@@ -70,4 +70,4 @@ sharex-manager/
 
 ## Licence
 
-Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
+Ce projet est sous licence GNU General Public License v3.0. Voir le fichier `LICENSE` pour plus de détails.
