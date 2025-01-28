@@ -12,7 +12,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Plus, Key, Trash2, Copy, Eye, EyeOff, Loader2, Info } from "lucide-react";
+import {
+  Plus,
+  Key,
+  Trash2,
+  Copy,
+  Eye,
+  EyeOff,
+  Loader2,
+  Info,
+} from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -41,7 +50,8 @@ export default function ApiKeysPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showKey, setShowKey] = useState<string | null>(null);
   const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
-  const [selectedKeyForDetails, setSelectedKeyForDetails] = useState<ApiKey | null>(null);
+  const [selectedKeyForDetails, setSelectedKeyForDetails] =
+    useState<ApiKey | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -89,14 +99,10 @@ export default function ApiKeysPage() {
 
   return (
     <>
-      <SidebarHeader 
-        showSearch={false}
-        title="Paramètres"
-        description="Gérez les paramètres de votre compte"
-      />
       <div className="flex flex-1">
         <AppSidebar />
         <SidebarInset>
+          <SidebarHeader showSearch={false} />
           <div className="container mx-auto py-8">
             <div className="mb-8 flex items-center justify-between">
               <div>
@@ -141,9 +147,12 @@ export default function ApiKeysPage() {
                       <TableCell colSpan={7}>
                         <div className="flex flex-col items-center justify-center py-6 text-center">
                           <Key className="h-12 w-12 text-muted-foreground" />
-                          <h3 className="mt-4 text-lg font-semibold">Aucune clé API</h3>
+                          <h3 className="mt-4 text-lg font-semibold">
+                            Aucune clé API
+                          </h3>
                           <p className="mb-4 text-sm text-muted-foreground">
-                            Vous n'avez pas encore créé de clé API. Commencez par en créer une pour utiliser ShareX.
+                            Vous n'avez pas encore créé de clé API. Commencez
+                            par en créer une pour utiliser ShareX.
                           </p>
                           <Button onClick={() => setShowCreateDialog(true)}>
                             <Plus className="mr-2 h-4 w-4" />
@@ -218,9 +227,13 @@ export default function ApiKeysPage() {
                         </TableCell>
                         <TableCell>
                           {key.lastUsed
-                            ? format(new Date(key.lastUsed), "dd/MM/yyyy HH:mm", {
-                                locale: fr,
-                              })
+                            ? format(
+                                new Date(key.lastUsed),
+                                "dd/MM/yyyy HH:mm",
+                                {
+                                  locale: fr,
+                                }
+                              )
                             : "Jamais"}
                         </TableCell>
                         <TableCell className="text-right">
@@ -268,7 +281,8 @@ export default function ApiKeysPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Cette action est irréversible. La clé sera définitivement supprimée.
+                    Cette action est irréversible. La clé sera définitivement
+                    supprimée.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -292,4 +306,4 @@ export default function ApiKeysPage() {
       </div>
     </>
   );
-} 
+}

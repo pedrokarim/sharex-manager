@@ -2,6 +2,11 @@
 
 Une application web pour gérer facilement vos uploads ShareX avec une interface moderne et sécurisée.
 
+## Screenshot
+
+![Screenshot](./assets/brave_FlSkkG1Mow.jpg)
+![Screenshot 2](./assets/brave_sBMTYLoYPj.png)
+
 ## Fonctionnalités
 
 - 🖼️ **Galerie d'images** - Visualisez et gérez tous vos fichiers uploadés
