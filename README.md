@@ -63,16 +63,6 @@ sharex-manager/
 └── types/            # Types TypeScript
 ```
 
-## Contribution
-
-Les contributions sont les bienvenues ! N'hésitez pas à :
-
-1. Fork le projet
-2. Créer une branche (`git checkout -b feature/amelioration`)
-3. Commit vos changements (`git commit -m 'Ajout d'une fonctionnalité'`)
-4. Push sur la branche (`git push origin feature/amelioration`)
-5. Ouvrir une Pull Request
-
 ## Licence
 
 Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
