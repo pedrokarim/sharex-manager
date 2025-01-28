@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ShareX Manager
 
-## Getting Started
+Une application web pour gérer facilement vos uploads ShareX avec une interface moderne et sécurisée.
 
-First, run the development server:
+## Fonctionnalités
 
+- 🖼️ **Galerie d'images** - Visualisez et gérez tous vos fichiers uploadés
+- 🔑 **Gestion des clés API** - Créez et gérez des clés API avec permissions personnalisées
+- 🔒 **Sécurité** - Authentification des utilisateurs et gestion des permissions
+- 📤 **Intégration ShareX** - Configuration automatique pour ShareX
+- 🎨 **Interface moderne** - Design responsive avec thème clair/sombre
+- 📱 **Multi-appareils** - Fonctionne sur desktop, tablette et mobile
+
+## Installation
+
+1. Clonez le dépôt :
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+git clone https://github.com/votre-username/sharex-manager.git
+cd sharex-manager
+```
+
+2. Installez les dépendances :
+```bash
+bun install
+```
+
+3. Créez un fichier `.env.local` avec les variables d'environnement :
+```bash
+AUTH_SECRET=votre_secret_auth
+NEXT_PUBLIC_API_URL=http://localhost:3000
+```
+
+4. Lancez le serveur de développement :
+```bash
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+5. Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Configuration de ShareX
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Créez une clé API dans l'interface d'administration
+2. Utilisez la configuration générée automatiquement pour ShareX
+3. Importez le fichier `.sxcu` dans ShareX
+4. Commencez à uploader !
 
-## Learn More
+## Technologies utilisées
 
-To learn more about Next.js, take a look at the following resources:
+- [Next.js 14](https://nextjs.org/) - Framework React
+- [NextAuth.js](https://next-auth.js.org/) - Authentification
+- [Tailwind CSS](https://tailwindcss.com/) - Styles
+- [shadcn/ui](https://ui.shadcn.com/) - Composants UI
+- [Lucide Icons](https://lucide.dev/) - Icônes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Structure du projet
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+sharex-manager/
+├── app/                # Routes et pages Next.js
+├── components/         # Composants React réutilisables
+├── public/            # Fichiers statiques et uploads
+├── styles/           # Styles globaux
+└── types/            # Types TypeScript
+```
 
-## Deploy on Vercel
+## Contribution
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Les contributions sont les bienvenues ! N'hésitez pas à :
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Fork le projet
+2. Créer une branche (`git checkout -b feature/amelioration`)
+3. Commit vos changements (`git commit -m 'Ajout d'une fonctionnalité'`)
+4. Push sur la branche (`git push origin feature/amelioration`)
+5. Ouvrir une Pull Request
+
+## Licence
+
+Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
