@@ -3,38 +3,20 @@
 import { useEffect, useState, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
-import Image from "next/image";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Trash2, Download, Copy, ExternalLink, ImageOff } from "lucide-react";
+import { ImageOff } from "lucide-react";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
-import { BreadcrumbNav } from "@/components/breadcrumb";
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb";
+import { SidebarInset } from "@/components/ui/sidebar";
 import { SidebarHeader } from "@/components/sidebar/sibebar-header";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { useQueryState } from "nuqs";
+import { ViewSelector } from "@/components/view-selector";
+import { GridView } from "@/components/gallery/grid-view";
+import { ListView } from "@/components/gallery/list-view";
+import { FileViewer } from "@/components/gallery/file-viewer";
 
 interface FileInfo {
   name: string;
@@ -51,7 +33,28 @@ export default function GalleryPage() {
   const { data: session, status } = useSession();
   const [search] = useQueryState("q");
   const [hasMore, setHasMore] = useState(true);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
+  const [page, setPage] = useState(1);
+  const [viewMode] = useQueryState<"grid" | "list" | "details">("view", {
+    defaultValue: "grid",
+    parse: (value): "grid" | "list" | "details" => {
+      if (value === "grid" || value === "list" || value === "details") {
+        return value;
+      }
+      return "grid";
+    },
+  });
+
+  const resetSearch = () => {
+    setPage(1);
+    setHasMore(true);
+  };
+
+  useEffect(() => {
+    console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> search", search);
+    resetSearch();
+    fetchFiles(1);
+  }, [search]);
 
   const fetchFiles = async (page: number) => {
     try {
@@ -69,7 +72,8 @@ export default function GalleryPage() {
     data: files,
     loading,
     ref,
-  } = useInfiniteScroll({
+    reset
+  } = useInfiniteScroll<FileInfo>({
     initialData: [],
     fetchMore: fetchFiles,
     hasMore,
@@ -95,6 +99,28 @@ export default function GalleryPage() {
     }, {});
   }, [files]);
 
+  // Fonction pour trouver l'index du fichier sélectionné
+  const findCurrentFileIndex = () => {
+    if (!selectedFile) return -1;
+    return files.findIndex((f) => f.name === selectedFile.name);
+  };
+
+  // Navigation entre les fichiers
+  const handlePrevious = () => {
+    const currentIndex = findCurrentFileIndex();
+    if (currentIndex > 0) {
+      setSelectedFile(files[currentIndex - 1]);
+    }
+  };
+
+  const handleNext = () => {
+    const currentIndex = findCurrentFileIndex();
+    if (currentIndex < files.length - 1) {
+      setSelectedFile(files[currentIndex + 1]);
+    }
+  };
+
+  // Modification du handleDelete
   const handleDelete = async (filename: string) => {
     try {
       const response = await fetch(`/api/files/${filename}`, {
@@ -103,6 +129,7 @@ export default function GalleryPage() {
 
       if (response.ok) {
         toast.success("Fichier supprimé avec succès");
+        setSelectedFile(null);
         fetchFiles(1);
       }
     } catch (error) {
@@ -125,9 +152,12 @@ export default function GalleryPage() {
           <div className="container mx-auto p-8">
             <div className="mb-8 flex items-center justify-between">
               <h1 className="text-2xl font-bold">Galerie d'images</h1>
-              <Button onClick={() => window.location.reload()}>
-                Rafraîchir
-              </Button>
+              <div className="flex items-center gap-4">
+                <ViewSelector />
+                <Button onClick={() => window.location.reload()}>
+                  Rafraîchir
+                </Button>
+              </div>
             </div>
 
             {files.length === 0 ? (
@@ -144,51 +174,22 @@ export default function GalleryPage() {
               Object.entries(groupedFiles).map(([date, filesInGroup]) => (
                 <div key={date} className="mb-8">
                   <h2 className="mb-4 text-xl font-semibold">{date}</h2>
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {filesInGroup.map((file) => (
-                      <Card key={file.name} className="overflow-hidden">
-                        <CardContent className="p-0">
-                          <div className="relative aspect-square">
-                            <Image
-                              src={file.url}
-                              alt={file.name}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <div className="p-4">
-                            <p className="mb-2 truncate text-sm">{file.name}</p>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => copyToClipboard(file.url)}
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                              <Button variant="outline" size="icon" asChild>
-                                <a
-                                  href={file.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => setSelectedFile(file.name)}
-                                className="ml-auto text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                  {(!viewMode || viewMode === "grid") ? (
+                    <GridView
+                      files={filesInGroup}
+                      onCopy={copyToClipboard}
+                      onDelete={(name) => setSelectedFile(files.find(f => f.name === name) || null)}
+                      onSelect={setSelectedFile}
+                    />
+                  ) : (
+                    <ListView
+                      files={filesInGroup}
+                      onCopy={copyToClipboard}
+                      onDelete={(name) => setSelectedFile(files.find(f => f.name === name) || null)}
+                      onSelect={setSelectedFile}
+                      detailed={viewMode === "details"}
+                    />
+                  )}
                 </div>
               ))
             )}
@@ -202,33 +203,16 @@ export default function GalleryPage() {
           </div>
         </SidebarInset>
 
-        <AlertDialog
-          open={!!selectedFile}
-          onOpenChange={() => setSelectedFile(null)}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Cette action est irréversible. Le fichier sera définitivement
-                supprimé.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Annuler</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  if (selectedFile) {
-                    handleDelete(selectedFile);
-                    setSelectedFile(null);
-                  }
-                }}
-              >
-                Supprimer
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <FileViewer
+          file={selectedFile}
+          onClose={() => setSelectedFile(null)}
+          onDelete={handleDelete}
+          onCopy={copyToClipboard}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          hasPrevious={findCurrentFileIndex() > 0}
+          hasNext={findCurrentFileIndex() < files.length - 1}
+        />
       </div>
     </>
   );

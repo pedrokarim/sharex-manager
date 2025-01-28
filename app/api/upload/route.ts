@@ -6,6 +6,8 @@ import { ApiKey } from "@/types/api-key";
 const UPLOADS_DIR = join(process.cwd(), "public/uploads");
 const API_KEYS_FILE = join(process.cwd(), "data/api-keys.json");
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
 async function validateApiKey(
   apiKey: string,
   fileType: string
@@ -75,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     return new Response(
       JSON.stringify({
-        url: `/uploads/${fileName}`,
+        url: `${API_URL}/uploads/${fileName}`,
         key: {
           name: validKey.name,
           lastUsed: validKey.lastUsed,

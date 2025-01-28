@@ -11,7 +11,7 @@ import {
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 
-const routes = {
+const routes: Record<string, string> = {
   '/': 'Accueil',
   '/gallery': 'Galerie',
   '/settings': 'Paramètres',
@@ -38,8 +38,8 @@ export function BreadcrumbNav() {
           
           return (
             <>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem key={path}>
+              <BreadcrumbSeparator key={`separator-${index}`} />
+              <BreadcrumbItem key={`item-${path}-${index}`}>
                 {isLast ? (
                   <BreadcrumbPage>{routes[href] || path}</BreadcrumbPage>
                 ) : (
