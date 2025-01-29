@@ -2,6 +2,7 @@ import { writeFile, readFile } from "fs/promises";
 import { join } from "path";
 import { NextRequest } from "next/server";
 import { ApiKey } from "@/types/api-key";
+import { storeDeletionToken } from "@/lib/deletion-tokens";
 
 const UPLOADS_DIR = join(process.cwd(), "public/uploads");
 const API_KEYS_FILE = join(process.cwd(), "data/api-keys.json");
@@ -45,39 +46,55 @@ async function validateApiKey(
 
 export async function POST(request: NextRequest) {
   try {
-    // Récupérer la clé API de l'en-tête
     const apiKey = request.headers.get("x-api-key");
     if (!apiKey) {
-      return new Response("Clé API manquante", { status: 401 });
+      return new Response(JSON.stringify({ error: "Clé API manquante" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
 
     if (!file) {
-      return new Response("Aucun fichier fourni", { status: 400 });
+      return new Response(JSON.stringify({ error: "Aucun fichier fourni" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    // Valider la clé API et les permissions
     const validKey = await validateApiKey(apiKey, file.name);
     if (!validKey) {
-      return new Response("Clé API invalide ou permissions insuffisantes", {
-        status: 403,
-      });
+      return new Response(
+        JSON.stringify({
+          error: "Clé API invalide ou permissions insuffisantes",
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Générer un nom de fichier unique
     const fileName = `${Date.now()}-${file.name}`;
     const filePath = join(UPLOADS_DIR, fileName);
 
     await writeFile(filePath, buffer);
 
+    // Générer un token de suppression unique
+    const deletionToken = crypto.randomUUID();
+
+    // Stocker le token de suppression (à implémenter dans une base de données)
+    await storeDeletionToken(fileName, deletionToken);
+
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+
     return new Response(
       JSON.stringify({
         url: `${API_URL}/uploads/${fileName}`,
+        thumbnail_url: isImage ? `${API_URL}/api/thumbnails/${fileName}` : null,
+        deletion_url: `${API_URL}/api/files/${fileName}?token=${deletionToken}`,
         key: {
           name: validKey.name,
           lastUsed: validKey.lastUsed,
@@ -90,6 +107,9 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Erreur lors de l'upload:", error);
-    return new Response("Erreur lors du traitement", { status: 500 });
+    return new Response(
+      JSON.stringify({ error: "Erreur lors du traitement" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 }

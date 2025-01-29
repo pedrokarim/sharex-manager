@@ -36,15 +36,20 @@ export function ApiKeyDetailsDialog({
     if (apiKey.permissions.uploadFiles) destinations.push("FileUploader");
 
     return {
+      Version: "14.0.0",
       Name: "ShareX Upload",
       DestinationType: destinations.join(", "),
+      RequestMethod: "POST",
       RequestURL: `${process.env.NEXT_PUBLIC_API_URL || window.location.origin}/api/upload`,
-      FileFormName: "file",
       Headers: {
         "x-api-key": apiKey.key,
       },
-      URL: "$json:url$",
-      ErrorMessage: "$json:error$",
+      Body: "MultipartFormData",
+      FileFormName: "file",
+      URL: "{json:url}",
+      ThumbnailURL: "{json:thumbnail_url}",
+      DeletionURL: "{json:deletion_url}",
+      ErrorMessage: "{json:error}",
     };
   };
 
@@ -125,30 +130,26 @@ export function ApiKeyDetailsDialog({
           <TabsContent value="config" className="space-y-6">
             <div className="rounded-lg border bg-muted/50 p-4 space-y-4">
               <p className="text-sm text-muted-foreground">
-                Configuration ShareX basée sur les permissions accordées à cette clé.
+                Cette configuration ShareX vous permet d'uploader directement des fichiers vers notre service. 
+                Les URLs de vos fichiers seront automatiquement copiées dans votre presse-papier après l'upload.
               </p>
               <div className="space-y-2">
-                <h4 className="font-semibold">Comment utiliser cette configuration :</h4>
+                <h4 className="font-semibold">Instructions d'installation :</h4>
                 <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
                   <li>
-                    Créez un nouveau fichier texte sur votre ordinateur avec l'extension{" "}
-                    <code className="rounded bg-muted px-1">.sxcu</code>{" "}
-                    (par exemple : <code className="rounded bg-muted px-1">sharex-upload.sxcu</code>)
+                    Copiez la configuration en cliquant sur le bouton "Copier"
                   </li>
                   <li>
-                    Copiez la configuration ci-dessous en cliquant sur le bouton "Copier"
+                    Créez un nouveau fichier avec l'extension <code className="rounded bg-muted px-1">.sxcu</code>
                   </li>
                   <li>
-                    Collez le contenu dans le fichier <code className="rounded bg-muted px-1">.sxcu</code> et sauvegardez-le
+                    Collez la configuration dans ce fichier et sauvegardez-le
                   </li>
                   <li>
-                    Double-cliquez sur le fichier <code className="rounded bg-muted px-1">.sxcu</code> pour l'importer dans ShareX
+                    Double-cliquez sur le fichier pour l'importer automatiquement dans ShareX
                   </li>
                   <li>
-                    ShareX va automatiquement ajouter cette configuration à votre liste de destinations
-                  </li>
-                  <li>
-                    Vous pouvez maintenant sélectionner cette destination dans ShareX pour vos uploads
+                    La destination sera automatiquement configurée dans ShareX selon les permissions de votre clé
                   </li>
                 </ol>
               </div>
