@@ -22,6 +22,7 @@ import { NavMain } from "./nav-main"
 import { NavProjects } from "./nav-projects"
 import { NavSecondary } from "./nav-secondary"
 import { NavUser } from "./nav-user"
+import { ThemeToggle } from "../theme-toggle"
 import {
   Sidebar,
   SidebarContent,
@@ -181,6 +182,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
+        <div className="flex items-center justify-between px-4 py-2">
+          <ThemeToggle />
+        </div>
         <NavUser />
       </SidebarFooter>
     </Sidebar>

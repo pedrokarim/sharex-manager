@@ -3,6 +3,7 @@ import { join } from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { storeDeletionToken } from "@/lib/deletion-tokens";
+import { recordUpload } from "@/lib/history";
 import crypto from "crypto";
 
 const UPLOADS_DIR = join(process.cwd(), "public/uploads");
@@ -53,10 +54,30 @@ export async function POST(request: NextRequest) {
     const deletionToken = crypto.randomUUID();
     await storeDeletionToken(fileName, deletionToken);
 
+    // Construire les URLs
+    const fileUrl = `${API_URL}/uploads/${fileName}`;
+    const thumbnailUrl = `${API_URL}/api/thumbnails/${fileName}`;
+
+    // Enregistrer dans l'historique
+    await recordUpload({
+      filename: fileName,
+      originalFilename: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+      uploadMethod: "web",
+      fileUrl,
+      thumbnailUrl,
+      deletionToken,
+      ipAddress:
+        request.ip || request.headers.get("x-forwarded-for") || "unknown",
+      userId: session?.user?.id,
+      userName: session?.user?.name || undefined,
+    });
+
     return NextResponse.json({
       success: true,
       file: {
-        url: `${API_URL}/uploads/${fileName}`,
+        url: fileUrl,
         name: fileName,
         originalName: file.name,
         size: file.size,

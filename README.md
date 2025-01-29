@@ -20,7 +20,7 @@ Une application web pour gérer facilement vos uploads ShareX avec une interface
 
 1. Clonez le dépôt :
 ```bash
-git clone https://github.com/votre-username/sharex-manager.git
+git clone https://github.com/AliasPedroKarim/sharex-manager.git
 cd sharex-manager
 ```
 

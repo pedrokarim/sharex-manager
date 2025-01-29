@@ -3,6 +3,7 @@ import { join } from "path";
 import { NextRequest } from "next/server";
 import { ApiKey } from "@/types/api-key";
 import { storeDeletionToken } from "@/lib/deletion-tokens";
+import { recordUpload } from "@/lib/history";
 
 const UPLOADS_DIR = join(process.cwd(), "public/uploads");
 const API_KEYS_FILE = join(process.cwd(), "data/api-keys.json");
@@ -85,15 +86,35 @@ export async function POST(request: NextRequest) {
     // Générer un token de suppression unique
     const deletionToken = crypto.randomUUID();
 
-    // Stocker le token de suppression (à implémenter dans une base de données)
+    // Stocker le token de suppression
     await storeDeletionToken(fileName, deletionToken);
 
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+    const fileUrl = `${API_URL}/uploads/${fileName}`;
+    const thumbnailUrl = isImage
+      ? `${API_URL}/api/thumbnails/${fileName}`
+      : null;
+
+    // Enregistrer dans l'historique
+    await recordUpload({
+      filename: fileName,
+      originalFilename: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+      uploadMethod: "api",
+      fileUrl,
+      thumbnailUrl: thumbnailUrl || undefined,
+      deletionToken,
+      ipAddress:
+        request.ip || request.headers.get("x-forwarded-for") || "unknown",
+      userId: validKey.id,
+      userName: validKey.name,
+    });
 
     return new Response(
       JSON.stringify({
-        url: `${API_URL}/uploads/${fileName}`,
-        thumbnail_url: isImage ? `${API_URL}/api/thumbnails/${fileName}` : null,
+        url: fileUrl,
+        thumbnail_url: thumbnailUrl,
         deletion_url: `${API_URL}/api/files/${fileName}?token=${deletionToken}`,
         key: {
           name: validKey.name,

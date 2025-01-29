@@ -14,6 +14,10 @@ import Link from "next/link";
 const routes: Record<string, string> = {
   '/': 'Accueil',
   '/gallery': 'Galerie',
+  '/uploads': 'Uploads',
+  '/uploads/history': 'Historique',
+  '/uploads/config': 'Configuration',
+  '/uploads/stats': 'Statistiques',
   '/settings': 'Paramètres',
   '/settings/api-keys': 'Clés API',
   '/settings/api-keys/create': 'Nouvelle clé',

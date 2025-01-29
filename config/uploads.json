@@ -1,0 +1,19 @@
+{
+  "allowedTypes": {
+    "images": true,
+    "documents": false,
+    "archives": false
+  },
+  "maxFileSize": 10,
+  "filenamePattern": "{timestamp}-{original}",
+  "thumbnails": {
+    "enabled": true,
+    "maxWidth": 200,
+    "maxHeight": 200,
+    "quality": 80
+  },
+  "storage": {
+    "path": "./uploads",
+    "structure": "flat"
+  }
+}
