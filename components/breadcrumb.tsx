@@ -42,7 +42,7 @@ export function BreadcrumbNav() {
           
           return (
             <>
-              <BreadcrumbSeparator key={`separator-${index}`} />
+              <BreadcrumbSeparator key={`separator-${path}-${index}`} />
               <BreadcrumbItem key={`item-${path}-${index}`}>
                 {isLast ? (
                   <BreadcrumbPage>{routes[href] || path}</BreadcrumbPage>

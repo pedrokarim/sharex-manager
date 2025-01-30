@@ -1,7 +1,10 @@
-import { mkdir } from "fs/promises";
-import { join, dirname } from "path";
+import { mkdir, chmod, stat, writeFile } from "fs/promises";
+import { join, dirname, extname, basename } from "path";
 import sharp from "sharp";
 import { UploadConfig } from "@/hooks/use-upload-config";
+import { generateId } from "@/lib/utils";
+import { format } from "date-fns";
+import { zonedTimeToUtc } from "date-fns-tz";
 
 export interface UploadResult {
   success: boolean;
@@ -11,141 +14,262 @@ export interface UploadResult {
   deletionToken?: string;
 }
 
+function formatFileName(
+  originalName: string,
+  pattern: string,
+  preserveFilenames: boolean
+): string {
+  if (preserveFilenames) {
+    return originalName.replace(/[^a-zA-Z0-9-_\.]/g, "-").toLowerCase();
+  }
+
+  const timestamp = Date.now();
+  const random = generateId();
+  const ext = extname(originalName);
+  const nameWithoutExt = originalName.slice(0, -ext.length);
+
+  return (
+    pattern
+      .replace("{timestamp}", timestamp.toString())
+      .replace("{random}", random)
+      .replace("{original}", nameWithoutExt)
+      .replace(/[^a-zA-Z0-9-_\.]/g, "-") + // Assainir le nom de fichier
+    ext.toLowerCase()
+  );
+}
+
+async function getUploadPath(
+  config: UploadConfig,
+  fileName: string
+): Promise<string> {
+  const baseDir = join(process.cwd(), "public/uploads");
+
+  switch (config.storage.structure) {
+    case "date": {
+      const now = new Date();
+      const zoned = zonedTimeToUtc(now, config.storage.dateFormat.timezone);
+      const datePath = format(zoned, config.storage.dateFormat.folderStructure);
+      const fullPath = join(baseDir, datePath);
+      await mkdir(fullPath, {
+        recursive: true,
+        mode: parseInt(config.storage.permissions.directories, 8),
+      });
+      return fullPath;
+    }
+    case "type": {
+      const ext = extname(fileName).toLowerCase();
+      let typePath = "others";
+
+      if (/\.(jpg|jpeg|png|gif|webp)$/i.test(ext)) typePath = "images";
+      else if (/\.(pdf|doc|docx|txt)$/i.test(ext)) typePath = "documents";
+      else if (/\.(zip|rar)$/i.test(ext)) typePath = "archives";
+
+      const fullPath = join(baseDir, typePath);
+      await mkdir(fullPath, {
+        recursive: true,
+        mode: parseInt(config.storage.permissions.directories, 8),
+      });
+      return fullPath;
+    }
+    default: {
+      await mkdir(baseDir, {
+        recursive: true,
+        mode: parseInt(config.storage.permissions.directories, 8),
+      });
+      return baseDir;
+    }
+  }
+}
+
+async function getThumbnailPath(
+  config: UploadConfig,
+  uploadPath: string
+): Promise<string> {
+  const thumbnailPath = join(
+    dirname(uploadPath),
+    config.storage.thumbnailsPath
+  );
+  await mkdir(thumbnailPath, {
+    recursive: true,
+    mode: parseInt(config.storage.permissions.directories, 8),
+  });
+  return thumbnailPath;
+}
+
+async function checkFileExists(filePath: string): Promise<boolean> {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function generateDeletionToken(): Promise<string> {
+  return generateId(32);
+}
+
+async function saveFile(
+  filePath: string,
+  buffer: Buffer,
+  permissions: string
+): Promise<void> {
+  await writeFile(filePath, buffer);
+  await chmod(filePath, parseInt(permissions, 8));
+}
+
+async function generateThumbnail(
+  buffer: Buffer,
+  config: UploadConfig,
+  originalFormat: string
+): Promise<Buffer> {
+  let sharpInstance = sharp(buffer);
+
+  // Déterminer le format de sortie
+  const outputFormat =
+    config.thumbnails.format === "auto"
+      ? /\.(png|webp)$/i.test(originalFormat) &&
+        config.thumbnails.preserveFormat
+        ? originalFormat.replace(".", "").toLowerCase()
+        : "jpeg"
+      : config.thumbnails.format;
+
+  // Appliquer les transformations de base
+  sharpInstance = sharpInstance.resize(
+    config.thumbnails.maxWidth,
+    config.thumbnails.maxHeight,
+    {
+      fit: config.thumbnails.fit,
+      withoutEnlargement: true,
+      background: config.thumbnails.background,
+    }
+  );
+
+  // Appliquer les optimisations selon le format
+  switch (outputFormat) {
+    case "png":
+      sharpInstance = sharpInstance.png({
+        compressionLevel: 9,
+        palette: true,
+        progressive: config.thumbnails.progressive,
+      });
+      break;
+    case "webp":
+      sharpInstance = sharpInstance.webp({
+        quality: config.thumbnails.quality,
+        lossless: false,
+        smartSubsample: true,
+        effort: 6,
+      });
+      break;
+    default:
+      sharpInstance = sharpInstance.jpeg({
+        quality: config.thumbnails.quality,
+        mozjpeg: true,
+        progressive: config.thumbnails.progressive,
+        optimizeCoding: true,
+        trellisQuantisation: true,
+        overshootDeringing: true,
+        optimizeScans: true,
+      });
+  }
+
+  // Appliquer les optimisations supplémentaires
+  if (config.thumbnails.blur > 0) {
+    sharpInstance = sharpInstance.blur(config.thumbnails.blur);
+  }
+
+  if (config.thumbnails.sharpen) {
+    sharpInstance = sharpInstance.sharpen({
+      sigma: 1,
+      m1: 0.5,
+      m2: 0.5,
+      x1: 4,
+      y2: 10,
+      y3: 20,
+    });
+  }
+
+  // Supprimer les métadonnées si configuré
+  if (!config.thumbnails.metadata) {
+    sharpInstance = sharpInstance.withMetadata(false);
+  }
+
+  return sharpInstance.toBuffer();
+}
+
 export async function handleFileUpload(
   file: File,
-  config: UploadConfig,
-  userId?: string
+  config: UploadConfig
 ): Promise<UploadResult> {
   try {
-    // Vérification du type de fichier
-    const imageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-    const documentTypes = [
-      "application/pdf",
-      "application/msword",
-      "text/plain",
-    ];
-    const archiveTypes = ["application/zip", "application/x-rar-compressed"];
+    // Formater le nom du fichier selon le pattern de la configuration
+    const fileName = formatFileName(
+      file.name,
+      config.filenamePattern,
+      config.storage.preserveFilenames
+    );
+    const uploadPath = await getUploadPath(config, fileName);
+    const filePath = join(uploadPath, fileName);
 
-    let isAllowed = false;
-
-    if (imageTypes.includes(file.type) && config.allowedTypes.images) {
-      isAllowed = true;
-    } else if (
-      documentTypes.includes(file.type) &&
-      config.allowedTypes.documents
-    ) {
-      isAllowed = true;
-    } else if (
-      archiveTypes.includes(file.type) &&
-      config.allowedTypes.archives
-    ) {
-      isAllowed = true;
-    }
-
-    if (!isAllowed) {
+    // Vérifier si le fichier existe déjà
+    if (!config.storage.replaceExisting && (await checkFileExists(filePath))) {
       return {
         success: false,
-        error: "Type de fichier non autorisé",
+        error: "Un fichier avec ce nom existe déjà",
       };
     }
 
-    // Vérification de la taille
-    if (file.size > config.maxFileSize * 1024 * 1024) {
-      return {
-        success: false,
-        error: `La taille du fichier dépasse la limite de ${config.maxFileSize}MB`,
-      };
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Écrire le fichier avec les permissions configurées
+    await saveFile(filePath, buffer, config.storage.permissions.files);
+
+    let thumbnailUrl: string | undefined;
+
+    // Générer une miniature si c'est une image et que les miniatures sont activées
+    if (
+      config.thumbnails.enabled &&
+      /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)
+    ) {
+      const thumbnailPath = await getThumbnailPath(config, uploadPath);
+      const thumbnailFileName = `thumb_${fileName}`;
+      const thumbnailFilePath = join(thumbnailPath, thumbnailFileName);
+
+      // Générer la miniature avec les options avancées
+      const thumbnailBuffer = await generateThumbnail(
+        buffer,
+        config,
+        extname(file.name)
+      );
+      await saveFile(
+        thumbnailFilePath,
+        thumbnailBuffer,
+        config.storage.permissions.files
+      );
+
+      thumbnailUrl = `/uploads/${config.storage.thumbnailsPath}/${thumbnailFileName}`;
     }
 
-    // Génération du nom de fichier
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 15);
-    const filename = config.filenamePattern
-      .replace("{timestamp}", timestamp.toString())
-      .replace("{original}", file.name)
-      .replace("{random}", random);
+    // Générer un token de suppression
+    const deletionToken = await generateDeletionToken();
 
-    // Détermination du chemin de stockage
-    const uploadPath = getUploadPath(config, filename, file.type);
-    const fullPath = join(process.cwd(), uploadPath);
-
-    // Création des dossiers nécessaires
-    await mkdir(dirname(fullPath), { recursive: true });
-
-    // Lecture du fichier
-    const buffer = await file.arrayBuffer();
-
-    // Génération de la miniature pour les images si activé
-    let thumbnailPath: string | undefined;
-    if (config.thumbnails.enabled && imageTypes.includes(file.type)) {
-      thumbnailPath = join(dirname(uploadPath), "thumbnails", filename);
-      const thumbnailFullPath = join(process.cwd(), thumbnailPath);
-      await mkdir(dirname(thumbnailFullPath), { recursive: true });
-
-      await sharp(Buffer.from(buffer))
-        .resize(config.thumbnails.maxWidth, config.thumbnails.maxHeight, {
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .jpeg({
-          quality: config.thumbnails.quality,
-        })
-        .toFile(thumbnailFullPath);
-    }
-
-    // Sauvegarde du fichier original
-    const fileData = Buffer.from(buffer);
-    await Bun.write(fullPath, fileData);
-
-    // Génération du token de suppression
-    const deletionToken = generateDeletionToken();
+    // Construire les URLs relatifs
+    const fileUrl = `/uploads/${
+      config.storage.structure === "type" ? basename(uploadPath) + "/" : ""
+    }${fileName}`;
 
     return {
       success: true,
-      fileUrl: uploadPath,
-      thumbnailUrl: thumbnailPath,
+      fileUrl,
+      thumbnailUrl,
       deletionToken,
     };
   } catch (error) {
     console.error("Erreur lors de l'upload:", error);
     return {
       success: false,
-      error: "Erreur lors de l'upload du fichier",
+      error: "Une erreur est survenue lors de l'upload du fichier",
     };
   }
-}
-
-function getUploadPath(
-  config: UploadConfig,
-  filename: string,
-  fileType: string
-): string {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  let basePath = config.storage.path;
-  if (!basePath.startsWith("./")) {
-    basePath = "./" + basePath;
-  }
-
-  switch (config.storage.structure) {
-    case "date":
-      return join(basePath, year.toString(), month, day, filename);
-    case "type":
-      const type = fileType.split("/")[0];
-      return join(basePath, type, filename);
-    default:
-      return join(basePath, filename);
-  }
-}
-
-function generateDeletionToken(): string {
-  return Buffer.from(
-    Math.random().toString(36).substring(2) + Date.now().toString()
-  )
-    .toString("base64")
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .substring(0, 32);
 }

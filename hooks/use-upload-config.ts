@@ -7,17 +7,45 @@ export interface UploadConfig {
     documents: boolean;
     archives: boolean;
   };
-  maxFileSize: number;
+  limits: {
+    maxFileSize: number; // en MB
+    minFileSize: number; // en KB
+    maxFilesPerUpload: number;
+    maxFilesPerType: {
+      images: number;
+      documents: number;
+      archives: number;
+    };
+  };
   filenamePattern: string;
   thumbnails: {
     enabled: boolean;
     maxWidth: number;
     maxHeight: number;
     quality: number;
+    fit: "cover" | "contain" | "fill" | "inside" | "outside";
+    format: "jpeg" | "png" | "webp" | "auto";
+    preserveFormat: boolean;
+    background: { r: number; g: number; b: number; alpha: number };
+    sharpen: boolean;
+    blur: number;
+    progressive: boolean;
+    metadata: boolean;
   };
   storage: {
     path: string;
     structure: "flat" | "date" | "type";
+    preserveFilenames: boolean;
+    replaceExisting: boolean;
+    thumbnailsPath: string;
+    dateFormat: {
+      folderStructure: string;
+      timezone: string;
+    };
+    permissions: {
+      files: string;
+      directories: string;
+    };
   };
 }
 
@@ -27,17 +55,45 @@ export const defaultConfig: UploadConfig = {
     documents: false,
     archives: false,
   },
-  maxFileSize: 10,
-  filenamePattern: "{timestamp}-{original}",
+  limits: {
+    maxFileSize: 10, // 10 MB
+    minFileSize: 1, // 1 KB
+    maxFilesPerUpload: 50,
+    maxFilesPerType: {
+      images: 30,
+      documents: 20,
+      archives: 10,
+    },
+  },
+  filenamePattern: "{timestamp}-{random}-{original}",
   thumbnails: {
     enabled: true,
     maxWidth: 200,
     maxHeight: 200,
     quality: 80,
+    fit: "inside",
+    format: "auto",
+    preserveFormat: true,
+    background: { r: 255, g: 255, b: 255, alpha: 0 },
+    sharpen: true,
+    blur: 0,
+    progressive: true,
+    metadata: false,
   },
   storage: {
     path: "./uploads",
-    structure: "flat",
+    structure: "type",
+    preserveFilenames: false,
+    replaceExisting: false,
+    thumbnailsPath: "thumbnails",
+    dateFormat: {
+      folderStructure: "YYYY/MM",
+      timezone: "Europe/Paris",
+    },
+    permissions: {
+      files: "0644",
+      directories: "0755",
+    },
   },
 };
 
@@ -124,7 +180,6 @@ export function useUploadConfig() {
 
     return config.filenamePattern
       .replace("{timestamp}", timestamp.toString())
-      .replace("{original}", originalFilename)
       .replace("{random}", random);
   };
 

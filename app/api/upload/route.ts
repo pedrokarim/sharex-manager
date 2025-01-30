@@ -4,6 +4,8 @@ import { NextRequest } from "next/server";
 import { ApiKey } from "@/types/api-key";
 import { storeDeletionToken } from "@/lib/deletion-tokens";
 import { recordUpload } from "@/lib/history";
+import { getConfig } from "@/lib/upload-config";
+import { handleFileUpload } from "@/lib/upload";
 
 const UPLOADS_DIR = join(process.cwd(), "public/uploads");
 const API_KEYS_FILE = join(process.cwd(), "data/api-keys.json");
@@ -28,11 +30,13 @@ async function validateApiKey(
 
     // Vérifier les permissions selon le type de fichier
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileType);
-    const isText = /\.(txt|md|json|csv)$/i.test(fileType);
+    const isDocument = /\.(pdf|doc|docx|txt)$/i.test(fileType);
+    const isArchive = /\.(zip|rar)$/i.test(fileType);
 
     if (isImage && !key.permissions.uploadImages) return null;
-    if (isText && !key.permissions.uploadText) return null;
-    if (!isImage && !isText && !key.permissions.uploadFiles) return null;
+    if (isDocument && !key.permissions.uploadText) return null;
+    if (!isImage && !isDocument && !isArchive && !key.permissions.uploadFiles)
+      return null;
 
     // Mettre à jour la date de dernière utilisation
     key.lastUsed = new Date().toISOString();
@@ -75,36 +79,84 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    // Charger la configuration
+    const config = await getConfig();
 
-    const fileName = `${Date.now()}-${file.name}`;
-    const filePath = join(UPLOADS_DIR, fileName);
-
-    await writeFile(filePath, buffer);
-
-    // Générer un token de suppression unique
-    const deletionToken = crypto.randomUUID();
-
-    // Stocker le token de suppression
-    await storeDeletionToken(fileName, deletionToken);
-
+    // Vérifier le type de fichier
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
-    const fileUrl = `${API_URL}/uploads/${fileName}`;
-    const thumbnailUrl = isImage
-      ? `${API_URL}/api/thumbnails/${fileName}`
-      : null;
+    const isDocument = /\.(pdf|doc|docx|txt)$/i.test(file.name);
+    const isArchive = /\.(zip|rar)$/i.test(file.name);
+
+    if (isImage && !config.allowedTypes.images) {
+      return new Response(
+        JSON.stringify({ error: "L'upload d'images n'est pas autorisé" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (isDocument && !config.allowedTypes.documents) {
+      return new Response(
+        JSON.stringify({ error: "L'upload de documents n'est pas autorisé" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (isArchive && !config.allowedTypes.archives) {
+      return new Response(
+        JSON.stringify({ error: "L'upload d'archives n'est pas autorisé" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!isImage && !isDocument && !isArchive) {
+      return new Response(
+        JSON.stringify({ error: "Type de fichier non supporté" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Vérifier la taille minimale
+    if (file.size < config.limits.minFileSize * 1024) {
+      return new Response(
+        JSON.stringify({
+          error: `La taille du fichier est inférieure à la limite minimale de ${config.limits.minFileSize}KB`,
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Vérifier la taille maximale
+    if (file.size > config.limits.maxFileSize * 1024 * 1024) {
+      return new Response(
+        JSON.stringify({
+          error: `La taille du fichier dépasse la limite de ${config.limits.maxFileSize}MB`,
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Utiliser handleFileUpload pour gérer l'upload
+    const uploadResult = await handleFileUpload(file, config);
+
+    if (!uploadResult.success) {
+      return new Response(JSON.stringify({ error: uploadResult.error }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // Enregistrer dans l'historique
     await recordUpload({
-      filename: fileName,
+      filename: uploadResult.fileUrl!.split("/").pop()!,
       originalFilename: file.name,
       fileSize: file.size,
       mimeType: file.type,
       uploadMethod: "api",
-      fileUrl,
-      thumbnailUrl: thumbnailUrl || undefined,
-      deletionToken,
+      fileUrl: `${API_URL}${uploadResult.fileUrl}`,
+      thumbnailUrl: uploadResult.thumbnailUrl
+        ? `${API_URL}${uploadResult.thumbnailUrl}`
+        : undefined,
+      deletionToken: uploadResult.deletionToken,
       ipAddress:
         request.ip || request.headers.get("x-forwarded-for") || "unknown",
       userId: validKey.id,
@@ -113,9 +165,15 @@ export async function POST(request: NextRequest) {
 
     return new Response(
       JSON.stringify({
-        url: fileUrl,
-        thumbnail_url: thumbnailUrl,
-        deletion_url: `${API_URL}/api/files/${fileName}?token=${deletionToken}`,
+        url: `${API_URL}${uploadResult.fileUrl}`,
+        thumbnail_url: uploadResult.thumbnailUrl
+          ? `${API_URL}${uploadResult.thumbnailUrl}`
+          : null,
+        deletion_url: uploadResult.deletionToken
+          ? `${API_URL}/api/files/${uploadResult
+              .fileUrl!.split("/")
+              .pop()}?token=${uploadResult.deletionToken}`
+          : null,
         key: {
           name: validKey.name,
           lastUsed: validKey.lastUsed,

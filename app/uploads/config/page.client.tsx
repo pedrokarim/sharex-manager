@@ -121,20 +121,149 @@ export function ConfigPageClient() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="maxFileSize">Taille maximale (MB)</Label>
-                      <Input
-                        id="maxFileSize"
-                        type="number"
-                        value={config.maxFileSize}
-                        onChange={(e) =>
-                          saveConfig({
-                            ...config,
-                            maxFileSize: parseInt(e.target.value),
-                          })
-                        }
-                      />
+                    <div className="grid gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="maxFileSize">Taille maximale des fichiers (MB)</Label>
+                        <Input
+                          id="maxFileSize"
+                          type="number"
+                          min="1"
+                          value={config.limits.maxFileSize}
+                          onChange={(e) =>
+                            saveConfig({
+                              ...config,
+                              limits: {
+                                ...config.limits,
+                                maxFileSize: parseInt(e.target.value),
+                              },
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="minFileSize">Taille minimale des fichiers (KB)</Label>
+                        <Input
+                          id="minFileSize"
+                          type="number"
+                          min="1"
+                          value={config.limits.minFileSize}
+                          onChange={(e) =>
+                            saveConfig({
+                              ...config,
+                              limits: {
+                                ...config.limits,
+                                minFileSize: parseInt(e.target.value),
+                              },
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="maxFilesPerUpload">Nombre maximum de fichiers par upload</Label>
+                        <Input
+                          id="maxFilesPerUpload"
+                          type="number"
+                          min="1"
+                          value={config.limits.maxFilesPerUpload}
+                          onChange={(e) =>
+                            saveConfig({
+                              ...config,
+                              limits: {
+                                ...config.limits,
+                                maxFilesPerUpload: parseInt(e.target.value),
+                              },
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Limites par type de fichier</Label>
+                        <div className="grid gap-4">
+                          <div className="flex items-center gap-4">
+                            <Label htmlFor="maxImagesPerUpload" className="flex-1">Images</Label>
+                            <Input
+                              id="maxImagesPerUpload"
+                              type="number"
+                              min="1"
+                              className="w-32"
+                              value={config.limits.maxFilesPerType.images}
+                              onChange={(e) =>
+                                saveConfig({
+                                  ...config,
+                                  limits: {
+                                    ...config.limits,
+                                    maxFilesPerType: {
+                                      ...config.limits.maxFilesPerType,
+                                      images: parseInt(e.target.value),
+                                    },
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            <Label htmlFor="maxDocumentsPerUpload" className="flex-1">Documents</Label>
+                            <Input
+                              id="maxDocumentsPerUpload"
+                              type="number"
+                              min="1"
+                              className="w-32"
+                              value={config.limits.maxFilesPerType.documents}
+                              onChange={(e) =>
+                                saveConfig({
+                                  ...config,
+                                  limits: {
+                                    ...config.limits,
+                                    maxFilesPerType: {
+                                      ...config.limits.maxFilesPerType,
+                                      documents: parseInt(e.target.value),
+                                    },
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            <Label htmlFor="maxArchivesPerUpload" className="flex-1">Archives</Label>
+                            <Input
+                              id="maxArchivesPerUpload"
+                              type="number"
+                              min="1"
+                              className="w-32"
+                              value={config.limits.maxFilesPerType.archives}
+                              onChange={(e) =>
+                                saveConfig({
+                                  ...config,
+                                  limits: {
+                                    ...config.limits,
+                                    maxFilesPerType: {
+                                      ...config.limits.maxFilesPerType,
+                                      archives: parseInt(e.target.value),
+                                    },
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Format du nom de fichier</CardTitle>
+                    <CardDescription>
+                      Configurez le format des noms de fichiers uploadés
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                     <div className="grid gap-2">
                       <Label htmlFor="filenamePattern">Format du nom de fichier</Label>
                       <Input

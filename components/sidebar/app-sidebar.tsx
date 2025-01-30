@@ -182,7 +182,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <div className="flex items-center justify-between px-4 py-2">
+        <div className="p-2">
           <ThemeToggle />
         </div>
         <NavUser />

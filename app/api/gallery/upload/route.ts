@@ -1,12 +1,10 @@
-import { writeFile } from "fs/promises";
-import { join } from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { storeDeletionToken } from "@/lib/deletion-tokens";
 import { recordUpload } from "@/lib/history";
-import crypto from "crypto";
+import { getConfig } from "@/lib/upload-config";
+import { handleFileUpload } from "@/lib/upload";
 
-const UPLOADS_DIR = join(process.cwd(), "public/uploads");
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export async function POST(request: NextRequest) {
@@ -30,44 +28,81 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vérifier que c'est une image
+    // Charger la configuration
+    const config = await getConfig();
+
+    // Vérifier le type de fichier
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
-    if (!isImage) {
+    const isDocument = /\.(pdf|doc|docx|txt)$/i.test(file.name);
+    const isArchive = /\.(zip|rar)$/i.test(file.name);
+
+    if (isImage && !config.allowedTypes.images) {
       return NextResponse.json(
-        { error: "Seules les images sont autorisées (JPG, PNG, GIF, WEBP)" },
+        { error: "L'upload d'images n'est pas autorisé" },
         { status: 400 }
       );
     }
 
-    // Générer un nom de fichier unique
-    const ext = file.name.split(".").pop();
-    const uniqueId = crypto.randomBytes(8).toString("hex");
-    const fileName = `${uniqueId}.${ext}`;
-    const filePath = join(UPLOADS_DIR, fileName);
+    if (isDocument && !config.allowedTypes.documents) {
+      return NextResponse.json(
+        { error: "L'upload de documents n'est pas autorisé" },
+        { status: 400 }
+      );
+    }
 
-    // Convertir le File en Buffer et sauvegarder
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
+    if (isArchive && !config.allowedTypes.archives) {
+      return NextResponse.json(
+        { error: "L'upload d'archives n'est pas autorisé" },
+        { status: 400 }
+      );
+    }
 
-    // Générer et stocker le token de suppression
-    const deletionToken = crypto.randomUUID();
-    await storeDeletionToken(fileName, deletionToken);
+    if (!isImage && !isDocument && !isArchive) {
+      return NextResponse.json(
+        { error: "Type de fichier non supporté" },
+        { status: 400 }
+      );
+    }
 
-    // Construire les URLs
-    const fileUrl = `${API_URL}/uploads/${fileName}`;
-    const thumbnailUrl = `${API_URL}/api/thumbnails/${fileName}`;
+    // Vérifier la taille minimale
+    if (file.size < config.limits.minFileSize * 1024) {
+      return NextResponse.json(
+        {
+          error: `La taille du fichier est inférieure à la limite minimale de ${config.limits.minFileSize}KB`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Vérifier la taille maximale
+    if (file.size > config.limits.maxFileSize * 1024 * 1024) {
+      return NextResponse.json(
+        {
+          error: `La taille du fichier dépasse la limite de ${config.limits.maxFileSize}MB`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Utiliser handleFileUpload pour gérer l'upload
+    const uploadResult = await handleFileUpload(file, config);
+
+    if (!uploadResult.success) {
+      return NextResponse.json({ error: uploadResult.error }, { status: 400 });
+    }
 
     // Enregistrer dans l'historique
     await recordUpload({
-      filename: fileName,
+      filename: uploadResult.fileUrl!.split("/").pop()!,
       originalFilename: file.name,
       fileSize: file.size,
       mimeType: file.type,
       uploadMethod: "web",
-      fileUrl,
-      thumbnailUrl,
-      deletionToken,
+      fileUrl: `${API_URL}${uploadResult.fileUrl}`,
+      thumbnailUrl: uploadResult.thumbnailUrl
+        ? `${API_URL}${uploadResult.thumbnailUrl}`
+        : undefined,
+      deletionToken: uploadResult.deletionToken,
       ipAddress:
         request.ip || request.headers.get("x-forwarded-for") || "unknown",
       userId: session?.user?.id,
@@ -77,12 +112,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       file: {
-        url: fileUrl,
-        name: fileName,
+        url: `${API_URL}${uploadResult.fileUrl}`,
+        name: uploadResult.fileUrl!.split("/").pop()!,
         originalName: file.name,
         size: file.size,
         type: file.type,
-        deletionToken,
+        deletionToken: uploadResult.deletionToken,
       },
     });
   } catch (error) {
