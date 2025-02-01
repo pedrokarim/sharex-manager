@@ -1,14 +1,14 @@
-import { FileInfo } from "@/types"
-import { Card, CardContent } from "../ui/card"
-import { Button } from "../ui/button"
-import { Copy, ExternalLink, Trash2 } from "lucide-react"
-import Image from "next/image"
+import { FileInfo } from "@/types";
+import { Card, CardContent } from "../ui/card";
+import { Button } from "../ui/button";
+import { Copy, ExternalLink, Trash2 } from "lucide-react";
+import Image from "next/image";
 
 interface GridViewProps {
-  files: FileInfo[]
-  onCopy: (url: string) => void
-  onDelete: (name: string) => void
-  onSelect: (file: FileInfo) => void
+  files: FileInfo[];
+  onCopy: (url: string) => void;
+  onDelete: (name: string) => void;
+  onSelect: (file: FileInfo) => void;
 }
 
 export function GridView({ files, onCopy, onDelete, onSelect }: GridViewProps) {
@@ -17,7 +17,7 @@ export function GridView({ files, onCopy, onDelete, onSelect }: GridViewProps) {
       {files.map((file) => (
         <Card key={file.name} className="overflow-hidden">
           <CardContent className="p-0">
-            <div 
+            <div
               className="relative aspect-square cursor-pointer"
               onClick={() => onSelect(file)}
             >
@@ -57,5 +57,5 @@ export function GridView({ files, onCopy, onDelete, onSelect }: GridViewProps) {
         </Card>
       ))}
     </div>
-  )
-} 
+  );
+}

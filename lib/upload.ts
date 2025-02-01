@@ -58,13 +58,13 @@ async function getUploadPath(
     }
     case "type": {
       const ext = extname(fileName).toLowerCase();
-      let typePath = "others";
+      // let typePath = "others";
 
-      if (/\.(jpg|jpeg|png|gif|webp)$/i.test(ext)) typePath = "images";
-      else if (/\.(pdf|doc|docx|txt)$/i.test(ext)) typePath = "documents";
-      else if (/\.(zip|rar)$/i.test(ext)) typePath = "archives";
+      // if (/\.(jpg|jpeg|png|gif|webp)$/i.test(ext)) typePath = "images";
+      // else if (/\.(pdf|doc|docx|txt)$/i.test(ext)) typePath = "documents";
+      // else if (/\.(zip|rar)$/i.test(ext)) typePath = "archives";
 
-      const fullPath = join(baseDir, typePath);
+      const fullPath = join(baseDir);
       await mkdir(fullPath, {
         recursive: true,
         mode: parseInt(config.storage.permissions.directories, 8),
