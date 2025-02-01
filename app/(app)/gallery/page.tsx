@@ -144,74 +144,70 @@ export default function GalleryPage() {
   };
 
   return (
-    <div className="flex h-screen">
-      <AppSidebar>
-        <SidebarInset>
-          <SidebarHeader title="Galerie" />
-          <div className="space-y-4 p-4">
-            <ViewSelector />
+    <>
+      <UploadZone>
+        <div className="p-8">
+          <div className="mb-8 flex items-center justify-between">
+            <h1 className="text-2xl font-bold">Galerie d'images</h1>
+            <div className="flex items-center gap-4">
+              <ViewSelector />
+
+              <Button onClick={() => window.location.reload()}>
+                Rafraîchir
+              </Button>
+            </div>
           </div>
-        </SidebarInset>
-      </AppSidebar>
 
-      <div className="flex-1 relative">
-        <UploadZone>
-          <SidebarInset>
-            <SidebarHeader showSearch={true} />
-            <div className="p-8">
-              <div className="mb-8 flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Galerie d'images</h1>
-                <div className="flex items-center gap-4">
-                  <Button onClick={() => window.location.reload()}>
-                    Rafraîchir
-                  </Button>
-                </div>
-              </div>
-
-              {files.length === 0 ? (
-                <div className="flex flex-col items-center justify-center space-y-4 py-24 text-center">
-                  <ImageOff className="h-12 w-12 text-muted-foreground" />
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold">Aucune image</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Commencez à uploader des images avec ShareX
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                Object.entries(groupedFiles).map(([date, filesInGroup]) => (
-                  <div key={date} className="mb-8">
-                    <h2 className="mb-4 text-xl font-semibold">{date}</h2>
-                    {(!viewMode || viewMode === "grid") ? (
-                      <GridView
-                        files={filesInGroup}
-                        onCopy={copyToClipboard}
-                        onDelete={(name) => setSelectedFile(files.find(f => f.name === name) || null)}
-                        onSelect={setSelectedFile}
-                      />
-                    ) : (
-                      <ListView
-                        files={filesInGroup}
-                        onCopy={copyToClipboard}
-                        onDelete={(name) => setSelectedFile(files.find(f => f.name === name) || null)}
-                        onSelect={setSelectedFile}
-                        detailed={viewMode === "details"}
-                      />
-                    )}
-                  </div>
-                ))
-              )}
-
-              {/* État de chargement */}
-              <div ref={ref} className="h-10 flex items-center justify-center">
-                {loading && (
-                  <div className="text-muted-foreground">Chargement...</div>
-                )}
+          {files.length === 0 ? (
+            <div className="flex flex-col items-center justify-center space-y-4 py-24 text-center">
+              <ImageOff className="h-12 w-12 text-muted-foreground" />
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Aucune image</h3>
+                <p className="text-sm text-muted-foreground">
+                  Commencez à uploader des images avec ShareX
+                </p>
               </div>
             </div>
-          </SidebarInset>
-        </UploadZone>
-      </div>
+          ) : (
+            Object.entries(groupedFiles).map(([date, filesInGroup]) => (
+              <div key={date} className="mb-8">
+                <h2 className="mb-4 text-xl font-semibold">{date}</h2>
+                {!viewMode || viewMode === "grid" ? (
+                  <GridView
+                    files={filesInGroup}
+                    onCopy={copyToClipboard}
+                    onDelete={(name) =>
+                      setSelectedFile(
+                        files.find((f) => f.name === name) || null
+                      )
+                    }
+                    onSelect={setSelectedFile}
+                  />
+                ) : (
+                  <ListView
+                    files={filesInGroup}
+                    onCopy={copyToClipboard}
+                    onDelete={(name) =>
+                      setSelectedFile(
+                        files.find((f) => f.name === name) || null
+                      )
+                    }
+                    onSelect={setSelectedFile}
+                    detailed={viewMode === "details"}
+                  />
+                )}
+              </div>
+            ))
+          )}
+
+          {/* État de chargement */}
+          <div ref={ref} className="h-10 flex items-center justify-center">
+            {loading && (
+              <div className="text-muted-foreground">Chargement...</div>
+            )}
+          </div>
+        </div>
+      </UploadZone>
 
       <FileViewer
         file={selectedFile}
@@ -223,6 +219,6 @@ export default function GalleryPage() {
         hasPrevious={findCurrentFileIndex() > 0}
         hasNext={findCurrentFileIndex() < files.length - 1}
       />
-    </div>
+    </>
   );
 }

@@ -15,8 +15,10 @@ import {
   Shield,
   HelpCircle,
   Send,
+  UserCog,
 } from "lucide-react"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 
 import { NavMain } from "./nav-main"
 import { NavProjects } from "./nav-projects"
@@ -122,6 +124,27 @@ const data = {
       ],
     },
   ],
+  navAdmin: [
+    {
+      title: "Administration",
+      url: "/admin",
+      icon: Shield,
+      items: [
+        {
+          title: "Utilisateurs",
+          url: "/admin/users",
+        },
+        {
+          title: "Statistiques",
+          url: "/admin/stats",
+        },
+        {
+          title: "Logs",
+          url: "/admin/logs",
+        },
+      ],
+    },
+  ],
   navSecondary: [
     {
       title: "Support",
@@ -154,6 +177,9 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { data: session } = useSession()
+  const isAdmin = session?.user?.role === "admin"
+
   return (
     <Sidebar
       collapsible="icon"
@@ -178,6 +204,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
+        {isAdmin && <NavMain items={data.navAdmin} />}
         <NavProjects projects={data.projects} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>

@@ -10,7 +10,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest watch"
+    "test:watch": "vitest watch",
+    "users": "bun cli/users.ts"
   },
   "dependencies": {
     "@auth/core": "^0.37.4",
@@ -44,9 +45,11 @@
     "@radix-ui/react-tooltip": "^1.1.7",
     "@types/bcrypt": "^5.0.2",
     "bcrypt": "^5.1.1",
+    "chalk": "^5.4.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.0",
+    "commander": "^13.1.0",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "embla-carousel-react": "^8.5.2",
@@ -57,6 +60,7 @@
     "next-auth": "5.0.0-beta.25",
     "next-themes": "^0.4.4",
     "nuqs": "^2.3.1",
+    "prompts": "^2.4.2",
     "react": "^18",
     "react-day-picker": "8.10.1",
     "react-dom": "^18",
@@ -78,6 +82,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/nanoid": "^3.0.0",
     "@types/node": "^22.10.10",
+    "@types/prompts": "^2.4.9",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",

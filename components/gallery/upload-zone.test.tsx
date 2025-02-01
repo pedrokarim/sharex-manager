@@ -3,30 +3,14 @@ import { UploadZone } from './upload-zone'
 import { renderWithProviders } from '@/tests/utils'
 import { screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { mockUseUploadConfig, mockSonner } from '@/tests/mocks'
 
-// Mock des hooks et des dépendances
 vi.mock('@/hooks/use-upload-config', () => ({
-  useUploadConfig: () => ({
-    config: {
-      allowedTypes: {
-        images: true,
-        documents: true,
-        archives: true
-      },
-      limits: {
-        maxFileSize: 10,
-        minFileSize: 1,
-        maxFilesPerUpload: 10,
-        maxFilesPerType: {
-          images: 5,
-          documents: 5,
-          archives: 5
-        }
-      }
-    },
+  useUploadConfig: vi.fn().mockImplementation(() => ({
+    config: mockUseUploadConfig.useUploadConfig().config,
     isLoading: false,
     isFileAllowed: () => true
-  })
+  }))
 }))
 
 vi.mock('sonner', () => ({
@@ -52,7 +36,7 @@ describe('UploadZone', () => {
   })
 
   it('shows loading state when config is loading', () => {
-    vi.mocked(useUploadConfig).mockReturnValueOnce({
+    vi.mocked(mockUseUploadConfig.useUploadConfig).mockReturnValueOnce({
       config: {} as any,
       isLoading: true,
       isFileAllowed: () => true
@@ -123,7 +107,7 @@ describe('UploadZone', () => {
 
     await fireEvent.drop(dropzone, { dataTransfer })
     
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('taille du fichier dépasse la limite'))
+    expect(mockSonner.toast.error).toHaveBeenCalledWith(expect.stringContaining('taille du fichier dépasse la limite'))
   })
 
   it('allows file removal', async () => {

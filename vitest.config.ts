@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -14,6 +15,14 @@ export default defineConfig({
     },
     include: ["**/*.test.{ts,tsx}"],
     css: true,
+    mockReset: true,
+    deps: {
+      inline: [
+        "@testing-library/user-event",
+        "@testing-library/react",
+        "@testing-library/jest-dom",
+      ],
+    },
   },
   resolve: {
     alias: {

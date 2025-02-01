@@ -2,10 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { ViewSelector } from './view-selector'
 import { renderWithProviders } from '@/tests/utils'
 import { screen, fireEvent } from '@testing-library/react'
+import { mockNuqs } from '@/tests/mocks'
 
-// Mock nuqs
 vi.mock('nuqs', () => ({
-  useQueryState: () => ['grid', vi.fn()],
+  useQueryState: vi.fn().mockImplementation(() => ['grid', vi.fn()])
 }))
 
 describe('ViewSelector', () => {

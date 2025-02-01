@@ -32,12 +32,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <div className="[--header-height:calc(theme(spacing.14))]">
-            <SidebarProvider className="flex flex-col">
-              {children}
-              <Toaster />
-            </SidebarProvider>
-          </div>
+          {children}
+          <Toaster />
         </Providers>
       </body>
     </html>

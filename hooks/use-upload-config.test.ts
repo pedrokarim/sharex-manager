@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useUploadConfig, defaultConfig } from "./use-upload-config";
-import { toast } from "sonner";
+import { mockSonner } from "@/tests/mocks";
 
 // Mock de fetch
 global.fetch = vi.fn();
 
-// Mock de sonner
 vi.mock("sonner", () => ({
   toast: {
     error: vi.fn(),
@@ -61,7 +60,7 @@ describe("useUploadConfig", () => {
     });
 
     expect(result.current.isLoading).toBe(false);
-    expect(toast.error).toHaveBeenCalledWith(
+    expect(mockSonner.toast.error).toHaveBeenCalledWith(
       "Impossible de charger la configuration"
     );
   });

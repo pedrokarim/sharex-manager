@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { promises as fs } from "fs";
 import path from "path";
 import {
@@ -10,18 +10,21 @@ import {
 } from "./history";
 import { HistoryEntry } from "./types/history";
 
-// Mock du module fs
-vi.mock("fs", () => ({
-  promises: {
-    access: vi.fn(),
-    writeFile: vi.fn(),
-    readFile: vi.fn(),
-  },
-}));
+// Mock des modules
+vi.mock("fs", async (importOriginal) => {
+  const actual = (await importOriginal()) as typeof import("fs");
+  return {
+    ...actual,
+    promises: {
+      access: vi.fn(),
+      writeFile: vi.fn(),
+      readFile: vi.fn(),
+    },
+  };
+});
 
-// Mock de nanoid
 vi.mock("nanoid", () => ({
-  nanoid: () => "test-id",
+  nanoid: vi.fn().mockReturnValue("test-id"),
 }));
 
 describe("History", () => {
