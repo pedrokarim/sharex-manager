@@ -1,7 +1,12 @@
 "use client";
 
 import { FileInfo } from "@/types";
-import { Dialog, DialogContent } from "../ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "../ui/dialog";
 import { Button } from "../ui/button";
 import {
   Copy,
@@ -18,6 +23,7 @@ import { fr } from "date-fns/locale";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Separator } from "../ui/separator";
+import { VisuallyHidden } from "../ui/visually-hidden";
 
 interface FileViewerProps {
   file: FileInfo | null;
@@ -47,6 +53,20 @@ export function FileViewer({
   return (
     <Dialog open={!!file} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-7xl border-none bg-background/95 p-0 backdrop-blur-xl">
+        <DialogTitle>
+          <VisuallyHidden>Visualiseur d'image - {file.name}</VisuallyHidden>
+        </DialogTitle>
+        <DialogDescription>
+          <VisuallyHidden>
+            Image ajoutée le{" "}
+            {format(parseISO(file.createdAt), "dd MMMM yyyy", { locale: fr })}.
+            Taille du fichier : {(file.size / 1024).toFixed(2)} Ko.
+            {hasPrevious &&
+              "Utilisez le bouton précédent pour voir l'image précédente."}
+            {hasNext &&
+              "Utilisez le bouton suivant pour voir l'image suivante."}
+          </VisuallyHidden>
+        </DialogDescription>
         <div className="relative flex h-[85vh] overflow-hidden rounded-lg">
           {/* Zone principale */}
           <div className="relative flex-1">
