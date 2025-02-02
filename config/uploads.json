@@ -44,18 +44,6 @@
         "name": "Local Development",
         "url": "http://localhost:3000",
         "isDefault": true
-      },
-      {
-        "id": "toto",
-        "name": "toto",
-        "url": "https://titi.ascencia.re",
-        "isDefault": false
-      },
-      {
-        "id": "principal",
-        "name": "Ascencia Image",
-        "url": "https://img.ascencia.re",
-        "isDefault": false
       }
     ],
     "defaultDomain": "default",
