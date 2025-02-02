@@ -14,9 +14,13 @@ services:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3000}
       - TZ=Europe/Paris
     restart: unless-stopped
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       # Montage des dossiers locaux
       - ./config:/app/config
-      - ./public/uploads:/app/public/uploads:delegated
-      - ./public/thumbnails:/app/public/thumbnails:delegated
+      - ./uploads:/app/uploads:delegated
       - ./data:/app/data
+      - next-cache:/app/.next/cache
+
+volumes:
+  next-cache:

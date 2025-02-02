@@ -6,8 +6,11 @@ import {
   validateDeletionToken,
   deleteDeletionToken,
 } from "@/lib/deletion-tokens";
+import { getAbsoluteUploadPath } from "@/lib/config";
+import path from "path";
+import fs from "fs/promises";
 
-const UPLOADS_DIR = join(process.cwd(), "public/uploads");
+const UPLOADS_DIR = getAbsoluteUploadPath();
 
 export async function DELETE(
   request: NextRequest,
@@ -43,4 +46,55 @@ export async function DELETE(
     console.error("Erreur lors de la suppression:", error);
     return new Response("Erreur lors de la suppression", { status: 500 });
   }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { filename: string } }
+) {
+  try {
+    const filePath = path.join(UPLOADS_DIR, params.filename);
+    
+    // Vérifier si le fichier existe
+    try {
+      await fs.access(filePath);
+    } catch {
+      return new Response("File not found", { status: 404 });
+    }
+    
+    // Lire et retourner le fichier
+    const file = await fs.readFile(filePath);
+    
+    // Déterminer le type MIME
+    const mimeType = getMimeType(params.filename);
+    
+    return new Response(file, {
+      headers: {
+        "Content-Type": mimeType,
+        "Cache-Control": "public, max-age=31536000",
+      },
+    });
+  } catch (error) {
+    console.error("Erreur lors de la lecture du fichier:", error);
+    return new Response("Internal Server Error", { status: 500 });
+  }
+}
+
+function getMimeType(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".pdf": "application/pdf",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".txt": "text/plain",
+    ".zip": "application/zip",
+    ".rar": "application/x-rar-compressed",
+  };
+  
+  return mimeTypes[ext] || "application/octet-stream";
 }

@@ -18,7 +18,7 @@ async function writeConfig(config: UploadConfig): Promise<void> {
   await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const config = await readConfig();
     return NextResponse.json(config);
@@ -30,15 +30,15 @@ export async function GET() {
   }
 }
 
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
   try {
-    const updates = await request.json();
+    const data = await req.json();
     const currentConfig = await readConfig();
 
     // Fusionner les mises à jour avec la configuration actuelle
     const newConfig = {
       ...currentConfig,
-      ...updates,
+      ...data,
     };
 
     await writeConfig(newConfig);
@@ -49,4 +49,15 @@ export async function PUT(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  })
 }

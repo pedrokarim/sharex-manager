@@ -6,6 +6,7 @@ import { generateId } from "@/lib/utils";
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { getFileUrl } from "@/lib/utils/url";
+import { getAbsoluteUploadPath } from "@/lib/config";
 
 export interface UploadResult {
   success: boolean;
@@ -87,9 +88,10 @@ async function getThumbnailPath(
   uploadPath: string
 ): Promise<string> {
   const thumbnailPath = join(
-    dirname(uploadPath),
+    uploadPath,
     config.storage.thumbnailsPath
   );
+
   await mkdir(thumbnailPath, {
     recursive: true,
     mode: parseInt(config.storage.permissions.directories, 8),
@@ -204,13 +206,12 @@ export async function handleFileUpload(
   config: UploadConfig
 ): Promise<UploadResult> {
   try {
-    // Formater le nom du fichier selon le pattern de la configuration
+    const uploadPath = getAbsoluteUploadPath();
     const fileName = formatFileName(
       file.name,
       config.filenamePattern,
       config.storage.preserveFilenames
     );
-    const uploadPath = await getUploadPath(config, fileName);
     const filePath = join(uploadPath, fileName);
 
     // Vérifier si le fichier existe déjà

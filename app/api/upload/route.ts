@@ -1,13 +1,16 @@
 import { writeFile, readFile } from "fs/promises";
-import { join } from "path";
+import path from "path";
 import { NextRequest } from "next/server";
 import { ApiKey } from "@/types/api-key";
 import { storeDeletionToken } from "@/lib/deletion-tokens";
 import { recordUpload } from "@/lib/history";
 import { getServerConfig } from "@/lib/server/config";
 import { handleFileUpload } from "@/lib/upload";
+import { revalidatePath } from 'next/cache';
+import { getAbsoluteUploadPath } from "@/lib/config";
+import fs from "fs/promises";
 
-const API_KEYS_FILE = join(process.cwd(), "data/api-keys.json");
+const API_KEYS_FILE = path.join(process.cwd(), "data/api-keys.json");
 
 async function validateApiKey(
   apiKey: string,
@@ -132,6 +135,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const uploadPath = getAbsoluteUploadPath();
+    
+    // Assurez-vous que le dossier existe
+    await fs.mkdir(uploadPath, { recursive: true });
+    
+    const filePath = path.join(uploadPath, file.name);
+
     // Utiliser handleFileUpload pour gérer l'upload
     const uploadResult = await handleFileUpload(file, config);
 
@@ -157,6 +167,9 @@ export async function POST(request: NextRequest) {
       userId: validKey.id,
       userName: validKey.name,
     });
+
+    // Après l'upload réussi
+    revalidatePath('/uploads');
 
     return new Response(
       JSON.stringify({

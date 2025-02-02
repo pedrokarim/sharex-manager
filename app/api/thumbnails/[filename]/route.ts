@@ -3,8 +3,9 @@ import { NextRequest } from "next/server";
 import sharp from "sharp";
 import { createReadStream } from "fs";
 import { stat } from "fs/promises";
+import { getAbsoluteUploadPath } from "@/lib/config";
 
-const UPLOADS_DIR = join(process.cwd(), "public/uploads");
+const UPLOADS_DIR = getAbsoluteUploadPath();
 const THUMBNAIL_SIZE = 300;
 
 export async function GET(

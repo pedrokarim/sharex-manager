@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import type { NextRequest } from 'next/server'
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
@@ -18,6 +19,27 @@ export default auth((req) => {
 
   return null;
 });
+
+export function middleware(request: NextRequest) {
+  const response = NextResponse.next()
+
+  // Autoriser les requêtes depuis localhost:3000
+  response.headers.set('Access-Control-Allow-Origin', '*')
+  
+  // Autoriser les méthodes HTTP
+  response.headers.set(
+    'Access-Control-Allow-Methods',
+    'GET, POST, PUT, DELETE, OPTIONS'
+  )
+  
+  // Autoriser les en-têtes
+  response.headers.set(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization'
+  )
+
+  return response
+}
 
 // Voir https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
 export const config = {

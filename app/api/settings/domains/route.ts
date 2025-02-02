@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Vérifier si le domaine existe déjà
     if (
-      config.domains.list.some((d: Domain) => d.domain === newDomain.domain)
+      config.domains.list.some((d: Domain) => d.url === newDomain.url)
     ) {
       return NextResponse.json(
         { error: "Ce domaine existe déjà" },
@@ -78,7 +78,7 @@ export async function PUT(request: NextRequest) {
     // Vérifier si le domaine existe déjà (sauf pour le domaine en cours de modification)
     if (
       config.domains.list.some(
-        (d: Domain) => d.domain === updates.domain && d.id !== updates.id
+        (d: Domain) => d.url === updates.url && d.id !== updates.id
       )
     ) {
       return NextResponse.json(

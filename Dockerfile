@@ -17,12 +17,12 @@ FROM base AS runner
 
 # Créer les dossiers nécessaires et définir les permissions
 RUN mkdir -p /app/.next/static \
-    /app/public/uploads \
-    /app/public/thumbnails \
+    /app/uploads \
+    /app/uploads/thumbnails \
     /app/data \
     /app/config && \
-    chmod 777 /app/public/uploads \
-    /app/public/thumbnails \
+    chmod 777 /app/uploads \
+    /app/uploads/thumbnails \
     /app/data \
     /app/config
 
@@ -39,6 +39,9 @@ ENV HOSTNAME=0.0.0.0
 EXPOSE 3000
 
 # Définir les volumes
-VOLUME ["/app/public/uploads", "/app/public/thumbnails", "/app/config", "/app/data"]
+VOLUME ["/app/uploads", "/app/config", "/app/data"]
+
+# Créer le dossier cache et définir les permissions
+RUN mkdir -p .next/cache && chown -R 1000:1000 .next
 
 CMD ["bun", "server.js"] 

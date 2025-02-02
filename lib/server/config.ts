@@ -1,6 +1,7 @@
 import { readFile } from "fs/promises";
-import { resolve } from "path";
+import { resolve, join } from "path";
 import { UploadConfig } from "@/lib/types/upload-config";
+import { getAbsoluteUploadPath } from "@/lib/config";
 
 const CONFIG_PATH = resolve(process.cwd(), "config", "uploads.json");
 
@@ -54,6 +55,10 @@ const defaultConfig: UploadConfig = {
     defaultDomain: "default",
     useSSL: true,
     pathPrefix: "/uploads",
+  },
+  paths: {
+    uploads: getAbsoluteUploadPath(),
+    thumbnails: join(getAbsoluteUploadPath(), "thumbnails"),
   },
 };
 

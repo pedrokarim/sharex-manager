@@ -2,8 +2,10 @@ import { auth } from "@/auth";
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
 import { NextResponse } from "next/server";
+import { revalidatePath } from 'next/cache';
+import { getAbsoluteUploadPath } from "@/lib/config";
 
-const UPLOADS_DIR = join(process.cwd(), "public/uploads");
+const UPLOADS_DIR = getAbsoluteUploadPath();
 const PAGE_SIZE = 12; // Nombre d'images par page
 
 export async function GET(request: Request) {
@@ -16,6 +18,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const search = searchParams.get("q") || "";
+
+    // Force la revalidation du dossier public/uploads
+    revalidatePath('/uploads');
 
     // Récupérer tous les fichiers et leurs stats
     const entries = await readdir(UPLOADS_DIR, { withFileTypes: true });
@@ -38,7 +43,7 @@ export async function GET(request: Request) {
           
           return {
             name: entry.name,
-            url: `/uploads/${entry.name}`,
+            url: `/api/uploads/${entry.name}`,
             size: stats.size,
             createdAt: fileDate.toISOString(),
           };
