@@ -34,6 +34,14 @@ export interface UploadConfig {
     maxWidth: number;
     maxHeight: number;
     quality: number;
+    format: "auto" | "jpeg" | "png" | "webp";
+    preserveFormat: boolean;
+    fit: "cover" | "contain" | "fill" | "inside" | "outside";
+    background: string;
+    progressive: boolean;
+    blur: number;
+    sharpen: boolean;
+    metadata: boolean;
   };
   storage: {
     path: string;

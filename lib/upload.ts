@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { UploadConfig } from "@/lib/types/upload-config";
 import { generateId } from "@/lib/utils";
 import { format } from "date-fns";
-import { zonedTimeToUtc } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
 import { getFileUrl } from "@/lib/utils/url";
 
 export interface UploadResult {
@@ -48,7 +48,7 @@ async function getUploadPath(
   switch (config.storage.structure) {
     case "date": {
       const now = new Date();
-      const zoned = zonedTimeToUtc(now, config.storage.dateFormat.timezone);
+      const zoned = toZonedTime(now, config.storage.dateFormat.timezone);
       const datePath = format(zoned, config.storage.dateFormat.folderStructure);
       const fullPath = join(baseDir, datePath);
       await mkdir(fullPath, {
@@ -191,9 +191,9 @@ async function generateThumbnail(
     });
   }
 
-  // Supprimer les métadonnées si configuré
-  if (!config.thumbnails.metadata) {
-    sharpInstance = sharpInstance.withMetadata(false);
+  // Gérer les métadonnées selon la configuration
+  if (config.thumbnails.metadata) {
+    sharpInstance = sharpInstance.withMetadata();
   }
 
   return sharpInstance.toBuffer();

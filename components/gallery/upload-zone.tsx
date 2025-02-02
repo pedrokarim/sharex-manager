@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   X,
@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useUploadConfig, UploadConfig } from "@/hooks/use-upload-config";
+import { useUploadConfig } from "@/hooks/use-upload-config";
 
 interface FileWithPreview extends File {
   preview?: string;

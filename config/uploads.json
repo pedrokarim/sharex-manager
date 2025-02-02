@@ -19,11 +19,12 @@
     "enabled": true,
     "maxWidth": 200,
     "maxHeight": 200,
-    "quality": 80
+    "quality": 80,
+    "blur": 0.5
   },
   "storage": {
     "path": "./uploads",
-    "structure": "flat",
+    "structure": "type",
     "preserveFilenames": false,
     "replaceExisting": false,
     "thumbnailsPath": "thumbnails",
@@ -42,16 +43,10 @@
         "id": "default",
         "name": "Local Development",
         "url": "http://localhost:3000",
-        "isDefault": false
-      },
-      {
-        "id": "test",
-        "name": "Test domaine",
-        "url": "https://dev.test.io",
         "isDefault": true
       }
     ],
-    "defaultDomain": "test",
+    "defaultDomain": "default",
     "useSSL": true,
     "pathPrefix": "/uploads"
   }

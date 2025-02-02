@@ -17,9 +17,35 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 import { useUploadConfig } from "@/hooks/use-upload-config";
+import { Slider } from "@/components/ui/slider";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { Pipette } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export function ConfigPageClient() {
   const { config, isLoading, isSaving, saveConfig } = useUploadConfig();
+  const [blurValue, setBlurValue] = useState(config?.thumbnails.blur ?? 0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (config && blurValue !== config.thumbnails.blur) {
+        saveConfig({
+          ...config,
+          thumbnails: {
+            ...config.thumbnails,
+            blur: blurValue,
+          },
+        });
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [blurValue, config, saveConfig]);
 
   if (isLoading) {
     return (
@@ -328,58 +354,294 @@ export function ConfigPageClient() {
                     }
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="maxWidth">Largeur maximale (px)</Label>
-                  <Input
-                    id="maxWidth"
-                    type="number"
-                    value={config.thumbnails.maxWidth}
-                    onChange={(e) =>
-                      saveConfig({
-                        ...config,
-                        thumbnails: {
-                          ...config.thumbnails,
-                          maxWidth: parseInt(e.target.value),
-                        },
-                      })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="maxHeight">Hauteur maximale (px)</Label>
-                  <Input
-                    id="maxHeight"
-                    type="number"
-                    value={config.thumbnails.maxHeight}
-                    onChange={(e) =>
-                      saveConfig({
-                        ...config,
-                        thumbnails: {
-                          ...config.thumbnails,
-                          maxHeight: parseInt(e.target.value),
-                        },
-                      })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="quality">Qualité (0-100)</Label>
-                  <Input
-                    id="quality"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={config.thumbnails.quality}
-                    onChange={(e) =>
-                      saveConfig({
-                        ...config,
-                        thumbnails: {
-                          ...config.thumbnails,
-                          quality: parseInt(e.target.value),
-                        },
-                      })
-                    }
-                  />
+
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="format">Format de sortie</Label>
+                    <select
+                      id="format"
+                      value={config.thumbnails.format}
+                      onChange={(e) =>
+                        saveConfig({
+                          ...config,
+                          thumbnails: {
+                            ...config.thumbnails,
+                            format: e.target.value as
+                              | "auto"
+                              | "jpeg"
+                              | "png"
+                              | "webp",
+                          },
+                        })
+                      }
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                    >
+                      <option value="auto">Automatique</option>
+                      <option value="jpeg">JPEG</option>
+                      <option value="png">PNG</option>
+                      <option value="webp">WebP</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="preserveFormat">
+                      Préserver le format d'origine (PNG/WebP)
+                    </Label>
+                    <Switch
+                      id="preserveFormat"
+                      checked={config.thumbnails.preserveFormat}
+                      onCheckedChange={(checked) =>
+                        saveConfig({
+                          ...config,
+                          thumbnails: {
+                            ...config.thumbnails,
+                            preserveFormat: checked,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="fit">Mode d'ajustement</Label>
+                    <select
+                      id="fit"
+                      value={config.thumbnails.fit}
+                      onChange={(e) =>
+                        saveConfig({
+                          ...config,
+                          thumbnails: {
+                            ...config.thumbnails,
+                            fit: e.target.value as
+                              | "cover"
+                              | "contain"
+                              | "fill"
+                              | "inside"
+                              | "outside",
+                          },
+                        })
+                      }
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                    >
+                      <option value="cover">Cover</option>
+                      <option value="contain">Contain</option>
+                      <option value="fill">Fill</option>
+                      <option value="inside">Inside</option>
+                      <option value="outside">Outside</option>
+                    </select>
+                  </div>
+
+                  <div className="grid gap-4">
+                    <Label htmlFor="background">Couleur d'arrière-plan</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-[240px] justify-start text-left font-normal",
+                            !config.thumbnails.background &&
+                              "text-muted-foreground"
+                          )}
+                        >
+                          <div
+                            className="h-4 w-4 rounded-full mr-2"
+                            style={{
+                              backgroundColor: config.thumbnails.background,
+                            }}
+                          />
+                          {config.thumbnails.background}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[240px] p-3">
+                        <div className="grid gap-2">
+                          <div className="grid grid-cols-5 gap-2">
+                            {[
+                              "#FFFFFF",
+                              "#000000",
+                              "#FF0000",
+                              "#00FF00",
+                              "#0000FF",
+                              "#FFFF00",
+                              "#FF00FF",
+                              "#00FFFF",
+                              "#808080",
+                              "#FFA500",
+                            ].map((color) => (
+                              <Button
+                                key={color}
+                                variant="outline"
+                                className="w-full p-0 h-8 aspect-square"
+                                style={{ backgroundColor: color }}
+                                onClick={() =>
+                                  saveConfig({
+                                    ...config,
+                                    thumbnails: {
+                                      ...config.thumbnails,
+                                      background: color,
+                                    },
+                                  })
+                                }
+                              />
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <Input
+                              id="background"
+                              type="color"
+                              value={config.thumbnails.background}
+                              className="w-full"
+                              onChange={(e) =>
+                                saveConfig({
+                                  ...config,
+                                  thumbnails: {
+                                    ...config.thumbnails,
+                                    background: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <Button
+                              variant="outline"
+                              className="px-2"
+                              onClick={() => {
+                                // @ts-ignore
+                                const eyeDropper = new EyeDropper();
+                                eyeDropper
+                                  .open()
+                                  .then((result: { sRGBHex: string }) =>
+                                    saveConfig({
+                                      ...config,
+                                      thumbnails: {
+                                        ...config.thumbnails,
+                                        background: result.sRGBHex,
+                                      },
+                                    })
+                                  )
+                                  .catch(() => {});
+                              }}
+                            >
+                              <Pipette className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="grid gap-4">
+                    <Label htmlFor="blur">Flou ({blurValue})</Label>
+                    <div className="grid gap-4">
+                      <Slider
+                        id="blur"
+                        min={0}
+                        max={20}
+                        step={0.5}
+                        value={[blurValue]}
+                        onValueChange={([value]) => setBlurValue(value)}
+                      />
+                      <div className="aspect-video rounded-lg overflow-hidden relative w-full md:w-1/2">
+                        <img
+                          src="/preview-image.jpg"
+                          alt="Prévisualisation du flou"
+                          className="w-full h-full object-cover"
+                          style={{
+                            filter: `blur(${blurValue}px)`,
+                            transform: "scale(1.1)",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="sharpen">Accentuation (Sharpening)</Label>
+                    <Switch
+                      id="sharpen"
+                      checked={config.thumbnails.sharpen}
+                      onCheckedChange={(checked) =>
+                        saveConfig({
+                          ...config,
+                          thumbnails: {
+                            ...config.thumbnails,
+                            sharpen: checked,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="metadata">Conserver les métadonnées</Label>
+                    <Switch
+                      id="metadata"
+                      checked={config.thumbnails.metadata}
+                      onCheckedChange={(checked) =>
+                        saveConfig({
+                          ...config,
+                          thumbnails: {
+                            ...config.thumbnails,
+                            metadata: checked,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="maxWidth">Largeur maximale (px)</Label>
+                    <Input
+                      id="maxWidth"
+                      type="number"
+                      value={config.thumbnails.maxWidth}
+                      onChange={(e) =>
+                        saveConfig({
+                          ...config,
+                          thumbnails: {
+                            ...config.thumbnails,
+                            maxWidth: parseInt(e.target.value),
+                          },
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="maxHeight">Hauteur maximale (px)</Label>
+                    <Input
+                      id="maxHeight"
+                      type="number"
+                      value={config.thumbnails.maxHeight}
+                      onChange={(e) =>
+                        saveConfig({
+                          ...config,
+                          thumbnails: {
+                            ...config.thumbnails,
+                            maxHeight: parseInt(e.target.value),
+                          },
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="quality">Qualité (0-100)</Label>
+                    <Input
+                      id="quality"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={config.thumbnails.quality}
+                      onChange={(e) =>
+                        saveConfig({
+                          ...config,
+                          thumbnails: {
+                            ...config.thumbnails,
+                            quality: parseInt(e.target.value),
+                          },
+                        })
+                      }
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>
