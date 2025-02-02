@@ -38,4 +38,5 @@ next-env.d.ts
 
 # JSON
 data/*.json
-public/*
+public/uploads/*
+public/thumbnails/*

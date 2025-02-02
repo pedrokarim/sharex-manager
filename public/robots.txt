@@ -1,0 +1,32 @@
+# ShareX Manager robots.txt
+# Copyright © 2025 Ascencia (https://ascencia.re). Tous droits réservés.
+# Licence MIT - https://opensource.org/licenses/MIT
+
+# Règles globales pour tous les robots
+User-agent: *
+
+# Interdire l'accès aux routes sensibles
+Disallow: /api/
+Disallow: /admin/
+Disallow: /settings/
+Disallow: /uploads/config/
+Disallow: /api-keys/
+
+# Autoriser l'accès aux ressources statiques
+Allow: /static/
+Allow: /_next/static/
+Allow: /_next/image/
+
+# Autoriser l'accès aux pages publiques
+Allow: /
+Allow: /about
+Allow: /contact
+Allow: /legal
+
+# Sitemap
+Sitemap: https://sxm.ascencia.re/sitemap.xml
+
+# Contact
+# Pour toute question concernant ce fichier robots.txt,
+# veuillez contacter Ascencia à l'adresse : contact@ascencia.re
+# ou visitez notre page de contact : https://sxm.ascencia.re/contact 
