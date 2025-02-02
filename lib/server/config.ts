@@ -1,10 +1,10 @@
 import { readFile } from "fs/promises";
-import { join } from "path";
+import { resolve } from "path";
 import { UploadConfig } from "@/lib/types/upload-config";
 
-const CONFIG_FILE_PATH = join(process.cwd(), "config", "uploads.json");
+const CONFIG_PATH = resolve(process.cwd(), "config", "uploads.json");
 
-export const defaultConfig: UploadConfig = {
+const defaultConfig: UploadConfig = {
   allowedTypes: {
     images: true,
     documents: false,
@@ -57,12 +57,12 @@ export const defaultConfig: UploadConfig = {
   },
 };
 
-export async function getConfig(): Promise<UploadConfig> {
+export async function getServerConfig(): Promise<UploadConfig> {
   try {
-    const configData = await readFile(CONFIG_FILE_PATH, "utf-8");
+    const configData = await readFile(CONFIG_PATH, "utf-8");
     return JSON.parse(configData);
   } catch (error) {
-    // Si le fichier n'existe pas ou est invalide, retourner la configuration par défaut
+    console.error("Erreur lors de la lecture de la configuration:", error);
     return defaultConfig;
   }
 }

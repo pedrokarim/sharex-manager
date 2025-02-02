@@ -2,20 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { storeDeletionToken } from "@/lib/deletion-tokens";
 import { recordUpload } from "@/lib/history";
-import { getConfig } from "@/lib/upload-config";
+import { getServerConfig } from "@/lib/server/config";
 import { handleFileUpload } from "@/lib/upload";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export async function POST(request: NextRequest) {
   try {
-    // Vérifier que l'utilisateur est connecté
     const session = await auth();
+
     if (!session) {
-      return NextResponse.json(
-        { error: "Vous devez être connecté pour uploader des fichiers" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     const formData = await request.formData();
@@ -28,8 +23,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Charger la configuration
-    const config = await getConfig();
+    const config = await getServerConfig();
 
     // Vérifier le type de fichier
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
@@ -98,10 +92,8 @@ export async function POST(request: NextRequest) {
       fileSize: file.size,
       mimeType: file.type,
       uploadMethod: "web",
-      fileUrl: `${API_URL}${uploadResult.fileUrl}`,
-      thumbnailUrl: uploadResult.thumbnailUrl
-        ? `${API_URL}${uploadResult.thumbnailUrl}`
-        : undefined,
+      fileUrl: uploadResult.fileUrl!,
+      thumbnailUrl: uploadResult.thumbnailUrl,
       deletionToken: uploadResult.deletionToken,
       ipAddress:
         request.ip || request.headers.get("x-forwarded-for") || "unknown",
@@ -111,14 +103,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      file: {
-        url: `${API_URL}${uploadResult.fileUrl}`,
-        name: uploadResult.fileUrl!.split("/").pop()!,
-        originalName: file.name,
-        size: file.size,
-        type: file.type,
-        deletionToken: uploadResult.deletionToken,
-      },
+      url: uploadResult.fileUrl,
+      thumbnail: uploadResult.thumbnailUrl || null,
+      deletionToken: uploadResult.deletionToken,
     });
   } catch (error) {
     console.error("Erreur lors de l'upload:", error);

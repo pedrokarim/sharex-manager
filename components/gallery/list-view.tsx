@@ -1,25 +1,38 @@
-import { FileInfo } from "@/types"
-import { Button } from "../ui/button"
-import { Copy, ExternalLink, Trash2 } from "lucide-react"
-import { format, parseISO } from "date-fns"
-import { fr } from "date-fns/locale"
-import Image from "next/image"
+import { FileInfo } from "@/types";
+import { Button } from "../ui/button";
+import { Copy, ExternalLink, Trash2 } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { fr } from "date-fns/locale";
+import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 interface ListViewProps {
-  files: FileInfo[]
-  onCopy: (url: string) => void
-  onDelete: (name: string) => void
-  onSelect: (file: FileInfo) => void
-  detailed?: boolean
+  files: FileInfo[];
+  onCopy: (url: string) => void;
+  onDelete: (name: string) => void;
+  onSelect: (file: FileInfo) => void;
+  detailed?: boolean;
+  newFileIds?: string[];
 }
 
-export function ListView({ files, onCopy, onDelete, onSelect, detailed }: ListViewProps) {
+export function ListView({
+  files,
+  onCopy,
+  onDelete,
+  onSelect,
+  detailed,
+  newFileIds = [],
+}: ListViewProps) {
   return (
     <div className="space-y-2">
       {files.map((file) => (
         <div
           key={file.name}
-          className="flex cursor-pointer items-center justify-between rounded-lg border p-4 hover:bg-accent/50"
+          className={cn(
+            "flex cursor-pointer items-center justify-between rounded-lg border p-4 hover:bg-accent/50 transition-all duration-500",
+            newFileIds.includes(file.name) &&
+              "animate-in fade-in-0 slide-in-from-left-5"
+          )}
           onClick={() => onSelect(file)}
         >
           <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md">
@@ -72,5 +85,5 @@ export function ListView({ files, onCopy, onDelete, onSelect, detailed }: ListVi
         </div>
       ))}
     </div>
-  )
-} 
+  );
+}

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
-import { ImageOff } from "lucide-react";
+import { ImageOff, RefreshCcw } from "lucide-react";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { SidebarHeader } from "@/components/sidebar/sibebar-header";
@@ -19,6 +19,14 @@ import { ListView } from "@/components/gallery/list-view";
 import { FileViewer } from "@/components/gallery/file-viewer";
 import { FileUploader } from "@/components/gallery/file-uploader";
 import { UploadZone } from "@/components/gallery/upload-zone";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 interface FileInfo {
   name: string;
@@ -46,6 +54,9 @@ export default function GalleryPage() {
       return "grid";
     },
   });
+  const [refreshInterval, setRefreshInterval] = useState<string>("0");
+  const [newFileIds, setNewFileIds] = useState<string[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const resetSearch = () => {
     setPage(1);
@@ -73,7 +84,7 @@ export default function GalleryPage() {
     data: files,
     loading,
     ref,
-    // reset
+    reset,
   } = useInfiniteScroll<FileInfo>({
     initialData: [],
     fetchMore: fetchFiles,
@@ -85,6 +96,50 @@ export default function GalleryPage() {
       redirect("/login");
     }
   }, [status]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const newFiles = await fetchFiles(1);
+      await reset(newFiles);
+      setPage(1);
+      setHasMore(true);
+    } catch (error) {
+      console.error("Erreur lors du rafraîchissement:", error);
+      toast.error("Erreur lors du rafraîchissement de la galerie");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Rafraîchissement automatique
+  useEffect(() => {
+    const interval = parseInt(refreshInterval);
+    if (interval === 0) return;
+
+    const timer = setInterval(handleRefresh, interval * 1000);
+    return () => clearInterval(timer);
+  }, [refreshInterval]);
+
+  // Écouter l'événement filesUploaded
+  useEffect(() => {
+    const handleFilesUploaded = (event: Event) => {
+      const customEvent = event as CustomEvent<{ files: FileInfo[] }>;
+      const newIds = customEvent.detail.files.map((file) => file.name);
+      setNewFileIds(newIds);
+      handleRefresh();
+
+      // Retirer les IDs après l'animation
+      setTimeout(() => {
+        setNewFileIds([]);
+      }, 2000);
+    };
+
+    window.addEventListener("filesUploaded", handleFilesUploaded);
+    return () => {
+      window.removeEventListener("filesUploaded", handleFilesUploaded);
+    };
+  }, []);
 
   // Grouper les fichiers par date
   const groupedFiles = useMemo(() => {
@@ -152,8 +207,32 @@ export default function GalleryPage() {
             <div className="flex items-center gap-4">
               <ViewSelector />
 
-              <Button onClick={() => window.location.reload()}>
-                Rafraîchir
+              <Select
+                value={refreshInterval}
+                onValueChange={setRefreshInterval}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Rafraîchissement auto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Pas de rafraîchissement</SelectItem>
+                  <SelectItem value="5">Toutes les 5 secondes</SelectItem>
+                  <SelectItem value="10">Toutes les 10 secondes</SelectItem>
+                  <SelectItem value="15">Toutes les 15 secondes</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleRefresh}
+                className={cn(
+                  "shrink-0 transition-all duration-200",
+                  isRefreshing && "animate-spin text-primary"
+                )}
+                disabled={isRefreshing}
+              >
+                <RefreshCcw className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -182,6 +261,7 @@ export default function GalleryPage() {
                       )
                     }
                     onSelect={setSelectedFile}
+                    newFileIds={newFileIds}
                   />
                 ) : (
                   <ListView
@@ -194,6 +274,7 @@ export default function GalleryPage() {
                     }
                     onSelect={setSelectedFile}
                     detailed={viewMode === "details"}
+                    newFileIds={newFileIds}
                   />
                 )}
               </div>

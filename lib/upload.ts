@@ -1,10 +1,11 @@
 import { mkdir, chmod, stat, writeFile } from "fs/promises";
 import { join, dirname, extname, basename } from "path";
 import sharp from "sharp";
-import { UploadConfig } from "@/hooks/use-upload-config";
+import { UploadConfig } from "@/lib/types/upload-config";
 import { generateId } from "@/lib/utils";
 import { format } from "date-fns";
 import { zonedTimeToUtc } from "date-fns-tz";
+import { getFileUrl } from "@/lib/utils/url";
 
 export interface UploadResult {
   success: boolean;
@@ -42,7 +43,7 @@ async function getUploadPath(
   config: UploadConfig,
   fileName: string
 ): Promise<string> {
-  const baseDir = join(process.cwd(), "public/uploads");
+  const baseDir = join(process.cwd(), "public", `${config.storage.path}`);
 
   switch (config.storage.structure) {
     case "date": {
@@ -248,21 +249,26 @@ export async function handleFileUpload(
         config.storage.permissions.files
       );
 
-      thumbnailUrl = `/uploads/${config.storage.thumbnailsPath}/${thumbnailFileName}`;
+      thumbnailUrl = `/${config.storage.thumbnailsPath}/${thumbnailFileName}`;
     }
 
     // Générer un token de suppression
     const deletionToken = await generateDeletionToken();
 
-    // Construire les URLs relatifs
-    const fileUrl = `/uploads/${
+    // Construire les URLs avec le domaine configuré
+    const relativeFileUrl = `/${
       config.storage.structure === "type" ? basename(uploadPath) + "/" : ""
     }${fileName}`;
+
+    const fileUrl = getFileUrl(config, relativeFileUrl);
+    const fullThumbnailUrl = thumbnailUrl
+      ? getFileUrl(config, thumbnailUrl)
+      : undefined;
 
     return {
       success: true,
       fileUrl,
-      thumbnailUrl,
+      thumbnailUrl: fullThumbnailUrl,
       deletionToken,
     };
   } catch (error) {

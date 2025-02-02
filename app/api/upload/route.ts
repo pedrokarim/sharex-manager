@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 import { ApiKey } from "@/types/api-key";
 import { storeDeletionToken } from "@/lib/deletion-tokens";
 import { recordUpload } from "@/lib/history";
-import { getConfig } from "@/lib/upload-config";
+import { getServerConfig } from "@/lib/server/config";
 import { handleFileUpload } from "@/lib/upload";
 
 const UPLOADS_DIR = join(process.cwd(), "public/uploads");
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Charger la configuration
-    const config = await getConfig();
+    const config = await getServerConfig();
 
     // Vérifier le type de fichier
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
@@ -152,10 +152,8 @@ export async function POST(request: NextRequest) {
       fileSize: file.size,
       mimeType: file.type,
       uploadMethod: "api",
-      fileUrl: `${API_URL}${uploadResult.fileUrl}`,
-      thumbnailUrl: uploadResult.thumbnailUrl
-        ? `${API_URL}${uploadResult.thumbnailUrl}`
-        : undefined,
+      fileUrl: uploadResult.fileUrl!,
+      thumbnailUrl: uploadResult.thumbnailUrl,
       deletionToken: uploadResult.deletionToken,
       ipAddress:
         request.ip || request.headers.get("x-forwarded-for") || "unknown",
@@ -165,14 +163,10 @@ export async function POST(request: NextRequest) {
 
     return new Response(
       JSON.stringify({
-        url: `${API_URL}${uploadResult.fileUrl}`,
-        thumbnail_url: uploadResult.thumbnailUrl
-          ? `${API_URL}${uploadResult.thumbnailUrl}`
-          : null,
+        url: uploadResult.fileUrl,
+        thumbnail_url: uploadResult.thumbnailUrl || null,
         deletion_url: uploadResult.deletionToken
-          ? `${API_URL}/api/files/${uploadResult
-              .fileUrl!.split("/")
-              .pop()}?token=${uploadResult.deletionToken}`
+          ? `${uploadResult.fileUrl}?token=${uploadResult.deletionToken}`
           : null,
         key: {
           name: validKey.name,
@@ -187,8 +181,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Erreur lors de l'upload:", error);
     return new Response(
-      JSON.stringify({ error: "Erreur lors du traitement" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      JSON.stringify({
+        error: "Une erreur est survenue lors de l'upload",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
     );
   }
 }

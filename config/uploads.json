@@ -23,7 +23,7 @@
   },
   "storage": {
     "path": "./uploads",
-    "structure": "type",
+    "structure": "flat",
     "preserveFilenames": false,
     "replaceExisting": false,
     "thumbnailsPath": "thumbnails",
@@ -35,5 +35,24 @@
       "files": "0644",
       "directories": "0755"
     }
+  },
+  "domains": {
+    "list": [
+      {
+        "id": "default",
+        "name": "Local Development",
+        "url": "http://localhost:3000",
+        "isDefault": false
+      },
+      {
+        "id": "test",
+        "name": "Test domaine",
+        "url": "https://dev.test.io",
+        "isDefault": true
+      }
+    ],
+    "defaultDomain": "test",
+    "useSSL": true,
+    "pathPrefix": "/uploads"
   }
 }

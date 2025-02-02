@@ -149,8 +149,6 @@ export async function DELETE(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const session = await auth();
 
-  console.log("[GET] >>>>>>>>>>>>>>>>>>>>>>>>>>>>> ", session);
-
   if (!session?.user?.role || session.user.role !== "admin") {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }

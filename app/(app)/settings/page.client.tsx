@@ -16,6 +16,7 @@ import {
   Key,
   Trash2,
   Shield,
+  Globe,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -55,6 +56,13 @@ export function SettingsPageClient() {
       icon: Key,
       href: "/settings/api-keys",
       color: "text-red-500",
+    },
+    {
+      title: "Domaines",
+      description: "Gérez les domaines pour vos fichiers",
+      icon: Globe,
+      href: "/settings/domains",
+      color: "text-pink-500",
     },
     {
       title: "Nettoyage",

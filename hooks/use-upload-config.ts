@@ -2,64 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { UploadConfig } from "@/lib/types/upload-config";
 
-export interface UploadConfig {
-  allowedTypes: {
-    images: boolean;
-    documents: boolean;
-    archives: boolean;
-  };
-  limits: {
-    maxFileSize: number; // en MB
-    minFileSize: number; // en KB
-    maxFilesPerUpload: number;
-    maxFilesPerType: {
-      images: number;
-      documents: number;
-      archives: number;
-    };
-  };
-  filenamePattern: string;
-  thumbnails: {
-    enabled: boolean;
-    maxWidth: number;
-    maxHeight: number;
-    quality: number;
-    fit: "cover" | "contain" | "fill" | "inside" | "outside";
-    format: "jpeg" | "png" | "webp" | "auto";
-    preserveFormat: boolean;
-    background: { r: number; g: number; b: number; alpha: number };
-    sharpen: boolean;
-    blur: number;
-    progressive: boolean;
-    metadata: boolean;
-  };
-  storage: {
-    path: string;
-    structure: "flat" | "date" | "type";
-    preserveFilenames: boolean;
-    replaceExisting: boolean;
-    thumbnailsPath: string;
-    dateFormat: {
-      folderStructure: string;
-      timezone: string;
-    };
-    permissions: {
-      files: string;
-      directories: string;
-    };
-  };
-}
-
-export const defaultConfig: UploadConfig = {
+const defaultConfig: UploadConfig = {
   allowedTypes: {
     images: true,
     documents: false,
     archives: false,
   },
   limits: {
-    maxFileSize: 10, // 10 MB
-    minFileSize: 1, // 1 KB
+    maxFileSize: 10,
+    minFileSize: 1,
     maxFilesPerUpload: 50,
     maxFilesPerType: {
       images: 30,
@@ -73,14 +26,6 @@ export const defaultConfig: UploadConfig = {
     maxWidth: 200,
     maxHeight: 200,
     quality: 80,
-    fit: "inside",
-    format: "auto",
-    preserveFormat: true,
-    background: { r: 255, g: 255, b: 255, alpha: 0 },
-    sharpen: true,
-    blur: 0,
-    progressive: true,
-    metadata: false,
   },
   storage: {
     path: "./uploads",
@@ -97,6 +42,19 @@ export const defaultConfig: UploadConfig = {
       directories: "0755",
     },
   },
+  domains: {
+    list: [
+      {
+        id: "default",
+        name: "Local Development",
+        url: "http://localhost:3000",
+        isDefault: true,
+      },
+    ],
+    defaultDomain: "default",
+    useSSL: true,
+    pathPrefix: "/uploads",
+  },
 };
 
 export function useUploadConfig() {
@@ -104,49 +62,46 @@ export function useUploadConfig() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    loadConfig();
-  }, []);
-
   const loadConfig = async () => {
     try {
-      setIsLoading(true);
-      const response = await fetch("/api/uploads/config");
+      const response = await fetch("/api/settings/config");
       if (!response.ok)
         throw new Error("Erreur lors du chargement de la configuration");
       const data = await response.json();
       setConfig(data);
     } catch (error) {
-      console.error("Erreur:", error);
+      console.error("Erreur lors du chargement de la configuration:", error);
       toast.error("Impossible de charger la configuration");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const saveConfig = async (newConfig: UploadConfig) => {
+  const saveConfig = async (newConfig: Partial<UploadConfig>) => {
     try {
       setIsSaving(true);
-      const response = await fetch("/api/uploads/config", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+      const response = await fetch("/api/settings/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newConfig),
       });
 
       if (!response.ok) throw new Error("Erreur lors de la sauvegarde");
 
-      setConfig(newConfig);
-      toast.success("Configuration sauvegardée");
+      const updatedConfig = await response.json();
+      setConfig(updatedConfig);
+      toast.success("Configuration mise à jour");
     } catch (error) {
-      console.error("Erreur:", error);
+      console.error("Erreur lors de la sauvegarde:", error);
       toast.error("Impossible de sauvegarder la configuration");
-      throw error;
     } finally {
       setIsSaving(false);
     }
   };
+
+  useEffect(() => {
+    loadConfig();
+  }, []);
 
   const isFileAllowed = (file: File): boolean => {
     const imageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -157,7 +112,7 @@ export function useUploadConfig() {
     ];
     const archiveTypes = ["application/zip", "application/x-rar-compressed"];
 
-    if (file.size > config.maxFileSize * 1024 * 1024) {
+    if (file.size > config.limits.maxFileSize * 1024 * 1024) {
       return false;
     }
 

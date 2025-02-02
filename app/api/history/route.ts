@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
 
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "25");
+    const sortField = searchParams.get("sortField") || "uploadDate";
+    const sortOrder = searchParams.get("sortOrder") || "desc";
 
     const filters = {
       startDate: searchParams.get("startDate")
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
       searchQuery: searchParams.get("q") || undefined,
     };
 
-    const allItems =
+    let allItems =
       filters.startDate ||
       filters.endDate ||
       filters.userId ||
@@ -39,6 +41,17 @@ export async function GET(request: NextRequest) {
       filters.searchQuery
         ? await searchHistory(filters)
         : await getAllHistory();
+
+    // Trier les éléments
+    allItems = allItems.sort((a, b) => {
+      const aValue = a[sortField as keyof typeof a];
+      const bValue = b[sortField as keyof typeof b];
+
+      if (aValue === undefined || bValue === undefined) return 0;
+
+      const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      return sortOrder === "desc" ? -comparison : comparison;
+    });
 
     // Calculer l'index de début et de fin pour la pagination
     const startIndex = (page - 1) * pageSize;
@@ -53,6 +66,8 @@ export async function GET(request: NextRequest) {
       page,
       pageSize,
       totalPages: Math.ceil(allItems.length / pageSize),
+      sortField,
+      sortOrder,
     });
   } catch (error) {
     console.error("Erreur lors de la récupération de l'historique:", error);

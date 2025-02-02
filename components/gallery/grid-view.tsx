@@ -3,19 +3,33 @@ import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { Copy, ExternalLink, Trash2 } from "lucide-react";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 interface GridViewProps {
   files: FileInfo[];
   onCopy: (url: string) => void;
   onDelete: (name: string) => void;
   onSelect: (file: FileInfo) => void;
+  newFileIds?: string[];
 }
 
-export function GridView({ files, onCopy, onDelete, onSelect }: GridViewProps) {
+export function GridView({
+  files,
+  onCopy,
+  onDelete,
+  onSelect,
+  newFileIds = [],
+}: GridViewProps) {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {files.map((file) => (
-        <Card key={file.name} className="overflow-hidden">
+        <Card
+          key={file.name}
+          className={cn(
+            "overflow-hidden transition-all duration-500",
+            newFileIds.includes(file.name) && "animate-in fade-in-0 zoom-in-95"
+          )}
+        >
           <CardContent className="p-0">
             <div
               className="relative aspect-square cursor-pointer"
