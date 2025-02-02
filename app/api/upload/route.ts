@@ -7,10 +7,7 @@ import { recordUpload } from "@/lib/history";
 import { getServerConfig } from "@/lib/server/config";
 import { handleFileUpload } from "@/lib/upload";
 
-const UPLOADS_DIR = join(process.cwd(), "public/uploads");
 const API_KEYS_FILE = join(process.cwd(), "data/api-keys.json");
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 async function validateApiKey(
   apiKey: string,

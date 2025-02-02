@@ -2,6 +2,7 @@
 node_modules
 .pnp
 .pnp.js
+.yarn/install-state.gz
 
 # Build
 .next
@@ -37,10 +38,19 @@ yarn-error.log*
 .idea
 
 # Volumes qui seront montés
-uploads/*
+public/uploads/*
+public/thumbnails/*
 config/*
+data/*
 
 # Divers
 README.md
 LICENSE
-*.md 
+*.md
+
+# Vercel
+.vercel
+
+# Typescript
+*.tsbuildinfo
+next-env.d.ts 

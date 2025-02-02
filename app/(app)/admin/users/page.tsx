@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 export default async function UsersPage() {
   const headersList = headers();
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/users`,
+    `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`,
     {
       headers: {
         cookie: headersList.get("cookie") || "",

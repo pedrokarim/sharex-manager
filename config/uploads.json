@@ -49,5 +49,7 @@
     "defaultDomain": "default",
     "useSSL": true,
     "pathPrefix": "/uploads"
-  }
+  },
+  "uploads": [],
+  "lastUpdate": ""
 }

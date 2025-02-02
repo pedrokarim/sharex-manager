@@ -15,8 +15,16 @@ RUN bun run build
 # Production
 FROM base AS runner
 
-# Créer les dossiers nécessaires
-RUN mkdir -p /app/.next/static /app/uploads /app/config
+# Créer les dossiers nécessaires et définir les permissions
+RUN mkdir -p /app/.next/static \
+    /app/public/uploads \
+    /app/public/thumbnails \
+    /app/data \
+    /app/config && \
+    chmod 777 /app/public/uploads \
+    /app/public/thumbnails \
+    /app/data \
+    /app/config
 
 # Copier les fichiers nécessaires
 COPY --from=builder /app/.next/standalone ./
@@ -31,6 +39,6 @@ ENV HOSTNAME=0.0.0.0
 EXPOSE 3000
 
 # Définir les volumes
-VOLUME ["/app/uploads", "/app/config"]
+VOLUME ["/app/public/uploads", "/app/public/thumbnails", "/app/config", "/app/data"]
 
 CMD ["bun", "server.js"] 

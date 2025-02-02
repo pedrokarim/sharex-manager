@@ -11,15 +11,12 @@ services:
       - NODE_ENV=production
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_URL=${AUTH_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+      - TZ=Europe/Paris
     restart: unless-stopped
     volumes:
-      - ./uploads:/app/uploads
+      # Montage des dossiers locaux
       - ./config:/app/config
-      - uploads_data:/app/uploads
-      - config_data:/app/config
-
-volumes:
-  uploads_data:
-    driver: local
-  config_data:
-    driver: local 
+      - ./public/uploads:/app/public/uploads:delegated
+      - ./public/thumbnails:/app/public/thumbnails:delegated
+      - ./data:/app/data

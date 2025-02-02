@@ -32,12 +32,15 @@ export async function GET(request: Request) {
         .map(async (entry) => {
           const filePath = join(UPLOADS_DIR, entry.name);
           const stats = await stat(filePath);
-
+          
+          // Utiliser mtime au lieu de birthtime car plus fiable dans Docker
+          const fileDate = stats.mtime;
+          
           return {
             name: entry.name,
             url: `/uploads/${entry.name}`,
             size: stats.size,
-            createdAt: stats.birthtime.toISOString(),
+            createdAt: fileDate.toISOString(),
           };
         })
     );
