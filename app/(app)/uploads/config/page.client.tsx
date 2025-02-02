@@ -541,7 +541,7 @@ export function ConfigPageClient() {
                       />
                       <div className="aspect-video rounded-lg overflow-hidden relative w-full md:w-1/2">
                         <img
-                          src="/preview-image.jpg"
+                          src="/preview-image.png"
                           alt="Prévisualisation du flou"
                           className="w-full h-full object-cover"
                           style={{
