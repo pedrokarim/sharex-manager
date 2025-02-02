@@ -1,20 +1,17 @@
 version: '3.8'
 
 services:
-  app:
+  sharex-manager:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: sharex-manager
-    restart: unless-stopped
+      target: runner
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
-      - NEXTAUTH_URL=${NEXTAUTH_URL}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - GITHUB_ID=${GITHUB_ID}
-      - GITHUB_SECRET=${GITHUB_SECRET}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_URL=${AUTH_URL:-http://localhost:3000}
+    restart: unless-stopped
     volumes:
       - ./uploads:/app/uploads
       - ./config:/app/config

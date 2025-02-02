@@ -1,20 +1,36 @@
-FROM oven/bun:1 as base
+FROM oven/bun:1 AS base
 WORKDIR /app
 
 # Installation des dépendances
+FROM base AS deps
 COPY package.json bun.lockb ./
 RUN bun install --frozen-lockfile
 
-# Build de l'application
+# Build
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN bun run build
 
-# Configuration des volumes
-RUN mkdir -p /app/uploads /app/config
-VOLUME ["/app/uploads", "/app/config"]
+# Production
+FROM base AS runner
 
-# Exposition du port
+# Créer les dossiers nécessaires
+RUN mkdir -p /app/.next/static /app/uploads /app/config
+
+# Copier les fichiers nécessaires
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+# Définition des variables d'environnement
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+# Exposition du port (sera écrasé par docker-compose)
 EXPOSE 3000
 
-# Commande de démarrage
-CMD ["bun", "run", "start"] 
+# Définir les volumes
+VOLUME ["/app/uploads", "/app/config"]
+
+CMD ["bun", "server.js"] 
