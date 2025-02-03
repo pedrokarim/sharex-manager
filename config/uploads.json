@@ -14,7 +14,7 @@
       "archives": 10
     }
   },
-  "filenamePattern": "{timestamp}-{random}-{original}",
+  "filenamePattern": "{random}",
   "thumbnails": {
     "enabled": true,
     "blur": 2.5,
@@ -42,7 +42,7 @@
       {
         "id": "default",
         "name": "Local Development",
-        "url": "http://localhost:3000",
+        "url": "http://localhost:4001",
         "isDefault": true
       }
     ],

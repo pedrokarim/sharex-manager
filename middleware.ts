@@ -1,47 +1,87 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
-import type { NextRequest } from 'next/server'
+import type { NextRequest } from "next/server";
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const isAuthPage = req.nextUrl.pathname.startsWith("/login");
+const sxmDomain = process.env.NEXT_PUBLIC_SXM_DOMAIN;
+const imageDomain = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
 
-  if (isAuthPage) {
-    if (isLoggedIn) {
-      return NextResponse.redirect(new URL("/", req.nextUrl));
-    }
-    return null;
-  }
+// Configuration combinée
+export default auth(async function middleware(req) {
+	const path = req.nextUrl.pathname;
+	const isLoggedIn = !!req.auth;
 
-  if (!isLoggedIn && req.nextUrl.pathname !== "/") {
-    return NextResponse.redirect(new URL("/login", req.nextUrl));
-  }
+	const url = req.nextUrl.clone();
 
-  return null;
+	// get real domain
+	const realDomain = req.headers.get("host") || url.host || url.hostname;
+
+	console.log("realDomain >>>>>>> ", realDomain);
+
+	// Gestion du domaine principal
+	// if (realDomain === sxmDomain) {
+	// 	return NextResponse.rewrite(new URL(`/sxm-app${url.pathname}`, req.url));
+	// }
+
+	// Gestion du domaine d'images
+	if (realDomain === imageDomain) {
+		return NextResponse.rewrite(
+			new URL(`/img-handler${url.pathname}`, req.url),
+		);
+	}
+
+	// Gestion des routes API
+	const apiPublicRoutes = ["/api/auth", "/api/upload"];
+
+	if (path.startsWith("/api")) {
+		if (apiPublicRoutes.some((route) => path.startsWith(route))) {
+			return setCorsHeaders(NextResponse.next());
+		}
+
+		if (!isLoggedIn) {
+			return new NextResponse(JSON.stringify({ error: "Non autorisé" }), {
+				status: 401,
+				headers: {
+					"Content-Type": "application/json",
+					...corsHeaders,
+				},
+			});
+		}
+		return setCorsHeaders(NextResponse.next());
+	}
+
+	// Gestion des routes pages
+	const isAuthPage = path.startsWith("/login");
+
+	if (isAuthPage) {
+		if (isLoggedIn) {
+			return NextResponse.redirect(new URL("/", req.nextUrl));
+		}
+		return setCorsHeaders(NextResponse.next());
+	}
+
+	// Autoriser l'accès à la page d'accueil sans authentification
+	if (!isLoggedIn && path !== "/") {
+		return NextResponse.redirect(new URL("/login", req.nextUrl));
+	}
+
+	return setCorsHeaders(NextResponse.next());
 });
 
-export function middleware(request: NextRequest) {
-  const response = NextResponse.next()
+// Configuration CORS
+const corsHeaders = {
+	"Access-Control-Allow-Origin": "*",
+	"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+	"Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
 
-  // Autoriser les requêtes depuis localhost:3000
-  response.headers.set('Access-Control-Allow-Origin', '*')
-  
-  // Autoriser les méthodes HTTP
-  response.headers.set(
-    'Access-Control-Allow-Methods',
-    'GET, POST, PUT, DELETE, OPTIONS'
-  )
-  
-  // Autoriser les en-têtes
-  response.headers.set(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization'
-  )
+const setCorsHeaders = (response: NextResponse) => {
+	Object.entries(corsHeaders).forEach(([key, value]) => {
+		response.headers.set(key, value);
+	});
+	return response;
+};
 
-  return response
-}
-
-// Voir https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
+// Configuration du matcher
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+	matcher: ["/((?!_next/static|_next/image|favicon.ico).*)", "/api/:path*"],
 };
