@@ -9,14 +9,7 @@ const DATA_DIR = join(process.cwd(), "data");
 const CONFIG_DIR = join(process.cwd(), "config");
 
 const DEFAULT_FILES = {
-  "data/users.json": [
-    {
-      id: "usr_default_admin",
-      username: "admin",
-      password: "admin",
-      role: "admin",
-    },
-  ],
+  "data/users.json": [],
   "data/history.json": [],
   "data/deletion-tokens.json": [],
   "data/api-keys.json": [],
