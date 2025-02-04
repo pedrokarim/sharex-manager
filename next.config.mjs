@@ -20,11 +20,19 @@ const nextConfig = {
         ],
     },
     async rewrites() {
+        const domaineImg = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
+        const domaineApp = process.env.NEXT_PUBLIC_APP_DOMAIN;
+
+        if (!domaineImg || !domaineApp) {
+            console.error('NEXT_PUBLIC_IMAGE_DOMAIN et NEXT_PUBLIC_APP_DOMAIN doivent être définis');
+            return [];
+        }
+
         return [
             {
                 source: '/:path*', // Capture toutes les requêtes
-                has: [{ type: 'host', value: 'img.ascencia.io' }], // Vérifie le domaine
-                destination: 'http://sxm.ascencia.io/img-handler/:path*', // Redirige vers la nouvelle URL
+                has: [{ type: 'host', value: domaineImg }], // Vérifie le domaine
+                destination: `http://${domaineApp}/img-handler/:path*`, // Redirige vers la nouvelle URL
             },
         ];
     },
