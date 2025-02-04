@@ -44,7 +44,7 @@ async function getUploadPath(
   config: UploadConfig,
   fileName: string
 ): Promise<string> {
-  const baseDir = join(process.cwd(), "public", `${config.storage.path}`);
+  const baseDir = getAbsoluteUploadPath();
 
   switch (config.storage.structure) {
     case "date": {

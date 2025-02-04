@@ -3,6 +3,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { auth } from "@/auth";
 import { getAllHistory } from "@/lib/history";
+import { getAbsoluteUploadPath } from "@/lib/config";
 
 interface FileStats {
   totalFiles: number;
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
+    const uploadsDir = getAbsoluteUploadPath();
     const files = await fs.readdir(uploadsDir);
     const history = await getAllHistory();
 

@@ -19,6 +19,15 @@ const nextConfig = {
             },
         ],
     },
+    async rewrites() {
+        return [
+            {
+                source: '/:path*', // Capture toutes les requêtes
+                has: [{ type: 'host', value: 'img.ascencia.io' }], // Vérifie le domaine
+                destination: 'http://sxm.ascencia.io/img-handler/:path*', // Redirige vers la nouvelle URL
+            },
+        ];
+    },
 };
 
 export default nextConfig;
