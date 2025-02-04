@@ -19,17 +19,51 @@ async function serveFileNotFound() {
   });
 }
 
+function getClientInfo(request: NextRequest) {
+  const ip = request.ip || 
+             request.headers.get('x-forwarded-for') || 
+             request.headers.get('x-real-ip') || 
+             'IP inconnue';
+             
+  const userAgent = request.headers.get('user-agent') || 'User-Agent inconnu';
+  const referer = request.headers.get('referer') || 'Referer inconnu';
+  
+  return {
+    ip,
+    userAgent,
+    referer,
+    method: request.method,
+    url: request.url,
+    timestamp: new Date().toISOString()
+  };
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { filename: string } }
 ) {
+  const clientInfo = getClientInfo(request);
+  
   try {
     // Sécurisation : on ne prend que le nom du fichier, sans chemin
     const filename = params.filename.replace(/[/\\]/g, "");
 
+    // Log de la requête
+    console.log('Nouvelle requête image :', {
+      ...clientInfo,
+      filename,
+      status: 'début'
+    });
+
     // Vérifier si le fichier a une extension
     const ext = filename.split(".").pop()?.toLowerCase();
     if (!ext) {
+      console.log('Requête échouée :', {
+        ...clientInfo,
+        filename,
+        error: 'Extension manquante',
+        status: 'échec'
+      });
       return serveFileNotFound();
     }
 
@@ -38,6 +72,12 @@ export async function GET(
     // Vérifier si le fichier existe
     const stats = await stat(filePath);
     if (!stats.isFile()) {
+      console.log('Requête échouée :', {
+        ...clientInfo,
+        filename,
+        error: 'Fichier non trouvé',
+        status: 'échec'
+      });
       return serveFileNotFound();
     }
 
@@ -54,11 +94,25 @@ export async function GET(
 
     const contentType = mimeTypes[ext];
     if (!contentType) {
+      console.log('Requête échouée :', {
+        ...clientInfo,
+        filename,
+        error: 'Type MIME non supporté',
+        status: 'échec'
+      });
       return serveFileNotFound();
     }
 
     // Créer un stream de lecture du fichier
     const fileStream = createReadStream(filePath);
+
+    console.log('Requête réussie :', {
+      ...clientInfo,
+      filename,
+      fileSize: stats.size,
+      contentType,
+      status: 'succès'
+    });
 
     // Retourner le fichier avec le bon type MIME
     return new Response(fileStream as any, {
@@ -68,7 +122,12 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Erreur lors de la lecture du fichier:", error);
+    console.error('Erreur critique :', {
+      ...clientInfo,
+      filename: params.filename,
+      error: error instanceof Error ? error.message : 'Erreur inconnue',
+      status: 'erreur critique'
+    });
     return serveFileNotFound();
   }
 }
