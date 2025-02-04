@@ -44,10 +44,17 @@ export async function middleware(req: NextRequest) {
 	}
 
 	// Gestion des routes API
-	const apiPublicRoutes = ["/api/auth", "/api/upload"];
+	const apiPublicRoutes = {
+		exact: ["/api/upload"],
+		startsWith: ["/api/auth"]
+	};
 
 	if (path.startsWith("/api")) {
-		if (apiPublicRoutes.some((route) => path.startsWith(route))) {
+		// Vérification des routes publiques
+		if (
+			apiPublicRoutes.exact.includes(path) || 
+			apiPublicRoutes.startsWith.some(route => path.startsWith(route))
+		) {
 			return setCorsHeaders(NextResponse.next());
 		}
 

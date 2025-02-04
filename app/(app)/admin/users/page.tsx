@@ -14,7 +14,7 @@ export default async function UsersPage() {
   );
 
   if (response.status === 401) {
-    redirect("/auth/login");
+    redirect("/login");
   }
 
   let users: any[] = [];
@@ -22,8 +22,6 @@ export default async function UsersPage() {
   if (response.ok) {
     users = await response.json();
   }
-
-  console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>> ", users);
 
   return <UsersPageClient initialUsers={users || []} />;
 }

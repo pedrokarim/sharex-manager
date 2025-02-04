@@ -12,7 +12,7 @@ export default async function RootLayout({
   const session = await auth();
 
   if (!session?.user) {
-    redirect("/auth/login");
+    redirect("/login");
   }
 
   return (

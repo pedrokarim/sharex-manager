@@ -43,7 +43,7 @@ export async function GET(request: Request) {
           
           return {
             name: entry.name,
-            url: `/api/uploads/${entry.name}`,
+            url: `/api/files/${entry.name}`,
             size: stats.size,
             createdAt: fileDate.toISOString(),
           };
