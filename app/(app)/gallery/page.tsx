@@ -21,7 +21,7 @@ export default async function GalleryPage({
   }
 
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/files?page=1&q=${searchParams.q || ""}`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/files?page=1&limit=20&q=${searchParams.q || ""}`, {
       cache: "no-store",
       headers: {
         Cookie: cookieStore.toString()
@@ -35,6 +35,7 @@ export default async function GalleryPage({
         initialHasMore={data.hasMore}
         initialView={searchParams.view as "grid" | "list" | "details"}
         initialSearch={searchParams.q}
+        initialPage={1}
       />
     )
   } catch (error) {
@@ -45,6 +46,7 @@ export default async function GalleryPage({
         initialHasMore={false}
         initialView={searchParams.view as "grid" | "list" | "details"}
         initialSearch={searchParams.q}
+        initialPage={1}
       />
     )
   }

@@ -14,6 +14,8 @@ export default auth(async function middleware(req) {
 	// get real domain
 	const realDomain = req.headers.get("host") || url.host || url.hostname;
 
+	console.log("[LOG] realDomain: ", realDomain, " - imageDomain: ", imageDomain);
+
 	// Gestion du domaine d'images
 	if (realDomain === imageDomain) {
 		return NextResponse.rewrite(

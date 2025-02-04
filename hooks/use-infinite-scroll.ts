@@ -1,24 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { useInView } from "react-intersection-observer";
 
-interface UseInfiniteScrollProps<T> {
+interface UseInfiniteScrollOptions<T> {
   initialData: T[];
   fetchMore: (page: number) => Promise<T[]>;
   hasMore: boolean;
+  skipInitialFetch?: boolean;
 }
 
 export function useInfiniteScroll<T>({
   initialData,
   fetchMore,
   hasMore,
-}: UseInfiniteScrollProps<T>) {
+  skipInitialFetch = false
+}: UseInfiniteScrollOptions<T>) {
   const [data, setData] = useState<T[]>(initialData);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const { ref, inView } = useInView();
 
   useEffect(() => {
-    if (inView && hasMore && !loading) {
+    if (!hasMore || loading || skipInitialFetch) return
+
+    const loadMore = async () => {
       setLoading(true);
       fetchMore(page)
         .then((newData) => {
@@ -27,7 +31,9 @@ export function useInfiniteScroll<T>({
         })
         .finally(() => setLoading(false));
     }
-  }, [inView, hasMore, page, fetchMore, loading]);
+
+    loadMore()
+  }, [hasMore, loading, skipInitialFetch, page, fetchMore]);
 
   const reset = async (newData: T[]) => {
     setData(newData);

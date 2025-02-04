@@ -34,19 +34,21 @@ interface GalleryClientProps {
   initialHasMore: boolean
   initialView?: "grid" | "list" | "details"
   initialSearch?: string
+  initialPage: number
 }
 
 export function GalleryClient({
   initialFiles,
   initialHasMore,
   initialView = "grid",
-  initialSearch = ""
+  initialSearch = "",
+  initialPage
 }: GalleryClientProps) {
   const { data: session, status } = useSession()
   const [search] = useQueryState("q")
   const [hasMore, setHasMore] = useState(initialHasMore)
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(initialPage)
   const [viewMode] = useQueryState<"grid" | "list" | "details">("view", {
     defaultValue: initialView,
     parse: (value): "grid" | "list" | "details" => {
@@ -66,9 +68,14 @@ export function GalleryClient({
   }
 
   useEffect(() => {
-    resetSearch()
-    fetchFiles(1)
-  }, [search])
+    if (search !== initialSearch && search !== undefined) {
+      resetSearch()
+      reset([])
+      fetchFiles(1).then(newFiles => {
+        reset(newFiles)
+      })
+    }
+  }, [search, initialSearch])
 
   const fetchFiles = async (page: number) => {
     try {
@@ -91,6 +98,7 @@ export function GalleryClient({
     initialData: initialFiles,
     fetchMore: fetchFiles,
     hasMore,
+    skipInitialFetch: true
   })
 
   useEffect(() => {
