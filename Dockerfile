@@ -36,7 +36,7 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
 # Exposition du port (sera écrasé par docker-compose)
-EXPOSE 3000
+# EXPOSE 3000
 
 # Définir les volumes
 VOLUME ["/app/uploads", "/app/config", "/app/data"]
