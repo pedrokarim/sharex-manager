@@ -19,7 +19,10 @@ export function NavUser() {
   const { isMobile } = useSidebar()
 
   const handleSignOut = async () => {
-    await signOut()
+    await signOut({
+      redirect: true,
+      redirectTo: "/",
+    })
     toast.success("Déconnexion réussie")
   }
 

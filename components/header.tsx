@@ -11,7 +11,10 @@ export function Header() {
   const { data: session } = useSession()
 
   const handleSignOut = async () => {
-    await signOut()
+    await signOut({
+      redirect: true,
+      redirectTo: "/",
+    })
     toast.success("Déconnexion réussie")
   }
 
