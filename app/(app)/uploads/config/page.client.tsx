@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { uploadConfigSchema, type UploadConfig } from "@/schemas/upload-config";
 import { Form } from "@/components/ui/form";
-import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -57,32 +56,32 @@ export function ConfigPageClient() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <Tabs defaultValue="general" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="general">Général</TabsTrigger>
-            <TabsTrigger value="thumbnails">Miniatures</TabsTrigger>
-            <TabsTrigger value="storage">Stockage</TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="general" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="general">Général</TabsTrigger>
+              <TabsTrigger value="thumbnails">Miniatures</TabsTrigger>
+              <TabsTrigger value="storage">Stockage</TabsTrigger>
+            </TabsList>
 
             <TabsContent value="general">
               <GeneralTab form={form} />
-          </TabsContent>
+            </TabsContent>
 
             <TabsContent value="thumbnails">
               <ThumbnailsTab form={form} />
-          </TabsContent>
+            </TabsContent>
 
             <TabsContent value="storage">
               <StorageTab form={form} />
-          </TabsContent>
-        </Tabs>
+            </TabsContent>
+          </Tabs>
 
           <div className="flex justify-end">
             <Button type="submit" disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sauvegarder
             </Button>
-      </div>
+          </div>
         </form>
       </Form>
     </main>
