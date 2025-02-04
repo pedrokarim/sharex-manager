@@ -6,12 +6,14 @@ services:
       context: .
       target: runner
     ports:
-      - "${PORT:-3000}:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     environment:
+      - PORT=${PORT:-3000}
       - NODE_ENV=production
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_URL=${AUTH_URL:-http://localhost:3000}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_IMAGE_DOMAIN=${NEXT_PUBLIC_IMAGE_DOMAIN:-img.ascencia.re}
       - TZ=Europe/Paris
     restart: unless-stopped
     user: "${UID:-1000}:${GID:-1000}"

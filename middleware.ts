@@ -2,7 +2,6 @@ import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const sxmDomain = process.env.NEXT_PUBLIC_SXM_DOMAIN;
 const imageDomain = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
 
 // Configuration combinée
@@ -14,13 +13,6 @@ export default auth(async function middleware(req) {
 
 	// get real domain
 	const realDomain = req.headers.get("host") || url.host || url.hostname;
-
-	console.log("realDomain >>>>>>> ", realDomain);
-
-	// Gestion du domaine principal
-	// if (realDomain === sxmDomain) {
-	// 	return NextResponse.rewrite(new URL(`/sxm-app${url.pathname}`, req.url));
-	// }
 
 	// Gestion du domaine d'images
 	if (realDomain === imageDomain) {

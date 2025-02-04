@@ -1,8 +1,8 @@
 {
   "allowedTypes": {
     "images": true,
-    "documents": false,
-    "archives": false
+    "documents": true,
+    "archives": true
   },
   "limits": {
     "maxFileSize": 10,
