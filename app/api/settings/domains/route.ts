@@ -45,6 +45,12 @@ export async function POST(request: NextRequest) {
     if (config.domains.list.length === 0) {
       newDomain.isDefault = true;
       config.domains.defaultDomain = newDomain.id;
+    } else if (newDomain.isDefault) {
+      // Si le nouveau domaine est défini comme par défaut, retirer le statut par défaut des autres domaines
+      config.domains.list.forEach((d: Domain) => {
+        d.isDefault = false;
+      });
+      config.domains.defaultDomain = newDomain.id;
     }
 
     config.domains.list.push(newDomain);
@@ -91,7 +97,9 @@ export async function PUT(request: NextRequest) {
     if (updates.isDefault) {
       // Retirer le statut par défaut des autres domaines
       config.domains.list.forEach((d: Domain) => {
-        d.isDefault = false;
+        if (d.id !== updates.id) {
+          d.isDefault = false;
+        }
       });
       config.domains.defaultDomain = updates.id;
     }

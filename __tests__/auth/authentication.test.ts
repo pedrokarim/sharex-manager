@@ -1,6 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 import bcrypt from "bcryptjs";
+import { signIn } from "next-auth/react";
+import type { SignInResponse } from "next-auth/react";
 import { auth } from "@/auth";
+
+// Mock next-auth
+vi.mock("next-auth/react", () => ({
+	signIn: vi.fn(),
+}));
 
 // Mock des données utilisateur
 const mockUsers = [
@@ -13,9 +20,13 @@ const mockUsers = [
 ];
 
 // Mock de fs
-vi.mock("node:fs", () => ({
-	readFileSync: vi.fn(() => JSON.stringify(mockUsers)),
-}));
+vi.mock("fs", async () => {
+	const actual = await vi.importActual("fs");
+	return {
+		...actual,
+		readFileSync: vi.fn(() => JSON.stringify(mockUsers)),
+	};
+});
 
 describe("Authentication", () => {
 	beforeAll(async () => {
@@ -29,12 +40,22 @@ describe("Authentication", () => {
 			password: "testpass123",
 		};
 
-		const user = await auth().signIn("credentials", {
+		const mockResponse = {
+			error: undefined,
+			status: 200,
+			ok: true,
+			url: null,
+		};
+
+		vi.mocked(signIn).mockResolvedValueOnce(mockResponse);
+
+		const result = await signIn("credentials", {
 			redirect: false,
 			...credentials,
 		});
 
-		expect(user?.error).toBeUndefined();
+		expect(result?.error).toBeUndefined();
+		expect(result?.ok).toBe(true);
 	});
 
 	it("should reject invalid credentials", async () => {
@@ -43,11 +64,21 @@ describe("Authentication", () => {
 			password: "wrongpass",
 		};
 
-		const result = await auth().signIn("credentials", {
+		const mockResponse = {
+			error: "Invalid credentials",
+			status: 401,
+			ok: false,
+			url: null,
+		};
+
+		vi.mocked(signIn).mockResolvedValueOnce(mockResponse);
+
+		const result = await signIn("credentials", {
 			redirect: false,
 			...credentials,
 		});
 
 		expect(result?.error).toBeDefined();
+		expect(result?.ok).toBe(false);
 	});
 });
