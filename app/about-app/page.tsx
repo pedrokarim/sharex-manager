@@ -8,7 +8,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Mail, Globe, ArrowLeft } from "lucide-react";
-import { appConfig } from "@/config/constant";
+import { appConfig } from "@/lib/constant";
 import { Separator } from "@/components/ui/separator";
 
 export default function AboutPage() {
