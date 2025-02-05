@@ -41,6 +41,7 @@ data/*.json
 config/uploads.json
 public/uploads/*
 public/thumbnails/*
+data/users.test.json
 
 # uploads
 /uploads

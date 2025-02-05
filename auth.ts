@@ -3,11 +3,13 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 
 interface User {
 	id: string;
 	username: string;
-	role: string;
+	password: string;
+	role: "admin" | "user";
 }
 
 const userSchema = z.object({
@@ -27,15 +29,20 @@ export const {
 				try {
 					const users = JSON.parse(
 						readFileSync(join(process.cwd(), "data/users.json"), "utf-8"),
-					);
+					) as User[];
 
 					const parsed = userSchema.parse(credentials);
-					const user = users.find(
-						(u: User) =>
-							u.username === parsed.username && u.password === parsed.password,
+					const user = users.find((u) => u.username === parsed.username);
+
+					if (!user) return null;
+
+					// Vérification du mot de passe avec bcrypt
+					const passwordMatch = await bcrypt.compare(
+						parsed.password,
+						user.password,
 					);
 
-					if (user) {
+					if (passwordMatch) {
 						return {
 							id: user.id,
 							name: user.username,

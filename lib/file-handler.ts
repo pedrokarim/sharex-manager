@@ -1,6 +1,6 @@
 import { createReadStream } from "fs";
 import { stat } from "fs/promises";
-import { Duplex } from "node:stream";
+import { Duplex } from "stream";
 import type { NextRequest } from "next/server";
 
 export interface ClientInfo {
