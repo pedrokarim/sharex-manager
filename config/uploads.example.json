@@ -24,7 +24,7 @@
   },
   "storage": {
     "path": "./uploads",
-    "structure": "type",
+    "structure": "flat",
     "preserveFilenames": false,
     "replaceExisting": false,
     "thumbnailsPath": "thumbnails",
@@ -48,7 +48,7 @@
     ],
     "defaultDomain": "default",
     "useSSL": true,
-    "pathPrefix": "/uploads"
+    "pathPrefix": "/"
   },
   "uploads": [],
   "lastUpdate": ""

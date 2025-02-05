@@ -1,70 +1,32 @@
-'use client'
+import { Image } from "lucide-react";
 
-import { signIn } from 'next-auth/react'
-import { useState } from 'react'
-import { toast } from "sonner"
+import { LoginForm } from "@/components/login-form";
 
 export default function LoginPage() {
-  const [error, setError] = useState('')
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const formData = new FormData(e.currentTarget)
-    
-    const res = await signIn('credentials', {
-      username: formData.get('username'),
-      password: formData.get('password'),
-      redirect: true,
-      callbackUrl: '/gallery',
-    })
-
-    if (res?.error) {
-      toast.error("Identifiants invalides")
-    }
-  }
-
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-md p-8">
-        <h1 className="text-2xl font-bold text-center">Connexion</h1>
-        
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Nom d'utilisateur
-          </label>
-          <input
-            name="username"
-            type="text"
-            required
-            className="w-full p-2 border rounded"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Mot de passe
-          </label>
-          <input
-            name="password"
-            type="password"
-            required
-            className="w-full p-2 border rounded"
-          />
-        </div>
-
-        <button
-          type="submit"
-          className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-        >
-          Se connecter
-        </button>
-      </form>
-    </div>
-  )
-} 
+	return (
+		<div className="grid min-h-svh lg:grid-cols-2">
+			<div className="flex flex-col gap-4 p-6 md:p-10">
+				<div className="flex justify-center gap-2 md:justify-start">
+					<a href="/" className="flex items-center gap-2 font-medium">
+						<div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+							<Image className="size-4" />
+						</div>
+						ShareX Manager
+					</a>
+				</div>
+				<div className="flex flex-1 items-center justify-center">
+					<div className="w-full max-w-xs">
+						<LoginForm />
+					</div>
+				</div>
+			</div>
+			<div className="relative hidden bg-muted lg:block">
+				<img
+					src="/login_bg.jpg"
+					alt="Background Login"
+					className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+				/>
+			</div>
+		</div>
+	);
+}

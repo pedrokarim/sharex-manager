@@ -38,6 +38,7 @@ next-env.d.ts
 
 # JSON
 data/*.json
+config/uploads.json
 public/uploads/*
 public/thumbnails/*
 
