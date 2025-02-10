@@ -1,5 +1,5 @@
 import type { Log, CreateLogOptions } from "@/lib/types/logs";
-import Database from "better-sqlite3";
+import { Database } from "bun:sqlite";
 import { join } from "path";
 import { existsSync, mkdirSync } from "fs";
 
@@ -9,30 +9,27 @@ interface Statement {
 }
 
 class LogDatabase {
-  private db: Database.Database;
-  private static instance: LogDatabase;
+  private static dbPath: string;
 
-  private constructor() {
-    const dataDir = join(process.cwd(), "data");
-    // Créer le dossier data s'il n'existe pas
-    if (!existsSync(dataDir)) {
-      mkdirSync(dataDir, { recursive: true });
+  private static initDbPath() {
+    if (!LogDatabase.dbPath) {
+      const dataDir = join(process.cwd(), "data");
+      if (!existsSync(dataDir)) {
+        mkdirSync(dataDir, { recursive: true });
+      }
+      LogDatabase.dbPath = join(dataDir, "logs.db");
     }
-
-    const dbPath = join(dataDir, "logs.db");
-    this.db = new Database(dbPath);
-    this.init();
+    return LogDatabase.dbPath;
   }
 
-  public static getInstance(): LogDatabase {
-    if (!LogDatabase.instance) {
-      LogDatabase.instance = new LogDatabase();
-    }
-    return LogDatabase.instance;
+  private static getConnection(): Database {
+    const db = new Database(LogDatabase.initDbPath(), { create: true });
+    db.run("PRAGMA journal_mode = WAL");
+    return db;
   }
 
-  private init() {
-    const stmt = this.db.prepare(`
+  private static initTable(db: Database) {
+    db.run(`
       CREATE TABLE IF NOT EXISTS logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         timestamp TEXT NOT NULL,
@@ -46,14 +43,16 @@ class LogDatabase {
         userAgent TEXT
       )
     `);
-    stmt.run();
   }
 
-  public createLog(options: CreateLogOptions): Log {
+  public static createLog(options: CreateLogOptions): Log {
+    const db = LogDatabase.getConnection();
+    LogDatabase.initTable(db);
+
     const timestamp = new Date().toISOString();
     const metadata = options.metadata ? JSON.stringify(options.metadata) : null;
 
-    const query = this.db.prepare(`
+    const query = db.prepare(`
       INSERT INTO logs (timestamp, level, action, userId, userEmail, message, metadata, ip, userAgent)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
@@ -78,7 +77,7 @@ class LogDatabase {
     };
   }
 
-  public getLogs(
+  public static getLogs(
     limit = 50,
     offset = 0,
     filters?: {
@@ -89,6 +88,9 @@ class LogDatabase {
       endDate?: string;
     }
   ): Log[] {
+    const db = LogDatabase.getConnection();
+    LogDatabase.initTable(db);
+
     let query = `
       SELECT * FROM logs 
       WHERE 1=1
@@ -123,13 +125,16 @@ class LogDatabase {
     query += ` ORDER BY timestamp DESC LIMIT ? OFFSET ?`;
     params.push(limit, offset);
 
-    const stmt = this.db.prepare(query);
+    const stmt = db.prepare(query);
     const results = stmt.all(...params);
-    return this.mapLogsFromDb(results);
+    return LogDatabase.mapLogsFromDb(results);
   }
 
-  public getLogsByUser(userId: string, limit = 50, offset = 0): Log[] {
-    const query = this.db.prepare(`
+  public static getLogsByUser(userId: string, limit = 50, offset = 0): Log[] {
+    const db = LogDatabase.getConnection();
+    LogDatabase.initTable(db);
+
+    const query = db.prepare(`
       SELECT * FROM logs 
       WHERE userId = ? 
       ORDER BY timestamp DESC 
@@ -137,11 +142,14 @@ class LogDatabase {
     `);
 
     const results = query.all(userId, limit, offset);
-    return this.mapLogsFromDb(results);
+    return LogDatabase.mapLogsFromDb(results);
   }
 
-  public getLogsByLevel(level: string, limit = 50, offset = 0): Log[] {
-    const query = this.db.prepare(`
+  public static getLogsByLevel(level: string, limit = 50, offset = 0): Log[] {
+    const db = LogDatabase.getConnection();
+    LogDatabase.initTable(db);
+
+    const query = db.prepare(`
       SELECT * FROM logs 
       WHERE level = ? 
       ORDER BY timestamp DESC 
@@ -149,11 +157,14 @@ class LogDatabase {
     `);
 
     const results = query.all(level, limit, offset);
-    return this.mapLogsFromDb(results);
+    return LogDatabase.mapLogsFromDb(results);
   }
 
-  public getLogsByAction(action: string, limit = 50, offset = 0): Log[] {
-    const query = this.db.prepare(`
+  public static getLogsByAction(action: string, limit = 50, offset = 0): Log[] {
+    const db = LogDatabase.getConnection();
+    LogDatabase.initTable(db);
+
+    const query = db.prepare(`
       SELECT * FROM logs 
       WHERE action = ? 
       ORDER BY timestamp DESC 
@@ -161,20 +172,23 @@ class LogDatabase {
     `);
 
     const results = query.all(action, limit, offset);
-    return this.mapLogsFromDb(results);
+    return LogDatabase.mapLogsFromDb(results);
   }
 
-  private mapLogsFromDb(results: any[]): Log[] {
+  private static mapLogsFromDb(results: any[]): Log[] {
     return results.map((row) => ({
       ...row,
       metadata: row.metadata ? JSON.parse(row.metadata) : {},
     }));
   }
 
-  public clearLogs(): void {
-    const stmt = this.db.prepare("DELETE FROM logs");
+  public static clearLogs(): void {
+    const db = LogDatabase.getConnection();
+    LogDatabase.initTable(db);
+
+    const stmt = db.prepare("DELETE FROM logs");
     stmt.run();
   }
 }
 
-export const logDb = LogDatabase.getInstance();
+export const logDb = LogDatabase;

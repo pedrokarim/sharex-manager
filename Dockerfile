@@ -4,7 +4,7 @@ WORKDIR /app
 # Installation des dépendances
 FROM base AS deps
 COPY package.json bun.lockb ./
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Build
 FROM base AS builder
@@ -36,13 +36,10 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Exposition du port (sera écrasé par docker-compose)
-# EXPOSE 3000
-
 # Définir les volumes
 VOLUME ["/app/uploads", "/app/config", "/app/data"]
 
 # Créer le dossier cache et définir les permissions
 RUN mkdir -p .next/cache && chown -R 1000:1000 .next
 
-CMD ["bun", "server.js"] 
+CMD ["bun", "server.js"]
