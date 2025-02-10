@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/auth";
-// import { logger } from "@/lib/utils/logger";
+import { isEdgeRuntime } from "@/lib/utils";
+import type { LogAction } from "@/lib/types/logs";
 
 const imageDomain = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
 
@@ -32,6 +33,28 @@ export const config = {
   ],
 };
 
+// Fonction de journalisation sécurisée pour le middleware
+const safeLog = async (options: {
+  level: "info" | "warning" | "error";
+  action: LogAction;
+  message: string;
+  userId?: string;
+  userEmail?: string;
+  metadata?: any;
+  ip?: string;
+  userAgent?: string;
+}) => {
+  console.log(
+    `[Edge Runtime Log] ${options.level.toUpperCase()} - ${options.action}: ${
+      options.message
+    }`,
+    {
+      ...options,
+      timestamp: new Date().toISOString(),
+    }
+  );
+};
+
 // Configuration du middleware
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
@@ -47,7 +70,7 @@ export async function middleware(req: NextRequest) {
 
   // Gestion des routes API
   const apiPublicRoutes = {
-    exact: ["/api/upload"],
+    exact: ["/api/upload", "/api/logs"],
     startsWith: ["/api/auth"],
   };
 
@@ -63,6 +86,14 @@ export async function middleware(req: NextRequest) {
     // Vérification de l'authentification avec Next Auth 5
     const session = await auth();
     if (!session) {
+      await safeLog({
+        level: "warning",
+        action: "auth.unauthorized" as LogAction,
+        message: "Tentative d'accès non autorisé à l'API",
+        ip: req.ip || req.headers.get("x-forwarded-for") || "unknown",
+        userAgent: req.headers.get("user-agent") || "unknown",
+        metadata: { path },
+      });
       return new NextResponse(JSON.stringify({ error: "Non autorisé" }), {
         status: 401,
         headers: {
@@ -77,20 +108,29 @@ export async function middleware(req: NextRequest) {
   // Vérification de l'authentification avec Next Auth 5
   const session = await auth();
   if (!session) {
+    await safeLog({
+      level: "warning",
+      action: "auth.unauthorized" as LogAction,
+      message: "Tentative d'accès non autorisé",
+      ip: req.ip || req.headers.get("x-forwarded-for") || "unknown",
+      userAgent: req.headers.get("user-agent") || "unknown",
+      metadata: { path },
+    });
     return NextResponse.redirect(new URL("/login", req.nextUrl));
   }
 
   // Gérer les tentatives de connexion
   if (path === "/api/auth/callback/credentials") {
     const email = req.nextUrl.searchParams.get("email");
-
-    // Pour les tentatives de connexion, on utilise un ID temporaire
-    // await logger.logAuthAction("auth.login", "Tentative de connexion", {
-    //   userId: "temp-" + Date.now(), // ID temporaire pour satisfaire le type
-    //   userEmail: email || "inconnu",
-    //   ip: req.ip || req.headers.get("x-forwarded-for") || "inconnu",
-    //   userAgent: req.headers.get("user-agent") || "inconnu",
-    // });
+    await safeLog({
+      level: "info",
+      action: "auth.login" as LogAction,
+      message: "Tentative de connexion",
+      userEmail: email || "inconnu",
+      ip: req.ip || req.headers.get("x-forwarded-for") || "unknown",
+      userAgent: req.headers.get("user-agent") || "unknown",
+      metadata: { email },
+    });
   }
 
   return setCorsHeaders(NextResponse.next());

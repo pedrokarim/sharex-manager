@@ -27,6 +27,7 @@ interface FileWithPreview extends File {
 
 interface UploadZoneProps {
   children: React.ReactNode;
+  onFinishUpload?: () => void;
 }
 
 const fileRejectionMessages = {
@@ -40,7 +41,7 @@ const fileRejectionMessages = {
   "file-too-many-archives": "Vous ne pouvez uploader que 10 archives à la fois",
 };
 
-export const UploadZone = ({ children }: UploadZoneProps) => {
+export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [filesToUpload, setFilesToUpload] = useState<FileWithPreview[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -289,6 +290,10 @@ export const UploadZone = ({ children }: UploadZoneProps) => {
 
     setIsUploading(false);
     clearFiles();
+
+    if (onFinishUpload) {
+      onFinishUpload();
+    }
   };
 
   if (isLoading) {

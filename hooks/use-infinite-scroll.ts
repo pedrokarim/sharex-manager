@@ -29,15 +29,15 @@ export function useInfiniteScroll<T>({
     }
   }, [inView, hasMore, page, fetchMore, loading]);
 
-  // const reset = async (newData: T[]) => {
-  //   setData(newData);
-  //   setPage(2); // On commence à 2 car les premières données sont déjà chargées
-  // };
+  const reset = async (newData: T[]) => {
+    setData(newData);
+    setPage(2); // On commence à 2 car les premières données sont déjà chargées
+  };
 
   return {
     data,
     loading,
     ref,
-    // reset,
+    reset,
   };
 }
