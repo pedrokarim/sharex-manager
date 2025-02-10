@@ -20,19 +20,18 @@ const nextConfig = {
         ],
     },
     async rewrites() {
-        const domaineImg = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
-        const domaineApp = process.env.NEXT_PUBLIC_APP_DOMAIN;
-
-        if (!domaineImg || !domaineApp) {
-            console.error('NEXT_PUBLIC_IMAGE_DOMAIN et NEXT_PUBLIC_APP_DOMAIN doivent être définis');
-            return [];
-        }
-
         return [
             {
-                source: '/:path*', // Capture toutes les requêtes
-                has: [{ type: 'host', value: domaineImg }], // Vérifie le domaine
-                destination: `http://${domaineApp}/img-handler/:path*`, // Redirige vers la nouvelle URL
+                // Pour le dev
+                source: '/:path*',
+                has: [{ type: 'host', value: "img.ascencia.io" }],
+                destination: `https://sxm.ascencia.io/img-handler/:path*`,
+            },
+            {
+                // Pour la prod
+                source: '/:path*',
+                has: [{ type: 'host', value: "img.ascencia.re" }],
+                destination: `https://sxm.ascencia.re/img-handler/:path*`,
             },
         ];
     },
