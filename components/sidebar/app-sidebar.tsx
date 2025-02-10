@@ -208,8 +208,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 				</SidebarMenu>
 			</SidebarHeader>
 			<SidebarContent>
-				<NavMain items={data.navMain} />
-				{isAdmin && <NavMain items={data.navAdmin} />}
+				<NavMain title="Galerie" items={data.navMain} />
+				{isAdmin && <NavMain title="Administration" items={data.navAdmin} />}
 				<NavProjects projects={data.projects} />
 				<NavSecondary items={data.navSecondary} className="mt-auto" />
 			</SidebarContent>
