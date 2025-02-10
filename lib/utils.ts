@@ -28,3 +28,7 @@ export function generateId(length: number = 12): string {
   }
   return result;
 }
+
+export const isEdgeRuntime = () => {
+  return process.env.NEXT_RUNTIME === "edge";
+};

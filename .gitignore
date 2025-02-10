@@ -43,6 +43,9 @@ public/uploads/*
 public/thumbnails/*
 data/users.test.json
 
+# DB
+data/*.db
+
 # uploads
 /uploads
 .idea

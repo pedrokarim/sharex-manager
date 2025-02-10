@@ -2,21 +2,21 @@
 
 import type * as React from "react";
 import {
-	Home,
-	Image as ImageIcon,
-	Upload,
-	Settings2,
-	FileImage,
-	History,
-	Star,
-	Settings,
-	FolderOpen,
-	Users,
-	Shield,
-	HelpCircle,
-	Send,
-	UserCog,
-	Info,
+  Home,
+  Image as ImageIcon,
+  Upload,
+  Settings2,
+  FileImage,
+  History,
+  Star,
+  Settings,
+  FolderOpen,
+  Users,
+  Shield,
+  HelpCircle,
+  Send,
+  UserCog,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -27,198 +27,202 @@ import { NavSecondary } from "./nav-secondary";
 import { NavUser } from "./nav-user";
 import { ThemeToggle } from "../theme-toggle";
 import {
-	Sidebar,
-	SidebarContent,
-	SidebarFooter,
-	SidebarHeader,
-	SidebarMenu,
-	SidebarMenuButton,
-	SidebarMenuItem,
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
 } from "../ui/sidebar";
 
 const data = {
-	user: {
-		name: "Admin",
-		email: "admin@sharex.com",
-		avatar: "/avatars/admin.jpg",
-	},
-	navMain: [
-		{
-			title: "Galerie",
-			url: "/gallery",
-			icon: ImageIcon,
-			isActive: true,
-			items: [
-				{
-					title: "Récents",
-					url: "/gallery?sort=recent",
-				},
-				{
-					title: "Favoris",
-					url: "/gallery?sort=starred",
-				},
-				{
-					title: "Paramètres",
-					url: "/gallery/settings",
-				},
-			],
-		},
-		{
-			title: "Uploads",
-			url: "/uploads",
-			icon: Upload,
-			items: [
-				{
-					title: "Historique",
-					url: "/uploads/history",
-				},
-				{
-					title: "Configuration",
-					url: "/uploads/config",
-				},
-				{
-					title: "Stats",
-					url: "/uploads/stats",
-				},
-			],
-		},
-		{
-			title: "Organisation",
-			url: "/organization",
-			icon: FolderOpen,
-			items: [
-				{
-					title: "Dossiers",
-					url: "/organization/folders",
-				},
-				{
-					title: "Tags",
-					url: "/organization/tags",
-				},
-				{
-					title: "Collections",
-					url: "/organization/collections",
-				},
-			],
-		},
-		{
-			title: "Paramètres",
-			url: "/settings",
-			icon: Settings2,
-			items: [
-				{
-					title: "Général",
-					url: "/settings/general",
-				},
-				{
-					title: "Clés API",
-					url: "/settings/api-keys",
-				},
-				{
-					title: "Sécurité",
-					url: "/settings/security",
-				},
-				{
-					title: "Intégrations",
-					url: "/settings/integrations",
-				},
-			],
-		},
-	],
-	navAdmin: [
-		{
-			title: "Administration",
-			url: "/admin",
-			icon: Shield,
-			items: [
-				{
-					title: "Utilisateurs",
-					url: "/admin/users",
-				},
-				{
-					title: "Statistiques",
-					url: "/admin/stats",
-				},
-				{
-					title: "Logs",
-					url: "/admin/logs",
-				},
-			],
-		},
-	],
-	navSecondary: [
-		{
-			title: "Support",
-			url: "/support",
-			icon: HelpCircle,
-		},
-		{
-			title: "Feedback",
-			url: "/feedback",
-			icon: Send,
-		},
-		{
-			title: "À propos de l'application",
-			url: "/about-app",
-			icon: Info,
-		},
-	],
-	projects: [
-		{
-			name: "Images Personnelles",
-			url: "/folders/personal",
-			icon: FileImage,
-		},
-		{
-			name: "Images Partagées",
-			url: "/folders/shared",
-			icon: Users,
-		},
-		{
-			name: "Images Sécurisées",
-			url: "/folders/secure",
-			icon: Shield,
-		},
-	],
+  user: {
+    name: "Admin",
+    email: "admin@sharex.com",
+    avatar: "/avatars/admin.jpg",
+  },
+  navMain: [
+    {
+      title: "Galerie",
+      url: "/gallery",
+      icon: ImageIcon,
+      isActive: true,
+      items: [
+        {
+          title: "Récents",
+          url: "/gallery?sort=recent",
+        },
+        {
+          title: "Favoris",
+          url: "/gallery?sort=starred",
+        },
+        {
+          title: "Paramètres",
+          url: "/gallery/settings",
+        },
+      ],
+    },
+    {
+      title: "Uploads",
+      url: "/uploads",
+      icon: Upload,
+      items: [
+        {
+          title: "Historique",
+          url: "/uploads/history",
+        },
+        {
+          title: "Configuration",
+          url: "/uploads/config",
+        },
+        {
+          title: "Stats",
+          url: "/uploads/stats",
+        },
+      ],
+    },
+    {
+      title: "Organisation",
+      url: "/organization",
+      icon: FolderOpen,
+      items: [
+        {
+          title: "Dossiers",
+          url: "/organization/folders",
+        },
+        {
+          title: "Tags",
+          url: "/organization/tags",
+        },
+        {
+          title: "Collections",
+          url: "/organization/collections",
+        },
+      ],
+    },
+    {
+      title: "Paramètres",
+      url: "/settings",
+      icon: Settings2,
+      items: [
+        {
+          title: "Général",
+          url: "/settings/general",
+        },
+        {
+          title: "Clés API",
+          url: "/settings/api-keys",
+        },
+        {
+          title: "Sécurité",
+          url: "/settings/security",
+        },
+        {
+          title: "Intégrations",
+          url: "/settings/integrations",
+        },
+      ],
+    },
+  ],
+  navAdmin: [
+    {
+      title: "Administration",
+      url: "/admin",
+      icon: Shield,
+      items: [
+        {
+          title: "Utilisateurs",
+          url: "/admin/users",
+        },
+        {
+          title: "Logs",
+          url: "/admin/logs",
+        },
+        {
+          title: "Configuration système",
+          url: "/admin/system",
+        },
+        {
+          title: "Sécurité",
+          url: "/admin/security",
+        },
+      ],
+    },
+  ],
+  navSecondary: [
+    {
+      title: "Support",
+      url: "/support",
+      icon: HelpCircle,
+    },
+    {
+      title: "Feedback",
+      url: "/feedback",
+      icon: Send,
+    },
+    {
+      title: "À propos de l'application",
+      url: "/about-app",
+      icon: Info,
+    },
+  ],
+  projects: [
+    {
+      name: "Images Personnelles",
+      url: "/folders/personal",
+      icon: FileImage,
+    },
+    {
+      name: "Images Partagées",
+      url: "/folders/shared",
+      icon: Users,
+    },
+    {
+      name: "Images Sécurisées",
+      url: "/folders/secure",
+      icon: Shield,
+    },
+  ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-	const { data: session } = useSession();
-	const isAdmin = session?.user?.role === "admin";
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "admin";
 
-	return (
-		<Sidebar collapsible="icon" {...props}>
-			<SidebarHeader>
-				<SidebarMenu>
-					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" asChild>
-							<Link href="/">
-								<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-									<ImageIcon className="size-4" />
-								</div>
-								<div className="grid flex-1 text-left text-sm leading-tight">
-									<span className="truncate font-semibold">ShareX Manager</span>
-									<span className="truncate text-xs">
-										Gestionnaire d'images
-									</span>
-								</div>
-							</Link>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				</SidebarMenu>
-			</SidebarHeader>
-			<SidebarContent>
-				<NavMain title="Galerie" items={data.navMain} />
-				{isAdmin && <NavMain title="Administration" items={data.navAdmin} />}
-				<NavProjects projects={data.projects} />
-				<NavSecondary items={data.navSecondary} className="mt-auto" />
-			</SidebarContent>
-			<SidebarFooter>
-				<div className="p-2">
-					<ThemeToggle />
-				</div>
-				<NavUser />
-			</SidebarFooter>
-		</Sidebar>
-	);
+  return (
+    <Sidebar collapsible="icon" {...props}>
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <Link href="/">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                  <ImageIcon className="size-4" />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">ShareX Manager</span>
+                  <span className="truncate text-xs">
+                    Gestionnaire d'images
+                  </span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <NavMain title="Galerie" items={data.navMain} />
+        {isAdmin && <NavMain title="Administration" items={data.navAdmin} />}
+        <NavProjects projects={data.projects} />
+        <NavSecondary items={data.navSecondary} className="mt-auto" />
+      </SidebarContent>
+      <SidebarFooter>
+        <div className="p-2">
+          <ThemeToggle />
+        </div>
+        <NavUser />
+      </SidebarFooter>
+    </Sidebar>
+  );
 }

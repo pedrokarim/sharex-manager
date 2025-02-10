@@ -2,23 +2,82 @@ import { readFile, writeFile } from "fs/promises";
 import { resolve } from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { Domain } from "@/lib/types/upload-config";
+import { logDb } from "@/lib/utils/db";
+import { auth } from "@/auth";
 
 const CONFIG_PATH = resolve(process.cwd(), "config", "uploads.json");
 
 async function readConfig() {
-  const configFile = await readFile(CONFIG_PATH, "utf-8");
-  return JSON.parse(configFile);
+  try {
+    const configFile = await readFile(CONFIG_PATH, "utf-8");
+    return JSON.parse(configFile);
+  } catch (error) {
+    logDb.createLog({
+      level: "error",
+      action: "system.error",
+      message: "Erreur lors de la lecture de la configuration des domaines",
+      metadata: {
+        error: error instanceof Error ? error.message : "Unknown error",
+        configPath: CONFIG_PATH,
+      },
+    });
+    throw error;
+  }
 }
 
 async function writeConfig(config: any) {
-  await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2));
+  try {
+    await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2));
+  } catch (error) {
+    logDb.createLog({
+      level: "error",
+      action: "system.error",
+      message: "Erreur lors de l'écriture de la configuration des domaines",
+      metadata: {
+        error: error instanceof Error ? error.message : "Unknown error",
+        configPath: CONFIG_PATH,
+      },
+    });
+    throw error;
+  }
 }
 
 export async function GET() {
+  const session = await auth();
   try {
+    if (!session?.user) {
+      logDb.createLog({
+        level: "warning",
+        action: "admin.action",
+        message: "Tentative de lecture des domaines non autorisée",
+        userId: session?.user?.id || undefined,
+        userEmail: session?.user?.email || undefined,
+      });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
     const config = await readConfig();
+
+    logDb.createLog({
+      level: "info",
+      action: "admin.action",
+      message: "Lecture des domaines réussie",
+      userId: session.user.id || undefined,
+      userEmail: session.user.email || undefined,
+    });
+
     return NextResponse.json(config.domains.list);
   } catch (error) {
+    logDb.createLog({
+      level: "error",
+      action: "system.error",
+      message: "Erreur lors de la lecture des domaines",
+      userId: session?.user?.id || undefined,
+      userEmail: session?.user?.email || undefined,
+      metadata: {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+    });
     return NextResponse.json(
       { error: "Erreur lors de la lecture des domaines" },
       { status: 500 }
@@ -27,14 +86,34 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
   try {
+    if (!session?.user || session.user.role !== "admin") {
+      logDb.createLog({
+        level: "warning",
+        action: "admin.action",
+        message: "Tentative d'ajout de domaine non autorisée",
+        userId: session?.user?.id || undefined,
+        userEmail: session?.user?.email || undefined,
+      });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
     const newDomain = await request.json();
     const config = await readConfig();
 
     // Vérifier si le domaine existe déjà
-    if (
-      config.domains.list.some((d: Domain) => d.url === newDomain.url)
-    ) {
+    if (config.domains.list.some((d: Domain) => d.url === newDomain.url)) {
+      logDb.createLog({
+        level: "warning",
+        action: "admin.action",
+        message: "Tentative d'ajout d'un domaine déjà existant",
+        userId: session.user.id || undefined,
+        userEmail: session.user.email || undefined,
+        metadata: {
+          domainUrl: newDomain.url,
+        },
+      });
       return NextResponse.json(
         { error: "Ce domaine existe déjà" },
         { status: 400 }
@@ -56,8 +135,30 @@ export async function POST(request: NextRequest) {
     config.domains.list.push(newDomain);
     await writeConfig(config);
 
+    logDb.createLog({
+      level: "info",
+      action: "config.update",
+      message: "Ajout d'un nouveau domaine",
+      userId: session.user.id || undefined,
+      userEmail: session.user.email || undefined,
+      metadata: {
+        domain: newDomain,
+        isFirstDomain: config.domains.list.length === 1,
+      },
+    });
+
     return NextResponse.json(newDomain);
   } catch (error) {
+    logDb.createLog({
+      level: "error",
+      action: "system.error",
+      message: "Erreur lors de l'ajout du domaine",
+      userId: session?.user?.id || undefined,
+      userEmail: session?.user?.email || undefined,
+      metadata: {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+    });
     return NextResponse.json(
       { error: "Erreur lors de l'ajout du domaine" },
       { status: 500 }
@@ -66,7 +167,19 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const session = await auth();
   try {
+    if (!session?.user || session.user.role !== "admin") {
+      logDb.createLog({
+        level: "warning",
+        action: "admin.action",
+        message: "Tentative de modification de domaine non autorisée",
+        userId: session?.user?.id || undefined,
+        userEmail: session?.user?.email || undefined,
+      });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
     const updates = await request.json();
     const config = await readConfig();
 
@@ -75,6 +188,16 @@ export async function PUT(request: NextRequest) {
     );
 
     if (domainIndex === -1) {
+      logDb.createLog({
+        level: "warning",
+        action: "admin.action",
+        message: "Tentative de modification d'un domaine inexistant",
+        userId: session.user.id || undefined,
+        userEmail: session.user.email || undefined,
+        metadata: {
+          domainId: updates.id,
+        },
+      });
       return NextResponse.json(
         { error: "Domaine non trouvé" },
         { status: 404 }
@@ -87,11 +210,24 @@ export async function PUT(request: NextRequest) {
         (d: Domain) => d.url === updates.url && d.id !== updates.id
       )
     ) {
+      logDb.createLog({
+        level: "warning",
+        action: "admin.action",
+        message: "Tentative de modification vers un domaine déjà existant",
+        userId: session.user.id || undefined,
+        userEmail: session.user.email || undefined,
+        metadata: {
+          domainId: updates.id,
+          newUrl: updates.url,
+        },
+      });
       return NextResponse.json(
         { error: "Ce domaine existe déjà" },
         { status: 400 }
       );
     }
+
+    const oldDomain = { ...config.domains.list[domainIndex] };
 
     // Si on définit ce domaine comme domaine par défaut
     if (updates.isDefault) {
@@ -128,8 +264,33 @@ export async function PUT(request: NextRequest) {
 
     await writeConfig(config);
 
+    logDb.createLog({
+      level: "info",
+      action: "config.update",
+      message: "Modification d'un domaine",
+      userId: session.user.id || undefined,
+      userEmail: session.user.email || undefined,
+      metadata: {
+        domainId: updates.id,
+        changes: {
+          before: oldDomain,
+          after: config.domains.list[domainIndex],
+        },
+      },
+    });
+
     return NextResponse.json(config.domains.list[domainIndex]);
   } catch (error) {
+    logDb.createLog({
+      level: "error",
+      action: "system.error",
+      message: "Erreur lors de la mise à jour du domaine",
+      userId: session?.user?.id || undefined,
+      userEmail: session?.user?.email || undefined,
+      metadata: {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+    });
     return NextResponse.json(
       { error: "Erreur lors de la mise à jour du domaine" },
       { status: 500 }
@@ -137,19 +298,54 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest) {
+  const session = await auth();
   try {
+    if (!session?.user || session.user.role !== "admin") {
+      logDb.createLog({
+        level: "warning",
+        action: "admin.action",
+        message: "Tentative de suppression de domaine non autorisée",
+        userId: session?.user?.id || undefined,
+        userEmail: session?.user?.email || undefined,
+      });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const domainId = searchParams.get("id");
+
+    if (!domainId) {
+      logDb.createLog({
+        level: "warning",
+        action: "admin.action",
+        message: "Tentative de suppression sans ID de domaine",
+        userId: session.user.id || undefined,
+        userEmail: session.user.email || undefined,
+      });
+      return NextResponse.json(
+        { error: "ID de domaine manquant" },
+        { status: 400 }
+      );
+    }
+
     const config = await readConfig();
-    const domainId = params.id;
 
     const domainIndex = config.domains.list.findIndex(
       (d: Domain) => d.id === domainId
     );
 
     if (domainIndex === -1) {
+      logDb.createLog({
+        level: "warning",
+        action: "admin.action",
+        message: "Tentative de suppression d'un domaine inexistant",
+        userId: session.user.id || undefined,
+        userEmail: session.user.email || undefined,
+        metadata: {
+          domainId,
+        },
+      });
       return NextResponse.json(
         { error: "Domaine non trouvé" },
         { status: 404 }
@@ -158,14 +354,25 @@ export async function DELETE(
 
     // Vérifier si c'est le dernier domaine
     if (config.domains.list.length === 1) {
+      logDb.createLog({
+        level: "warning",
+        action: "admin.action",
+        message: "Tentative de suppression du dernier domaine",
+        userId: session.user.id || undefined,
+        userEmail: session.user.email || undefined,
+        metadata: {
+          domainId,
+        },
+      });
       return NextResponse.json(
         { error: "Impossible de supprimer le dernier domaine" },
         { status: 400 }
       );
     }
 
+    const deletedDomain = { ...config.domains.list[domainIndex] };
+
     // Si le domaine supprimé était le domaine par défaut
-    const deletedDomain = config.domains.list[domainIndex];
     if (deletedDomain.isDefault || config.domains.defaultDomain === domainId) {
       // Définir le premier domaine restant comme domaine par défaut
       const newDefaultDomain = config.domains.list.find(
@@ -180,8 +387,31 @@ export async function DELETE(
     config.domains.list.splice(domainIndex, 1);
     await writeConfig(config);
 
+    logDb.createLog({
+      level: "info",
+      action: "config.update",
+      message: "Suppression d'un domaine",
+      userId: session.user.id || undefined,
+      userEmail: session.user.email || undefined,
+      metadata: {
+        deletedDomain,
+        wasDefault: deletedDomain.isDefault,
+        newDefaultDomainId: config.domains.defaultDomain,
+      },
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
+    logDb.createLog({
+      level: "error",
+      action: "system.error",
+      message: "Erreur lors de la suppression du domaine",
+      userId: session?.user?.id || undefined,
+      userEmail: session?.user?.email || undefined,
+      metadata: {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+    });
     return NextResponse.json(
       { error: "Erreur lors de la suppression du domaine" },
       { status: 500 }

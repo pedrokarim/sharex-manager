@@ -23,14 +23,14 @@ const nextConfig = {
         return [
             {
                 // Pour le dev
-                source: '/:path*',
-                has: [{ type: 'host', value: "img.ascencia.io" }],
-                destination: `https://sxm.ascencia.io/img-handler/:path*`,
+                source: "/:path*",
+                has: [{ type: "host", value: "img.ascencia.io" }],
+                destination: `http://sxm.ascencia.io/img-handler/:path*`,
             },
             {
                 // Pour la prod
-                source: '/:path*',
-                has: [{ type: 'host', value: "img.ascencia.re" }],
+                source: "/:path*",
+                has: [{ type: "host", value: "img.ascencia.re" }],
                 destination: `https://sxm.ascencia.re/img-handler/:path*`,
             },
         ];
