@@ -10,6 +10,7 @@ import {
   setFileSecure,
   removeFileFromSecure,
 } from "@/lib/secure-files";
+import { getStarredFiles, isFileStarred } from "@/lib/starred-files";
 import type { NextRequest } from "next/server";
 import { logger } from "@/lib/utils/logger";
 
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
     const page = Number.parseInt(searchParams.get("page") || "1", 10);
     const search = searchParams.get("q") || "";
     const secureOnly = searchParams.get("secure") === "true";
+    const starredOnly = searchParams.get("starred") === "true";
 
     // Force la revalidation du dossier public/uploads
     revalidatePath("/uploads");
@@ -34,6 +36,7 @@ export async function GET(request: Request) {
     // Récupérer tous les fichiers et leurs stats
     const entries = await readdir(UPLOADS_DIR, { withFileTypes: true });
     const secureFiles = await getSecureFiles();
+    const starredFiles = await getStarredFiles();
 
     const filesInfo = await Promise.all(
       entries
@@ -47,9 +50,15 @@ export async function GET(request: Request) {
           const filePath = join(UPLOADS_DIR, entry.name);
           const stats = await stat(filePath);
           const isSecure = secureFiles.includes(entry.name);
+          const isStarred = starredFiles.includes(entry.name);
 
           // Si on veut uniquement les fichiers sécurisés et que ce fichier n'est pas sécurisé, on le saute
           if (secureOnly && !isSecure) {
+            return null;
+          }
+
+          // Si on veut uniquement les fichiers favoris et que ce fichier n'est pas favori, on le saute
+          if (starredOnly && !isStarred) {
             return null;
           }
 
@@ -59,6 +68,7 @@ export async function GET(request: Request) {
             size: stats.size,
             createdAt: stats.mtime.toISOString(),
             isSecure,
+            isStarred,
           };
         })
     );

@@ -7,6 +7,7 @@ interface GridViewProps {
   onDelete: (name: string) => void;
   onSelect: (file: FileInfo) => void;
   onToggleSecurity: (file: FileInfo) => Promise<void>;
+  onToggleStar: (file: FileInfo) => Promise<void>;
   newFileIds: string[];
 }
 
@@ -16,6 +17,7 @@ export function GridView({
   onDelete,
   onSelect,
   onToggleSecurity,
+  onToggleStar,
   newFileIds,
 }: GridViewProps) {
   return (
@@ -28,6 +30,7 @@ export function GridView({
           onCopy={() => onCopy(file.url)}
           onSelect={() => onSelect(file)}
           onToggleSecurity={() => onToggleSecurity(file)}
+          onToggleStar={() => onToggleStar(file)}
           isNew={newFileIds.includes(file.name)}
         />
       ))}

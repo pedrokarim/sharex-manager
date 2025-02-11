@@ -42,6 +42,7 @@ interface FileInfo {
   size: number;
   createdAt: string;
   isSecure?: boolean;
+  isStarred?: boolean;
 }
 
 interface GroupedFiles {
@@ -55,6 +56,7 @@ interface GalleryClientProps {
   initialSearch?: string;
   initialPage: number;
   secureOnly?: boolean;
+  starredOnly?: boolean;
 }
 
 interface UploadModalProps {
@@ -153,6 +155,7 @@ export function GalleryClient({
   initialSearch = "",
   initialPage,
   secureOnly = false,
+  starredOnly = false,
 }: GalleryClientProps) {
   const { data: session, status } = useSession();
   const [search] = useQueryState("q");
@@ -181,6 +184,7 @@ export function GalleryClient({
         searchParams.set("page", page.toString());
         if (search) searchParams.set("q", search);
         if (secureOnly) searchParams.set("secure", "true");
+        if (starredOnly) searchParams.set("starred", "true");
 
         const res = await fetch(`/api/files?${searchParams.toString()}`);
         const data = await res.json();
@@ -196,7 +200,7 @@ export function GalleryClient({
         };
       }
     },
-    [search, secureOnly]
+    [search, secureOnly, starredOnly]
   );
 
   const {
@@ -426,12 +430,50 @@ export function GalleryClient({
     }
   };
 
+  const handleToggleStar = async (file: FileInfo) => {
+    try {
+      const formData = new FormData();
+      formData.append("isStarred", (!file.isStarred).toString());
+
+      const response = await fetch(
+        `/api/files/${encodeURIComponent(file.name)}/star`,
+        {
+          method: "PUT",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la modification des favoris");
+      }
+
+      const data = await response.json();
+
+      // Mettre à jour le fichier dans la liste
+      const updatedFiles = files.map((f) =>
+        f.name === file.name ? { ...f, isStarred: data.isStarred } : f
+      );
+      reset(updatedFiles);
+
+      toast.success(
+        file.isStarred ? "Retiré des favoris" : "Ajouté aux favoris"
+      );
+    } catch (error) {
+      console.error("Erreur lors de la modification des favoris:", error);
+      toast.error("Une erreur est survenue");
+    }
+  };
+
   return (
     <>
       <div className="p-8">
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-2xl font-bold">
-            {secureOnly ? "Fichiers Sécurisés" : "Galerie d'images"}
+            {secureOnly
+              ? "Fichiers Sécurisés"
+              : starredOnly
+              ? "Fichiers Favoris"
+              : "Galerie d'images"}
           </h1>
           <div className="flex items-center gap-4">
             <ViewSelector />
@@ -487,14 +529,11 @@ export function GalleryClient({
                     files={filesInGroup}
                     onCopy={copyToClipboard}
                     onDelete={(name) => {
-                      // setSelectedFile(
-                      //   files.find((f) => f.name === name) || null
-                      // );
-                      console.log(files);
                       reset(files.filter((f) => f.name !== name));
                     }}
                     onSelect={setSelectedFile}
                     onToggleSecurity={handleToggleSecurity}
+                    onToggleStar={handleToggleStar}
                     newFileIds={newFileIds}
                   />
                 ) : (
@@ -502,13 +541,11 @@ export function GalleryClient({
                     files={filesInGroup}
                     onCopy={copyToClipboard}
                     onDelete={(name) => {
-                      // setSelectedFile(
-                      //   files.find((f) => f.name === name) || null
-                      // );
                       reset(files.filter((f) => f.name !== name));
                     }}
                     onSelect={setSelectedFile}
                     onToggleSecurity={handleToggleSecurity}
+                    onToggleStar={handleToggleStar}
                     detailed={viewMode === "details"}
                     newFileIds={newFileIds}
                   />
@@ -534,6 +571,7 @@ export function GalleryClient({
         onDelete={handleDelete}
         onCopy={copyToClipboard}
         onToggleSecurity={handleToggleSecurity}
+        onToggleStar={handleToggleStar}
         onPrevious={handlePrevious}
         onNext={handleNext}
         hasPrevious={findCurrentFileIndex() > 0}

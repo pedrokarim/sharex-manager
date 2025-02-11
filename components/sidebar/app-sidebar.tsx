@@ -55,7 +55,11 @@ const data = {
         },
         {
           title: "Favoris",
-          url: "/gallery?sort=starred",
+          url: "/gallery/starred",
+        },
+        {
+          title: "Sécurisés",
+          url: "/gallery/secure",
         },
         {
           title: "Paramètres",
@@ -170,7 +174,7 @@ const data = {
   projects: [
     {
       name: "Images Favoris",
-      url: "/gallery/favorites",
+      url: "/gallery/starred",
       icon: Star,
     },
     {

@@ -11,6 +11,7 @@ import {
   Download,
   Copy,
   ExternalLink,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +42,7 @@ interface FileCardProps {
   onCopy?: () => void;
   onSelect?: () => void;
   onToggleSecurity?: () => void;
+  onToggleStar?: () => void;
   isNew?: boolean;
 }
 
@@ -50,6 +52,7 @@ export function FileCard({
   onCopy,
   onSelect,
   onToggleSecurity,
+  onToggleStar,
   isNew,
 }: FileCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -92,6 +95,24 @@ export function FileCard({
           className="relative aspect-video w-full bg-muted cursor-pointer"
           onClick={onSelect}
         >
+          {onToggleStar && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleStar();
+              }}
+              className={cn(
+                "h-8 w-8 absolute top-2 right-2 z-10",
+                file.isStarred &&
+                  "text-white bg-yellow-500 hover:bg-yellow-500 hover:text-white"
+              )}
+            >
+              <Star className="h-4 w-4" />
+            </Button>
+          )}
+
           {isImage ? (
             <Image
               src={file.url}
@@ -119,20 +140,25 @@ export function FileCard({
               {formatBytes(file.size)}
             </p>
           </div>
-          {onToggleSecurity && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggleSecurity}
-              className="h-8 w-8"
-            >
-              {file.isSecure ? (
-                <Lock className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <Unlock className="h-4 w-4 text-muted-foreground" />
-              )}
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {onToggleSecurity && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleSecurity();
+                }}
+                className="h-8 w-8"
+              >
+                {file.isSecure ? (
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Unlock className="h-4 w-4 text-muted-foreground" />
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
       <CardFooter className="grid grid-cols-4 gap-2 p-4 pt-0">

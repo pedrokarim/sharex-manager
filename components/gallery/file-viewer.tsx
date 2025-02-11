@@ -20,6 +20,7 @@ import {
   Info,
   Lock,
   Unlock,
+  Star,
 } from "lucide-react";
 import Image from "next/image";
 import { format, parseISO } from "date-fns";
@@ -35,6 +36,7 @@ interface FileViewerProps {
   onDelete: (filename: string) => Promise<void>;
   onCopy: (url: string) => void;
   onToggleSecurity: (file: FileInfo) => Promise<void>;
+  onToggleStar: (file: FileInfo) => Promise<void>;
   onPrevious: () => void;
   onNext: () => void;
   hasPrevious: boolean;
@@ -47,6 +49,7 @@ export function FileViewer({
   onDelete,
   onCopy,
   onToggleSecurity,
+  onToggleStar,
   onPrevious,
   onNext,
   hasPrevious,
@@ -152,8 +155,19 @@ export function FileViewer({
                 <Button
                   variant="ghost"
                   size="icon"
+                  className={cn(
+                    "rounded-full bg-background/50 hover:bg-yellow-500 hover:text-white",
+                    file?.isStarred && "text-yellow-500"
+                  )}
+                  onClick={() => file && onToggleStar(file)}
+                >
+                  <Star className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="rounded-full bg-background/50 hover:bg-background/80"
-                  onClick={() => onCopy(file.url)}
+                  onClick={() => file && onCopy(file.url)}
                 >
                   <Copy className="h-5 w-5" />
                 </Button>
@@ -163,7 +177,7 @@ export function FileViewer({
                   className="rounded-full bg-background/50 hover:bg-background/80"
                   asChild
                 >
-                  <a href={file.url} target="_blank" rel="noopener noreferrer">
+                  <a href={file?.url} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-5 w-5" />
                   </a>
                 </Button>
@@ -172,12 +186,12 @@ export function FileViewer({
                   size="icon"
                   className={cn(
                     "rounded-full bg-background/50",
-                    file.isSecure &&
+                    file?.isSecure &&
                       "text-yellow-500 hover:bg-yellow-500 hover:text-white"
                   )}
-                  onClick={() => onToggleSecurity(file)}
+                  onClick={() => file && onToggleSecurity(file)}
                 >
-                  {file.isSecure ? (
+                  {file?.isSecure ? (
                     <Lock className="h-4 w-4" />
                   ) : (
                     <Unlock className="h-4 w-4 text-muted-foreground" />
@@ -190,7 +204,7 @@ export function FileViewer({
                   variant="ghost"
                   size="icon"
                   className="rounded-full bg-background/50 hover:bg-red-600 hover:text-white text-red-600"
-                  onClick={() => onDelete(file.name)}
+                  onClick={() => file && onDelete(file.name)}
                 >
                   <Trash2 className="h-5 w-5" />
                 </Button>

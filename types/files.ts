@@ -4,4 +4,5 @@ export interface FileInfo {
   size: number;
   createdAt: string;
   isSecure?: boolean;
+  isStarred?: boolean;
 }
