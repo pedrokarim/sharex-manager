@@ -8,6 +8,12 @@ const nextConfig = {
         ignoreDuringBuilds: true,
     },
     output: 'standalone',
+    webpack: (config, { isServer }) => {
+        if (isServer) {
+            config.externals = [...config.externals, 'bun:sqlite'];
+        }
+        return config;
+    },
     images: {
         unoptimized: true,
         remotePatterns: [

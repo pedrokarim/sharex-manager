@@ -3,15 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest watch",
-    "users": "bun cli/users.ts"
+    "dev": "bun --bun next dev",
+    "build": "bun --bun next build",
+    "start": "bun --bun next start",
+    "lint": "bun --bun next lint",
+    "test": "bun --bun vitest",
+    "test:ui": "bun --bun vitest --ui",
+    "test:coverage": "bun --bun vitest run --coverage",
+    "test:watch": "bun --bun vitest watch",
+    "cli": "bun cli/index.ts"
   },
   "dependencies": {
     "@auth/core": "^0.37.4",

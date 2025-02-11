@@ -45,6 +45,7 @@ data/users.test.json
 
 # DB
 data/*.db
+data/*.db-*
 
 # uploads
 /uploads
