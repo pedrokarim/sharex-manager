@@ -32,3 +32,8 @@ export function generateId(length: number = 12): string {
 export const isEdgeRuntime = () => {
   return process.env.NEXT_RUNTIME === "edge";
 };
+
+// capitalize the first letter of a string
+export function capitalize(str: string) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}

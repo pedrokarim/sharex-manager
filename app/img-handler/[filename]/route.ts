@@ -4,9 +4,12 @@ import { getAbsoluteUploadPath } from "@/lib/config";
 import { serveFile, getClientInfo } from "@/lib/file-handler";
 import { logDb } from "@/lib/utils/db";
 import { existsSync } from "fs";
+import { auth } from "@/auth";
+import { isFileSecure } from "@/lib/secure-files";
 
 const UPLOADS_DIR = getAbsoluteUploadPath();
 const FILE_NOT_FOUND_PATH = join(process.cwd(), "public", "file_not_found.png");
+const UNAUTHORIZED_PATH = join(process.cwd(), "public", "unauthorized.png");
 
 export async function GET(
   request: NextRequest,
@@ -21,6 +24,38 @@ export async function GET(
   // Vérifier si le fichier existe
   const fileExists = existsSync(filePath);
 
+  // Vérifier si le fichier est sécurisé
+  const isSecure = await isFileSecure(filename);
+
+  // Si le fichier est sécurisé, vérifier l'authentification
+  if (isSecure) {
+    // Remarque : ça ne fonctionne pas avec le middleware auth
+    const session = await auth();
+    if (!session?.user) {
+      // Logger la tentative d'accès non autorisé
+      logDb.createLog({
+        level: "warning",
+        action: "file.unauthorized",
+        message: `Tentative d'accès non autorisé à une image sécurisée: ${filename}`,
+        ip: clientInfo.ip,
+        userAgent: clientInfo.userAgent,
+        metadata: {
+          filename,
+          path: filePath,
+          referer: request.headers.get("referer") || undefined,
+        },
+      });
+
+      return serveFile({
+        filePath: UNAUTHORIZED_PATH,
+        filename: "unauthorized.png",
+        clientInfo,
+        fallbackPath: FILE_NOT_FOUND_PATH,
+        enableLogging: false,
+      });
+    }
+  }
+
   // Logger la tentative d'accès
   logDb.createLog({
     level: fileExists ? "info" : "warning",
@@ -34,6 +69,7 @@ export async function GET(
       filename,
       path: filePath,
       exists: fileExists,
+      isSecure,
       referer: request.headers.get("referer") || undefined,
     },
   });

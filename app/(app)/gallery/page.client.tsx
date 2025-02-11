@@ -22,13 +22,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { capitalize, cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2 } from "lucide-react";
 
 interface FileInfo {
   name: string;
   url: string;
   size: number;
   createdAt: string;
+  isSecure?: boolean;
 }
 
 interface GroupedFiles {
@@ -41,6 +54,96 @@ interface GalleryClientProps {
   initialView?: "grid" | "list" | "details";
   initialSearch?: string;
   initialPage: number;
+  secureOnly?: boolean;
+}
+
+interface UploadModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onUpload: (file: File) => Promise<void>;
+  isSecure?: boolean;
+  onSecureChange?: (isSecure: boolean) => void;
+}
+
+function UploadModal({
+  isOpen,
+  onClose,
+  onUpload,
+  isSecure,
+  onSecureChange,
+}: UploadModalProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      setIsUploading(true);
+      await onUpload(file);
+      onClose();
+    } catch (error) {
+      console.error("Erreur lors de l'upload:", error);
+      toast.error("Erreur lors de l'upload");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Uploader un fichier</DialogTitle>
+          <DialogDescription>
+            Sélectionnez un fichier à uploader sur le serveur.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <div className="grid gap-2">
+            <Label>Fichier</Label>
+            <Input type="file" onChange={handleFileChange} />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="secure"
+              checked={isSecure}
+              onCheckedChange={(checked) =>
+                onSecureChange?.(checked as boolean)
+              }
+            />
+            <Label htmlFor="secure">Fichier privé</Label>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            type="submit"
+            onClick={handleUpload}
+            disabled={!file || isUploading}
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Upload en cours...
+              </>
+            ) : (
+              "Uploader"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function GalleryClient({
@@ -49,6 +152,7 @@ export function GalleryClient({
   initialView = "grid",
   initialSearch = "",
   initialPage,
+  secureOnly = false,
 }: GalleryClientProps) {
   const { data: session, status } = useSession();
   const [search] = useQueryState("q");
@@ -67,11 +171,18 @@ export function GalleryClient({
   const [refreshInterval, setRefreshInterval] = useState<string>("0");
   const [newFileIds, setNewFileIds] = useState<string[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isSecureUpload, setIsSecureUpload] = useState(false);
 
   const fetchFiles = useCallback(
     async (page: number) => {
       try {
-        const res = await fetch(`/api/files?page=${page}&q=${search || ""}`);
+        const searchParams = new URLSearchParams();
+        searchParams.set("page", page.toString());
+        if (search) searchParams.set("q", search);
+        if (secureOnly) searchParams.set("secure", "true");
+
+        const res = await fetch(`/api/files?${searchParams.toString()}`);
         const data = await res.json();
         return {
           files: data.files,
@@ -85,7 +196,7 @@ export function GalleryClient({
         };
       }
     },
-    [search]
+    [search, secureOnly]
   );
 
   const {
@@ -222,16 +333,106 @@ export function GalleryClient({
     }
   };
 
-  const copyToClipboard = (url: string) => {
-    navigator.clipboard.writeText(url);
-    toast.success("URL copiée dans le presse-papier");
+  const copyToClipboard = async (url: string) => {
+    try {
+      if (
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === "function"
+      ) {
+        await navigator.clipboard.writeText(url);
+        toast.success("URL copiée dans le presse-papier");
+      } else {
+        // Fallback pour les navigateurs qui ne supportent pas l'API Clipboard
+        const textArea = document.createElement("textarea");
+        textArea.value = url;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+          document.execCommand("copy");
+          toast.success("URL copiée dans le presse-papier");
+        } catch (err) {
+          toast.error("Impossible de copier l'URL");
+          console.error("Erreur lors de la copie:", err);
+        }
+
+        document.body.removeChild(textArea);
+      }
+    } catch (error) {
+      toast.error("Impossible de copier l'URL");
+      console.error("Erreur lors de la copie:", error);
+    }
+  };
+
+  const handleUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(
+      `/api/files${isSecureUpload ? "/secure" : ""}`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Erreur lors de l'upload");
+    }
+
+    await fetchFiles(1).then(({ files }) => {
+      reset(files);
+      setSelectedFile(files[0]);
+    });
+  };
+
+  const handleToggleSecurity = async (file: FileInfo) => {
+    try {
+      const formData = new FormData();
+      formData.append("isSecure", (!file.isSecure).toString());
+
+      const response = await fetch(
+        `/api/files?filename=${encodeURIComponent(file.name)}`,
+        {
+          method: "PUT",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la modification de la sécurité");
+      }
+
+      const data = await response.json();
+
+      // Mettre à jour le fichier dans la liste
+      const updatedFiles = files.map((f) =>
+        f.name === file.name ? { ...f, isSecure: data.isSecure } : f
+      );
+      reset(updatedFiles);
+
+      toast.success(
+        file.isSecure
+          ? "Le fichier est maintenant public"
+          : "Le fichier est maintenant privé"
+      );
+    } catch (error) {
+      console.error("Erreur lors de la modification de la sécurité:", error);
+      toast.error("Une erreur est survenue");
+    }
   };
 
   return (
     <>
       <div className="p-8">
         <div className="mb-8 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Galerie d'images</h1>
+          <h1 className="text-2xl font-bold">
+            {secureOnly ? "Fichiers Sécurisés" : "Galerie d'images"}
+          </h1>
           <div className="flex items-center gap-4">
             <ViewSelector />
 
@@ -259,6 +460,8 @@ export function GalleryClient({
             >
               <RefreshCcw className="h-4 w-4" />
             </Button>
+
+            <Button onClick={() => setIsUploadModalOpen(true)}>Upload</Button>
           </div>
         </div>
 
@@ -276,29 +479,36 @@ export function GalleryClient({
           <>
             {Object.entries(groupedFiles).map(([date, filesInGroup]) => (
               <div key={date} className="mb-8">
-                <h2 className="mb-4 text-xl font-semibold">{date}</h2>
+                <h2 className="mb-4 text-xl font-semibold text-muted-foreground">
+                  {capitalize(date)}
+                </h2>
                 {!viewMode || viewMode === "grid" ? (
                   <GridView
                     files={filesInGroup}
                     onCopy={copyToClipboard}
-                    onDelete={(name) =>
-                      setSelectedFile(
-                        files.find((f) => f.name === name) || null
-                      )
-                    }
+                    onDelete={(name) => {
+                      // setSelectedFile(
+                      //   files.find((f) => f.name === name) || null
+                      // );
+                      console.log(files);
+                      reset(files.filter((f) => f.name !== name));
+                    }}
                     onSelect={setSelectedFile}
+                    onToggleSecurity={handleToggleSecurity}
                     newFileIds={newFileIds}
                   />
                 ) : (
                   <ListView
                     files={filesInGroup}
                     onCopy={copyToClipboard}
-                    onDelete={(name) =>
-                      setSelectedFile(
-                        files.find((f) => f.name === name) || null
-                      )
-                    }
+                    onDelete={(name) => {
+                      // setSelectedFile(
+                      //   files.find((f) => f.name === name) || null
+                      // );
+                      reset(files.filter((f) => f.name !== name));
+                    }}
                     onSelect={setSelectedFile}
+                    onToggleSecurity={handleToggleSecurity}
                     detailed={viewMode === "details"}
                     newFileIds={newFileIds}
                   />
@@ -323,10 +533,22 @@ export function GalleryClient({
         onClose={() => setSelectedFile(null)}
         onDelete={handleDelete}
         onCopy={copyToClipboard}
+        onToggleSecurity={handleToggleSecurity}
         onPrevious={handlePrevious}
         onNext={handleNext}
         hasPrevious={findCurrentFileIndex() > 0}
         hasNext={findCurrentFileIndex() < files.length - 1}
+      />
+
+      <UploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setIsSecureUpload(false);
+        }}
+        onUpload={handleUpload}
+        isSecure={isSecureUpload}
+        onSecureChange={setIsSecureUpload}
       />
     </>
   );

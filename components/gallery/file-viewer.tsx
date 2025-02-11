@@ -1,11 +1,13 @@
 "use client";
 
-import { FileInfo } from "@/types";
+import { FileInfo } from "@/types/files";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
   DialogDescription,
+  DialogHeader,
+  DialogFooter,
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import {
@@ -16,6 +18,8 @@ import {
   ChevronRight,
   ChevronLeft,
   Info,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import Image from "next/image";
 import { format, parseISO } from "date-fns";
@@ -28,12 +32,13 @@ import { VisuallyHidden } from "../ui/visually-hidden";
 interface FileViewerProps {
   file: FileInfo | null;
   onClose: () => void;
-  onDelete: (name: string) => void;
+  onDelete: (filename: string) => Promise<void>;
   onCopy: (url: string) => void;
-  onPrevious?: () => void;
-  onNext?: () => void;
-  hasPrevious?: boolean;
-  hasNext?: boolean;
+  onToggleSecurity: (file: FileInfo) => Promise<void>;
+  onPrevious: () => void;
+  onNext: () => void;
+  hasPrevious: boolean;
+  hasNext: boolean;
 }
 
 export function FileViewer({
@@ -41,6 +46,7 @@ export function FileViewer({
   onClose,
   onDelete,
   onCopy,
+  onToggleSecurity,
   onPrevious,
   onNext,
   hasPrevious,
@@ -53,9 +59,38 @@ export function FileViewer({
   return (
     <Dialog open={!!file} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-7xl border-none bg-background/95 p-0 backdrop-blur-xl">
-        <DialogTitle>
-          <VisuallyHidden>Visualiseur d'image - {file.name}</VisuallyHidden>
-        </DialogTitle>
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between p-4">
+            <span>{file.name}</span>
+            {/* <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onToggleSecurity(file)}
+              >
+                {file.isSecure ? (
+                  <Lock className="h-4 w-4" />
+                ) : (
+                  <Unlock className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onCopy(file.url)}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onDelete(file.name)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div> */}
+          </DialogTitle>
+        </DialogHeader>
         <DialogDescription>
           <VisuallyHidden>
             Image ajoutée le{" "}
@@ -109,7 +144,7 @@ export function FileViewer({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full bg-background/50 hover:bg-background/80"
+                  className="rounded-full bg-background/50 hover:bg-blue-600 hover:text-white text-blue-600"
                   onClick={() => setShowDetails(!showDetails)}
                 >
                   <Info className="h-5 w-5" />
@@ -132,13 +167,29 @@ export function FileViewer({
                     <ExternalLink className="h-5 w-5" />
                   </a>
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "rounded-full bg-background/50",
+                    file.isSecure &&
+                      "text-yellow-500 hover:bg-yellow-500 hover:text-white"
+                  )}
+                  onClick={() => onToggleSecurity(file)}
+                >
+                  {file.isSecure ? (
+                    <Lock className="h-4 w-4" />
+                  ) : (
+                    <Unlock className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
               </div>
 
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full bg-background/50 hover:bg-background/80 hover:text-destructive"
+                  className="rounded-full bg-background/50 hover:bg-red-600 hover:text-white text-red-600"
                   onClick={() => onDelete(file.name)}
                 >
                   <Trash2 className="h-5 w-5" />

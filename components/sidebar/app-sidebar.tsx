@@ -169,18 +169,13 @@ const data = {
   ],
   projects: [
     {
-      name: "Images Personnelles",
-      url: "/folders/personal",
-      icon: FileImage,
-    },
-    {
-      name: "Images Partagées",
-      url: "/folders/shared",
-      icon: Users,
+      name: "Images Favoris",
+      url: "/gallery/favorites",
+      icon: Star,
     },
     {
       name: "Images Sécurisées",
-      url: "/folders/secure",
+      url: "/gallery/secure",
       icon: Shield,
     },
   ],

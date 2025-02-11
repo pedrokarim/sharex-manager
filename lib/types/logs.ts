@@ -28,7 +28,8 @@ export type LogAction =
   | "admin.action"
   | "system.error"
   | "api.request"
-  | "api.error";
+  | "api.error"
+  | "file.unauthorized";
 
 export interface CreateLogOptions {
   level: LogLevel;

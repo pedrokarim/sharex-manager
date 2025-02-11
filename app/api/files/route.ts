@@ -1,9 +1,15 @@
 import { auth } from "@/auth";
-import { readdir, stat } from "fs/promises";
+import { readdir, stat, unlink } from "fs/promises";
 import { join } from "path";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getAbsoluteUploadPath } from "@/lib/config";
+import {
+  getSecureFiles,
+  isFileSecure,
+  setFileSecure,
+  removeFileFromSecure,
+} from "@/lib/secure-files";
 import type { NextRequest } from "next/server";
 import { logger } from "@/lib/utils/logger";
 
@@ -20,17 +26,18 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const page = Number.parseInt(searchParams.get("page") || "1", 10);
     const search = searchParams.get("q") || "";
+    const secureOnly = searchParams.get("secure") === "true";
 
     // Force la revalidation du dossier public/uploads
     revalidatePath("/uploads");
 
     // Récupérer tous les fichiers et leurs stats
     const entries = await readdir(UPLOADS_DIR, { withFileTypes: true });
+    const secureFiles = await getSecureFiles();
+
     const filesInfo = await Promise.all(
       entries
-        // Ne garder que les fichiers (pas les dossiers)
         .filter((entry) => entry.isFile())
-        // Filtrer par la recherche si nécessaire
         .filter((entry) =>
           search
             ? entry.name.toLowerCase().includes(search.toLowerCase())
@@ -39,21 +46,30 @@ export async function GET(request: Request) {
         .map(async (entry) => {
           const filePath = join(UPLOADS_DIR, entry.name);
           const stats = await stat(filePath);
+          const isSecure = secureFiles.includes(entry.name);
 
-          // Utiliser mtime au lieu de birthtime car plus fiable dans Docker
-          const fileDate = stats.mtime;
+          // Si on veut uniquement les fichiers sécurisés et que ce fichier n'est pas sécurisé, on le saute
+          if (secureOnly && !isSecure) {
+            return null;
+          }
 
           return {
             name: entry.name,
             url: `/api/files/${entry.name}`,
             size: stats.size,
-            createdAt: fileDate.toISOString(),
+            createdAt: stats.mtime.toISOString(),
+            isSecure,
           };
         })
     );
 
+    // Filtrer les fichiers null (ceux qui ont été sautés)
+    const validFiles = filesInfo.filter(
+      (file): file is NonNullable<typeof file> => file !== null
+    );
+
     // Trier par date de création décroissante
-    filesInfo.sort(
+    validFiles.sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
@@ -61,13 +77,13 @@ export async function GET(request: Request) {
     // Pagination
     const start = (page - 1) * PAGE_SIZE;
     const end = start + PAGE_SIZE;
-    const paginatedFiles = filesInfo.slice(start, end);
-    const hasMore = end < filesInfo.length;
+    const paginatedFiles = validFiles.slice(start, end);
+    const hasMore = end < validFiles.length;
 
     return NextResponse.json({
       files: paginatedFiles,
       hasMore,
-      total: filesInfo.length,
+      total: validFiles.length,
     });
   } catch (error) {
     console.error("Erreur lors de la récupération des fichiers:", error);
@@ -128,38 +144,76 @@ export async function DELETE(req: NextRequest) {
       return Response.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Vérifier que l'utilisateur a un ID et un email
-    if (!session.user.id || !session.user.email) {
+    if (!session.user.id) {
       return Response.json({ error: "Session invalide" }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
-    const fileId = searchParams.get("id");
+    const filename = searchParams.get("id");
 
-    if (!fileId) {
+    if (!filename) {
       return Response.json(
-        { error: "ID du fichier manquant" },
+        { error: "Nom du fichier manquant" },
         { status: 400 }
       );
     }
 
-    // Suppression du fichier ici...
-    // Exemple : suppression physique, mise à jour de la base de données, etc.
+    const filePath = join(UPLOADS_DIR, filename);
 
-    await logger.logFileAction("file.delete", "Suppression d'un fichier", {
-      userId: session.user.id,
-      userEmail: session.user.email,
-      metadata: {
-        fileId,
-      },
-    });
+    try {
+      // Supprimer le fichier physiquement
+      await unlink(filePath);
 
-    return Response.json({ success: true });
+      // Retirer le fichier de la liste des fichiers sécurisés s'il y est
+      await removeFileFromSecure(filename);
+
+      await logger.logFileAction("file.delete", "Suppression d'un fichier", {
+        userId: session.user.id,
+        userEmail: session.user.email ?? "unknown",
+        metadata: {
+          fileName: filename,
+        },
+      });
+
+      return Response.json({ success: true });
+    } catch (error) {
+      console.error("Erreur lors de la suppression du fichier:", error);
+      return Response.json({ error: "Fichier introuvable" }, { status: 404 });
+    }
   } catch (error) {
     console.error("Erreur lors de la suppression:", error);
     return Response.json(
       { error: "Erreur lors de la suppression du fichier" },
       { status: 500 }
     );
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return new Response("Non autorisé", { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const filename = searchParams.get("filename");
+
+    if (!filename) {
+      return new Response("Nom de fichier manquant", { status: 400 });
+    }
+
+    const formData = await request.formData();
+    const isSecure = formData.get("isSecure") === "true";
+
+    await setFileSecure(filename, isSecure);
+
+    return NextResponse.json({
+      success: true,
+      isSecure,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la modification de la sécurité:", error);
+    return new Response("Erreur serveur", { status: 500 });
   }
 }

@@ -1,6 +1,13 @@
-import { FileInfo } from "@/types";
+import { FileInfo } from "@/types/files";
 import { Button } from "../ui/button";
-import { Copy, ExternalLink, Trash2 } from "lucide-react";
+import {
+  Copy,
+  ExternalLink,
+  Trash2,
+  Download,
+  Lock,
+  Unlock,
+} from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import Image from "next/image";
@@ -11,8 +18,9 @@ interface ListViewProps {
   onCopy: (url: string) => void;
   onDelete: (name: string) => void;
   onSelect: (file: FileInfo) => void;
-  detailed?: boolean;
-  newFileIds?: string[];
+  onToggleSecurity: (file: FileInfo) => Promise<void>;
+  detailed: boolean;
+  newFileIds: string[];
 }
 
 export function ListView({
@@ -20,8 +28,9 @@ export function ListView({
   onCopy,
   onDelete,
   onSelect,
+  onToggleSecurity,
   detailed,
-  newFileIds = [],
+  newFileIds,
 }: ListViewProps) {
   return (
     <div className="space-y-2">
@@ -69,6 +78,11 @@ export function ListView({
               <Copy className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="icon" asChild>
+              <a href={file.url} download>
+                <Download className="h-4 w-4" />
+              </a>
+            </Button>
+            <Button variant="outline" size="icon" asChild>
               <a href={file.url} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="h-4 w-4" />
               </a>
@@ -76,8 +90,26 @@ export function ListView({
             <Button
               variant="outline"
               size="icon"
+              onClick={() => onToggleSecurity(file)}
+              className={cn(
+                "bg-background/50 hover:bg-yellow-500 hover:text-white",
+                file.isSecure && "text-yellow-500"
+              )}
+            >
+              {file.isSecure ? (
+                <Lock className="h-4 w-4" />
+              ) : (
+                <Unlock className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
               onClick={() => onDelete(file.name)}
-              className="text-destructive"
+              className={cn(
+                "bg-background/50 hover:bg-red-500 hover:text-white",
+                "text-destructive"
+              )}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
