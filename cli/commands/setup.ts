@@ -15,6 +15,12 @@ const DEFAULT_FILES = {
   "data/history.json": [],
   "data/deletion-tokens.json": [],
   "data/api-keys.json": [],
+  "data/secure-files.json": {
+    files: [],
+  },
+  "data/starred-files.json": {
+    files: [],
+  },
   "config/uploads.json": {
     allowedTypes: {
       images: true,
