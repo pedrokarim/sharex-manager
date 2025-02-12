@@ -125,7 +125,8 @@ export async function GET(request: NextRequest) {
       }
 
       // Fichier le plus ancien/récent
-      const fileDate = fileStat.birthtime.toISOString();
+      const fileDate = fileStat.mtime.toISOString();
+
       if (!fileStats.oldestFile.date || fileDate < fileStats.oldestFile.date) {
         fileStats.oldestFile = { name: file, date: fileDate };
       }

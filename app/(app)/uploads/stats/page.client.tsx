@@ -21,11 +21,20 @@ import {
   AreaChart,
   Area,
   LabelList,
+  CartesianGrid,
 } from "recharts";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { HistoryEntry } from "@/lib/types/history";
 import { Loader2 } from "lucide-react";
+import {
+  ChartContainer,
+  ChartTooltip,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface StatsData {
   totalUploads: number;
@@ -37,8 +46,9 @@ interface StatsData {
   };
   uploadsByDay: {
     date: string;
-    count: number;
-    size: number;
+    api: number;
+    web: number;
+    total: number;
   }[];
   uploadsByType: {
     type: string;
@@ -80,6 +90,187 @@ interface StatsData {
 export function StatsPageClient() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [useTestData, setUseTestData] = useState(true);
+  const [historyData, setHistoryData] = useState<any>(null);
+  const [fileStats, setFileStats] = useState<any>(null);
+  const [activeView, setActiveView] = useState<"api" | "web" | null>(null);
+
+  // Données de test pour la visualisation
+  const testData: StatsData = {
+    totalUploads: 1250,
+    totalSize: 1024 * 1024 * 1024 * 5, // 5GB
+    uploadsByMethod: {
+      api: 750,
+      web: 450,
+      sharex: 50,
+    },
+    uploadsByDay: Array.from({ length: 30 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (29 - i));
+      const api = Math.floor(Math.random() * 40) + 30; // Entre 30 et 70
+      const web = Math.floor(Math.random() * 30) + 15; // Entre 15 et 45
+      return {
+        date: format(date, "yyyy-MM-dd"),
+        api,
+        web,
+        total: api + web,
+      };
+    }),
+    uploadsByType: [
+      { type: "png", count: 450, percentage: 36 },
+      { type: "jpg", count: 380, percentage: 30 },
+      { type: "gif", count: 220, percentage: 18 },
+      { type: "mp4", count: 120, percentage: 10 },
+      { type: "autres", count: 80, percentage: 6 },
+    ],
+    averageSizeByDay: [
+      { date: "2024-03-01", averageSize: 2.5 },
+      { date: "2024-03-02", averageSize: 3.1 },
+      { date: "2024-03-03", averageSize: 2.8 },
+      { date: "2024-03-04", averageSize: 3.5 },
+      { date: "2024-03-05", averageSize: 2.9 },
+      { date: "2024-03-06", averageSize: 3.2 },
+      { date: "2024-03-07", averageSize: 2.7 },
+    ],
+    uploadsByHour: Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      count: Math.floor(Math.random() * 50) + 10,
+    })),
+    uploadsByWeekday: [
+      { weekday: "Lundi", count: 180 },
+      { weekday: "Mardi", count: 220 },
+      { weekday: "Mercredi", count: 240 },
+      { weekday: "Jeudi", count: 190 },
+      { weekday: "Vendredi", count: 260 },
+      { weekday: "Samedi", count: 120 },
+      { weekday: "Dimanche", count: 90 },
+    ],
+    sizeDistribution: [
+      { range: "< 100 KB", count: 450, percentage: 36 },
+      { range: "100 KB - 1 MB", count: 380, percentage: 30 },
+      { range: "1 MB - 5 MB", count: 220, percentage: 18 },
+      { range: "5 MB - 10 MB", count: 120, percentage: 10 },
+      { range: "> 10 MB", count: 80, percentage: 6 },
+    ],
+    monthlyGrowth: [
+      { month: "2024-01", newFiles: 280, totalSize: 1024 * 1024 * 500 },
+      { month: "2024-02", newFiles: 420, totalSize: 1024 * 1024 * 800 },
+      { month: "2024-03", newFiles: 550, totalSize: 1024 * 1024 * 1200 },
+    ],
+    oldestFile: {
+      name: "premiere-image.png",
+      date: "2024-01-01T08:30:00Z",
+    },
+    newestFile: {
+      name: "derniere-capture.jpg",
+      date: "2024-03-14T15:45:00Z",
+    },
+  };
+
+  // Fonction pour calculer les vraies statistiques
+  const calculateStats = (historyData: any, fileStats: any): StatsData => {
+    const entries: HistoryEntry[] = historyData.items;
+
+    // Calculer les statistiques de base
+    const stats: StatsData = {
+      totalUploads: entries.length,
+      totalSize: entries.reduce((acc, entry) => acc + entry.fileSize, 0),
+      uploadsByMethod: {
+        api: entries.filter((e) => e.uploadMethod === "api").length,
+        web: entries.filter((e) => e.uploadMethod === "web").length,
+        sharex: entries.filter((e) => e.uploadMethod === "sharex").length,
+      },
+      uploadsByDay: [],
+      uploadsByType: fileStats.byExtension.map((ext: any) => ({
+        type: ext.extension || "sans extension",
+        count: ext.count,
+        percentage: ext.percentage,
+      })),
+      averageSizeByDay: [],
+      uploadsByHour: [],
+      uploadsByWeekday: [],
+      sizeDistribution: fileStats.sizeDistribution,
+      monthlyGrowth: fileStats.monthlyGrowth,
+      oldestFile: fileStats.oldestFile,
+      newestFile: fileStats.newestFile,
+    };
+
+    // Grouper par jour avec séparation API/Web
+    const byDay = new Map<
+      string,
+      { api: number; web: number; total: number }
+    >();
+
+    // Initialiser les 30 derniers jours avec des valeurs à 0
+    for (let i = 0; i < 30; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      byDay.set(format(date, "yyyy-MM-dd"), {
+        api: 0,
+        web: 0,
+        total: 0,
+      });
+    }
+
+    // Ajouter les données réelles
+    entries.forEach((entry) => {
+      const date = format(new Date(entry.uploadDate), "yyyy-MM-dd");
+      // Ne prendre en compte que les 30 derniers jours
+      if (byDay.has(date)) {
+        const current = byDay.get(date)!;
+        if (entry.uploadMethod === "api") current.api++;
+        else if (entry.uploadMethod === "web") current.web++;
+        current.total = current.api + current.web;
+        byDay.set(date, current);
+      }
+    });
+
+    stats.uploadsByDay = Array.from(byDay.entries())
+      .map(([date, stats]) => ({
+        date,
+        api: stats.api,
+        web: stats.web,
+        total: stats.total,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Calcul des uploads par heure
+    const byHour = new Map<number, number>();
+    for (let i = 0; i < 24; i++) byHour.set(i, 0);
+    entries.forEach((entry) => {
+      const hour = new Date(entry.uploadDate).getHours();
+      byHour.set(hour, (byHour.get(hour) || 0) + 1);
+    });
+    stats.uploadsByHour = Array.from(byHour.entries()).map(([hour, count]) => ({
+      hour,
+      count,
+    }));
+
+    // Calcul des uploads par jour de la semaine
+    const weekdays = [
+      "Lundi",
+      "Mardi",
+      "Mercredi",
+      "Jeudi",
+      "Vendredi",
+      "Samedi",
+      "Dimanche",
+    ];
+    const byWeekday = new Map<string, number>();
+    weekdays.forEach((day) => byWeekday.set(day, 0));
+    entries.forEach((entry) => {
+      const date = new Date(entry.uploadDate);
+      const weekday = weekdays[date.getDay() === 0 ? 6 : date.getDay() - 1]; // Convertir 0-6 (Dimanche-Samedi) en 1-7 (Lundi-Dimanche)
+      byWeekday.set(weekday, (byWeekday.get(weekday) || 0) + 1);
+    });
+    stats.uploadsByWeekday = weekdays.map((weekday) => ({
+      weekday,
+      count: byWeekday.get(weekday) || 0,
+    }));
+
+    // Autres calculs existants...
+    return stats;
+  };
 
   useEffect(() => {
     const loadStats = async () => {
@@ -94,107 +285,14 @@ export function StatsPageClient() {
 
         const historyData = await historyResponse.json();
         const fileStats = await fileStatsResponse.json();
-        const entries: HistoryEntry[] = historyData.items;
 
-        // Calculer les statistiques
-        const stats: StatsData = {
-          totalUploads: entries.length,
-          totalSize: entries.reduce((acc, entry) => acc + entry.fileSize, 0),
-          uploadsByMethod: {
-            api: entries.filter((e) => e.uploadMethod === "api").length,
-            web: entries.filter((e) => e.uploadMethod === "web").length,
-            sharex: entries.filter((e) => e.uploadMethod === "sharex").length,
-          },
-          uploadsByDay: [],
-          uploadsByType: fileStats.byExtension,
-          averageSizeByDay: [],
-          uploadsByHour: [],
-          uploadsByWeekday: [],
-          sizeDistribution: fileStats.sizeDistribution,
-          monthlyGrowth: fileStats.monthlyGrowth,
-          oldestFile: fileStats.oldestFile,
-          newestFile: fileStats.newestFile,
-        };
+        setHistoryData(historyData);
+        setFileStats(fileStats);
 
-        // Grouper par jour
-        const byDay = new Map<string, { count: number; size: number }>();
-        entries.forEach((entry) => {
-          const date = format(new Date(entry.uploadDate), "yyyy-MM-dd");
-          const current = byDay.get(date) || { count: 0, size: 0 };
-          byDay.set(date, {
-            count: current.count + 1,
-            size: current.size + entry.fileSize,
-          });
-        });
-
-        stats.uploadsByDay = Array.from(byDay.entries())
-          .map(([date, stats]) => ({
-            date,
-            count: stats.count,
-            size: Math.round(stats.size / 1024 / 1024), // Convertir en MB
-          }))
-          .sort((a, b) => a.date.localeCompare(b.date));
-
-        // Calculer la taille moyenne par jour
-        stats.averageSizeByDay = Array.from(byDay.entries())
-          .map(([date, stats]) => ({
-            date,
-            averageSize: Math.round(stats.size / stats.count / 1024 / 1024), // Convertir en MB
-          }))
-          .sort((a, b) => a.date.localeCompare(b.date));
-
-        // Grouper par extension de fichier
-        const byType = new Map<string, number>();
-        entries.forEach((entry) => {
-          const extension =
-            entry.originalFilename.split(".").pop()?.toLowerCase() ||
-            "sans extension";
-          byType.set(extension, (byType.get(extension) || 0) + 1);
-        });
-
-        const totalFiles = entries.length;
-        stats.uploadsByType = Array.from(byType.entries())
-          .map(([type, count]) => ({
-            type,
-            count,
-            percentage: Math.round((count / totalFiles) * 100),
-          }))
-          .sort((a, b) => b.count - a.count);
-
-        // Grouper par heure
-        const byHour = new Map<number, number>();
-        entries.forEach((entry) => {
-          const hour = new Date(entry.uploadDate).getHours();
-          byHour.set(hour, (byHour.get(hour) || 0) + 1);
-        });
-
-        stats.uploadsByHour = Array.from({ length: 24 }, (_, hour) => ({
-          hour,
-          count: byHour.get(hour) || 0,
-        }));
-
-        // Grouper par jour de la semaine
-        const weekdays = [
-          "Dimanche",
-          "Lundi",
-          "Mardi",
-          "Mercredi",
-          "Jeudi",
-          "Vendredi",
-          "Samedi",
-        ];
-        const byWeekday = new Map<string, number>();
-        entries.forEach((entry) => {
-          const weekday = weekdays[new Date(entry.uploadDate).getDay()];
-          byWeekday.set(weekday, (byWeekday.get(weekday) || 0) + 1);
-        });
-
-        stats.uploadsByWeekday = weekdays.map((weekday) => ({
-          weekday,
-          count: byWeekday.get(weekday) || 0,
-        }));
-
-        setStats(stats);
+        // Utiliser les données de test ou réelles selon l'état
+        setStats(
+          useTestData ? testData : calculateStats(historyData, fileStats)
+        );
       } catch (error) {
         console.error("Erreur lors du chargement des statistiques:", error);
       } finally {
@@ -203,7 +301,7 @@ export function StatsPageClient() {
     };
 
     loadStats();
-  }, []);
+  }, [useTestData]); // Recharger quand useTestData change
 
   const formatFileSize = (bytes: number) => {
     const units = ["B", "KB", "MB", "GB"];
@@ -217,6 +315,17 @@ export function StatsPageClient() {
 
     return `${size.toFixed(1)} ${units[unitIndex]}`;
   };
+
+  const chartConfig = {
+    api: {
+      label: "Via API",
+      color: "hsl(var(--chart-1))",
+    },
+    web: {
+      label: "Via Web",
+      color: "hsl(var(--chart-2))",
+    },
+  } satisfies ChartConfig;
 
   if (isLoading) {
     return (
@@ -232,13 +341,30 @@ export function StatsPageClient() {
     <main className="p-8">
       <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex flex-col gap-4 py-4">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">
-              Statistiques des uploads
-            </h1>
-            <p className="text-muted-foreground">
-              Visualisez les statistiques de vos uploads ShareX
-            </p>
+          <div className="flex justify-between items-center">
+            <div className="flex flex-col gap-2">
+              <h1 className="text-3xl font-bold tracking-tight">
+                Statistiques des uploads
+              </h1>
+              <p className="text-muted-foreground">
+                Visualisez les statistiques de vos uploads ShareX
+              </p>
+            </div>
+            {process.env.NODE_ENV === "development" && (
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="test-mode"
+                  checked={useTestData}
+                  onCheckedChange={setUseTestData}
+                />
+                <Label
+                  htmlFor="test-mode"
+                  className="text-sm text-muted-foreground"
+                >
+                  {useTestData ? "Données de test" : "Données réelles"}
+                </Label>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -350,35 +476,146 @@ export function StatsPageClient() {
 
         {/* Graphique des uploads par jour */}
         <Card className="col-span-full">
-          <CardHeader>
-            <CardTitle>Uploads par jour</CardTitle>
+          <CardHeader className="flex flex-col items-stretch space-y-0 border-b p-0 sm:flex-row">
+            <div className="flex flex-1 flex-col justify-center gap-1 px-6 py-5 sm:py-6">
+              <CardTitle>Uploads par jour</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Affichage des uploads par méthode sur les 30 derniers jours
+              </p>
+            </div>
+            <div className="flex">
+              {["api", "web"].map((method) => (
+                <button
+                  key={method}
+                  onClick={() =>
+                    setActiveView(
+                      activeView === (method as "api" | "web")
+                        ? null
+                        : (method as "api" | "web")
+                    )
+                  }
+                  className={cn(
+                    "relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-6 py-4 text-left even:border-l sm:border-l sm:border-t-0 sm:px-8 sm:py-6 transition-colors",
+                    activeView === method || activeView === null
+                      ? "hover:bg-muted/50"
+                      : "opacity-50 hover:opacity-75 bg-muted/10"
+                  )}
+                >
+                  <span className="text-xs text-muted-foreground">
+                    Via {method.toUpperCase()}
+                  </span>
+                  <span className="text-lg font-bold leading-none sm:text-3xl">
+                    {
+                      stats.uploadsByMethod[
+                        method as keyof typeof stats.uploadsByMethod
+                      ]
+                    }
+                  </span>
+                </button>
+              ))}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stats.uploadsByDay}>
+            <ChartContainer config={chartConfig}>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={stats.uploadsByDay}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="date"
                     tickFormatter={(date) =>
                       format(new Date(date), "dd MMM", { locale: fr })
                     }
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    minTickGap={20}
                   />
-                  <YAxis />
-                  <Tooltip
-                    labelFormatter={(date) =>
-                      format(new Date(date), "dd MMMM yyyy", { locale: fr })
-                    }
-                    formatter={(value: number) => [value, "uploads"]}
+                  <YAxis tickLine={false} axisLine={false} />
+                  <ChartTooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
+                          <div className="mb-2 font-medium">
+                            {format(new Date(label), "dd MMMM yyyy", {
+                              locale: fr,
+                            })}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            {payload.map((entry, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between gap-2"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <div
+                                    className="h-2 w-2 rounded-full"
+                                    style={{
+                                      backgroundColor: entry.color,
+                                    }}
+                                  />
+                                  <span>
+                                    {entry.name === "api"
+                                      ? "Via API"
+                                      : "Via Web"}
+                                  </span>
+                                </div>
+                                <div className="font-medium">
+                                  {entry.value} uploads
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="count"
-                    stroke="#2563eb"
-                    strokeWidth={2}
+                  <Legend
+                    onClick={(e) => {
+                      const dataKey = e.dataKey as "api" | "web";
+                      setActiveView(activeView === dataKey ? null : dataKey);
+                    }}
+                    wrapperStyle={{ paddingTop: "1rem" }}
                   />
-                </LineChart>
+                  {(activeView === "api" || activeView === null) && (
+                    <Bar
+                      dataKey="api"
+                      name="Via API"
+                      stackId="a"
+                      fill={chartConfig.api.color}
+                      fillOpacity={0.8}
+                      animationDuration={1000}
+                      animationBegin={0}
+                    >
+                      <LabelList
+                        dataKey="api"
+                        position="top"
+                        style={{ fontSize: "10px" }}
+                        formatter={(value: number) => (value > 50 ? value : "")}
+                      />
+                    </Bar>
+                  )}
+                  {(activeView === "web" || activeView === null) && (
+                    <Bar
+                      dataKey="web"
+                      name="Via Web"
+                      stackId="a"
+                      fill={chartConfig.web.color}
+                      fillOpacity={0.8}
+                      animationDuration={1000}
+                      animationBegin={200}
+                    >
+                      <LabelList
+                        dataKey="web"
+                        position="top"
+                        style={{ fontSize: "10px" }}
+                        formatter={(value: number) => (value > 35 ? value : "")}
+                      />
+                    </Bar>
+                  )}
+                </BarChart>
               </ResponsiveContainer>
-            </div>
+            </ChartContainer>
           </CardContent>
         </Card>
 
@@ -388,34 +625,51 @@ export function StatsPageClient() {
             <CardTitle>Taille moyenne des fichiers par jour</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer config={chartConfig}>
+              <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={stats.averageSizeByDay}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="date"
                     tickFormatter={(date) =>
                       format(new Date(date), "dd MMM", { locale: fr })
                     }
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
                   />
-                  <YAxis />
-                  <Tooltip
-                    labelFormatter={(date) =>
-                      format(new Date(date), "dd MMMM yyyy", { locale: fr })
-                    }
-                    formatter={(value: number) => [
-                      `${value} MB`,
-                      "taille moyenne",
-                    ]}
+                  <YAxis tickLine={false} axisLine={false} />
+                  <ChartTooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
+                          <div className="mb-2 font-medium">
+                            {format(new Date(label), "dd MMMM yyyy", {
+                              locale: fr,
+                            })}
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span>Taille moyenne</span>
+                            <span className="font-medium">
+                              {payload[0].value} MB
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }}
                   />
                   <Line
                     type="monotone"
                     dataKey="averageSize"
-                    stroke="#2563eb"
+                    stroke="hsl(var(--chart-2))"
                     strokeWidth={2}
+                    dot={false}
+                    animationDuration={2000}
                   />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
+            </ChartContainer>
           </CardContent>
         </Card>
 
@@ -427,9 +681,36 @@ export function StatsPageClient() {
               <CardTitle>Extensions de fichiers</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <ChartContainer config={chartConfig}>
+                <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
+                    <ChartTooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const data = payload[0].payload;
+                        return (
+                          <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
+                            <div className="mb-2 font-medium">
+                              Extension .{data.type}
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span>Fichiers</span>
+                                <span className="font-medium">
+                                  {data.count}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2">
+                                <span>Pourcentage</span>
+                                <span className="font-medium">
+                                  {data.percentage}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
                     <Pie
                       data={stats.uploadsByType}
                       dataKey="count"
@@ -438,38 +719,26 @@ export function StatsPageClient() {
                       cy="50%"
                       outerRadius={100}
                       label={(entry) => `${entry.type} (${entry.percentage}%)`}
+                      animationDuration={2000}
                     >
                       {stats.uploadsByType.map((entry, index) => (
                         <Cell
                           key={entry.type}
                           fill={
                             [
-                              "#2563eb", // Bleu
-                              "#16a34a", // Vert
-                              "#dc2626", // Rouge
-                              "#ca8a04", // Jaune
-                              "#9333ea", // Violet
-                              "#0891b2", // Cyan
-                              "#be185d", // Rose
-                              "#2dd4bf", // Turquoise
-                              "#f97316", // Orange
-                              "#8b5cf6", // Indigo
-                              "#ec4899", // Pink
-                              "#14b8a6", // Teal
-                            ][index % 12]
+                              "hsl(var(--chart-1))",
+                              "hsl(var(--chart-2))",
+                              "hsl(var(--chart-3))",
+                              "hsl(var(--chart-4))",
+                              "hsl(var(--chart-5))",
+                            ][index % 5]
                           }
                         />
                       ))}
                     </Pie>
-                    <Tooltip
-                      formatter={(value: number, name: string, props: any) => [
-                        `${value} fichiers (${props.payload.percentage}%)`,
-                        `Extension .${name}`,
-                      ]}
-                    />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
+              </ChartContainer>
             </CardContent>
           </Card>
 
@@ -479,22 +748,49 @@ export function StatsPageClient() {
               <CardTitle>Uploads par heure</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <ChartContainer config={chartConfig}>
+                <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={stats.uploadsByHour}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis
                       dataKey="hour"
                       tickFormatter={(hour) => `${hour}h`}
+                      tickLine={false}
+                      axisLine={false}
                     />
-                    <YAxis />
-                    <Tooltip
-                      formatter={(value: number) => [value, "uploads"]}
-                      labelFormatter={(hour) => `${hour}h00`}
+                    <YAxis tickLine={false} axisLine={false} />
+                    <ChartTooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const data = payload[0].payload;
+                        return (
+                          <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
+                            <div className="mb-2 font-medium">
+                              {data.hour}h00
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span>Uploads</span>
+                              <span className="font-medium">{data.count}</span>
+                            </div>
+                          </div>
+                        );
+                      }}
                     />
-                    <Bar dataKey="count" fill="#2563eb" />
+                    <Bar
+                      dataKey="count"
+                      fill="hsl(var(--chart-1))"
+                      animationDuration={2000}
+                    >
+                      <LabelList
+                        dataKey="count"
+                        position="top"
+                        style={{ fontSize: "10px" }}
+                        formatter={(value: number) => (value > 30 ? value : "")}
+                      />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
+              </ChartContainer>
             </CardContent>
           </Card>
         </div>
@@ -505,16 +801,42 @@ export function StatsPageClient() {
             <CardTitle>Uploads par jour de la semaine</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer config={chartConfig}>
+              <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={stats.uploadsByWeekday}>
-                  <XAxis dataKey="weekday" />
-                  <YAxis />
-                  <Tooltip formatter={(value: number) => [value, "uploads"]} />
-                  <Bar dataKey="count" fill="#2563eb" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="weekday" tickLine={false} axisLine={false} />
+                  <YAxis tickLine={false} axisLine={false} />
+                  <ChartTooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const data = payload[0].payload;
+                      return (
+                        <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
+                          <div className="mb-2 font-medium">{data.weekday}</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span>Uploads</span>
+                            <span className="font-medium">{data.count}</span>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar
+                    dataKey="count"
+                    fill="hsl(var(--chart-2))"
+                    animationDuration={2000}
+                  >
+                    <LabelList
+                      dataKey="count"
+                      position="top"
+                      style={{ fontSize: "10px" }}
+                      formatter={(value: number) => (value > 100 ? value : "")}
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </ChartContainer>
           </CardContent>
         </Card>
 
@@ -524,36 +846,50 @@ export function StatsPageClient() {
             <CardTitle>Distribution des tailles de fichiers</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer config={chartConfig}>
+              <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={stats.sizeDistribution}>
-                  <XAxis dataKey="range" />
-                  <YAxis />
-                  <Tooltip
-                    formatter={(value: number, name: string, props: any) => [
-                      `${value} fichiers (${props.payload.percentage}%)`,
-                      "Nombre de fichiers",
-                    ]}
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="range" tickLine={false} axisLine={false} />
+                  <YAxis tickLine={false} axisLine={false} />
+                  <ChartTooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const data = payload[0].payload;
+                      return (
+                        <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
+                          <div className="mb-2 font-medium">{data.range}</div>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span>Fichiers</span>
+                              <span className="font-medium">{data.count}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span>Pourcentage</span>
+                              <span className="font-medium">
+                                {data.percentage}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }}
                   />
                   <Bar
                     dataKey="count"
-                    fill="#2563eb"
-                    name="Fichiers"
-                    label={({ x, y, width, height, value, payload }) => (
-                      <text
-                        x={x + width / 2}
-                        y={y - 10}
-                        fill="#666"
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                      >
-                        {payload?.percentage ?? 0}%
-                      </text>
-                    )}
-                  />
+                    fill="hsl(var(--chart-3))"
+                    animationDuration={2000}
+                  >
+                    <LabelList
+                      dataKey="percentage"
+                      position="top"
+                      style={{ fontSize: "10px" }}
+                      formatter={(value: number) => `${value}%`}
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </ChartContainer>
           </CardContent>
         </Card>
 
@@ -563,29 +899,70 @@ export function StatsPageClient() {
             <CardTitle>Croissance mensuelle</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer config={chartConfig}>
+              <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={stats.monthlyGrowth}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="month"
                     tickFormatter={(month) =>
                       format(new Date(month), "MMM yyyy", { locale: fr })
                     }
+                    tickLine={false}
+                    axisLine={false}
                   />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip
-                    labelFormatter={(month) =>
-                      format(new Date(month), "MMMM yyyy", { locale: fr })
-                    }
-                    formatter={(value: number, name: string) => [
-                      name === "newFiles"
-                        ? `${value} fichiers`
-                        : formatFileSize(value),
-                      name === "newFiles"
-                        ? "Nouveaux fichiers"
-                        : "Taille totale",
-                    ]}
+                  <YAxis yAxisId="left" tickLine={false} axisLine={false} />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <ChartTooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const totalSize = payload[1]?.value;
+                      if (typeof totalSize !== "number") return null;
+                      return (
+                        <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
+                          <div className="mb-2 font-medium">
+                            {format(new Date(label), "MMMM yyyy", {
+                              locale: fr,
+                            })}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1">
+                                <div
+                                  className="h-2 w-2 rounded-full"
+                                  style={{
+                                    backgroundColor: "hsl(var(--chart-1))",
+                                  }}
+                                />
+                                <span>Nouveaux fichiers</span>
+                              </div>
+                              <span className="font-medium">
+                                {payload[0]?.value} fichiers
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1">
+                                <div
+                                  className="h-2 w-2 rounded-full"
+                                  style={{
+                                    backgroundColor: "hsl(var(--chart-2))",
+                                  }}
+                                />
+                                <span>Taille totale</span>
+                              </div>
+                              <span className="font-medium">
+                                {formatFileSize(totalSize)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }}
                   />
                   <Legend
                     formatter={(value) =>
@@ -593,26 +970,32 @@ export function StatsPageClient() {
                         ? "Nouveaux fichiers"
                         : "Taille totale"
                     }
+                    wrapperStyle={{ paddingTop: "1rem" }}
                   />
                   <Area
                     yAxisId="left"
                     type="monotone"
                     dataKey="newFiles"
-                    stroke="#2563eb"
-                    fill="#2563eb"
+                    name="newFiles"
+                    stroke="hsl(var(--chart-1))"
+                    fill="hsl(var(--chart-1))"
                     fillOpacity={0.2}
+                    animationDuration={2000}
                   />
                   <Area
                     yAxisId="right"
                     type="monotone"
                     dataKey="totalSize"
-                    stroke="#16a34a"
-                    fill="#16a34a"
+                    name="totalSize"
+                    stroke="hsl(var(--chart-2))"
+                    fill="hsl(var(--chart-2))"
                     fillOpacity={0.2}
+                    animationDuration={2000}
+                    animationBegin={500}
                   />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
+            </ChartContainer>
           </CardContent>
         </Card>
       </div>
