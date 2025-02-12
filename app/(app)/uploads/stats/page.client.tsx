@@ -90,7 +90,7 @@ interface StatsData {
 export function StatsPageClient() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [useTestData, setUseTestData] = useState(true);
+  const [useTestData, setUseTestData] = useState(false);
   const [historyData, setHistoryData] = useState<any>(null);
   const [fileStats, setFileStats] = useState<any>(null);
   const [activeView, setActiveView] = useState<"api" | "web" | null>(null);
@@ -195,10 +195,10 @@ export function StatsPageClient() {
       newestFile: fileStats.newestFile,
     };
 
-    // Grouper par jour avec séparation API/Web
+    // Grouper par jour avec séparation API/Web et calcul de la taille moyenne
     const byDay = new Map<
       string,
-      { api: number; web: number; total: number }
+      { api: number; web: number; total: number; totalSize: number }
     >();
 
     // Initialiser les 30 derniers jours avec des valeurs à 0
@@ -209,6 +209,7 @@ export function StatsPageClient() {
         api: 0,
         web: 0,
         total: 0,
+        totalSize: 0,
       });
     }
 
@@ -221,6 +222,7 @@ export function StatsPageClient() {
         if (entry.uploadMethod === "api") current.api++;
         else if (entry.uploadMethod === "web") current.web++;
         current.total = current.api + current.web;
+        current.totalSize += entry.fileSize;
         byDay.set(date, current);
       }
     });
@@ -231,6 +233,18 @@ export function StatsPageClient() {
         api: stats.api,
         web: stats.web,
         total: stats.total,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Calcul de la taille moyenne par jour
+    stats.averageSizeByDay = Array.from(byDay.entries())
+      .map(([date, stats]) => ({
+        date,
+        averageSize:
+          stats.total > 0
+            ? Math.round((stats.totalSize / stats.total / (1024 * 1024)) * 10) /
+              10
+            : 0, // Convertir en MB avec 1 décimale
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -515,11 +529,11 @@ export function StatsPageClient() {
               ))}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="!p-6">
             <ChartContainer config={chartConfig}>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={stats.uploadsByDay}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <CartesianGrid vertical={false} />
                   <XAxis
                     dataKey="date"
                     tickFormatter={(date) =>
@@ -569,13 +583,6 @@ export function StatsPageClient() {
                         </div>
                       );
                     }}
-                  />
-                  <Legend
-                    onClick={(e) => {
-                      const dataKey = e.dataKey as "api" | "web";
-                      setActiveView(activeView === dataKey ? null : dataKey);
-                    }}
-                    wrapperStyle={{ paddingTop: "1rem" }}
                   />
                   {(activeView === "api" || activeView === null) && (
                     <Bar
@@ -638,7 +645,11 @@ export function StatsPageClient() {
                     axisLine={false}
                     tickMargin={8}
                   />
-                  <YAxis tickLine={false} axisLine={false} />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `${value} MB`}
+                  />
                   <ChartTooltip
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;
@@ -664,9 +675,30 @@ export function StatsPageClient() {
                     dataKey="averageSize"
                     stroke="hsl(var(--chart-2))"
                     strokeWidth={2}
-                    dot={false}
+                    dot={{
+                      r: 4,
+                      fill: "hsl(var(--chart-2))",
+                      strokeWidth: 2,
+                      stroke: "hsl(var(--background))",
+                    }}
+                    activeDot={{
+                      r: 6,
+                      fill: "hsl(var(--chart-2))",
+                      strokeWidth: 2,
+                      stroke: "hsl(var(--background))",
+                    }}
                     animationDuration={2000}
-                  />
+                  >
+                    <LabelList
+                      dataKey="averageSize"
+                      position="top"
+                      offset={10}
+                      style={{ fontSize: "10px" }}
+                      formatter={(value: number) =>
+                        value > 0 ? `${value} MB` : ""
+                      }
+                    />
+                  </Line>
                 </LineChart>
               </ResponsiveContainer>
             </ChartContainer>
