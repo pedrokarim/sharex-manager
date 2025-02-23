@@ -171,15 +171,11 @@ export function StatsPageClient() {
   const calculateStats = (historyData: any, fileStats: any): StatsData => {
     const entries: HistoryEntry[] = historyData.items;
 
-    // Calculer les statistiques de base
+    // Utiliser les statistiques globales directement depuis fileStats
     const stats: StatsData = {
-      totalUploads: entries.length,
-      totalSize: entries.reduce((acc, entry) => acc + entry.fileSize, 0),
-      uploadsByMethod: {
-        api: entries.filter((e) => e.uploadMethod === "api").length,
-        web: entries.filter((e) => e.uploadMethod === "web").length,
-        sharex: entries.filter((e) => e.uploadMethod === "sharex").length,
-      },
+      totalUploads: fileStats.totalFiles,
+      totalSize: fileStats.totalSize,
+      uploadsByMethod: fileStats.uploadsByMethod,
       uploadsByDay: [],
       uploadsByType: fileStats.byExtension.map((ext: any) => ({
         type: ext.extension || "sans extension",

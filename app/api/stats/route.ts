@@ -38,6 +38,11 @@ interface FileStats {
     count: number;
     percentage: number;
   }[];
+  uploadsByMethod: {
+    api: number;
+    web: number;
+    sharex: number;
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -61,6 +66,11 @@ export async function GET(request: NextRequest) {
       sizeDistribution: [],
       monthlyGrowth: [],
       topExtensions: [],
+      uploadsByMethod: {
+        api: 0,
+        web: 0,
+        sharex: 0,
+      },
     };
 
     // Map pour stocker les statistiques par extension
@@ -143,6 +153,12 @@ export async function GET(request: NextRequest) {
         newFiles: current.newFiles + 1,
         totalSize: current.totalSize + entry.fileSize,
       });
+
+      // Compter les uploads par méthode
+      if (entry.uploadMethod === "api") fileStats.uploadsByMethod.api++;
+      else if (entry.uploadMethod === "web") fileStats.uploadsByMethod.web++;
+      else if (entry.uploadMethod === "sharex")
+        fileStats.uploadsByMethod.sharex++;
     });
 
     // Conversion des statistiques par extension
