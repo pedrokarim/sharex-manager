@@ -12,13 +12,17 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
+    const isStatsRequest = searchParams.get("stats") === "true";
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "25");
     const sortField = searchParams.get("sortField") || "uploadDate";
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
+    // Si c'est une requête pour les stats, on force les filtres pour les 30 derniers jours
     const filters = {
-      startDate: searchParams.get("startDate")
+      startDate: isStatsRequest
+        ? new Date(new Date().setDate(new Date().getDate() - 30))
+        : searchParams.get("startDate")
         ? new Date(searchParams.get("startDate")!)
         : undefined,
       endDate: searchParams.get("endDate")
@@ -53,11 +57,17 @@ export async function GET(request: NextRequest) {
       return sortOrder === "desc" ? -comparison : comparison;
     });
 
-    // Calculer l'index de début et de fin pour la pagination
+    // Si c'est une requête pour les stats, on renvoie tous les éléments
+    if (isStatsRequest) {
+      return NextResponse.json({
+        items: allItems,
+        total: allItems.length,
+      });
+    }
+
+    // Sinon, on applique la pagination normale
     const startIndex = (page - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-
-    // Extraire les éléments de la page courante
     const items = allItems.slice(startIndex, endIndex);
 
     return NextResponse.json({

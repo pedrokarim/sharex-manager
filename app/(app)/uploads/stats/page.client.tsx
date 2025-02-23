@@ -285,8 +285,9 @@ export function StatsPageClient() {
   useEffect(() => {
     const loadStats = async () => {
       try {
+        setIsLoading(true);
         const [historyResponse, fileStatsResponse] = await Promise.all([
-          fetch("/api/history"),
+          fetch("/api/history?stats=true"),
           fetch("/api/stats"),
         ]);
 

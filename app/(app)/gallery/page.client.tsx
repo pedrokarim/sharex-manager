@@ -289,8 +289,16 @@ export function GalleryClient({
     }
   }, [status]);
 
+  // TODO: Par pitié, il faut trouver une solution pour éviter les doublons en production.
+  const uniqueFiles = useMemo(() => {
+    return files.filter(
+      (file, index, self) =>
+        index === self.findIndex((f) => f.name === file.name)
+    );
+  }, [files]);
+
   const groupedFiles = useMemo(() => {
-    return files.reduce((acc: GroupedFiles, file) => {
+    return uniqueFiles.reduce((acc: GroupedFiles, file) => {
       const date = format(parseISO(file.createdAt), "MMMM yyyy", {
         locale: fr,
       });
@@ -300,7 +308,7 @@ export function GalleryClient({
       acc[date].push(file);
       return acc;
     }, {});
-  }, [files]);
+  }, [uniqueFiles]);
 
   const findCurrentFileIndex = () => {
     if (!selectedFile) return -1;
