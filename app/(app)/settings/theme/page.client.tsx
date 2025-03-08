@@ -17,6 +17,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { presets, type PresetTheme, type ThemeCategory } from "@/themes";
+import {
+  Bar,
+  BarChart,
+  Line,
+  LineChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  PolarAngleAxis,
+  RadialBar,
+  RadialBarChart,
+  Rectangle,
+  ReferenceLine,
+  Label as RechartLabel,
+} from "recharts";
 
 export function ThemeConfigClient() {
   const { theme, setTheme } = useTheme();
@@ -167,58 +183,143 @@ export function ThemeConfigClient() {
     {
       title: "Graphique en barres",
       render: (className: string) => (
-        <div className={cn("flex items-end gap-2 h-32", className)}>
-          {[40, 70, 55, 90, 60].map((height, i) => (
-            <div
-              key={i}
-              className="w-8 rounded-t-md transition-colors"
-              style={{
-                height: `${height}%`,
-                backgroundColor: getChartColor(i + 1),
-              }}
+        <div className={cn("h-48", className)}>
+          <BarChart
+            width={300}
+            height={180}
+            data={[
+              { date: "Lun", steps: 2000 },
+              { date: "Mar", steps: 2100 },
+              { date: "Mer", steps: 2200 },
+              { date: "Jeu", steps: 1300 },
+              { date: "Ven", steps: 1400 },
+              { date: "Sam", steps: 2500 },
+              { date: "Dim", steps: 1600 },
+            ]}
+            margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+          >
+            <Bar
+              dataKey="steps"
+              fill={getChartColor(1)}
+              radius={5}
+              fillOpacity={0.6}
+              activeBar={<Rectangle fillOpacity={0.8} />}
             />
-          ))}
-        </div>
-      ),
-    },
-    {
-      title: "Graphique en anneaux",
-      render: (className: string) => (
-        <div className={cn("relative h-32", className)}>
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div
-              key={i}
-              className="absolute inset-0 rounded-full border-8 transition-colors"
-              style={{
-                borderColor: getChartColor(i),
-                transform: `scale(${0.5 + i * 0.1})`,
-                opacity: 1 - (i - 1) * 0.15,
-              }}
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={4}
+              tick={{ fill: "currentColor", fontSize: 12 }}
             />
-          ))}
+            <ReferenceLine
+              y={1800}
+              stroke={getChartColor(2)}
+              strokeDasharray="3 3"
+              strokeWidth={1}
+            >
+              <RechartLabel
+                position="insideBottomLeft"
+                value="Moyenne"
+                offset={10}
+                fill="currentColor"
+                fontSize={10}
+              />
+            </ReferenceLine>
+          </BarChart>
         </div>
       ),
     },
     {
       title: "Graphique en lignes",
       render: (className: string) => (
-        <div className={cn("h-32 flex items-center", className)}>
-          <svg className="w-full h-24" viewBox="0 0 100 50">
-            {[
-              "M0,40 C20,40 20,10 40,10 S60,40 80,40 S100,10 100,10",
-              "M0,30 C30,30 30,20 50,20 S70,30 100,30",
-              "M0,25 C40,25 40,35 70,35 S100,25 100,25",
-            ].map((path, i) => (
-              <path
-                key={i}
-                d={path}
-                fill="none"
-                stroke={getChartColor(i + 1)}
-                strokeWidth="2"
-                className="transition-colors"
-              />
-            ))}
-          </svg>
+        <div className={cn("h-48", className)}>
+          <LineChart
+            width={300}
+            height={180}
+            data={[
+              { date: "Lun", resting: 62 },
+              { date: "Mar", resting: 72 },
+              { date: "Mer", resting: 35 },
+              { date: "Jeu", resting: 62 },
+              { date: "Ven", resting: 52 },
+              { date: "Sam", resting: 62 },
+              { date: "Dim", resting: 70 },
+            ]}
+            margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+          >
+            <CartesianGrid
+              strokeDasharray="4 4"
+              vertical={false}
+              stroke={getChartColor(3)}
+              strokeOpacity={0.5}
+            />
+            <YAxis hide domain={["dataMin - 10", "dataMax + 10"]} />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              tick={{ fill: "currentColor", fontSize: 12 }}
+            />
+            <Line
+              dataKey="resting"
+              type="natural"
+              stroke={getChartColor(2)}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{
+                fill: getChartColor(2),
+                stroke: getChartColor(2),
+                r: 4,
+              }}
+            />
+          </LineChart>
+        </div>
+      ),
+    },
+    {
+      title: "Graphique radial",
+      render: (className: string) => (
+        <div className={cn("h-48", className)}>
+          <RadialBarChart
+            width={300}
+            height={180}
+            innerRadius="20%"
+            outerRadius="80%"
+            data={[
+              {
+                activity: "Série 3",
+                value: 65,
+                fill: getChartColor(3),
+              },
+              {
+                activity: "Série 2",
+                value: 75,
+                fill: getChartColor(2),
+              },
+              {
+                activity: "Série 1",
+                value: 85,
+                fill: getChartColor(1),
+              },
+            ]}
+            startAngle={90}
+            endAngle={450}
+            barSize={20}
+          >
+            <PolarAngleAxis
+              type="number"
+              domain={[0, 100]}
+              dataKey="value"
+              tick={false}
+            />
+            <RadialBar
+              dataKey="value"
+              background={{ fill: "var(--background)" }}
+              cornerRadius={5}
+            />
+          </RadialBarChart>
         </div>
       ),
     },
