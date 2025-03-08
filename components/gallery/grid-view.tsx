@@ -1,5 +1,9 @@
 import { FileInfo } from "@/types/files";
 import { FileCard } from "@/components/file-card";
+import { useAtom } from "jotai";
+import { thumbnailSizeAtom } from "@/lib/atoms/preferences";
+import { useQueryState } from "nuqs";
+import { cn } from "@/lib/utils";
 
 interface GridViewProps {
   files: FileInfo[];
@@ -20,8 +24,27 @@ export function GridView({
   onToggleStar,
   newFileIds,
 }: GridViewProps) {
+  const [defaultThumbnailSize, setDefaultThumbnailSize] =
+    useAtom(thumbnailSizeAtom);
+  const [thumbnailSize] = useQueryState<"small" | "medium" | "large">("size", {
+    defaultValue: defaultThumbnailSize,
+    parse: (value): "small" | "medium" | "large" => {
+      if (value === "small" || value === "medium" || value === "large") {
+        return value;
+      }
+      return defaultThumbnailSize;
+    },
+  });
+
+  const gridSizeClasses = {
+    small:
+      "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8",
+    medium: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+    large: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3",
+  };
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className={cn("grid gap-4", gridSizeClasses[thumbnailSize])}>
       {files.map((file) => (
         <FileCard
           key={file.url}
@@ -32,6 +55,7 @@ export function GridView({
           onToggleSecurity={() => onToggleSecurity(file)}
           onToggleStar={() => onToggleStar(file)}
           isNew={newFileIds.includes(file.name)}
+          size={thumbnailSize}
         />
       ))}
     </div>

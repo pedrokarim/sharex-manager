@@ -2,11 +2,12 @@
 
 import { useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
-import { usePreferences } from "@/lib/stores/preferences";
+import { useAtom } from "jotai";
+import { preferencesAtom } from "@/lib/atoms/preferences";
 
 export function useThemeSync() {
   const { theme } = useTheme();
-  const preferences = usePreferences();
+  const [preferences] = useAtom(preferencesAtom);
   const isInitialized = useRef(false);
 
   useEffect(() => {

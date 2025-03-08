@@ -1,6 +1,8 @@
 "use client";
 
-import { usePreferences } from "@/lib/stores/preferences";
+import { useAtom } from "jotai";
+import { useQueryState } from "nuqs";
+import { autoRefreshIntervalAtom } from "@/lib/atoms/preferences";
 import {
   Select,
   SelectContent,
@@ -10,17 +12,31 @@ import {
 } from "@/components/ui/select";
 
 export function RefreshInterval() {
-  const preferences = usePreferences();
+  const [defaultAutoRefreshInterval, setDefaultAutoRefreshInterval] = useAtom(
+    autoRefreshIntervalAtom
+  );
+
+  const [autoRefreshInterval, setAutoRefreshInterval] = useQueryState(
+    "refresh",
+    {
+      defaultValue: defaultAutoRefreshInterval.toString(),
+      parse: (value): string => {
+        const parsed = parseInt(value);
+        if (!isNaN(parsed) && [0, 5, 10, 15, 30].includes(parsed)) {
+          return value;
+        }
+        return defaultAutoRefreshInterval.toString();
+      },
+    }
+  );
+
+  const handleChange = async (value: string) => {
+    await setAutoRefreshInterval(value);
+    setDefaultAutoRefreshInterval(parseInt(value));
+  };
 
   return (
-    <Select
-      value={preferences.autoRefreshInterval.toString()}
-      onValueChange={(value) =>
-        preferences.updatePreferences({
-          autoRefreshInterval: parseInt(value),
-        })
-      }
-    >
+    <Select value={autoRefreshInterval} onValueChange={handleChange}>
       <SelectTrigger className="w-[200px]">
         <SelectValue placeholder="Rafraîchissement auto" />
       </SelectTrigger>

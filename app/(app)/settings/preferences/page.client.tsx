@@ -1,6 +1,27 @@
 "use client";
 
-import { usePreferences } from "@/lib/stores/preferences";
+import { useAtom } from "jotai";
+import {
+  preferencesAtom,
+  languageAtom,
+  galleryViewModeAtom,
+  thumbnailSizeAtom,
+  showFileInfoAtom,
+  showFileSizeAtom,
+  showUploadDateAtom,
+  sortByAtom,
+  sortOrderAtom,
+  autoRefreshIntervalAtom,
+  showNotificationsAtom,
+  timeBasedThemeAtom,
+  preferredThemeModeAtom,
+  type GalleryViewMode,
+  type ThumbnailSize,
+  type Language,
+  type SortBy,
+  type SortOrder,
+  type ThemeMode,
+} from "@/lib/atoms/preferences";
 import {
   Settings2,
   RotateCcw,
@@ -17,6 +38,9 @@ import {
   Bell,
   Languages,
   RefreshCcw,
+  Grid,
+  LayoutGrid,
+  Table2,
 } from "lucide-react";
 import {
   Card,
@@ -47,14 +71,58 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
+import { useTimeBasedTheme } from "@/hooks/use-time-based-theme";
+import { TimePicker } from "@/components/ui/time-picker";
 
 export function PreferencesPageClient() {
-  const preferences = usePreferences();
+  const [preferences, setPreferences] = useAtom(preferencesAtom);
+  const [language, setLanguage] = useAtom(languageAtom);
+  const [galleryViewMode, setGalleryViewMode] = useAtom(galleryViewModeAtom);
+  const [thumbnailSize, setThumbnailSize] = useAtom(thumbnailSizeAtom);
+  const [showFileInfo, setShowFileInfo] = useAtom(showFileInfoAtom);
+  const [showFileSize, setShowFileSize] = useAtom(showFileSizeAtom);
+  const [showUploadDate, setShowUploadDate] = useAtom(showUploadDateAtom);
+  const [sortBy, setSortBy] = useAtom(sortByAtom);
+  const [sortOrder, setSortOrder] = useAtom(sortOrderAtom);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useAtom(
+    autoRefreshIntervalAtom
+  );
+  const [showNotifications, setShowNotifications] = useAtom(
+    showNotificationsAtom
+  );
+  const [timeBasedTheme, setTimeBasedTheme] = useAtom(timeBasedThemeAtom);
+  const [preferredThemeMode, setPreferredThemeMode] = useAtom(
+    preferredThemeModeAtom
+  );
+
   const { setTheme } = useTheme();
   const router = useRouter();
 
   const handleReset = () => {
-    preferences.resetPreferences();
+    setPreferences({
+      language: "fr",
+      galleryViewMode: "grid",
+      thumbnailSize: "medium",
+      showFileInfo: true,
+      showFileSize: true,
+      showUploadDate: true,
+      sortBy: "date",
+      sortOrder: "desc",
+      autoRefreshInterval: 0,
+      showNotifications: true,
+      showThumbnails: true,
+      defaultView: "grid",
+      defaultSortBy: "date",
+      defaultSortOrder: "desc",
+      enableUploadNotifications: true,
+      theme: "system",
+      lightColors: {},
+      darkColors: {},
+      radius: 0,
+      dayStartHour: 7,
+      dayEndHour: 19,
+    });
+    setPreferredThemeMode("system");
     setTheme("system");
     toast.success("Préférences réinitialisées avec succès");
   };
@@ -63,7 +131,15 @@ export function PreferencesPageClient() {
     light: Sun,
     dark: Moon,
     system: Monitor,
+    "time-based": Clock,
   };
+
+  const themeLabels = {
+    light: "Clair",
+    dark: "Sombre",
+    system: "Système",
+    "time-based": "Automatique",
+  } as const;
 
   const viewModeIcons = {
     grid: Grid2X2,
@@ -71,10 +147,26 @@ export function PreferencesPageClient() {
     details: LayoutList,
   };
 
-  const thumbnailSizes = {
-    small: 100,
-    medium: 150,
-    large: 200,
+  const thumbnailSizeIcons = {
+    large: LayoutGrid,
+    medium: Grid,
+    small: Grid2X2,
+    tiny: Table2,
+  } as const;
+
+  const thumbnailSizeOptions = {
+    large: "Très grandes icônes",
+    medium: "Grandes icônes",
+    small: "Icônes moyennes",
+    tiny: "Petites icônes",
+  } as const;
+
+  const handleThemeChange = (newTheme: ThemeMode) => {
+    setPreferredThemeMode(newTheme);
+
+    if (newTheme !== "time-based") {
+      setTheme(newTheme);
+    }
   };
 
   return (
@@ -109,35 +201,89 @@ export function PreferencesPageClient() {
               <div className="space-y-4">
                 <Label>Thème</Label>
                 <div className="flex gap-4 max-w-md">
-                  {Object.entries(themeIcons).map(([theme, Icon]) => (
-                    <TooltipProvider key={theme}>
+                  {Object.entries(themeIcons).map(([themeKey, Icon]) => (
+                    <TooltipProvider key={themeKey}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
                             variant={
-                              preferences.theme === theme
+                              preferredThemeMode === themeKey
                                 ? "default"
                                 : "outline"
                             }
                             className="flex-1"
                             onClick={() => {
-                              preferences.updatePreferences({
-                                theme: theme as "light" | "dark" | "system",
-                              });
-                              setTheme(theme);
+                              handleThemeChange(themeKey as ThemeMode);
                             }}
                           >
                             <Icon className="h-4 w-4 mr-2" />
-                            {theme.charAt(0).toUpperCase() + theme.slice(1)}
+                            {themeLabels[themeKey as keyof typeof themeLabels]}
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Thème {theme}</p>
+                          <p>
+                            {themeKey === "time-based"
+                              ? `Thème automatique (${timeBasedTheme.dayStartHour}h-${timeBasedTheme.dayEndHour}h)`
+                              : `Thème ${
+                                  themeLabels[
+                                    themeKey as keyof typeof themeLabels
+                                  ]
+                                }`}
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   ))}
                 </div>
+
+                {preferredThemeMode === "time-based" && (
+                  <div className="space-y-4 mt-4 border rounded-lg p-4">
+                    <div className="flex items-center gap-2">
+                      <Sun className="h-4 w-4" />
+                      <Label>Heures du thème clair</Label>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <TimePicker
+                          label="Début"
+                          value={`${timeBasedTheme.dayStartHour
+                            .toString()
+                            .padStart(2, "0")}:00`}
+                          onChange={(value) => {
+                            const [hours] = value.split(":").map(Number);
+                            setTimeBasedTheme({
+                              ...timeBasedTheme,
+                              dayStartHour: hours,
+                            });
+                          }}
+                          format="24h"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <TimePicker
+                          label="Fin"
+                          value={`${timeBasedTheme.dayEndHour
+                            .toString()
+                            .padStart(2, "0")}:00`}
+                          onChange={(value) => {
+                            const [hours] = value.split(":").map(Number);
+                            setTimeBasedTheme({
+                              ...timeBasedTheme,
+                              dayEndHour: hours,
+                            });
+                          }}
+                          format="24h"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Le thème clair sera actif de {timeBasedTheme.dayStartHour}
+                      h00 à {timeBasedTheme.dayEndHour}h00. En dehors de ces
+                      heures, le thème sombre sera utilisé.
+                    </p>
+                  </div>
+                )}
+
                 <Button
                   variant="outline"
                   className="w-full"
@@ -154,12 +300,8 @@ export function PreferencesPageClient() {
                   <Label>Langue</Label>
                 </div>
                 <Select
-                  value={preferences.language}
-                  onValueChange={(value) =>
-                    preferences.updatePreferences({
-                      language: value as "fr" | "en",
-                    })
-                  }
+                  value={language}
+                  onValueChange={(value) => setLanguage(value as Language)}
                 >
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Sélectionner une langue" />
@@ -192,18 +334,11 @@ export function PreferencesPageClient() {
                       <TooltipTrigger asChild>
                         <Button
                           variant={
-                            preferences.galleryViewMode === mode
-                              ? "default"
-                              : "outline"
+                            galleryViewMode === mode ? "default" : "outline"
                           }
                           className="flex-1"
                           onClick={() =>
-                            preferences.updatePreferences({
-                              galleryViewMode: mode as
-                                | "grid"
-                                | "list"
-                                | "details",
-                            })
+                            setGalleryViewMode(mode as GalleryViewMode)
                           }
                         >
                           <Icon className="h-4 w-4 mr-2" />
@@ -218,151 +353,102 @@ export function PreferencesPageClient() {
                 ))}
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" />
-                  <Label>Taille des vignettes</Label>
-                </div>
-                <div className="pt-2">
-                  <Slider
-                    value={[thumbnailSizes[preferences.thumbnailSize]]}
-                    min={thumbnailSizes.small}
-                    max={thumbnailSizes.large}
-                    step={50}
-                    className="w-full"
-                    onValueChange={([value]) => {
-                      const size = Object.entries(thumbnailSizes).find(
-                        ([, size]) => size === value
-                      )?.[0] as "small" | "medium" | "large";
-                      if (size) {
-                        preferences.updatePreferences({ thumbnailSize: size });
+              <div className="grid gap-2">
+                <Label htmlFor="thumbnailSize">Taille des vignettes</Label>
+                <Select
+                  value={thumbnailSize}
+                  onValueChange={(value: ThumbnailSize) =>
+                    setThumbnailSize(value)
+                  }
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Sélectionnez une taille" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(thumbnailSizeOptions).map(
+                      ([value, label]) => {
+                        const Icon = thumbnailSizeIcons[value as ThumbnailSize];
+                        return (
+                          <SelectItem key={value} value={value}>
+                            <div className="flex items-center gap-2">
+                              <Icon className="h-4 w-4 shrink-0" />
+                              <span>{label}</span>
+                            </div>
+                          </SelectItem>
+                        );
                       }
-                    }}
-                  />
-                  <div className="flex justify-between mt-1 text-sm text-muted-foreground">
-                    <span>Petite</span>
-                    <span>Moyenne</span>
-                    <span>Grande</span>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    <Label>Informations des fichiers</Label>
                   </div>
+                  <Switch
+                    checked={showFileInfo}
+                    onCheckedChange={setShowFileInfo}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="h-4 w-4" />
+                    <Label>Taille des fichiers</Label>
+                  </div>
+                  <Switch
+                    checked={showFileSize}
+                    onCheckedChange={setShowFileSize}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <Label>Date d'upload</Label>
+                  </div>
+                  <Switch
+                    checked={showUploadDate}
+                    onCheckedChange={setShowUploadDate}
+                  />
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4" />
-                  <div>
-                    <Label>Tri des fichiers</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Ordre d'affichage des fichiers
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
+              <Separator />
+
+              <div className="space-y-4">
+                <Label>Tri par défaut</Label>
+                <div className="flex gap-4">
                   <Select
-                    value={preferences.sortBy}
-                    onValueChange={(value) =>
-                      preferences.updatePreferences({
-                        sortBy: value as "date" | "name" | "size",
-                      })
-                    }
+                    value={sortBy}
+                    onValueChange={(value) => setSortBy(value as SortBy)}
                   >
-                    <SelectTrigger className="w-[140px]">
+                    <SelectTrigger>
                       <SelectValue placeholder="Trier par" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="date">
-                        <Clock className="h-4 w-4 mr-2 inline-block" />
-                        Date
-                      </SelectItem>
-                      <SelectItem value="name">
-                        <FileText className="h-4 w-4 mr-2 inline-block" />
-                        Nom
-                      </SelectItem>
-                      <SelectItem value="size">
-                        <ArrowUpDown className="h-4 w-4 mr-2 inline-block" />
-                        Taille
-                      </SelectItem>
+                      <SelectItem value="name">Nom</SelectItem>
+                      <SelectItem value="date">Date</SelectItem>
+                      <SelectItem value="size">Taille</SelectItem>
                     </SelectContent>
                   </Select>
 
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() =>
-                      preferences.updatePreferences({
-                        sortOrder:
-                          preferences.sortOrder === "asc" ? "desc" : "asc",
-                      })
-                    }
+                  <Select
+                    value={sortOrder}
+                    onValueChange={(value) => setSortOrder(value as SortOrder)}
                   >
-                    <ArrowUpDown
-                      className={cn(
-                        "h-4 w-4 transition-transform",
-                        preferences.sortOrder === "asc"
-                          ? "rotate-0"
-                          : "rotate-180"
-                      )}
-                    />
-                  </Button>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ordre" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="asc">Croissant</SelectItem>
+                      <SelectItem value="desc">Décroissant</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" />
-                  <div className="space-y-0.5">
-                    <Label>Afficher les vignettes</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Afficher les vignettes des images dans la galerie
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={preferences.showThumbnails}
-                  onCheckedChange={(checked) =>
-                    preferences.updatePreferences({ showThumbnails: checked })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4" />
-                  <div className="space-y-0.5">
-                    <Label>Afficher la taille des fichiers</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Afficher la taille des fichiers dans la galerie
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={preferences.showFileSize}
-                  onCheckedChange={(checked) =>
-                    preferences.updatePreferences({ showFileSize: checked })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  <div className="space-y-0.5">
-                    <Label>Afficher la date d'upload</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Afficher la date d'upload des fichiers dans la galerie
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={preferences.showUploadDate}
-                  onCheckedChange={(checked) =>
-                    preferences.updatePreferences({ showUploadDate: checked })
-                  }
-                />
               </div>
             </div>
           </CardContent>
@@ -380,52 +466,34 @@ export function PreferencesPageClient() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4" />
-                <div className="space-y-0.5">
-                  <Label>Notifications d'upload</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Recevoir une notification lors de l'upload d'un fichier
-                  </p>
-                </div>
+                <Label>Notifications</Label>
               </div>
               <Switch
-                checked={preferences.enableUploadNotifications}
-                onCheckedChange={(checked) =>
-                  preferences.updatePreferences({
-                    enableUploadNotifications: checked,
-                  })
-                }
+                checked={showNotifications}
+                onCheckedChange={setShowNotifications}
               />
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <RefreshCcw className="h-4 w-4" />
-                <div className="space-y-0.5">
-                  <Label>Intervalle de rafraîchissement</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Rafraîchir automatiquement la galerie
-                  </p>
+                <Label>Intervalle de rafraîchissement (secondes)</Label>
+              </div>
+              <div className="pt-2">
+                <Slider
+                  value={[autoRefreshInterval]}
+                  min={0}
+                  max={60}
+                  step={5}
+                  className="w-full"
+                  onValueChange={([value]) => setAutoRefreshInterval(value)}
+                />
+                <div className="flex justify-between mt-1 text-sm text-muted-foreground">
+                  <span>Désactivé</span>
+                  <span>30s</span>
+                  <span>60s</span>
                 </div>
               </div>
-              <Select
-                value={preferences.autoRefreshInterval.toString()}
-                onValueChange={(value) =>
-                  preferences.updatePreferences({
-                    autoRefreshInterval: parseInt(value),
-                  })
-                }
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Intervalle" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">Désactivé</SelectItem>
-                  <SelectItem value="5">5 secondes</SelectItem>
-                  <SelectItem value="10">10 secondes</SelectItem>
-                  <SelectItem value="15">15 secondes</SelectItem>
-                  <SelectItem value="30">30 secondes</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </CardContent>
         </Card>

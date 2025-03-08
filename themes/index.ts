@@ -24,7 +24,15 @@ export const presets: Presets = {
     Yellow: shadcnThemes.Yellow,
     Violet: shadcnThemes.Violet,
   },
-  "Thèmes colorés": {},
+  "Thèmes colorés": {
+    "Modern Blue": colorThemes["Modern Blue"],
+    "Forest Green": colorThemes["Forest Green"],
+    "Royal Purple": colorThemes["Royal Purple"],
+    "Sunset Orange": colorThemes["Sunset Orange"],
+    "Rose Garden": colorThemes["Rose Garden"],
+    "Ocean Blue": colorThemes["Ocean Blue"],
+    Emerald: colorThemes.Emerald,
+  },
 } as const;
 
 export type { ColorVars } from "@/hooks/use-theme-config";

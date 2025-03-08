@@ -2,7 +2,8 @@
 
 import { Grid2X2, List, LayoutList } from "lucide-react";
 import { useQueryState } from "nuqs";
-import { usePreferences } from "@/lib/stores/preferences";
+import { useAtom } from "jotai";
+import { galleryViewModeAtom } from "@/lib/atoms/preferences";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,20 +13,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function ViewSelector() {
-  const preferences = usePreferences();
+  const [galleryViewMode, setGalleryViewMode] = useAtom(galleryViewModeAtom);
   const [view, setView] = useQueryState<"grid" | "list" | "details">("view", {
-    defaultValue: preferences.galleryViewMode,
+    defaultValue: galleryViewMode,
     parse: (value): "grid" | "list" | "details" => {
       if (value === "grid" || value === "list" || value === "details") {
         return value;
       }
-      return preferences.galleryViewMode;
+      return galleryViewMode;
     },
   });
 
   const handleViewChange = (newView: "grid" | "list" | "details") => {
     setView(newView);
-    preferences.updatePreferences({ galleryViewMode: newView });
+    setGalleryViewMode(newView);
   };
 
   return (

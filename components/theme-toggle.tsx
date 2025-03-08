@@ -1,7 +1,14 @@
 "use client";
 
-import { Moon, Sun, Laptop } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useAtom } from "jotai";
+import {
+  timeBasedThemeAtom,
+  preferredThemeModeAtom,
+  type ThemeMode,
+} from "@/lib/atoms/preferences";
+import { useTimeBasedTheme } from "@/hooks/use-time-based-theme";
+import { Moon, Sun, Monitor, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,38 +18,61 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function ThemeToggle() {
-  const { setTheme, theme } = useTheme();
+  const { theme, setTheme } = useTheme();
+  const [timeBasedTheme] = useAtom(timeBasedThemeAtom);
+  const [preferredThemeMode, setPreferredThemeMode] = useAtom(
+    preferredThemeModeAtom
+  );
+
+  // Utiliser le hook pour activer le thème basé sur le temps
+  useTimeBasedTheme();
+
+  const themeIcons = {
+    light: Sun,
+    dark: Moon,
+    system: Monitor,
+    "time-based": Clock,
+  };
+
+  // Utiliser le mode préféré pour l'icône plutôt que le thème actuel
+  const Icon = themeIcons[preferredThemeMode as keyof typeof themeIcons] || Sun;
+  const { dayStartHour, dayEndHour } = timeBasedTheme;
+
+  // Fonction pour gérer le changement de thème
+  const handleThemeChange = (newTheme: ThemeMode) => {
+    setPreferredThemeMode(newTheme);
+
+    // Si le thème n'est pas basé sur le temps, le définir directement
+    if (newTheme !== "time-based") {
+      setTheme(newTheme);
+    }
+    // Pour le thème basé sur le temps, le hook useTimeBasedTheme s'en chargera
+  };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" title="Changer le thème">
-          <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        <Button variant="ghost" size="icon">
+          <Icon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all" />
           <span className="sr-only">Changer le thème</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onClick={() => setTheme("light")}
-          className="flex items-center gap-2"
-        >
-          <Sun className="h-4 w-4" />
-          <span>Mode clair</span>
+        <DropdownMenuItem onClick={() => handleThemeChange("light")}>
+          <Sun className="mr-2 h-4 w-4" />
+          Clair
         </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => setTheme("dark")}
-          className="flex items-center gap-2"
-        >
-          <Moon className="h-4 w-4" />
-          <span>Mode sombre</span>
+        <DropdownMenuItem onClick={() => handleThemeChange("dark")}>
+          <Moon className="mr-2 h-4 w-4" />
+          Sombre
         </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => setTheme("system")}
-          className="flex items-center gap-2"
-        >
-          <Laptop className="h-4 w-4" />
-          <span>Système</span>
+        <DropdownMenuItem onClick={() => handleThemeChange("system")}>
+          <Monitor className="mr-2 h-4 w-4" />
+          Système
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleThemeChange("time-based")}>
+          <Clock className="mr-2 h-4 w-4" />
+          Automatique ({dayStartHour}h-{dayEndHour}h)
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

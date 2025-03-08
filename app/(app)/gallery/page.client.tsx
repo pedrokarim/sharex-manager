@@ -6,6 +6,20 @@ import { redirect } from "next/navigation";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useAtom } from "jotai";
+import {
+  galleryViewModeAtom,
+  showFileInfoAtom,
+  showFileSizeAtom,
+  showUploadDateAtom,
+  sortingAtom,
+  autoRefreshIntervalAtom,
+  enableUploadNotificationsAtom,
+  showThumbnailsAtom,
+  thumbnailSizeAtom,
+  sortByAtom,
+  sortOrderAtom,
+} from "@/lib/atoms/preferences";
 import { Button } from "@/components/ui/button";
 import { ImageOff, RefreshCcw } from "lucide-react";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
@@ -15,7 +29,6 @@ import { GridView } from "@/components/gallery/grid-view";
 import { ListView } from "@/components/gallery/list-view";
 import { FileViewer } from "@/components/gallery/file-viewer";
 import { UploadZone } from "@/components/gallery/upload-zone";
-import { usePreferences } from "@/lib/stores/preferences";
 import {
   Select,
   SelectContent,
@@ -38,6 +51,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import { RefreshInterval } from "@/components/refresh-interval";
 import { Loading } from "@/components/ui/loading";
+import { SortSelector } from "@/components/sort-selector";
 
 interface FileInfo {
   name: string;
@@ -161,18 +175,29 @@ export function GalleryClient({
   starredOnly = false,
 }: GalleryClientProps) {
   const { data: session, status } = useSession();
-  const preferences = usePreferences();
+  const [defaultViewMode, setDefaultViewMode] = useAtom(galleryViewModeAtom);
+  const [showFileInfo] = useAtom(showFileInfoAtom);
+  const [showFileSize] = useAtom(showFileSizeAtom);
+  const [showUploadDate] = useAtom(showUploadDateAtom);
+  const [sorting] = useAtom(sortingAtom);
+  const [autoRefreshInterval] = useAtom(autoRefreshIntervalAtom);
+  const [enableUploadNotifications] = useAtom(enableUploadNotificationsAtom);
+  const [showThumbnails] = useAtom(showThumbnailsAtom);
+  const [thumbnailSize] = useAtom(thumbnailSizeAtom);
+  const [sortBy] = useAtom(sortByAtom);
+  const [sortOrder] = useAtom(sortOrderAtom);
+
   const [search] = useQueryState("q");
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
   const [page, setPage] = useState(initialPage);
   const [viewMode] = useQueryState<"grid" | "list" | "details">("view", {
-    defaultValue: preferences.galleryViewMode,
+    defaultValue: defaultViewMode,
     parse: (value): "grid" | "list" | "details" => {
       if (value === "grid" || value === "list" || value === "details") {
         return value;
       }
-      return preferences.galleryViewMode;
+      return defaultViewMode;
     },
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -269,14 +294,14 @@ export function GalleryClient({
   }, [fetchFiles]);
 
   useEffect(() => {
-    if (preferences.autoRefreshInterval === 0) return;
+    if (autoRefreshInterval === 0) return;
 
     const timer = setInterval(() => {
       handleRefresh();
-    }, preferences.autoRefreshInterval * 1000);
+    }, autoRefreshInterval * 1000);
 
     return () => clearInterval(timer);
-  }, [preferences.autoRefreshInterval]);
+  }, [autoRefreshInterval]);
 
   useEffect(() => {
     const handleFilesUploaded = (event: Event) => {
@@ -310,8 +335,32 @@ export function GalleryClient({
     );
   }, [files]);
 
+  const sortFiles = (files: FileInfo[]) => {
+    return [...files].sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case "name":
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case "date":
+          comparison =
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+        case "size":
+          comparison = a.size - b.size;
+          break;
+      }
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+  };
+
+  const sortedFiles = useMemo(
+    () => sortFiles(uniqueFiles),
+    [uniqueFiles, sortBy, sortOrder]
+  );
+
   const groupedFiles = useMemo(() => {
-    return uniqueFiles.reduce((acc: GroupedFiles, file) => {
+    return sortedFiles.reduce((acc: GroupedFiles, file) => {
       const date = format(parseISO(file.createdAt), "MMMM yyyy", {
         locale: fr,
       });
@@ -321,7 +370,7 @@ export function GalleryClient({
       acc[date].push(file);
       return acc;
     }, {});
-  }, [uniqueFiles]);
+  }, [sortedFiles]);
 
   const findCurrentFileIndex = () => {
     if (!selectedFile) return -1;
@@ -486,10 +535,10 @@ export function GalleryClient({
   };
 
   useEffect(() => {
-    if (viewMode !== preferences.galleryViewMode) {
-      preferences.updatePreferences({ galleryViewMode: viewMode });
+    if (viewMode !== defaultViewMode) {
+      setDefaultViewMode(viewMode);
     }
-  }, [viewMode]);
+  }, [viewMode, defaultViewMode, setDefaultViewMode]);
 
   if (isInitialLoading) {
     return <Loading fullHeight />;
@@ -508,6 +557,7 @@ export function GalleryClient({
           </h1>
           <div className="flex items-center gap-4">
             <ViewSelector />
+            <SortSelector />
             <RefreshInterval />
             <Button
               variant="outline"
