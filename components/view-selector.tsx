@@ -11,8 +11,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useTranslation } from "@/lib/i18n";
 
 export function ViewSelector() {
+  const { t } = useTranslation();
   const [galleryViewMode, setGalleryViewMode] = useAtom(galleryViewModeAtom);
   const [view, setView] = useQueryState<"grid" | "list" | "details">("view", {
     defaultValue: galleryViewMode,
@@ -45,15 +47,15 @@ export function ViewSelector() {
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={() => handleViewChange("grid")}>
           <Grid2X2 className="mr-2 h-4 w-4" />
-          Grille
+          {t("gallery.view_modes.grid")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleViewChange("list")}>
           <List className="mr-2 h-4 w-4" />
-          Liste
+          {t("gallery.view_modes.list")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleViewChange("details")}>
           <LayoutList className="mr-2 h-4 w-4" />
-          Détails
+          {t("gallery.view_modes.details")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

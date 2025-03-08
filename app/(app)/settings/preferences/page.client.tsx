@@ -73,6 +73,8 @@ import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { useTimeBasedTheme } from "@/hooks/use-time-based-theme";
 import { TimePicker } from "@/components/ui/time-picker";
+import { useTranslation } from "@/lib/i18n";
+import { LanguageSelector } from "@/components/LanguageSelector";
 
 export function PreferencesPageClient() {
   const [preferences, setPreferences] = useAtom(preferencesAtom);
@@ -97,6 +99,7 @@ export function PreferencesPageClient() {
 
   const { setTheme } = useTheme();
   const router = useRouter();
+  const { t } = useTranslation();
 
   const handleReset = () => {
     setPreferences({
@@ -124,7 +127,7 @@ export function PreferencesPageClient() {
     });
     setPreferredThemeMode("system");
     setTheme("system");
-    toast.success("Préférences réinitialisées avec succès");
+    toast.success(t("settings.save_success"));
   };
 
   const themeIcons = {
@@ -135,10 +138,10 @@ export function PreferencesPageClient() {
   };
 
   const themeLabels = {
-    light: "Clair",
-    dark: "Sombre",
-    system: "Système",
-    "time-based": "Automatique",
+    light: t("settings.theme_options.light"),
+    dark: t("settings.theme_options.dark"),
+    system: t("settings.theme_options.system"),
+    "time-based": t("settings.theme_options.time_based"),
   } as const;
 
   const viewModeIcons = {
@@ -155,10 +158,10 @@ export function PreferencesPageClient() {
   } as const;
 
   const thumbnailSizeOptions = {
-    large: "Très grandes icônes",
-    medium: "Grandes icônes",
-    small: "Icônes moyennes",
-    tiny: "Petites icônes",
+    large: t("settings.gallery.thumbnail_sizes.large"),
+    medium: t("settings.gallery.thumbnail_sizes.medium"),
+    small: t("settings.gallery.thumbnail_sizes.small"),
+    tiny: t("settings.gallery.thumbnail_sizes.tiny"),
   } as const;
 
   const handleThemeChange = (newTheme: ThemeMode) => {
@@ -175,31 +178,34 @@ export function PreferencesPageClient() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Settings2 className="h-8 w-8" />
-            Préférences utilisateur
+            {t("settings.preferences")}
           </h1>
           <p className="text-muted-foreground mt-2">
-            Personnalisez votre expérience ShareX Manager
+            {t("settings.preferences_description")}
           </p>
         </div>
-        <Button variant="outline" onClick={handleReset}>
-          <RotateCcw className="h-4 w-4 mr-2" />
-          Réinitialiser
-        </Button>
+        <div className="flex items-center gap-2">
+          <LanguageSelector />
+          <Button variant="outline" onClick={handleReset}>
+            <RotateCcw className="h-4 w-4 mr-2" />
+            {t("settings.reset")}
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 flex-1">
         {/* Apparence */}
         <Card>
           <CardHeader>
-            <CardTitle>Apparence</CardTitle>
+            <CardTitle>{t("settings.appearance")}</CardTitle>
             <CardDescription>
-              Personnalisez l'apparence de l'interface
+              {t("settings.appearance_description")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
               <div className="space-y-4">
-                <Label>Thème</Label>
+                <Label>{t("settings.theme")}</Label>
                 <div className="flex gap-4 max-w-md">
                   {Object.entries(themeIcons).map(([themeKey, Icon]) => (
                     <TooltipProvider key={themeKey}>
@@ -223,8 +229,10 @@ export function PreferencesPageClient() {
                         <TooltipContent>
                           <p>
                             {themeKey === "time-based"
-                              ? `Thème automatique (${timeBasedTheme.dayStartHour}h-${timeBasedTheme.dayEndHour}h)`
-                              : `Thème ${
+                              ? `${t("settings.theme_options.time_based")} (${
+                                  timeBasedTheme.dayStartHour
+                                }h-${timeBasedTheme.dayEndHour}h)`
+                              : `${t("settings.theme")} ${
                                   themeLabels[
                                     themeKey as keyof typeof themeLabels
                                   ]
@@ -240,12 +248,12 @@ export function PreferencesPageClient() {
                   <div className="space-y-4 mt-4 border rounded-lg p-4">
                     <div className="flex items-center gap-2">
                       <Sun className="h-4 w-4" />
-                      <Label>Heures du thème clair</Label>
+                      <Label>{t("settings.theme_options.light")}</Label>
                     </div>
                     <div className="flex gap-4">
                       <div className="flex-1">
                         <TimePicker
-                          label="Début"
+                          label={t("common.start")}
                           value={`${timeBasedTheme.dayStartHour
                             .toString()
                             .padStart(2, "0")}:00`}
@@ -261,7 +269,7 @@ export function PreferencesPageClient() {
                       </div>
                       <div className="flex-1">
                         <TimePicker
-                          label="Fin"
+                          label={t("common.end")}
                           value={`${timeBasedTheme.dayEndHour
                             .toString()
                             .padStart(2, "0")}:00`}
@@ -277,9 +285,10 @@ export function PreferencesPageClient() {
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Le thème clair sera actif de {timeBasedTheme.dayStartHour}
-                      h00 à {timeBasedTheme.dayEndHour}h00. En dehors de ces
-                      heures, le thème sombre sera utilisé.
+                      {t("settings.theme_options.time_based_description", {
+                        start: timeBasedTheme.dayStartHour,
+                        end: timeBasedTheme.dayEndHour,
+                      })}
                     </p>
                   </div>
                 )}
@@ -290,21 +299,21 @@ export function PreferencesPageClient() {
                   onClick={() => router.push("/settings/theme")}
                 >
                   <Settings2 className="h-4 w-4 mr-2" />
-                  Configuration avancée du thème
+                  {t("settings.theme_advanced")}
                 </Button>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Languages className="h-4 w-4" />
-                  <Label>Langue</Label>
+                  <Label>{t("settings.language")}</Label>
                 </div>
                 <Select
                   value={language}
                   onValueChange={(value) => setLanguage(value as Language)}
                 >
                   <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Sélectionner une langue" />
+                    <SelectValue placeholder={t("settings.language_select")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="fr">Français</SelectItem>
@@ -319,14 +328,14 @@ export function PreferencesPageClient() {
         {/* Galerie */}
         <Card>
           <CardHeader>
-            <CardTitle>Galerie</CardTitle>
+            <CardTitle>{t("navigation.gallery")}</CardTitle>
             <CardDescription>
-              Configurez l'affichage de la galerie d'images
+              {t("settings.gallery_description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
-              <Label>Mode d'affichage</Label>
+              <Label>{t("settings.gallery.view_mode")}</Label>
               <div className="flex gap-4 max-w-md">
                 {Object.entries(viewModeIcons).map(([mode, Icon]) => (
                   <TooltipProvider key={mode}>
@@ -342,11 +351,11 @@ export function PreferencesPageClient() {
                           }
                         >
                           <Icon className="h-4 w-4 mr-2" />
-                          {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                          {t(`gallery.view_modes.${mode}`)}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Mode {mode}</p>
+                        <p>{t(`gallery.view_modes.${mode}`)}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -354,7 +363,9 @@ export function PreferencesPageClient() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="thumbnailSize">Taille des vignettes</Label>
+                <Label htmlFor="thumbnailSize">
+                  {t("settings.gallery.thumbnail_size")}
+                </Label>
                 <Select
                   value={thumbnailSize}
                   onValueChange={(value: ThumbnailSize) =>
@@ -362,7 +373,7 @@ export function PreferencesPageClient() {
                   }
                 >
                   <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Sélectionnez une taille" />
+                    <SelectValue placeholder={t("settings.select_size")} />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(thumbnailSizeOptions).map(
@@ -386,7 +397,7 @@ export function PreferencesPageClient() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4" />
-                    <Label>Informations des fichiers</Label>
+                    <Label>{t("settings.gallery.show_file_info")}</Label>
                   </div>
                   <Switch
                     checked={showFileInfo}
@@ -397,7 +408,7 @@ export function PreferencesPageClient() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <ArrowUpDown className="h-4 w-4" />
-                    <Label>Taille des fichiers</Label>
+                    <Label>{t("settings.gallery.show_file_size")}</Label>
                   </div>
                   <Switch
                     checked={showFileSize}
@@ -408,7 +419,7 @@ export function PreferencesPageClient() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    <Label>Date d'upload</Label>
+                    <Label>{t("settings.gallery.show_upload_date")}</Label>
                   </div>
                   <Switch
                     checked={showUploadDate}
@@ -420,19 +431,27 @@ export function PreferencesPageClient() {
               <Separator />
 
               <div className="space-y-4">
-                <Label>Tri par défaut</Label>
+                <Label>{t("settings.gallery.sort_by")}</Label>
                 <div className="flex gap-4">
                   <Select
                     value={sortBy}
                     onValueChange={(value) => setSortBy(value as SortBy)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Trier par" />
+                      <SelectValue
+                        placeholder={t("settings.gallery.sort_by")}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="name">Nom</SelectItem>
-                      <SelectItem value="date">Date</SelectItem>
-                      <SelectItem value="size">Taille</SelectItem>
+                      <SelectItem value="name">
+                        {t("gallery.sort.name")}
+                      </SelectItem>
+                      <SelectItem value="date">
+                        {t("gallery.sort.date")}
+                      </SelectItem>
+                      <SelectItem value="size">
+                        {t("gallery.sort.size")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -441,11 +460,17 @@ export function PreferencesPageClient() {
                     onValueChange={(value) => setSortOrder(value as SortOrder)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Ordre" />
+                      <SelectValue
+                        placeholder={t("settings.gallery.sort_order")}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="asc">Croissant</SelectItem>
-                      <SelectItem value="desc">Décroissant</SelectItem>
+                      <SelectItem value="asc">
+                        {t("gallery.sort.asc")}
+                      </SelectItem>
+                      <SelectItem value="desc">
+                        {t("gallery.sort.desc")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -457,16 +482,16 @@ export function PreferencesPageClient() {
         {/* Notifications */}
         <Card>
           <CardHeader>
-            <CardTitle>Notifications</CardTitle>
+            <CardTitle>{t("settings.notifications")}</CardTitle>
             <CardDescription>
-              Configurez les notifications de l'application
+              {t("settings.notifications_description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4" />
-                <Label>Notifications</Label>
+                <Label>{t("settings.notifications")}</Label>
               </div>
               <Switch
                 checked={showNotifications}
@@ -477,7 +502,7 @@ export function PreferencesPageClient() {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <RefreshCcw className="h-4 w-4" />
-                <Label>Intervalle de rafraîchissement (secondes)</Label>
+                <Label>{t("settings.gallery.auto_refresh")}</Label>
               </div>
               <div className="pt-2">
                 <Slider
@@ -489,7 +514,7 @@ export function PreferencesPageClient() {
                   onValueChange={([value]) => setAutoRefreshInterval(value)}
                 />
                 <div className="flex justify-between mt-1 text-sm text-muted-foreground">
-                  <span>Désactivé</span>
+                  <span>{t("common.disabled")}</span>
                   <span>30s</span>
                   <span>60s</span>
                 </div>

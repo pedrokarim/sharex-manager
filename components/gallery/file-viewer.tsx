@@ -24,11 +24,12 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { format, parseISO } from "date-fns";
-import { fr } from "date-fns/locale";
+import { useDateLocale } from "@/lib/i18n/date-locales";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Separator } from "../ui/separator";
 import { VisuallyHidden } from "../ui/visually-hidden";
+import { useTranslation } from "@/lib/i18n";
 
 interface FileViewerProps {
   file: FileInfo | null;
@@ -56,8 +57,29 @@ export function FileViewer({
   hasNext,
 }: FileViewerProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const { t } = useTranslation();
+  const locale = useDateLocale();
 
   if (!file) return null;
+
+  const formattedDate = format(parseISO(file.createdAt), "dd MMMM yyyy", {
+    locale,
+  });
+  const formattedDateTime = format(
+    parseISO(file.createdAt),
+    "dd MMMM yyyy à HH:mm",
+    { locale }
+  );
+  const fileSize = (file.size / 1024).toFixed(2);
+
+  // Construire le texte d'accessibilité
+  let navigationText = "";
+  if (hasPrevious) {
+    navigationText += t("gallery.file_viewer.previous_button") + " ";
+  }
+  if (hasNext) {
+    navigationText += t("gallery.file_viewer.next_button");
+  }
 
   return (
     <Dialog open={!!file} onOpenChange={() => onClose()}>
@@ -65,44 +87,15 @@ export function FileViewer({
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between p-4">
             <span>{file.name}</span>
-            {/* <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onToggleSecurity(file)}
-              >
-                {file.isSecure ? (
-                  <Lock className="h-4 w-4" />
-                ) : (
-                  <Unlock className="h-4 w-4" />
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onCopy(file.url)}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onDelete(file.name)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div> */}
           </DialogTitle>
         </DialogHeader>
         <DialogDescription>
           <VisuallyHidden>
-            Image ajoutée le{" "}
-            {format(parseISO(file.createdAt), "dd MMMM yyyy", { locale: fr })}.
-            Taille du fichier : {(file.size / 1024).toFixed(2)} Ko.
-            {hasPrevious &&
-              "Utilisez le bouton précédent pour voir l'image précédente."}
-            {hasNext &&
-              "Utilisez le bouton suivant pour voir l'image suivante."}
+            {t("gallery.file_viewer.accessibility", {
+              date: formattedDate,
+              size: fileSize,
+              navigation: navigationText,
+            })}
           </VisuallyHidden>
         </DialogDescription>
         <div className="relative flex h-[85vh] overflow-hidden rounded-lg">
@@ -229,34 +222,30 @@ export function FileViewer({
           >
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold">Informations</h3>
+                <h3 className="text-lg font-semibold">
+                  {t("gallery.file_viewer.info_panel.title")}
+                </h3>
                 <div className="mt-4 space-y-4">
                   <div>
                     <p className="text-sm text-muted-foreground">
-                      Nom du fichier
+                      {t("gallery.file_viewer.info_panel.filename")}
                     </p>
                     <p className="mt-1 font-medium">{file.name}</p>
                   </div>
                   <Separator />
                   <div>
                     <p className="text-sm text-muted-foreground">
-                      Date d'ajout
+                      {t("gallery.file_viewer.info_panel.date_added")}
                     </p>
-                    <p className="mt-1 font-medium">
-                      {format(
-                        parseISO(file.createdAt),
-                        "dd MMMM yyyy à HH:mm",
-                        {
-                          locale: fr,
-                        }
-                      )}
-                    </p>
+                    <p className="mt-1 font-medium">{formattedDateTime}</p>
                   </div>
                   <Separator />
                   <div>
-                    <p className="text-sm text-muted-foreground">Taille</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("gallery.file_viewer.info_panel.size")}
+                    </p>
                     <p className="mt-1 font-medium">
-                      {(file.size / 1024).toFixed(2)} Ko
+                      {fileSize} {t("gallery.file_viewer.info_panel.kb")}
                     </p>
                   </div>
                 </div>

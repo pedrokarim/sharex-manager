@@ -50,6 +50,7 @@ import {
   ReferenceLine,
   Label as RechartLabel,
 } from "recharts";
+import { useTranslation } from "@/lib/i18n";
 
 export function ThemeConfigClient() {
   const { theme, setTheme } = useTheme();
@@ -59,6 +60,7 @@ export function ThemeConfigClient() {
   const [selectedCategory, setSelectedCategory] =
     useState<keyof typeof presets>("Thèmes par défaut");
   const [config, setConfig] = useThemeConfig();
+  const { t } = useTranslation();
 
   useEffect(() => {
     setMounted(true);
@@ -99,6 +101,7 @@ export function ThemeConfigClient() {
           ...prev,
           theme: preset,
           cssVars: {
+            ...prev.cssVars,
             light: {
               ...prev.cssVars.light,
               ...presetColors.light,
@@ -109,53 +112,48 @@ export function ThemeConfigClient() {
             },
           },
         }));
-        toast.success(`Preset ${preset} appliqué avec succès`);
-        return;
+        break;
       }
     }
   };
 
   const handleReset = () => {
-    const defaultPreset = presets["Thèmes par défaut"]["Rose (Défaut)"];
     setConfig((prev) => ({
       ...prev,
       theme: "default",
       cssVars: {
-        light: { ...defaultPreset.light },
-        dark: { ...defaultPreset.dark },
+        light: { ...prev.cssVars.light, radius: prev.cssVars.light.radius },
+        dark: { ...prev.cssVars.dark, radius: prev.cssVars.dark.radius },
       },
     }));
-    toast.success("Thème réinitialisé avec succès");
+    setSelectedCategory("Thèmes par défaut");
+    toast.success(t("settings.save_success"));
   };
 
   const handleRadiusChange = (value: number) => {
     setConfig((prev) => ({
       ...prev,
       cssVars: {
-        light: {
-          ...prev.cssVars.light,
-          radius: value.toString(),
-        },
-        dark: {
-          ...prev.cssVars.dark,
+        ...prev.cssVars,
+        [activeTheme]: {
+          ...prev.cssVars[activeTheme],
           radius: value.toString(),
         },
       },
     }));
-    document.documentElement.style.setProperty("--radius", `${value}rem`);
   };
 
   const colorGroups = [
     {
-      title: "Couleurs principales",
+      title: t("settings.theme_config.color_groups.main"),
       colors: ["background", "foreground", "primary", "primary-foreground"],
     },
     {
-      title: "Composants",
+      title: t("settings.theme_config.color_groups.components"),
       colors: ["card", "card-foreground", "popover", "popover-foreground"],
     },
     {
-      title: "Actions",
+      title: t("settings.theme_config.color_groups.actions"),
       colors: [
         "secondary",
         "secondary-foreground",
@@ -166,7 +164,7 @@ export function ThemeConfigClient() {
       ],
     },
     {
-      title: "États",
+      title: t("settings.theme_config.color_groups.states"),
       colors: ["muted", "muted-foreground", "border", "input", "ring"],
     },
   ];
@@ -174,132 +172,141 @@ export function ThemeConfigClient() {
   const chartColors = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"];
 
   const getChartColor = (index: number) => {
-    const colorKey = `chart-${index}` as keyof ColorVars;
-    const hslValue = config.cssVars[activeTheme][colorKey];
-    return `hsl(${hslValue || "0 0% 0%"})`;
+    const colorKey = `chart-${index + 1}` as keyof ColorVars;
+    return `hsl(${config.cssVars[activeTheme][colorKey]})`;
   };
 
   const chartExamples = [
     {
-      title: "Graphique en barres",
+      title: t("settings.theme_config.chart_examples.line_chart"),
       render: (className: string) => (
-        <div className={cn("h-48", className)}>
-          <BarChart
-            width={300}
-            height={180}
-            data={[
-              { date: "Lun", steps: 2000 },
-              { date: "Mar", steps: 2100 },
-              { date: "Mer", steps: 2200 },
-              { date: "Jeu", steps: 1300 },
-              { date: "Ven", steps: 1400 },
-              { date: "Sam", steps: 2500 },
-              { date: "Dim", steps: 1600 },
-            ]}
-            margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
-          >
-            <Bar
-              dataKey="steps"
-              fill={getChartColor(1)}
-              radius={5}
-              fillOpacity={0.6}
-              activeBar={<Rectangle fillOpacity={0.8} />}
-            />
-            <XAxis
-              dataKey="date"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={4}
-              tick={{ fill: "currentColor", fontSize: 12 }}
-            />
-            <ReferenceLine
-              y={1800}
-              stroke={getChartColor(2)}
-              strokeDasharray="3 3"
-              strokeWidth={1}
-            >
-              <RechartLabel
-                position="insideBottomLeft"
-                value="Moyenne"
-                offset={10}
-                fill="currentColor"
-                fontSize={10}
-              />
-            </ReferenceLine>
-          </BarChart>
-        </div>
-      ),
-    },
-    {
-      title: "Graphique en lignes",
-      render: (className: string) => (
-        <div className={cn("h-48", className)}>
+        <div className={className}>
           <LineChart
             width={300}
-            height={180}
+            height={200}
             data={[
-              { date: "Lun", resting: 62 },
-              { date: "Mar", resting: 72 },
-              { date: "Mer", resting: 35 },
-              { date: "Jeu", resting: 62 },
-              { date: "Ven", resting: 52 },
-              { date: "Sam", resting: 62 },
-              { date: "Dim", resting: 70 },
+              {
+                name: "Jan",
+                [t("settings.theme_config.chart_examples.series") + " 1"]: 400,
+                [t("settings.theme_config.chart_examples.series") + " 2"]: 240,
+              },
+              {
+                name: "Feb",
+                [t("settings.theme_config.chart_examples.series") + " 1"]: 300,
+                [t("settings.theme_config.chart_examples.series") + " 2"]: 139,
+              },
+              {
+                name: "Mar",
+                [t("settings.theme_config.chart_examples.series") + " 1"]: 200,
+                [t("settings.theme_config.chart_examples.series") + " 2"]: 980,
+              },
+              {
+                name: "Apr",
+                [t("settings.theme_config.chart_examples.series") + " 1"]: 278,
+                [t("settings.theme_config.chart_examples.series") + " 2"]: 390,
+              },
+              {
+                name: "May",
+                [t("settings.theme_config.chart_examples.series") + " 1"]: 189,
+                [t("settings.theme_config.chart_examples.series") + " 2"]: 480,
+              },
             ]}
-            margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+            margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
           >
-            <CartesianGrid
-              strokeDasharray="4 4"
-              vertical={false}
-              stroke={getChartColor(3)}
-              strokeOpacity={0.5}
-            />
-            <YAxis hide domain={["dataMin - 10", "dataMax + 10"]} />
-            <XAxis
-              dataKey="date"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              tick={{ fill: "currentColor", fontSize: 12 }}
+            <Line
+              type="monotone"
+              dataKey={t("settings.theme_config.chart_examples.series") + " 1"}
+              stroke={getChartColor(0)}
+              strokeWidth={2}
             />
             <Line
-              dataKey="resting"
-              type="natural"
-              stroke={getChartColor(2)}
+              type="monotone"
+              dataKey={t("settings.theme_config.chart_examples.series") + " 2"}
+              stroke={getChartColor(1)}
               strokeWidth={2}
-              dot={false}
-              activeDot={{
-                fill: getChartColor(2),
-                stroke: getChartColor(2),
-                r: 4,
-              }}
             />
+            <CartesianGrid stroke="var(--border)" strokeDasharray="5 5" />
+            <XAxis
+              dataKey="name"
+              stroke="var(--muted-foreground)"
+              fontSize={12}
+            />
+            <YAxis stroke="var(--muted-foreground)" fontSize={12} />
           </LineChart>
         </div>
       ),
     },
     {
-      title: "Graphique radial",
+      title: t("settings.theme_config.chart_examples.bar_chart"),
       render: (className: string) => (
-        <div className={cn("h-48", className)}>
+        <div className={className}>
+          <BarChart
+            width={300}
+            height={200}
+            data={[
+              {
+                name: "A",
+                [t("settings.theme_config.chart_examples.series") + " 1"]: 120,
+                [t("settings.theme_config.chart_examples.series") + " 2"]: 80,
+              },
+              {
+                name: "B",
+                [t("settings.theme_config.chart_examples.series") + " 1"]: 100,
+                [t("settings.theme_config.chart_examples.series") + " 2"]: 130,
+              },
+              {
+                name: "C",
+                [t("settings.theme_config.chart_examples.series") + " 1"]: 86,
+                [t("settings.theme_config.chart_examples.series") + " 2"]: 130,
+              },
+              {
+                name: "D",
+                [t("settings.theme_config.chart_examples.series") + " 1"]: 99,
+                [t("settings.theme_config.chart_examples.series") + " 2"]: 100,
+              },
+            ]}
+            margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+          >
+            <CartesianGrid stroke="var(--border)" strokeDasharray="5 5" />
+            <XAxis
+              dataKey="name"
+              stroke="var(--muted-foreground)"
+              fontSize={12}
+            />
+            <YAxis stroke="var(--muted-foreground)" fontSize={12} />
+            <Bar
+              dataKey={t("settings.theme_config.chart_examples.series") + " 1"}
+              fill={getChartColor(0)}
+              radius={[4, 4, 0, 0]}
+            />
+            <Bar
+              dataKey={t("settings.theme_config.chart_examples.series") + " 2"}
+              fill={getChartColor(1)}
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        </div>
+      ),
+    },
+    {
+      title: t("settings.theme_config.chart_examples.radial_chart"),
+      render: (className: string) => (
+        <div className={className}>
           <RadialBarChart
             width={300}
-            height={180}
-            innerRadius="20%"
+            height={200}
+            innerRadius="10%"
             outerRadius="80%"
             data={[
               {
-                activity: "Série 3",
+                activity:
+                  t("settings.theme_config.chart_examples.series") + " 1",
                 value: 65,
-                fill: getChartColor(3),
+                fill: getChartColor(0),
               },
               {
-                activity: "Série 2",
-                value: 75,
-                fill: getChartColor(2),
-              },
-              {
-                activity: "Série 1",
+                activity:
+                  t("settings.theme_config.chart_examples.series") + " 1",
                 value: 85,
                 fill: getChartColor(1),
               },
@@ -326,43 +333,7 @@ export function ThemeConfigClient() {
   ];
 
   const getColorLabel = (colorKey: string) => {
-    const labels: Record<string, string> = {
-      // Couleurs principales
-      background: "Couleur du fond",
-      foreground: "Couleur du texte",
-      primary: "Couleur principale",
-      "primary-foreground": "Texte sur couleur principale",
-
-      // Composants
-      card: "Fond des cartes",
-      "card-foreground": "Texte des cartes",
-      popover: "Fond des pop-ups",
-      "popover-foreground": "Texte des pop-ups",
-
-      // Actions
-      secondary: "Couleur secondaire",
-      "secondary-foreground": "Texte sur couleur secondaire",
-      accent: "Couleur d'accentuation",
-      "accent-foreground": "Texte sur accentuation",
-      destructive: "Couleur de suppression",
-      "destructive-foreground": "Texte sur suppression",
-
-      // États
-      muted: "Couleur atténuée",
-      "muted-foreground": "Texte atténué",
-      border: "Couleur des bordures",
-      input: "Couleur des champs",
-      ring: "Couleur de focus",
-
-      // Graphiques
-      "chart-1": "Graphique - Série 1",
-      "chart-2": "Graphique - Série 2",
-      "chart-3": "Graphique - Série 3",
-      "chart-4": "Graphique - Série 4",
-      "chart-5": "Graphique - Série 5",
-    };
-
-    return labels[colorKey] || colorKey;
+    return t(`settings.theme_config.colors.${colorKey}`) || colorKey;
   };
 
   return (
@@ -375,10 +346,10 @@ export function ThemeConfigClient() {
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <Paintbrush className="h-8 w-8" />
-              Configuration avancée du thème
+              {t("settings.theme_advanced")}
             </h1>
             <p className="text-muted-foreground mt-2">
-              Personnalisez les couleurs de l'interface
+              {t("settings.theme_advanced_description")}
             </p>
           </div>
         </div>
@@ -390,14 +361,14 @@ export function ThemeConfigClient() {
           onClick={() => setActiveTheme("light")}
         >
           <Sun className="h-4 w-4 mr-2" />
-          Thème clair
+          {t("settings.theme_options.light")}
         </Button>
         <Button
           variant={activeTheme === "dark" ? "default" : "outline"}
           onClick={() => setActiveTheme("dark")}
         >
           <Moon className="h-4 w-4 mr-2" />
-          Thème sombre
+          {t("settings.theme_options.dark")}
         </Button>
         <div className="flex items-center gap-2 ml-auto">
           <Select
@@ -408,7 +379,9 @@ export function ThemeConfigClient() {
           >
             <SelectTrigger className="w-[180px]">
               <Palette className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Choisir une catégorie" />
+              <SelectValue
+                placeholder={t("settings.theme_config.choose_category")}
+              />
             </SelectTrigger>
             <SelectContent>
               {Object.keys(presets).map((category) => (
@@ -420,7 +393,7 @@ export function ThemeConfigClient() {
           </Select>
           <Button variant="outline" onClick={handleReset}>
             <Settings2 className="h-4 w-4 mr-2" />
-            Réinitialiser
+            {t("common.reset")}
           </Button>
         </div>
       </div>
@@ -428,9 +401,9 @@ export function ThemeConfigClient() {
       <div className="grid gap-6 flex-1">
         <Card>
           <CardHeader>
-            <CardTitle>Presets de thèmes</CardTitle>
+            <CardTitle>{t("settings.theme_config.presets")}</CardTitle>
             <CardDescription>
-              Choisissez parmi nos thèmes prédéfinis
+              {t("settings.theme_config.presets_description")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -468,15 +441,15 @@ export function ThemeConfigClient() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Général</CardTitle>
+            <CardTitle>{t("settings.theme_config.general")}</CardTitle>
             <CardDescription>
-              Configurez les paramètres généraux du thème
+              {t("settings.theme_config.general_description")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Radius des coins (rem)</Label>
+                <Label>{t("settings.theme_config.radius")}</Label>
                 <div className="pt-2">
                   <SliderWithStops
                     value={[parseFloat(config.cssVars[activeTheme].radius)]}
@@ -488,8 +461,8 @@ export function ThemeConfigClient() {
                     onValueChange={([value]) => handleRadiusChange(value)}
                   />
                   <div className="flex justify-between mt-4 text-sm text-muted-foreground">
-                    <span>Carré</span>
-                    <span>Arrondi</span>
+                    <span>{t("settings.theme_config.square")}</span>
+                    <span>{t("settings.theme_config.rounded")}</span>
                   </div>
                 </div>
               </div>
@@ -502,7 +475,7 @@ export function ThemeConfigClient() {
             <CardHeader>
               <CardTitle>{group.title}</CardTitle>
               <CardDescription>
-                Configurez les {group.title.toLowerCase()}
+                {t("settings.theme_config.general_description")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -555,10 +528,9 @@ export function ThemeConfigClient() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Couleurs des graphiques</CardTitle>
+            <CardTitle>{t("settings.theme_config.chart_colors")}</CardTitle>
             <CardDescription>
-              Configurez les couleurs utilisées dans les graphiques et
-              visualisations
+              {t("settings.theme_config.chart_colors_description")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -608,7 +580,9 @@ export function ThemeConfigClient() {
               </div>
 
               <div className="mt-6 space-y-4">
-                <Label className="text-sm font-medium">Aperçu</Label>
+                <Label className="text-sm font-medium">
+                  {t("common.preview")}
+                </Label>
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                   {chartExamples.map((example, i) => (
                     <div

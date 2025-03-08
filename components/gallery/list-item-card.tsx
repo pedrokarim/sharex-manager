@@ -10,7 +10,7 @@ import {
   Star,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { fr } from "date-fns/locale";
+import { useDateLocale } from "@/lib/i18n/date-locales";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,8 @@ export function ListItemCard({
   detailed,
   isNew,
 }: ListItemCardProps) {
+  const locale = useDateLocale();
+
   return (
     <div
       className={cn(
@@ -59,7 +61,7 @@ export function ListItemCard({
           <div className="mt-1 flex text-xs text-muted-foreground">
             <p>
               {format(parseISO(file.createdAt), "dd MMMM yyyy à HH:mm", {
-                locale: fr,
+                locale,
               })}
             </p>
             <span className="mx-2">•</span>

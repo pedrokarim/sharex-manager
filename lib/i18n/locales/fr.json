@@ -1,0 +1,400 @@
+{
+  "common": {
+    "welcome": "Bienvenue",
+    "login": "Connexion",
+    "logout": "Déconnexion",
+    "logout_success": "Déconnexion réussie",
+    "register": "S'inscrire",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "search": "Rechercher",
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "confirm": "Confirmer",
+    "back": "Retour",
+    "start": "Début",
+    "end": "Fin",
+    "disabled": "Désactivé",
+    "toggle": "Basculer",
+    "more": "Plus",
+    "create": "Nouvelle",
+    "reset": "Réinitialiser",
+    "preview": "Aperçu"
+  },
+  "navigation": {
+    "home": "Accueil",
+    "gallery": "Galerie",
+    "settings": "Paramètres",
+    "profile": "Profil",
+    "about": "À propos"
+  },
+  "account": {
+    "upgrade_pro": "Passer à Pro",
+    "my_account": "Mon compte",
+    "api_keys": "Clés API"
+  },
+  "breadcrumb": {
+    "edit_key": "Modifier clé"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "preferences": "Préférences utilisateur",
+    "preferences_description": "Personnalisez vos préférences d'affichage et de fonctionnalités",
+    "appearance": "Apparence",
+    "appearance_description": "Personnalisez l'apparence de l'interface",
+    "language": "Langue",
+    "language_select": "Sélectionner une langue",
+    "theme": "Thème",
+    "theme_advanced": "Configuration avancée du thème",
+    "theme_advanced_description": "Personnalisez les couleurs de l'interface",
+    "notifications": "Notifications",
+    "notifications_description": "Configurez les notifications de l'application",
+    "privacy": "Confidentialité",
+    "account": "Compte",
+    "reset": "Réinitialiser",
+    "save_success": "Paramètres enregistrés avec succès",
+    "select_size": "Sélectionnez une taille",
+    "gallery_description": "Configurez l'affichage de la galerie d'images",
+    "gallery": {
+      "view_mode": "Mode d'affichage",
+      "thumbnail_size": "Taille des vignettes",
+      "thumbnail_sizes": {
+        "large": "Très grandes icônes",
+        "medium": "Grandes icônes",
+        "small": "Icônes moyennes",
+        "tiny": "Petites icônes"
+      },
+      "show_file_info": "Informations des fichiers",
+      "show_file_size": "Taille des fichiers",
+      "show_upload_date": "Date d'upload",
+      "sort_by": "Trier par",
+      "sort_order": "Ordre de tri",
+      "auto_refresh": "Intervalle de rafraîchissement (secondes)"
+    },
+    "theme_options": {
+      "light": "Clair",
+      "dark": "Sombre",
+      "system": "Système",
+      "time_based": "Automatique",
+      "time_based_description": "Le thème clair sera actif de {start}h00 à {end}h00. En dehors de ces heures, le thème sombre sera utilisé."
+    },
+    "theme_config": {
+      "choose_category": "Choisir une catégorie",
+      "presets": "Presets de thèmes",
+      "presets_description": "Choisissez parmi nos thèmes prédéfinis",
+      "general": "Général",
+      "general_description": "Configurez les paramètres généraux du thème",
+      "radius": "Radius des coins (rem)",
+      "square": "Carré",
+      "rounded": "Arrondi",
+      "chart_colors": "Couleurs des graphiques",
+      "chart_colors_description": "Configurez les couleurs utilisées dans les graphiques et visualisations",
+      "color_groups": {
+        "main": "Couleurs principales",
+        "components": "Composants",
+        "actions": "Actions",
+        "states": "États"
+      },
+      "colors": {
+        "background": "Couleur du fond",
+        "foreground": "Couleur du texte",
+        "primary": "Couleur principale",
+        "primary-foreground": "Texte sur couleur principale",
+        "card": "Fond des cartes",
+        "card-foreground": "Texte des cartes",
+        "popover": "Fond des pop-ups",
+        "popover-foreground": "Texte des pop-ups",
+        "secondary": "Couleur secondaire",
+        "secondary-foreground": "Texte sur couleur secondaire",
+        "accent": "Couleur d'accentuation",
+        "accent-foreground": "Texte sur accentuation",
+        "destructive": "Couleur de suppression",
+        "destructive-foreground": "Texte sur suppression",
+        "muted": "Couleur atténuée",
+        "muted-foreground": "Texte atténué",
+        "border": "Couleur des bordures",
+        "input": "Couleur des champs",
+        "ring": "Couleur de focus",
+        "chart-1": "Graphique - Série 1",
+        "chart-2": "Graphique - Série 2",
+        "chart-3": "Graphique - Série 3",
+        "chart-4": "Graphique - Série 4",
+        "chart-5": "Graphique - Série 5"
+      },
+      "chart_examples": {
+        "line_chart": "Graphique linéaire",
+        "bar_chart": "Graphique à barres",
+        "radial_chart": "Graphique radial",
+        "series": "Série"
+      }
+    }
+  },
+  "gallery": {
+    "no_files": "Aucun fichier trouvé",
+    "upload": "Téléverser",
+    "select_all": "Tout sélectionner",
+    "deselect_all": "Tout désélectionner",
+    "selected_count": "{count} fichier(s) sélectionné(s)",
+    "view_modes": {
+      "grid": "Grille",
+      "list": "Liste",
+      "details": "Détails"
+    },
+    "sort": {
+      "name": "Nom",
+      "date": "Date",
+      "size": "Taille",
+      "asc": "Croissant",
+      "desc": "Décroissant"
+    },
+    "title": "Galerie d'images",
+    "secure_files": "Fichiers Sécurisés",
+    "starred_files": "Fichiers Favoris",
+    "empty": {
+      "title": "Aucune image",
+      "description": "Commencez à uploader des images avec ShareX"
+    },
+    "upload_modal": {
+      "title": "Uploader un fichier",
+      "description": "Sélectionnez un fichier à uploader sur le serveur.",
+      "file_label": "Fichier",
+      "private_file": "Fichier privé",
+      "uploading": "Upload en cours...",
+      "upload_button": "Uploader"
+    },
+    "file_actions": {
+      "copy_url": "URL copiée dans le presse-papier",
+      "copy_error": "Impossible de copier l'URL",
+      "delete_success": "Fichier supprimé avec succès",
+      "delete_error": "Une erreur est survenue lors de la suppression",
+      "security_error": "Erreur lors de la modification de la sécurité",
+      "now_public": "Le fichier est maintenant public",
+      "now_private": "Le fichier est maintenant privé",
+      "star_error": "Erreur lors de la modification des favoris",
+      "added_to_favorites": "Ajouté aux favoris",
+      "removed_from_favorites": "Retiré des favoris",
+      "error_occurred": "Une erreur est survenue"
+    },
+    "refresh": {
+      "error": "Erreur lors du rafraîchissement de la galerie",
+      "intervals": {
+        "none": "Pas de rafraîchissement",
+        "5s": "5 secondes",
+        "10s": "10 secondes",
+        "15s": "15 secondes",
+        "30s": "30 secondes",
+        "placeholder": "Rafraîchissement auto"
+      }
+    },
+    "file_viewer": {
+      "accessibility": "Image ajoutée le {date}. Taille du fichier : {size} Ko. {navigation}",
+      "previous_button": "Utilisez le bouton précédent pour voir l'image précédente.",
+      "next_button": "Utilisez le bouton suivant pour voir l'image suivante.",
+      "info_panel": {
+        "title": "Informations",
+        "filename": "Nom du fichier",
+        "date_added": "Date d'ajout",
+        "size": "Taille",
+        "kb": "Ko"
+      }
+    },
+    "upload_zone": {
+      "add_files": "Ajouter des fichiers",
+      "drop_files": "Déposez vos fichiers ici",
+      "supported_formats": "Formats supportés: {formats}",
+      "max_size": "Taille maximale: {size}MB",
+      "files_to_upload": "Fichiers à uploader ({valid}/{total})",
+      "clear_all": "Tout supprimer",
+      "upload": "Uploader",
+      "uploading": "Upload en cours...",
+      "no_valid_files": "Aucun fichier valide à uploader",
+      "upload_complete": "Upload terminé avec succès",
+      "upload_error": "Erreur lors de l'upload",
+      "rejection_messages": {
+        "file_invalid_type": "Type de fichier non supporté",
+        "file_too_large": "La taille du fichier dépasse la limite de 10MB",
+        "file_too_small": "La taille du fichier est trop petite",
+        "file_too_many": "Vous ne pouvez uploader que 10 fichiers à la fois",
+        "file_too_many_images": "Vous ne pouvez uploader que 10 images à la fois",
+        "file_too_many_documents": "Vous ne pouvez uploader que 10 documents à la fois",
+        "file_too_many_archives": "Vous ne pouvez uploader que 10 archives à la fois",
+        "unknown_error": "Erreur inconnue"
+      },
+      "validation_errors": {
+        "images_not_allowed": "L'upload d'images n'est pas autorisé actuellement",
+        "documents_not_allowed": "L'upload de documents n'est pas autorisé actuellement",
+        "archives_not_allowed": "L'upload d'archives n'est pas autorisé actuellement",
+        "unsupported_file_type": "Type de fichier non supporté",
+        "file_too_small": "La taille du fichier est inférieure à la limite minimale de {size}KB",
+        "file_too_large": "La taille du fichier dépasse la limite de {size}MB",
+        "too_many_files": "Vous ne pouvez pas uploader plus de {count} fichiers à la fois",
+        "too_many_images": "Vous ne pouvez pas uploader plus de {count} images à la fois",
+        "too_many_documents": "Vous ne pouvez pas uploader plus de {count} documents à la fois",
+        "too_many_archives": "Vous ne pouvez pas uploader plus de {count} archives à la fois"
+      }
+    },
+    "errors": {
+      "loading_files": "Erreur lors du chargement des fichiers"
+    },
+    "file_card": {
+      "delete_success": "Le fichier a été supprimé avec succès",
+      "delete_error": "Une erreur est survenue lors de la suppression du fichier",
+      "delete_confirmation": {
+        "title": "Êtes-vous sûr ?",
+        "description": "Cette action est irréversible. Le fichier sera définitivement supprimé.",
+        "cancel": "Annuler",
+        "confirm": "Continuer"
+      }
+    }
+  },
+  "sidebar": {
+    "app_name": "ShareX Manager",
+    "app_description": "Gestionnaire d'images",
+    "search": "Rechercher",
+    "search_placeholder": "Rechercher...",
+    "toggle": "Basculer",
+    "main": {
+      "gallery": "Galerie",
+      "recent": "Récents",
+      "starred": "Favoris",
+      "secure": "Sécurisés",
+      "settings": "Paramètres",
+      "uploads": "Uploads",
+      "history": "Historique",
+      "configuration": "Configuration",
+      "stats": "Stats",
+      "organization": "Organisation",
+      "folders": "Dossiers",
+      "tags": "Tags",
+      "collections": "Collections"
+    },
+    "admin": {
+      "administration": "Administration",
+      "users": "Utilisateurs",
+      "logs": "Logs",
+      "system_config": "Configuration système",
+      "security": "Sécurité"
+    },
+    "secondary": {
+      "preferences": "Préférences",
+      "support": "Support",
+      "feedback": "Feedback",
+      "about_app": "À propos de l'application"
+    },
+    "projects": {
+      "title": "Projets",
+      "starred_images": "Images Favoris",
+      "secure_images": "Images Sécurisées",
+      "view_project": "Voir le projet",
+      "share_project": "Partager le projet",
+      "delete_project": "Supprimer le projet"
+    },
+    "settings": {
+      "general": "Général",
+      "integrations": "Intégrations"
+    }
+  },
+  "loading": {
+    "messages": {
+      "preparing_gallery": "Préparation de votre galerie...",
+      "loading_images": "Chargement des images...",
+      "optimizing_display": "Optimisation de l'affichage...",
+      "retrieving_data": "Récupération des données...",
+      "configuring_interface": "Configuration de l'interface...",
+      "ai_neurons": "Réveil des neurones artificiels...",
+      "consulting_claude": "Consultation de Claude pour des conseils...",
+      "asking_gpt": "Demande à GPT-4 de faire plus vite...",
+      "negotiating_dalle": "Négociation avec DALL-E pour les miniatures...",
+      "training_models": "Formation accélérée des modèles...",
+      "meditating": "Méditation profonde avec Stable Diffusion...",
+      "calculating_meaning": "Calcul du sens de la vie numérique...",
+      "downloading_consciousness": "Téléchargement de la conscience artificielle...",
+      "aligning_transformers": "Alignement des transformers...",
+      "calibrating_attention": "Calibration des attention heads...",
+      "feeding_pixels": "Nourrissage des pixels affamés...",
+      "massaging_tensors": "Massage des tenseurs stressés...",
+      "deploying_hamsters": "Déploiement des hamsters quantiques...",
+      "fixing_bugs": "Réparation des bugs qui n'existent pas...",
+      "reading_manual": "Lecture du manuel d'utilisation (enfin presque)...",
+      "counting_pixels": "Comptage des pixels jusqu'à l'infini...",
+      "talking_backend": "Tentative de discussion avec le backend...",
+      "motivating_bytes": "Motivation des octets paresseux...",
+      "resolving_conflicts": "Résolution des conflits entre les composants...",
+      "negotiating_cache": "Négociation avec le cache récalcitrant...",
+      "optimizing_prompts": "Optimisation des prompts vectoriels...",
+      "calculating_embeddings": "Calcul des embeddings multidimensionnels...",
+      "training_llms": "Entraînement des LLMs de poche...",
+      "deploying_agents": "Déploiement des agents autonomes...",
+      "configuring_consciousness": "Configuration du flux de conscience numérique...",
+      "activating_synapses": "Activation des synapses artificielles...",
+      "updating_knowledge": "Mise à jour de la base de connaissances...",
+      "syncing_multiverse": "Synchronisation des multivers parallèles...",
+      "calibrating_sensors": "Calibration des capteurs émotionnels...",
+      "initializing_creativity": "Initialisation du module de créativité..."
+    },
+    "wait_message": "Veuillez patienter un instant pendant que nos IAs s'activent..."
+  },
+  "errors": {
+    "not_found": "Page non trouvée",
+    "server_error": "Erreur serveur",
+    "unauthorized": "Non autorisé",
+    "forbidden": "Accès interdit",
+    "validation": "Erreur de validation",
+    "upload_failed": "Échec du téléversement"
+  },
+  "home": {
+    "title": "ShareX Manager",
+    "subtitle": "Une interface moderne et puissante pour gérer vos captures d'écran et fichiers uploadés via ShareX",
+    "cta": {
+      "gallery": "Accéder à la galerie",
+      "configure": "Configurer ShareX"
+    },
+    "features": {
+      "upload": {
+        "title": "Upload Instantané",
+        "description": "Uploadez vos fichiers instantanément avec une configuration simple et rapide. Support des images, vidéos et fichiers.",
+        "fast": "Upload ultra-rapide",
+        "history": "Historique complet"
+      },
+      "security": {
+        "title": "Sécurité Avancée",
+        "description": "Protection complète de vos fichiers avec authentification et gestion des accès personnalisée.",
+        "private": "Fichiers privés",
+        "api_keys": "Clés API sécurisées"
+      },
+      "management": {
+        "title": "Gestion Intelligente",
+        "description": "Interface intuitive avec des fonctionnalités avancées pour organiser et analyser vos uploads.",
+        "customization": "Personnalisation complète",
+        "stats": "Statistiques détaillées"
+      }
+    },
+    "configuration": {
+      "title": "Configuration ShareX",
+      "badge": "Documentation",
+      "intro": "Configurez ShareX en quelques étapes simples pour commencer à uploader vos fichiers :",
+      "steps": {
+        "step1": "Ouvrez ShareX et accédez aux paramètres",
+        "step2": "Naviguez vers Destinations → Destination Settings",
+        "step3": "Dans Custom Uploader Settings, configurez :",
+        "step4": "Validez la configuration avec le bouton \"Test\""
+      },
+      "config_items": {
+        "request_url": "Request URL:",
+        "method": "Method:",
+        "file_form": "File form name:"
+      },
+      "download_config": "Télécharger la configuration",
+      "get_api_key": "Obtenir une clé API"
+    }
+  },
+  "layout": {
+    "metadata": {
+      "title": "ShareX Manager",
+      "description": "Gérez vos uploads ShareX facilement et en toute sécurité"
+    }
+  }
+}

@@ -18,8 +18,10 @@ import {
   Calendar,
   CalendarDays,
 } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export function SortSelector() {
+  const { t } = useTranslation();
   const [defaultSortBy, setDefaultSortBy] = useAtom(sortByAtom);
   const [defaultSortOrder, setDefaultSortOrder] = useAtom(sortOrderAtom);
 
@@ -78,7 +80,7 @@ export function SortSelector() {
           ) : (
             <ArrowUpAZ className="mr-2 h-4 w-4" />
           )}
-          Par nom
+          {t("gallery.sort.name")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleSortChange("date")}>
           {sortOrder === "asc" ? (
@@ -86,7 +88,7 @@ export function SortSelector() {
           ) : (
             <Calendar className="mr-2 h-4 w-4" />
           )}
-          Par date
+          {t("gallery.sort.date")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleSortChange("size")}>
           {sortOrder === "asc" ? (
@@ -94,7 +96,7 @@ export function SortSelector() {
           ) : (
             <ArrowUpWideNarrow className="mr-2 h-4 w-4" />
           )}
-          Par taille
+          {t("gallery.sort.size")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

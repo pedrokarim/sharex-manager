@@ -5,6 +5,7 @@ import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
+import { TranslationProvider } from "./providers/TranslationProvider";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -28,7 +29,9 @@ export function Providers({ children }: { children: ReactNode }) {
           enableSystem
           disableTransitionOnChange
         >
-          <SessionProvider>{children}</SessionProvider>
+          <TranslationProvider>
+            <SessionProvider>{children}</SessionProvider>
+          </TranslationProvider>
         </ThemeProvider>
       </NuqsAdapter>
     </QueryClientProvider>

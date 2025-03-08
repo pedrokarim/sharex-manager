@@ -1,12 +1,20 @@
-"use client"
+"use client";
 
-import { SidebarIcon } from "lucide-react"
-import { useSidebar } from "../ui/sidebar"
-import { Button } from "../ui/button"
-import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator, BreadcrumbPage } from "../ui/breadcrumb"
-import { Separator } from "../ui/separator"
-import { SearchForm } from "./search-form"
-import { BreadcrumbNav } from "../breadcrumb"
+import { SidebarIcon } from "lucide-react";
+import { useSidebar } from "../ui/sidebar";
+import { Button } from "../ui/button";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbSeparator,
+  BreadcrumbPage,
+} from "../ui/breadcrumb";
+import { Separator } from "../ui/separator";
+import { SearchForm } from "./search-form";
+import { BreadcrumbNav } from "../breadcrumb";
+import { useTranslation } from "@/lib/i18n";
 
 interface SidebarHeaderProps {
   /** Afficher la barre de recherche */
@@ -19,13 +27,14 @@ interface SidebarHeaderProps {
   description?: string;
 }
 
-export function SidebarHeader({ 
-  showSearch = true, 
+export function SidebarHeader({
+  showSearch = true,
   showBreadcrumbs = true,
   title,
-  description 
+  description,
 }: SidebarHeaderProps) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar } = useSidebar();
+  const { t } = useTranslation();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background">
@@ -35,6 +44,7 @@ export function SidebarHeader({
           variant="ghost"
           size="icon"
           onClick={toggleSidebar}
+          aria-label={t("sidebar.toggle")}
         >
           <SidebarIcon />
         </Button>
@@ -42,7 +52,7 @@ export function SidebarHeader({
         <Separator orientation="vertical" className="mr-2 h-4" />
 
         <div className="flex flex-1 items-center gap-4">
-        {/* {title && (
+          {/* {title && (
             <div className="hidden sm:block">
               <h1 className="text-sm font-medium">
                 {title}
@@ -61,13 +71,9 @@ export function SidebarHeader({
             </div>
           )}
 
-          
-
-          {showSearch && (
-            <SearchForm className="w-full sm:ml-auto sm:w-auto" />
-          )}
+          {showSearch && <SearchForm className="w-full sm:ml-auto sm:w-auto" />}
         </div>
       </div>
     </header>
-  )
+  );
 }

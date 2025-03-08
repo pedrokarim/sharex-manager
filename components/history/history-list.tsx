@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDateLocale } from "@/lib/i18n/date-locales";
 
 interface HistoryListProps {
   filters?: URLSearchParams;
@@ -56,6 +57,7 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
     defaultValue: "desc",
   });
   const [totalItems, setTotalItems] = useState(0);
+  const locale = useDateLocale();
 
   const loadHistory = async (searchParams?: URLSearchParams) => {
     try {
@@ -242,7 +244,7 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
                     {entry.originalFilename}
                   </TableCell>
                   <TableCell>
-                    {format(new Date(entry.uploadDate), "Pp", { locale: fr })}
+                    {format(new Date(entry.uploadDate), "Pp", { locale })}
                   </TableCell>
                   <TableCell>{formatFileSize(entry.fileSize)}</TableCell>
                   <TableCell>

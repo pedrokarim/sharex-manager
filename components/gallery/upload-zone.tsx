@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useUploadConfig } from "@/hooks/use-upload-config";
+import { useTranslation } from "@/lib/i18n";
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -31,17 +32,21 @@ interface UploadZoneProps {
 }
 
 const fileRejectionMessages = {
-  "file-invalid-type": "Type de fichier non supporté",
-  "file-too-large": "La taille du fichier dépasse la limite de 10MB",
-  "file-too-small": "La taille du fichier est trop petite",
-  "file-too-many": "Vous ne pouvez uploader que 10 fichiers à la fois",
-  "file-too-many-images": "Vous ne pouvez uploader que 10 images à la fois",
+  "file-invalid-type":
+    "gallery.upload_zone.rejection_messages.file_invalid_type",
+  "file-too-large": "gallery.upload_zone.rejection_messages.file_too_large",
+  "file-too-small": "gallery.upload_zone.rejection_messages.file_too_small",
+  "file-too-many": "gallery.upload_zone.rejection_messages.file_too_many",
+  "file-too-many-images":
+    "gallery.upload_zone.rejection_messages.file_too_many_images",
   "file-too-many-documents":
-    "Vous ne pouvez uploader que 10 documents à la fois",
-  "file-too-many-archives": "Vous ne pouvez uploader que 10 archives à la fois",
+    "gallery.upload_zone.rejection_messages.file_too_many_documents",
+  "file-too-many-archives":
+    "gallery.upload_zone.rejection_messages.file_too_many_archives",
 };
 
 export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
+  const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const [filesToUpload, setFilesToUpload] = useState<FileWithPreview[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -92,13 +97,13 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
 
     // Vérifier le type de fichier
     if (imageTypes.includes(file.type) && !config.allowedTypes.images) {
-      return "L'upload d'images n'est pas autorisé actuellement";
+      return t("gallery.upload_zone.validation_errors.images_not_allowed");
     }
     if (documentTypes.includes(file.type) && !config.allowedTypes.documents) {
-      return "L'upload de documents n'est pas autorisé actuellement";
+      return t("gallery.upload_zone.validation_errors.documents_not_allowed");
     }
     if (archiveTypes.includes(file.type) && !config.allowedTypes.archives) {
-      return "L'upload d'archives n'est pas autorisé actuellement";
+      return t("gallery.upload_zone.validation_errors.archives_not_allowed");
     }
 
     if (
@@ -106,17 +111,21 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
       !documentTypes.includes(file.type) &&
       !archiveTypes.includes(file.type)
     ) {
-      return "Type de fichier non supporté";
+      return t("gallery.upload_zone.validation_errors.unsupported_file_type");
     }
 
     // Vérifier la taille minimale
     if (file.size < config.limits.minFileSize * 1024) {
-      return `La taille du fichier est inférieure à la limite minimale de ${config.limits.minFileSize}KB`;
+      return t("gallery.upload_zone.validation_errors.file_too_small", {
+        size: config.limits.minFileSize,
+      });
     }
 
     // Vérifier la taille maximale
     if (file.size > config.limits.maxFileSize * 1024 * 1024) {
-      return `La taille du fichier dépasse la limite de ${config.limits.maxFileSize}MB`;
+      return t("gallery.upload_zone.validation_errors.file_too_large", {
+        size: config.limits.maxFileSize,
+      });
     }
 
     // Vérifier le nombre de fichiers par type
@@ -124,7 +133,9 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
     const totalFiles = currentFiles.length;
 
     if (totalFiles >= config.limits.maxFilesPerUpload) {
-      return `Vous ne pouvez pas uploader plus de ${config.limits.maxFilesPerUpload} fichiers à la fois`;
+      return t("gallery.upload_zone.validation_errors.too_many_files", {
+        count: config.limits.maxFilesPerUpload,
+      });
     }
 
     // Vérifier les limites par type
@@ -142,19 +153,25 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
       imageTypes.includes(file.type) &&
       currentImagesCount >= config.limits.maxFilesPerType.images
     ) {
-      return `Vous ne pouvez pas uploader plus de ${config.limits.maxFilesPerType.images} images à la fois`;
+      return t("gallery.upload_zone.validation_errors.too_many_images", {
+        count: config.limits.maxFilesPerType.images,
+      });
     }
     if (
       documentTypes.includes(file.type) &&
       currentDocumentsCount >= config.limits.maxFilesPerType.documents
     ) {
-      return `Vous ne pouvez pas uploader plus de ${config.limits.maxFilesPerType.documents} documents à la fois`;
+      return t("gallery.upload_zone.validation_errors.too_many_documents", {
+        count: config.limits.maxFilesPerType.documents,
+      });
     }
     if (
       archiveTypes.includes(file.type) &&
       currentArchivesCount >= config.limits.maxFilesPerType.archives
     ) {
-      return `Vous ne pouvez pas uploader plus de ${config.limits.maxFilesPerType.archives} archives à la fois`;
+      return t("gallery.upload_zone.validation_errors.too_many_archives", {
+        count: config.limits.maxFilesPerType.archives,
+      });
     }
 
     return null;
@@ -202,11 +219,11 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
     onDropRejected(fileRejections, event) {
       for (const file of fileRejections) {
         toast.error(
-          `${file.file.name}: ${
+          `${file.file.name}: ${t(
             fileRejectionMessages?.[
               file.errors[0]?.code as keyof typeof fileRejectionMessages
-            ] || "Erreur inconnue"
-          }`
+            ] || "gallery.upload_zone.rejection_messages.unknown_error"
+          )}`
         );
       }
     },
@@ -234,7 +251,7 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
   const uploadFiles = async () => {
     const validFiles = filesToUpload.filter((file) => !file.error);
     if (validFiles.length === 0) {
-      toast.error("Aucun fichier valide à uploader");
+      toast.error(t("gallery.upload_zone.no_valid_files"));
       return;
     }
 
@@ -337,7 +354,7 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
         disabled={Object.keys(acceptedFileTypes).length === 0}
       >
         <Upload className="w-4 h-4 mr-2" />
-        Ajouter des fichiers
+        {t("gallery.upload_zone.add_files")}
       </Button>
 
       {/* Overlay de drop */}
@@ -345,11 +362,17 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
         <div className="fixed left-[--sidebar-width] top-[--header-height] right-0 bottom-0 bg-primary/10 backdrop-blur-sm flex items-center justify-center z-[999]">
           <div className="bg-background/95 p-8 rounded-lg shadow-lg text-center border-2 border-dashed border-primary -translate-x-[120px] -translate-y-[32px]">
             <Upload className="w-16 h-16 mx-auto mb-4 text-primary animate-bounce" />
-            <h3 className="text-2xl font-semibold">Déposez vos fichiers ici</h3>
+            <h3 className="text-2xl font-semibold">
+              {t("gallery.upload_zone.drop_files")}
+            </h3>
             <p className="text-sm text-muted-foreground mt-2">
-              Formats supportés: {supportedFormatsMessage}
+              {t("gallery.upload_zone.supported_formats", {
+                formats: supportedFormatsMessage,
+              })}
               <br />
-              Taille maximale: {config.limits.maxFileSize}MB
+              {t("gallery.upload_zone.max_size", {
+                size: config.limits.maxFileSize,
+              })}
             </p>
           </div>
         </div>
@@ -361,9 +384,10 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
           <div className="p-4 border-b">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">
-                Fichiers à uploader (
-                {filesToUpload.filter((f) => !f.error).length}/
-                {filesToUpload.length})
+                {t("gallery.upload_zone.files_to_upload", {
+                  valid: filesToUpload.filter((f) => !f.error).length,
+                  total: filesToUpload.length,
+                })}
               </h3>
               <Button
                 variant="ghost"
@@ -383,7 +407,7 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
                 className="flex-1"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Tout supprimer
+                {t("gallery.upload_zone.clear_all")}
               </Button>
               <Button
                 size="sm"
@@ -395,7 +419,9 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
                 className="flex-1"
               >
                 <Upload className="w-4 h-4 mr-2" />
-                {isUploading ? "Upload en cours..." : "Uploader"}
+                {isUploading
+                  ? t("gallery.upload_zone.uploading")
+                  : t("gallery.upload_zone.upload")}
               </Button>
             </div>
             {isUploading && (

@@ -52,6 +52,7 @@ import { Loader2 } from "lucide-react";
 import { RefreshInterval } from "@/components/refresh-interval";
 import { Loading } from "@/components/ui/loading";
 import { SortSelector } from "@/components/sort-selector";
+import { useTranslation } from "@/lib/i18n";
 
 interface FileInfo {
   name: string;
@@ -93,6 +94,7 @@ function UploadModal({
 }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const { t } = useTranslation();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -113,7 +115,7 @@ function UploadModal({
       onClose();
     } catch (error) {
       console.error("Erreur lors de l'upload:", error);
-      toast.error("Erreur lors de l'upload");
+      toast.error(t("gallery.upload_zone.upload_error"));
     } finally {
       setIsUploading(false);
     }
@@ -123,14 +125,14 @@ function UploadModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Uploader un fichier</DialogTitle>
+          <DialogTitle>{t("gallery.upload_modal.title")}</DialogTitle>
           <DialogDescription>
-            Sélectionnez un fichier à uploader sur le serveur.
+            {t("gallery.upload_modal.description")}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-2">
-            <Label>Fichier</Label>
+            <Label>{t("gallery.upload_modal.file_label")}</Label>
             <Input type="file" onChange={handleFileChange} />
           </div>
           <div className="flex items-center space-x-2">
@@ -141,7 +143,9 @@ function UploadModal({
                 onSecureChange?.(checked as boolean)
               }
             />
-            <Label htmlFor="secure">Fichier privé</Label>
+            <Label htmlFor="secure">
+              {t("gallery.upload_modal.private_file")}
+            </Label>
           </div>
         </div>
         <DialogFooter>
@@ -153,10 +157,10 @@ function UploadModal({
             {isUploading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Upload en cours...
+                {t("gallery.upload_modal.uploading")}
               </>
             ) : (
-              "Uploader"
+              t("gallery.upload_modal.upload_button")
             )}
           </Button>
         </DialogFooter>
@@ -175,6 +179,7 @@ export function GalleryClient({
   starredOnly = false,
 }: GalleryClientProps) {
   const { data: session, status } = useSession();
+  const { t } = useTranslation();
   const [defaultViewMode, setDefaultViewMode] = useAtom(galleryViewModeAtom);
   const [showFileInfo] = useAtom(showFileInfoAtom);
   const [showFileSize] = useAtom(showFileSizeAtom);
@@ -232,13 +237,14 @@ export function GalleryClient({
         };
       } catch (error) {
         console.error("Erreur lors du chargement des fichiers:", error);
+        toast.error(t("gallery.errors.loading_files"));
         return {
           files: [],
           hasMore: false,
         };
       }
     },
-    [search, secureOnly, starredOnly]
+    [search, secureOnly, starredOnly, t]
   );
 
   const {
@@ -287,11 +293,11 @@ export function GalleryClient({
       setHasMore(newHasMore);
     } catch (error) {
       console.error("Erreur lors du rafraîchissement:", error);
-      toast.error("Erreur lors du rafraîchissement de la galerie");
+      toast.error(t("gallery.refresh.error"));
     } finally {
       setIsRefreshing(false);
     }
-  }, [fetchFiles]);
+  }, [fetchFiles, t]);
 
   useEffect(() => {
     if (autoRefreshInterval === 0) return;
@@ -327,7 +333,7 @@ export function GalleryClient({
     }
   }, [status]);
 
-  // TODO: Par pitié, il faut trouver une solution pour éviter les doublons en production.
+  // Éviter les doublons dans les fichiers
   const uniqueFiles = useMemo(() => {
     return files.filter(
       (file, index, self) =>
@@ -398,12 +404,12 @@ export function GalleryClient({
       });
 
       if (response.ok) {
-        toast.success("Fichier supprimé avec succès");
+        toast.success(t("gallery.file_actions.delete_success"));
         setSelectedFile(null);
         handleRefresh();
       }
     } catch (error) {
-      toast.error("Une erreur est survenue lors de la suppression");
+      toast.error(t("gallery.file_actions.delete_error"));
     }
   };
 
@@ -414,7 +420,7 @@ export function GalleryClient({
         typeof navigator.clipboard.writeText === "function"
       ) {
         await navigator.clipboard.writeText(url);
-        toast.success("URL copiée dans le presse-papier");
+        toast.success(t("gallery.file_actions.copy_url"));
       } else {
         // Fallback pour les navigateurs qui ne supportent pas l'API Clipboard
         const textArea = document.createElement("textarea");
@@ -428,16 +434,16 @@ export function GalleryClient({
 
         try {
           document.execCommand("copy");
-          toast.success("URL copiée dans le presse-papier");
+          toast.success(t("gallery.file_actions.copy_url"));
         } catch (err) {
-          toast.error("Impossible de copier l'URL");
+          toast.error(t("gallery.file_actions.copy_error"));
           console.error("Erreur lors de la copie:", err);
         }
 
         document.body.removeChild(textArea);
       }
     } catch (error) {
-      toast.error("Impossible de copier l'URL");
+      toast.error(t("gallery.file_actions.copy_error"));
       console.error("Erreur lors de la copie:", error);
     }
   };
@@ -455,7 +461,7 @@ export function GalleryClient({
     );
 
     if (!response.ok) {
-      throw new Error("Erreur lors de l'upload");
+      throw new Error(t("gallery.upload_zone.upload_error"));
     }
 
     await fetchFiles(1).then(({ files }) => {
@@ -478,7 +484,7 @@ export function GalleryClient({
       );
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la modification de la sécurité");
+        throw new Error(t("gallery.file_actions.security_error"));
       }
 
       const data = await response.json();
@@ -491,12 +497,12 @@ export function GalleryClient({
 
       toast.success(
         file.isSecure
-          ? "Le fichier est maintenant public"
-          : "Le fichier est maintenant privé"
+          ? t("gallery.file_actions.now_public")
+          : t("gallery.file_actions.now_private")
       );
     } catch (error) {
       console.error("Erreur lors de la modification de la sécurité:", error);
-      toast.error("Une erreur est survenue");
+      toast.error(t("gallery.file_actions.error_occurred"));
     }
   };
 
@@ -514,7 +520,7 @@ export function GalleryClient({
       );
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la modification des favoris");
+        throw new Error(t("gallery.file_actions.star_error"));
       }
 
       const data = await response.json();
@@ -526,11 +532,13 @@ export function GalleryClient({
       reset(updatedFiles);
 
       toast.success(
-        file.isStarred ? "Retiré des favoris" : "Ajouté aux favoris"
+        file.isStarred
+          ? t("gallery.file_actions.removed_from_favorites")
+          : t("gallery.file_actions.added_to_favorites")
       );
     } catch (error) {
       console.error("Erreur lors de la modification des favoris:", error);
-      toast.error("Une erreur est survenue");
+      toast.error(t("gallery.file_actions.error_occurred"));
     }
   };
 
@@ -550,10 +558,10 @@ export function GalleryClient({
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-2xl font-bold">
             {secureOnly
-              ? "Fichiers Sécurisés"
+              ? t("gallery.secure_files")
               : starredOnly
-              ? "Fichiers Favoris"
-              : "Galerie d'images"}
+              ? t("gallery.starred_files")
+              : t("gallery.title")}
           </h1>
           <div className="flex items-center gap-4">
             <ViewSelector />
@@ -571,7 +579,9 @@ export function GalleryClient({
             >
               <RefreshCcw className="h-4 w-4" />
             </Button>
-            <Button onClick={() => setIsUploadModalOpen(true)}>Upload</Button>
+            <Button onClick={() => setIsUploadModalOpen(true)}>
+              {t("gallery.upload")}
+            </Button>
           </div>
         </div>
 
@@ -579,9 +589,11 @@ export function GalleryClient({
           <div className="flex flex-col items-center justify-center space-y-4 py-24 text-center">
             <ImageOff className="h-12 w-12 text-muted-foreground" />
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold">Aucune image</h3>
+              <h3 className="text-lg font-semibold">
+                {t("gallery.empty.title")}
+              </h3>
               <p className="text-sm text-muted-foreground">
-                Commencez à uploader des images avec ShareX
+                {t("gallery.empty.description")}
               </p>
             </div>
           </div>

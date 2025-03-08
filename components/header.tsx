@@ -1,22 +1,29 @@
-'use client'
+"use client";
 
-import { signOut, useSession } from "next-auth/react"
-import { Button } from "./ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu"
-import { UserCircle } from "lucide-react"
-import Link from "next/link"
-import { toast } from "sonner"
+import { signOut, useSession } from "next-auth/react";
+import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { UserCircle } from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n";
 
 export function Header() {
-  const { data: session } = useSession()
+  const { data: session } = useSession();
+  const { t } = useTranslation();
 
   const handleSignOut = async () => {
     await signOut({
       redirect: true,
       redirectTo: "/",
-    })
-    toast.success("Déconnexion réussie")
-  }
+    });
+    toast.success(t("common.logout_success"));
+  };
 
   return (
     <header className="border-b">
@@ -29,7 +36,7 @@ export function Header() {
           {session ? (
             <>
               <Link href="/gallery">
-                <Button variant="ghost">Galerie</Button>
+                <Button variant="ghost">{t("navigation.gallery")}</Button>
               </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -39,18 +46,18 @@ export function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={handleSignOut}>
-                    Se déconnecter
+                    {t("common.logout")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
           ) : (
             <Link href="/login">
-              <Button>Se connecter</Button>
+              <Button>{t("common.login")}</Button>
             </Link>
           )}
         </nav>
       </div>
     </header>
-  )
-} 
+  );
+}

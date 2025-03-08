@@ -3,50 +3,51 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 
-const loadingMessages = [
+const loadingMessagesKeys = [
   // Messages classiques
-  "Préparation de votre galerie...",
-  "Chargement des images...",
-  "Optimisation de l'affichage...",
-  "Récupération des données...",
-  "Configuration de l'interface...",
+  "loading.messages.preparing_gallery",
+  "loading.messages.loading_images",
+  "loading.messages.optimizing_display",
+  "loading.messages.retrieving_data",
+  "loading.messages.configuring_interface",
 
   // Messages amusants liés à l'IA
-  "Réveil des neurones artificiels...",
-  "Consultation de Claude pour des conseils...",
-  "Demande à GPT-4 de faire plus vite...",
-  "Négociation avec DALL-E pour les miniatures...",
-  "Formation accélérée des modèles...",
-  "Méditation profonde avec Stable Diffusion...",
-  "Calcul du sens de la vie numérique...",
-  "Téléchargement de la conscience artificielle...",
-  "Alignement des transformers...",
-  "Calibration des attention heads...",
+  "loading.messages.ai_neurons",
+  "loading.messages.consulting_claude",
+  "loading.messages.asking_gpt",
+  "loading.messages.negotiating_dalle",
+  "loading.messages.training_models",
+  "loading.messages.meditating",
+  "loading.messages.calculating_meaning",
+  "loading.messages.downloading_consciousness",
+  "loading.messages.aligning_transformers",
+  "loading.messages.calibrating_attention",
 
   // Messages humoristiques
-  "Nourrissage des pixels affamés...",
-  "Massage des tenseurs stressés...",
-  "Déploiement des hamsters quantiques...",
-  "Réparation des bugs qui n'existent pas...",
-  "Lecture du manuel d'utilisation (enfin presque)...",
-  "Comptage des pixels jusqu'à l'infini...",
-  "Tentative de discussion avec le backend...",
-  "Motivation des octets paresseux...",
-  "Résolution des conflits entre les composants...",
-  "Négociation avec le cache récalcitrant...",
+  "loading.messages.feeding_pixels",
+  "loading.messages.massaging_tensors",
+  "loading.messages.deploying_hamsters",
+  "loading.messages.fixing_bugs",
+  "loading.messages.reading_manual",
+  "loading.messages.counting_pixels",
+  "loading.messages.talking_backend",
+  "loading.messages.motivating_bytes",
+  "loading.messages.resolving_conflicts",
+  "loading.messages.negotiating_cache",
 
   // Messages techniques fun
-  "Optimisation des prompts vectoriels...",
-  "Calcul des embeddings multidimensionnels...",
-  "Entraînement des LLMs de poche...",
-  "Déploiement des agents autonomes...",
-  "Configuration du flux de conscience numérique...",
-  "Activation des synapses artificielles...",
-  "Mise à jour de la base de connaissances...",
-  "Synchronisation des multivers parallèles...",
-  "Calibration des capteurs émotionnels...",
-  "Initialisation du module de créativité...",
+  "loading.messages.optimizing_prompts",
+  "loading.messages.calculating_embeddings",
+  "loading.messages.training_llms",
+  "loading.messages.deploying_agents",
+  "loading.messages.configuring_consciousness",
+  "loading.messages.activating_synapses",
+  "loading.messages.updating_knowledge",
+  "loading.messages.syncing_multiverse",
+  "loading.messages.calibrating_sensors",
+  "loading.messages.initializing_creativity",
 ];
 
 interface LoadingProps {
@@ -66,7 +67,8 @@ export function Loading({
   size = "md",
   showMessage = true,
 }: LoadingProps) {
-  const [message, setMessage] = useState(loadingMessages[0]);
+  const { t } = useTranslation();
+  const [messageKey, setMessageKey] = useState(loadingMessagesKeys[0]);
   const [fadeIn, setFadeIn] = useState(true);
 
   useEffect(() => {
@@ -75,8 +77,10 @@ export function Loading({
     const messageInterval = setInterval(() => {
       setFadeIn(false);
       setTimeout(() => {
-        const randomIndex = Math.floor(Math.random() * loadingMessages.length);
-        setMessage(loadingMessages[randomIndex]);
+        const randomIndex = Math.floor(
+          Math.random() * loadingMessagesKeys.length
+        );
+        setMessageKey(loadingMessagesKeys[randomIndex]);
         setFadeIn(true);
       }, 200);
     }, 2000);
@@ -113,10 +117,10 @@ export function Loading({
                 fadeIn ? "opacity-100" : "opacity-0"
               )}
             >
-              {message}
+              {t(messageKey)}
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              Veuillez patienter un instant pendant que nos IAs s'activent...
+              {t("loading.wait_message")}
             </p>
           </div>
         )}
@@ -135,7 +139,7 @@ export function Loading({
               className
             )}
           >
-            {message}
+            {t(messageKey)}
           </p>
         )}
       </div>

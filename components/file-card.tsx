@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
-import { fr } from "date-fns/locale";
+import { useDateLocale } from "@/lib/i18n/date-locales";
 import {
   Lock,
   Unlock,
@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import type { FileInfo } from "@/types/files";
 import type { ThumbnailSize } from "@/lib/atoms/preferences";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n";
 
 interface FileCardProps {
   file: FileInfo;
@@ -66,6 +67,8 @@ export function FileCard({
   isNew,
   size = "medium",
 }: FileCardProps) {
+  const { t } = useTranslation();
+  const locale = useDateLocale();
   const [isDeleting, setIsDeleting] = useState(false);
   const [defaultShowFileInfo] = useAtom(showFileInfoAtom);
   const [defaultShowFileSize] = useAtom(showFileSizeAtom);
@@ -116,6 +119,7 @@ export function FileCard({
     small: "aspect-square",
     medium: "aspect-video",
     large: "aspect-[4/3]",
+    tiny: "aspect-square",
   };
 
   const handleDelete = async () => {
@@ -132,11 +136,11 @@ export function FileCard({
         throw new Error("Erreur lors de la suppression");
       }
 
-      toast.success("Le fichier a été supprimé avec succès");
+      toast.success(t("gallery.file_card.delete_success"));
       onDelete?.();
     } catch (error) {
       console.error("Erreur lors de la suppression:", error);
-      toast.error("Une erreur est survenue lors de la suppression du fichier");
+      toast.error(t("gallery.file_card.delete_error"));
     } finally {
       setIsDeleting(false);
     }
@@ -232,7 +236,7 @@ export function FileCard({
                 >
                   {formatDistanceToNow(new Date(file.createdAt), {
                     addSuffix: true,
-                    locale: fr,
+                    locale,
                   })}
                 </p>
               )}
@@ -309,16 +313,19 @@ export function FileCard({
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
+              <AlertDialogTitle>
+                {t("gallery.file_card.delete_confirmation.title")}
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                Cette action est irréversible. Le fichier sera définitivement
-                supprimé.
+                {t("gallery.file_card.delete_confirmation.description")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogCancel>
+                {t("gallery.file_card.delete_confirmation.cancel")}
+              </AlertDialogCancel>
               <AlertDialogAction onClick={handleDelete}>
-                Continuer
+                {t("gallery.file_card.delete_confirmation.confirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

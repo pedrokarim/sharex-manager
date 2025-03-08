@@ -10,8 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useTranslation } from "@/lib/i18n";
 
 export function RefreshInterval() {
+  const { t } = useTranslation();
   const [defaultAutoRefreshInterval, setDefaultAutoRefreshInterval] = useAtom(
     autoRefreshIntervalAtom
   );
@@ -38,14 +40,14 @@ export function RefreshInterval() {
   return (
     <Select value={autoRefreshInterval} onValueChange={handleChange}>
       <SelectTrigger className="w-[200px]">
-        <SelectValue placeholder="Rafraîchissement auto" />
+        <SelectValue placeholder={t("gallery.refresh.intervals.placeholder")} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="0">Pas de rafraîchissement</SelectItem>
-        <SelectItem value="5">5s</SelectItem>
-        <SelectItem value="10">10s</SelectItem>
-        <SelectItem value="15">15s</SelectItem>
-        <SelectItem value="30">30s</SelectItem>
+        <SelectItem value="0">{t("gallery.refresh.intervals.none")}</SelectItem>
+        <SelectItem value="5">{t("gallery.refresh.intervals.5s")}</SelectItem>
+        <SelectItem value="10">{t("gallery.refresh.intervals.10s")}</SelectItem>
+        <SelectItem value="15">{t("gallery.refresh.intervals.15s")}</SelectItem>
+        <SelectItem value="30">{t("gallery.refresh.intervals.30s")}</SelectItem>
       </SelectContent>
     </Select>
   );

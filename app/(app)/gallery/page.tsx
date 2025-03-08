@@ -1,24 +1,24 @@
-import { auth } from "@/auth"
-import { redirect } from "next/navigation"
-import { GalleryClient } from "./page.client"
-import { cookies } from "next/headers"
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
+import { GalleryClient } from "./page.client";
+import { cookies } from "next/headers";
 
 interface SearchParams {
-  q?: string
-  view?: string
-  secure?: string
+  q?: string;
+  view?: string;
+  secure?: string;
 }
 
 export default async function GalleryPage({
   searchParams,
 }: {
-  searchParams: SearchParams
+  searchParams: SearchParams;
 }) {
-  const session = await auth()
-  const cookieStore = cookies()
-  
+  const session = await auth();
+  const cookieStore = cookies();
+
   if (!session) {
-    redirect("/login")
+    redirect("/login");
   }
 
   try {
@@ -29,32 +29,32 @@ export default async function GalleryPage({
       {
         cache: "no-store",
         headers: {
-          Cookie: cookieStore.toString()
-        }
+          Cookie: cookieStore.toString(),
+        },
       }
-    )
+    );
 
-    const data = await res.json()
+    const data = await res.json();
 
     return (
-      <GalleryClient 
+      <GalleryClient
         initialFiles={data.files}
         initialHasMore={data.hasMore}
         initialView={searchParams.view as "grid" | "list" | "details"}
         initialSearch={searchParams.q}
         initialPage={1}
       />
-    )
+    );
   } catch (error) {
-    console.error("Erreur lors du chargement initial des fichiers:", error)
+    console.error("Erreur lors du chargement initial des fichiers:", error);
     return (
-      <GalleryClient 
+      <GalleryClient
         initialFiles={[]}
         initialHasMore={false}
         initialView={searchParams.view as "grid" | "list" | "details"}
         initialSearch={searchParams.q}
         initialPage={1}
       />
-    )
+    );
   }
 }

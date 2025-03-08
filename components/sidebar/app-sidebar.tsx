@@ -24,6 +24,7 @@ import {
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
+import { useTranslation } from "@/lib/i18n";
 
 import { NavMain } from "./nav-main";
 import { NavProjects } from "./nav-projects";
@@ -40,172 +41,173 @@ import {
   SidebarMenuItem,
 } from "../ui/sidebar";
 
-const data = {
-  user: {
-    name: "Admin",
-    email: "admin@sharex.com",
-    avatar: "/avatars/admin.jpg",
-  },
-  navMain: [
-    {
-      title: "Galerie",
-      url: "/gallery",
-      icon: ImageIcon,
-      isActive: true,
-      items: [
-        {
-          title: "Récents",
-          url: "/gallery?sort=recent",
-        },
-        {
-          title: "Favoris",
-          url: "/gallery/starred",
-        },
-        {
-          title: "Sécurisés",
-          url: "/gallery/secure",
-        },
-        {
-          title: "Paramètres",
-          url: "/gallery/settings",
-        },
-      ],
-    },
-    {
-      title: "Uploads",
-      url: "/uploads",
-      icon: Upload,
-      items: [
-        {
-          title: "Historique",
-          url: "/uploads/history",
-        },
-        {
-          title: "Configuration",
-          url: "/uploads/config",
-        },
-        {
-          title: "Stats",
-          url: "/uploads/stats",
-        },
-      ],
-    },
-    {
-      title: "Organisation",
-      url: "/organization",
-      icon: FolderOpen,
-      items: [
-        {
-          title: "Dossiers",
-          url: "/organization/folders",
-        },
-        {
-          title: "Tags",
-          url: "/organization/tags",
-        },
-        {
-          title: "Collections",
-          url: "/organization/collections",
-        },
-      ],
-    },
-    {
-      title: "Paramètres",
-      url: "/settings",
-      icon: Settings2,
-      items: [
-        {
-          title: "Préférences",
-          url: "/settings/preferences",
-          icon: Sliders,
-        },
-        {
-          title: "Général",
-          url: "/settings/general",
-          icon: Settings,
-        },
-        {
-          title: "Clés API",
-          url: "/settings/api-keys",
-          icon: Key,
-        },
-        {
-          title: "Sécurité",
-          url: "/settings/security",
-          icon: Shield,
-        },
-        {
-          title: "Intégrations",
-          url: "/settings/integrations",
-          icon: Share2,
-        },
-      ],
-    },
-  ],
-  navAdmin: [
-    {
-      title: "Administration",
-      url: "/admin",
-      icon: Shield,
-      items: [
-        {
-          title: "Utilisateurs",
-          url: "/admin/users",
-        },
-        {
-          title: "Logs",
-          url: "/admin/logs",
-        },
-        {
-          title: "Configuration système",
-          url: "/admin/system",
-        },
-        {
-          title: "Sécurité",
-          url: "/admin/security",
-        },
-      ],
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Préférences",
-      url: "/settings/preferences",
-      icon: Sliders,
-    },
-    {
-      title: "Support",
-      url: "/support",
-      icon: HelpCircle,
-    },
-    {
-      title: "Feedback",
-      url: "/feedback",
-      icon: Send,
-    },
-    {
-      title: "À propos de l'application",
-      url: "/about-app",
-      icon: Info,
-    },
-  ],
-  projects: [
-    {
-      name: "Images Favoris",
-      url: "/gallery/starred",
-      icon: Star,
-    },
-    {
-      name: "Images Sécurisées",
-      url: "/gallery/secure",
-      icon: Shield,
-    },
-  ],
-};
-
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
+  const { t } = useTranslation();
+
+  const data = {
+    user: {
+      name: "Admin",
+      email: "admin@sharex.com",
+      avatar: "/avatars/admin.jpg",
+    },
+    navMain: [
+      {
+        title: t("sidebar.main.gallery"),
+        url: "/gallery",
+        icon: ImageIcon,
+        isActive: true,
+        items: [
+          {
+            title: t("sidebar.main.recent"),
+            url: "/gallery?sort=recent",
+          },
+          {
+            title: t("sidebar.main.starred"),
+            url: "/gallery/starred",
+          },
+          {
+            title: t("sidebar.main.secure"),
+            url: "/gallery/secure",
+          },
+          {
+            title: t("sidebar.main.settings"),
+            url: "/gallery/settings",
+          },
+        ],
+      },
+      {
+        title: t("sidebar.main.uploads"),
+        url: "/uploads",
+        icon: Upload,
+        items: [
+          {
+            title: t("sidebar.main.history"),
+            url: "/uploads/history",
+          },
+          {
+            title: t("sidebar.main.configuration"),
+            url: "/uploads/config",
+          },
+          {
+            title: t("sidebar.main.stats"),
+            url: "/uploads/stats",
+          },
+        ],
+      },
+      {
+        title: t("sidebar.main.organization"),
+        url: "/organization",
+        icon: FolderOpen,
+        items: [
+          {
+            title: t("sidebar.main.folders"),
+            url: "/organization/folders",
+          },
+          {
+            title: t("sidebar.main.tags"),
+            url: "/organization/tags",
+          },
+          {
+            title: t("sidebar.main.collections"),
+            url: "/organization/collections",
+          },
+        ],
+      },
+      {
+        title: t("sidebar.main.settings"),
+        url: "/settings",
+        icon: Settings2,
+        items: [
+          {
+            title: t("sidebar.secondary.preferences"),
+            url: "/settings/preferences",
+            icon: Sliders,
+          },
+          {
+            title: t("sidebar.settings.general"),
+            url: "/settings/general",
+            icon: Settings,
+          },
+          {
+            title: t("account.api_keys"),
+            url: "/settings/api-keys",
+            icon: Key,
+          },
+          {
+            title: t("sidebar.admin.security"),
+            url: "/settings/security",
+            icon: Shield,
+          },
+          {
+            title: t("sidebar.settings.integrations"),
+            url: "/settings/integrations",
+            icon: Share2,
+          },
+        ],
+      },
+    ],
+    navAdmin: [
+      {
+        title: t("sidebar.admin.administration"),
+        url: "/admin",
+        icon: Shield,
+        items: [
+          {
+            title: t("sidebar.admin.users"),
+            url: "/admin/users",
+          },
+          {
+            title: t("sidebar.admin.logs"),
+            url: "/admin/logs",
+          },
+          {
+            title: t("sidebar.admin.system_config"),
+            url: "/admin/system",
+          },
+          {
+            title: t("sidebar.admin.security"),
+            url: "/admin/security",
+          },
+        ],
+      },
+    ],
+    navSecondary: [
+      {
+        title: t("sidebar.secondary.preferences"),
+        url: "/settings/preferences",
+        icon: Sliders,
+      },
+      {
+        title: t("sidebar.secondary.support"),
+        url: "/support",
+        icon: HelpCircle,
+      },
+      {
+        title: t("sidebar.secondary.feedback"),
+        url: "/feedback",
+        icon: Send,
+      },
+      {
+        title: t("sidebar.secondary.about_app"),
+        url: "/about-app",
+        icon: Info,
+      },
+    ],
+    projects: [
+      {
+        name: t("sidebar.projects.starred_images"),
+        url: "/gallery/starred",
+        icon: Star,
+      },
+      {
+        name: t("sidebar.projects.secure_images"),
+        url: "/gallery/secure",
+        icon: Shield,
+      },
+    ],
+  };
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -223,9 +225,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">ShareX Manager</span>
+                  <span className="truncate font-semibold">
+                    {t("sidebar.app_name")}
+                  </span>
                   <span className="truncate text-xs">
-                    Gestionnaire d'images
+                    {t("sidebar.app_description")}
                   </span>
                 </div>
               </Link>
@@ -234,8 +238,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain title="Galerie" items={data.navMain} />
-        {isAdmin && <NavMain title="Administration" items={data.navAdmin} />}
+        <NavMain title={t("sidebar.main.gallery")} items={data.navMain} />
+        {isAdmin && (
+          <NavMain
+            title={t("sidebar.admin.administration")}
+            items={data.navAdmin}
+          />
+        )}
         <NavProjects projects={data.projects} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>

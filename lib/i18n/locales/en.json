@@ -1,0 +1,400 @@
+{
+  "common": {
+    "welcome": "Welcome",
+    "login": "Login",
+    "logout": "Logout",
+    "logout_success": "Logout successful",
+    "register": "Register",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "back": "Back",
+    "start": "Start",
+    "end": "End",
+    "disabled": "Disabled",
+    "toggle": "Toggle",
+    "more": "More",
+    "create": "New",
+    "reset": "Reset",
+    "preview": "Preview"
+  },
+  "navigation": {
+    "home": "Home",
+    "gallery": "Gallery",
+    "settings": "Settings",
+    "profile": "Profile",
+    "about": "About"
+  },
+  "account": {
+    "upgrade_pro": "Upgrade to Pro",
+    "my_account": "My Account",
+    "api_keys": "API Keys"
+  },
+  "breadcrumb": {
+    "edit_key": "Edit Key"
+  },
+  "settings": {
+    "title": "Settings",
+    "preferences": "User Preferences",
+    "preferences_description": "Customize your display and feature preferences",
+    "appearance": "Appearance",
+    "appearance_description": "Customize the interface appearance",
+    "language": "Language",
+    "language_select": "Select a language",
+    "theme": "Theme",
+    "theme_advanced": "Advanced theme settings",
+    "theme_advanced_description": "Customize the interface colors",
+    "notifications": "Notifications",
+    "notifications_description": "Configure application notifications",
+    "privacy": "Privacy",
+    "account": "Account",
+    "reset": "Reset",
+    "save_success": "Settings saved successfully",
+    "select_size": "Select a size",
+    "gallery_description": "Configure gallery display settings",
+    "gallery": {
+      "view_mode": "View Mode",
+      "thumbnail_size": "Thumbnail Size",
+      "thumbnail_sizes": {
+        "large": "Extra Large Icons",
+        "medium": "Large Icons",
+        "small": "Medium Icons",
+        "tiny": "Small Icons"
+      },
+      "show_file_info": "File Information",
+      "show_file_size": "File Size",
+      "show_upload_date": "Upload Date",
+      "sort_by": "Sort By",
+      "sort_order": "Sort Order",
+      "auto_refresh": "Refresh Interval (seconds)"
+    },
+    "theme_options": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System",
+      "time_based": "Time-based",
+      "time_based_description": "Light theme will be active from {start}:00 to {end}:00. Outside these hours, dark theme will be used."
+    },
+    "theme_config": {
+      "choose_category": "Choose a category",
+      "presets": "Theme Presets",
+      "presets_description": "Choose from our predefined themes",
+      "general": "General",
+      "general_description": "Configure general theme settings",
+      "radius": "Corner radius (rem)",
+      "square": "Square",
+      "rounded": "Rounded",
+      "chart_colors": "Chart Colors",
+      "chart_colors_description": "Configure colors used in charts and visualizations",
+      "color_groups": {
+        "main": "Main Colors",
+        "components": "Components",
+        "actions": "Actions",
+        "states": "States"
+      },
+      "colors": {
+        "background": "Background color",
+        "foreground": "Text color",
+        "primary": "Primary color",
+        "primary-foreground": "Text on primary color",
+        "card": "Card background",
+        "card-foreground": "Card text",
+        "popover": "Popover background",
+        "popover-foreground": "Popover text",
+        "secondary": "Secondary color",
+        "secondary-foreground": "Text on secondary color",
+        "accent": "Accent color",
+        "accent-foreground": "Text on accent color",
+        "destructive": "Destructive color",
+        "destructive-foreground": "Text on destructive color",
+        "muted": "Muted color",
+        "muted-foreground": "Muted text",
+        "border": "Border color",
+        "input": "Input field color",
+        "ring": "Focus ring color",
+        "chart-1": "Chart - Series 1",
+        "chart-2": "Chart - Series 2",
+        "chart-3": "Chart - Series 3",
+        "chart-4": "Chart - Series 4",
+        "chart-5": "Chart - Series 5"
+      },
+      "chart_examples": {
+        "line_chart": "Line Chart",
+        "bar_chart": "Bar Chart",
+        "radial_chart": "Radial Chart",
+        "series": "Series"
+      }
+    }
+  },
+  "gallery": {
+    "no_files": "No files found",
+    "upload": "Upload",
+    "select_all": "Select All",
+    "deselect_all": "Deselect All",
+    "selected_count": "{count} file(s) selected",
+    "view_modes": {
+      "grid": "Grid",
+      "list": "List",
+      "details": "Details"
+    },
+    "sort": {
+      "name": "Name",
+      "date": "Date",
+      "size": "Size",
+      "asc": "Ascending",
+      "desc": "Descending"
+    },
+    "title": "Image Gallery",
+    "secure_files": "Secure Files",
+    "starred_files": "Starred Files",
+    "empty": {
+      "title": "No images",
+      "description": "Start uploading images with ShareX"
+    },
+    "upload_modal": {
+      "title": "Upload a file",
+      "description": "Select a file to upload to the server.",
+      "file_label": "File",
+      "private_file": "Private file",
+      "uploading": "Uploading...",
+      "upload_button": "Upload"
+    },
+    "file_actions": {
+      "copy_url": "URL copied to clipboard",
+      "copy_error": "Unable to copy URL",
+      "delete_success": "File deleted successfully",
+      "delete_error": "An error occurred during deletion",
+      "security_error": "Error while changing security settings",
+      "now_public": "The file is now public",
+      "now_private": "The file is now private",
+      "star_error": "Error while modifying favorites",
+      "added_to_favorites": "Added to favorites",
+      "removed_from_favorites": "Removed from favorites",
+      "error_occurred": "An error occurred"
+    },
+    "refresh": {
+      "error": "Error refreshing the gallery",
+      "intervals": {
+        "none": "No refresh",
+        "5s": "5 seconds",
+        "10s": "10 seconds",
+        "15s": "15 seconds",
+        "30s": "30 seconds",
+        "placeholder": "Auto refresh"
+      }
+    },
+    "file_viewer": {
+      "accessibility": "Image added on {date}. File size: {size} KB. {navigation}",
+      "previous_button": "Use the previous button to see the previous image.",
+      "next_button": "Use the next button to see the next image.",
+      "info_panel": {
+        "title": "Information",
+        "filename": "Filename",
+        "date_added": "Date added",
+        "size": "Size",
+        "kb": "KB"
+      }
+    },
+    "upload_zone": {
+      "add_files": "Add files",
+      "drop_files": "Drop your files here",
+      "supported_formats": "Supported formats: {formats}",
+      "max_size": "Maximum size: {size}MB",
+      "files_to_upload": "Files to upload ({valid}/{total})",
+      "clear_all": "Clear all",
+      "upload": "Upload",
+      "uploading": "Uploading...",
+      "no_valid_files": "No valid files to upload",
+      "upload_complete": "Upload completed successfully",
+      "upload_error": "Error during upload",
+      "rejection_messages": {
+        "file_invalid_type": "Unsupported file type",
+        "file_too_large": "File size exceeds the 10MB limit",
+        "file_too_small": "File size is too small",
+        "file_too_many": "You can only upload 10 files at a time",
+        "file_too_many_images": "You can only upload 10 images at a time",
+        "file_too_many_documents": "You can only upload 10 documents at a time",
+        "file_too_many_archives": "You can only upload 10 archives at a time",
+        "unknown_error": "Unknown error"
+      },
+      "validation_errors": {
+        "images_not_allowed": "Image uploads are not currently allowed",
+        "documents_not_allowed": "Document uploads are not currently allowed",
+        "archives_not_allowed": "Archive uploads are not currently allowed",
+        "unsupported_file_type": "Unsupported file type",
+        "file_too_small": "File size is below the minimum limit of {size}KB",
+        "file_too_large": "File size exceeds the limit of {size}MB",
+        "too_many_files": "You cannot upload more than {count} files at a time",
+        "too_many_images": "You cannot upload more than {count} images at a time",
+        "too_many_documents": "You cannot upload more than {count} documents at a time",
+        "too_many_archives": "You cannot upload more than {count} archives at a time"
+      }
+    },
+    "errors": {
+      "loading_files": "Error loading files"
+    },
+    "file_card": {
+      "delete_success": "The file has been successfully deleted",
+      "delete_error": "An error occurred while deleting the file",
+      "delete_confirmation": {
+        "title": "Are you sure?",
+        "description": "This action is irreversible. The file will be permanently deleted.",
+        "cancel": "Cancel",
+        "confirm": "Continue"
+      }
+    }
+  },
+  "sidebar": {
+    "app_name": "ShareX Manager",
+    "app_description": "Image Manager",
+    "search": "Search",
+    "search_placeholder": "Search...",
+    "toggle": "Toggle",
+    "main": {
+      "gallery": "Gallery",
+      "recent": "Recent",
+      "starred": "Starred",
+      "secure": "Secure",
+      "settings": "Settings",
+      "uploads": "Uploads",
+      "history": "History",
+      "configuration": "Configuration",
+      "stats": "Stats",
+      "organization": "Organization",
+      "folders": "Folders",
+      "tags": "Tags",
+      "collections": "Collections"
+    },
+    "admin": {
+      "administration": "Administration",
+      "users": "Users",
+      "logs": "Logs",
+      "system_config": "System Configuration",
+      "security": "Security"
+    },
+    "secondary": {
+      "preferences": "Preferences",
+      "support": "Support",
+      "feedback": "Feedback",
+      "about_app": "About App"
+    },
+    "projects": {
+      "title": "Projects",
+      "starred_images": "Starred Images",
+      "secure_images": "Secure Images",
+      "view_project": "View Project",
+      "share_project": "Share Project",
+      "delete_project": "Delete Project"
+    },
+    "settings": {
+      "general": "General",
+      "integrations": "Integrations"
+    }
+  },
+  "loading": {
+    "messages": {
+      "preparing_gallery": "Preparing your gallery...",
+      "loading_images": "Loading images...",
+      "optimizing_display": "Optimizing display...",
+      "retrieving_data": "Retrieving data...",
+      "configuring_interface": "Configuring interface...",
+      "ai_neurons": "Waking up artificial neurons...",
+      "consulting_claude": "Consulting Claude for advice...",
+      "asking_gpt": "Asking GPT-4 to hurry up...",
+      "negotiating_dalle": "Negotiating with DALL-E for thumbnails...",
+      "training_models": "Accelerated model training...",
+      "meditating": "Deep meditation with Stable Diffusion...",
+      "calculating_meaning": "Calculating the meaning of digital life...",
+      "downloading_consciousness": "Downloading artificial consciousness...",
+      "aligning_transformers": "Aligning transformers...",
+      "calibrating_attention": "Calibrating attention heads...",
+      "feeding_pixels": "Feeding hungry pixels...",
+      "massaging_tensors": "Massaging stressed tensors...",
+      "deploying_hamsters": "Deploying quantum hamsters...",
+      "fixing_bugs": "Fixing bugs that don't exist...",
+      "reading_manual": "Reading the manual (well, almost)...",
+      "counting_pixels": "Counting pixels to infinity...",
+      "talking_backend": "Attempting to talk with the backend...",
+      "motivating_bytes": "Motivating lazy bytes...",
+      "resolving_conflicts": "Resolving conflicts between components...",
+      "negotiating_cache": "Negotiating with stubborn cache...",
+      "optimizing_prompts": "Optimizing vector prompts...",
+      "calculating_embeddings": "Calculating multidimensional embeddings...",
+      "training_llms": "Training pocket LLMs...",
+      "deploying_agents": "Deploying autonomous agents...",
+      "configuring_consciousness": "Configuring digital consciousness flow...",
+      "activating_synapses": "Activating artificial synapses...",
+      "updating_knowledge": "Updating knowledge base...",
+      "syncing_multiverse": "Synchronizing parallel multiverses...",
+      "calibrating_sensors": "Calibrating emotional sensors...",
+      "initializing_creativity": "Initializing creativity module..."
+    },
+    "wait_message": "Please wait a moment while our AIs get to work..."
+  },
+  "errors": {
+    "not_found": "Page not found",
+    "server_error": "Server error",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Forbidden",
+    "validation": "Validation error",
+    "upload_failed": "Upload failed"
+  },
+  "home": {
+    "title": "ShareX Manager",
+    "subtitle": "A modern and powerful interface to manage your screenshots and files uploaded via ShareX",
+    "cta": {
+      "gallery": "Access Gallery",
+      "configure": "Configure ShareX"
+    },
+    "features": {
+      "upload": {
+        "title": "Instant Upload",
+        "description": "Upload your files instantly with a simple and quick configuration. Support for images, videos, and files.",
+        "fast": "Ultra-fast upload",
+        "history": "Complete history"
+      },
+      "security": {
+        "title": "Advanced Security",
+        "description": "Complete protection of your files with authentication and customized access management.",
+        "private": "Private files",
+        "api_keys": "Secure API keys"
+      },
+      "management": {
+        "title": "Intelligent Management",
+        "description": "Intuitive interface with advanced features to organize and analyze your uploads.",
+        "customization": "Complete customization",
+        "stats": "Detailed statistics"
+      }
+    },
+    "configuration": {
+      "title": "ShareX Configuration",
+      "badge": "Documentation",
+      "intro": "Configure ShareX in a few simple steps to start uploading your files:",
+      "steps": {
+        "step1": "Open ShareX and access settings",
+        "step2": "Navigate to Destinations → Destination Settings",
+        "step3": "In Custom Uploader Settings, configure:",
+        "step4": "Validate the configuration with the \"Test\" button"
+      },
+      "config_items": {
+        "request_url": "Request URL:",
+        "method": "Method:",
+        "file_form": "File form name:"
+      },
+      "download_config": "Download configuration",
+      "get_api_key": "Get API key"
+    }
+  },
+  "layout": {
+    "metadata": {
+      "title": "ShareX Manager",
+      "description": "Manage your ShareX uploads easily and securely"
+    }
+  }
+}
