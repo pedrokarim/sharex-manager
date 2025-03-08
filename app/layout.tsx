@@ -3,7 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
-import { ThemeSync } from "@/components/theme-sync";
+import { ThemeWrapper } from "@/components/theme-wrapper";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -33,11 +33,12 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <ThemeSync />
-          <div className="relative min-h-screen">
-            <main>{children}</main>
-          </div>
-          <Toaster />
+          <ThemeWrapper>
+            <div className="relative min-h-screen">
+              <main>{children}</main>
+              <Toaster />
+            </div>
+          </ThemeWrapper>
         </Providers>
       </body>
     </html>
