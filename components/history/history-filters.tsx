@@ -18,9 +18,11 @@ import {
 } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { useDateLocale } from "@/lib/i18n/date-locales";
+import { useTranslation } from "@/lib/i18n";
 import { CalendarIcon, X } from "lucide-react";
 
 export const HistoryFilters = () => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useQueryState("q");
   const [uploadMethod, setUploadMethod] = useQueryState("method");
   const [startDate, setStartDate] = useQueryState("start");
@@ -56,7 +58,9 @@ export const HistoryFilters = () => {
     <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium">Filtres</h2>
+          <h2 className="text-lg font-medium">
+            {t("uploads.history.filters.title")}
+          </h2>
           {hasActiveFilters && (
             <Button
               variant="ghost"
@@ -65,16 +69,18 @@ export const HistoryFilters = () => {
               className="h-8 px-2 lg:px-3"
             >
               <X className="mr-2 h-4 w-4" />
-              Réinitialiser
+              {t("common.reset")}
             </Button>
           )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium">Rechercher</label>
+            <label className="text-sm font-medium">
+              {t("uploads.history.filters.search")}
+            </label>
             <Input
-              placeholder="Rechercher un fichier..."
+              placeholder={t("uploads.history.filters.search_placeholder")}
               onChange={(e) => handleSearch(e.target.value)}
               value={searchQuery || ""}
               className="w-full"
@@ -82,25 +88,39 @@ export const HistoryFilters = () => {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium">Méthode d&apos;upload</label>
+            <label className="text-sm font-medium">
+              {t("uploads.history.filters.upload_method")}
+            </label>
             <Select
               value={uploadMethod || "all"}
               onValueChange={handleMethodChange}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Toutes les méthodes" />
+                <SelectValue
+                  placeholder={t("uploads.history.filters.all_methods")}
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Toutes les méthodes</SelectItem>
-                <SelectItem value="api">API</SelectItem>
-                <SelectItem value="web">Interface Web</SelectItem>
-                <SelectItem value="sharex">ShareX</SelectItem>
+                <SelectItem value="all">
+                  {t("uploads.history.filters.all_methods")}
+                </SelectItem>
+                <SelectItem value="api">
+                  {t("uploads.stats.labels.api")}
+                </SelectItem>
+                <SelectItem value="web">
+                  {t("uploads.stats.labels.web")}
+                </SelectItem>
+                <SelectItem value="sharex">
+                  {t("uploads.stats.labels.sharex")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium">Date de début</label>
+            <label className="text-sm font-medium">
+              {t("uploads.history.filters.start_date")}
+            </label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -110,7 +130,7 @@ export const HistoryFilters = () => {
                   {startDate ? (
                     format(new Date(startDate), "P", { locale })
                   ) : (
-                    <span>Choisir une date</span>
+                    <span>{t("uploads.history.filters.choose_date")}</span>
                   )}
                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                 </Button>
@@ -127,7 +147,9 @@ export const HistoryFilters = () => {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium">Date de fin</label>
+            <label className="text-sm font-medium">
+              {t("uploads.history.filters.end_date")}
+            </label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -137,7 +159,7 @@ export const HistoryFilters = () => {
                   {endDate ? (
                     format(new Date(endDate), "P", { locale })
                   ) : (
-                    <span>Choisir une date</span>
+                    <span>{t("uploads.history.filters.choose_date")}</span>
                   )}
                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                 </Button>

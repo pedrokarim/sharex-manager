@@ -7,25 +7,34 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { FormField, FormItem, FormLabel, FormControl, FormDescription } from "@/components/ui/form";
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormDescription,
+} from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UseFormReturn } from "react-hook-form";
 import { UploadConfig } from "@/schemas/upload-config";
+import { useTranslation } from "@/lib/i18n";
 
 interface StorageTabProps {
   form: UseFormReturn<UploadConfig>;
 }
 
 export function StorageTab({ form }: StorageTabProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Configuration du stockage</CardTitle>
+          <CardTitle>{t("uploads.config.storage.title")}</CardTitle>
           <CardDescription>
-            Paramètres de stockage des fichiers uploadés
+            {t("uploads.config.storage.description")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -34,7 +43,7 @@ export function StorageTab({ form }: StorageTabProps) {
             name="storage.path"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Chemin de stockage</FormLabel>
+                <FormLabel>{t("uploads.config.storage.path")}</FormLabel>
                 <FormControl>
                   <Input value={field.value ?? ""} onChange={field.onChange} />
                 </FormControl>
@@ -47,7 +56,9 @@ export function StorageTab({ form }: StorageTabProps) {
             name="storage.structure"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Structure des dossiers</FormLabel>
+                <FormLabel>
+                  {t("uploads.config.storage.structure.label")}
+                </FormLabel>
                 <FormControl>
                   <div className="flex gap-4">
                     <div className="flex items-center space-x-2">
@@ -56,9 +67,15 @@ export function StorageTab({ form }: StorageTabProps) {
                         id="flat"
                         value="flat"
                         checked={field.value === "flat"}
-                        onChange={(e) => field.onChange(e.target.value as "flat" | "date" | "type")}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value as "flat" | "date" | "type"
+                          )
+                        }
                       />
-                      <Label htmlFor="flat">Plat</Label>
+                      <Label htmlFor="flat">
+                        {t("uploads.config.storage.structure.flat")}
+                      </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <input
@@ -66,9 +83,15 @@ export function StorageTab({ form }: StorageTabProps) {
                         id="date"
                         value="date"
                         checked={field.value === "date"}
-                        onChange={(e) => field.onChange(e.target.value as "flat" | "date" | "type")}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value as "flat" | "date" | "type"
+                          )
+                        }
                       />
-                      <Label htmlFor="date">Par date</Label>
+                      <Label htmlFor="date">
+                        {t("uploads.config.storage.structure.date")}
+                      </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <input
@@ -76,9 +99,15 @@ export function StorageTab({ form }: StorageTabProps) {
                         id="type"
                         value="type"
                         checked={field.value === "type"}
-                        onChange={(e) => field.onChange(e.target.value as "flat" | "date" | "type")}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value as "flat" | "date" | "type"
+                          )
+                        }
                       />
-                      <Label htmlFor="type">Par type</Label>
+                      <Label htmlFor="type">
+                        {t("uploads.config.storage.structure.type")}
+                      </Label>
                     </div>
                   </div>
                 </FormControl>
@@ -91,9 +120,14 @@ export function StorageTab({ form }: StorageTabProps) {
             name="storage.preserveFilenames"
             render={({ field }) => (
               <FormItem className="flex items-center justify-between">
-                <FormLabel>Préserver les noms de fichiers</FormLabel>
+                <FormLabel>
+                  {t("uploads.config.storage.preserve_filenames")}
+                </FormLabel>
                 <FormControl>
-                  <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
+                  <Switch
+                    checked={field.value ?? false}
+                    onCheckedChange={field.onChange}
+                  />
                 </FormControl>
               </FormItem>
             )}
@@ -104,9 +138,14 @@ export function StorageTab({ form }: StorageTabProps) {
             name="storage.replaceExisting"
             render={({ field }) => (
               <FormItem className="flex items-center justify-between">
-                <FormLabel>Remplacer les fichiers existants</FormLabel>
+                <FormLabel>
+                  {t("uploads.config.storage.replace_existing")}
+                </FormLabel>
                 <FormControl>
-                  <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
+                  <Switch
+                    checked={field.value ?? false}
+                    onCheckedChange={field.onChange}
+                  />
                 </FormControl>
               </FormItem>
             )}
@@ -117,7 +156,9 @@ export function StorageTab({ form }: StorageTabProps) {
             name="storage.thumbnailsPath"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Chemin des miniatures</FormLabel>
+                <FormLabel>
+                  {t("uploads.config.storage.thumbnails_path")}
+                </FormLabel>
                 <FormControl>
                   <Input value={field.value ?? ""} onChange={field.onChange} />
                 </FormControl>
@@ -131,12 +172,19 @@ export function StorageTab({ form }: StorageTabProps) {
               name="storage.dateFormat.folderStructure"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Format de la structure des dossiers par date</FormLabel>
+                  <FormLabel>
+                    {t("uploads.config.storage.date_format.folder_structure")}
+                  </FormLabel>
                   <FormControl>
-                    <Input value={field.value ?? ""} onChange={field.onChange} />
+                    <Input
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                    />
                   </FormControl>
                   <FormDescription>
-                    Format: YYYY/MM/DD
+                    {t(
+                      "uploads.config.storage.date_format.folder_structure_example"
+                    )}
                   </FormDescription>
                 </FormItem>
               )}
@@ -147,12 +195,17 @@ export function StorageTab({ form }: StorageTabProps) {
               name="storage.dateFormat.timezone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Fuseau horaire</FormLabel>
+                  <FormLabel>
+                    {t("uploads.config.storage.date_format.timezone")}
+                  </FormLabel>
                   <FormControl>
-                    <Input value={field.value ?? ""} onChange={field.onChange} />
+                    <Input
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                    />
                   </FormControl>
                   <FormDescription>
-                    Ex: Europe/Paris
+                    {t("uploads.config.storage.date_format.timezone_example")}
                   </FormDescription>
                 </FormItem>
               )}
@@ -165,12 +218,17 @@ export function StorageTab({ form }: StorageTabProps) {
               name="storage.permissions.files"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Permissions des fichiers</FormLabel>
+                  <FormLabel>
+                    {t("uploads.config.storage.permissions.files")}
+                  </FormLabel>
                   <FormControl>
-                    <Input value={field.value ?? ""} onChange={field.onChange} />
+                    <Input
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                    />
                   </FormControl>
                   <FormDescription>
-                    Ex: 0644
+                    {t("uploads.config.storage.permissions.files_example")}
                   </FormDescription>
                 </FormItem>
               )}
@@ -181,12 +239,19 @@ export function StorageTab({ form }: StorageTabProps) {
               name="storage.permissions.directories"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Permissions des dossiers</FormLabel>
+                  <FormLabel>
+                    {t("uploads.config.storage.permissions.directories")}
+                  </FormLabel>
                   <FormControl>
-                    <Input value={field.value ?? ""} onChange={field.onChange} />
+                    <Input
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                    />
                   </FormControl>
                   <FormDescription>
-                    Ex: 0755
+                    {t(
+                      "uploads.config.storage.permissions.directories_example"
+                    )}
                   </FormDescription>
                 </FormItem>
               )}
@@ -196,4 +261,4 @@ export function StorageTab({ form }: StorageTabProps) {
       </Card>
     </div>
   );
-} 
+}

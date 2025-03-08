@@ -22,7 +22,9 @@
     "more": "Plus",
     "create": "Nouvelle",
     "reset": "Réinitialiser",
-    "preview": "Aperçu"
+    "preview": "Aperçu",
+    "yes": "Oui",
+    "no": "Non"
   },
   "navigation": {
     "home": "Accueil",
@@ -41,6 +43,7 @@
   },
   "settings": {
     "title": "Paramètres",
+    "description": "Gérez tous les paramètres de votre application ShareX Manager",
     "preferences": "Préférences utilisateur",
     "preferences_description": "Personnalisez vos préférences d'affichage et de fonctionnalités",
     "appearance": "Apparence",
@@ -58,6 +61,119 @@
     "save_success": "Paramètres enregistrés avec succès",
     "select_size": "Sélectionnez une taille",
     "gallery_description": "Configurez l'affichage de la galerie d'images",
+    "sections": {
+      "upload_config": {
+        "title": "Configuration des uploads",
+        "description": "Gérez les paramètres de vos uploads ShareX"
+      },
+      "api_keys": {
+        "title": "Clés API",
+        "description": "Gérez vos clés API pour l'upload via ShareX"
+      },
+      "domains": {
+        "title": "Domaines",
+        "description": "Gérez les domaines pour vos fichiers"
+      },
+      "cleanup": {
+        "title": "Nettoyage",
+        "description": "Supprimez les fichiers inutilisés"
+      },
+      "security": {
+        "title": "Sécurité",
+        "description": "Configurez les paramètres de sécurité"
+      }
+    },
+    "domains": {
+      "config": {
+        "title": "Configuration des domaines",
+        "description": "Gérez les domaines utilisés pour générer les URLs de vos fichiers",
+        "force_https": "Forcer HTTPS",
+        "force_https_description": "Force l'utilisation de HTTPS pour toutes les URLs",
+        "path_prefix": "Préfixe du chemin",
+        "path_prefix_description": "Préfixe ajouté à toutes les URLs de fichiers",
+        "save": "Enregistrer la configuration"
+      },
+      "list": {
+        "title": "Liste des domaines",
+        "description": "Gérez les domaines disponibles pour vos fichiers",
+        "add": "Ajouter un domaine"
+      },
+      "form": {
+        "add_title": "Ajouter un domaine",
+        "edit_title": "Modifier le domaine",
+        "add_description": "Ajoutez un nouveau domaine pour vos fichiers",
+        "edit_description": "Modifiez les informations du domaine",
+        "id": "Identifiant",
+        "id_description": "Identifiant unique pour ce domaine",
+        "name": "Nom",
+        "name_description": "Nom d'affichage du domaine",
+        "url": "URL",
+        "url_description": "URL de base du domaine",
+        "default": "Domaine par défaut",
+        "default_description": "Utiliser ce domaine par défaut",
+        "errors": {
+          "id_required": "L'identifiant est requis",
+          "name_required": "Le nom est requis",
+          "url_invalid": "L'URL doit être valide",
+          "prefix_required": "Le préfixe est requis"
+        }
+      },
+      "table": {
+        "id": "Identifiant",
+        "name": "Nom",
+        "url": "URL",
+        "default": "Par défaut",
+        "actions": "Actions"
+      },
+      "messages": {
+        "added": "Domaine ajouté",
+        "updated": "Domaine mis à jour",
+        "deleted": "Domaine supprimé",
+        "config_updated": "Configuration mise à jour"
+      },
+      "errors": {
+        "save": "Erreur lors de la sauvegarde",
+        "delete": "Erreur lors de la suppression",
+        "generic": "Une erreur est survenue"
+      }
+    },
+    "api_keys": {
+      "new_key": "Nouvelle clé",
+      "create_key": "Créer une clé",
+      "loading": "Chargement des clés API...",
+      "never": "Jamais",
+      "table": {
+        "name": "Nom",
+        "key": "Clé",
+        "created_at": "Créée le",
+        "expires_at": "Expire le",
+        "permissions": "Permissions",
+        "last_used": "Dernière utilisation",
+        "actions": "Actions"
+      },
+      "no_keys": {
+        "title": "Aucune clé API",
+        "description": "Vous n'avez pas encore créé de clé API. Commencez par en créer une pour utiliser ShareX."
+      },
+      "permissions": {
+        "images": "Images",
+        "text": "Texte",
+        "files": "Fichiers"
+      },
+      "actions": {
+        "view_details": "Voir les détails",
+        "delete": "Supprimer la clé"
+      },
+      "delete_confirmation": "Cette action est irréversible. La clé sera définitivement supprimée.",
+      "messages": {
+        "delete_success": "Clé supprimée avec succès",
+        "copy_success": "Clé copiée dans le presse-papier"
+      },
+      "errors": {
+        "loading": "Erreur lors du chargement des clés",
+        "delete": "Erreur lors de la suppression"
+      }
+    },
     "gallery": {
       "view_mode": "Mode d'affichage",
       "thumbnail_size": "Taille des vignettes",
@@ -395,6 +511,371 @@
     "metadata": {
       "title": "ShareX Manager",
       "description": "Gérez vos uploads ShareX facilement et en toute sécurité"
+    }
+  },
+  "admin": {
+    "title": "Administration",
+    "description": "Gérez les paramètres d'administration de votre application ShareX Manager",
+    "sections": {
+      "users": {
+        "title": "Gestion des utilisateurs",
+        "description": "Gérez les utilisateurs et leurs permissions"
+      },
+      "logs": {
+        "title": "Logs système",
+        "description": "Consultez les logs et l'activité du système"
+      },
+      "system": {
+        "title": "Configuration système",
+        "description": "Gérez les paramètres système et la configuration des uploads"
+      },
+      "security": {
+        "title": "Sécurité (Bientôt disponible)",
+        "description": "Configurez les paramètres de sécurité avancés"
+      }
+    },
+    "security": {
+      "title": "Sécurité",
+      "description": "Configuration des paramètres de sécurité avancés",
+      "coming_soon": {
+        "title": "Fonctionnalité à venir",
+        "subtitle": "Cette section est en cours de développement",
+        "description": "La configuration avancée de la sécurité sera bientôt disponible. Cette section permettra de :",
+        "check_back": "Revenez bientôt pour découvrir ces nouvelles fonctionnalités !"
+      },
+      "features": {
+        "password_policies": "Configurer les politiques de mots de passe",
+        "two_factor": "Gérer l'authentification à deux facteurs (2FA)",
+        "ip_restrictions": "Définir les restrictions d'accès IP",
+        "sessions": "Configurer les sessions et leur durée de vie",
+        "login_attempts": "Gérer les tentatives de connexion et le blocage automatique",
+        "security_alerts": "Mettre en place des alertes de sécurité"
+      }
+    },
+    "system": {
+      "title": "Configuration système",
+      "description": "Gérez les paramètres système et la configuration des uploads",
+      "upload_config": {
+        "title": "Configuration des uploads",
+        "subtitle": "Gérez les paramètres liés aux uploads de fichiers",
+        "description": "Configurez les types de fichiers autorisés, les limites de taille, les options de stockage et plus encore.",
+        "button": "Accéder à la configuration des uploads"
+      },
+      "advanced_config": {
+        "title": "Configuration système",
+        "subtitle": "Paramètres système avancés (Bientôt disponible)",
+        "description": "Cette section permettra de configurer les paramètres système avancés :",
+        "coming_soon": "Ces fonctionnalités seront disponibles dans une prochaine mise à jour."
+      },
+      "features": {
+        "database": "Gestion de la base de données",
+        "cache": "Configuration du cache",
+        "performance": "Paramètres de performance",
+        "backup": "Options de sauvegarde",
+        "scheduled_tasks": "Gestion des tâches planifiées",
+        "notifications": "Configuration des notifications système"
+      }
+    },
+    "users": {
+      "title": "Gestion des utilisateurs",
+      "stats": {
+        "total": "Total Utilisateurs",
+        "admins": "Administrateurs",
+        "users": "Utilisateurs"
+      },
+      "search_placeholder": "Rechercher un utilisateur...",
+      "filter_by_role": "Filtrer par rôle",
+      "roles": {
+        "all": "Tous les rôles",
+        "admin": "Administrateurs",
+        "user": "Utilisateurs",
+        "admin_label": "Administrateur",
+        "user_label": "Utilisateur"
+      },
+      "table": {
+        "username": "Nom d'utilisateur",
+        "role": "Rôle",
+        "actions": "Actions"
+      },
+      "actions": {
+        "edit": "Modifier",
+        "delete": "Supprimer"
+      },
+      "delete_dialog": {
+        "title": "Êtes-vous sûr de vouloir supprimer cet utilisateur ?",
+        "description": "Cette action est irréversible. L'utilisateur ne pourra plus se connecter."
+      },
+      "no_users_found": "Aucun utilisateur trouvé",
+      "messages": {
+        "delete_success": "Utilisateur supprimé avec succès",
+        "refresh_success": "Liste des utilisateurs mise à jour"
+      },
+      "errors": {
+        "generic": "Une erreur est survenue",
+        "refresh": "Erreur lors du rechargement des utilisateurs"
+      }
+    },
+    "logs": {
+      "title": "Logs système",
+      "description": "Consultez les logs et l'activité du système",
+      "level": "Niveau",
+      "action": "Action",
+      "user": "Utilisateur",
+      "date_range": "Plage de dates",
+      "start_date": "Date de début",
+      "end_date": "Date de fin",
+      "apply_filters": "Appliquer les filtres",
+      "reset_filters": "Réinitialiser",
+      "no_logs": "Aucun log disponible",
+      "loading": "Chargement des logs...",
+      "error": "Erreur lors du chargement des logs",
+      "refresh": "Actualiser",
+      "timestamp": "Horodatage",
+      "message": "Message",
+      "ip": "Adresse IP",
+      "details": "Détails",
+      "system": "Système",
+      "user_agent": "User Agent",
+      "metadata": "Métadonnées",
+      "clear_logs": "Supprimer tous les logs",
+      "clear_success": "Logs supprimés avec succès",
+      "clear_error": "Erreur lors de la suppression des logs",
+      "refresh_interval": "Intervalle de rafraîchissement",
+      "refresh_intervals": {
+        "none": "Pas de rafraîchissement",
+        "5s": "5 secondes",
+        "10s": "10 secondes",
+        "15s": "15 secondes"
+      },
+      "levels": {
+        "all": "Tous les niveaux",
+        "info": "Information",
+        "warning": "Avertissement",
+        "error": "Erreur",
+        "debug": "Debug"
+      },
+      "actions": {
+        "all": "Toutes les actions",
+        "login": "Connexion",
+        "logout": "Déconnexion",
+        "upload": "Upload de fichier",
+        "delete": "Suppression de fichier",
+        "update": "Modification de fichier",
+        "download": "Téléchargement de fichier",
+        "admin": "Action administrateur",
+        "user_create": "Création d'utilisateur",
+        "user_update": "Modification d'utilisateur",
+        "user_delete": "Suppression d'utilisateur",
+        "config_update": "Modification de configuration",
+        "api_request": "Requête API",
+        "api_error": "Erreur API",
+        "system_error": "Erreur système"
+      },
+      "filters": {
+        "title": "Filtres",
+        "select_level": "Filtrer par niveau",
+        "select_action": "Filtrer par action",
+        "select_user": "Sélectionner un utilisateur",
+        "select_date": "Sélectionner une date",
+        "choose_date": "Choisir une date"
+      },
+      "details_dialog": {
+        "title": "Détails du log",
+        "close": "Fermer"
+      }
+    }
+  },
+  "uploads": {
+    "title": "Gestion des uploads",
+    "description": "Gérez vos uploads ShareX et accédez à toutes les fonctionnalités",
+    "features": {
+      "history": {
+        "title": "Historique",
+        "description": "Consultez l'historique de tous vos uploads"
+      },
+      "stats": {
+        "title": "Statistiques",
+        "description": "Visualisez les statistiques de vos uploads"
+      },
+      "config": {
+        "title": "Configuration",
+        "description": "Configurez vos paramètres d'upload"
+      }
+    },
+    "history": {
+      "title": "Historique des uploads",
+      "description": "Consultez l'historique de tous les fichiers uploadés via ShareX",
+      "filters": {
+        "title": "Filtres",
+        "search": "Rechercher",
+        "search_placeholder": "Rechercher un fichier...",
+        "upload_method": "Méthode d'upload",
+        "all_methods": "Toutes les méthodes",
+        "start_date": "Date de début",
+        "end_date": "Date de fin",
+        "choose_date": "Choisir une date"
+      },
+      "list": {
+        "title": "Résultats",
+        "no_results": "Aucun fichier dans l'historique",
+        "loading": "Chargement des résultats...",
+        "error": "Erreur lors du chargement de l'historique",
+        "anonymous": "Anonyme",
+        "open_menu": "Ouvrir le menu",
+        "items_per_page": "Éléments par page",
+        "total_items": "{count} élément(s) au total",
+        "pagination": {
+          "previous": "Précédent",
+          "next": "Suivant",
+          "page": "Page",
+          "of": "sur"
+        },
+        "columns": {
+          "filename": "Nom du fichier",
+          "date": "Date d'upload",
+          "size": "Taille",
+          "method": "Méthode",
+          "actions": "Actions"
+        },
+        "actions": {
+          "view": "Voir le fichier",
+          "download": "Télécharger",
+          "delete": "Supprimer",
+          "copy": "Copier le lien",
+          "delete_success": "L'entrée a été supprimée",
+          "delete_error": "Impossible de supprimer l'entrée"
+        }
+      }
+    },
+    "config": {
+      "title": "Configuration des uploads",
+      "description": "Configurez les paramètres de vos uploads ShareX",
+      "tabs": {
+        "general": "Général",
+        "thumbnails": "Miniatures",
+        "storage": "Stockage"
+      },
+      "general": {
+        "allowed_types": {
+          "title": "Types de fichiers autorisés",
+          "description": "Définissez les types de fichiers qui peuvent être uploadés",
+          "images": "Images (jpg, png, gif, webp)",
+          "documents": "Documents (pdf, doc, txt)",
+          "archives": "Archives (zip, rar)"
+        },
+        "limits": {
+          "title": "Limites",
+          "description": "Configurez les limites pour les uploads",
+          "max_file_size": "Taille maximale des fichiers (MB)",
+          "min_file_size": "Taille minimale des fichiers (KB)",
+          "max_files_per_upload": "Nombre maximum de fichiers par upload",
+          "max_images": "Images",
+          "max_documents": "Documents",
+          "max_archives": "Archives"
+        },
+        "filename": {
+          "title": "Format du nom de fichier",
+          "description": "Configurez le format des noms de fichiers uploadés",
+          "pattern": "Format du nom de fichier",
+          "variables": "Variables disponibles: {variables}"
+        }
+      },
+      "storage": {
+        "title": "Configuration du stockage",
+        "description": "Paramètres de stockage des fichiers uploadés",
+        "path": "Chemin de stockage",
+        "structure": {
+          "label": "Structure des dossiers",
+          "flat": "Plat",
+          "date": "Par date",
+          "type": "Par type"
+        },
+        "preserve_filenames": "Préserver les noms de fichiers",
+        "replace_existing": "Remplacer les fichiers existants",
+        "thumbnails_path": "Chemin des miniatures",
+        "date_format": {
+          "folder_structure": "Format de la structure des dossiers par date",
+          "folder_structure_example": "Format: YYYY/MM/DD",
+          "timezone": "Fuseau horaire",
+          "timezone_example": "Ex: Europe/Paris"
+        },
+        "permissions": {
+          "files": "Permissions des fichiers",
+          "files_example": "Ex: 0644",
+          "directories": "Permissions des dossiers",
+          "directories_example": "Ex: 0755"
+        }
+      },
+      "thumbnails": {
+        "title": "Configuration des miniatures",
+        "description": "Paramètres de génération des miniatures pour les images",
+        "enable": "Activer les miniatures",
+        "format": "Format de sortie",
+        "select_format": "Sélectionnez un format",
+        "formats": {
+          "auto": "Automatique",
+          "jpeg": "JPEG",
+          "png": "PNG",
+          "webp": "WebP"
+        },
+        "preserve_format": "Préserver le format d'origine (PNG/WebP)",
+        "fit_mode": "Mode d'ajustement",
+        "select_mode": "Sélectionnez un mode",
+        "fit_modes": {
+          "cover": "Cover",
+          "contain": "Contain",
+          "fill": "Fill",
+          "inside": "Inside",
+          "outside": "Outside"
+        },
+        "background_color": "Couleur d'arrière-plan",
+        "blur": "Flou ({value})",
+        "blur_preview": "Prévisualisation du flou",
+        "sharpen": "Accentuation (Sharpening)",
+        "keep_metadata": "Conserver les métadonnées",
+        "max_width": "Largeur maximale (px)",
+        "max_height": "Hauteur maximale (px)",
+        "quality": "Qualité (0-100)"
+      }
+    },
+    "stats": {
+      "title": "Statistiques des uploads",
+      "description": "Visualisez les statistiques de vos uploads ShareX",
+      "cards": {
+        "total_uploads": "Total des uploads",
+        "total_size": "Taille totale",
+        "average_size": "Taille moyenne",
+        "uploads_today": "Uploads aujourd'hui"
+      },
+      "charts": {
+        "uploads_by_day": "Uploads par jour",
+        "uploads_by_type": "Uploads par type",
+        "uploads_by_method": "Méthode d'upload",
+        "size_distribution": "Distribution des tailles",
+        "uploads_by_hour": "Uploads par heure",
+        "uploads_by_weekday": "Uploads par jour de la semaine",
+        "monthly_growth": "Croissance mensuelle"
+      },
+      "labels": {
+        "api": "API",
+        "web": "Web",
+        "sharex": "ShareX",
+        "total": "Total",
+        "date": "Date",
+        "count": "Nombre",
+        "size": "Taille",
+        "type": "Type",
+        "percentage": "Pourcentage",
+        "hour": "Heure",
+        "weekday": "Jour",
+        "month": "Mois",
+        "new_files": "Nouveaux fichiers",
+        "oldest_file": "Fichier le plus ancien",
+        "newest_file": "Fichier le plus récent",
+        "space_used": "d'espace utilisé",
+        "files_via_api": "fichiers via l'API",
+        "files_via_web": "fichiers via l'interface"
+      }
     }
   }
 }

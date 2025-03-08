@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useTranslation } from "@/lib/i18n";
 
 interface User {
   id: string;
@@ -48,6 +49,7 @@ export default function UsersPageClient({
 }: {
   initialUsers: User[];
 }) {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [filteredUsers, setFilteredUsers] = useState<User[]>(initialUsers);
   const [searchQuery, setSearchQuery] = useState("");
@@ -80,14 +82,14 @@ export default function UsersPageClient({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Une erreur est survenue");
+        throw new Error(error.error || t("admin.users.errors.generic"));
       }
 
       setUsers((users) => users.filter((user) => user.id !== userId));
-      toast.success("Utilisateur supprimé avec succès");
+      toast.success(t("admin.users.messages.delete_success"));
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Une erreur est survenue"
+        error instanceof Error ? error.message : t("admin.users.errors.generic")
       );
     }
   };
@@ -98,9 +100,9 @@ export default function UsersPageClient({
       const response = await fetch("/api/admin/users");
       const data = await response.json();
       setUsers(data);
-      toast.success("Liste des utilisateurs mise à jour");
+      toast.success(t("admin.users.messages.refresh_success"));
     } catch (error) {
-      toast.error("Erreur lors du rechargement des utilisateurs");
+      toast.error(t("admin.users.errors.refresh"));
     } finally {
       setIsLoading(false);
     }
@@ -112,7 +114,9 @@ export default function UsersPageClient({
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Utilisateurs</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t("admin.users.stats.total")}
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -121,7 +125,9 @@ export default function UsersPageClient({
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Administrateurs</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t("admin.users.stats.admins")}
+            </CardTitle>
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -130,7 +136,9 @@ export default function UsersPageClient({
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Utilisateurs</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t("admin.users.stats.users")}
+            </CardTitle>
             <UserPlus className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -142,7 +150,7 @@ export default function UsersPageClient({
       {/* Main Content */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Gestion des utilisateurs</CardTitle>
+          <CardTitle>{t("admin.users.title")}</CardTitle>
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
@@ -150,7 +158,9 @@ export default function UsersPageClient({
               onClick={refreshUsers}
               disabled={isLoading}
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+              />
             </Button>
             <UserDialog onSuccess={refreshUsers} />
           </div>
@@ -160,7 +170,7 @@ export default function UsersPageClient({
             <div className="relative flex-1">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher un utilisateur..."
+                placeholder={t("admin.users.search_placeholder")}
                 className="pl-8"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -168,15 +178,23 @@ export default function UsersPageClient({
             </div>
             <Select
               value={roleFilter}
-              onValueChange={(value: "all" | "admin" | "user") => setRoleFilter(value)}
+              onValueChange={(value: "all" | "admin" | "user") =>
+                setRoleFilter(value)
+              }
             >
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filtrer par rôle" />
+                <SelectValue placeholder={t("admin.users.filter_by_role")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les rôles</SelectItem>
-                <SelectItem value="admin">Administrateurs</SelectItem>
-                <SelectItem value="user">Utilisateurs</SelectItem>
+                <SelectItem value="all">
+                  {t("admin.users.roles.all")}
+                </SelectItem>
+                <SelectItem value="admin">
+                  {t("admin.users.roles.admin")}
+                </SelectItem>
+                <SelectItem value="user">
+                  {t("admin.users.roles.user")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -186,35 +204,56 @@ export default function UsersPageClient({
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
-                  <TableHead>Nom d'utilisateur</TableHead>
-                  <TableHead>Rôle</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t("admin.users.table.username")}</TableHead>
+                  <TableHead>{t("admin.users.table.role")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("admin.users.table.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-32" /></TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-8 w-32" />
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                      Aucun utilisateur trouvé
+                    <TableCell
+                      colSpan={4}
+                      className="text-center py-8 text-muted-foreground"
+                    >
+                      {t("admin.users.no_users_found")}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-mono text-sm">{user.id}</TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {user.id}
+                      </TableCell>
                       <TableCell>{user.username}</TableCell>
                       <TableCell>
-                        <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                          {user.role === "admin" ? "Administrateur" : "Utilisateur"}
+                        <Badge
+                          variant={
+                            user.role === "admin" ? "default" : "secondary"
+                          }
+                        >
+                          {user.role === "admin"
+                            ? t("admin.users.roles.admin_label")
+                            : t("admin.users.roles.user_label")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -224,7 +263,7 @@ export default function UsersPageClient({
                             onSuccess={refreshUsers}
                             trigger={
                               <Button variant="outline" size="sm">
-                                Modifier
+                                {t("admin.users.actions.edit")}
                               </Button>
                             }
                           />
@@ -232,22 +271,26 @@ export default function UsersPageClient({
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button variant="destructive" size="sm">
-                                  Supprimer
+                                  {t("admin.users.actions.delete")}
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>
-                                    Êtes-vous sûr de vouloir supprimer cet utilisateur ?
+                                    {t("admin.users.delete_dialog.title")}
                                   </AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Cette action est irréversible. L'utilisateur ne pourra plus se connecter.
+                                    {t("admin.users.delete_dialog.description")}
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                  <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(user.id)}>
-                                    Supprimer
+                                  <AlertDialogCancel>
+                                    {t("common.cancel")}
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(user.id)}
+                                  >
+                                    {t("admin.users.actions.delete")}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>

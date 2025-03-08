@@ -19,61 +19,64 @@ import {
   Globe,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n";
 
 export function SettingsPageClient() {
+  const { t } = useTranslation();
+
   const settingsSections = [
     {
-      title: "Configuration des uploads",
-      description: "Gérez les paramètres de vos uploads ShareX",
+      title: t("settings.sections.upload_config.title"),
+      description: t("settings.sections.upload_config.description"),
       icon: Upload,
       href: "/uploads/config",
       color: "text-blue-500",
     },
     {
-      title: "Gestion des utilisateurs",
-      description: "Gérez les utilisateurs et leurs permissions",
+      title: t("admin.sections.users.title"),
+      description: t("admin.sections.users.description"),
       icon: Users,
       href: "/admin/users",
       color: "text-green-500",
     },
     {
-      title: "Historique des uploads",
-      description: "Consultez l'historique des fichiers uploadés",
+      title: t("uploads.history.title"),
+      description: t("uploads.history.description"),
       icon: History,
       href: "/uploads/history",
       color: "text-purple-500",
     },
     {
-      title: "Statistiques",
-      description: "Visualisez les statistiques d'utilisation",
+      title: t("uploads.stats.title"),
+      description: t("uploads.stats.description"),
       icon: BarChart,
       href: "/uploads/stats",
       color: "text-yellow-500",
     },
     {
-      title: "Clés API",
-      description: "Gérez vos clés API pour ShareX",
+      title: t("settings.sections.api_keys.title"),
+      description: t("settings.sections.api_keys.description"),
       icon: Key,
       href: "/settings/api-keys",
       color: "text-red-500",
     },
     {
-      title: "Domaines",
-      description: "Gérez les domaines pour vos fichiers",
+      title: t("settings.sections.domains.title"),
+      description: t("settings.sections.domains.description"),
       icon: Globe,
       href: "/settings/domains",
       color: "text-pink-500",
     },
     {
-      title: "Nettoyage",
-      description: "Supprimez les fichiers inutilisés",
+      title: t("settings.sections.cleanup.title"),
+      description: t("settings.sections.cleanup.description"),
       icon: Trash2,
       href: "/cleanup",
       color: "text-orange-500",
     },
     {
-      title: "Sécurité",
-      description: "Configurez les paramètres de sécurité",
+      title: t("settings.sections.security.title"),
+      description: t("settings.sections.security.description"),
       icon: Shield,
       href: "/security",
       color: "text-indigo-500",
@@ -85,10 +88,10 @@ export function SettingsPageClient() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <Settings className="h-8 w-8" />
-          Paramètres
+          {t("settings.title")}
         </h1>
         <p className="text-muted-foreground mt-2">
-          Gérez tous les paramètres de votre application ShareX Manager
+          {t("settings.description")}
         </p>
       </div>
 

@@ -2,8 +2,8 @@ import { Metadata } from "next";
 import { SettingsPageClient } from "./page.client";
 
 export const metadata: Metadata = {
-  title: "Paramètres | ShareX Manager",
-  description: "Gérez les paramètres de votre application ShareX Manager",
+  title: "Settings | ShareX Manager",
+  description: "Manage your ShareX Manager application settings",
 };
 
 export default function SettingsPage() {

@@ -8,34 +8,36 @@ import {
 } from "@/components/ui/card";
 import { Settings, Users, Database, Shield, Upload } from "lucide-react";
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n";
 
 export function AdminPageClient() {
+  const { t } = useTranslation();
+
   const adminSections = [
     {
-      title: "Gestion des utilisateurs",
-      description: "Gérez les utilisateurs et leurs permissions",
+      title: t("admin.sections.users.title"),
+      description: t("admin.sections.users.description"),
       icon: Users,
       href: "/admin/users",
       color: "text-blue-500",
     },
     {
-      title: "Logs système",
-      description: "Consultez les logs et l'activité du système",
+      title: t("admin.sections.logs.title"),
+      description: t("admin.sections.logs.description"),
       icon: Database,
       href: "/admin/logs",
       color: "text-green-500",
     },
     {
-      title: "Configuration système",
-      description:
-        "Gérez les paramètres système et la configuration des uploads",
+      title: t("admin.sections.system.title"),
+      description: t("admin.sections.system.description"),
       icon: Settings,
       href: "/admin/system",
       color: "text-yellow-500",
     },
     {
-      title: "Sécurité (Bientôt disponible)",
-      description: "Configurez les paramètres de sécurité avancés",
+      title: t("admin.sections.security.title"),
+      description: t("admin.sections.security.description"),
       icon: Shield,
       href: "/admin/security",
       color: "text-purple-500",
@@ -48,12 +50,9 @@ export function AdminPageClient() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <Shield className="h-8 w-8" />
-          Administration
+          {t("admin.title")}
         </h1>
-        <p className="text-muted-foreground mt-2">
-          Gérez les paramètres d'administration de votre application ShareX
-          Manager
-        </p>
+        <p className="text-muted-foreground mt-2">{t("admin.description")}</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

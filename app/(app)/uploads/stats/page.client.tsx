@@ -35,6 +35,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useTranslation } from "@/lib/i18n";
+import { useDateLocale } from "@/lib/i18n/date-locales";
 
 interface StatsData {
   totalUploads: number;
@@ -88,6 +90,8 @@ interface StatsData {
 }
 
 export function StatsPageClient() {
+  const { t } = useTranslation();
+  const locale = useDateLocale();
   const [stats, setStats] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [useTestData, setUseTestData] = useState(false);
@@ -355,10 +359,10 @@ export function StatsPageClient() {
           <div className="flex justify-between items-center">
             <div className="flex flex-col gap-2">
               <h1 className="text-3xl font-bold tracking-tight">
-                Statistiques des uploads
+                {t("uploads.stats.title")}
               </h1>
               <p className="text-muted-foreground">
-                Visualisez les statistiques de vos uploads ShareX
+                {t("uploads.stats.description")}
               </p>
             </div>
             {process.env.NODE_ENV === "development" && (
@@ -386,41 +390,13 @@ export function StatsPageClient() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Total des uploads
+                {t("uploads.stats.cards.total_uploads")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalUploads}</div>
-              <p className="text-xs text-muted-foreground">fichiers uploadés</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Taille totale
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatFileSize(stats.totalSize)}
-              </div>
-              <p className="text-xs text-muted-foreground">d'espace utilisé</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Uploads via API
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {stats.uploadsByMethod.api}
-              </div>
               <p className="text-xs text-muted-foreground">
-                fichiers via l'API
+                {t("uploads.stats.labels.total")}
               </p>
             </CardContent>
           </Card>
@@ -428,7 +404,39 @@ export function StatsPageClient() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Uploads via Web
+                {t("uploads.stats.cards.total_size")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {formatFileSize(stats.totalSize)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("uploads.stats.labels.space_used")}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                {t("uploads.stats.labels.api")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {stats.uploadsByMethod.api}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("uploads.stats.labels.files_via_api")}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                {t("uploads.stats.labels.web")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -436,7 +444,7 @@ export function StatsPageClient() {
                 {stats.uploadsByMethod.web}
               </div>
               <p className="text-xs text-muted-foreground">
-                fichiers via l'interface
+                {t("uploads.stats.labels.files_via_web")}
               </p>
             </CardContent>
           </Card>
@@ -445,13 +453,13 @@ export function StatsPageClient() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Premier fichier
+                {t("uploads.stats.labels.oldest_file")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
                 {format(new Date(stats.oldestFile.date), "dd/MM/yyyy", {
-                  locale: fr,
+                  locale,
                 })}
               </div>
               <p
@@ -466,13 +474,13 @@ export function StatsPageClient() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Dernier fichier
+                {t("uploads.stats.labels.newest_file")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
                 {format(new Date(stats.newestFile.date), "dd/MM/yyyy", {
-                  locale: fr,
+                  locale,
                 })}
               </div>
               <p
@@ -489,9 +497,9 @@ export function StatsPageClient() {
         <Card className="col-span-full">
           <CardHeader className="flex flex-col items-stretch space-y-0 border-b p-0 sm:flex-row">
             <div className="flex flex-1 flex-col justify-center gap-1 px-6 py-5 sm:py-6">
-              <CardTitle>Uploads par jour</CardTitle>
+              <CardTitle>{t("uploads.stats.charts.uploads_by_day")}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Affichage des uploads par méthode sur les 30 derniers jours
+                {t("uploads.stats.charts.uploads_by_method")}
               </p>
             </div>
             <div className="flex">
@@ -513,7 +521,7 @@ export function StatsPageClient() {
                   )}
                 >
                   <span className="text-xs text-muted-foreground">
-                    Via {method.toUpperCase()}
+                    {t(`uploads.stats.labels.${method}`)}
                   </span>
                   <span className="text-lg font-bold leading-none sm:text-3xl">
                     {
@@ -534,7 +542,7 @@ export function StatsPageClient() {
                   <XAxis
                     dataKey="date"
                     tickFormatter={(date) =>
-                      format(new Date(date), "dd MMM", { locale: fr })
+                      format(new Date(date), "dd MMM", { locale })
                     }
                     tickLine={false}
                     axisLine={false}
@@ -549,7 +557,7 @@ export function StatsPageClient() {
                         <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
                           <div className="mb-2 font-medium">
                             {format(new Date(label), "dd MMMM yyyy", {
-                              locale: fr,
+                              locale,
                             })}
                           </div>
                           <div className="flex flex-col gap-1">
@@ -567,12 +575,13 @@ export function StatsPageClient() {
                                   />
                                   <span>
                                     {entry.name === "api"
-                                      ? "Via API"
-                                      : "Via Web"}
+                                      ? t("uploads.stats.labels.api")
+                                      : t("uploads.stats.labels.web")}
                                   </span>
                                 </div>
                                 <div className="font-medium">
-                                  {entry.value} uploads
+                                  {entry.value}{" "}
+                                  {t("uploads.stats.labels.count")}
                                 </div>
                               </div>
                             ))}
@@ -584,7 +593,7 @@ export function StatsPageClient() {
                   {(activeView === "api" || activeView === null) && (
                     <Bar
                       dataKey="api"
-                      name="Via API"
+                      name="api"
                       stackId="a"
                       fill={chartConfig.api.color}
                       fillOpacity={0.8}
@@ -602,7 +611,7 @@ export function StatsPageClient() {
                   {(activeView === "web" || activeView === null) && (
                     <Bar
                       dataKey="web"
-                      name="Via Web"
+                      name="web"
                       stackId="a"
                       fill={chartConfig.web.color}
                       fillOpacity={0.8}
@@ -626,7 +635,7 @@ export function StatsPageClient() {
         {/* Graphique de la taille moyenne des fichiers par jour */}
         <Card className="col-span-full">
           <CardHeader>
-            <CardTitle>Taille moyenne des fichiers par jour</CardTitle>
+            <CardTitle>{t("uploads.stats.cards.average_size")}</CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig}>
@@ -636,7 +645,7 @@ export function StatsPageClient() {
                   <XAxis
                     dataKey="date"
                     tickFormatter={(date) =>
-                      format(new Date(date), "dd MMM", { locale: fr })
+                      format(new Date(date), "dd MMM", { locale })
                     }
                     tickLine={false}
                     axisLine={false}
@@ -654,11 +663,11 @@ export function StatsPageClient() {
                         <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
                           <div className="mb-2 font-medium">
                             {format(new Date(label), "dd MMMM yyyy", {
-                              locale: fr,
+                              locale,
                             })}
                           </div>
                           <div className="flex items-center justify-between gap-2">
-                            <span>Taille moyenne</span>
+                            <span>{t("uploads.stats.cards.average_size")}</span>
                             <span className="font-medium">
                               {payload[0].value} MB
                             </span>
@@ -707,7 +716,7 @@ export function StatsPageClient() {
           {/* Types de fichiers */}
           <Card>
             <CardHeader>
-              <CardTitle>Extensions de fichiers</CardTitle>
+              <CardTitle>{t("uploads.stats.charts.uploads_by_type")}</CardTitle>
             </CardHeader>
             <CardContent>
               <ChartContainer config={chartConfig}>
@@ -720,17 +729,19 @@ export function StatsPageClient() {
                         return (
                           <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
                             <div className="mb-2 font-medium">
-                              Extension .{data.type}
+                              {t("uploads.stats.labels.type")} .{data.type}
                             </div>
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center justify-between gap-2">
-                                <span>Fichiers</span>
+                                <span>{t("uploads.stats.labels.count")}</span>
                                 <span className="font-medium">
                                   {data.count}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between gap-2">
-                                <span>Pourcentage</span>
+                                <span>
+                                  {t("uploads.stats.labels.percentage")}
+                                </span>
                                 <span className="font-medium">
                                   {data.percentage}%
                                 </span>
@@ -774,7 +785,7 @@ export function StatsPageClient() {
           {/* Uploads par heure */}
           <Card>
             <CardHeader>
-              <CardTitle>Uploads par heure</CardTitle>
+              <CardTitle>{t("uploads.stats.charts.uploads_by_hour")}</CardTitle>
             </CardHeader>
             <CardContent>
               <ChartContainer config={chartConfig}>
@@ -798,7 +809,7 @@ export function StatsPageClient() {
                               {data.hour}h00
                             </div>
                             <div className="flex items-center justify-between gap-2">
-                              <span>Uploads</span>
+                              <span>{t("uploads.stats.labels.count")}</span>
                               <span className="font-medium">{data.count}</span>
                             </div>
                           </div>
@@ -827,7 +838,9 @@ export function StatsPageClient() {
         {/* Uploads par jour de la semaine */}
         <Card className="col-span-full">
           <CardHeader>
-            <CardTitle>Uploads par jour de la semaine</CardTitle>
+            <CardTitle>
+              {t("uploads.stats.charts.uploads_by_weekday")}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig}>
@@ -844,7 +857,7 @@ export function StatsPageClient() {
                         <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
                           <div className="mb-2 font-medium">{data.weekday}</div>
                           <div className="flex items-center justify-between gap-2">
-                            <span>Uploads</span>
+                            <span>{t("uploads.stats.labels.count")}</span>
                             <span className="font-medium">{data.count}</span>
                           </div>
                         </div>
@@ -872,7 +885,7 @@ export function StatsPageClient() {
         {/* Distribution des tailles de fichiers */}
         <Card className="col-span-full">
           <CardHeader>
-            <CardTitle>Distribution des tailles de fichiers</CardTitle>
+            <CardTitle>{t("uploads.stats.charts.size_distribution")}</CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig}>
@@ -890,11 +903,13 @@ export function StatsPageClient() {
                           <div className="mb-2 font-medium">{data.range}</div>
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center justify-between gap-2">
-                              <span>Fichiers</span>
+                              <span>{t("uploads.stats.labels.count")}</span>
                               <span className="font-medium">{data.count}</span>
                             </div>
                             <div className="flex items-center justify-between gap-2">
-                              <span>Pourcentage</span>
+                              <span>
+                                {t("uploads.stats.labels.percentage")}
+                              </span>
                               <span className="font-medium">
                                 {data.percentage}%
                               </span>
@@ -925,7 +940,7 @@ export function StatsPageClient() {
         {/* Croissance mensuelle */}
         <Card className="col-span-full">
           <CardHeader>
-            <CardTitle>Croissance mensuelle</CardTitle>
+            <CardTitle>{t("uploads.stats.charts.monthly_growth")}</CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig}>
@@ -935,7 +950,7 @@ export function StatsPageClient() {
                   <XAxis
                     dataKey="month"
                     tickFormatter={(month) =>
-                      format(new Date(month), "MMM yyyy", { locale: fr })
+                      format(new Date(month), "MMM yyyy", { locale })
                     }
                     tickLine={false}
                     axisLine={false}
@@ -956,7 +971,7 @@ export function StatsPageClient() {
                         <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
                           <div className="mb-2 font-medium">
                             {format(new Date(label), "MMMM yyyy", {
-                              locale: fr,
+                              locale,
                             })}
                           </div>
                           <div className="flex flex-col gap-1">
@@ -968,10 +983,13 @@ export function StatsPageClient() {
                                     backgroundColor: "hsl(var(--chart-1))",
                                   }}
                                 />
-                                <span>Nouveaux fichiers</span>
+                                <span>
+                                  {t("uploads.stats.labels.new_files")}
+                                </span>
                               </div>
                               <span className="font-medium">
-                                {payload[0]?.value} fichiers
+                                {payload[0]?.value}{" "}
+                                {t("uploads.stats.labels.count")}
                               </span>
                             </div>
                             <div className="flex items-center justify-between gap-2">
@@ -982,7 +1000,9 @@ export function StatsPageClient() {
                                     backgroundColor: "hsl(var(--chart-2))",
                                   }}
                                 />
-                                <span>Taille totale</span>
+                                <span>
+                                  {t("uploads.stats.cards.total_size")}
+                                </span>
                               </div>
                               <span className="font-medium">
                                 {formatFileSize(totalSize)}
@@ -996,8 +1016,8 @@ export function StatsPageClient() {
                   <Legend
                     formatter={(value) =>
                       value === "newFiles"
-                        ? "Nouveaux fichiers"
-                        : "Taille totale"
+                        ? t("uploads.stats.labels.new_files")
+                        : t("uploads.stats.cards.total_size")
                     }
                     wrapperStyle={{ paddingTop: "1rem" }}
                   />

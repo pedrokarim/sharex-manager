@@ -7,8 +7,10 @@ import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import { SidebarHeader } from "@/components/sidebar/sibebar-header";
 import { BreadcrumbNav } from "@/components/breadcrumb";
 import { SidebarInset } from "@/components/ui/sidebar";
+import { useTranslation } from "@/lib/i18n";
 
 export function HistoryPageClient() {
+  const { t } = useTranslation();
   const [currentFilters, setCurrentFilters] = useState<
     URLSearchParams | undefined
   >();
@@ -19,11 +21,10 @@ export function HistoryPageClient() {
         <div className="container flex flex-col gap-4 py-4">
           <div className="flex flex-col gap-2">
             <h1 className="text-3xl font-bold tracking-tight">
-              Historique des uploads
+              {t("uploads.history.title")}
             </h1>
             <p className="text-muted-foreground">
-              Consultez l&apos;historique de tous les fichiers uploadés via
-              ShareX
+              {t("uploads.history.description")}
             </p>
           </div>
         </div>

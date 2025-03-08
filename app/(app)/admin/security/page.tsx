@@ -6,17 +6,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/lib/i18n";
 
 export default function SecurityPage() {
+  const { t } = useTranslation();
+
   return (
     <div className="p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <Shield className="h-8 w-8" />
-          Sécurité
+          {t("admin.security.title")}
         </h1>
         <p className="text-muted-foreground mt-2">
-          Configuration des paramètres de sécurité avancés
+          {t("admin.security.description")}
         </p>
       </div>
 
@@ -24,30 +27,25 @@ export default function SecurityPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Fonctionnalité à venir
+            {t("admin.security.coming_soon.title")}
           </CardTitle>
           <CardDescription>
-            Cette section est en cours de développement
+            {t("admin.security.coming_soon.subtitle")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <p>
-              La configuration avancée de la sécurité sera bientôt disponible.
-              Cette section permettra de :
-            </p>
+            <p>{t("admin.security.coming_soon.description")}</p>
             <ul className="list-disc pl-6 space-y-2">
-              <li>Configurer les politiques de mots de passe</li>
-              <li>Gérer l'authentification à deux facteurs (2FA)</li>
-              <li>Définir les restrictions d'accès IP</li>
-              <li>Configurer les sessions et leur durée de vie</li>
-              <li>
-                Gérer les tentatives de connexion et le blocage automatique
-              </li>
-              <li>Mettre en place des alertes de sécurité</li>
+              <li>{t("admin.security.features.password_policies")}</li>
+              <li>{t("admin.security.features.two_factor")}</li>
+              <li>{t("admin.security.features.ip_restrictions")}</li>
+              <li>{t("admin.security.features.sessions")}</li>
+              <li>{t("admin.security.features.login_attempts")}</li>
+              <li>{t("admin.security.features.security_alerts")}</li>
             </ul>
             <p className="text-muted-foreground mt-4">
-              Revenez bientôt pour découvrir ces nouvelles fonctionnalités !
+              {t("admin.security.coming_soon.check_back")}
             </p>
           </div>
         </CardContent>

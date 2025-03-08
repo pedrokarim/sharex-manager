@@ -42,8 +42,11 @@ import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { SidebarHeader } from "@/components/sidebar/sibebar-header";
 import { ApiKeyDetailsDialog } from "@/components/api-keys/api-key-details-dialog";
+import { useTranslation } from "@/lib/i18n";
+import { useDateLocale } from "@/lib/i18n/date-locales";
 
 export default function ApiKeysPage() {
+  const { t } = useTranslation();
   const { data: session, status } = useSession();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +55,7 @@ export default function ApiKeysPage() {
   const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
   const [selectedKeyForDetails, setSelectedKeyForDetails] =
     useState<ApiKey | null>(null);
+  const locale = useDateLocale();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -69,7 +73,7 @@ export default function ApiKeysPage() {
       const data = await res.json();
       setKeys(data);
     } catch (error) {
-      toast.error("Erreur lors du chargement des clés");
+      toast.error(t("settings.api_keys.errors.loading"));
     } finally {
       setLoading(false);
     }
@@ -83,10 +87,10 @@ export default function ApiKeysPage() {
 
       if (!res.ok) throw new Error();
 
-      toast.success("Clé supprimée avec succès");
+      toast.success(t("settings.api_keys.messages.delete_success"));
       fetchKeys();
     } catch (error) {
-      toast.error("Erreur lors de la suppression");
+      toast.error(t("settings.api_keys.errors.delete"));
     } finally {
       setSelectedKeyId(null);
     }
@@ -94,7 +98,7 @@ export default function ApiKeysPage() {
 
   const copyToClipboard = (key: string) => {
     navigator.clipboard.writeText(key);
-    toast.success("Clé copiée dans le presse-papier");
+    toast.success(t("settings.api_keys.messages.copy_success"));
   };
 
   return (
@@ -102,14 +106,16 @@ export default function ApiKeysPage() {
       <div className="p-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Clés API</h1>
+            <h1 className="text-2xl font-bold">
+              {t("settings.sections.api_keys.title")}
+            </h1>
             <p className="text-muted-foreground">
-              Gérez vos clés API pour l'upload via ShareX
+              {t("settings.sections.api_keys.description")}
             </p>
           </div>
           <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            Nouvelle clé
+            {t("settings.api_keys.new_key")}
           </Button>
         </div>
 
@@ -117,13 +123,17 @@ export default function ApiKeysPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>Clé</TableHead>
-                <TableHead>Créée le</TableHead>
-                <TableHead>Expire le</TableHead>
-                <TableHead>Permissions</TableHead>
-                <TableHead>Dernière utilisation</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t("settings.api_keys.table.name")}</TableHead>
+                <TableHead>{t("settings.api_keys.table.key")}</TableHead>
+                <TableHead>{t("settings.api_keys.table.created_at")}</TableHead>
+                <TableHead>{t("settings.api_keys.table.expires_at")}</TableHead>
+                <TableHead>
+                  {t("settings.api_keys.table.permissions")}
+                </TableHead>
+                <TableHead>{t("settings.api_keys.table.last_used")}</TableHead>
+                <TableHead className="text-right">
+                  {t("settings.api_keys.table.actions")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -133,7 +143,7 @@ export default function ApiKeysPage() {
                     <div className="flex flex-col items-center justify-center gap-2 py-8">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       <p className="text-sm text-muted-foreground">
-                        Chargement des clés API...
+                        {t("settings.api_keys.loading")}
                       </p>
                     </div>
                   </TableCell>
@@ -144,15 +154,14 @@ export default function ApiKeysPage() {
                     <div className="flex flex-col items-center justify-center py-6 text-center">
                       <Key className="h-12 w-12 text-muted-foreground" />
                       <h3 className="mt-4 text-lg font-semibold">
-                        Aucune clé API
+                        {t("settings.api_keys.no_keys.title")}
                       </h3>
                       <p className="mb-4 text-sm text-muted-foreground">
-                        Vous n'avez pas encore créé de clé API. Commencez par en
-                        créer une pour utiliser ShareX.
+                        {t("settings.api_keys.no_keys.description")}
                       </p>
                       <Button onClick={() => setShowCreateDialog(true)}>
                         <Plus className="mr-2 h-4 w-4" />
-                        Créer une clé
+                        {t("settings.api_keys.create_key")}
                       </Button>
                     </div>
                   </TableCell>
@@ -198,35 +207,41 @@ export default function ApiKeysPage() {
                     </TableCell>
                     <TableCell>
                       {format(new Date(key.createdAt), "dd/MM/yyyy", {
-                        locale: fr,
+                        locale,
                       })}
                     </TableCell>
                     <TableCell>
                       {key.expiresAt
                         ? format(new Date(key.expiresAt), "dd/MM/yyyy", {
-                            locale: fr,
+                            locale,
                           })
-                        : "Jamais"}
+                        : t("settings.api_keys.never")}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {key.permissions.uploadImages && (
-                          <Badge variant="secondary">Images</Badge>
+                          <Badge variant="secondary">
+                            {t("settings.api_keys.permissions.images")}
+                          </Badge>
                         )}
                         {key.permissions.uploadText && (
-                          <Badge variant="secondary">Texte</Badge>
+                          <Badge variant="secondary">
+                            {t("settings.api_keys.permissions.text")}
+                          </Badge>
                         )}
                         {key.permissions.uploadFiles && (
-                          <Badge variant="secondary">Fichiers</Badge>
+                          <Badge variant="secondary">
+                            {t("settings.api_keys.permissions.files")}
+                          </Badge>
                         )}
                       </div>
                     </TableCell>
                     <TableCell>
                       {key.lastUsed
                         ? format(new Date(key.lastUsed), "dd/MM/yyyy HH:mm", {
-                            locale: fr,
+                            locale,
                           })
-                        : "Jamais"}
+                        : t("settings.api_keys.never")}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -234,7 +249,7 @@ export default function ApiKeysPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => setSelectedKeyForDetails(key)}
-                          title="Voir les détails"
+                          title={t("settings.api_keys.actions.view_details")}
                         >
                           <Info className="h-4 w-4" />
                         </Button>
@@ -243,7 +258,7 @@ export default function ApiKeysPage() {
                           size="icon"
                           className="text-destructive"
                           onClick={() => setSelectedKeyId(key.id)}
-                          title="Supprimer la clé"
+                          title={t("settings.api_keys.actions.delete")}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -271,18 +286,17 @@ export default function ApiKeysPage() {
         >
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
+              <AlertDialogTitle>{t("common.confirm")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Cette action est irréversible. La clé sera définitivement
-                supprimée.
+                {t("settings.api_keys.delete_confirmation")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => selectedKeyId && handleDelete(selectedKeyId)}
               >
-                Supprimer
+                {t("common.delete")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

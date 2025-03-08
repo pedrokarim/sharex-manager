@@ -2,9 +2,8 @@ import { Metadata } from "next";
 import { PreferencesPageClient } from "./page.client";
 
 export const metadata: Metadata = {
-  title: "Préférences utilisateur | ShareX Manager",
-  description:
-    "Personnalisez vos préférences d'affichage et de fonctionnalités",
+  title: "User Preferences | ShareX Manager",
+  description: "Customize your display and feature preferences",
 };
 
 export default function PreferencesPage() {

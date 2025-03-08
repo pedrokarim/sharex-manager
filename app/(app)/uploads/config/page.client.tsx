@@ -12,8 +12,10 @@ import { useUploadConfig } from "@/hooks/use-upload-config";
 import { GeneralTab } from "../_components/general-tab";
 import { ThumbnailsTab } from "../_components/thumbnails-tab";
 import { StorageTab } from "../_components/storage-tab";
+import { useTranslation } from "@/lib/i18n";
 
 export function ConfigPageClient() {
+  const { t } = useTranslation();
   const { config, isLoading, isSaving, saveConfig } = useUploadConfig();
 
   const form = useForm<UploadConfig>({
@@ -45,10 +47,10 @@ export function ConfigPageClient() {
         <div className="container flex flex-col gap-4 py-4">
           <div className="flex flex-col gap-2">
             <h1 className="text-3xl font-bold tracking-tight">
-              Configuration des uploads
+              {t("uploads.config.title")}
             </h1>
             <p className="text-muted-foreground">
-              Configurez les paramètres de vos uploads ShareX
+              {t("uploads.config.description")}
             </p>
           </div>
         </div>
@@ -58,9 +60,15 @@ export function ConfigPageClient() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           <Tabs defaultValue="general" className="space-y-4">
             <TabsList>
-              <TabsTrigger value="general">Général</TabsTrigger>
-              <TabsTrigger value="thumbnails">Miniatures</TabsTrigger>
-              <TabsTrigger value="storage">Stockage</TabsTrigger>
+              <TabsTrigger value="general">
+                {t("uploads.config.tabs.general")}
+              </TabsTrigger>
+              <TabsTrigger value="thumbnails">
+                {t("uploads.config.tabs.thumbnails")}
+              </TabsTrigger>
+              <TabsTrigger value="storage">
+                {t("uploads.config.tabs.storage")}
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="general">
@@ -79,7 +87,7 @@ export function ConfigPageClient() {
           <div className="flex justify-end">
             <Button type="submit" disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sauvegarder
+              {t("common.save")}
             </Button>
           </div>
         </form>

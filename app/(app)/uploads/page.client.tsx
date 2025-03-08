@@ -11,43 +11,44 @@ import {
 } from "@/components/ui/card";
 import Link from "next/link";
 import { History, BarChart, Settings } from "lucide-react";
-
-const features = [
-  {
-    title: "Historique",
-    description: "Consultez l'historique de tous vos uploads",
-    icon: History,
-    href: "/uploads/history",
-    color: "text-blue-500",
-  },
-  {
-    title: "Statistiques",
-    description: "Visualisez les statistiques de vos uploads",
-    icon: BarChart,
-    href: "/uploads/stats",
-    color: "text-green-500",
-  },
-  {
-    title: "Configuration",
-    description: "Configurez vos paramètres d'upload",
-    icon: Settings,
-    href: "/uploads/config",
-    color: "text-purple-500",
-  },
-];
+import { useTranslation } from "@/lib/i18n";
 
 export function UploadsPageClient() {
+  const { t } = useTranslation();
+
+  const features = [
+    {
+      title: t("uploads.features.history.title"),
+      description: t("uploads.features.history.description"),
+      icon: History,
+      href: "/uploads/history",
+      color: "text-blue-500",
+    },
+    {
+      title: t("uploads.features.stats.title"),
+      description: t("uploads.features.stats.description"),
+      icon: BarChart,
+      href: "/uploads/stats",
+      color: "text-green-500",
+    },
+    {
+      title: t("uploads.features.config.title"),
+      description: t("uploads.features.config.description"),
+      icon: Settings,
+      href: "/uploads/config",
+      color: "text-purple-500",
+    },
+  ];
+
   return (
     <main className="p-8">
       <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex flex-col gap-4 py-4">
           <div className="flex flex-col gap-2">
             <h1 className="text-3xl font-bold tracking-tight">
-              Gestion des uploads
+              {t("uploads.title")}
             </h1>
-            <p className="text-muted-foreground">
-              Gérez vos uploads ShareX et accédez à toutes les fonctionnalités
-            </p>
+            <p className="text-muted-foreground">{t("uploads.description")}</p>
           </div>
         </div>
       </div>

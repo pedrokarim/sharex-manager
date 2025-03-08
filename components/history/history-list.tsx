@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useDateLocale } from "@/lib/i18n/date-locales";
+import { useTranslation } from "@/lib/i18n";
 
 interface HistoryListProps {
   filters?: URLSearchParams;
@@ -46,6 +47,7 @@ interface HistoryListProps {
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 export const HistoryList = ({ filters }: HistoryListProps) => {
+  const { t } = useTranslation();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useQueryState("page", { defaultValue: "1" });
@@ -72,14 +74,14 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
       const response = await fetch(url);
 
       if (!response.ok) {
-        throw new Error("Erreur lors du chargement de l'historique");
+        throw new Error(t("uploads.history.list.error"));
       }
 
       const data = await response.json();
       setEntries(data.items);
       setTotalItems(data.total);
     } catch (error) {
-      toast.error("Impossible de charger l'historique");
+      toast.error(t("uploads.history.list.error"));
     } finally {
       setIsLoading(false);
     }
@@ -130,14 +132,14 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
       });
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la suppression");
+        throw new Error(t("uploads.history.list.actions.delete_error"));
       }
 
       setEntries(entries.filter((entry) => entry.id !== id));
       setTotalItems((prev) => prev - 1);
-      toast.success("L'entrée a été supprimée");
+      toast.success(t("uploads.history.list.actions.delete_success"));
     } catch (error) {
-      toast.error("Impossible de supprimer l'entrée");
+      toast.error(t("uploads.history.list.actions.delete_error"));
     }
   };
 
@@ -170,7 +172,7 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
                   onClick={() => handleSort("originalFilename")}
                   className="flex items-center hover:bg-transparent"
                 >
-                  Nom du fichier
+                  {t("uploads.history.list.columns.filename")}
                   {renderSortIcon("originalFilename")}
                 </Button>
               </TableHead>
@@ -180,7 +182,7 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
                   onClick={() => handleSort("uploadDate")}
                   className="flex items-center hover:bg-transparent"
                 >
-                  Date d&apos;upload
+                  {t("uploads.history.list.columns.date")}
                   {renderSortIcon("uploadDate")}
                 </Button>
               </TableHead>
@@ -190,7 +192,7 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
                   onClick={() => handleSort("fileSize")}
                   className="flex items-center hover:bg-transparent"
                 >
-                  Taille
+                  {t("uploads.history.list.columns.size")}
                   {renderSortIcon("fileSize")}
                 </Button>
               </TableHead>
@@ -200,7 +202,7 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
                   onClick={() => handleSort("uploadMethod")}
                   className="flex items-center hover:bg-transparent"
                 >
-                  Méthode
+                  {t("uploads.history.list.columns.method")}
                   {renderSortIcon("uploadMethod")}
                 </Button>
               </TableHead>
@@ -220,11 +222,13 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
                   onClick={() => handleSort("userName")}
                   className="flex items-center hover:bg-transparent"
                 >
-                  Utilisateur
+                  {t("admin.users.table.username")}
                   {renderSortIcon("userName")}
                 </Button>
               </TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="text-right">
+                {t("uploads.history.list.columns.actions")}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -234,7 +238,7 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
                   colSpan={7}
                   className="text-center py-8 text-gray-500"
                 >
-                  Aucun fichier dans l&apos;historique
+                  {t("uploads.history.list.no_results")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -248,17 +252,24 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
                   </TableCell>
                   <TableCell>{formatFileSize(entry.fileSize)}</TableCell>
                   <TableCell>
-                    {entry.uploadMethod === "api" && "API"}
-                    {entry.uploadMethod === "web" && "Interface Web"}
-                    {entry.uploadMethod === "sharex" && "ShareX"}
+                    {entry.uploadMethod === "api" &&
+                      t("uploads.stats.labels.api")}
+                    {entry.uploadMethod === "web" &&
+                      t("uploads.stats.labels.web")}
+                    {entry.uploadMethod === "sharex" &&
+                      t("uploads.stats.labels.sharex")}
                   </TableCell>
                   <TableCell>{entry.ipAddress}</TableCell>
-                  <TableCell>{entry.userName || "Anonyme"}</TableCell>
+                  <TableCell>
+                    {entry.userName || t("uploads.history.list.anonymous")}
+                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Ouvrir le menu</span>
+                          <span className="sr-only">
+                            {t("uploads.history.list.open_menu")}
+                          </span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -267,7 +278,7 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
                           onClick={() => window.open(entry.fileUrl, "_blank")}
                         >
                           <ExternalLink className="mr-2 h-4 w-4" />
-                          Voir le fichier
+                          {t("uploads.history.list.actions.view")}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => {
@@ -280,14 +291,14 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
                           }}
                         >
                           <Download className="mr-2 h-4 w-4" />
-                          Télécharger
+                          {t("uploads.history.list.actions.download")}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-red-600"
                           onClick={() => handleDelete(entry.id)}
                         >
                           <Trash className="mr-2 h-4 w-4" />
-                          Supprimer
+                          {t("uploads.history.list.actions.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -301,7 +312,9 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
 
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-2">
-          <p className="text-sm text-muted-foreground">Éléments par page</p>
+          <p className="text-sm text-muted-foreground">
+            {t("uploads.history.list.items_per_page")}
+          </p>
           <Select value={pageSize} onValueChange={handlePageSizeChange}>
             <SelectTrigger className="w-[80px]">
               <SelectValue placeholder="25" />
@@ -315,7 +328,7 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
-            {totalItems} élément{totalItems > 1 ? "s" : ""} au total
+            {t("uploads.history.list.total_items", { count: totalItems })}
           </p>
         </div>
 
@@ -327,12 +340,16 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
             disabled={currentPage === 1}
           >
             <ChevronLeft className="h-4 w-4" />
-            Précédent
+            {t("uploads.history.list.pagination.previous")}
           </Button>
           <div className="flex items-center gap-1">
-            <span className="text-sm">Page</span>
+            <span className="text-sm">
+              {t("uploads.history.list.pagination.page")}
+            </span>
             <span className="text-sm font-medium">{currentPage}</span>
-            <span className="text-sm">sur</span>
+            <span className="text-sm">
+              {t("uploads.history.list.pagination.of")}
+            </span>
             <span className="text-sm font-medium">{totalPages}</span>
           </div>
           <Button
@@ -341,7 +358,7 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >
-            Suivant
+            {t("uploads.history.list.pagination.next")}
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

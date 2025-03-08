@@ -1,6 +1,12 @@
 import { readFile } from "fs/promises";
 import { resolve } from "path";
+import { Metadata } from "next";
 import DomainsPage from "./page.client";
+
+export const metadata: Metadata = {
+  title: "Domains | ShareX Manager",
+  description: "Manage domains for your ShareX uploads",
+};
 
 async function getDomainsConfig() {
   try {
@@ -17,7 +23,7 @@ async function getDomainsConfig() {
       },
     };
   } catch (error) {
-    console.error("Erreur lors de la lecture de la configuration:", error);
+    console.error("Error reading configuration:", error);
     return {
       domains: [],
       config: {

@@ -22,7 +22,9 @@
     "more": "More",
     "create": "New",
     "reset": "Reset",
-    "preview": "Preview"
+    "preview": "Preview",
+    "yes": "Yes",
+    "no": "No"
   },
   "navigation": {
     "home": "Home",
@@ -41,6 +43,7 @@
   },
   "settings": {
     "title": "Settings",
+    "description": "Manage all settings for your ShareX Manager application",
     "preferences": "User Preferences",
     "preferences_description": "Customize your display and feature preferences",
     "appearance": "Appearance",
@@ -58,6 +61,119 @@
     "save_success": "Settings saved successfully",
     "select_size": "Select a size",
     "gallery_description": "Configure gallery display settings",
+    "sections": {
+      "upload_config": {
+        "title": "Upload Configuration",
+        "description": "Manage your ShareX upload settings"
+      },
+      "api_keys": {
+        "title": "API Keys",
+        "description": "Manage your API keys for ShareX uploads"
+      },
+      "domains": {
+        "title": "Domains",
+        "description": "Manage domains for your files"
+      },
+      "cleanup": {
+        "title": "Cleanup",
+        "description": "Delete unused files"
+      },
+      "security": {
+        "title": "Security",
+        "description": "Configure security settings"
+      }
+    },
+    "domains": {
+      "config": {
+        "title": "Domain Configuration",
+        "description": "Manage domains used to generate URLs for your files",
+        "force_https": "Force HTTPS",
+        "force_https_description": "Force HTTPS for all URLs",
+        "path_prefix": "Path prefix",
+        "path_prefix_description": "Prefix added to all file URLs",
+        "save": "Save configuration"
+      },
+      "list": {
+        "title": "Domain List",
+        "description": "Manage available domains for your files",
+        "add": "Add domain"
+      },
+      "form": {
+        "add_title": "Add domain",
+        "edit_title": "Edit domain",
+        "add_description": "Add a new domain for your files",
+        "edit_description": "Edit domain information",
+        "id": "Identifier",
+        "id_description": "Unique identifier for this domain",
+        "name": "Name",
+        "name_description": "Display name for the domain",
+        "url": "URL",
+        "url_description": "Base URL for the domain",
+        "default": "Default domain",
+        "default_description": "Use this domain as default",
+        "errors": {
+          "id_required": "Identifier is required",
+          "name_required": "Name is required",
+          "url_invalid": "URL must be valid",
+          "prefix_required": "Prefix is required"
+        }
+      },
+      "table": {
+        "id": "Identifier",
+        "name": "Name",
+        "url": "URL",
+        "default": "Default",
+        "actions": "Actions"
+      },
+      "messages": {
+        "added": "Domain added",
+        "updated": "Domain updated",
+        "deleted": "Domain deleted",
+        "config_updated": "Configuration updated"
+      },
+      "errors": {
+        "save": "Error saving",
+        "delete": "Error deleting",
+        "generic": "An error occurred"
+      }
+    },
+    "api_keys": {
+      "new_key": "New key",
+      "create_key": "Create key",
+      "loading": "Loading API keys...",
+      "never": "Never",
+      "table": {
+        "name": "Name",
+        "key": "Key",
+        "created_at": "Created on",
+        "expires_at": "Expires on",
+        "permissions": "Permissions",
+        "last_used": "Last used",
+        "actions": "Actions"
+      },
+      "no_keys": {
+        "title": "No API keys",
+        "description": "You haven't created any API keys yet. Start by creating one to use ShareX."
+      },
+      "permissions": {
+        "images": "Images",
+        "text": "Text",
+        "files": "Files"
+      },
+      "actions": {
+        "view_details": "View details",
+        "delete": "Delete key"
+      },
+      "delete_confirmation": "This action is irreversible. The key will be permanently deleted.",
+      "messages": {
+        "delete_success": "Key deleted successfully",
+        "copy_success": "Key copied to clipboard"
+      },
+      "errors": {
+        "loading": "Error loading keys",
+        "delete": "Error deleting key"
+      }
+    },
     "gallery": {
       "view_mode": "View Mode",
       "thumbnail_size": "Thumbnail Size",
@@ -395,6 +511,371 @@
     "metadata": {
       "title": "ShareX Manager",
       "description": "Manage your ShareX uploads easily and securely"
+    }
+  },
+  "admin": {
+    "title": "Administration",
+    "description": "Manage administration settings for your ShareX Manager application",
+    "sections": {
+      "users": {
+        "title": "User Management",
+        "description": "Manage users and their permissions"
+      },
+      "logs": {
+        "title": "System Logs",
+        "description": "View logs and system activity"
+      },
+      "system": {
+        "title": "System Configuration",
+        "description": "Manage system settings and upload configuration"
+      },
+      "security": {
+        "title": "Security (Coming soon)",
+        "description": "Configure advanced security settings"
+      }
+    },
+    "security": {
+      "title": "Security",
+      "description": "Configure advanced security settings",
+      "coming_soon": {
+        "title": "Feature Coming Soon",
+        "subtitle": "This section is under development",
+        "description": "Advanced security configuration will be available soon. This section will allow you to:",
+        "check_back": "Check back soon to discover these new features!"
+      },
+      "features": {
+        "password_policies": "Configure password policies",
+        "two_factor": "Manage two-factor authentication (2FA)",
+        "ip_restrictions": "Define IP access restrictions",
+        "sessions": "Configure sessions and their lifetime",
+        "login_attempts": "Manage login attempts and automatic blocking",
+        "security_alerts": "Set up security alerts"
+      }
+    },
+    "system": {
+      "title": "System Configuration",
+      "description": "Manage system settings and upload configuration",
+      "upload_config": {
+        "title": "Upload Configuration",
+        "subtitle": "Manage settings related to file uploads",
+        "description": "Configure allowed file types, size limits, storage options, and more.",
+        "button": "Access upload configuration"
+      },
+      "advanced_config": {
+        "title": "System Configuration",
+        "subtitle": "Advanced system settings (Coming soon)",
+        "description": "This section will allow you to configure advanced system settings:",
+        "coming_soon": "These features will be available in a future update."
+      },
+      "features": {
+        "database": "Database management",
+        "cache": "Cache configuration",
+        "performance": "Performance settings",
+        "backup": "Backup options",
+        "scheduled_tasks": "Scheduled tasks management",
+        "notifications": "System notifications configuration"
+      }
+    },
+    "users": {
+      "title": "User Management",
+      "stats": {
+        "total": "Total Users",
+        "admins": "Administrators",
+        "users": "Users"
+      },
+      "search_placeholder": "Search for a user...",
+      "filter_by_role": "Filter by role",
+      "roles": {
+        "all": "All roles",
+        "admin": "Administrators",
+        "user": "Users",
+        "admin_label": "Administrator",
+        "user_label": "User"
+      },
+      "table": {
+        "username": "Username",
+        "role": "Role",
+        "actions": "Actions"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "delete_dialog": {
+        "title": "Are you sure you want to delete this user?",
+        "description": "This action is irreversible. The user will no longer be able to log in."
+      },
+      "no_users_found": "No users found",
+      "messages": {
+        "delete_success": "User deleted successfully",
+        "refresh_success": "User list updated"
+      },
+      "errors": {
+        "generic": "An error occurred",
+        "refresh": "Error refreshing users"
+      }
+    },
+    "logs": {
+      "title": "System Logs",
+      "description": "View logs and system activity",
+      "level": "Level",
+      "action": "Action",
+      "user": "User",
+      "date_range": "Date Range",
+      "start_date": "Start Date",
+      "end_date": "End Date",
+      "apply_filters": "Apply Filters",
+      "reset_filters": "Reset",
+      "no_logs": "No logs available",
+      "loading": "Loading logs...",
+      "error": "Error loading logs",
+      "refresh": "Refresh",
+      "timestamp": "Timestamp",
+      "message": "Message",
+      "ip": "IP Address",
+      "details": "Details",
+      "system": "System",
+      "user_agent": "User Agent",
+      "metadata": "Metadata",
+      "clear_logs": "Delete all logs",
+      "clear_success": "Logs deleted successfully",
+      "clear_error": "Error deleting logs",
+      "refresh_interval": "Refresh Interval",
+      "refresh_intervals": {
+        "none": "No refresh",
+        "5s": "5 seconds",
+        "10s": "10 seconds",
+        "15s": "15 seconds"
+      },
+      "levels": {
+        "all": "All Levels",
+        "info": "Information",
+        "warning": "Warning",
+        "error": "Error",
+        "debug": "Debug"
+      },
+      "actions": {
+        "all": "All Actions",
+        "login": "Login",
+        "logout": "Logout",
+        "upload": "File Upload",
+        "delete": "File Deletion",
+        "update": "File Modification",
+        "download": "File Download",
+        "admin": "Admin Action",
+        "user_create": "User Creation",
+        "user_update": "User Modification",
+        "user_delete": "User Deletion",
+        "config_update": "Configuration Update",
+        "api_request": "API Request",
+        "api_error": "API Error",
+        "system_error": "System Error"
+      },
+      "filters": {
+        "title": "Filters",
+        "select_level": "Filter by level",
+        "select_action": "Filter by action",
+        "select_user": "Select a user",
+        "select_date": "Select a date",
+        "choose_date": "Choose a date"
+      },
+      "details_dialog": {
+        "title": "Log Details",
+        "close": "Close"
+      }
+    }
+  },
+  "uploads": {
+    "title": "Upload Management",
+    "description": "Manage your ShareX uploads and access all features",
+    "features": {
+      "history": {
+        "title": "History",
+        "description": "View the history of all your uploads"
+      },
+      "stats": {
+        "title": "Statistics",
+        "description": "Visualize statistics of your uploads"
+      },
+      "config": {
+        "title": "Configuration",
+        "description": "Configure your upload settings"
+      }
+    },
+    "history": {
+      "title": "Upload History",
+      "description": "View the history of all files uploaded via ShareX",
+      "filters": {
+        "title": "Filters",
+        "search": "Search",
+        "search_placeholder": "Search for a file...",
+        "upload_method": "Upload method",
+        "all_methods": "All methods",
+        "start_date": "Start date",
+        "end_date": "End date",
+        "choose_date": "Choose a date"
+      },
+      "list": {
+        "title": "Results",
+        "no_results": "No files in history",
+        "loading": "Loading results...",
+        "error": "Error loading history",
+        "anonymous": "Anonymous",
+        "open_menu": "Open menu",
+        "items_per_page": "Items per page",
+        "total_items": "{count} item(s) total",
+        "pagination": {
+          "previous": "Previous",
+          "next": "Next",
+          "page": "Page",
+          "of": "of"
+        },
+        "columns": {
+          "filename": "Filename",
+          "date": "Upload date",
+          "size": "Size",
+          "method": "Method",
+          "actions": "Actions"
+        },
+        "actions": {
+          "view": "View file",
+          "download": "Download",
+          "delete": "Delete",
+          "copy": "Copy link",
+          "delete_success": "Entry has been deleted",
+          "delete_error": "Unable to delete entry"
+        }
+      }
+    },
+    "config": {
+      "title": "Upload Configuration",
+      "description": "Configure your ShareX upload settings",
+      "tabs": {
+        "general": "General",
+        "thumbnails": "Thumbnails",
+        "storage": "Storage"
+      },
+      "general": {
+        "allowed_types": {
+          "title": "Allowed File Types",
+          "description": "Define which file types can be uploaded",
+          "images": "Images (jpg, png, gif, webp)",
+          "documents": "Documents (pdf, doc, txt)",
+          "archives": "Archives (zip, rar)"
+        },
+        "limits": {
+          "title": "Limits",
+          "description": "Configure upload limits",
+          "max_file_size": "Maximum file size (MB)",
+          "min_file_size": "Minimum file size (KB)",
+          "max_files_per_upload": "Maximum files per upload",
+          "max_images": "Images",
+          "max_documents": "Documents",
+          "max_archives": "Archives"
+        },
+        "filename": {
+          "title": "Filename Format",
+          "description": "Configure the format of uploaded filenames",
+          "pattern": "Filename format",
+          "variables": "Available variables: {variables}"
+        }
+      },
+      "storage": {
+        "title": "Storage Configuration",
+        "description": "Storage settings for uploaded files",
+        "path": "Storage path",
+        "structure": {
+          "label": "Folder structure",
+          "flat": "Flat",
+          "date": "By date",
+          "type": "By type"
+        },
+        "preserve_filenames": "Preserve filenames",
+        "replace_existing": "Replace existing files",
+        "thumbnails_path": "Thumbnails path",
+        "date_format": {
+          "folder_structure": "Date folder structure format",
+          "folder_structure_example": "Format: YYYY/MM/DD",
+          "timezone": "Timezone",
+          "timezone_example": "Ex: Europe/London"
+        },
+        "permissions": {
+          "files": "File permissions",
+          "files_example": "Ex: 0644",
+          "directories": "Directory permissions",
+          "directories_example": "Ex: 0755"
+        }
+      },
+      "thumbnails": {
+        "title": "Thumbnail Configuration",
+        "description": "Settings for image thumbnail generation",
+        "enable": "Enable thumbnails",
+        "format": "Output format",
+        "select_format": "Select a format",
+        "formats": {
+          "auto": "Automatic",
+          "jpeg": "JPEG",
+          "png": "PNG",
+          "webp": "WebP"
+        },
+        "preserve_format": "Preserve original format (PNG/WebP)",
+        "fit_mode": "Fit mode",
+        "select_mode": "Select a mode",
+        "fit_modes": {
+          "cover": "Cover",
+          "contain": "Contain",
+          "fill": "Fill",
+          "inside": "Inside",
+          "outside": "Outside"
+        },
+        "background_color": "Background color",
+        "blur": "Blur ({value})",
+        "blur_preview": "Blur preview",
+        "sharpen": "Sharpen",
+        "keep_metadata": "Keep metadata",
+        "max_width": "Maximum width (px)",
+        "max_height": "Maximum height (px)",
+        "quality": "Quality (0-100)"
+      }
+    },
+    "stats": {
+      "title": "Upload Statistics",
+      "description": "Visualize statistics of your ShareX uploads",
+      "cards": {
+        "total_uploads": "Total Uploads",
+        "total_size": "Total Size",
+        "average_size": "Average Size",
+        "uploads_today": "Uploads Today"
+      },
+      "charts": {
+        "uploads_by_day": "Uploads by Day",
+        "uploads_by_type": "Uploads by Type",
+        "uploads_by_method": "Upload Method",
+        "size_distribution": "Size Distribution",
+        "uploads_by_hour": "Uploads by Hour",
+        "uploads_by_weekday": "Uploads by Weekday",
+        "monthly_growth": "Monthly Growth"
+      },
+      "labels": {
+        "api": "API",
+        "web": "Web",
+        "sharex": "ShareX",
+        "total": "Total",
+        "date": "Date",
+        "count": "Count",
+        "size": "Size",
+        "type": "Type",
+        "percentage": "Percentage",
+        "hour": "Hour",
+        "weekday": "Day",
+        "month": "Month",
+        "new_files": "New Files",
+        "oldest_file": "Oldest File",
+        "newest_file": "Newest File",
+        "space_used": "of space used",
+        "files_via_api": "files via API",
+        "files_via_web": "files via web interface"
+      }
     }
   }
 }

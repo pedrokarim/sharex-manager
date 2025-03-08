@@ -43,6 +43,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 const domainSchema = z.object({
   id: z.string().min(1, "L'identifiant est requis"),
@@ -72,12 +73,27 @@ export default function DomainsPage({
   initialDomains,
   initialConfig,
 }: DomainsPageProps) {
+  const { t } = useTranslation();
   const [domains, setDomains] = useState<Domain[]>(initialDomains);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingDomain, setEditingDomain] = useState<Domain | null>(null);
 
+  const domainSchemaWithTranslation = z.object({
+    id: z.string().min(1, t("settings.domains.form.errors.id_required")),
+    name: z.string().min(1, t("settings.domains.form.errors.name_required")),
+    url: z.string().url(t("settings.domains.form.errors.url_invalid")),
+    isDefault: z.boolean().optional(),
+  });
+
+  const configSchemaWithTranslation = z.object({
+    useSSL: z.boolean(),
+    pathPrefix: z
+      .string()
+      .min(1, t("settings.domains.form.errors.prefix_required")),
+  });
+
   const domainForm = useForm<DomainFormValues>({
-    resolver: zodResolver(domainSchema),
+    resolver: zodResolver(domainSchemaWithTranslation),
     defaultValues: {
       id: "",
       name: "",
@@ -87,7 +103,7 @@ export default function DomainsPage({
   });
 
   const configForm = useForm<ConfigFormValues>({
-    resolver: zodResolver(configSchema),
+    resolver: zodResolver(configSchemaWithTranslation),
     defaultValues: {
       useSSL: initialConfig.useSSL,
       pathPrefix: initialConfig.pathPrefix,
@@ -102,7 +118,7 @@ export default function DomainsPage({
         body: JSON.stringify(values),
       });
 
-      if (!response.ok) throw new Error("Erreur lors de la sauvegarde");
+      if (!response.ok) throw new Error(t("settings.domains.errors.save"));
 
       const updatedDomain = await response.json();
 
@@ -117,9 +133,13 @@ export default function DomainsPage({
       setIsAddDialogOpen(false);
       setEditingDomain(null);
       domainForm.reset();
-      toast.success(editingDomain ? "Domaine mis à jour" : "Domaine ajouté");
+      toast.success(
+        editingDomain
+          ? t("settings.domains.messages.updated")
+          : t("settings.domains.messages.added")
+      );
     } catch (error) {
-      toast.error("Une erreur est survenue");
+      toast.error(t("settings.domains.errors.generic"));
     }
   };
 
@@ -131,11 +151,11 @@ export default function DomainsPage({
         body: JSON.stringify(values),
       });
 
-      if (!response.ok) throw new Error("Erreur lors de la sauvegarde");
+      if (!response.ok) throw new Error(t("settings.domains.errors.save"));
 
-      toast.success("Configuration mise à jour");
+      toast.success(t("settings.domains.messages.config_updated"));
     } catch (error) {
-      toast.error("Une erreur est survenue");
+      toast.error(t("settings.domains.errors.generic"));
     }
   };
 
@@ -145,12 +165,12 @@ export default function DomainsPage({
         method: "DELETE",
       });
 
-      if (!response.ok) throw new Error("Erreur lors de la suppression");
+      if (!response.ok) throw new Error(t("settings.domains.errors.delete"));
 
       setDomains(domains.filter((d) => d.id !== id));
-      toast.success("Domaine supprimé");
+      toast.success(t("settings.domains.messages.deleted"));
     } catch (error) {
-      toast.error("Une erreur est survenue");
+      toast.error(t("settings.domains.errors.generic"));
     }
   };
 
@@ -164,9 +184,9 @@ export default function DomainsPage({
     <div className="p-8 space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Configuration des domaines</CardTitle>
+          <CardTitle>{t("settings.domains.config.title")}</CardTitle>
           <CardDescription>
-            Gérez les domaines utilisés pour générer les URLs de vos fichiers
+            {t("settings.domains.config.description")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -181,9 +201,11 @@ export default function DomainsPage({
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <FormLabel>Forcer HTTPS</FormLabel>
+                      <FormLabel>
+                        {t("settings.domains.config.force_https")}
+                      </FormLabel>
                       <FormDescription>
-                        Force l'utilisation de HTTPS pour toutes les URLs
+                        {t("settings.domains.config.force_https_description")}
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -200,18 +222,20 @@ export default function DomainsPage({
                 name="pathPrefix"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Préfixe du chemin</FormLabel>
+                    <FormLabel>
+                      {t("settings.domains.config.path_prefix")}
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="/uploads" />
                     </FormControl>
                     <FormDescription>
-                      Préfixe ajouté à toutes les URLs de fichiers
+                      {t("settings.domains.config.path_prefix_description")}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit">Enregistrer la configuration</Button>
+              <Button type="submit">{t("settings.domains.config.save")}</Button>
             </form>
           </Form>
         </CardContent>
@@ -221,29 +245,29 @@ export default function DomainsPage({
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Liste des domaines</CardTitle>
+              <CardTitle>{t("settings.domains.list.title")}</CardTitle>
               <CardDescription>
-                Gérez les domaines disponibles pour vos fichiers
+                {t("settings.domains.list.description")}
               </CardDescription>
             </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
-                  Ajouter un domaine
+                  {t("settings.domains.list.add")}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>
                     {editingDomain
-                      ? "Modifier le domaine"
-                      : "Ajouter un domaine"}
+                      ? t("settings.domains.form.edit_title")
+                      : t("settings.domains.form.add_title")}
                   </DialogTitle>
                   <DialogDescription>
                     {editingDomain
-                      ? "Modifiez les informations du domaine"
-                      : "Ajoutez un nouveau domaine pour vos fichiers"}
+                      ? t("settings.domains.form.edit_description")
+                      : t("settings.domains.form.add_description")}
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...domainForm}>
@@ -256,12 +280,12 @@ export default function DomainsPage({
                       name="id"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Identifiant</FormLabel>
+                          <FormLabel>{t("settings.domains.form.id")}</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="mon-domaine" />
+                            <Input {...field} placeholder="my-domain" />
                           </FormControl>
                           <FormDescription>
-                            Identifiant unique pour ce domaine
+                            {t("settings.domains.form.id_description")}
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -272,12 +296,14 @@ export default function DomainsPage({
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Nom</FormLabel>
+                          <FormLabel>
+                            {t("settings.domains.form.name")}
+                          </FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="Mon Domaine" />
+                            <Input {...field} placeholder="My Domain" />
                           </FormControl>
                           <FormDescription>
-                            Nom d'affichage du domaine
+                            {t("settings.domains.form.name_description")}
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -288,7 +314,9 @@ export default function DomainsPage({
                       name="url"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>URL</FormLabel>
+                          <FormLabel>
+                            {t("settings.domains.form.url")}
+                          </FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -296,7 +324,7 @@ export default function DomainsPage({
                             />
                           </FormControl>
                           <FormDescription>
-                            URL de base du domaine
+                            {t("settings.domains.form.url_description")}
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -308,9 +336,11 @@ export default function DomainsPage({
                       render={({ field }) => (
                         <FormItem className="flex items-center justify-between">
                           <div className="space-y-0.5">
-                            <FormLabel>Domaine par défaut</FormLabel>
+                            <FormLabel>
+                              {t("settings.domains.form.default")}
+                            </FormLabel>
                             <FormDescription>
-                              Utiliser ce domaine par défaut
+                              {t("settings.domains.form.default_description")}
                             </FormDescription>
                           </div>
                           <FormControl>
@@ -324,7 +354,7 @@ export default function DomainsPage({
                     />
                     <DialogFooter>
                       <Button type="submit">
-                        {editingDomain ? "Modifier" : "Ajouter"}
+                        {editingDomain ? t("common.edit") : t("common.create")}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -337,11 +367,13 @@ export default function DomainsPage({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Identifiant</TableHead>
-                <TableHead>Nom</TableHead>
-                <TableHead>URL</TableHead>
-                <TableHead>Par défaut</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t("settings.domains.table.id")}</TableHead>
+                <TableHead>{t("settings.domains.table.name")}</TableHead>
+                <TableHead>{t("settings.domains.table.url")}</TableHead>
+                <TableHead>{t("settings.domains.table.default")}</TableHead>
+                <TableHead className="text-right">
+                  {t("settings.domains.table.actions")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -350,7 +382,9 @@ export default function DomainsPage({
                   <TableCell>{domain.id}</TableCell>
                   <TableCell>{domain.name}</TableCell>
                   <TableCell>{domain.url}</TableCell>
-                  <TableCell>{domain.isDefault ? "Oui" : "Non"}</TableCell>
+                  <TableCell>
+                    {domain.isDefault ? t("common.yes") : t("common.no")}
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"

@@ -37,8 +37,9 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon, RefreshCw, Info } from "lucide-react";
 import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { useDateLocale } from "@/lib/i18n/date-locales";
 import { Loading } from "@/components/ui/loading";
+import { useTranslation } from "@/lib/i18n";
 
 const ITEMS_PER_PAGE = 50;
 
@@ -49,14 +50,17 @@ const levelColors = {
   debug: "bg-gray-500",
 } as const;
 
-const REFRESH_INTERVALS = {
-  "0": "Pas de rafraîchissement",
-  "5": "5 secondes",
-  "10": "10 secondes",
-  "15": "15 secondes",
-} as const;
-
 export default function LogsPage() {
+  const { t } = useTranslation();
+  const locale = useDateLocale();
+
+  const REFRESH_INTERVALS = {
+    "0": t("admin.logs.refresh_intervals.none"),
+    "5": t("admin.logs.refresh_intervals.5s"),
+    "10": t("admin.logs.refresh_intervals.10s"),
+    "15": t("admin.logs.refresh_intervals.15s"),
+  } as const;
+
   const [level, setLevel] = useQueryState<LogLevel | "all">("level", {
     defaultValue: "all",
     parse: (value) => value as LogLevel | "all",
@@ -96,8 +100,7 @@ export default function LogsPage() {
         const response = await fetch(
           `/api/admin/logs?${searchParams.toString()}`
         );
-        if (!response.ok)
-          throw new Error("Erreur lors de la récupération des logs");
+        if (!response.ok) throw new Error(t("admin.logs.error"));
         return response.json() as Promise<Log[]>;
       },
       initialPageParam: 0,
@@ -121,22 +124,20 @@ export default function LogsPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la suppression des logs");
+        throw new Error(t("admin.logs.clear_error"));
       }
 
-      toast.success("Logs supprimés avec succès");
+      toast.success(t("admin.logs.clear_success"));
       refetch();
     } catch (error) {
-      toast.error("Erreur lors de la suppression des logs");
+      toast.error(t("admin.logs.clear_error"));
     }
   };
 
   if (isError) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-destructive">
-          Une erreur est survenue lors du chargement des logs
-        </p>
+        <p className="text-destructive">{t("admin.logs.error")}</p>
       </div>
     );
   }
@@ -151,14 +152,26 @@ export default function LogsPage() {
               onValueChange={(value) => setLevel(value as LogLevel | "all")}
             >
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filtrer par niveau" />
+                <SelectValue
+                  placeholder={t("admin.logs.filters.select_level")}
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les niveaux</SelectItem>
-                <SelectItem value="info">Info</SelectItem>
-                <SelectItem value="warning">Warning</SelectItem>
-                <SelectItem value="error">Error</SelectItem>
-                <SelectItem value="debug">Debug</SelectItem>
+                <SelectItem value="all">
+                  {t("admin.logs.levels.all")}
+                </SelectItem>
+                <SelectItem value="info">
+                  {t("admin.logs.levels.info")}
+                </SelectItem>
+                <SelectItem value="warning">
+                  {t("admin.logs.levels.warning")}
+                </SelectItem>
+                <SelectItem value="error">
+                  {t("admin.logs.levels.error")}
+                </SelectItem>
+                <SelectItem value="debug">
+                  {t("admin.logs.levels.debug")}
+                </SelectItem>
               </SelectContent>
             </Select>
 
@@ -167,40 +180,56 @@ export default function LogsPage() {
               onValueChange={(value) => setAction(value as LogAction | "all")}
             >
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filtrer par action" />
+                <SelectValue
+                  placeholder={t("admin.logs.filters.select_action")}
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Toutes les actions</SelectItem>
-                <SelectItem value="auth.login">Connexion</SelectItem>
-                <SelectItem value="auth.logout">Déconnexion</SelectItem>
-                <SelectItem value="file.upload">Upload de fichier</SelectItem>
+                <SelectItem value="all">
+                  {t("admin.logs.actions.all")}
+                </SelectItem>
+                <SelectItem value="auth.login">
+                  {t("admin.logs.actions.login")}
+                </SelectItem>
+                <SelectItem value="auth.logout">
+                  {t("admin.logs.actions.logout")}
+                </SelectItem>
+                <SelectItem value="file.upload">
+                  {t("admin.logs.actions.upload")}
+                </SelectItem>
                 <SelectItem value="file.delete">
-                  Suppression de fichier
+                  {t("admin.logs.actions.delete")}
                 </SelectItem>
                 <SelectItem value="file.update">
-                  Modification de fichier
+                  {t("admin.logs.actions.update")}
                 </SelectItem>
                 <SelectItem value="file.download">
-                  Téléchargement de fichier
+                  {t("admin.logs.actions.download")}
                 </SelectItem>
                 <SelectItem value="admin.action">
-                  Action administrateur
+                  {t("admin.logs.actions.admin")}
                 </SelectItem>
                 <SelectItem value="user.create">
-                  Création d'utilisateur
+                  {t("admin.logs.actions.user_create")}
                 </SelectItem>
                 <SelectItem value="user.update">
-                  Modification d'utilisateur
+                  {t("admin.logs.actions.user_update")}
                 </SelectItem>
                 <SelectItem value="user.delete">
-                  Suppression d'utilisateur
+                  {t("admin.logs.actions.user_delete")}
                 </SelectItem>
                 <SelectItem value="config.update">
-                  Modification de configuration
+                  {t("admin.logs.actions.config_update")}
                 </SelectItem>
-                <SelectItem value="api.request">Requête API</SelectItem>
-                <SelectItem value="api.error">Erreur API</SelectItem>
-                <SelectItem value="system.error">Erreur système</SelectItem>
+                <SelectItem value="api.request">
+                  {t("admin.logs.actions.api_request")}
+                </SelectItem>
+                <SelectItem value="api.error">
+                  {t("admin.logs.actions.api_error")}
+                </SelectItem>
+                <SelectItem value="system.error">
+                  {t("admin.logs.actions.system_error")}
+                </SelectItem>
               </SelectContent>
             </Select>
 
@@ -212,8 +241,8 @@ export default function LogsPage() {
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {startDate
-                    ? format(new Date(startDate), "P", { locale: fr })
-                    : "Date de début"}
+                    ? format(new Date(startDate), "P", { locale })
+                    : t("admin.logs.start_date")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -222,6 +251,7 @@ export default function LogsPage() {
                   selected={startDate ? new Date(startDate) : undefined}
                   onSelect={(date) => setStartDate(date?.toISOString() || null)}
                   initialFocus
+                  locale={locale}
                 />
               </PopoverContent>
             </Popover>
@@ -234,8 +264,8 @@ export default function LogsPage() {
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {endDate
-                    ? format(new Date(endDate), "P", { locale: fr })
-                    : "Date de fin"}
+                    ? format(new Date(endDate), "P", { locale })
+                    : t("admin.logs.end_date")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -244,6 +274,7 @@ export default function LogsPage() {
                   selected={endDate ? new Date(endDate) : undefined}
                   onSelect={(date) => setEndDate(date?.toISOString() || null)}
                   initialFocus
+                  locale={locale}
                 />
               </PopoverContent>
             </Popover>
@@ -257,7 +288,7 @@ export default function LogsPage() {
               }
             >
               <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Intervalle de rafraîchissement" />
+                <SelectValue placeholder={t("admin.logs.refresh_interval")} />
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(REFRESH_INTERVALS).map(([value, label]) => (
@@ -272,7 +303,7 @@ export default function LogsPage() {
             </Select>
 
             <Button variant="destructive" onClick={handleClearLogs}>
-              Supprimer tous les logs
+              {t("admin.logs.clear_logs")}
             </Button>
           </div>
         </div>
@@ -282,19 +313,19 @@ export default function LogsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Niveau</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Message</TableHead>
-              <TableHead>Utilisateur</TableHead>
-              <TableHead>Détails</TableHead>
+              <TableHead>{t("admin.logs.timestamp")}</TableHead>
+              <TableHead>{t("admin.logs.level")}</TableHead>
+              <TableHead>{t("admin.logs.action")}</TableHead>
+              <TableHead>{t("admin.logs.message")}</TableHead>
+              <TableHead>{t("admin.logs.user")}</TableHead>
+              <TableHead>{t("admin.logs.details")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data?.pages[0]?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
-                  Aucun log disponible
+                  {t("admin.logs.no_logs")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -317,7 +348,9 @@ export default function LogsPage() {
                     </TableCell>
                     <TableCell>{log.action}</TableCell>
                     <TableCell>{log.message}</TableCell>
-                    <TableCell>{log.userEmail || "Système"}</TableCell>
+                    <TableCell>
+                      {log.userEmail || t("admin.logs.system")}
+                    </TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
@@ -340,20 +373,20 @@ export default function LogsPage() {
       <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Détails du log</DialogTitle>
+            <DialogTitle>{t("admin.logs.details_dialog.title")}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="font-semibold">Date</p>
+                <p className="font-semibold">{t("admin.logs.timestamp")}</p>
                 <p>
                   {selectedLog &&
                     new Date(selectedLog.timestamp).toLocaleString()}
                 </p>
               </div>
               <div>
-                <p className="font-semibold">Niveau</p>
+                <p className="font-semibold">{t("admin.logs.level")}</p>
                 <p>
                   {selectedLog && (
                     <Badge
@@ -366,33 +399,35 @@ export default function LogsPage() {
                 </p>
               </div>
               <div>
-                <p className="font-semibold">Action</p>
+                <p className="font-semibold">{t("admin.logs.action")}</p>
                 <p>{selectedLog?.action}</p>
               </div>
               <div>
-                <p className="font-semibold">Utilisateur</p>
-                <p>{selectedLog?.userEmail || "Système"}</p>
+                <p className="font-semibold">{t("admin.logs.user")}</p>
+                <p>{selectedLog?.userEmail || t("admin.logs.system")}</p>
               </div>
               <div className="col-span-2">
-                <p className="font-semibold">Message</p>
+                <p className="font-semibold">{t("admin.logs.message")}</p>
                 <p>{selectedLog?.message}</p>
               </div>
               {selectedLog?.ip && (
                 <div>
-                  <p className="font-semibold">IP</p>
+                  <p className="font-semibold">{t("admin.logs.ip")}</p>
                   <p>{selectedLog.ip}</p>
                 </div>
               )}
               {selectedLog?.userAgent && (
                 <div className="col-span-2">
-                  <p className="font-semibold">User Agent</p>
+                  <p className="font-semibold">{t("admin.logs.user_agent")}</p>
                   <p className="truncate">{selectedLog.userAgent}</p>
                 </div>
               )}
               {selectedLog?.metadata &&
                 Object.keys(selectedLog.metadata).length > 0 && (
                   <div className="col-span-2">
-                    <p className="font-semibold mb-2">Métadonnées</p>
+                    <p className="font-semibold mb-2">
+                      {t("admin.logs.metadata")}
+                    </p>
                     <pre className="bg-muted p-4 rounded-lg overflow-auto max-h-[300px]">
                       <code>
                         {JSON.stringify(selectedLog.metadata, null, 2)}
