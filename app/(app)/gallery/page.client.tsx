@@ -15,6 +15,7 @@ import { GridView } from "@/components/gallery/grid-view";
 import { ListView } from "@/components/gallery/list-view";
 import { FileViewer } from "@/components/gallery/file-viewer";
 import { UploadZone } from "@/components/gallery/upload-zone";
+import { usePreferences } from "@/lib/stores/preferences";
 import {
   Select,
   SelectContent,
@@ -35,6 +36,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
+import { RefreshInterval } from "@/components/refresh-interval";
+import { Loading } from "@/components/ui/loading";
 
 interface FileInfo {
   name: string;
@@ -158,24 +161,34 @@ export function GalleryClient({
   starredOnly = false,
 }: GalleryClientProps) {
   const { data: session, status } = useSession();
+  const preferences = usePreferences();
   const [search] = useQueryState("q");
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
   const [page, setPage] = useState(initialPage);
   const [viewMode] = useQueryState<"grid" | "list" | "details">("view", {
-    defaultValue: initialView,
+    defaultValue: preferences.galleryViewMode,
     parse: (value): "grid" | "list" | "details" => {
       if (value === "grid" || value === "list" || value === "details") {
         return value;
       }
-      return "grid";
+      return preferences.galleryViewMode;
     },
   });
-  const [refreshInterval, setRefreshInterval] = useState<string>("0");
-  const [newFileIds, setNewFileIds] = useState<string[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [newFileIds, setNewFileIds] = useState<string[]>([]);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isSecureUpload, setIsSecureUpload] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  useEffect(() => {
+    // Simuler un temps de chargement pour une meilleure expérience utilisateur
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const fetchFiles = useCallback(
     async (page: number) => {
@@ -256,14 +269,14 @@ export function GalleryClient({
   }, [fetchFiles]);
 
   useEffect(() => {
-    const interval = Number.parseInt(refreshInterval);
-    if (interval === 0) return;
+    if (preferences.autoRefreshInterval === 0) return;
 
     const timer = setInterval(() => {
       handleRefresh();
-    }, interval * 1000);
+    }, preferences.autoRefreshInterval * 1000);
+
     return () => clearInterval(timer);
-  }, [refreshInterval, handleRefresh]);
+  }, [preferences.autoRefreshInterval]);
 
   useEffect(() => {
     const handleFilesUploaded = (event: Event) => {
@@ -472,6 +485,16 @@ export function GalleryClient({
     }
   };
 
+  useEffect(() => {
+    if (viewMode !== preferences.galleryViewMode) {
+      preferences.updatePreferences({ galleryViewMode: viewMode });
+    }
+  }, [viewMode]);
+
+  if (isInitialLoading) {
+    return <Loading fullHeight />;
+  }
+
   return (
     <>
       <div className="p-8">
@@ -485,19 +508,7 @@ export function GalleryClient({
           </h1>
           <div className="flex items-center gap-4">
             <ViewSelector />
-
-            <Select value={refreshInterval} onValueChange={setRefreshInterval}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Rafraîchissement auto" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">Pas de rafraîchissement</SelectItem>
-                <SelectItem value="5">5s</SelectItem>
-                <SelectItem value="10">10s</SelectItem>
-                <SelectItem value="15">15s</SelectItem>
-              </SelectContent>
-            </Select>
-
+            <RefreshInterval />
             <Button
               variant="outline"
               size="icon"
@@ -510,7 +521,6 @@ export function GalleryClient({
             >
               <RefreshCcw className="h-4 w-4" />
             </Button>
-
             <Button onClick={() => setIsUploadModalOpen(true)}>Upload</Button>
           </div>
         </div>
@@ -562,7 +572,12 @@ export function GalleryClient({
             ))}
             <div ref={ref} className="h-10 flex items-center justify-center">
               {loading && (
-                <div className="text-muted-foreground">Chargement...</div>
+                <Loading
+                  variant="minimal"
+                  size="sm"
+                  showMessage={true}
+                  className="text-xs"
+                />
               )}
             </div>
           </>

@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 import type { UploadConfig } from "@/lib/types/upload-config";
 import { logDb } from "@/lib/utils/db";
 import { auth } from "@/auth";
+import { defaultConfig } from "@/lib/defaultConfig";
 
 const CONFIG_PATH = resolve(process.cwd(), "config", "uploads.json");
 
@@ -13,15 +14,16 @@ async function readConfig(): Promise<UploadConfig> {
     return JSON.parse(configFile);
   } catch (error) {
     logDb.createLog({
-      level: "error",
+      level: "warning",
       action: "system.error",
-      message: "Erreur lors de la lecture de la configuration",
+      message:
+        "Configuration non trouvée, utilisation de la configuration par défaut",
       metadata: {
         error: error instanceof Error ? error.message : "Unknown error",
         configPath: CONFIG_PATH,
       },
     });
-    throw new Error("Erreur lors de la lecture de la configuration");
+    return defaultConfig;
   }
 }
 
@@ -46,14 +48,8 @@ export async function GET() {
   const session = await auth();
   try {
     if (!session?.user) {
-      logDb.createLog({
-        level: "warning",
-        action: "admin.action",
-        message: "Tentative de lecture de configuration non autorisée",
-        userId: session?.user?.id || undefined,
-        userEmail: session?.user?.email || undefined,
-      });
-      return Response.json({ error: "Non autorisé" }, { status: 401 });
+      // Si l'utilisateur n'est pas authentifié, retourner la configuration par défaut
+      return Response.json(defaultConfig);
     }
 
     const config = await readConfig();
@@ -78,10 +74,8 @@ export async function GET() {
         error: error instanceof Error ? error.message : "Unknown error",
       },
     });
-    return Response.json(
-      { error: "Erreur lors de la récupération de la configuration" },
-      { status: 500 }
-    );
+    // En cas d'erreur, retourner la configuration par défaut
+    return Response.json(defaultConfig);
   }
 }
 

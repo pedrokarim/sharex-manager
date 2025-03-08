@@ -17,6 +17,9 @@ import {
   Send,
   UserCog,
   Info,
+  Sliders,
+  Key,
+  Share2,
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -111,20 +114,29 @@ const data = {
       icon: Settings2,
       items: [
         {
+          title: "Préférences",
+          url: "/settings/preferences",
+          icon: Sliders,
+        },
+        {
           title: "Général",
           url: "/settings/general",
+          icon: Settings,
         },
         {
           title: "Clés API",
           url: "/settings/api-keys",
+          icon: Key,
         },
         {
           title: "Sécurité",
           url: "/settings/security",
+          icon: Shield,
         },
         {
           title: "Intégrations",
           url: "/settings/integrations",
+          icon: Share2,
         },
       ],
     },
@@ -155,6 +167,11 @@ const data = {
     },
   ],
   navSecondary: [
+    {
+      title: "Préférences",
+      url: "/settings/preferences",
+      icon: Sliders,
+    },
     {
       title: "Support",
       url: "/support",

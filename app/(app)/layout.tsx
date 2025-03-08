@@ -22,7 +22,7 @@ export default async function RootLayout({
           <AppSidebar />
 
           <div className="flex-1 relative">
-            <SidebarInset>
+            <SidebarInset className="h-full">
               <SidebarHeader showSearch={true} />
               {children}
             </SidebarInset>
