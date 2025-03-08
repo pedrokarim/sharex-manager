@@ -38,6 +38,7 @@ import {
 import { CalendarIcon, RefreshCw, Info } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { Loading } from "@/components/ui/loading";
 
 const ITEMS_PER_PAGE = 50;
 
@@ -406,11 +407,25 @@ export default function LogsPage() {
 
       {isLoading && (
         <div className="mt-4 flex justify-center">
-          <p>Chargement...</p>
+          <Loading
+            variant="minimal"
+            size="sm"
+            showMessage={true}
+            className="text-xs"
+          />
         </div>
       )}
 
-      <div ref={ref} className="h-10" />
+      <div ref={ref} className="h-10 flex items-center justify-center">
+        {hasNextPage && (
+          <Loading
+            variant="minimal"
+            size="sm"
+            showMessage={true}
+            className="text-xs"
+          />
+        )}
+      </div>
     </div>
   );
 }
