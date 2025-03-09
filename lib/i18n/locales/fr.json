@@ -24,7 +24,8 @@
     "reset": "Réinitialiser",
     "preview": "Aperçu",
     "yes": "Oui",
-    "no": "Non"
+    "no": "Non",
+    "apply": "Appliquer"
   },
   "navigation": {
     "home": "Accueil",
@@ -315,6 +316,51 @@
         "date_added": "Date d'ajout",
         "size": "Taille",
         "kb": "Ko"
+      },
+      "name": "Nom",
+      "date": "Date",
+      "size": "Taille",
+      "url": "URL",
+      "actions": "Actions",
+      "copy_url": "Copier l'URL",
+      "open": "Ouvrir",
+      "secured": "Sécurisé",
+      "public": "Public",
+      "starred": "Favori",
+      "star": "Ajouter aux favoris",
+      "process_image": "Traiter l'image",
+      "modules": {
+        "title": "Modules disponibles",
+        "loading": "Chargement des modules...",
+        "no_modules": "Aucun module disponible pour ce type de fichier",
+        "apply_error": "Erreur lors de l'application du module",
+        "apply_success": "Module {module} appliqué avec succès",
+        "fetch_error": "Erreur lors de la récupération des modules",
+        "module_not_found": "Module non trouvé",
+        "ui_load_error": "Erreur lors du chargement de l'interface",
+        "module_load_failed": "Le module {module} n'a pas pu être chargé",
+        "unknown_error": "Erreur inconnue",
+        "all": "Tous",
+        "other": "Autres",
+        "categories": {
+          "edition": "Édition",
+          "brand": "Marque",
+          "effects": "Effets",
+          "filters": "Filtres"
+        },
+        "categories_additional": {
+          "edition_alt": "Édition d'image",
+          "brand_alt": "Marque et identité",
+          "effects_alt": "Effets spéciaux",
+          "filters_alt": "Filtres d'image"
+        },
+        "install_dependencies": "Installation des dépendances...",
+        "install_success": "Dépendances installées avec succès",
+        "install_error": "Erreur lors de l'installation des dépendances",
+        "processing": "Traitement en cours...",
+        "select_module": "Sélectionner un module",
+        "apply_module": "Appliquer le module",
+        "cancel_processing": "Annuler le traitement"
       }
     },
     "upload_zone": {
@@ -876,6 +922,83 @@
         "files_via_api": "fichiers via l'API",
         "files_via_web": "fichiers via l'interface"
       }
+    }
+  },
+  "modules": {
+    "crop": {
+      "title": "Recadrage",
+      "description": "Recadrez votre image avec précision",
+      "aspect_ratio": "Ratio d'aspect",
+      "aspect_ratios": {
+        "free": "Libre",
+        "square": "Carré (1:1)",
+        "landscape": "Paysage (4:3)",
+        "widescreen": "Écran large (16:9)",
+        "portrait": "Portrait (2:3)"
+      },
+      "circular_crop": "Recadrage circulaire",
+      "quality": "Qualité de l'image",
+      "apply": "Appliquer le recadrage",
+      "preview": "Aperçu du recadrage",
+      "reset": "Réinitialiser",
+      "aspect_ratio_alt": "Proportions de l'image"
+    },
+    "resize": {
+      "title": "Redimensionnement",
+      "description": "Modifiez la taille de votre image",
+      "max_width": "Largeur maximale",
+      "max_height": "Hauteur maximale",
+      "quality": "Qualité de l'image",
+      "maintain_aspect_ratio": "Conserver les proportions",
+      "dimensions": {
+        "original": "Dimensions originales",
+        "new": "Nouvelles dimensions",
+        "reduction": "Réduction"
+      },
+      "apply": "Appliquer le redimensionnement",
+      "preview": "Aperçu du redimensionnement",
+      "reset": "Réinitialiser les dimensions"
+    },
+    "watermark": {
+      "title": "Filigrane",
+      "description": "Ajoutez un filigrane à votre image",
+      "text": "Texte du filigrane",
+      "position": "Position",
+      "positions": {
+        "top_left": "Haut gauche",
+        "top_center": "Haut centre",
+        "top_right": "Haut droite",
+        "middle_left": "Milieu gauche",
+        "middle_center": "Milieu centre",
+        "middle_right": "Milieu droite",
+        "bottom_left": "Bas gauche",
+        "bottom_center": "Bas centre",
+        "bottom_right": "Bas droite"
+      },
+      "opacity": "Opacité",
+      "font_size": "Taille de police",
+      "color": "Couleur",
+      "padding": "Marge",
+      "preview": "Aperçu",
+      "tips": {
+        "title": "Conseils",
+        "opacity": "Utilisez une opacité réduite pour un filigrane discret",
+        "font_size": "Ajustez la taille de police en fonction de la taille de l'image",
+        "position": "Les coins sont généralement les meilleurs emplacements pour les filigranes",
+        "color": "Utilisez une couleur contrastée avec votre image"
+      },
+      "apply": "Appliquer le filigrane",
+      "text_placeholder": "Entrez le texte du filigrane",
+      "choose_position": "Choisir une position"
+    },
+    "common": {
+      "loading": "Chargement de l'interface...",
+      "error": "Erreur lors du chargement",
+      "success": "Opération réussie",
+      "apply": "Appliquer",
+      "cancel": "Annuler",
+      "reset": "Réinitialiser",
+      "preview": "Aperçu"
     }
   }
 }

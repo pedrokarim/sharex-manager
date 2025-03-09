@@ -1,0 +1,9 @@
+{
+  "name": "module-resize",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "sharp": "^0.32.1",
+    "react-slider": "^2.0.6"
+  }
+}

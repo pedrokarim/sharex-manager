@@ -1,0 +1,31 @@
+{
+  "advanced": {
+    "title": "Options avancées",
+    "grid_overlay": "Afficher la grille",
+    "grid_type": "Type de grille",
+    "grid_types": {
+      "rule_of_thirds": "Règle des tiers",
+      "golden_ratio": "Nombre d'or",
+      "diagonal": "Diagonales",
+      "center": "Centre",
+      "none": "Aucune"
+    },
+    "zoom": "Zoom",
+    "rotate": "Rotation",
+    "flip_horizontal": "Retourner horizontalement",
+    "flip_vertical": "Retourner verticalement",
+    "reset_rotation": "Réinitialiser la rotation",
+    "reset_zoom": "Réinitialiser le zoom"
+  },
+  "tools": {
+    "crop": "Recadrer",
+    "rotate": "Pivoter",
+    "flip": "Retourner",
+    "zoom": "Zoomer"
+  },
+  "help": {
+    "drag": "Faites glisser pour recadrer",
+    "resize": "Redimensionnez les poignées pour ajuster",
+    "apply": "Cliquez sur Appliquer pour confirmer"
+  }
+}

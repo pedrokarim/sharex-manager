@@ -6,3 +6,199 @@ Tu dois d'abord vérifier si un élément existe déjà dans ton index avant de 
 - All `Shadcn` components are contained in the `components/ui` folder
 - For the authentication system, we use `next-auth` in version beta, so version 5. If there is still any doubt, you can check the `package.json` file
 - The authentication function for Next Haute is in the root, so if you are in the project and want to use Next Haute for user connection verification, know that the haute function that allows you to retrieve the user session is in a file called host in the root project here `auth.ts`
+
+# Règles d'utilisation des Hooks React
+
+## Règles fondamentales des Hooks
+
+1. **N'appelez les Hooks qu'au niveau racine**
+   - N'appelez JAMAIS les Hooks à l'intérieur de boucles, de conditions ou de fonctions imbriquées
+   - Appelez toujours les Hooks au niveau supérieur de votre composant React
+   - Cette règle garantit que les Hooks sont appelés dans le même ordre à chaque rendu
+
+2. **N'appelez les Hooks que depuis des composants React ou des Hooks personnalisés**
+   - N'appelez pas les Hooks depuis des fonctions JavaScript ordinaires
+   - Appelez les Hooks uniquement depuis des composants fonctionnels React
+   - Appelez les Hooks depuis des Hooks personnalisés (qui commencent par "use")
+
+3. **Les Hooks personnalisés doivent commencer par "use"**
+   - Tous les Hooks personnalisés DOIVENT commencer par "use" (ex: useMonHook)
+   - Cela permet à l'analyseur statique de détecter les violations des règles des Hooks
+
+## Règles spécifiques pour les Hooks courants
+
+### useState
+- Déclarez toujours les états au niveau racine du composant
+- N'utilisez pas la valeur d'état directement après l'avoir mise à jour (React met à jour l'état de manière asynchrone)
+- Utilisez la forme fonctionnelle du setState lorsque vous dépendez de l'état précédent:
+  ```jsx
+  // CORRECT
+  setCount(prevCount => prevCount + 1)
+  
+  // INCORRECT - peut causer des bugs
+  setCount(count + 1)
+  ```
+
+### useEffect
+- Spécifiez TOUJOURS un tableau de dépendances
+- Incluez toutes les valeurs du scope du composant qui sont utilisées dans l'effet
+- N'omettez pas de dépendances à moins d'avoir une bonne raison
+- Nettoyez les ressources dans la fonction de retour (return) si nécessaire
+- Évitez les dépendances circulaires qui causent des boucles infinies
+- N'utilisez pas useEffect pour des événements synchrones qui doivent se produire pendant le rendu
+- **N'incluez JAMAIS les fonctions de traduction (t, i18n, etc.) dans les dépendances des hooks** - Ces fonctions sont gérées par les bibliothèques de traduction et sont stables entre les rendus
+
+### useCallback et useMemo
+- Utilisez useCallback pour mémoriser des fonctions qui sont passées aux composants enfants
+- Utilisez useMemo pour mémoriser des calculs coûteux
+- Spécifiez toujours un tableau de dépendances complet
+- N'utilisez pas ces Hooks prématurément pour l'optimisation
+- **N'incluez JAMAIS les fonctions de traduction (t, i18n, etc.) dans les dépendances des hooks** - Ces fonctions sont gérées par les bibliothèques de traduction et sont stables entre les rendus
+
+### useRef
+- Utilisez useRef pour accéder aux éléments DOM ou pour stocker des valeurs mutables qui ne déclenchent pas de re-rendu
+- N'accédez pas à ref.current pendant le rendu (sauf pour l'initialisation)
+
+### useContext
+- Placez les appels useContext au niveau racine du composant
+- Évitez de placer des valeurs qui changent fréquemment dans le contexte pour éviter des re-rendus inutiles
+
+### useReducer
+- Utilisez useReducer pour la logique d'état complexe
+- Gardez les fonctions reducer pures (sans effets secondaires)
+- Définissez les reducers en dehors du composant pour éviter les recréations
+
+## Bonnes pratiques générales
+
+1. **Extraction en Hooks personnalisés**
+   - Extrayez la logique commune en Hooks personnalisés réutilisables
+   - Gardez les Hooks personnalisés simples et axés sur une seule responsabilité
+
+2. **Évitez les Hooks conditionnels**
+   - N'utilisez pas de Hooks dans des expressions ternaires ou des conditions
+   - Si vous avez besoin de logique conditionnelle, placez-la à l'intérieur du Hook
+
+3. **Gestion des erreurs**
+   - Utilisez try/catch à l'intérieur des Hooks pour gérer les erreurs
+   - Considérez l'utilisation d'un Hook personnalisé pour la gestion des erreurs
+
+4. **Tests**
+   - Testez les Hooks personnalisés avec @testing-library/react-hooks
+   - Isolez la logique des Hooks pour faciliter les tests
+
+5. **Gestion des fonctions externes et stables**
+   - N'incluez pas dans les dépendances des hooks les fonctions qui sont garanties stables entre les rendus
+   - Cela inclut les fonctions de traduction, les fonctions utilitaires globales, etc.
+   - L'inclusion de ces fonctions peut causer des re-rendus inutiles et des boucles infinies
+
+## Erreurs courantes à éviter
+
+1. **Appeler des Hooks conditionnellement**
+   ```jsx
+   // INCORRECT
+   if (condition) {
+     useEffect(() => {
+       // ...
+     }, []);
+   }
+   
+   // CORRECT
+   useEffect(() => {
+     if (condition) {
+       // ...
+     }
+   }, [condition]);
+   ```
+
+2. **Oublier des dépendances dans useEffect/useCallback/useMemo**
+   ```jsx
+   // INCORRECT
+   useEffect(() => {
+     console.log(count);
+   }, []); // count est manquant dans les dépendances
+   
+   // CORRECT
+   useEffect(() => {
+     console.log(count);
+   }, [count]);
+   ```
+
+3. **Créer des fonctions à l'intérieur de useEffect sans useCallback**
+   ```jsx
+   // INCORRECT
+   useEffect(() => {
+     const handleClick = () => {
+       // Utilise des props ou état
+     };
+     element.addEventListener('click', handleClick);
+     return () => element.removeEventListener('click', handleClick);
+   }, [/* dépendances manquantes */]);
+   
+   // CORRECT
+   const handleClick = useCallback(() => {
+     // Utilise des props ou état
+   }, [/* dépendances */]);
+   
+   useEffect(() => {
+     element.addEventListener('click', handleClick);
+     return () => element.removeEventListener('click', handleClick);
+   }, [handleClick]);
+   ```
+
+4. **Utiliser useState lorsque useRef est plus approprié**
+   - Utilisez useRef pour les valeurs qui ne doivent pas déclencher de re-rendu
+
+5. **Ignorer le nettoyage dans useEffect**
+   ```jsx
+   // INCORRECT
+   useEffect(() => {
+     const subscription = source.subscribe();
+     // Pas de nettoyage
+   }, [source]);
+   
+   // CORRECT
+   useEffect(() => {
+     const subscription = source.subscribe();
+     return () => subscription.unsubscribe();
+   }, [source]);
+   ```
+
+6. **Inclure des fonctions de traduction dans les dépendances**
+   ```jsx
+   // INCORRECT
+   useEffect(() => {
+     document.title = t('page.title');
+   }, [t]); // t ne devrait pas être dans les dépendances
+   
+   // CORRECT
+   useEffect(() => {
+     document.title = t('page.title');
+   }, []); // t est stable et géré par la bibliothèque de traduction
+   ```
+
+## Ressources
+- [Règles des Hooks (Documentation officielle React)](https://fr.reactjs.org/docs/hooks-rules.html)
+- [API de référence des Hooks](https://fr.reactjs.org/docs/hooks-reference.html)
+- [Penser en React Hooks](https://wattenberger.com/blog/react-hooks)
+
+## Règles de gestion des traductions
+
+1. **Ne jamais supprimer de traductions existantes**
+   - Ne supprimez JAMAIS une traduction existante, même si vous pensez qu'elle est incorrecte ou redondante
+   - Si vous devez modifier une traduction, créez une version alternative en dessous mais conservez l'originale
+   - Toutes les clés de traduction existantes doivent être préservées pour maintenir la compatibilité
+
+2. **Ajout de nouvelles traductions**
+   - Ajoutez les nouvelles traductions en respectant la structure hiérarchique existante
+   - Assurez-vous que les nouvelles clés suivent le même format de nommage que les clés existantes
+   - Documentez les nouvelles clés ajoutées pour faciliter leur maintenance
+
+3. **Organisation des traductions**
+   - Respectez l'organisation par sections du fichier de traduction
+   - Placez les nouvelles traductions dans la section appropriée
+   - Maintenez une structure cohérente pour faciliter la navigation dans le fichier
+
+4. **Vérification avant modification**
+   - Avant d'ajouter ou de modifier des traductions, vérifiez toujours si elles existent déjà
+   - Utilisez la recherche pour vous assurer que vous ne créez pas de doublons
+   - En cas de doute, préservez l'existant et ajoutez votre suggestion comme alternative

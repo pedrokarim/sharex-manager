@@ -1,0 +1,32 @@
+{
+  "advanced": {
+    "title": "Options avancées",
+    "fit_mode": "Mode d'ajustement",
+    "fit_modes": {
+      "cover": "Couvrir",
+      "contain": "Contenir",
+      "fill": "Remplir",
+      "inside": "À l'intérieur",
+      "outside": "À l'extérieur"
+    },
+    "sharpen": "Netteté",
+    "blur": "Flou",
+    "gamma": "Gamma",
+    "keep_metadata": "Conserver les métadonnées",
+    "background_color": "Couleur d'arrière-plan"
+  },
+  "presets": {
+    "title": "Préréglages",
+    "hd": "HD (1280x720)",
+    "full_hd": "Full HD (1920x1080)",
+    "4k": "4K (3840x2160)",
+    "thumbnail": "Vignette (300x300)",
+    "social_media": "Réseaux sociaux (1200x630)",
+    "custom": "Personnalisé"
+  },
+  "help": {
+    "preview": "Aperçu des dimensions après redimensionnement",
+    "quality_tip": "Une qualité plus élevée donne de meilleurs résultats mais des fichiers plus volumineux",
+    "aspect_ratio_tip": "Conserver les proportions pour éviter la déformation de l'image"
+  }
+}

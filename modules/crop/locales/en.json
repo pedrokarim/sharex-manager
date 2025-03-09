@@ -1,0 +1,31 @@
+{
+  "advanced": {
+    "title": "Advanced options",
+    "grid_overlay": "Show grid",
+    "grid_type": "Grid type",
+    "grid_types": {
+      "rule_of_thirds": "Rule of thirds",
+      "golden_ratio": "Golden ratio",
+      "diagonal": "Diagonals",
+      "center": "Center",
+      "none": "None"
+    },
+    "zoom": "Zoom",
+    "rotate": "Rotation",
+    "flip_horizontal": "Flip horizontally",
+    "flip_vertical": "Flip vertically",
+    "reset_rotation": "Reset rotation",
+    "reset_zoom": "Reset zoom"
+  },
+  "tools": {
+    "crop": "Crop",
+    "rotate": "Rotate",
+    "flip": "Flip",
+    "zoom": "Zoom"
+  },
+  "help": {
+    "drag": "Drag to crop",
+    "resize": "Resize handles to adjust",
+    "apply": "Click Apply to confirm"
+  }
+}

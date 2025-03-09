@@ -21,6 +21,7 @@ import {
   Lock,
   Unlock,
   Star,
+  Wand2,
 } from "lucide-react";
 import Image from "next/image";
 import { format, parseISO } from "date-fns";
@@ -30,6 +31,8 @@ import { cn } from "@/lib/utils";
 import { Separator } from "../ui/separator";
 import { VisuallyHidden } from "../ui/visually-hidden";
 import { useTranslation } from "@/lib/i18n";
+import { toast } from "sonner";
+import { ModuleActions } from "./module-actions";
 
 interface FileViewerProps {
   file: FileInfo | null;
@@ -59,6 +62,8 @@ export function FileViewer({
   const [showDetails, setShowDetails] = useState(false);
   const { t } = useTranslation();
   const locale = useDateLocale();
+  const [showInfo, setShowInfo] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   if (!file) return null;
 
@@ -81,8 +86,61 @@ export function FileViewer({
     navigationText += t("gallery.file_viewer.next_button");
   }
 
+  const handleProcessImage = async () => {
+    if (!file) return;
+
+    try {
+      setIsProcessing(true);
+
+      const response = await fetch("/api/gallery/process", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ fileName: file.name }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Erreur lors du traitement de l'image");
+      }
+
+      // Recharger l'image en ajoutant un paramètre timestamp pour éviter le cache
+      const imgElement = document.querySelector(
+        ".file-viewer-image"
+      ) as HTMLImageElement;
+      if (imgElement) {
+        const timestamp = new Date().getTime();
+        imgElement.src = `${file.url}?t=${timestamp}`;
+      }
+
+      toast.success("Image traitée avec succès");
+    } catch (error) {
+      console.error("Erreur lors du traitement de l'image:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erreur lors du traitement de l'image"
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Fonction pour recharger l'image après traitement
+  const handleProcessComplete = () => {
+    // Recharger l'image en ajoutant un paramètre timestamp pour éviter le cache
+    const imgElement = document.querySelector(
+      ".file-viewer-image"
+    ) as HTMLImageElement;
+    if (imgElement && file) {
+      const timestamp = new Date().getTime();
+      imgElement.src = `${file.url}?t=${timestamp}`;
+    }
+  };
+
   return (
-    <Dialog open={!!file} onOpenChange={() => onClose()}>
+    <Dialog open={!!file} onOpenChange={() => file && onClose()}>
       <DialogContent className="max-w-7xl border-none bg-background/95 p-0 backdrop-blur-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between p-4">
@@ -106,7 +164,7 @@ export function FileViewer({
                 src={file.url}
                 alt={file.name}
                 fill
-                className="object-contain"
+                className="object-contain file-viewer-image"
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 60vw"
                 priority
               />
@@ -133,6 +191,18 @@ export function FileViewer({
                 <ChevronRight className="h-8 w-8" />
               </Button>
             )}
+
+            {/* Modules en haut à droite */}
+            <div className="absolute top-4 right-4 z-10 flex justify-end">
+              {/* Afficher les actions des modules si le fichier est une image */}
+              {file && (
+                <ModuleActions
+                  file={file}
+                  onProcessComplete={handleProcessComplete}
+                  variant="overlay"
+                />
+              )}
+            </div>
 
             {/* Barre d'actions flottante en bas */}
             <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between gap-4 bg-gradient-to-t from-background/80 to-transparent p-4">
@@ -196,7 +266,7 @@ export function FileViewer({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full bg-background/50 hover:bg-red-600 hover:text-white text-red-600"
+                  className="rounded-full bg-background/50 hover:bg-red-600 hover:text-white"
                   onClick={() => file && onDelete(file.name)}
                 >
                   <Trash2 className="h-5 w-5" />
@@ -213,45 +283,127 @@ export function FileViewer({
             </div>
           </div>
 
-          {/* Panneau latéral */}
-          <div
-            className={cn(
-              "h-full w-[400px] bg-background p-6 shadow-lg transition-all duration-300",
-              !showDetails && "w-0 p-0 opacity-0"
-            )}
-          >
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold">
-                  {t("gallery.file_viewer.info_panel.title")}
-                </h3>
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      {t("gallery.file_viewer.info_panel.filename")}
-                    </p>
-                    <p className="mt-1 font-medium">{file.name}</p>
+          {/* Panneau latéral pour les détails */}
+          {showDetails && (
+            <div className="w-80 bg-background/95 p-4 overflow-y-auto">
+              <h3 className="text-lg font-semibold mb-4">
+                {t("gallery.file_viewer.details")}
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {t("gallery.file_viewer.name")}
+                  </p>
+                  <p className="text-sm">{file.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {t("gallery.file_viewer.date")}
+                  </p>
+                  <p className="text-sm">{formattedDateTime}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {t("gallery.file_viewer.size")}
+                  </p>
+                  <p className="text-sm">{fileSize} KB</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {t("gallery.file_viewer.url")}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm truncate">{file.url}</p>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => file && onCopy(file.url)}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
                   </div>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      {t("gallery.file_viewer.info_panel.date_added")}
-                    </p>
-                    <p className="mt-1 font-medium">{formattedDateTime}</p>
+                </div>
+                <Separator />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">
+                    {t("gallery.file_viewer.actions")}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => file && onCopy(file.url)}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      {t("gallery.file_viewer.copy_url")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      asChild
+                    >
+                      <a
+                        href={file?.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        {t("gallery.file_viewer.open")}
+                      </a>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "w-full",
+                        file?.isSecure && "border-yellow-500 text-yellow-500"
+                      )}
+                      onClick={() => file && onToggleSecurity(file)}
+                    >
+                      {file?.isSecure ? (
+                        <>
+                          <Lock className="h-4 w-4 mr-2" />
+                          {t("gallery.file_viewer.secured")}
+                        </>
+                      ) : (
+                        <>
+                          <Unlock className="h-4 w-4 mr-2" />
+                          {t("gallery.file_viewer.public")}
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "w-full",
+                        file?.isStarred && "border-yellow-500 text-yellow-500"
+                      )}
+                      onClick={() => file && onToggleStar(file)}
+                    >
+                      <Star className="h-4 w-4 mr-2" />
+                      {file?.isStarred
+                        ? t("gallery.file_viewer.starred")
+                        : t("gallery.file_viewer.star")}
+                    </Button>
                   </div>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      {t("gallery.file_viewer.info_panel.size")}
-                    </p>
-                    <p className="mt-1 font-medium">
-                      {fileSize} {t("gallery.file_viewer.info_panel.kb")}
-                    </p>
-                  </div>
+                </div>
+                <Separator />
+                <div>
+                  {file && (
+                    <ModuleActions
+                      file={file}
+                      onProcessComplete={handleProcessComplete}
+                      variant="details"
+                    />
+                  )}
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
