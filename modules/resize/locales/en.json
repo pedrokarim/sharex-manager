@@ -1,4 +1,18 @@
 {
+  "title": "Resize",
+  "description": "Modify the size of your image",
+  "max_width": "Maximum width",
+  "max_height": "Maximum height",
+  "quality": "Image quality",
+  "maintain_aspect_ratio": "Maintain aspect ratio",
+  "dimensions": {
+    "original": "Original dimensions",
+    "new": "New dimensions",
+    "reduction": "Reduction"
+  },
+  "apply": "Apply resize",
+  "preview": "Resize preview",
+  "reset": "Reset dimensions",
   "advanced": {
     "title": "Advanced options",
     "fit_mode": "Fit mode",

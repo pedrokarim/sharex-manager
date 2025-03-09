@@ -1,4 +1,20 @@
 {
+  "title": "Crop",
+  "description": "Crop your image with precision",
+  "aspect_ratio": "Aspect ratio",
+  "aspect_ratios": {
+    "free": "Free",
+    "square": "Square (1:1)",
+    "landscape": "Landscape (4:3)",
+    "widescreen": "Widescreen (16:9)",
+    "portrait": "Portrait (2:3)"
+  },
+  "circular_crop": "Circular crop",
+  "quality": "Image quality",
+  "apply": "Apply crop",
+  "preview": "Crop preview",
+  "reset": "Reset",
+  "aspect_ratio_alt": "Image proportions",
   "advanced": {
     "title": "Advanced options",
     "grid_overlay": "Show grid",

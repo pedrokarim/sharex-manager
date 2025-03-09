@@ -1,69 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
-import { moduleManager } from "@/lib/modules/module-manager";
 import { auth } from "@/auth";
+import {
+  apiModuleManager,
+  initApiModuleManager,
+} from "@/lib/modules/api-module-manager";
 import fs from "fs";
 import path from "path";
-import { nanoid } from "nanoid";
-import { mkdir, writeFile } from "fs/promises";
+import os from "os";
+import { v4 as uuidv4 } from "uuid";
+import AdmZip from "adm-zip";
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
   try {
-    // Vérifier l'authentification
-    const session = await auth();
-    if (!session || !session.user) {
+    if (!session) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Récupérer les données du formulaire
-    const formData = await request.formData();
-    const moduleZip = formData.get("module") as File;
-    const iconUrl = formData.get("iconUrl") as string;
+    // Initialiser le gestionnaire de modules API
+    await initApiModuleManager();
 
-    if (!moduleZip) {
+    // Récupérer le fichier ZIP du module
+    const formData = await request.formData();
+    const file = formData.get("file") as File;
+
+    if (!file) {
       return NextResponse.json(
         { error: "Aucun fichier fourni" },
         { status: 400 }
       );
     }
 
-    // Vérifier le type de fichier
-    if (
-      moduleZip.type !== "application/zip" &&
-      moduleZip.type !== "application/x-zip-compressed"
-    ) {
+    // Vérifier que c'est un fichier ZIP
+    if (!file.name.endsWith(".zip")) {
       return NextResponse.json(
         { error: "Le fichier doit être au format ZIP" },
         { status: 400 }
       );
     }
 
-    // Créer un dossier temporaire pour extraire le module
-    const tempDir = path.join(process.cwd(), "temp", nanoid());
-    await mkdir(tempDir, { recursive: true });
+    // Créer un dossier temporaire pour extraire le ZIP
+    const tempDir = path.join(os.tmpdir(), `module-${uuidv4()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
 
     try {
-      // Enregistrer le fichier ZIP
+      // Lire le contenu du fichier
+      const buffer = Buffer.from(await file.arrayBuffer());
+
+      // Écrire le fichier ZIP dans le dossier temporaire
       const zipPath = path.join(tempDir, "module.zip");
-      const zipBuffer = Buffer.from(await moduleZip.arrayBuffer());
-      await writeFile(zipPath, zipBuffer);
+      fs.writeFileSync(zipPath, buffer);
 
-      // Extraire le fichier ZIP (cette partie nécessite une bibliothèque d'extraction ZIP)
-      // Pour simplifier, nous supposons que le module est déjà extrait
-      // Dans une implémentation réelle, vous devriez utiliser une bibliothèque comme 'adm-zip' ou 'unzipper'
+      // Extraire le ZIP
+      const zip = new AdmZip(zipPath);
+      zip.extractAllTo(tempDir, true);
 
-      // Si une URL d'icône est fournie, la sauvegarder dans le fichier module.json
-      if (iconUrl) {
-        const configPath = path.join(tempDir, "module.json");
-        if (fs.existsSync(configPath)) {
-          const configContent = fs.readFileSync(configPath, "utf-8");
-          const config = JSON.parse(configContent);
-          config.icon = iconUrl;
-          fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-        }
-      }
+      // Supprimer le fichier ZIP
+      fs.unlinkSync(zipPath);
 
       // Installer le module
-      const success = await moduleManager.installModule(tempDir);
+      const success = await apiModuleManager.installModule(tempDir);
 
       // Nettoyer le dossier temporaire
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -72,17 +68,22 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true });
       } else {
         return NextResponse.json(
-          { error: "Impossible d'installer le module" },
-          { status: 400 }
+          { error: "Échec de l'installation du module" },
+          { status: 500 }
         );
       }
     } catch (error) {
       // Nettoyer le dossier temporaire en cas d'erreur
-      fs.rmSync(tempDir, { recursive: true, force: true });
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
       throw error;
     }
   } catch (error) {
     console.error("Erreur lors de l'installation du module:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erreur lors de l'installation du module" },
+      { status: 500 }
+    );
   }
 }

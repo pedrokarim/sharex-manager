@@ -24,6 +24,8 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Suspense, lazy } from "react";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface ModuleActionsProps {
   file: FileInfo;
@@ -49,14 +51,18 @@ export function ModuleActions({
 }: ModuleActionsProps) {
   const { t } = useTranslation();
   const [modules, setModules] = useState<ModuleConfig[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedModule, setSelectedModule] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedModule, setSelectedModule] = useState<ModuleConfig | null>(
+    null
+  );
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [processingModule, setProcessingModule] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [createNewVersion, setCreateNewVersion] = useState(true);
   const [moduleUIOpen, setModuleUIOpen] = useState(false);
   const [moduleComponent, setModuleComponent] =
     useState<React.ComponentType<ModuleUIProps> | null>(null);
   const [moduleError, setModuleError] = useState<Error | null>(null);
-  const [processingModule, setProcessingModule] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string>("all");
 
   // Récupérer l'extension du fichier
   const fileExtension = file.name.split(".").pop()?.toLowerCase() || "";
@@ -64,13 +70,13 @@ export function ModuleActions({
   // Fonction pour gérer le résultat du module UI
   const handleModuleUIComplete = useCallback(
     async (result: any) => {
-      if (!selectedModule || !result) return;
+      if (!selectedModule) return;
 
       try {
-        setProcessingModule(selectedModule);
+        setProcessingModule(selectedModule.name);
 
         console.log(
-          `Envoi des données pour le module ${selectedModule}:`,
+          `Envoi des données pour le module ${selectedModule.name}:`,
           result
         );
 
@@ -81,8 +87,9 @@ export function ModuleActions({
           },
           body: JSON.stringify({
             fileName: file.name,
-            moduleName: selectedModule,
+            moduleName: selectedModule.name,
             settings: result,
+            createNewVersion: createNewVersion,
           }),
         });
 
@@ -95,9 +102,11 @@ export function ModuleActions({
 
         toast.success(
           t("gallery.file_viewer.modules.apply_success", {
-            module: selectedModule,
+            module: selectedModule.name,
           })
         );
+
+        setModuleUIOpen(false);
 
         if (onProcessComplete) {
           onProcessComplete();
@@ -113,7 +122,7 @@ export function ModuleActions({
         setProcessingModule(null);
       }
     },
-    [selectedModule, file.name, onProcessComplete]
+    [selectedModule, file.name, onProcessComplete, createNewVersion]
   ); // t est stable et géré par la bibliothèque de traduction
 
   // Fonction pour appliquer un module sans interface utilisateur
@@ -130,6 +139,7 @@ export function ModuleActions({
           body: JSON.stringify({
             fileName: file.name,
             moduleName: moduleName,
+            createNewVersion: createNewVersion,
           }),
         });
 
@@ -158,7 +168,7 @@ export function ModuleActions({
         setProcessingModule(null);
       }
     },
-    [file.name, onProcessComplete]
+    [file.name, onProcessComplete, createNewVersion]
   ); // t est stable et géré par la bibliothèque de traduction
 
   // Fonction pour charger le composant UI d'un module
@@ -181,7 +191,7 @@ export function ModuleActions({
   const openModuleUI = useCallback(
     async (moduleName: string) => {
       try {
-        setSelectedModule(moduleName);
+        setSelectedModule(modules.find((m) => m.name === moduleName) || null);
         setModuleComponent(null);
         setModuleError(null);
 
@@ -216,7 +226,7 @@ export function ModuleActions({
   useEffect(() => {
     const fetchModules = async () => {
       try {
-        setLoading(true);
+        setIsLoading(true);
         const response = await fetch(
           `/api/modules/by-type?fileType=${fileExtension}`
         );
@@ -231,7 +241,7 @@ export function ModuleActions({
         console.error("Erreur lors de la récupération des modules:", error);
         toast.error(t("gallery.file_viewer.modules.fetch_error"));
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
 
@@ -249,7 +259,7 @@ export function ModuleActions({
   };
 
   // Si aucun module n'est disponible ou en cours de chargement, ne rien afficher
-  if (loading) {
+  if (isLoading) {
     return (
       <div
         className={cn(
@@ -293,7 +303,7 @@ export function ModuleActions({
           </p>
           <p>
             {t("gallery.file_viewer.modules.module_load_failed", {
-              module: selectedModule,
+              module: selectedModule?.name,
             })}
           </p>
           <p className="text-sm text-muted-foreground mt-2">
@@ -429,15 +439,27 @@ export function ModuleActions({
             <DialogHeader>
               <DialogTitle>
                 {selectedModule &&
-                  modules.find((m) => m.name === selectedModule)?.name}
+                  modules.find((m) => m.name === selectedModule.name)?.name}
               </DialogTitle>
               <DialogDescription>
                 {selectedModule &&
-                  modules.find((m) => m.name === selectedModule)?.description}
+                  modules.find((m) => m.name === selectedModule.name)
+                    ?.description}
               </DialogDescription>
             </DialogHeader>
 
             <div className="py-4">{renderModuleUI()}</div>
+
+            <div className="flex items-center space-x-2 mt-4 border-t pt-4">
+              <Switch
+                id="create-new-version"
+                checked={createNewVersion}
+                onCheckedChange={setCreateNewVersion}
+              />
+              <Label htmlFor="create-new-version">
+                {t("gallery.file_viewer.modules.create_new_version")}
+              </Label>
+            </div>
 
             <DialogFooter>
               <Button
@@ -550,15 +572,27 @@ export function ModuleActions({
           <DialogHeader>
             <DialogTitle>
               {selectedModule &&
-                modules.find((m) => m.name === selectedModule)?.name}
+                modules.find((m) => m.name === selectedModule.name)?.name}
             </DialogTitle>
             <DialogDescription>
               {selectedModule &&
-                modules.find((m) => m.name === selectedModule)?.description}
+                modules.find((m) => m.name === selectedModule.name)
+                  ?.description}
             </DialogDescription>
           </DialogHeader>
 
           <div className="py-4">{renderModuleUI()}</div>
+
+          <div className="flex items-center space-x-2 mt-4 border-t pt-4">
+            <Switch
+              id="create-new-version"
+              checked={createNewVersion}
+              onCheckedChange={setCreateNewVersion}
+            />
+            <Label htmlFor="create-new-version">
+              {t("gallery.file_viewer.modules.create_new_version")}
+            </Label>
+          </div>
 
           <DialogFooter>
             <Button

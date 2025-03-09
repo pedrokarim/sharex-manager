@@ -5,7 +5,7 @@ import { Crop as CropIcon } from "lucide-react";
 import dynamic from "next/dynamic";
 
 // Import dynamique de l'interface utilisateur
-const CropUI = dynamic(() => import("./ui").then((mod) => mod.CropUI), {
+const CropUIComponent = dynamic(() => import("./ui"), {
   ssr: false,
   loading: () => React.createElement("div", {}, "Chargement de l'interface..."),
 });
@@ -18,27 +18,57 @@ let settings: {
 };
 
 // Fonction pour recadrer une image
-async function cropImage(imageBuffer: Buffer, cropData: any): Promise<Buffer> {
+export async function cropImage(
+  imageBuffer: Buffer,
+  cropData: any
+): Promise<Buffer> {
   try {
     console.log("Recadrage avec les données:", cropData);
 
     // Extraire les informations de recadrage
     const { crop, circularCrop, quality } = cropData;
 
+    // Obtenir les métadonnées de l'image originale
+    const metadata = await sharp(imageBuffer).metadata();
+    const originalWidth = metadata.width || 800;
+    const originalHeight = metadata.height || 600;
+    console.log(
+      "Métadonnées de l'image originale:",
+      originalWidth,
+      "x",
+      originalHeight
+    );
+
     // Si crop est au format PixelCrop (valeurs en pixels)
     if (crop.unit === "px") {
+      console.log("Recadrage en pixels:", crop);
+
+      // Vérifier que les valeurs sont dans les limites de l'image
+      const x = Math.max(0, Math.round(crop.x));
+      const y = Math.max(0, Math.round(crop.y));
+      const width = Math.min(Math.round(crop.width), originalWidth - x);
+      const height = Math.min(Math.round(crop.height), originalHeight - y);
+
+      console.log(
+        `Recadrage effectif: x=${x}, y=${y}, width=${width}, height=${height}`
+      );
+
+      if (width <= 0 || height <= 0) {
+        console.error("Dimensions de recadrage invalides");
+        return imageBuffer;
+      }
+
       // Recadrer l'image avec les valeurs en pixels
       let processedImage = sharp(imageBuffer).extract({
-        left: Math.round(crop.x),
-        top: Math.round(crop.y),
-        width: Math.round(crop.width),
-        height: Math.round(crop.height),
+        left: x,
+        top: y,
+        width: width,
+        height: height,
       });
 
       // Appliquer un masque circulaire si nécessaire
       if (circularCrop) {
-        const width = Math.round(crop.width);
-        const height = Math.round(crop.height);
+        console.log("Application d'un masque circulaire");
 
         // Créer un masque circulaire
         const circleBuffer = Buffer.from(`
@@ -59,12 +89,90 @@ async function cropImage(imageBuffer: Buffer, cropData: any): Promise<Buffer> {
       }
 
       // Convertir en JPEG avec la qualité spécifiée
-      return await processedImage.jpeg({ quality: quality || 90 }).toBuffer();
+      const result = await processedImage
+        .jpeg({ quality: quality || 90 })
+        .toBuffer();
+
+      // Vérifier les métadonnées de l'image recadrée
+      const newMetadata = await sharp(result).metadata();
+      console.log(
+        "Métadonnées de l'image recadrée:",
+        newMetadata.width,
+        "x",
+        newMetadata.height
+      );
+
+      console.log("Image recadrée avec succès");
+      return result;
     }
-    // Si crop est au format pourcentage ou autre format
-    else {
-      console.error("Format de recadrage non pris en charge:", crop);
-      return imageBuffer; // Retourner l'image originale en cas d'erreur
+    // Si crop est au format pourcentage
+    else if (crop.unit === "%" || crop.unit === "percent") {
+      console.log("Recadrage en pourcentage:", crop);
+
+      // Convertir les pourcentages en pixels
+      const x = Math.round((crop.x / 100) * originalWidth);
+      const y = Math.round((crop.y / 100) * originalHeight);
+      const width = Math.round((crop.width / 100) * originalWidth);
+      const height = Math.round((crop.height / 100) * originalHeight);
+
+      console.log(
+        `Recadrage converti en pixels: x=${x}, y=${y}, width=${width}, height=${height}`
+      );
+
+      if (width <= 0 || height <= 0) {
+        console.error("Dimensions de recadrage invalides après conversion");
+        return imageBuffer;
+      }
+
+      // Recadrer l'image avec les valeurs converties en pixels
+      let processedImage = sharp(imageBuffer).extract({
+        left: x,
+        top: y,
+        width: width,
+        height: height,
+      });
+
+      // Appliquer un masque circulaire si nécessaire
+      if (circularCrop) {
+        console.log("Application d'un masque circulaire");
+
+        // Créer un masque circulaire
+        const circleBuffer = Buffer.from(`
+          <svg width="${width}" height="${height}">
+            <circle cx="${width / 2}" cy="${height / 2}" r="${
+          Math.min(width, height) / 2
+        }" fill="white" />
+          </svg>
+        `);
+
+        // Appliquer le masque
+        processedImage = processedImage.composite([
+          {
+            input: circleBuffer,
+            blend: "dest-in",
+          },
+        ]);
+      }
+
+      // Convertir en JPEG avec la qualité spécifiée
+      const result = await processedImage
+        .jpeg({ quality: quality || 90 })
+        .toBuffer();
+
+      // Vérifier les métadonnées de l'image recadrée
+      const newMetadata = await sharp(result).metadata();
+      console.log(
+        "Métadonnées de l'image recadrée:",
+        newMetadata.width,
+        "x",
+        newMetadata.height
+      );
+
+      console.log("Image recadrée avec succès");
+      return result;
+    } else {
+      console.error("Format de recadrage non pris en charge:", crop.unit);
+      return imageBuffer;
     }
   } catch (error) {
     console.error("Erreur lors du recadrage de l'image:", error);
@@ -73,24 +181,15 @@ async function cropImage(imageBuffer: Buffer, cropData: any): Promise<Buffer> {
 }
 
 // Interface utilisateur du module
-const renderUI = (fileInfo: any, onComplete: (result: any) => void) => {
-  // Utilisation de l'importation dynamique directement ici
-  const CropUI = React.lazy(() => import("./ui"));
-
-  return React.createElement(
-    React.Suspense,
-    {
-      fallback: React.createElement("div", {}, "Chargement de l'interface..."),
-    },
-    React.createElement(CropUI, {
-      fileInfo,
-      onComplete,
-    })
-  );
+export const renderUI = (fileInfo: any, onComplete: (result: any) => void) => {
+  return React.createElement(CropUIComponent, {
+    fileInfo: fileInfo,
+    onComplete: onComplete,
+  });
 };
 
 // Icône d'action du module
-const getActionIcon = () => {
+export const getActionIcon = () => {
   return {
     icon: CropIcon,
     tooltip: "Recadrer l'image",
@@ -98,7 +197,7 @@ const getActionIcon = () => {
 };
 
 // Hooks du module
-const moduleHooks: ModuleHooks = {
+export const moduleHooks: ModuleHooks = {
   onInit: () => {
     console.log("Module Crop initialisé");
   },
@@ -108,12 +207,7 @@ const moduleHooks: ModuleHooks = {
   onDisable: () => {
     console.log("Module Crop désactivé");
   },
-  processImage: async (imageBuffer: Buffer) => {
-    // Ce module ne traite pas automatiquement les images
-    // Il nécessite une interaction utilisateur
-    return imageBuffer;
-  },
-  cropImage,
+  processImage: cropImage,
   renderUI,
   getActionIcon,
 };

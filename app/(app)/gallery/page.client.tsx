@@ -244,7 +244,7 @@ export function GalleryClient({
         };
       }
     },
-    [search, secureOnly, starredOnly, t]
+    [search, secureOnly, starredOnly]
   );
 
   const {
@@ -297,7 +297,7 @@ export function GalleryClient({
     } finally {
       setIsRefreshing(false);
     }
-  }, [fetchFiles, t]);
+  }, [fetchFiles]);
 
   useEffect(() => {
     if (autoRefreshInterval === 0) return;

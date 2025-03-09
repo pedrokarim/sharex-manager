@@ -1,5 +1,9 @@
-import { moduleManager } from "@/lib/modules/module-manager";
-import { ModulesPageClient } from "./page.client";
+import {
+  apiModuleManager,
+  initApiModuleManager,
+} from "@/lib/modules/api-module-manager";
+import { ModuleList } from "@/components/modules/module-list";
+import { Metadata } from "next";
 
 export const metadata = {
   title: "Gestion des modules - ShareX Manager",
@@ -7,7 +11,16 @@ export const metadata = {
 };
 
 export default async function ModulesPage() {
-  const modules = await moduleManager.getModules();
+  // Initialiser le gestionnaire de modules API
+  await initApiModuleManager();
 
-  return <ModulesPageClient initialModules={modules} />;
+  // Récupérer la liste des modules
+  const modules = await apiModuleManager.getModules();
+
+  return (
+    <div className="container mx-auto py-6">
+      <h1 className="text-2xl font-bold mb-6">Gestion des modules</h1>
+      <ModuleList />
+    </div>
+  );
 }

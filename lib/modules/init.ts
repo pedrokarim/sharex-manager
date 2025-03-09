@@ -1,14 +1,25 @@
-import { moduleManager } from "./module-manager";
+import {
+  clientModuleManager,
+  initClientModuleManager,
+} from "./client-module-manager";
+// import { apiModuleManager, initApiModuleManager } from "./api-module-manager";
+
+// Exporter les deux gestionnaires de modules
+export {
+  clientModuleManager,
+  //  apiModuleManager
+};
 
 // Fonction pour initialiser les modules au démarrage de l'application
 export async function initModules() {
-  try {
-    console.log("Initialisation des modules...");
-    const loadedModules = await moduleManager.loadModules();
-    console.log(`${loadedModules.length} modules chargés avec succès`);
-    return loadedModules;
-  } catch (error) {
-    console.error("Erreur lors de l'initialisation des modules:", error);
-    return [];
+  // En fonction de l'environnement, initialiser le gestionnaire approprié
+  if (typeof window === "undefined") {
+    // Côté serveur (API)
+    // console.log("Initialisation du gestionnaire de modules côté API");
+    // await initApiModuleManager();
+  } else {
+    // Côté client (Next.js)
+    console.log("Initialisation du gestionnaire de modules côté client");
+    await initClientModuleManager();
   }
 }

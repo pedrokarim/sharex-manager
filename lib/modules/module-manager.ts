@@ -129,27 +129,106 @@ class ModuleManagerImpl implements ModuleManager {
             }
           }
 
-          // Au lieu d'importer dynamiquement le module, nous allons créer un objet ModuleHooks basique
-          // Cette approche évite les problèmes d'importation dynamique avec Next.js
-          const moduleInstance: ModuleHooks = {
-            onInit: () => {
-              console.log(`Module ${config.name} initialisé (mode simplifié)`);
-            },
-            onEnable: () => {
-              console.log(`Module ${config.name} activé (mode simplifié)`);
-            },
-            onDisable: () => {
-              console.log(`Module ${config.name} désactivé (mode simplifié)`);
-            },
-            processImage: async (imageBuffer: Buffer) => {
-              // Dans une implémentation réelle, nous traiterions l'image ici
-              // Pour l'instant, nous retournons simplement l'image originale
-              console.log(
-                `Traitement d'image par le module ${config.name} (mode simplifié)`
-              );
-              return imageBuffer;
-            },
-          };
+          // Importer dynamiquement le module
+          let moduleInstance: ModuleHooks;
+
+          try {
+            // Construire les chemins
+            const modulePath = path.join(process.cwd(), "modules", moduleName);
+            const entryPath = path.join(modulePath, config.entry);
+
+            console.log(`Module ${moduleName}: configuration chargée`);
+
+            // Créer un objet ModuleHooks de base
+            moduleInstance = {
+              onInit: () => console.log(`Module ${moduleName} initialisé`),
+              onEnable: () => console.log(`Module ${moduleName} activé`),
+              onDisable: () => console.log(`Module ${moduleName} désactivé`),
+              processImage: async (
+                imageBuffer: Buffer,
+                moduleSettings?: any
+              ) => {
+                console.log(`Traitement d'image avec le module ${moduleName}`);
+
+                // Déléguer le traitement à l'API
+                try {
+                  // Convertir le buffer en base64 pour le transfert
+                  const base64Buffer = imageBuffer.toString("base64");
+
+                  // Appeler l'API pour traiter l'image
+                  const response = await fetch("/api/modules/apply", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      moduleName,
+                      settings: moduleSettings || config.settings,
+                      fileBuffer: base64Buffer,
+                      internalProcessing: true,
+                    }),
+                  });
+
+                  if (!response.ok) {
+                    throw new Error(
+                      `Erreur lors du traitement de l'image: ${response.statusText}`
+                    );
+                  }
+
+                  // L'API retournera l'image traitée
+                  const result = await response.arrayBuffer();
+                  return Buffer.from(result);
+                } catch (error) {
+                  console.error(
+                    `Erreur lors du traitement de l'image avec le module ${moduleName}:`,
+                    error
+                  );
+                  return imageBuffer;
+                }
+              },
+              renderUI: () => {
+                // Nous implémenterons cette fonction dans l'interface utilisateur
+                console.log(
+                  `Rendu de l'interface utilisateur pour le module ${moduleName}`
+                );
+                return null;
+              },
+              getActionIcon: () => {
+                // Utiliser une icône par défaut
+                const { FileQuestion } = require("lucide-react");
+                return { icon: FileQuestion, tooltip: moduleName };
+              },
+            };
+
+            console.log(`Module ${moduleName} chargé avec succès`);
+          } catch (error) {
+            console.error(
+              `Erreur lors du chargement du module ${moduleName}:`,
+              error
+            );
+
+            // Créer une instance de secours en cas d'erreur
+            moduleInstance = {
+              onInit: () =>
+                console.log(`Module ${moduleName} initialisé (mode secours)`),
+              onEnable: () =>
+                console.log(`Module ${moduleName} activé (mode secours)`),
+              onDisable: () =>
+                console.log(`Module ${moduleName} désactivé (mode secours)`),
+              processImage: async (imageBuffer: Buffer) => {
+                console.log(
+                  `Traitement d'image avec le module ${moduleName} (mode secours)`
+                );
+                return imageBuffer;
+              },
+              renderUI: () => null,
+              getActionIcon: () => {
+                // Utiliser une icône par défaut
+                const { FileQuestion } = require("lucide-react");
+                return { icon: FileQuestion, tooltip: moduleName };
+              },
+            };
+          }
 
           // Appeler le hook onInit
           try {
@@ -168,7 +247,6 @@ class ModuleManagerImpl implements ModuleManager {
             module: moduleInstance,
             path: modulePath,
           };
-
           this.loadedModules.set(config.name, loadedModule);
           loadedModules.push(loadedModule);
 
@@ -181,6 +259,7 @@ class ModuleManagerImpl implements ModuleManager {
         }
       }
 
+      console.log(`${loadedModules.length} modules chargés avec succès`);
       return loadedModules;
     } catch (error) {
       console.error("Erreur lors du chargement des modules:", error);
@@ -471,7 +550,26 @@ class ModuleManagerImpl implements ModuleManager {
    * Récupère un module chargé par son nom
    */
   public getLoadedModule(moduleName: string): LoadedModule | undefined {
-    return this.loadedModules.get(moduleName);
+    // Recherche directe par nom exact
+    const exactMatch = this.loadedModules.get(moduleName);
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    // Recherche insensible à la casse
+    for (const [key, module] of this.loadedModules.entries()) {
+      if (key.toLowerCase() === moduleName.toLowerCase()) {
+        return module;
+      }
+    }
+
+    // Module non trouvé
+    console.warn(
+      `Module non trouvé: ${moduleName}. Modules disponibles: ${Array.from(
+        this.loadedModules.keys()
+      ).join(", ")}`
+    );
+    return undefined;
   }
 
   /**

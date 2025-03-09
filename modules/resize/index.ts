@@ -5,7 +5,7 @@ import { Scaling } from "lucide-react";
 import dynamic from "next/dynamic";
 
 // Import dynamique de l'interface utilisateur
-const ResizeUI = dynamic(() => import("./ui").then((mod) => mod.ResizeUI), {
+const ResizeUI = dynamic(() => import("./ui"), {
   ssr: false,
   loading: () => React.createElement("div", {}, "Chargement de l'interface..."),
 });
@@ -19,57 +19,90 @@ let settings: {
 };
 
 // Fonction pour redimensionner une image
-async function resizeImage(imageBuffer: Buffer): Promise<Buffer> {
+export async function resizeImage(
+  imageBuffer: Buffer,
+  customSettings?: any
+): Promise<Buffer> {
   try {
+    // Utiliser les paramètres personnalisés s'ils sont fournis, sinon utiliser les paramètres par défaut
+    const resizeSettings = customSettings ||
+      settings || {
+        maxWidth: 1920,
+        maxHeight: 1080,
+        quality: 90,
+        maintainAspectRatio: true,
+      };
+
+    console.log("Redimensionnement avec les paramètres:", resizeSettings);
+
     // Obtenir les dimensions de l'image
     const metadata = await sharp(imageBuffer).metadata();
     const originalWidth = metadata.width || 0;
     const originalHeight = metadata.height || 0;
 
+    console.log("Dimensions originales:", originalWidth, "x", originalHeight);
+
     // Vérifier si l'image a besoin d'être redimensionnée
     if (
-      originalWidth <= settings.maxWidth &&
-      originalHeight <= settings.maxHeight
+      originalWidth <= resizeSettings.maxWidth &&
+      originalHeight <= resizeSettings.maxHeight
     ) {
+      console.log(
+        "L'image est déjà dans les dimensions maximales, pas de redimensionnement nécessaire"
+      );
       return imageBuffer; // Pas besoin de redimensionner
     }
 
     // Calculer les nouvelles dimensions
-    let newWidth = settings.maxWidth;
-    let newHeight = settings.maxHeight;
+    let newWidth = resizeSettings.maxWidth;
+    let newHeight = resizeSettings.maxHeight;
 
-    if (settings.maintainAspectRatio) {
+    if (resizeSettings.maintainAspectRatio) {
       const aspectRatio = originalWidth / originalHeight;
 
       if (originalWidth > originalHeight) {
         // Image horizontale
-        newWidth = settings.maxWidth;
+        newWidth = resizeSettings.maxWidth;
         newHeight = Math.round(newWidth / aspectRatio);
 
-        if (newHeight > settings.maxHeight) {
-          newHeight = settings.maxHeight;
+        if (newHeight > resizeSettings.maxHeight) {
+          newHeight = resizeSettings.maxHeight;
           newWidth = Math.round(newHeight * aspectRatio);
         }
       } else {
         // Image verticale ou carrée
-        newHeight = settings.maxHeight;
+        newHeight = resizeSettings.maxHeight;
         newWidth = Math.round(newHeight * aspectRatio);
 
-        if (newWidth > settings.maxWidth) {
-          newWidth = settings.maxWidth;
+        if (newWidth > resizeSettings.maxWidth) {
+          newWidth = resizeSettings.maxWidth;
           newHeight = Math.round(newWidth / aspectRatio);
         }
       }
     }
 
+    console.log(`Nouvelles dimensions: ${newWidth}x${newHeight}`);
+
     // Redimensionner l'image
-    return await sharp(imageBuffer)
+    const result = await sharp(imageBuffer)
       .resize(newWidth, newHeight, {
         fit: "inside",
         withoutEnlargement: true,
       })
-      .jpeg({ quality: settings.quality })
+      .jpeg({ quality: resizeSettings.quality })
       .toBuffer();
+
+    // Vérifier les dimensions après redimensionnement
+    const newMetadata = await sharp(result).metadata();
+    console.log(
+      "Dimensions après redimensionnement:",
+      newMetadata.width,
+      "x",
+      newMetadata.height
+    );
+
+    console.log("Image redimensionnée avec succès");
+    return result;
   } catch (error) {
     console.error("Erreur lors du redimensionnement de l'image:", error);
     return imageBuffer; // Retourner l'image originale en cas d'erreur
@@ -82,8 +115,7 @@ const renderUI = (fileInfo: any, onComplete: (result: any) => void) => {
     fileInfo,
     initialSettings: settings,
     onComplete,
-    onCancel: () => onComplete(null),
-  });
+  } as any); // Utiliser 'as any' pour éviter les erreurs de type
 };
 
 // Icône d'action du module

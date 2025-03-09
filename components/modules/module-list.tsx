@@ -20,7 +20,7 @@ export const ModuleList = () => {
       }
 
       const data = await response.json();
-      setModules(data);
+      setModules(data.modules || []);
     } catch (error) {
       console.error("Erreur lors de la récupération des modules:", error);
       toast.error("Erreur lors de la récupération des modules");
@@ -44,13 +44,18 @@ export const ModuleList = () => {
       }
 
       // Mettre à jour l'état local
-      setModules(
-        modules.map((module) =>
-          module.name === moduleName
-            ? { ...module, enabled: !module.enabled }
-            : module
-        )
-      );
+      if (Array.isArray(modules)) {
+        setModules(
+          modules.map((module) =>
+            module.name === moduleName
+              ? { ...module, enabled: !module.enabled }
+              : module
+          )
+        );
+      } else {
+        // Recharger les modules si la structure n'est pas celle attendue
+        fetchModules();
+      }
     } catch (error) {
       console.error(
         "Erreur lors de l'activation/désactivation du module:",
@@ -71,7 +76,12 @@ export const ModuleList = () => {
       }
 
       // Mettre à jour l'état local
-      setModules(modules.filter((module) => module.name !== moduleName));
+      if (Array.isArray(modules)) {
+        setModules(modules.filter((module) => module.name !== moduleName));
+      } else {
+        // Recharger les modules si la structure n'est pas celle attendue
+        fetchModules();
+      }
     } catch (error) {
       console.error("Erreur lors de la suppression du module:", error);
       throw error;
@@ -89,17 +99,26 @@ export const ModuleList = () => {
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {modules.map((module) => (
-          <ModuleCard
-            key={module.name}
-            module={module}
-            onToggle={handleToggleModule}
-            onDelete={handleDeleteModule}
-          />
-        ))}
+        {Array.isArray(modules) ? (
+          modules.map((module) => (
+            <ModuleCard
+              key={module.name}
+              module={module}
+              onToggle={handleToggleModule}
+              onDelete={handleDeleteModule}
+            />
+          ))
+        ) : (
+          <div className="col-span-3 text-center p-8 border border-dashed rounded-lg">
+            <p className="text-gray-500 dark:text-gray-400">
+              Erreur lors du chargement des modules. Veuillez rafraîchir la
+              page.
+            </p>
+          </div>
+        )}
       </div>
 
-      {modules.length === 0 && (
+      {Array.isArray(modules) && modules.length === 0 && (
         <div className="text-center p-8 border border-dashed rounded-lg">
           <p className="text-gray-500 dark:text-gray-400">
             Aucun module n'est installé. Installez votre premier module

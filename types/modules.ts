@@ -12,6 +12,7 @@ export interface ModuleConfig {
   dependencies?: string[];
   npmDependencies?: Record<string, string>;
   settings?: Record<string, any>;
+  capabilities?: string[];
 }
 
 export interface LoadedModule {
@@ -29,6 +30,19 @@ export interface ModuleManager {
   installModule: (modulePath: string) => Promise<boolean>;
   getModulesByFileType: (fileType: string) => Promise<ModuleConfig[]>;
   installNpmDependencies: (moduleName: string) => Promise<boolean>;
+  getLoadedModule: (moduleName: string) => LoadedModule | undefined;
+  getAllLoadedModules: () => LoadedModule[];
+  processImageWithModule?: (
+    moduleName: string,
+    imageBuffer: Buffer,
+    settings?: any
+  ) => Promise<Buffer>;
+  processImage?: (imageBuffer: Buffer) => Promise<Buffer>;
+  callModuleFunction?: (
+    moduleName: string,
+    functionName: string,
+    ...args: any[]
+  ) => Promise<any>;
 }
 
 export interface ModuleHooks {
@@ -36,11 +50,13 @@ export interface ModuleHooks {
   onEnable?: () => void | Promise<void>;
   onDisable?: () => void | Promise<void>;
   onUninstall?: () => void | Promise<void>;
-  processImage?: (imageBuffer: Buffer) => Promise<Buffer>;
-  cropImage?: (imageBuffer: Buffer, cropData: any) => Promise<Buffer>;
+  processImage?: (imageBuffer: Buffer, data: any) => Promise<Buffer>;
+  processText?: (text: string, data: any) => Promise<string>;
   renderUI?: (
     fileInfo: any,
     onComplete: (result: any) => void
   ) => React.ReactNode;
   getActionIcon?: () => { icon: React.ComponentType; tooltip: string };
+  getCapabilities?: () => string[];
+  _exports?: Record<string, any>;
 }

@@ -1,4 +1,20 @@
 {
+  "title": "Recadrage",
+  "description": "Recadrez votre image avec précision",
+  "aspect_ratio": "Ratio d'aspect",
+  "aspect_ratios": {
+    "free": "Libre",
+    "square": "Carré (1:1)",
+    "landscape": "Paysage (4:3)",
+    "widescreen": "Écran large (16:9)",
+    "portrait": "Portrait (2:3)"
+  },
+  "circular_crop": "Recadrage circulaire",
+  "quality": "Qualité de l'image",
+  "apply": "Appliquer le recadrage",
+  "preview": "Aperçu du recadrage",
+  "reset": "Réinitialiser",
+  "aspect_ratio_alt": "Proportions de l'image",
   "advanced": {
     "title": "Options avancées",
     "grid_overlay": "Afficher la grille",
