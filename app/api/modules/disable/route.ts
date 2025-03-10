@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { moduleManager } from "@/lib/modules/module-manager";
+import { apiModuleManager } from "@/lib/modules/api-module-manager";
 import { auth } from "@/auth";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Désactiver le module
-    const success = await moduleManager.toggleModule(moduleName);
+    const success = await apiModuleManager.toggleModule(moduleName);
 
     if (success) {
       logDb.createLog({
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Recharger les modules pour s'assurer que le module est correctement désactivé
-      await moduleManager.loadModules();
+      await apiModuleManager.loadModules();
 
       return NextResponse.json({ success: true });
     } else {

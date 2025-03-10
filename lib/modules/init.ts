@@ -1,7 +1,7 @@
 import {
   clientModuleManager,
   initClientModuleManager,
-} from "./client-module-manager";
+} from "./module-manager.client";
 // import { apiModuleManager, initApiModuleManager } from "./api-module-manager";
 
 // Exporter les deux gestionnaires de modules

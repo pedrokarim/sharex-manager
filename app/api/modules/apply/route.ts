@@ -8,7 +8,7 @@ import { LogAction } from "@/lib/types/logs";
 import {
   apiModuleManager,
   initApiModuleManager,
-} from "@/lib/modules/api-module-manager";
+} from "@/lib/modules/module-manager.api";
 import sharp from "sharp";
 
 export async function POST(request: NextRequest) {

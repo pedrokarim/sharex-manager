@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import {
   apiModuleManager,
   initApiModuleManager,
-} from "@/lib/modules/api-module-manager";
+} from "@/lib/modules/module-manager.api";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 

@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import {
   apiModuleManager,
   initApiModuleManager,
-} from "@/lib/modules/api-module-manager";
+} from "@/lib/modules/module-manager.api";
 
 export async function GET(request: NextRequest) {
   const session = await auth();

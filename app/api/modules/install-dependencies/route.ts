@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { moduleManager } from "@/lib/modules/module-manager";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import { auth } from "@/auth";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Vérifier si le module existe
-    const modules = await moduleManager.getModules();
+    const modules = await apiModuleManager.getModules();
     const moduleExists = modules.some((m) => m.name === moduleName);
 
     if (!moduleExists) {
@@ -85,11 +85,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Recharger les modules pour s'assurer que le module est chargé
-      await moduleManager.loadModules();
+      await apiModuleManager.loadModules();
     }
 
     // Installer les dépendances NPM du module
-    const success = await moduleManager.installNpmDependencies(moduleName);
+    const success = await apiModuleManager.installNpmDependencies(moduleName);
 
     if (success) {
       logDb.createLog({

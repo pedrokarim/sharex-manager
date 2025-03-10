@@ -236,7 +236,7 @@ export function ModuleActions({
         }
 
         const data = await response.json();
-        setModules(data);
+        setModules(data?.modules || []);
       } catch (error) {
         console.error("Erreur lors de la récupération des modules:", error);
         toast.error(t("gallery.file_viewer.modules.fetch_error"));
@@ -277,7 +277,7 @@ export function ModuleActions({
     );
   }
 
-  if (modules.length === 0) {
+  if (!modules || modules.length === 0) {
     return null;
   }
 

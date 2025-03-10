@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { moduleManager } from "@/lib/modules/module-manager";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import { auth } from "@/auth";
 
 export async function POST(request: NextRequest) {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const { fileInfo } = await request.json();
 
     // Récupérer le module
-    const loadedModule = moduleManager.getLoadedModule(moduleName);
+    const loadedModule = apiModuleManager.getLoadedModule(moduleName);
     if (!loadedModule) {
       return NextResponse.json({ error: "Module non trouvé" }, { status: 404 });
     }

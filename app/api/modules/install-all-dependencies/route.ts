@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { moduleManager } from "@/lib/modules/module-manager";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import { auth } from "@/auth";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Récupérer tous les modules
-    const modules = await moduleManager.getModules();
+    const modules = await apiModuleManager.getModules();
 
     // Filtrer les modules qui ont des dépendances NPM
     const modulesWithDependencies = modules.filter(
@@ -38,7 +38,9 @@ export async function POST(request: NextRequest) {
     const results = [];
     for (const module of modulesWithDependencies) {
       try {
-        const success = await moduleManager.installNpmDependencies(module.name);
+        const success = await apiModuleManager.installNpmDependencies(
+          module.name
+        );
         results.push({
           name: module.name,
           success,
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Recharger les modules pour s'assurer que tous les modules sont chargés
-    await moduleManager.loadModules();
+    await apiModuleManager.loadModules();
 
     return NextResponse.json({
       success: true,

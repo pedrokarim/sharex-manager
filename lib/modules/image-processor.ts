@@ -1,4 +1,4 @@
-import { moduleManager } from "./module-manager";
+import { apiModuleManager } from "./module-manager.api";
 import fs from "fs";
 import path from "path";
 
@@ -10,7 +10,7 @@ import path from "path";
 export async function processImage(imageBuffer: Buffer): Promise<Buffer> {
   try {
     // Traiter l'image avec tous les modules activés
-    return await moduleManager.processImage(imageBuffer);
+    return await apiModuleManager.processImage(imageBuffer);
   } catch (error) {
     console.error("Erreur lors du traitement de l'image:", error);
     return imageBuffer; // Retourner l'image originale en cas d'erreur

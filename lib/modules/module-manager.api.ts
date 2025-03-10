@@ -121,7 +121,7 @@ class ApiModuleManagerImpl implements ModuleManager {
 
             // Charger le module dynamiquement (côté serveur uniquement)
             const moduleExports = await import(
-              `@/modules/${moduleName}/index.ts`
+              `@/modules/${moduleName}/index.process.ts`
             );
 
             // Détecter automatiquement les capacités du module

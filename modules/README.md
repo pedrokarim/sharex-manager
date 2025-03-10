@@ -6,7 +6,7 @@ Ce guide explique comment créer des modules personnalisés pour ShareX Manager.
 
 1. [Structure d'un module](#structure-dun-module)
 2. [Fichier de configuration](#fichier-de-configuration)
-3. [Fichier principal](#fichier-principal)
+3. [Architecture des fichiers principaux](#architecture-des-fichiers-principaux)
 4. [Interface utilisateur](#interface-utilisateur)
 5. [Traductions](#traductions)
 6. [Dépendances](#dépendances)
@@ -21,7 +21,8 @@ Un module doit respecter la structure de dossiers suivante :
 modules/
 └── nom-du-module/
     ├── module.json       # Configuration du module
-    ├── index.ts          # Point d'entrée du module
+    ├── index.ts          # Point d'entrée du module (interfaces et UI)
+    ├── index.process.ts  # Logique de traitement d'image
     ├── ui.tsx            # Interface utilisateur (optionnel)
     ├── locales/          # Traductions (optionnel)
     │   ├── fr.json       # Traduction française
@@ -74,68 +75,132 @@ Le fichier `module.json` définit les métadonnées et la configuration du modul
 - `npmDependencies` : Dépendances npm requises
 - `settings` : Paramètres par défaut du module
 
-## Fichier principal
+## Architecture des fichiers principaux
 
-Le fichier `index.ts` est le point d'entrée du module. Il doit exporter un objet qui implémente l'interface `ModuleHooks`.
+Pour une meilleure organisation du code, les modules sont structurés en deux fichiers principaux :
+
+1. `index.process.ts` : Contient toute la logique de traitement d'image et les fonctions non liées à l'interface utilisateur
+2. `index.ts` : Importe les fonctions de traitement depuis index.process.ts et gère les interfaces utilisateur
+
+### Fichier index.process.ts
+
+Le fichier `index.process.ts` contient la logique métier et les fonctions de traitement d'image. Il doit exporter un objet qui implémente l'interface `ModuleHooks`.
 
 ```typescript
 import { ModuleHooks } from "../../types/modules";
 import sharp from "sharp";
 
+// Récupération des paramètres du module depuis module.json
+let settings: {
+  // Définition des paramètres du module
+  option1: string;
+  option2: number;
+};
+
+// Fonction principale de traitement d'image
+export async function processMyImage(
+  imageBuffer: Buffer,
+  customSettings?: any
+): Promise<Buffer> {
+  try {
+    // Utiliser les paramètres personnalisés ou par défaut
+    const options = customSettings || settings || { option1: "default", option2: 42 };
+    
+    console.log("Traitement avec les paramètres:", options);
+    
+    // Logique de traitement d'image avec sharp
+    const result = await sharp(imageBuffer)
+      // Opérations de traitement...
+      .toBuffer();
+      
+    return result;
+  } catch (error) {
+    console.error("Erreur lors du traitement de l'image:", error);
+    return imageBuffer; // Retourner l'image originale en cas d'erreur
+  }
+}
+
 // Hooks du module
-const moduleHooks: ModuleHooks = {
-  // Appelé lors de l'initialisation du module
-  onInit: async () => {
+export const moduleHooks: ModuleHooks = {
+  onInit: () => {
     console.log("Module initialisé");
   },
-
-  // Appelé lorsque le module est activé
-  onEnable: async () => {
+  onEnable: () => {
     console.log("Module activé");
   },
-
-  // Appelé lorsque le module est désactivé
-  onDisable: async () => {
+  onDisable: () => {
     console.log("Module désactivé");
   },
-
-  // Appelé lorsque le module est désinstallé
-  onUninstall: async () => {
-    console.log("Module désinstallé");
-  },
-
-  // Fonction de traitement d'image (sans interface utilisateur)
   processImage: async (imageBuffer: Buffer) => {
-    // Exemple de traitement avec sharp
-    const processedImage = await sharp(imageBuffer)
-      .grayscale()
-      .toBuffer();
-    
-    return processedImage;
+    return await processMyImage(imageBuffer);
   },
-
-  // Fonction spécifique (exemple pour le recadrage)
-  cropImage: async (imageBuffer: Buffer, cropData: any) => {
-    // Traitement spécifique au module
-    const processedImage = await sharp(imageBuffer)
-      // Logique de traitement spécifique
-      .toBuffer();
-    
-    return processedImage;
-  }
 };
+
+// Fonction pour initialiser les paramètres du module
+export function initModule(config: any) {
+  settings = config.settings;
+  return moduleHooks;
+}
 
 export default moduleHooks;
 ```
 
-### Hooks disponibles
+### Fichier index.ts
 
-- `onInit` : Appelé lors de l'initialisation du module
-- `onEnable` : Appelé lorsque le module est activé
-- `onDisable` : Appelé lorsque le module est désactivé
-- `onUninstall` : Appelé lorsque le module est désinstallé
-- `processImage` : Fonction de traitement d'image (sans interface utilisateur)
-- `cropImage`, `resizeImage`, etc. : Fonctions spécifiques au module
+Le fichier `index.ts` est le point d'entrée du module. Il importe les fonctions de traitement depuis `index.process.ts` et gère les interfaces utilisateur.
+
+```typescript
+import { ModuleHooks } from "../../types/modules";
+import React from "react";
+import { Icon } from "lucide-react"; // Remplacer par l'icône appropriée
+import dynamic from "next/dynamic";
+import { moduleHooks, processMyImage, initModule } from "./index.process";
+
+// Import dynamique de l'interface utilisateur
+const ModuleUIComponent = dynamic(() => import("./ui"), {
+  ssr: false,
+  loading: () => React.createElement("div", {}, "Chargement de l'interface..."),
+});
+
+// Interface utilisateur du module
+export const renderUI = (fileInfo: any, onComplete: (result: any) => void) => {
+  return React.createElement(ModuleUIComponent, {
+    fileInfo: fileInfo,
+    onComplete: onComplete,
+  });
+};
+
+// Icône d'action du module
+export const getActionIcon = () => {
+  return {
+    icon: Icon,
+    tooltip: "Description de l'action",
+  };
+};
+
+// Exporter les hooks du module avec les fonctions d'interface utilisateur
+export const enhancedModuleHooks: ModuleHooks = {
+  ...moduleHooks,
+  renderUI,
+  getActionIcon,
+};
+
+// Réexporter les fonctions de traitement pour les rendre disponibles
+export { processMyImage, initModule };
+
+// Exporter par défaut les hooks améliorés
+export default enhancedModuleHooks;
+```
+
+### Avantages de cette architecture
+
+Cette séparation offre plusieurs avantages :
+
+1. **Séparation des préoccupations** : La logique de traitement d'image est séparée de l'interface utilisateur
+2. **Testabilité** : Les fonctions de traitement peuvent être testées indépendamment de l'interface
+3. **Réutilisabilité** : Les fonctions de traitement peuvent être réutilisées dans d'autres contextes
+4. **Maintenabilité** : Le code est plus facile à maintenir et à faire évoluer
+5. **Performance** : Permet un chargement optimisé des modules
 
 ## Interface utilisateur
 
@@ -304,13 +369,14 @@ Consultez les modules existants pour des exemples concrets :
 
 ## Bonnes pratiques
 
-1. **Nommage** : Utilisez des noms clairs et descriptifs pour votre module
-2. **Traductions** : Fournissez des traductions pour au moins le français et l'anglais
-3. **Performances** : Optimisez le traitement des images pour de bonnes performances
-4. **Interface utilisateur** : Créez une interface intuitive et responsive
-5. **Validation** : Validez les entrées utilisateur pour éviter les erreurs
-6. **Documentation** : Documentez votre code et expliquez comment utiliser votre module
-7. **Tests** : Testez votre module avec différents types et tailles d'images
+1. **Architecture** : Séparez la logique de traitement (index.process.ts) de l'interface utilisateur (index.ts)
+2. **Nommage** : Utilisez des noms clairs et descriptifs pour votre module
+3. **Traductions** : Fournissez des traductions pour au moins le français et l'anglais
+4. **Performances** : Optimisez le traitement des images pour de bonnes performances
+5. **Interface utilisateur** : Créez une interface intuitive et responsive
+6. **Validation** : Validez les entrées utilisateur pour éviter les erreurs
+7. **Documentation** : Documentez votre code et expliquez comment utiliser votre module
+8. **Tests** : Testez votre module avec différents types et tailles d'images
 
 ## Intégration avec l'API
 

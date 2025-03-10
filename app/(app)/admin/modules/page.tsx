@@ -1,7 +1,7 @@
 import {
   apiModuleManager,
   initApiModuleManager,
-} from "@/lib/modules/api-module-manager";
+} from "@/lib/modules/module-manager.api";
 import { ModuleList } from "@/components/modules/module-list";
 import { Metadata } from "next";
 
