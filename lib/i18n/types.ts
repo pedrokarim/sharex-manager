@@ -17,3 +17,15 @@ export type LocaleData = {
 export type TranslationParams = {
   [key: string]: string | number | boolean | Date | null | undefined;
 };
+
+export interface ModuleTranslations {
+  [locale: string]: {
+    [key: string]:
+      | string
+      | number
+      | boolean
+      | null
+      | undefined
+      | { [key: string]: any };
+  };
+}

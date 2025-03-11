@@ -364,9 +364,17 @@ class ApiModuleManagerImpl implements ModuleManager {
    */
   public async getModulesByFileType(fileType: string): Promise<ModuleConfig[]> {
     const modules = await this.getModules();
-    return modules.filter(
-      (m) => m.enabled && m.supportedFileTypes.includes(fileType)
-    );
+    return modules.filter((m) => {
+      if (!m.enabled) return false;
+
+      // Si le module supporte tous les types de fichiers (*)
+      if (m.supportedFileTypes.includes("*")) return true;
+
+      // Sinon, vérifier si le type de fichier spécifique est supporté
+      return m.supportedFileTypes.includes(
+        fileType.toLowerCase().replace(".", "")
+      );
+    });
   }
 
   /**

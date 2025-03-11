@@ -1,0 +1,16 @@
+{
+  "name": "anime-trace",
+  "version": "1.0.0",
+  "description": "Module d'analyse d'images pour identifier les animes avec trace.moe",
+  "author": "System",
+  "enabled": true,
+  "entry": "index.ts",
+  "icon": "https://img.ascencia.re/kUHNekXzLfQb.png",
+  "category": "analysis",
+  "hasUI": true,
+  "supportedFileTypes": ["jpg", "jpeg", "png", "gif", "webp"],
+  "settings": {
+    "cacheSize": 1000,
+    "similarityThreshold": 0.85
+  }
+}

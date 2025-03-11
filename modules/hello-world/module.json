@@ -1,0 +1,13 @@
+{
+  "name": "hello-world",
+  "version": "1.0.0",
+  "description": "Un module simple qui affiche Hello World",
+  "author": "System",
+  "enabled": true,
+  "entry": "index.ts",
+  "icon": "MessageSquare",
+  "category": "text",
+  "hasUI": true,
+  "supportedFileTypes": ["*"],
+  "settings": {}
+}
