@@ -599,39 +599,42 @@ export function GalleryClient({
           </div>
         ) : (
           <>
-            {Object.entries(groupedFiles).map(([date, filesInGroup]) => (
-              <div key={date} className="mb-8">
-                <h2 className="mb-4 text-xl font-semibold text-muted-foreground">
-                  {capitalize(date)}
-                </h2>
-                {!viewMode || viewMode === "grid" ? (
-                  <GridView
-                    files={filesInGroup}
-                    onCopy={copyToClipboard}
-                    onDelete={(name) => {
-                      reset(files.filter((f) => f.name !== name));
-                    }}
-                    onSelect={setSelectedFile}
-                    onToggleSecurity={handleToggleSecurity}
-                    onToggleStar={handleToggleStar}
-                    newFileIds={newFileIds}
-                  />
-                ) : (
-                  <ListView
-                    files={filesInGroup}
-                    onCopy={copyToClipboard}
-                    onDelete={(name) => {
-                      reset(files.filter((f) => f.name !== name));
-                    }}
-                    onSelect={setSelectedFile}
-                    onToggleSecurity={handleToggleSecurity}
-                    onToggleStar={handleToggleStar}
-                    detailed={viewMode === "details"}
-                    newFileIds={newFileIds}
-                  />
-                )}
-              </div>
-            ))}
+            <UploadZone onFinishUpload={handleFinishUpload}>
+              {Object.entries(groupedFiles).map(([date, filesInGroup]) => (
+                <div key={date} className="mb-8">
+                  <h2 className="mb-4 text-xl font-semibold text-muted-foreground">
+                    {capitalize(date)}
+                  </h2>
+                  {!viewMode || viewMode === "grid" ? (
+                    <GridView
+                      files={filesInGroup}
+                      onCopy={copyToClipboard}
+                      onDelete={(name) => {
+                        reset(files.filter((f) => f.name !== name));
+                      }}
+                      onSelect={setSelectedFile}
+                      onToggleSecurity={handleToggleSecurity}
+                      onToggleStar={handleToggleStar}
+                      newFileIds={newFileIds}
+                    />
+                  ) : (
+                    <ListView
+                      files={filesInGroup}
+                      onCopy={copyToClipboard}
+                      onDelete={(name) => {
+                        reset(files.filter((f) => f.name !== name));
+                      }}
+                      onSelect={setSelectedFile}
+                      onToggleSecurity={handleToggleSecurity}
+                      onToggleStar={handleToggleStar}
+                      detailed={viewMode === "details"}
+                      newFileIds={newFileIds}
+                    />
+                  )}
+                </div>
+              ))}
+            </UploadZone>
+
             <div ref={ref} className="h-10 flex items-center justify-center">
               {loading && (
                 <Loading
@@ -645,10 +648,6 @@ export function GalleryClient({
           </>
         )}
       </div>
-
-      <UploadZone onFinishUpload={handleFinishUpload}>
-        <div className="h-1 w-1" />
-      </UploadZone>
 
       <FileViewer
         file={selectedFile}

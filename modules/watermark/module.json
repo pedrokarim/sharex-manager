@@ -7,15 +7,25 @@
   "entry": "index.ts",
   "icon": "https://cdn-icons-png.flaticon.com/512/5610/5610944.png",
   "category": "Marque",
-  "supportedFileTypes": ["jpg", "jpeg", "png", "gif", "webp"],
   "hasUI": true,
-  "npmDependencies": {
-    "sharp": "^0.32.1",
-    "react-colorful": "^5.6.1"
-  },
+  "supportedFileTypes": [
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "webp"
+  ],
   "settings": {
     "position": "bottom-right",
     "opacity": 0.7,
     "text": "© ShareX Manager"
-  }
+  },
+  "npmDependencies": {
+    "sharp": "^0.32.1",
+    "react-colorful": "^5.6.1"
+  },
+  "capabilities": [
+    "addWatermark",
+    "initModule"
+  ]
 }

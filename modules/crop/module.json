@@ -7,15 +7,25 @@
   "entry": "index.ts",
   "icon": "https://cdn-icons-png.flaticon.com/512/1251/1251717.png",
   "category": "Édition",
-  "supportedFileTypes": ["jpg", "jpeg", "png", "gif", "webp"],
   "hasUI": true,
-  "npmDependencies": {
-    "sharp": "^0.32.1",
-    "react-image-crop": "^10.1.5"
-  },
+  "supportedFileTypes": [
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "webp"
+  ],
   "settings": {
     "aspectRatio": null,
     "circularCrop": false,
     "quality": 90
-  }
+  },
+  "npmDependencies": {
+    "sharp": "^0.32.1",
+    "react-image-crop": "^10.1.5"
+  },
+  "capabilities": [
+    "cropImage",
+    "initModule"
+  ]
 }

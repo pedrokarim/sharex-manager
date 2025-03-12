@@ -101,19 +101,27 @@ export default function AnimeTraceUI({
 
       // Récupérer l'image
       const response = await fetch(fileInfo.url);
-      const buffer = await response.arrayBuffer();
-      const base64Image = Buffer.from(buffer).toString("base64");
+      const blob = await response.blob();
 
-      // Appeler directement l'API trace.moe
+      // Vérifier la taille de l'image (limite de 25MB)
+      if (blob.size > 25 * 1024 * 1024) {
+        throw new Error(t("modules.anime_trace.errors.image_too_large"));
+      }
+
+      // Créer un FormData et ajouter l'image
+      const formData = new FormData();
+      formData.append("image", blob);
+
+      // Appeler directement l'API trace.moe avec FormData
       const traceMoeResponse = await fetch("https://api.trace.moe/search", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ image: base64Image }),
+        body: formData,
       });
 
       if (!traceMoeResponse.ok) {
+        if (traceMoeResponse.status === 413) {
+          throw new Error(t("modules.anime_trace.errors.image_too_large"));
+        }
         throw new Error(t("modules.anime_trace.errors.analysis_failed"));
       }
 

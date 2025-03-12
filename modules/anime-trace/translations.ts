@@ -18,6 +18,7 @@ const translations: ModuleTranslations = {
     errors: {
       analysis_failed: "Failed to analyze the image",
       unknown: "An unknown error occurred",
+      image_too_large: "Image is too large. Maximum size is 25MB.",
     },
   },
   fr: {
@@ -37,6 +38,8 @@ const translations: ModuleTranslations = {
     errors: {
       analysis_failed: "Échec de l'analyse de l'image",
       unknown: "Une erreur inconnue est survenue",
+      image_too_large:
+        "L'image est trop volumineuse. La taille maximale est de 25MB.",
     },
   },
 };
