@@ -435,7 +435,7 @@ export function ModuleActions({
             }
           }}
         >
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {selectedModule &&
@@ -450,16 +450,19 @@ export function ModuleActions({
 
             <div className="py-4">{renderModuleUI()}</div>
 
-            <div className="flex items-center space-x-2 mt-4 border-t pt-4">
-              <Switch
-                id="create-new-version"
-                checked={createNewVersion}
-                onCheckedChange={setCreateNewVersion}
-              />
-              <Label htmlFor="create-new-version">
-                {t("gallery.file_viewer.modules.create_new_version")}
-              </Label>
-            </div>
+            {/* N'afficher le switcher que pour les modules de type Édition */}
+            {selectedModule?.category === "Édition" && (
+              <div className="flex items-center space-x-2 mt-4 border-t pt-4">
+                <Switch
+                  id="create-new-version"
+                  checked={createNewVersion}
+                  onCheckedChange={setCreateNewVersion}
+                />
+                <Label htmlFor="create-new-version">
+                  {t("gallery.file_viewer.modules.create_new_version")}
+                </Label>
+              </div>
+            )}
 
             <DialogFooter>
               <Button
@@ -568,7 +571,7 @@ export function ModuleActions({
           }
         }}
       >
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {selectedModule &&
@@ -583,16 +586,19 @@ export function ModuleActions({
 
           <div className="py-4">{renderModuleUI()}</div>
 
-          <div className="flex items-center space-x-2 mt-4 border-t pt-4">
-            <Switch
-              id="create-new-version"
-              checked={createNewVersion}
-              onCheckedChange={setCreateNewVersion}
-            />
-            <Label htmlFor="create-new-version">
-              {t("gallery.file_viewer.modules.create_new_version")}
-            </Label>
-          </div>
+          {/* N'afficher le switcher que pour les modules de type Édition */}
+          {selectedModule?.category === "Édition" && (
+            <div className="flex items-center space-x-2 mt-4 border-t pt-4">
+              <Switch
+                id="create-new-version"
+                checked={createNewVersion}
+                onCheckedChange={setCreateNewVersion}
+              />
+              <Label htmlFor="create-new-version">
+                {t("gallery.file_viewer.modules.create_new_version")}
+              </Label>
+            </div>
+          )}
 
           <DialogFooter>
             <Button

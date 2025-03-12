@@ -28,5 +28,19 @@
   },
   "apply": "Appliquer le filigrane",
   "text_placeholder": "Entrez le texte du filigrane",
-  "choose_position": "Choisir une position"
+  "choose_position": "Choisir une position",
+  "errors": {
+    "invalid_color": "Couleur invalide",
+    "text_required": "Le texte du filigrane est requis",
+    "processing_error": "Erreur lors du traitement de l'image"
+  },
+  "advanced": {
+    "title": "Options avancées",
+    "font_family": "Police de caractères",
+    "font_weight": "Épaisseur de police",
+    "text_shadow": "Ombre du texte",
+    "background": "Arrière-plan",
+    "rotation": "Rotation",
+    "scale": "Échelle"
+  }
 }

@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/select";
 import { HexColorPicker } from "react-colorful";
 import { Card } from "@/components/ui/card";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useModuleTranslations } from "@/lib/i18n";
+import moduleTranslations from "./translations";
 
 // Interface pour les props du composant
 interface WatermarkUIProps {
@@ -31,6 +32,8 @@ export default function WatermarkUI({
   fileInfo,
   onComplete,
 }: WatermarkUIProps) {
+  // Enregistrer les traductions du module
+  useModuleTranslations("watermark", moduleTranslations);
   const { t } = useTranslation();
   const [text, setText] = useState("© ShareX Manager");
   const [position, setPosition] = useState("bottom-right");
@@ -233,7 +236,7 @@ export default function WatermarkUI({
             <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
               <img
                 src={fileInfo.url}
-                alt="Aperçu"
+                alt={t("modules.watermark.preview")}
                 className="w-full h-full object-cover"
               />
               <div
