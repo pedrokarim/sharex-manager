@@ -14,7 +14,7 @@ RUN for dir in modules/*/; do \
       fi; \
     done
 
-# Build
+# Builds
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/modules ./modules
