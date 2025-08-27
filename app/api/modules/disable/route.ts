@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiModuleManager } from "@/lib/modules/api-module-manager";
 import { auth } from "@/auth";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 
 export async function POST(request: NextRequest) {
   const session = await auth();

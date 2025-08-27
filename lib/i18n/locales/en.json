@@ -306,6 +306,7 @@
       }
     },
     "file_viewer": {
+      "details": "Details",
       "accessibility": "Image added on {date}. File size: {size} KB. {navigation}",
       "previous_button": "Use the previous button to see the previous image.",
       "next_button": "Use the next button to see the next image.",
@@ -320,6 +321,7 @@
       "date": "Date",
       "size": "Size",
       "url": "URL",
+      "path": "Path",
       "actions": "Actions",
       "copy_url": "Copy URL",
       "open": "Open",

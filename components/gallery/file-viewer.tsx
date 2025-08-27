@@ -33,6 +33,7 @@ import { VisuallyHidden } from "../ui/visually-hidden";
 import { useTranslation } from "@/lib/i18n";
 import { toast } from "sonner";
 import { ModuleActions } from "./module-actions";
+import { getGalleryImageUrl, getFileStoragePath } from "@/lib/utils/url";
 
 interface FileViewerProps {
   file: FileInfo | null;
@@ -313,16 +314,28 @@ export function FileViewer({
                     {t("gallery.file_viewer.url")}
                   </p>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm truncate">{file.url}</p>
+                    <p className="text-sm truncate">
+                      {getGalleryImageUrl(file.name)}
+                    </p>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6"
-                      onClick={() => file && onCopy(file.url)}
+                      onClick={() =>
+                        file && onCopy(getGalleryImageUrl(file.name))
+                      }
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
                   </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {t("gallery.file_viewer.path")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {getFileStoragePath(file.name)}
+                  </p>
                 </div>
                 <Separator />
                 <div>
@@ -334,7 +347,9 @@ export function FileViewer({
                       variant="outline"
                       size="sm"
                       className="w-full"
-                      onClick={() => file && onCopy(file.url)}
+                      onClick={() =>
+                        file && onCopy(getGalleryImageUrl(file.name))
+                      }
                     >
                       <Copy className="h-4 w-4 mr-2" />
                       {t("gallery.file_viewer.copy_url")}
@@ -346,7 +361,7 @@ export function FileViewer({
                       asChild
                     >
                       <a
-                        href={file?.url}
+                        href={getGalleryImageUrl(file.name)}
                         target="_blank"
                         rel="noopener noreferrer"
                       >

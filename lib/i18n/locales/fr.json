@@ -307,6 +307,7 @@
       }
     },
     "file_viewer": {
+      "details": "Détails",
       "accessibility": "Image ajoutée le {date}. Taille du fichier : {size} Ko. {navigation}",
       "previous_button": "Utilisez le bouton précédent pour voir l'image précédente.",
       "next_button": "Utilisez le bouton suivant pour voir l'image suivante.",
@@ -321,6 +322,7 @@
       "date": "Date",
       "size": "Taille",
       "url": "URL",
+      "path": "Chemin",
       "actions": "Actions",
       "copy_url": "Copier l'URL",
       "open": "Ouvrir",

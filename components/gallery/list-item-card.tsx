@@ -13,6 +13,7 @@ import { format, parseISO } from "date-fns";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { getGalleryImageUrl } from "@/lib/utils/url";
 
 interface ListItemCardProps {
   file: FileInfo;
@@ -99,7 +100,7 @@ export function ListItemCard({
         </Button>
         <Button variant="ghost" size="icon" asChild>
           <a
-            href={file.url}
+            href={getGalleryImageUrl(file.name)}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
