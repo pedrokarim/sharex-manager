@@ -7,6 +7,10 @@ services:
       target: runner
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
+    env_file:
+      - .env
+      - .env.local
+      - .env.production
     environment:
       - PORT=${PORT:-3000}
       - NODE_ENV=production
