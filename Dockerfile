@@ -6,9 +6,18 @@ FROM base AS deps
 COPY package.json bun.lockb ./
 RUN bun install
 
+# Installation des dépendances des modules
+COPY modules/ ./modules/
+RUN for dir in modules/*/; do \
+      if [ -f "$dir/package.json" ]; then \
+        cd "$dir" && bun install && cd /app; \
+      fi; \
+    done
+
 # Build
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/modules ./modules
 COPY . .
 RUN bun run build
 
