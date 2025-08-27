@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
     const level = searchParams.get("level");
     const action = searchParams.get("action");
     const userId = searchParams.get("userId");
+    const search = searchParams.get("search");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
 
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
       level: level || undefined,
       action: action || undefined,
       userId: userId || undefined,
+      search: search || undefined,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
     });

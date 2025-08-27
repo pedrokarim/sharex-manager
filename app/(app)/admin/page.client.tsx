@@ -6,7 +6,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Settings, Users, Database, Shield, Upload } from "lucide-react";
+import {
+  Settings,
+  Users,
+  Database,
+  Shield,
+  Upload,
+  Package,
+} from "lucide-react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 
@@ -34,6 +41,13 @@ export function AdminPageClient() {
       icon: Settings,
       href: "/admin/system",
       color: "text-yellow-500",
+    },
+    {
+      title: "Gestion des modules",
+      description: "Gérer les modules installés et leurs dépendances",
+      icon: Package,
+      href: "/admin/modules",
+      color: "text-purple-500",
     },
     {
       title: t("admin.sections.security.title"),

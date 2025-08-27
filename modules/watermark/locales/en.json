@@ -1,0 +1,46 @@
+{
+  "title": "Watermark",
+  "description": "Add a watermark to your image",
+  "text": "Watermark text",
+  "position": "Position",
+  "positions": {
+    "top_left": "Top left",
+    "top_center": "Top center",
+    "top_right": "Top right",
+    "middle_left": "Middle left",
+    "middle_center": "Middle center",
+    "middle_right": "Middle right",
+    "bottom_left": "Bottom left",
+    "bottom_center": "Bottom center",
+    "bottom_right": "Bottom right"
+  },
+  "opacity": "Opacity",
+  "font_size": "Font size",
+  "color": "Color",
+  "padding": "Padding",
+  "preview": "Preview",
+  "tips": {
+    "title": "Tips",
+    "opacity": "Use reduced opacity for a subtle watermark",
+    "font_size": "Adjust font size based on image size",
+    "position": "Corners are usually the best locations for watermarks",
+    "color": "Use a color that contrasts with your image"
+  },
+  "apply": "Apply watermark",
+  "text_placeholder": "Enter watermark text",
+  "choose_position": "Choose a position",
+  "errors": {
+    "invalid_color": "Invalid color",
+    "text_required": "Watermark text is required",
+    "processing_error": "Error processing image"
+  },
+  "advanced": {
+    "title": "Advanced options",
+    "font_family": "Font family",
+    "font_weight": "Font weight",
+    "text_shadow": "Text shadow",
+    "background": "Background",
+    "rotation": "Rotation",
+    "scale": "Scale"
+  }
+}

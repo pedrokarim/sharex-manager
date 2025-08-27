@@ -1,6 +1,14 @@
 "use client";
 
-import { Settings, Upload, Database, RefreshCw, Server } from "lucide-react";
+import {
+  Settings,
+  Upload,
+  Database,
+  RefreshCw,
+  Server,
+  Package,
+  Loader2,
+} from "lucide-react";
 import Link from "next/link";
 import {
   Card,
@@ -23,9 +31,20 @@ interface SystemStats {
   uptime: string;
 }
 
+interface ModuleDependencyResult {
+  name: string;
+  success: boolean;
+  message: string;
+}
+
 export default function SystemPageClient() {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
+  const [isInstallingDependencies, setIsInstallingDependencies] =
+    useState(false);
+  const [dependencyResults, setDependencyResults] = useState<
+    ModuleDependencyResult[]
+  >([]);
   const [systemStats, setSystemStats] = useState<SystemStats>({
     cpuUsage: 12,
     memoryUsage: 45,
@@ -52,6 +71,42 @@ export default function SystemPageClient() {
       toast.error(t("admin.system.stats.refresh_error"));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const installAllModuleDependencies = async () => {
+    setIsInstallingDependencies(true);
+    setDependencyResults([]);
+
+    try {
+      const response = await fetch("/api/modules/install-all-dependencies", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Une erreur est survenue lors de l'installation des dépendances"
+        );
+      }
+
+      setDependencyResults(data.results || []);
+
+      if (data.success) {
+        toast.success("Installation des dépendances terminée");
+      } else {
+        toast.error("Erreur lors de l'installation des dépendances");
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'installation des dépendances:", error);
+      toast.error("Erreur lors de l'installation des dépendances");
+    } finally {
+      setIsInstallingDependencies(false);
     }
   };
 
@@ -125,6 +180,63 @@ export default function SystemPageClient() {
       </Card>
 
       <div className="grid gap-6 max-w-4xl">
+        {/* Gestion des modules */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Gestion des modules
+            </CardTitle>
+            <CardDescription>
+              Gérez les modules et leurs dépendances
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p>
+                Installez les dépendances NPM de tous les modules en une seule
+                fois.
+              </p>
+              <Button
+                onClick={installAllModuleDependencies}
+                disabled={isInstallingDependencies}
+              >
+                {isInstallingDependencies ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Installation en cours...
+                  </>
+                ) : (
+                  "Installer toutes les dépendances"
+                )}
+              </Button>
+
+              {dependencyResults.length > 0 && (
+                <div className="mt-4 border rounded-md p-4">
+                  <h3 className="text-sm font-medium mb-2">
+                    Résultats de l'installation
+                  </h3>
+                  <div className="space-y-2">
+                    {dependencyResults.map((result, index) => (
+                      <div
+                        key={index}
+                        className={`text-sm p-2 rounded-md ${
+                          result.success
+                            ? "bg-green-50 text-green-700"
+                            : "bg-red-50 text-red-700"
+                        }`}
+                      >
+                        <span className="font-medium">{result.name}:</span>{" "}
+                        {result.message}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Configuration des uploads */}
         <Card>
           <CardHeader>

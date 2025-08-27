@@ -306,6 +306,7 @@
       }
     },
     "file_viewer": {
+      "details": "Details",
       "accessibility": "Image added on {date}. File size: {size} KB. {navigation}",
       "previous_button": "Use the previous button to see the previous image.",
       "next_button": "Use the next button to see the next image.",
@@ -315,6 +316,42 @@
         "date_added": "Date added",
         "size": "Size",
         "kb": "KB"
+      },
+      "name": "Name",
+      "date": "Date",
+      "size": "Size",
+      "url": "URL",
+      "path": "Path",
+      "actions": "Actions",
+      "copy_url": "Copy URL",
+      "open": "Open",
+      "secured": "Secured",
+      "public": "Public",
+      "starred": "Starred",
+      "star": "Add to favorites",
+      "process_image": "Process image",
+      "view_logs": "View logs",
+      "modules": {
+        "title": "Available modules",
+        "loading": "Loading modules...",
+        "no_modules": "No modules available for this file type",
+        "apply_error": "Error applying module",
+        "apply_success": "Module {module} applied successfully",
+        "fetch_error": "Error fetching modules",
+        "module_not_found": "Module not found",
+        "ui_load_error": "Error loading interface",
+        "module_load_failed": "Module {module} could not be loaded",
+        "unknown_error": "Unknown error",
+        "all": "All",
+        "other": "Others",
+        "create_new_version": "Create a new version",
+        "modify_existing": "Modify existing version",
+        "categories": {
+          "edition": "Edition",
+          "brand": "Brand",
+          "effects": "Effects",
+          "filters": "Filters"
+        }
       }
     },
     "upload_zone": {
@@ -677,7 +714,8 @@
         "select_action": "Filter by action",
         "select_user": "Select a user",
         "select_date": "Select a date",
-        "choose_date": "Choose a date"
+        "choose_date": "Choose a date",
+        "search_placeholder": "Search by filename or IP"
       },
       "details_dialog": {
         "title": "Log Details",

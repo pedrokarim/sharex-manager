@@ -42,6 +42,7 @@ import {
 import { formatBytes } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { FileInfo } from "@/types/files";
+import { getGalleryImageUrl } from "@/lib/utils/url";
 import type { ThumbnailSize } from "@/lib/atoms/preferences";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
@@ -293,7 +294,11 @@ export function FileCard({
           </Button>
         )}
         <Button variant="secondary" className="w-full" asChild>
-          <a href={file.url} target="_blank" rel="noopener noreferrer">
+          <a
+            href={getGalleryImageUrl(file.name)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <ExternalLink
               className={cn("h-4 w-4", size === "small" && "h-3 w-3")}
             />

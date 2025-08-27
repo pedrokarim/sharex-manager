@@ -1,0 +1,46 @@
+{
+  "title": "Resize",
+  "description": "Modify the size of your image",
+  "max_width": "Maximum width",
+  "max_height": "Maximum height",
+  "quality": "Image quality",
+  "maintain_aspect_ratio": "Maintain aspect ratio",
+  "dimensions": {
+    "original": "Original dimensions",
+    "new": "New dimensions",
+    "reduction": "Reduction"
+  },
+  "apply": "Apply resize",
+  "preview": "Resize preview",
+  "reset": "Reset dimensions",
+  "advanced": {
+    "title": "Advanced options",
+    "fit_mode": "Fit mode",
+    "fit_modes": {
+      "cover": "Cover",
+      "contain": "Contain",
+      "fill": "Fill",
+      "inside": "Inside",
+      "outside": "Outside"
+    },
+    "sharpen": "Sharpen",
+    "blur": "Blur",
+    "gamma": "Gamma",
+    "keep_metadata": "Keep metadata",
+    "background_color": "Background color"
+  },
+  "presets": {
+    "title": "Presets",
+    "hd": "HD (1280x720)",
+    "full_hd": "Full HD (1920x1080)",
+    "4k": "4K (3840x2160)",
+    "thumbnail": "Thumbnail (300x300)",
+    "social_media": "Social Media (1200x630)",
+    "custom": "Custom"
+  },
+  "help": {
+    "preview": "Preview of dimensions after resizing",
+    "quality_tip": "Higher quality gives better results but larger files",
+    "aspect_ratio_tip": "Maintain aspect ratio to avoid image distortion"
+  }
+}

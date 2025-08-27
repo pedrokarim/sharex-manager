@@ -4,6 +4,7 @@ import { useAtom } from "jotai";
 import { thumbnailSizeAtom } from "@/lib/atoms/preferences";
 import { useQueryState } from "nuqs";
 import { cn } from "@/lib/utils";
+import { getGalleryImageUrl } from "@/lib/utils/url";
 
 interface GridViewProps {
   files: FileInfo[];
@@ -27,12 +28,12 @@ export function GridView({
   const [defaultThumbnailSize, setDefaultThumbnailSize] =
     useAtom(thumbnailSizeAtom);
   const [thumbnailSize] = useQueryState<"small" | "medium" | "large">("size", {
-    defaultValue: defaultThumbnailSize,
+    defaultValue: defaultThumbnailSize as "small" | "medium" | "large",
     parse: (value): "small" | "medium" | "large" => {
       if (value === "small" || value === "medium" || value === "large") {
         return value;
       }
-      return defaultThumbnailSize;
+      return defaultThumbnailSize as "small" | "medium" | "large";
     },
   });
 
@@ -50,7 +51,7 @@ export function GridView({
           key={file.url}
           file={file}
           onDelete={() => onDelete(file.name)}
-          onCopy={() => onCopy(file.url)}
+          onCopy={() => onCopy(getGalleryImageUrl(file.name))}
           onSelect={() => onSelect(file)}
           onToggleSecurity={() => onToggleSecurity(file)}
           onToggleStar={() => onToggleStar(file)}

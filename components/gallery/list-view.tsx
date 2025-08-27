@@ -1,5 +1,6 @@
 import { FileInfo } from "@/types/files";
 import { ListItemCard } from "./list-item-card";
+import { getGalleryImageUrl } from "@/lib/utils/url";
 
 interface ListViewProps {
   files: FileInfo[];
@@ -29,7 +30,7 @@ export function ListView({
           key={file.name}
           file={file}
           onDelete={() => onDelete(file.name)}
-          onCopy={() => onCopy(file.url)}
+          onCopy={() => onCopy(getGalleryImageUrl(file.name))}
           onSelect={() => onSelect(file)}
           onToggleSecurity={() => onToggleSecurity(file)}
           onToggleStar={() => onToggleStar(file)}

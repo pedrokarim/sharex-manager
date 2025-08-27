@@ -1,0 +1,10 @@
+{
+  "modules": {
+    "hello_world": {
+      "title": "Hello World",
+      "greeting": "👋 Hello World!",
+      "description": "This is a simple demonstration module",
+      "continue": "Continue"
+    }
+  }
+}

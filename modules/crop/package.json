@@ -1,0 +1,8 @@
+{
+  "name": "module-crop",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react-image-crop": "^10.1.5"
+  }
+}

@@ -145,6 +145,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             url: "/settings/integrations",
             icon: Share2,
           },
+          {
+            title: "Modules",
+            url: "/modules",
+            icon: FileImage,
+          },
         ],
       },
     ],

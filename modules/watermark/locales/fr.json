@@ -1,0 +1,46 @@
+{
+  "title": "Filigrane",
+  "description": "Ajoutez un filigrane à votre image",
+  "text": "Texte du filigrane",
+  "position": "Position",
+  "positions": {
+    "top_left": "Haut gauche",
+    "top_center": "Haut centre",
+    "top_right": "Haut droite",
+    "middle_left": "Milieu gauche",
+    "middle_center": "Milieu centre",
+    "middle_right": "Milieu droite",
+    "bottom_left": "Bas gauche",
+    "bottom_center": "Bas centre",
+    "bottom_right": "Bas droite"
+  },
+  "opacity": "Opacité",
+  "font_size": "Taille de police",
+  "color": "Couleur",
+  "padding": "Marge",
+  "preview": "Aperçu",
+  "tips": {
+    "title": "Conseils",
+    "opacity": "Utilisez une opacité réduite pour un filigrane discret",
+    "font_size": "Ajustez la taille de police en fonction de la taille de l'image",
+    "position": "Les coins sont généralement les meilleurs emplacements pour les filigranes",
+    "color": "Utilisez une couleur contrastée avec votre image"
+  },
+  "apply": "Appliquer le filigrane",
+  "text_placeholder": "Entrez le texte du filigrane",
+  "choose_position": "Choisir une position",
+  "errors": {
+    "invalid_color": "Couleur invalide",
+    "text_required": "Le texte du filigrane est requis",
+    "processing_error": "Erreur lors du traitement de l'image"
+  },
+  "advanced": {
+    "title": "Options avancées",
+    "font_family": "Police de caractères",
+    "font_weight": "Épaisseur de police",
+    "text_shadow": "Ombre du texte",
+    "background": "Arrière-plan",
+    "rotation": "Rotation",
+    "scale": "Échelle"
+  }
+}

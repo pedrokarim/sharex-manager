@@ -13,8 +13,8 @@ interface User {
 }
 
 const userSchema = z.object({
-  username: z.string(),
-  password: z.string(),
+  username: z.string().min(1, "Le nom d'utilisateur est requis"),
+  password: z.string().min(1, "Le mot de passe est requis"),
 });
 
 export const {
@@ -26,33 +26,59 @@ export const {
   providers: [
     Credentials({
       async authorize(credentials) {
+        console.log("🔍 Début du processus d'autorisation");
+        console.log("📝 Credentials reçus:", credentials);
+
         try {
+          if (!credentials) {
+            console.log("❌ Aucun identifiant fourni");
+            throw new Error("Aucun identifiant fourni");
+          }
+
+          console.log("🔎 Validation du schéma des credentials");
+          const parsed = userSchema.safeParse(credentials);
+          if (!parsed.success) {
+            console.log("❌ Échec de la validation:", parsed.error);
+            return null;
+          }
+          console.log("✅ Validation du schéma réussie");
+
+          console.log("📂 Lecture du fichier users.json");
           const users = JSON.parse(
             readFileSync(join(process.cwd(), "data/users.json"), "utf-8")
           ) as User[];
+          console.log("📋 Nombre d'utilisateurs trouvés:", users.length);
 
-          const parsed = userSchema.parse(credentials);
-          const user = users.find((u) => u.username === parsed.username);
+          console.log("🔍 Recherche de l'utilisateur:", parsed.data.username);
+          const user = users.find((u) => u.username === parsed.data.username);
+          if (!user) {
+            throw new Error("UserNotFound");
+          }
+          console.log("✅ Utilisateur trouvé");
 
-          if (!user) return null;
-
-          // Vérification du mot de passe avec bcrypt
+          console.log("🔐 Vérification du mot de passe");
           const passwordMatch = await bcrypt.compare(
-            parsed.password,
+            parsed.data.password,
             user.password
           );
 
-          if (passwordMatch) {
-            return {
-              id: user.id,
-              name: user.username,
-              username: user.username,
-              email: null,
-              role: user.role,
-            };
+          if (!passwordMatch) {
+            throw new Error("InvalidPassword");
           }
-          return null;
-        } catch {
+          console.log("✅ Mot de passe correct");
+
+          console.log(
+            "🎉 Authentification réussie, création du profil utilisateur"
+          );
+          return {
+            id: user.id,
+            name: user.username,
+            username: user.username,
+            email: null,
+            role: user.role,
+          };
+        } catch (error) {
+          console.log("💥 Erreur critique durant l'authentification:", error);
           return null;
         }
       },

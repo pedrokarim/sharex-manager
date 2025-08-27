@@ -84,6 +84,7 @@ class LogDatabase {
       level?: string;
       action?: string;
       userId?: string;
+      search?: string;
       startDate?: string;
       endDate?: string;
     }
@@ -110,6 +111,12 @@ class LogDatabase {
     if (filters?.userId) {
       query += ` AND userId = ?`;
       params.push(filters.userId);
+    }
+
+    if (filters?.search) {
+      query += ` AND (metadata LIKE ? OR message LIKE ? OR ip LIKE ?)`;
+      const searchPattern = `%${filters.search}%`;
+      params.push(searchPattern, searchPattern, searchPattern);
     }
 
     if (filters?.startDate) {

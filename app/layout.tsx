@@ -4,6 +4,13 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeWrapper } from "@/components/theme-wrapper";
+import { initModules } from "@/lib/modules/init";
+
+// Initialiser les modules au démarrage de l'application
+// Utiliser setTimeout pour éviter de bloquer le rendu
+setTimeout(() => {
+  initModules().catch(console.error);
+}, 1000);
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
