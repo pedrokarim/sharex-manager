@@ -18,11 +18,11 @@ tests
 # Fichiers de développement
 .git
 .gitignore
-.env.local
+# .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-.env
+# .env
 
 # Logs
 npm-debug.log*
