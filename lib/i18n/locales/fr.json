@@ -331,6 +331,7 @@
       "starred": "Favori",
       "star": "Ajouter aux favoris",
       "process_image": "Traiter l'image",
+      "view_logs": "Voir les logs",
       "modules": {
         "title": "Modules disponibles",
         "loading": "Chargement des modules...",
@@ -727,7 +728,8 @@
         "select_action": "Filtrer par action",
         "select_user": "Sélectionner un utilisateur",
         "select_date": "Sélectionner une date",
-        "choose_date": "Choisir une date"
+        "choose_date": "Choisir une date",
+        "search_placeholder": "Rechercher par nom de fichier ou IP"
       },
       "details_dialog": {
         "title": "Détails du log",

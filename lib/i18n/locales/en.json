@@ -330,6 +330,7 @@
       "starred": "Starred",
       "star": "Add to favorites",
       "process_image": "Process image",
+      "view_logs": "View logs",
       "modules": {
         "title": "Available modules",
         "loading": "Loading modules...",
@@ -713,7 +714,8 @@
         "select_action": "Filter by action",
         "select_user": "Select a user",
         "select_date": "Select a date",
-        "choose_date": "Choose a date"
+        "choose_date": "Choose a date",
+        "search_placeholder": "Search by filename or IP"
       },
       "details_dialog": {
         "title": "Log Details",

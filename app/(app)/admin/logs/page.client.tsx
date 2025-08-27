@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
 import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -69,6 +70,10 @@ export default function LogsPage() {
     defaultValue: "all",
     parse: (value) => value as LogAction | "all",
   });
+  const [search, setSearch] = useQueryState<string | null>("search", {
+    defaultValue: null,
+    parse: (value) => value || null,
+  });
   const [startDate, setStartDate] = useQueryState<string | null>("startDate", {
     defaultValue: null,
     parse: (value) => value || null,
@@ -84,7 +89,7 @@ export default function LogsPage() {
 
   const { data, fetchNextPage, hasNextPage, isLoading, isError, refetch } =
     useInfiniteQuery({
-      queryKey: ["logs", level, action, startDate, endDate],
+      queryKey: ["logs", level, action, search, startDate, endDate],
       queryFn: async ({ pageParam }) => {
         const searchParams = new URLSearchParams();
         searchParams.set(
@@ -94,6 +99,7 @@ export default function LogsPage() {
         searchParams.set("limit", String(ITEMS_PER_PAGE));
         if (level !== "all") searchParams.set("level", level);
         if (action !== "all") searchParams.set("action", action);
+        if (search) searchParams.set("search", search);
         if (startDate) searchParams.set("startDate", startDate);
         if (endDate) searchParams.set("endDate", endDate);
 
@@ -232,6 +238,13 @@ export default function LogsPage() {
                 </SelectItem>
               </SelectContent>
             </Select>
+
+            <Input
+              placeholder={t("admin.logs.filters.search_placeholder")}
+              value={search || ""}
+              onChange={(e) => setSearch(e.target.value || null)}
+              className="w-[200px]"
+            />
 
             <Popover>
               <PopoverTrigger asChild>

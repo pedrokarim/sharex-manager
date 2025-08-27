@@ -34,6 +34,7 @@ import { useTranslation } from "@/lib/i18n";
 import { toast } from "sonner";
 import { ModuleActions } from "./module-actions";
 import { getGalleryImageUrl, getFileStoragePath } from "@/lib/utils/url";
+import { useRouter } from "next/navigation";
 
 interface FileViewerProps {
   file: FileInfo | null;
@@ -65,6 +66,7 @@ export function FileViewer({
   const locale = useDateLocale();
   const [showInfo, setShowInfo] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const router = useRouter();
 
   if (!file) return null;
 
@@ -138,6 +140,17 @@ export function FileViewer({
       const timestamp = new Date().getTime();
       imgElement.src = `${file.url}?t=${timestamp}`;
     }
+  };
+
+  const handleViewLogs = () => {
+    if (!file) return;
+
+    // Rediriger vers la page des logs avec des paramètres de recherche pour cette image
+    const searchParams = new URLSearchParams();
+    searchParams.set("action", "file.download");
+    searchParams.set("search", file.name);
+
+    router.push(`/admin/logs?${searchParams.toString()}`);
   };
 
   return (
@@ -336,6 +349,17 @@ export function FileViewer({
                   <p className="text-sm text-muted-foreground">
                     {getFileStoragePath(file.name)}
                   </p>
+                </div>
+                <div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleViewLogs}
+                  >
+                    <Info className="h-4 w-4 mr-2" />
+                    {t("gallery.file_viewer.view_logs")}
+                  </Button>
                 </div>
                 <Separator />
                 <div>
