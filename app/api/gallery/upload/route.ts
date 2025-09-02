@@ -7,17 +7,29 @@ import { handleFileUpload } from "@/lib/upload";
 import { logDb } from "@/lib/utils/db";
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
   try {
+    const session = await auth();
+
     if (!session) {
       logDb.createLog({
         level: "warning",
         action: "file.upload",
         message: "Tentative d'upload non autorisée",
-        userId: session?.user?.id || undefined,
-        userEmail: session?.user?.email || undefined,
+        userId: undefined,
+        userEmail: undefined,
       });
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    if (!session.user?.id) {
+      logDb.createLog({
+        level: "warning",
+        action: "file.upload",
+        message: "Session utilisateur invalide",
+        userId: undefined,
+        userEmail: session.user?.email || undefined,
+      });
+      return NextResponse.json({ error: "Session invalide" }, { status: 401 });
     }
 
     const formData = await request.formData();

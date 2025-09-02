@@ -26,6 +26,14 @@ import { Suspense, lazy } from "react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Palette,
+  Shield,
+  Zap,
+  MessageSquare,
+  Crop,
+  Maximize2,
+} from "lucide-react";
 
 interface ModuleActionsProps {
   file: FileInfo;
@@ -222,6 +230,49 @@ export function ModuleActions({
     [modules, loadModuleUI]
   ); // t est stable et géré par la bibliothèque de traduction
 
+  // Fonction pour obtenir l'icône par défaut selon la catégorie du module
+  const getDefaultIcon = useCallback((category?: string) => {
+    switch (category?.toLowerCase()) {
+      case "édition":
+        return <Palette className="h-4 w-4" />;
+      case "marque":
+        return <Shield className="h-4 w-4" />;
+      case "analysis":
+        return <Zap className="h-4 w-4" />;
+      case "text":
+        return <MessageSquare className="h-4 w-4" />;
+      case "crop":
+        return <Crop className="h-4 w-4" />;
+      case "resize":
+        return <Maximize2 className="h-4 w-4" />;
+      default:
+        return <Wand2 className="h-4 w-4" />;
+    }
+  }, []);
+
+  // Fonction pour afficher l'icône du module avec gestion d'erreur
+  const renderModuleIcon = useCallback(
+    (module: ModuleConfig) => {
+      // Vérifier si l'icône est valide (doit être une URL)
+      if (!module.icon || !module.icon.startsWith("http")) {
+        return getDefaultIcon(module.category);
+      }
+
+      return (
+        <img
+          src={module.icon}
+          alt={module.name}
+          className="w-4 h-4"
+          onError={() => {
+            // En cas d'erreur de chargement, on ne peut pas utiliser setState ici
+            // car onError est appelé dans le rendu, mais on peut au moins afficher l'icône par défaut
+          }}
+        />
+      );
+    },
+    [getDefaultIcon]
+  );
+
   // Charger les modules disponibles pour ce type de fichier
   useEffect(() => {
     const fetchModules = async () => {
@@ -401,14 +452,8 @@ export function ModuleActions({
                     >
                       {processingModule === module.name ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : module.icon ? (
-                        <img
-                          src={module.icon}
-                          alt={module.name}
-                          className="w-4 h-4"
-                        />
                       ) : (
-                        <Wand2 className="h-4 w-4" />
+                        renderModuleIcon(module)
                       )}
                     </Button>
                   </TooltipTrigger>

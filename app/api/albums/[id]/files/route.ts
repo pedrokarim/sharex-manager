@@ -159,6 +159,8 @@ export async function POST(
       message: `${addedFiles.length} fichier(s) ajouté(s) à l'album`,
     });
   } catch (error) {
+    console.error("Erreur lors de l'ajout de fichiers à l'album:", error);
+
     logDb.createLog({
       level: "error",
       action: "system.error" as LogAction,

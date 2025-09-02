@@ -497,16 +497,14 @@ export function GalleryClient({
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(
-      `/api/files${isSecureUpload ? "/secure" : ""}`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
+    const response = await fetch("/api/gallery/upload", {
+      method: "POST",
+      body: formData,
+    });
 
     if (!response.ok) {
-      throw new Error(t("gallery.upload_zone.upload_error"));
+      const errorData = await response.json();
+      throw new Error(errorData.error || t("gallery.upload_zone.upload_error"));
     }
 
     await fetchFiles(1).then(({ files }) => {
@@ -727,6 +725,41 @@ export function GalleryClient({
     setIsAddToAlbumDialogOpen(true);
   }, [getSelectedFiles]);
 
+  const handleAddSingleFileToAlbum = useCallback(
+    (fileName: string) => {
+      // Sélectionner temporairement ce fichier
+      toggleFile(fileName);
+      setIsAddToAlbumDialogOpen(true);
+    },
+    [toggleFile]
+  );
+
+  const handleAddToSpecificAlbum = useCallback(
+    async (fileName: string, albumId: number) => {
+      try {
+        const response = await fetch(`/api/albums/${albumId}/files`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ fileNames: [fileName] }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Erreur lors de l'ajout du fichier à l'album");
+        }
+
+        const result = await response.json();
+        const album = availableAlbums.find((a) => a.id === albumId);
+        toast.success(`Fichier ajouté à l'album "${album?.name || albumId}"`);
+      } catch (error) {
+        console.error("Erreur:", error);
+        toast.error("Erreur lors de l'ajout du fichier à l'album");
+      }
+    },
+    [availableAlbums]
+  );
+
   const handleShowHelp = useCallback(() => {
     // TODO: Ouvrir le modal d'aide des raccourcis
     toast.info("Aide des raccourcis clavier (À implémenter)");
@@ -839,12 +872,17 @@ export function GalleryClient({
                       onToggleStar={handleToggleStar}
                       onToggleSelection={toggleFile}
                       onAddToAlbum={handleAddToAlbum}
+                      onAddSingleFileToAlbum={handleAddSingleFileToAlbum}
+                      onAddToSpecificAlbum={(albumId) =>
+                        handleAddToSpecificAlbum(file.name, albumId)
+                      }
                       isSelected={isSelected}
                       isSelectionMode={isSelectionMode}
                       showSelectionCheckbox={isSelectionMode}
                       albums={availableAlbums}
                       allSelectedFiles={getSelectedFilesData(files)}
                       selectedCount={selectedCount}
+                      hasSelection={hasSelection}
                       onClearSelection={clearSelection}
                       onCopyUrls={handleCopySelectedUrls}
                       onDeleteSelected={handleDeleteSelected}
@@ -864,12 +902,17 @@ export function GalleryClient({
                       onToggleStar={handleToggleStar}
                       onToggleSelection={toggleFile}
                       onAddToAlbum={handleAddToAlbum}
+                      onAddSingleFileToAlbum={handleAddSingleFileToAlbum}
+                      onAddToSpecificAlbum={(albumId) =>
+                        handleAddToSpecificAlbum(file.name, albumId)
+                      }
                       isSelected={isSelected}
                       isSelectionMode={isSelectionMode}
                       showSelectionCheckbox={isSelectionMode}
                       albums={availableAlbums}
                       allSelectedFiles={getSelectedFilesData(files)}
                       selectedCount={selectedCount}
+                      hasSelection={hasSelection}
                       onClearSelection={clearSelection}
                       onCopyUrls={handleCopySelectedUrls}
                       onDeleteSelected={handleDeleteSelected}

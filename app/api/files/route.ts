@@ -139,6 +139,12 @@ export async function POST(req: NextRequest) {
     return Response.json({ success: true });
   } catch (error) {
     console.error("Erreur lors de l'upload:", error);
+
+    // Si c'est une erreur d'authentification, retourner 401
+    if (error instanceof Error && error.message.includes("auth")) {
+      return Response.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
     return Response.json(
       { error: "Erreur lors de l'upload du fichier" },
       { status: 500 }

@@ -23,6 +23,7 @@ interface SelectableFileCardProps {
     shiftKey: boolean
   ) => void;
   onAddToAlbum?: () => void;
+  onAddSingleFileToAlbum?: (fileName: string) => void;
   onAddToSpecificAlbum?: (albumId: number) => void;
   isNew?: boolean;
   size?: ThumbnailSize;
@@ -32,6 +33,7 @@ interface SelectableFileCardProps {
   albums?: Array<{ id: number; name: string }>;
   allSelectedFiles?: FileInfo[];
   selectedCount?: number;
+  hasSelection?: boolean;
   onClearSelection?: () => void;
   onCopyUrls?: () => void;
   onDeleteSelected?: () => void;
@@ -48,6 +50,7 @@ export function SelectableFileCard({
   onToggleStar,
   onToggleSelection,
   onAddToAlbum,
+  onAddSingleFileToAlbum,
   onAddToSpecificAlbum,
   isNew,
   size = "medium",
@@ -57,6 +60,7 @@ export function SelectableFileCard({
   albums = [],
   allSelectedFiles = [],
   selectedCount = 0,
+  hasSelection = false,
   onClearSelection,
   onCopyUrls,
   onDeleteSelected,
@@ -99,7 +103,11 @@ export function SelectableFileCard({
         onToggleStarSelected={onToggleStarSelected}
         onToggleSecuritySelected={onToggleSecuritySelected}
         onDeleteSelected={onDeleteSelected}
-        onAddToAlbum={onAddToAlbum}
+        onAddToAlbum={
+          hasSelection
+            ? onAddToAlbum
+            : () => onAddSingleFileToAlbum?.(file.name)
+        }
         onClearSelection={onClearSelection}
         albums={albums}
         onAddToSpecificAlbum={onAddToSpecificAlbum}

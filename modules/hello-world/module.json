@@ -5,7 +5,7 @@
   "author": "System",
   "enabled": true,
   "entry": "index.ts",
-  "icon": "MessageSquare",
+  "icon": "",
   "category": "text",
   "hasUI": true,
   "supportedFileTypes": ["*"],

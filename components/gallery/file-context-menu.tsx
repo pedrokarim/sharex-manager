@@ -163,7 +163,7 @@ export function FileContextMenu({
               {albums.slice(0, 10).map((album) => (
                 <ContextMenuItem
                   key={album.id}
-                  onClick={() => handleAddToAlbum(album.id)}
+                  onClick={() => onAddToSpecificAlbum?.(album.id)}
                 >
                   {album.name}
                 </ContextMenuItem>
@@ -171,13 +171,13 @@ export function FileContextMenu({
               {albums.length > 10 && (
                 <>
                   <ContextMenuSeparator />
-                  <ContextMenuItem onClick={() => handleAddToAlbum()}>
+                  <ContextMenuItem onClick={onAddToAlbum}>
                     Voir tous les albums...
                   </ContextMenuItem>
                 </>
               )}
               <ContextMenuSeparator />
-              <ContextMenuItem onClick={() => handleAddToAlbum()}>
+              <ContextMenuItem onClick={onAddToAlbum}>
                 <FolderPlus className="h-4 w-4 mr-2" />
                 {t("albums.create")}
               </ContextMenuItem>

@@ -39,7 +39,7 @@ class AlbumsDatabase {
       if (!existsSync(dataDir)) {
         mkdirSync(dataDir, { recursive: true });
       }
-      AlbumsDatabase.dbPath = join(dataDir, "logs.db"); // Utilise la même DB que les logs
+      AlbumsDatabase.dbPath = join(dataDir, "albums.db"); // Base de données séparée pour les albums
     }
     return AlbumsDatabase.dbPath;
   }
@@ -224,27 +224,25 @@ class AlbumsDatabase {
     const timestamp = new Date().toISOString();
     const addedFiles: AlbumFile[] = [];
 
-    db.transaction(() => {
-      const insertQuery = db.prepare(`
-        INSERT OR IGNORE INTO album_files (album_id, file_name, added_at)
-        VALUES (?, ?, ?)
-      `);
+    const insertQuery = db.prepare(`
+      INSERT OR IGNORE INTO album_files (album_id, file_name, added_at)
+      VALUES (?, ?, ?)
+    `);
 
-      for (const fileName of fileNames) {
-        const result = insertQuery.run(albumId, fileName, timestamp);
-        if (result.changes && result.changes > 0) {
-          addedFiles.push({
-            id: Number(result.lastInsertRowid || 0),
-            albumId,
-            fileName,
-            addedAt: timestamp,
-          });
-        }
+    for (const fileName of fileNames) {
+      const result = insertQuery.run(albumId, fileName, timestamp);
+      if (result.changes && result.changes > 0) {
+        addedFiles.push({
+          id: Number(result.lastInsertRowid || 0),
+          albumId,
+          fileName,
+          addedAt: timestamp,
+        });
       }
+    }
 
-      // Mettre à jour le compteur de fichiers
-      AlbumsDatabase.updateFileCount(albumId);
-    })();
+    // Mettre à jour le compteur de fichiers après tous les ajouts
+    AlbumsDatabase.updateFileCount(albumId);
 
     return addedFiles;
   }
@@ -258,20 +256,18 @@ class AlbumsDatabase {
 
     let totalChanges = 0;
 
-    db.transaction(() => {
-      const deleteQuery = db.prepare(`
-        DELETE FROM album_files 
-        WHERE album_id = ? AND file_name = ?
-      `);
+    const deleteQuery = db.prepare(`
+      DELETE FROM album_files 
+      WHERE album_id = ? AND file_name = ?
+    `);
 
-      for (const fileName of fileNames) {
-        const result = deleteQuery.run(albumId, fileName);
-        totalChanges += result.changes || 0;
-      }
+    for (const fileName of fileNames) {
+      const result = deleteQuery.run(albumId, fileName);
+      totalChanges += result.changes || 0;
+    }
 
-      // Mettre à jour le compteur de fichiers
-      AlbumsDatabase.updateFileCount(albumId);
-    })();
+    // Mettre à jour le compteur de fichiers
+    AlbumsDatabase.updateFileCount(albumId);
 
     return totalChanges > 0;
   }
@@ -311,25 +307,23 @@ class AlbumsDatabase {
 
     let totalChanges = 0;
 
-    db.transaction(() => {
-      // Récupérer les albums affectés
-      const getAffectedQuery = db.prepare(`
-        SELECT DISTINCT album_id FROM album_files WHERE file_name = ?
-      `);
-      const affectedAlbums = getAffectedQuery.all(fileName);
+    // Récupérer les albums affectés
+    const getAffectedQuery = db.prepare(`
+      SELECT DISTINCT album_id FROM album_files WHERE file_name = ?
+    `);
+    const affectedAlbums = getAffectedQuery.all(fileName);
 
-      // Supprimer le fichier de tous les albums
-      const deleteQuery = db.prepare(`
-        DELETE FROM album_files WHERE file_name = ?
-      `);
-      const result = deleteQuery.run(fileName);
-      totalChanges = result.changes || 0;
+    // Supprimer le fichier de tous les albums
+    const deleteQuery = db.prepare(`
+      DELETE FROM album_files WHERE file_name = ?
+    `);
+    const result = deleteQuery.run(fileName);
+    totalChanges = result.changes || 0;
 
-      // Mettre à jour les compteurs de fichiers pour tous les albums affectés
-      for (const album of affectedAlbums) {
-        AlbumsDatabase.updateFileCount((album as any).album_id);
-      }
-    })();
+    // Mettre à jour les compteurs de fichiers pour tous les albums affectés
+    for (const album of affectedAlbums) {
+      AlbumsDatabase.updateFileCount((album as any).album_id);
+    }
 
     return totalChanges > 0;
   }
