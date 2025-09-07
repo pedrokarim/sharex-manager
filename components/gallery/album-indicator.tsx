@@ -45,9 +45,9 @@ export function AlbumIndicator({
               <span className="text-muted-foreground">•</span>
             )}
             {albums.length === 1 ? (
-              <Folder className="h-4 w-4 text-blue-500" />
+              <Folder className="h-4 w-4 text-primary" />
             ) : (
-              <FolderOpen className="h-4 w-4 text-blue-500" />
+              <FolderOpen className="h-4 w-4 text-primary" />
             )}
             <Badge
               variant="secondary"
