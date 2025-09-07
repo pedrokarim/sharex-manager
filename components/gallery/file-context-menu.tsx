@@ -37,6 +37,8 @@ interface FileContextMenuProps {
   onToggleSecurity?: () => void;
   onDelete?: () => void;
   onAddToAlbum?: () => void;
+  onCreateAlbum?: (fileName?: string) => void;
+  onAddSingleFileToAlbum?: (fileName: string) => void;
   onShowInfo?: () => void;
   onShare?: () => void;
   albums?: Array<{ id: number; name: string }>;
@@ -55,6 +57,8 @@ export function FileContextMenu({
   onToggleSecurity,
   onDelete,
   onAddToAlbum,
+  onCreateAlbum,
+  onAddSingleFileToAlbum,
   onShowInfo,
   onShare,
   albums = [],
@@ -177,7 +181,7 @@ export function FileContextMenu({
                 </>
               )}
               <ContextMenuSeparator />
-              <ContextMenuItem onClick={onAddToAlbum}>
+              <ContextMenuItem onClick={() => onCreateAlbum?.(file.name)}>
                 <FolderPlus className="h-4 w-4 mr-2" />
                 {t("albums.create")}
               </ContextMenuItem>

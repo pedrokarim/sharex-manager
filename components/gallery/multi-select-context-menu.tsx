@@ -35,6 +35,7 @@ interface MultiSelectContextMenuProps {
   onToggleSecuritySelected?: () => void;
   onDeleteSelected?: () => void;
   onAddToAlbum?: () => void;
+  onCreateAlbum?: (fileName?: string) => void;
   onClearSelection?: () => void;
   albums?: Array<{ id: number; name: string }>;
   onAddToSpecificAlbum?: (albumId: number) => void;
@@ -51,6 +52,7 @@ export function MultiSelectContextMenu({
   onToggleSecuritySelected,
   onDeleteSelected,
   onAddToAlbum,
+  onCreateAlbum,
   onClearSelection,
   albums = [],
   onAddToSpecificAlbum,
@@ -164,7 +166,7 @@ export function MultiSelectContextMenu({
                 </>
               )}
               <ContextMenuSeparator />
-              <ContextMenuItem onClick={() => handleAddToAlbum()}>
+              <ContextMenuItem onClick={() => onCreateAlbum?.()}>
                 <FolderPlus className="h-4 w-4 mr-2" />
                 {t("albums.create")}
               </ContextMenuItem>
@@ -202,5 +204,3 @@ export function MultiSelectContextMenu({
     </ContextMenu>
   );
 }
-
-

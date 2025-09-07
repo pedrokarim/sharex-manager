@@ -19,18 +19,22 @@ interface GridViewProps {
     shiftKey: boolean
   ) => void;
   onAddToAlbum?: () => void;
-  onAddToSpecificAlbum?: (albumId: number) => void;
+  onCreateAlbum?: (fileName?: string) => void;
+  onAddSingleFileToAlbum?: (fileName: string) => void;
+  onAddToSpecificAlbum?: (fileName: string, albumId: number) => void;
   isSelected?: (fileName: string) => boolean;
   isSelectionMode?: boolean;
   showSelectionCheckbox?: boolean;
   albums?: Array<{ id: number; name: string }>;
   allSelectedFiles?: FileInfo[];
   selectedCount?: number;
+  hasSelection?: boolean;
   onClearSelection?: () => void;
   onCopyUrls?: () => void;
   onDeleteSelected?: () => void;
   onToggleStarSelected?: () => void;
   onToggleSecuritySelected?: () => void;
+  onStartSelectionMode?: (fileName: string) => void;
   newFileIds: string[];
 }
 
@@ -43,6 +47,8 @@ export function GridView({
   onToggleStar,
   onToggleSelection,
   onAddToAlbum,
+  onCreateAlbum,
+  onAddSingleFileToAlbum,
   onAddToSpecificAlbum,
   isSelected,
   isSelectionMode = false,
@@ -50,11 +56,13 @@ export function GridView({
   albums = [],
   allSelectedFiles = [],
   selectedCount = 0,
+  hasSelection = false,
   onClearSelection,
   onCopyUrls,
   onDeleteSelected,
   onToggleStarSelected,
   onToggleSecuritySelected,
+  onStartSelectionMode,
   newFileIds,
 }: GridViewProps) {
   const [defaultThumbnailSize, setDefaultThumbnailSize] =
@@ -89,18 +97,24 @@ export function GridView({
           onToggleStar={() => onToggleStar(file)}
           onToggleSelection={onToggleSelection}
           onAddToAlbum={onAddToAlbum}
-          onAddToSpecificAlbum={onAddToSpecificAlbum}
+          onCreateAlbum={(fileName) => onCreateAlbum?.(fileName)}
+          onAddSingleFileToAlbum={onAddSingleFileToAlbum}
+          onAddToSpecificAlbum={(albumId) =>
+            onAddToSpecificAlbum?.(file.name, albumId)
+          }
           isSelected={isSelected?.(file.name) || false}
           isSelectionMode={isSelectionMode}
           showSelectionCheckbox={showSelectionCheckbox}
           albums={albums}
           allSelectedFiles={allSelectedFiles}
           selectedCount={selectedCount}
+          hasSelection={hasSelection}
           onClearSelection={onClearSelection}
           onCopyUrls={onCopyUrls}
           onDeleteSelected={onDeleteSelected}
           onToggleStarSelected={onToggleStarSelected}
           onToggleSecuritySelected={onToggleSecuritySelected}
+          onStartSelectionMode={onStartSelectionMode}
           isNew={newFileIds.includes(file.name)}
           size={thumbnailSize}
         />

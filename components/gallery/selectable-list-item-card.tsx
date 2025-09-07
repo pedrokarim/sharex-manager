@@ -31,9 +31,23 @@ interface SelectableListItemCardProps {
     ctrlKey: boolean,
     shiftKey: boolean
   ) => void;
+  onAddToAlbum?: () => void;
+  onCreateAlbum?: (fileName?: string) => void;
+  onAddSingleFileToAlbum?: (fileName: string) => void;
+  onAddToSpecificAlbum?: (albumId: number) => void;
   isSelected?: boolean;
   isSelectionMode?: boolean;
   showSelectionCheckbox?: boolean;
+  albums?: Array<{ id: number; name: string }>;
+  allSelectedFiles?: FileInfo[];
+  selectedCount?: number;
+  hasSelection?: boolean;
+  onClearSelection?: () => void;
+  onCopyUrls?: () => void;
+  onDeleteSelected?: () => void;
+  onToggleStarSelected?: () => void;
+  onToggleSecuritySelected?: () => void;
+  onStartSelectionMode?: (fileName: string) => void;
   detailed?: boolean;
   isNew?: boolean;
 }
@@ -46,15 +60,37 @@ export function SelectableListItemCard({
   onToggleSecurity,
   onToggleStar,
   onToggleSelection,
+  onAddToAlbum,
+  onCreateAlbum,
+  onAddSingleFileToAlbum,
+  onAddToSpecificAlbum,
   isSelected = false,
   isSelectionMode = false,
   showSelectionCheckbox = false,
+  albums = [],
+  allSelectedFiles = [],
+  selectedCount = 0,
+  hasSelection = false,
+  onClearSelection,
+  onCopyUrls,
+  onDeleteSelected,
+  onToggleStarSelected,
+  onToggleSecuritySelected,
+  onStartSelectionMode,
   detailed,
   isNew,
 }: SelectableListItemCardProps) {
   const locale = useDateLocale();
 
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
+    // Si Ctrl + clic gauche et pas en mode sélection, activer le mode sélection
+    if ((e.ctrlKey || e.metaKey) && !isSelectionMode && onStartSelectionMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      onStartSelectionMode(file.name);
+      return;
+    }
+
     if (isSelectionMode && onToggleSelection) {
       e.preventDefault();
       e.stopPropagation();
@@ -79,6 +115,11 @@ export function SelectableListItemCard({
       onToggleStar={onToggleStar}
       onToggleSecurity={onToggleSecurity}
       onDelete={onDelete}
+      onAddToAlbum={onAddToAlbum}
+      onCreateAlbum={(fileName) => onCreateAlbum?.(fileName)}
+      onAddSingleFileToAlbum={onAddSingleFileToAlbum}
+      onAddToSpecificAlbum={onAddToSpecificAlbum}
+      albums={albums}
       isSelectionMode={isSelectionMode}
       disabled={isSelectionMode}
     >

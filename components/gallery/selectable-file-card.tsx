@@ -23,6 +23,7 @@ interface SelectableFileCardProps {
     shiftKey: boolean
   ) => void;
   onAddToAlbum?: () => void;
+  onCreateAlbum?: (fileName?: string) => void;
   onAddSingleFileToAlbum?: (fileName: string) => void;
   onAddToSpecificAlbum?: (albumId: number) => void;
   isNew?: boolean;
@@ -39,6 +40,7 @@ interface SelectableFileCardProps {
   onDeleteSelected?: () => void;
   onToggleStarSelected?: () => void;
   onToggleSecuritySelected?: () => void;
+  onStartSelectionMode?: (fileName: string) => void;
 }
 
 export function SelectableFileCard({
@@ -50,6 +52,7 @@ export function SelectableFileCard({
   onToggleStar,
   onToggleSelection,
   onAddToAlbum,
+  onCreateAlbum,
   onAddSingleFileToAlbum,
   onAddToSpecificAlbum,
   isNew,
@@ -66,6 +69,7 @@ export function SelectableFileCard({
   onDeleteSelected,
   onToggleStarSelected,
   onToggleSecuritySelected,
+  onStartSelectionMode,
 }: SelectableFileCardProps) {
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     console.log("Click debug:", {
@@ -74,7 +78,18 @@ export function SelectableFileCard({
       isSelected,
       hasOnToggleSelection: !!onToggleSelection,
       hasOnSelect: !!onSelect,
+      ctrlKey: e.ctrlKey,
+      metaKey: e.metaKey,
     });
+
+    // Si Ctrl + clic gauche et pas en mode sélection, activer le mode sélection
+    if ((e.ctrlKey || e.metaKey) && !isSelectionMode && onStartSelectionMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("Starting selection mode for:", file.name);
+      onStartSelectionMode(file.name);
+      return;
+    }
 
     if (isSelectionMode && onToggleSelection) {
       e.preventDefault();
@@ -108,6 +123,7 @@ export function SelectableFileCard({
             ? onAddToAlbum
             : () => onAddSingleFileToAlbum?.(file.name)
         }
+        onCreateAlbum={(fileName) => onCreateAlbum?.(fileName)}
         onClearSelection={onClearSelection}
         albums={albums}
         onAddToSpecificAlbum={onAddToSpecificAlbum}
@@ -185,6 +201,8 @@ export function SelectableFileCard({
       onToggleSecurity={onToggleSecurity}
       onDelete={onDelete}
       onAddToAlbum={onAddToAlbum}
+      onCreateAlbum={onCreateAlbum}
+      onAddSingleFileToAlbum={onAddSingleFileToAlbum}
       albums={albums}
       onAddToSpecificAlbum={onAddToSpecificAlbum}
       isSelectionMode={isSelectionMode}

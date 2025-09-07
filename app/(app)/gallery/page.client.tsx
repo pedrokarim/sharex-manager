@@ -216,6 +216,7 @@ export function GalleryClient({
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [isAddToAlbumDialogOpen, setIsAddToAlbumDialogOpen] = useState(false);
+  const [filesToAddToAlbum, setFilesToAddToAlbum] = useState<string[]>([]);
   const [availableAlbums, setAvailableAlbums] = useState<
     Array<{ id: number; name: string }>
   >([]);
@@ -316,6 +317,12 @@ export function GalleryClient({
     }
   }, [search, initialSearch, resetSearch]);
 
+  // Fonction pour gérer la sélection vide
+  const handleSelectionEmpty = useCallback(() => {
+    // Sortir du mode sélection quand il n'y a plus de sélection
+    setIsSelectionMode(false);
+  }, []);
+
   // Multi-sélection
   const {
     selectedCount,
@@ -328,6 +335,7 @@ export function GalleryClient({
     clearSelection,
   } = useSimpleSelection({
     enabled: isSelectionMode,
+    onSelectionEmpty: handleSelectionEmpty,
   });
 
   const handleRefresh = useCallback(async () => {
@@ -657,7 +665,7 @@ export function GalleryClient({
   }, [getSelectedFiles, files, reset, clearSelection, t]);
 
   const handleToggleStarSelected = useCallback(async () => {
-    const selectedFilesData = getSelectedFilesData();
+    const selectedFilesData = getSelectedFilesData(files);
     if (selectedFilesData.length === 0) return;
 
     try {
@@ -688,7 +696,7 @@ export function GalleryClient({
   }, [getSelectedFilesData, files, reset, t]);
 
   const handleToggleSecuritySelected = useCallback(async () => {
-    const selectedFilesData = getSelectedFilesData();
+    const selectedFilesData = getSelectedFilesData(files);
     if (selectedFilesData.length === 0) return;
 
     try {
@@ -722,17 +730,15 @@ export function GalleryClient({
     const selectedFiles = getSelectedFiles();
     if (selectedFiles.length === 0) return;
 
+    setFilesToAddToAlbum(selectedFiles);
     setIsAddToAlbumDialogOpen(true);
   }, [getSelectedFiles]);
 
-  const handleAddSingleFileToAlbum = useCallback(
-    (fileName: string) => {
-      // Sélectionner temporairement ce fichier
-      toggleFile(fileName);
-      setIsAddToAlbumDialogOpen(true);
-    },
-    [toggleFile]
-  );
+  const handleAddSingleFileToAlbum = useCallback((fileName: string) => {
+    // Passer directement ce fichier au dialog
+    setFilesToAddToAlbum([fileName]);
+    setIsAddToAlbumDialogOpen(true);
+  }, []);
 
   const handleAddToSpecificAlbum = useCallback(
     async (fileName: string, albumId: number) => {
@@ -758,6 +764,29 @@ export function GalleryClient({
       }
     },
     [availableAlbums]
+  );
+
+  const handleCreateAlbum = useCallback((fileName?: string) => {
+    console.log("🔍 handleCreateAlbum appelé avec fileName:", fileName);
+    // Si un fileName est fourni, passer directement ce fichier au dialog
+    if (fileName) {
+      setFilesToAddToAlbum([fileName]);
+      setIsAddToAlbumDialogOpen(true);
+    } else {
+      // Ouvrir le dialog de création d'album directement
+      setFilesToAddToAlbum([]);
+      setIsAddToAlbumDialogOpen(true);
+    }
+  }, []);
+
+  const handleStartSelectionMode = useCallback(
+    (fileName: string) => {
+      // Activer le mode sélection
+      setIsSelectionMode(true);
+      // Sélectionner le fichier
+      toggleFile(fileName);
+    },
+    [toggleFile]
   );
 
   const handleShowHelp = useCallback(() => {
@@ -872,10 +901,9 @@ export function GalleryClient({
                       onToggleStar={handleToggleStar}
                       onToggleSelection={toggleFile}
                       onAddToAlbum={handleAddToAlbum}
+                      onCreateAlbum={(fileName) => handleCreateAlbum(fileName)}
                       onAddSingleFileToAlbum={handleAddSingleFileToAlbum}
-                      onAddToSpecificAlbum={(albumId) =>
-                        handleAddToSpecificAlbum(file.name, albumId)
-                      }
+                      onAddToSpecificAlbum={handleAddToSpecificAlbum}
                       isSelected={isSelected}
                       isSelectionMode={isSelectionMode}
                       showSelectionCheckbox={isSelectionMode}
@@ -888,6 +916,7 @@ export function GalleryClient({
                       onDeleteSelected={handleDeleteSelected}
                       onToggleStarSelected={handleToggleStarSelected}
                       onToggleSecuritySelected={handleToggleSecuritySelected}
+                      onStartSelectionMode={handleStartSelectionMode}
                       newFileIds={newFileIds}
                     />
                   ) : (
@@ -902,10 +931,9 @@ export function GalleryClient({
                       onToggleStar={handleToggleStar}
                       onToggleSelection={toggleFile}
                       onAddToAlbum={handleAddToAlbum}
+                      onCreateAlbum={(fileName) => handleCreateAlbum(fileName)}
                       onAddSingleFileToAlbum={handleAddSingleFileToAlbum}
-                      onAddToSpecificAlbum={(albumId) =>
-                        handleAddToSpecificAlbum(file.name, albumId)
-                      }
+                      onAddToSpecificAlbum={handleAddToSpecificAlbum}
                       isSelected={isSelected}
                       isSelectionMode={isSelectionMode}
                       showSelectionCheckbox={isSelectionMode}
@@ -967,7 +995,7 @@ export function GalleryClient({
       {/* Barre d'outils de sélection */}
       {isSelectionMode && hasSelection && (
         <SelectionToolbar
-          selectedFiles={getSelectedFilesData()}
+          selectedFiles={getSelectedFilesData(files)}
           selectedCount={selectedCount}
           onClearSelection={clearSelection}
           onCopyUrls={handleCopySelectedUrls}
@@ -982,11 +1010,15 @@ export function GalleryClient({
       {/* Dialog d'ajout à un album */}
       <AddToAlbumDialog
         open={isAddToAlbumDialogOpen}
-        onClose={() => setIsAddToAlbumDialogOpen(false)}
-        selectedFiles={getSelectedFiles()}
+        onClose={() => {
+          setIsAddToAlbumDialogOpen(false);
+          setFilesToAddToAlbum([]);
+        }}
+        selectedFiles={filesToAddToAlbum}
         onSuccess={() => {
           clearSelection();
           setIsSelectionMode(false);
+          setFilesToAddToAlbum([]);
         }}
       />
     </>

@@ -3,9 +3,13 @@ import type { FileInfo } from "@/types/files";
 
 interface UseSimpleSelectionOptions {
   enabled: boolean;
+  onSelectionEmpty?: () => void;
 }
 
-export function useSimpleSelection({ enabled }: UseSimpleSelectionOptions) {
+export function useSimpleSelection({
+  enabled,
+  onSelectionEmpty,
+}: UseSimpleSelectionOptions) {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
   const isSelected = useCallback(
@@ -26,6 +30,10 @@ export function useSimpleSelection({ enabled }: UseSimpleSelectionOptions) {
         if (newSet.has(fileName)) {
           newSet.delete(fileName);
           console.log("Removed:", fileName, "New size:", newSet.size);
+          // Si la sélection devient vide, appeler le callback
+          if (newSet.size === 0 && onSelectionEmpty) {
+            setTimeout(() => onSelectionEmpty(), 0);
+          }
         } else {
           newSet.add(fileName);
           console.log("Added:", fileName, "New size:", newSet.size);
@@ -33,12 +41,15 @@ export function useSimpleSelection({ enabled }: UseSimpleSelectionOptions) {
         return newSet;
       });
     },
-    [enabled]
+    [enabled, onSelectionEmpty]
   );
 
   const clearSelection = useCallback(() => {
     setSelectedFiles(new Set());
-  }, []);
+    if (onSelectionEmpty) {
+      setTimeout(() => onSelectionEmpty(), 0);
+    }
+  }, [onSelectionEmpty]);
 
   const selectAll = useCallback(
     (files: FileInfo[]) => {
