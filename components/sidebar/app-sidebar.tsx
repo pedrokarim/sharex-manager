@@ -98,12 +98,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       },
       {
         title: t("sidebar.main.organization"),
-        url: "/organization",
+        url: "/albums",
         icon: FolderOpen,
         items: [
           {
-            title: t("sidebar.main.folders"),
-            url: "/organization/folders",
+            title: t("albums.title"),
+            url: "/albums",
           },
           {
             title: t("sidebar.main.tags"),

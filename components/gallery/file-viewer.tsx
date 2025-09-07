@@ -31,10 +31,12 @@ import { cn } from "@/lib/utils";
 import { Separator } from "../ui/separator";
 import { VisuallyHidden } from "../ui/visually-hidden";
 import { useTranslation } from "@/lib/i18n";
+import { FileAlbumsSection } from "@/components/gallery/file-albums-section";
 import { toast } from "sonner";
 import { ModuleActions } from "./module-actions";
 import { getGalleryImageUrl, getFileStoragePath } from "@/lib/utils/url";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface FileViewerProps {
   file: FileInfo | null;
@@ -155,295 +157,352 @@ export function FileViewer({
 
   return (
     <Dialog open={!!file} onOpenChange={() => file && onClose()}>
-      <DialogContent className="max-w-7xl border-none bg-background/95 p-0 backdrop-blur-xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between p-4">
-            <span>{file.name}</span>
-          </DialogTitle>
-        </DialogHeader>
-        <DialogDescription>
-          <VisuallyHidden>
-            {t("gallery.file_viewer.accessibility", {
-              date: formattedDate,
-              size: fileSize,
-              navigation: navigationText,
-            })}
-          </VisuallyHidden>
-        </DialogDescription>
-        <div className="relative flex h-[85vh] overflow-hidden rounded-lg">
-          {/* Zone principale */}
-          <div className="relative flex-1">
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-              <Image
-                src={file.url}
-                alt={file.name}
-                fill
-                className="object-contain file-viewer-image"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 60vw"
-                priority
-              />
-            </div>
+      <DialogContent className="max-w-[95vw] w-full border-none bg-background/95 p-0 backdrop-blur-xl">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 30,
+            duration: 0.2,
+          }}
+          className="w-full h-full"
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between p-4">
+              <span>{file.name}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <DialogDescription>
+            <VisuallyHidden>
+              {t("gallery.file_viewer.accessibility", {
+                date: formattedDate,
+                size: fileSize,
+                navigation: navigationText,
+              })}
+            </VisuallyHidden>
+          </DialogDescription>
+          <div className="relative flex h-[85vh] overflow-hidden rounded-lg">
+            {/* Zone principale */}
+            <div className="relative flex-1">
+              <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 30,
+                    delay: 0.1,
+                    duration: 0.4,
+                  }}
+                  className="w-full h-full"
+                >
+                  <Image
+                    src={file.url}
+                    alt={file.name}
+                    fill
+                    className="object-contain file-viewer-image"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 60vw"
+                    priority
+                  />
+                </motion.div>
+              </div>
 
-            {/* Boutons de navigation */}
-            {hasPrevious && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-background/50 hover:bg-background/80"
-                onClick={onPrevious}
-              >
-                <ChevronLeft className="h-8 w-8" />
-              </Button>
-            )}
-            {hasNext && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-background/50 hover:bg-background/80"
-                onClick={onNext}
-              >
-                <ChevronRight className="h-8 w-8" />
-              </Button>
-            )}
-
-            {/* Modules en haut à droite */}
-            <div className="absolute top-4 right-4 z-10 flex justify-end">
-              {/* Afficher les actions des modules si le fichier est une image */}
-              {file && (
-                <ModuleActions
-                  file={file}
-                  onProcessComplete={handleProcessComplete}
-                  variant="overlay"
-                />
+              {/* Boutons de navigation */}
+              {hasPrevious && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-background/50 hover:bg-background/80"
+                  onClick={onPrevious}
+                >
+                  <ChevronLeft className="h-8 w-8" />
+                </Button>
               )}
-            </div>
+              {hasNext && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-background/50 hover:bg-background/80"
+                  onClick={onNext}
+                >
+                  <ChevronRight className="h-8 w-8" />
+                </Button>
+              )}
 
-            {/* Barre d'actions flottante en bas */}
-            <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between gap-4 bg-gradient-to-t from-background/80 to-transparent p-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full bg-background/50 hover:bg-blue-600 hover:text-white text-blue-600"
-                  onClick={() => setShowDetails(!showDetails)}
-                >
-                  <Info className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "rounded-full bg-background/50 hover:bg-yellow-500 hover:text-white",
-                    file?.isStarred && "text-yellow-500"
-                  )}
-                  onClick={() => file && onToggleStar(file)}
-                >
-                  <Star className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full bg-background/50 hover:bg-background/80"
-                  onClick={() => file && onCopy(file.url)}
-                >
-                  <Copy className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full bg-background/50 hover:bg-background/80"
-                  asChild
-                >
-                  <a href={file?.url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-5 w-5" />
-                  </a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "rounded-full bg-background/50",
-                    file?.isSecure &&
-                      "text-yellow-500 hover:bg-yellow-500 hover:text-white"
-                  )}
-                  onClick={() => file && onToggleSecurity(file)}
-                >
-                  {file?.isSecure ? (
-                    <Lock className="h-4 w-4" />
-                  ) : (
-                    <Unlock className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </Button>
+              {/* Modules en haut à droite */}
+              <div className="absolute top-4 right-4 z-10 flex justify-end">
+                {/* Afficher les actions des modules si le fichier est une image */}
+                {file && (
+                  <ModuleActions
+                    file={file}
+                    onProcessComplete={handleProcessComplete}
+                    variant="overlay"
+                  />
+                )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full bg-background/50 hover:bg-red-600 hover:text-white"
-                  onClick={() => file && onDelete(file.name)}
-                >
-                  <Trash2 className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full bg-background/50 hover:bg-background/80"
-                  onClick={onClose}
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Panneau latéral pour les détails */}
-          {showDetails && (
-            <div className="w-80 bg-background/95 p-4 overflow-y-auto">
-              <h3 className="text-lg font-semibold mb-4">
-                {t("gallery.file_viewer.details")}
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {t("gallery.file_viewer.name")}
-                  </p>
-                  <p className="text-sm">{file.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {t("gallery.file_viewer.date")}
-                  </p>
-                  <p className="text-sm">{formattedDateTime}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {t("gallery.file_viewer.size")}
-                  </p>
-                  <p className="text-sm">{fileSize} KB</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {t("gallery.file_viewer.url")}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm truncate">
-                      {getGalleryImageUrl(file.name)}
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() =>
-                        file && onCopy(getGalleryImageUrl(file.name))
-                      }
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {t("gallery.file_viewer.path")}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {getFileStoragePath(file.name)}
-                  </p>
-                </div>
-                <div>
+              {/* Barre d'actions flottante en bas */}
+              <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between gap-4 bg-gradient-to-t from-background/80 to-transparent p-4">
+                <div className="flex items-center gap-2">
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={handleViewLogs}
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full bg-background/50 hover:bg-blue-600 hover:text-white text-blue-600"
+                    onClick={() => setShowDetails(!showDetails)}
                   >
-                    <Info className="h-4 w-4 mr-2" />
-                    {t("gallery.file_viewer.view_logs")}
+                    <Info className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "rounded-full bg-background/50 hover:bg-yellow-500 hover:text-white",
+                      file?.isStarred && "text-yellow-500"
+                    )}
+                    onClick={() => file && onToggleStar(file)}
+                  >
+                    <Star className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full bg-background/50 hover:bg-background/80"
+                    onClick={() => file && onCopy(file.url)}
+                  >
+                    <Copy className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full bg-background/50 hover:bg-background/80"
+                    asChild
+                  >
+                    <a
+                      href={file?.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-5 w-5" />
+                    </a>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "rounded-full bg-background/50",
+                      file?.isSecure &&
+                        "text-yellow-500 hover:bg-yellow-500 hover:text-white"
+                    )}
+                    onClick={() => file && onToggleSecurity(file)}
+                  >
+                    {file?.isSecure ? (
+                      <Lock className="h-4 w-4" />
+                    ) : (
+                      <Unlock className="h-4 w-4 text-muted-foreground" />
+                    )}
                   </Button>
                 </div>
-                <Separator />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">
-                    {t("gallery.file_viewer.actions")}
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() =>
-                        file && onCopy(getGalleryImageUrl(file.name))
-                      }
-                    >
-                      <Copy className="h-4 w-4 mr-2" />
-                      {t("gallery.file_viewer.copy_url")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      asChild
-                    >
-                      <a
-                        href={getGalleryImageUrl(file.name)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        {t("gallery.file_viewer.open")}
-                      </a>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "w-full",
-                        file?.isSecure && "border-yellow-500 text-yellow-500"
-                      )}
-                      onClick={() => file && onToggleSecurity(file)}
-                    >
-                      {file?.isSecure ? (
-                        <>
-                          <Lock className="h-4 w-4 mr-2" />
-                          {t("gallery.file_viewer.secured")}
-                        </>
-                      ) : (
-                        <>
-                          <Unlock className="h-4 w-4 mr-2" />
-                          {t("gallery.file_viewer.public")}
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "w-full",
-                        file?.isStarred && "border-yellow-500 text-yellow-500"
-                      )}
-                      onClick={() => file && onToggleStar(file)}
-                    >
-                      <Star className="h-4 w-4 mr-2" />
-                      {file?.isStarred
-                        ? t("gallery.file_viewer.starred")
-                        : t("gallery.file_viewer.star")}
-                    </Button>
-                  </div>
-                </div>
-                <Separator />
-                <div>
-                  {file && (
-                    <ModuleActions
-                      file={file}
-                      onProcessComplete={handleProcessComplete}
-                      variant="details"
-                    />
-                  )}
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full bg-background/50 hover:bg-red-600 hover:text-white"
+                    onClick={() => file && onDelete(file.name)}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full bg-background/50 hover:bg-background/80"
+                    onClick={onClose}
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+
+            {/* Panneau latéral pour les détails */}
+            <AnimatePresence>
+              {showDetails && (
+                <motion.div
+                  initial={{ x: 320, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: 320, opacity: 0 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 30,
+                    duration: 0.3,
+                  }}
+                  className="w-80 bg-background/95 p-4 overflow-y-auto border-l border-border/50"
+                >
+                  <h3 className="text-lg font-semibold mb-4">
+                    {t("gallery.file_viewer.details")}
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {t("gallery.file_viewer.name")}
+                      </p>
+                      <p className="text-sm">{file.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {t("gallery.file_viewer.date")}
+                      </p>
+                      <p className="text-sm">{formattedDateTime}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {t("gallery.file_viewer.size")}
+                      </p>
+                      <p className="text-sm">{fileSize} KB</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {t("gallery.file_viewer.url")}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm truncate">
+                          {getGalleryImageUrl(file.name)}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() =>
+                            file && onCopy(getGalleryImageUrl(file.name))
+                          }
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {t("gallery.file_viewer.path")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {getFileStoragePath(file.name)}
+                      </p>
+                    </div>
+                    <div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={handleViewLogs}
+                      >
+                        <Info className="h-4 w-4 mr-2" />
+                        {t("gallery.file_viewer.view_logs")}
+                      </Button>
+                    </div>
+                    <Separator />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">
+                        {t("gallery.file_viewer.actions")}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() =>
+                            file && onCopy(getGalleryImageUrl(file.name))
+                          }
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          {t("gallery.file_viewer.copy_url")}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          asChild
+                        >
+                          <a
+                            href={getGalleryImageUrl(file.name)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            {t("gallery.file_viewer.open")}
+                          </a>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={cn(
+                            "w-full",
+                            file?.isSecure &&
+                              "border-yellow-500 text-yellow-500"
+                          )}
+                          onClick={() => file && onToggleSecurity(file)}
+                        >
+                          {file?.isSecure ? (
+                            <>
+                              <Lock className="h-4 w-4 mr-2" />
+                              {t("gallery.file_viewer.secured")}
+                            </>
+                          ) : (
+                            <>
+                              <Unlock className="h-4 w-4 mr-2" />
+                              {t("gallery.file_viewer.public")}
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={cn(
+                            "w-full",
+                            file?.isStarred &&
+                              "border-yellow-500 text-yellow-500"
+                          )}
+                          onClick={() => file && onToggleStar(file)}
+                        >
+                          <Star className="h-4 w-4 mr-2" />
+                          {file?.isStarred
+                            ? t("gallery.file_viewer.starred")
+                            : t("gallery.file_viewer.star")}
+                        </Button>
+                      </div>
+                    </div>
+                    <Separator />
+                    <div>
+                      {file && (
+                        <ModuleActions
+                          file={file}
+                          onProcessComplete={handleProcessComplete}
+                          variant="details"
+                        />
+                      )}
+                    </div>
+                    <Separator />
+                    <FileAlbumsSection
+                      fileName={file.name}
+                      onAddToAlbum={() => {
+                        // TODO: Implémenter l'ajout à un album depuis la modale
+                        toast.info("Fonctionnalité à implémenter");
+                      }}
+                      onCreateAlbum={() => {
+                        // TODO: Implémenter la création d'album depuis la modale
+                        toast.info("Fonctionnalité à implémenter");
+                      }}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );

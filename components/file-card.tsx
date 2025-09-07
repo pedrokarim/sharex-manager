@@ -56,6 +56,7 @@ interface FileCardProps {
   onToggleStar?: () => void;
   isNew?: boolean;
   size?: ThumbnailSize;
+  albumIndicator?: React.ReactNode;
 }
 
 export function FileCard({
@@ -67,6 +68,7 @@ export function FileCard({
   onToggleStar,
   isNew,
   size = "medium",
+  albumIndicator,
 }: FileCardProps) {
   const { t } = useTranslation();
   const locale = useDateLocale();
@@ -229,17 +231,20 @@ export function FileCard({
                 </p>
               )}
               {showUploadDate && (
-                <p
-                  className={cn(
-                    "text-sm text-muted-foreground",
-                    size === "small" && "text-xs"
-                  )}
-                >
-                  {formatDistanceToNow(new Date(file.createdAt), {
-                    addSuffix: true,
-                    locale,
-                  })}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p
+                    className={cn(
+                      "text-sm text-muted-foreground",
+                      size === "small" && "text-xs"
+                    )}
+                  >
+                    {formatDistanceToNow(new Date(file.createdAt), {
+                      addSuffix: true,
+                      locale,
+                    })}
+                  </p>
+                  {albumIndicator && <>{albumIndicator}</>}
+                </div>
               )}
             </div>
             <div className="flex gap-2">

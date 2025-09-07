@@ -4,7 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { FileInfo } from "@/types/files";
 import { ModuleConfig } from "@/types/modules";
-import { Wand2, Loader2, Sparkles, Settings2 } from "lucide-react";
+import {
+  Wand2,
+  Loader2,
+  Sparkles,
+  Settings2,
+  ChevronLeft,
+  ChevronRight,
+  PanelRight,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -26,6 +34,15 @@ import { Suspense, lazy } from "react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Palette,
+  Shield,
+  Zap,
+  MessageSquare,
+  Crop,
+  Maximize2,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ModuleActionsProps {
   file: FileInfo;
@@ -63,6 +80,7 @@ export function ModuleActions({
   const [moduleComponent, setModuleComponent] =
     useState<React.ComponentType<ModuleUIProps> | null>(null);
   const [moduleError, setModuleError] = useState<Error | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Récupérer l'extension du fichier
   const fileExtension = file.name.split(".").pop()?.toLowerCase() || "";
@@ -222,6 +240,49 @@ export function ModuleActions({
     [modules, loadModuleUI]
   ); // t est stable et géré par la bibliothèque de traduction
 
+  // Fonction pour obtenir l'icône par défaut selon la catégorie du module
+  const getDefaultIcon = useCallback((category?: string) => {
+    switch (category?.toLowerCase()) {
+      case "édition":
+        return <Palette className="h-4 w-4" />;
+      case "marque":
+        return <Shield className="h-4 w-4" />;
+      case "analysis":
+        return <Zap className="h-4 w-4" />;
+      case "text":
+        return <MessageSquare className="h-4 w-4" />;
+      case "crop":
+        return <Crop className="h-4 w-4" />;
+      case "resize":
+        return <Maximize2 className="h-4 w-4" />;
+      default:
+        return <Wand2 className="h-4 w-4" />;
+    }
+  }, []);
+
+  // Fonction pour afficher l'icône du module avec gestion d'erreur
+  const renderModuleIcon = useCallback(
+    (module: ModuleConfig) => {
+      // Vérifier si l'icône est valide (doit être une URL)
+      if (!module.icon || !module.icon.startsWith("http")) {
+        return getDefaultIcon(module.category);
+      }
+
+      return (
+        <img
+          src={module.icon}
+          alt={module.name}
+          className="w-4 h-4"
+          onError={() => {
+            // En cas d'erreur de chargement, on ne peut pas utiliser setState ici
+            // car onError est appelé dans le rendu, mais on peut au moins afficher l'icône par défaut
+          }}
+        />
+      );
+    },
+    [getDefaultIcon]
+  );
+
   // Charger les modules disponibles pour ce type de fichier
   useEffect(() => {
     const fetchModules = async () => {
@@ -265,12 +326,12 @@ export function ModuleActions({
         className={cn(
           "flex items-center justify-center",
           variant === "overlay"
-            ? "p-2 bg-background/50 rounded-lg backdrop-blur-sm"
+            ? "p-3 bg-white/10 dark:bg-black/20 backdrop-blur-md border border-white/20 dark:border-white/10 rounded-xl shadow-2xl"
             : "p-1"
         )}
       >
-        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-        <span className="text-xs text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin mr-2 text-white/90" />
+        <span className="text-xs text-white/80">
           {t("gallery.file_viewer.modules.loading")}
         </span>
       </div>
@@ -342,87 +403,124 @@ export function ModuleActions({
   if (variant === "overlay") {
     return (
       <>
-        <div className="flex flex-col gap-2 bg-background/80 p-2 rounded-lg shadow-sm backdrop-blur-sm w-full max-w-[300px]">
-          {categories.length > 1 && (
-            <Tabs
-              value={activeCategory}
-              onValueChange={setActiveCategory}
-              className="w-full"
+        <motion.div
+          className="flex items-center bg-white/10 dark:bg-black/20 backdrop-blur-md border border-white/20 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden"
+          initial={{ width: "auto" }}
+          animate={{ width: isExpanded ? "auto" : "auto" }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+        >
+          {/* Bouton de toggle à gauche */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-12 w-12 bg-white/10 dark:bg-black/20 hover:bg-white/20 dark:hover:bg-white/10 border-r border-white/20 dark:border-white/10 rounded-l-xl rounded-r-none flex-shrink-0"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            <motion.div
+              animate={{ rotate: isExpanded ? 180 : 0 }}
+              transition={{ duration: 0.3 }}
             >
-              <TabsList
-                className="grid"
-                style={{
-                  gridTemplateColumns: `repeat(${Math.min(
-                    categories.length,
-                    4
-                  )}, 1fr)`,
-                }}
-              >
-                {categories.map((category) => (
-                  <TabsTrigger
-                    key={category}
-                    value={category}
-                    className="text-xs h-6"
-                  >
-                    {category === "all"
-                      ? t("gallery.file_viewer.modules.all")
-                      : category === "other"
-                      ? t("gallery.file_viewer.modules.other")
-                      : category === "Édition"
-                      ? t("gallery.file_viewer.modules.categories.edition")
-                      : category === "Marque"
-                      ? t("gallery.file_viewer.modules.categories.brand")
-                      : category === "Effets"
-                      ? t("gallery.file_viewer.modules.categories.effects")
-                      : category === "Filtres"
-                      ? t("gallery.file_viewer.modules.categories.filters")
-                      : category}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          )}
+              {isExpanded ? (
+                <ChevronLeft className="h-5 w-5 text-white/90" />
+              ) : (
+                <ChevronRight className="h-5 w-5 text-white/90" />
+              )}
+            </motion.div>
+          </Button>
 
-          <div className="flex flex-wrap gap-1 justify-center">
-            {filteredModules.map((module) => (
-              <TooltipProvider key={module.name}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 bg-background/50 hover:bg-background"
-                      onClick={() =>
-                        module.hasUI
-                          ? openModuleUI(module.name)
-                          : applyModule(module.name)
-                      }
-                      disabled={processingModule === module.name}
-                    >
-                      {processingModule === module.name ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : module.icon ? (
-                        <img
-                          src={module.icon}
-                          alt={module.name}
-                          className="w-4 h-4"
-                        />
-                      ) : (
-                        <Wand2 className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-[200px]">
-                    <p className="font-medium">{module.name}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {module.description}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ))}
-          </div>
-        </div>
+          {/* Séparateur */}
+          <div className="w-px h-10 bg-white/20 dark:bg-white/10 flex-shrink-0 my-1" />
+
+          {/* Contenu expandable */}
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.div
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: "auto", opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                className="flex flex-col gap-3 p-3 min-w-[300px]"
+              >
+                {categories.length > 1 && (
+                  <Tabs
+                    value={activeCategory}
+                    onValueChange={setActiveCategory}
+                    className="w-full"
+                  >
+                    <TabsList className="flex w-full bg-white/5 dark:bg-black/10 border border-white/10 dark:border-white/5 justify-end">
+                      {categories.map((category) => (
+                        <TabsTrigger
+                          key={category}
+                          value={category}
+                          className="text-xs h-7 px-3 whitespace-nowrap flex-shrink-0 data-[state=active]:bg-white/20 dark:data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-sm"
+                        >
+                          {category === "all"
+                            ? t("gallery.file_viewer.modules.all")
+                            : category === "other"
+                            ? t("gallery.file_viewer.modules.other")
+                            : category === "Édition"
+                            ? t(
+                                "gallery.file_viewer.modules.categories.edition"
+                              )
+                            : category === "Marque"
+                            ? t("gallery.file_viewer.modules.categories.brand")
+                            : category === "Effets"
+                            ? t(
+                                "gallery.file_viewer.modules.categories.effects"
+                              )
+                            : category === "Filtres"
+                            ? t(
+                                "gallery.file_viewer.modules.categories.filters"
+                              )
+                            : category}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                )}
+
+                <div className="flex flex-wrap gap-2 justify-end">
+                  {filteredModules.map((module) => (
+                    <TooltipProvider key={module.name}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 bg-white/10 dark:bg-black/20 hover:bg-white/20 dark:hover:bg-white/10 border border-white/20 dark:border-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center justify-center"
+                            onClick={() =>
+                              module.hasUI
+                                ? openModuleUI(module.name)
+                                : applyModule(module.name)
+                            }
+                            disabled={processingModule === module.name}
+                          >
+                            {processingModule === module.name ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-white" />
+                            ) : (
+                              <div className="text-white/90 flex items-center justify-center">
+                                {renderModuleIcon(module)}
+                              </div>
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="bottom"
+                          className="max-w-[200px] bg-white/95 dark:bg-black/95 backdrop-blur-md border border-white/20 dark:border-white/10 text-black dark:text-white"
+                        >
+                          <p className="font-medium">{module.name}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {module.description}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
 
         {/* Dialog pour l'interface utilisateur du module */}
         <Dialog

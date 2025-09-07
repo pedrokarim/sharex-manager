@@ -22,13 +22,14 @@ export const FileUploader = () => {
       formData.append("file", file);
 
       try {
-        const response = await fetch("/api/upload", {
+        const response = await fetch("/api/gallery/upload", {
           method: "POST",
           body: formData,
         });
 
         if (!response.ok) {
-          throw new Error("Erreur lors de l'upload");
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Erreur lors de l'upload");
         }
 
         const data = await response.json();
@@ -42,7 +43,7 @@ export const FileUploader = () => {
 
     setIsUploading(false);
     setProgress(0);
-    
+
     // Rafraîchir la page pour voir les nouveaux fichiers
     window.location.reload();
   };
@@ -66,10 +67,8 @@ export const FileUploader = () => {
           <Upload className="w-4 h-4 mr-2" />
           {isUploading ? "Upload en cours..." : "Sélectionner des fichiers"}
         </Button>
-        {isUploading && (
-          <Progress value={progress} className="w-full" />
-        )}
+        {isUploading && <Progress value={progress} className="w-full" />}
       </div>
     </div>
   );
-}; 
+};

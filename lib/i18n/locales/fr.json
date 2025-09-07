@@ -254,7 +254,8 @@
     "upload": "Téléverser",
     "select_all": "Tout sélectionner",
     "deselect_all": "Tout désélectionner",
-    "selected_count": "{count} fichier(s) sélectionné(s)",
+    "star": "Marquer comme favori",
+    "starred": "Favori",
     "view_modes": {
       "grid": "Grille",
       "list": "Liste",
@@ -928,6 +929,69 @@
         "files_via_api": "fichiers via l'API",
         "files_via_web": "fichiers via l'interface"
       }
+    }
+  },
+  "albums": {
+    "title": "Albums",
+    "create": "Nouvel album",
+    "name": "Nom de l'album",
+    "description": "Description",
+    "empty": "Aucun album créé",
+    "files_count": "{count} fichier(s)",
+    "add_files": "Ajouter des fichiers",
+    "add_to_album": "Ajouter à un album",
+    "remove_from_album": "Retirer de l'album",
+    "delete_album": "Supprimer l'album",
+    "create_album": "Créer un album",
+    "album_name": "Nom de l'album",
+    "album_description": "Description de l'album (optionnel)",
+    "create_success": "Album créé avec succès",
+    "create_error": "Erreur lors de la création de l'album",
+    "in_one_album": "Dans 1 album",
+    "in_albums": "Dans {count} albums",
+    "not_in_any_album": "Ce fichier n'est dans aucun album",
+    "no_albums": {
+      "title": "Aucun album",
+      "description": "Commencez par créer votre premier album pour organiser vos fichiers"
+    }
+  },
+  "multiselect": {
+    "selected_count": "{count} fichier(s) sélectionné(s)",
+    "selection_mode": "Sélection multiple",
+    "exit_selection_mode": "Quitter la sélection",
+    "select_all": "Tout sélectionner",
+    "deselect_all": "Tout désélectionner",
+    "add_to_album": "Ajouter à un album",
+    "actions": {
+      "toggle_favorites": "Basculer favoris",
+      "toggle_security": "Basculer sécurité",
+      "download_selected": "Télécharger la sélection",
+      "delete_selected": "Supprimer la sélection"
+    },
+    "keyboard_shortcuts": "Raccourcis clavier",
+    "shortcuts": {
+      "selection": "Sélection",
+      "actions": "Actions",
+      "help": "Aide",
+      "ctrl_click": "Sélectionner/désélectionner un fichier",
+      "shift_click": "Sélectionner une plage de fichiers",
+      "delete_selected": "Supprimer les fichiers sélectionnés",
+      "copy_urls": "Copier les URLs des fichiers sélectionnés",
+      "toggle_star": "Basculer les favoris des fichiers sélectionnés",
+      "toggle_security": "Basculer la sécurité des fichiers sélectionnés",
+      "add_to_album": "Ajouter les fichiers sélectionnés à un album",
+      "show_help": "Afficher l'aide des raccourcis"
+    },
+    "actions": {
+      "delete_selected": "Supprimer la sélection",
+      "download_selected": "Télécharger la sélection",
+      "toggle_favorites": "Basculer les favoris",
+      "toggle_security": "Basculer la sécurité",
+      "add_to_album": "Ajouter à un album"
+    },
+    "help": {
+      "title": "Raccourcis clavier",
+      "description": "Utilisez ces raccourcis pour naviguer plus rapidement dans la galerie"
     }
   },
   "modules": {
