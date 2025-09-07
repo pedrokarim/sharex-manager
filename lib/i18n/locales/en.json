@@ -915,5 +915,79 @@
         "files_via_web": "files via web interface"
       }
     }
+  },
+  "albums": {
+    "title": "Albums",
+    "create": "New album",
+    "name": "Album name",
+    "description": "Description",
+    "empty": "No albums created",
+    "files_count": "{count} file(s)",
+    "add_files": "Add files",
+    "add_to_album": "Add to album",
+    "remove_from_album": "Remove from album",
+    "delete_album": "Delete album",
+    "create_album": "Create album",
+    "album_name": "Album name",
+    "album_description": "Album description (optional)",
+    "create_success": "Album created successfully",
+    "create_error": "Error creating album",
+    "in_one_album": "In 1 album",
+    "in_albums": "In {count} albums",
+    "not_in_any_album": "This file is not in any album",
+    "no_albums": {
+      "title": "No albums",
+      "description": "Start by creating your first album to organize your files"
+    }
+  },
+  "multiselect": {
+    "selected_count": "{count} file(s) selected",
+    "selection_mode": "Multiple selection",
+    "exit_selection_mode": "Exit selection",
+    "select_all": "Select all",
+    "deselect_all": "Deselect all",
+    "add_to_album": "Add to album",
+    "actions": {
+      "toggle_favorites": "Toggle favorites",
+      "toggle_security": "Toggle security",
+      "download_selected": "Download selection",
+      "delete_selected": "Delete selection"
+    },
+    "keyboard_shortcuts": "Keyboard shortcuts",
+    "shortcuts": {
+      "selection": "Selection",
+      "actions": "Actions",
+      "help": "Help",
+      "ctrl_click": "Select/deselect a file",
+      "shift_click": "Select a range of files",
+      "delete_selected": "Delete selected files",
+      "copy_urls": "Copy URLs of selected files",
+      "toggle_star": "Toggle favorites of selected files",
+      "toggle_security": "Toggle security of selected files",
+      "add_to_album": "Add selected files to an album",
+      "show_help": "Show shortcuts help"
+    },
+    "actions": {
+      "delete_selected": "Delete selection",
+      "download_selected": "Download selection",
+      "toggle_favorites": "Toggle favorites",
+      "toggle_security": "Toggle security",
+      "add_to_album": "Add to album"
+    },
+    "help": {
+      "title": "Keyboard shortcuts",
+      "description": "Use these shortcuts to navigate faster in the gallery"
+    }
+  },
+  "modules": {
+    "common": {
+      "loading": "Loading interface...",
+      "error": "Error loading",
+      "success": "Operation successful",
+      "apply": "Apply",
+      "cancel": "Cancel",
+      "reset": "Reset",
+      "preview": "Preview"
+    }
   }
 }

@@ -3,6 +3,7 @@ import { FileInfo } from "@/types/files";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { FileContextMenu } from "@/components/gallery/file-context-menu";
+import { AlbumIndicator } from "@/components/gallery/album-indicator";
 import {
   Copy,
   ExternalLink,
@@ -195,6 +196,11 @@ export function SelectableListItemCard({
               <span>{format(parseISO(file.createdAt), "PPp", { locale })}</span>
             </div>
           )}
+        </div>
+
+        {/* Indicateur d'album */}
+        <div className="flex-shrink-0">
+          <AlbumIndicator fileName={file.name} />
         </div>
 
         {/* Actions */}

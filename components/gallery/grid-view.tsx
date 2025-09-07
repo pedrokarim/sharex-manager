@@ -35,6 +35,7 @@ interface GridViewProps {
   onToggleStarSelected?: () => void;
   onToggleSecuritySelected?: () => void;
   onStartSelectionMode?: (fileName: string) => void;
+  fileAlbumsCache?: Record<string, any[]>;
   newFileIds: string[];
 }
 
@@ -63,6 +64,7 @@ export function GridView({
   onToggleStarSelected,
   onToggleSecuritySelected,
   onStartSelectionMode,
+  fileAlbumsCache = {},
   newFileIds,
 }: GridViewProps) {
   const [defaultThumbnailSize, setDefaultThumbnailSize] =
@@ -115,6 +117,7 @@ export function GridView({
           onToggleStarSelected={onToggleStarSelected}
           onToggleSecuritySelected={onToggleSecuritySelected}
           onStartSelectionMode={onStartSelectionMode}
+          fileAlbums={fileAlbumsCache[file.name] || []}
           isNew={newFileIds.includes(file.name)}
           size={thumbnailSize}
         />

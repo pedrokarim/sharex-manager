@@ -30,7 +30,7 @@ export interface AlbumWithFiles extends Album {
   files: string[];
 }
 
-class AlbumsDatabase {
+export class AlbumsDatabase {
   private static dbPath: string;
 
   private static initDbPath() {
@@ -44,9 +44,10 @@ class AlbumsDatabase {
     return AlbumsDatabase.dbPath;
   }
 
-  private static getConnection(): Database {
+  public static getConnection(): Database {
     const db = new Database(AlbumsDatabase.initDbPath(), { create: true });
     db.run("PRAGMA journal_mode = WAL");
+    AlbumsDatabase.initTables(db);
     return db;
   }
 
@@ -211,6 +212,28 @@ class AlbumsDatabase {
     const result = query.run(id);
 
     return (result.changes || 0) > 0;
+  }
+
+  public static getAlbumsForFile(fileName: string): Album[] {
+    const db = AlbumsDatabase.getConnection();
+    AlbumsDatabase.initTables(db);
+
+    const query = db.prepare(`
+      SELECT a.* FROM albums a
+      INNER JOIN album_files af ON a.id = af.album_id
+      WHERE af.file_name = ?
+      ORDER BY a.name
+    `);
+
+    const albums = query.all(fileName) as any[];
+    return albums.map((album) => ({
+      id: album.id,
+      name: album.name,
+      description: album.description,
+      createdAt: album.created_at,
+      updatedAt: album.created_at, // Utiliser createdAt comme updatedAt pour l'instant
+      fileCount: 0, // On ne calcule pas le fileCount ici pour optimiser
+    }));
   }
 
   // Gestion des fichiers dans les albums

@@ -220,6 +220,9 @@ export function GalleryClient({
   const [availableAlbums, setAvailableAlbums] = useState<
     Array<{ id: number; name: string }>
   >([]);
+  const [fileAlbumsCache, setFileAlbumsCache] = useState<Record<string, any[]>>(
+    {}
+  );
 
   useEffect(() => {
     // Simuler un temps de chargement pour une meilleure expérience utilisateur
@@ -251,6 +254,42 @@ export function GalleryClient({
 
     fetchAlbums();
   }, []);
+
+  // Fonction pour charger les albums des fichiers visibles
+  const loadFileAlbums = useCallback(
+    async (fileNames: string[]) => {
+      try {
+        // Filtrer les fichiers qui ne sont pas encore dans le cache
+        const uncachedFiles = fileNames.filter(
+          (fileName) => !fileAlbumsCache[fileName]
+        );
+
+        if (uncachedFiles.length === 0) return;
+
+        const response = await fetch("/api/files/albums/batch", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ fileNames: uncachedFiles }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setFileAlbumsCache((prev) => ({
+            ...prev,
+            ...data.fileAlbumsMap,
+          }));
+        }
+      } catch (error) {
+        console.error(
+          "Erreur lors du chargement des albums des fichiers:",
+          error
+        );
+      }
+    },
+    [fileAlbumsCache]
+  );
 
   const fetchFiles = useCallback(
     async (page: number) => {
@@ -393,6 +432,14 @@ export function GalleryClient({
         index === self.findIndex((f) => f.name === file.name)
     );
   }, [files]);
+
+  // Charger les albums des fichiers visibles
+  useEffect(() => {
+    if (uniqueFiles.length > 0) {
+      const fileNames = uniqueFiles.map((file) => file.name);
+      loadFileAlbums(fileNames);
+    }
+  }, [uniqueFiles, loadFileAlbums]);
 
   const sortFiles = (files: FileInfo[]) => {
     return [...files].sort((a, b) => {
@@ -917,6 +964,7 @@ export function GalleryClient({
                       onToggleStarSelected={handleToggleStarSelected}
                       onToggleSecuritySelected={handleToggleSecuritySelected}
                       onStartSelectionMode={handleStartSelectionMode}
+                      fileAlbumsCache={fileAlbumsCache}
                       newFileIds={newFileIds}
                     />
                   ) : (

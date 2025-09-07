@@ -6,6 +6,7 @@ import { FileCard } from "@/components/file-card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileContextMenu } from "@/components/gallery/file-context-menu";
 import { MultiSelectContextMenu } from "@/components/gallery/multi-select-context-menu";
+import { AlbumIndicator } from "@/components/gallery/album-indicator";
 import { cn } from "@/lib/utils";
 import type { FileInfo } from "@/types/files";
 import type { ThumbnailSize } from "@/lib/atoms/preferences";
@@ -41,6 +42,7 @@ interface SelectableFileCardProps {
   onToggleStarSelected?: () => void;
   onToggleSecuritySelected?: () => void;
   onStartSelectionMode?: (fileName: string) => void;
+  fileAlbums?: any[];
 }
 
 export function SelectableFileCard({
@@ -70,6 +72,7 @@ export function SelectableFileCard({
   onToggleStarSelected,
   onToggleSecuritySelected,
   onStartSelectionMode,
+  fileAlbums = [],
 }: SelectableFileCardProps) {
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     console.log("Click debug:", {
@@ -266,6 +269,9 @@ export function SelectableFileCard({
           onToggleStar={onToggleStar}
           isNew={isNew}
           size={size}
+          albumIndicator={
+            <AlbumIndicator fileName={file.name} albums={fileAlbums} />
+          }
         />
       </div>
     </FileContextMenu>

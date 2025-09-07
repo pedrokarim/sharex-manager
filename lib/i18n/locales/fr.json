@@ -939,6 +939,7 @@
     "empty": "Aucun album créé",
     "files_count": "{count} fichier(s)",
     "add_files": "Ajouter des fichiers",
+    "add_to_album": "Ajouter à un album",
     "remove_from_album": "Retirer de l'album",
     "delete_album": "Supprimer l'album",
     "create_album": "Créer un album",
@@ -946,6 +947,9 @@
     "album_description": "Description de l'album (optionnel)",
     "create_success": "Album créé avec succès",
     "create_error": "Erreur lors de la création de l'album",
+    "in_one_album": "Dans 1 album",
+    "in_albums": "Dans {count} albums",
+    "not_in_any_album": "Ce fichier n'est dans aucun album",
     "no_albums": {
       "title": "Aucun album",
       "description": "Commencez par créer votre premier album pour organiser vos fichiers"
