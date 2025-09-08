@@ -49,13 +49,13 @@ jobs:
       - name: Run tests
         run: |
           echo "Running tests..."
-          bun test --run --reporter=verbose
+          bun --bun vitest run
           echo "Tests completed successfully"
 
       - name: Run test coverage
         run: |
           echo "Running test coverage..."
-          bun test --run --coverage --reporter=verbose
+          bun --bun vitest run --coverage
           echo "Test coverage completed successfully"
 
       - name: Upload coverage reports
