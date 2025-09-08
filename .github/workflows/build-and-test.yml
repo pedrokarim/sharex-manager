@@ -59,7 +59,7 @@ jobs:
           echo "Test coverage completed successfully"
 
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
           path: coverage/
@@ -128,7 +128,7 @@ jobs:
         run: mkdir -p .next/cache && chmod 777 .next/cache
 
       - name: Cache build output
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             .next/cache
