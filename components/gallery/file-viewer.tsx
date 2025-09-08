@@ -37,6 +37,8 @@ import { ModuleActions } from "./module-actions";
 import { getGalleryImageUrl, getFileStoragePath } from "@/lib/utils/url";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { AddToAlbumDialog } from "@/components/albums/add-to-album-dialog";
+import { CreateAlbumDialog } from "@/components/albums/create-album-dialog";
 
 interface FileViewerProps {
   file: FileInfo | null;
@@ -68,6 +70,8 @@ export function FileViewer({
   const locale = useDateLocale();
   const [showInfo, setShowInfo] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAddToAlbumDialogOpen, setIsAddToAlbumDialogOpen] = useState(false);
+  const [isCreateAlbumDialogOpen, setIsCreateAlbumDialogOpen] = useState(false);
   const router = useRouter();
 
   if (!file) return null;
@@ -153,6 +157,71 @@ export function FileViewer({
     searchParams.set("search", file.name);
 
     router.push(`/admin/logs?${searchParams.toString()}`);
+  };
+
+  const handleAddToAlbum = () => {
+    setIsAddToAlbumDialogOpen(true);
+  };
+
+  const handleCreateAlbum = () => {
+    setIsCreateAlbumDialogOpen(true);
+  };
+
+  const handleCreateAlbumSubmit = async (data: {
+    name: string;
+    description?: string;
+  }) => {
+    try {
+      const response = await fetch("/api/albums", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la création de l'album");
+      }
+
+      toast.success(t("albums.create_success"));
+      setIsCreateAlbumDialogOpen(false);
+
+      // Optionnel : ajouter automatiquement le fichier au nouvel album
+      if (file) {
+        const albumData = await response.json();
+        await handleAddFileToAlbum(albumData.id);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la création de l'album:", error);
+      toast.error(t("albums.create_error"));
+    }
+  };
+
+  const handleAddFileToAlbum = async (albumId: number) => {
+    if (!file) return;
+
+    try {
+      const response = await fetch(`/api/albums/${albumId}/files`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileNames: [file.name],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de l'ajout du fichier à l'album");
+      }
+
+      toast.success("Fichier ajouté à l'album avec succès");
+      setIsAddToAlbumDialogOpen(false);
+    } catch (error) {
+      console.error("Erreur lors de l'ajout du fichier à l'album:", error);
+      toast.error("Erreur lors de l'ajout du fichier à l'album");
+    }
   };
 
   return (
@@ -488,14 +557,8 @@ export function FileViewer({
                     <Separator />
                     <FileAlbumsSection
                       fileName={file.name}
-                      onAddToAlbum={() => {
-                        // TODO: Implémenter l'ajout à un album depuis la modale
-                        toast.info("Fonctionnalité à implémenter");
-                      }}
-                      onCreateAlbum={() => {
-                        // TODO: Implémenter la création d'album depuis la modale
-                        toast.info("Fonctionnalité à implémenter");
-                      }}
+                      onAddToAlbum={handleAddToAlbum}
+                      onCreateAlbum={handleCreateAlbum}
                     />
                   </div>
                 </motion.div>
@@ -504,6 +567,22 @@ export function FileViewer({
           </div>
         </motion.div>
       </DialogContent>
+
+      {/* Dialogs pour les albums */}
+      <AddToAlbumDialog
+        open={isAddToAlbumDialogOpen}
+        onClose={() => setIsAddToAlbumDialogOpen(false)}
+        selectedFiles={file ? [file.name] : []}
+        onSuccess={() => {
+          // Optionnel : recharger les albums du fichier
+        }}
+      />
+
+      <CreateAlbumDialog
+        open={isCreateAlbumDialogOpen}
+        onClose={() => setIsCreateAlbumDialogOpen(false)}
+        onSubmit={handleCreateAlbumSubmit}
+      />
     </Dialog>
   );
 }

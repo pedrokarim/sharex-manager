@@ -39,7 +39,7 @@ export function RefreshInterval() {
 
   return (
     <Select value={autoRefreshInterval} onValueChange={handleChange}>
-      <SelectTrigger className="w-[200px]">
+      <SelectTrigger className="w-[200px] backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200">
         <SelectValue placeholder={t("gallery.refresh.intervals.placeholder")} />
       </SelectTrigger>
       <SelectContent>

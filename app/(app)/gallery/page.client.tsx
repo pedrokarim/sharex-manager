@@ -886,6 +886,7 @@ export function GalleryClient({
               onClick={handleRefresh}
               className={cn(
                 "shrink-0 transition-all duration-200",
+                "backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20",
                 isRefreshing && "animate-spin text-primary"
               )}
               disabled={isRefreshing}
@@ -899,7 +900,11 @@ export function GalleryClient({
                 setIsSelectionMode(!isSelectionMode);
                 if (isSelectionMode) clearSelection();
               }}
-              className="shrink-0"
+              className={cn(
+                "shrink-0",
+                !isSelectionMode &&
+                  "backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200"
+              )}
             >
               {isSelectionMode ? (
                 <CheckSquare className="h-4 w-4 mr-2" />
