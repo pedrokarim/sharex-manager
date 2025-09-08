@@ -8,12 +8,13 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    setupFiles: ["__tests__/setup.ts"],
+    setupFiles: ["tests/setup.ts"],
+    testTimeout: 10000,
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
     },
-    include: ["__tests__/**/*.test.ts"],
+    include: ["tests/**/*.test.ts"],
     css: true,
     mockReset: true,
     deps: {
