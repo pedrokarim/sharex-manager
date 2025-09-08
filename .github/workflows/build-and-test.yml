@@ -52,11 +52,11 @@ jobs:
           bunx vitest run
           echo "Tests completed successfully"
 
-      # - name: Run test coverage
-      #   run: |
-      #     echo "Running test coverage..."
-      #     bunx vitest run --coverage
-      #     echo "Test coverage completed successfully"
+      - name: Run test coverage
+        run: |
+          echo "Running test coverage..."
+          bunx vitest run --coverage
+          echo "Test coverage completed successfully"
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
