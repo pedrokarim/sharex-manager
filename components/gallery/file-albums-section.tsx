@@ -66,7 +66,7 @@ export function FileAlbumsSection({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
         <h3 className="text-sm font-medium flex items-center gap-2">
           {albums.length === 0 ? (
             <Folder className="h-4 w-4" />
@@ -75,30 +75,6 @@ export function FileAlbumsSection({
           )}
           {t("albums.title")}
         </h3>
-        <div className="flex gap-1">
-          {onAddToAlbum && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onAddToAlbum}
-              className="h-7 px-2 text-xs"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              {t("albums.add_to_album")}
-            </Button>
-          )}
-          {onCreateAlbum && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onCreateAlbum}
-              className="h-7 px-2 text-xs"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              {t("albums.create")}
-            </Button>
-          )}
-        </div>
       </div>
 
       {albums.length === 0 ? (
@@ -128,6 +104,32 @@ export function FileAlbumsSection({
           ))}
         </div>
       )}
+
+      {/* Boutons d'action en dessous */}
+      <div className="flex gap-2 pt-2">
+        {onAddToAlbum && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onAddToAlbum}
+            className="h-8 px-3 text-xs flex-1"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            {t("albums.add_to_album")}
+          </Button>
+        )}
+        {onCreateAlbum && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCreateAlbum}
+            className="h-8 px-3 text-xs flex-1"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            {t("albums.create")}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

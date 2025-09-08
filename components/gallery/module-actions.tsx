@@ -326,12 +326,12 @@ export function ModuleActions({
         className={cn(
           "flex items-center justify-center",
           variant === "overlay"
-            ? "p-3 bg-white/10 dark:bg-black/20 backdrop-blur-md border border-white/20 dark:border-white/10 rounded-xl shadow-2xl"
+            ? "p-3 bg-black/20 dark:bg-white/10 backdrop-blur-md border border-black/20 dark:border-white/20 rounded-xl shadow-2xl"
             : "p-1"
         )}
       >
-        <Loader2 className="h-4 w-4 animate-spin mr-2 text-white/90" />
-        <span className="text-xs text-white/80">
+        <Loader2 className="h-4 w-4 animate-spin mr-2 text-white/90 dark:text-black/90" />
+        <span className="text-xs text-white/80 dark:text-black/80">
           {t("gallery.file_viewer.modules.loading")}
         </span>
       </div>
@@ -404,7 +404,7 @@ export function ModuleActions({
     return (
       <>
         <motion.div
-          className="flex items-center bg-white/10 dark:bg-black/20 backdrop-blur-md border border-white/20 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden"
+          className="flex items-center bg-black/20 dark:bg-white/10 backdrop-blur-md border border-black/20 dark:border-white/20 rounded-xl shadow-2xl overflow-hidden"
           initial={{ width: "auto" }}
           animate={{ width: isExpanded ? "auto" : "auto" }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
@@ -413,7 +413,7 @@ export function ModuleActions({
           <Button
             variant="ghost"
             size="icon"
-            className="h-12 w-12 bg-white/10 dark:bg-black/20 hover:bg-white/20 dark:hover:bg-white/10 border-r border-white/20 dark:border-white/10 rounded-l-xl rounded-r-none flex-shrink-0"
+            className="h-12 w-12 bg-black/20 dark:bg-white/10 hover:bg-black/30 dark:hover:bg-white/20 border-r border-black/20 dark:border-white/20 rounded-l-xl rounded-r-none flex-shrink-0"
             onClick={() => setIsExpanded(!isExpanded)}
           >
             <motion.div
@@ -421,15 +421,15 @@ export function ModuleActions({
               transition={{ duration: 0.3 }}
             >
               {isExpanded ? (
-                <ChevronLeft className="h-5 w-5 text-white/90" />
+                <ChevronLeft className="h-5 w-5 text-white/90 dark:text-black/90" />
               ) : (
-                <ChevronRight className="h-5 w-5 text-white/90" />
+                <ChevronRight className="h-5 w-5 text-white/90 dark:text-black/90" />
               )}
             </motion.div>
           </Button>
 
           {/* Séparateur */}
-          <div className="w-px h-10 bg-white/20 dark:bg-white/10 flex-shrink-0 my-1" />
+          <div className="w-px h-10 bg-black/20 dark:bg-white/20 flex-shrink-0 my-1" />
 
           {/* Contenu expandable */}
           <AnimatePresence>
@@ -447,12 +447,12 @@ export function ModuleActions({
                     onValueChange={setActiveCategory}
                     className="w-full"
                   >
-                    <TabsList className="flex w-full bg-white/5 dark:bg-black/10 border border-white/10 dark:border-white/5 justify-end">
+                    <TabsList className="flex w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 justify-end">
                       {categories.map((category) => (
                         <TabsTrigger
                           key={category}
                           value={category}
-                          className="text-xs h-7 px-3 whitespace-nowrap flex-shrink-0 data-[state=active]:bg-white/20 dark:data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-sm"
+                          className="text-xs h-7 px-3 whitespace-nowrap flex-shrink-0 data-[state=active]:bg-black/20 dark:data-[state=active]:bg-white/20 data-[state=active]:text-white dark:data-[state=active]:text-black data-[state=active]:shadow-sm"
                         >
                           {category === "all"
                             ? t("gallery.file_viewer.modules.all")
@@ -487,7 +487,7 @@ export function ModuleActions({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 bg-white/10 dark:bg-black/20 hover:bg-white/20 dark:hover:bg-white/10 border border-white/20 dark:border-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center justify-center"
+                            className="h-9 w-9 bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 border border-black/20 dark:border-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center justify-center"
                             onClick={() =>
                               module.hasUI
                                 ? openModuleUI(module.name)
@@ -496,9 +496,9 @@ export function ModuleActions({
                             disabled={processingModule === module.name}
                           >
                             {processingModule === module.name ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-white" />
+                              <Loader2 className="h-4 w-4 animate-spin text-white dark:text-black" />
                             ) : (
-                              <div className="text-white/90 flex items-center justify-center">
+                              <div className="text-white/90 dark:text-black/90 flex items-center justify-center">
                                 {renderModuleIcon(module)}
                               </div>
                             )}

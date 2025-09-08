@@ -176,11 +176,18 @@ export function FileCard({
               }}
               className={cn(
                 "h-8 w-8 absolute top-2 right-2 z-10",
-                file.isStarred &&
-                  "text-white bg-yellow-500 hover:bg-yellow-500 hover:text-white"
+                "backdrop-blur-md border border-white/20",
+                "bg-white/10 dark:bg-black/10",
+                "hover:bg-white/20 dark:hover:bg-black/20",
+                "transition-all duration-200",
+                file.isStarred
+                  ? "text-white bg-yellow-500/20 border-yellow-500/30 hover:bg-yellow-500/30"
+                  : "text-white hover:text-white"
               )}
             >
-              <Star className="h-4 w-4" />
+              <Star
+                className={cn("h-4 w-4", file.isStarred && "fill-current")}
+              />
             </Button>
           )}
 
