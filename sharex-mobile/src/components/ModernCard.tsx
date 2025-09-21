@@ -1,6 +1,6 @@
 // Composant de carte moderne réutilisable
 
-import React from "react";
+import React, { memo, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,14 @@ import {
   ViewStyle,
   TouchableOpacity,
 } from "react-native";
-import { COLORS, COMPONENT_COLORS, SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY } from "../config/design";
+import {
+  COLORS,
+  COMPONENT_COLORS,
+  SPACING,
+  BORDER_RADIUS,
+  SHADOWS,
+  TYPOGRAPHY,
+} from "../config/design";
 
 interface ModernCardProps {
   children: React.ReactNode;
@@ -20,77 +27,86 @@ interface ModernCardProps {
   padding?: "sm" | "md" | "lg";
 }
 
-export const ModernCard: React.FC<ModernCardProps> = ({
-  children,
-  title,
-  subtitle,
-  onPress,
-  style,
-  variant = "default",
-  padding = "md",
-}) => {
-  const getCardStyle = (): ViewStyle => {
-    const baseStyle: ViewStyle = {
-      borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: COLORS.background,
-      ...SHADOWS.sm,
-    };
+export const ModernCard: React.FC<ModernCardProps> = memo(
+  ({
+    children,
+    title,
+    subtitle,
+    onPress,
+    style,
+    variant = "default",
+    padding = "md",
+  }) => {
+    const cardStyle = useMemo((): ViewStyle => {
+      const baseStyle: ViewStyle = {
+        borderRadius: BORDER_RADIUS.lg,
+        backgroundColor: COLORS.background,
+        marginBottom: SPACING.lg,
+        ...SHADOWS.sm,
+      };
 
-    // Variantes
-    switch (variant) {
-      case "elevated":
-        return {
-          ...baseStyle,
-          ...SHADOWS.md,
-        };
-      case "outlined":
-        return {
-          ...baseStyle,
-          borderWidth: 1,
-          borderColor: COLORS.border,
-          shadowOpacity: 0,
-          elevation: 0,
-        };
-      default:
-        return baseStyle;
+      // Variantes
+      switch (variant) {
+        case "elevated":
+          return {
+            ...baseStyle,
+            ...SHADOWS.md,
+          };
+        case "outlined":
+          return {
+            ...baseStyle,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            shadowOpacity: 0,
+            elevation: 0,
+          };
+        default:
+          return baseStyle;
+      }
+    }, [variant]);
+
+    const paddingStyle = useMemo((): ViewStyle => {
+      switch (padding) {
+        case "sm":
+          return { padding: SPACING.sm };
+        case "md":
+          return { padding: SPACING.lg };
+        case "lg":
+          return { padding: SPACING.xxl };
+        default:
+          return { padding: SPACING.lg };
+      }
+    }, [padding]);
+
+    if (onPress) {
+      return (
+        <TouchableOpacity onPress={onPress} activeOpacity={0.95}>
+          <View style={[cardStyle, paddingStyle, style]}>
+            {(title || subtitle) && (
+              <View style={styles.header}>
+                {title && <Text style={styles.title}>{title}</Text>}
+                {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+              </View>
+            )}
+            {children}
+          </View>
+        </TouchableOpacity>
+      );
     }
-  };
 
-  const getPaddingStyle = (): ViewStyle => {
-    switch (padding) {
-      case "sm":
-        return { padding: SPACING.sm };
-      case "md":
-        return { padding: SPACING.lg };
-      case "lg":
-        return { padding: SPACING.xxl };
-      default:
-        return { padding: SPACING.lg };
-    }
-  };
-
-  const CardContent = () => (
-    <View style={[getCardStyle(), getPaddingStyle(), style]}>
-      {(title || subtitle) && (
-        <View style={styles.header}>
-          {title && <Text style={styles.title}>{title}</Text>}
-          {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-        </View>
-      )}
-      {children}
-    </View>
-  );
-
-  if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.95}>
-        <CardContent />
-      </TouchableOpacity>
+      <View style={[cardStyle, paddingStyle, style]}>
+        {(title || subtitle) && (
+          <View style={styles.header}>
+            {title && <Text style={styles.title}>{title}</Text>}
+            {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+          </View>
+        )}
+        {children}
+      </View>
     );
   }
-
-  return <CardContent />;
-};
+);
 
 const styles = StyleSheet.create({
   header: {

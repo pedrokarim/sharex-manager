@@ -3,8 +3,9 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Icon } from "./Icon";
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from "../config/design";
 
-export type ViewMode = "grid" | "list";
+export type ViewMode = "grid" | "list" | "mini-grid";
 
 interface ViewSelectorProps {
   currentView: ViewMode;
@@ -24,7 +25,9 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
         <Icon
           name="grid"
           size={16}
-          color={currentView === "grid" ? "#ffffff" : "#8E8E93"}
+          color={
+            currentView === "grid" ? COLORS.textInverse : COLORS.textTertiary
+          }
           type="ionicons"
         />
         <Text
@@ -44,7 +47,9 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
         <Icon
           name="list"
           size={16}
-          color={currentView === "list" ? "#ffffff" : "#8E8E93"}
+          color={
+            currentView === "list" ? COLORS.textInverse : COLORS.textTertiary
+          }
           type="ionicons"
         />
         <Text
@@ -56,6 +61,33 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
           Liste
         </Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[
+          styles.button,
+          currentView === "mini-grid" && styles.activeButton,
+        ]}
+        onPress={() => onViewChange("mini-grid")}
+      >
+        <Icon
+          name="apps"
+          size={16}
+          color={
+            currentView === "mini-grid"
+              ? COLORS.textInverse
+              : COLORS.textTertiary
+          }
+          type="ionicons"
+        />
+        <Text
+          style={[
+            styles.buttonText,
+            currentView === "mini-grid" && styles.activeButtonText,
+          ]}
+        >
+          Mini
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -63,32 +95,33 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: BORDER_RADIUS.md,
     padding: 4,
-    marginHorizontal: 20,
-    marginVertical: 12,
+    flex: 0,
+    maxWidth: 250,
+    gap: 4,
   },
   button: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
-    minHeight: 36,
+    minHeight: 40,
   },
   activeButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: COLORS.primary,
   },
   buttonText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#666666",
-    marginLeft: 6,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.textSecondary,
+    marginLeft: SPACING.xs,
   },
   activeButtonText: {
-    color: "#ffffff",
+    color: COLORS.textInverse,
   },
 });

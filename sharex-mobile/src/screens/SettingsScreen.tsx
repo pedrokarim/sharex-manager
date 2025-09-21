@@ -19,9 +19,16 @@ import { ShareXApiService } from "../services/api";
 import { Icon } from "../components/Icon";
 import { ModernButton } from "../components/ModernButton";
 import { ModernCard } from "../components/ModernCard";
-import { COLORS, COMPONENT_COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from "../config/design";
+import { QRCodeScannerScreen } from "./QRCodeScannerScreen";
+import {
+  COLORS,
+  COMPONENT_COLORS,
+  SPACING,
+  BORDER_RADIUS,
+  TYPOGRAPHY,
+} from "../config/design";
 
-export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
+const SettingsScreenComponent: React.FC<NavigationProps> = ({ navigation }) => {
   const [settings, setSettings] = useState<AppSettings>({
     serverUrl: "",
     apiKey: "",
@@ -33,6 +40,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -144,33 +152,38 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Icon
-              name="arrow-back"
-              size={24}
-              color={COLORS.primary}
-              type="ionicons"
-            />
-          </TouchableOpacity>
-          <Text style={styles.title}>Paramètres</Text>
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Icon
+            name="arrow-back"
+            size={24}
+            color={COLORS.primary}
+            type="ionicons"
+          />
+        </TouchableOpacity>
+        <Text style={styles.title}>Paramètres</Text>
+        <View style={styles.placeholder} />
+      </View>
 
-        {/* Configuration du serveur */}
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Configuration du serveur - AVEC ModernCard CORRIGÉE */}
         <ModernCard title="Configuration du serveur" variant="elevated">
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>URL du serveur *</Text>
             <TextInput
               style={styles.textInput}
               value={settings.serverUrl}
-              onChangeText={(text) =>
-                setSettings({ ...settings, serverUrl: text })
-              }
+              onChangeText={(text) => {
+                setSettings((prev) => ({ ...prev, serverUrl: text }));
+              }}
               placeholder="https://votre-serveur.com"
               keyboardType="url"
               autoCapitalize="none"
@@ -183,9 +196,9 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <TextInput
               style={styles.textInput}
               value={settings.apiKey}
-              onChangeText={(text) =>
-                setSettings({ ...settings, apiKey: text })
-              }
+              onChangeText={(text) => {
+                setSettings((prev) => ({ ...prev, apiKey: text }));
+              }}
               placeholder="Votre clé API"
               secureTextEntry
               autoCapitalize="none"
@@ -264,6 +277,15 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
           />
 
           <ModernButton
+            title="Scanner QR Code"
+            onPress={() => setShowQRScanner(true)}
+            variant="secondary"
+            size="lg"
+            icon="qr-code"
+            iconType="ionicons"
+          />
+
+          <ModernButton
             title="Supprimer les données"
             onPress={handleClearData}
             variant="danger"
@@ -271,8 +293,25 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             icon="trash"
             iconType="ionicons"
           />
+
+          <ModernButton
+            title="À propos de l'application"
+            onPress={() => navigation.navigate("About")}
+            variant="ghost"
+            size="lg"
+            icon="information-circle"
+            iconType="ionicons"
+          />
         </View>
       </ScrollView>
+
+      {/* QR Code Scanner Modal */}
+      <QRCodeScannerScreen
+        visible={showQRScanner}
+        onClose={() => {
+          setShowQRScanner(false);
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -281,6 +320,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  content: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -294,25 +336,30 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     padding: 20,
+    paddingBottom: 60, // Espace pour la bottom bar
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 30,
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+    backgroundColor: COLORS.background,
   },
   backButton: {
-    marginRight: 16,
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
     backgroundColor: COLORS.primaryBg,
-    borderRadius: 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.textPrimary,
+  },
+  placeholder: {
+    width: 40,
   },
   section: {
     marginBottom: 30,
@@ -404,3 +451,5 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 });
+
+export const SettingsScreen = SettingsScreenComponent;

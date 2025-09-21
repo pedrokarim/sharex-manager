@@ -1,6 +1,6 @@
 // Écran principal moderne avec galerie
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   StatusBar,
   Dimensions,
   Alert,
+  TextInput,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NavigationProps, ImageInfo } from "../types";
@@ -17,9 +19,14 @@ import { StorageService } from "../services/storage";
 import { ImageService } from "../services/imageService";
 import { UploadHistoryService } from "../services/uploadHistory";
 import { ClipboardService } from "../services/clipboard";
+import { ShareService } from "../services/shareService";
 import { getApiService } from "../services/api";
 import { ViewSelector } from "../components/ViewSelector";
 import { ImageCard } from "../components/ImageCard";
+import {
+  ImageActionDrawer,
+  ImageActionDrawerRef,
+} from "../components/ImageActionDrawer";
 import { Icon } from "../components/Icon";
 import { ImagePreview } from "../components/ImagePreview";
 import { ModernButton } from "../components/ModernButton";
@@ -39,14 +46,16 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [history, setHistory] = useState<any[]>([]);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [stats, setStats] = useState({
-    totalUploads: 0,
-    totalSize: 0,
-    lastUpload: null as Date | null,
-  });
+  const [viewMode, setViewMode] = useState<"grid" | "list" | "mini-grid">(
+    "grid"
+  );
+  const [sortBy, setSortBy] = useState<"date" | "name">("date");
+  const [searchQuery, setSearchQuery] = useState("");
   const [previewImage, setPreviewImage] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const actionDrawerRef = useRef<ImageActionDrawerRef>(null);
+  const waveAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     checkConfiguration();
@@ -88,18 +97,64 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const loadHistory = async () => {
     try {
       const uploadHistory = await UploadHistoryService.getHistory();
-      const historyStats = await UploadHistoryService.getStats();
-
       setHistory(uploadHistory);
-      setStats({
-        ...historyStats,
-        lastUpload: historyStats.lastUpload
-          ? new Date(historyStats.lastUpload)
-          : null,
-      });
     } catch (error) {
       console.error("Erreur lors du chargement de l'historique:", error);
     }
+  };
+
+  const getFilteredAndSortedHistory = () => {
+    let filtered = [...history];
+
+    // Filtrage par nom
+    if (searchQuery.trim()) {
+      filtered = filtered.filter((item) =>
+        item.filename.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Tri
+    filtered.sort((a, b) => {
+      if (sortBy === "date") {
+        return (
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+        );
+      } else {
+        return a.filename.localeCompare(b.filename);
+      }
+    });
+
+    return filtered;
+  };
+
+  const getGreetingMessage = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) {
+      return "Bonjour !";
+    } else if (hour < 18) {
+      return "Bon après-midi !";
+    } else {
+      return "Bonsoir !";
+    }
+  };
+
+  const startWaveAnimation = () => {
+    Animated.sequence([
+      Animated.timing(waveAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(waveAnimation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handleGreetingPress = () => {
+    startWaveAnimation();
   };
 
   const handleSelectImage = async () => {
@@ -148,6 +203,17 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
     navigation.navigate("Settings");
   };
 
+  const handleShareImage = async (item: any) => {
+    try {
+      await ShareService.shareImageUrl({
+        url: item.url,
+        filename: item.filename,
+      });
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible de partager l'image");
+    }
+  };
+
   const handleGalleryItemPress = (item: any) => {
     setPreviewImage({
       uri: item.localUri,
@@ -156,6 +222,46 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
       id: item.id,
     });
     setShowPreview(true);
+  };
+
+  const handleMenuPress = (item: any) => {
+    console.log("handleMenuPress called with item:", item);
+    actionDrawerRef.current?.present(item);
+  };
+
+  const handleCopyLink = async (item: any) => {
+    try {
+      await ClipboardService.copyUrl(item.url);
+      Alert.alert("Succès", "Lien copié dans le presse-papiers !");
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible de copier le lien");
+    }
+  };
+
+  const handleDeleteImage = (item: any) => {
+    Alert.alert(
+      "Supprimer l'image",
+      "Êtes-vous sûr de vouloir supprimer cette image de l'historique ?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await UploadHistoryService.removeUpload(item.id);
+              setHistory(await UploadHistoryService.getHistory());
+              Alert.alert("Succès", "Image supprimée de l'historique");
+            } catch (error) {
+              Alert.alert("Erreur", "Impossible de supprimer l'image");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDeleteItem = async (id: string) => {
@@ -194,22 +300,45 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
-            <View style={styles.greetingContainer}>
-              <Text style={styles.greeting}>Bonjour !</Text>
-              <Icon
-                name="hand-left"
-                size={20}
-                color="#666666"
-                type="ionicons"
-              />
-            </View>
+            <TouchableOpacity
+              style={styles.greetingContainer}
+              onPress={handleGreetingPress}
+              onPressIn={() => setIsHovering(true)}
+              onPressOut={() => setIsHovering(false)}
+            >
+              <Text style={styles.greeting}>{getGreetingMessage()}</Text>
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      rotate: waveAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["0deg", "20deg"],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Icon
+                  name="hand-left"
+                  size={20}
+                  color={isHovering ? COLORS.primary : COLORS.accent}
+                  type="ionicons"
+                />
+              </Animated.View>
+            </TouchableOpacity>
             <Text style={styles.appName}>ShareX Manager</Text>
           </View>
           <TouchableOpacity
             style={styles.settingsButton}
             onPress={handleSettings}
           >
-            <Icon name="settings" size={20} color="#666666" type="ionicons" />
+            <Icon
+              name="settings"
+              size={20}
+              color={COLORS.primary}
+              type="ionicons"
+            />
           </TouchableOpacity>
         </View>
 
@@ -225,16 +354,7 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
               },
             ]}
           >
-            <Text
-              style={[
-                styles.statusText,
-                {
-                  color: isConfigured
-                    ? COMPONENT_COLORS.statusSuccess
-                    : COMPONENT_COLORS.statusError,
-                },
-              ]}
-            >
+            <View style={styles.statusContent}>
               <Icon
                 name={isConfigured ? "checkmark-circle" : "close-circle"}
                 size={12}
@@ -245,10 +365,19 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
                 }
                 type="ionicons"
               />
-              <Text style={{ marginLeft: 4 }}>
+              <Text
+                style={[
+                  styles.statusText,
+                  {
+                    color: isConfigured
+                      ? COMPONENT_COLORS.statusSuccess
+                      : COMPONENT_COLORS.statusError,
+                  },
+                ]}
+              >
                 {isConfigured ? "Configuré" : "Non configuré"}
               </Text>
-            </Text>
+            </View>
           </View>
           {isConfigured && (
             <View
@@ -261,16 +390,7 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
                 },
               ]}
             >
-              <Text
-                style={[
-                  styles.statusText,
-                  {
-                    color: isConnected
-                      ? COMPONENT_COLORS.statusSuccess
-                      : COMPONENT_COLORS.statusError,
-                  },
-                ]}
-              >
+              <View style={styles.statusContent}>
                 <Icon
                   name={isConnected ? "checkmark-circle" : "close-circle"}
                   size={12}
@@ -281,18 +401,37 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
                   }
                   type="ionicons"
                 />
-                <Text style={{ marginLeft: 4 }}>
+                <Text
+                  style={[
+                    styles.statusText,
+                    {
+                      color: isConnected
+                        ? COMPONENT_COLORS.statusSuccess
+                        : COMPONENT_COLORS.statusError,
+                    },
+                  ]}
+                >
                   {isConnected ? "Connecté" : "Déconnecté"}
                 </Text>
-              </Text>
+              </View>
             </View>
           )}
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Actions rapides */}
-        <ModernCard title="Actions rapides" variant="elevated">
+        <ModernCard
+          title="Actions rapides"
+          variant="elevated"
+          style={{
+            marginTop: 3,
+          }}
+        >
           <View style={styles.quickActions}>
             <ModernButton
               title="Galerie"
@@ -302,7 +441,7 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
               disabled={!isConfigured}
               icon="images"
               iconType="ionicons"
-              style={styles.quickActionButton}
+              style={styles.halfWidthButton}
             />
 
             <ModernButton
@@ -313,28 +452,10 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
               disabled={!isConfigured}
               icon="camera"
               iconType="ionicons"
-              style={styles.quickActionButton}
+              style={styles.halfWidthButton}
             />
           </View>
         </ModernCard>
-
-        {/* Statistiques */}
-        {history.length > 0 && (
-          <ModernCard title="Statistiques" variant="elevated">
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{stats.totalUploads}</Text>
-                <Text style={styles.statLabel}>Images</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>
-                  {formatFileSize(stats.totalSize)}
-                </Text>
-                <Text style={styles.statLabel}>Taille totale</Text>
-              </View>
-            </View>
-          </ModernCard>
-        )}
 
         {/* Galerie */}
         <View style={styles.galleryContainer}>
@@ -343,7 +464,94 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <ViewSelector currentView={viewMode} onViewChange={setViewMode} />
           </View>
 
-          {history.length === 0 ? (
+          {/* Contrôles de filtre et recherche */}
+          {history.length > 0 && (
+            <View style={styles.filterContainer}>
+              <View style={styles.searchContainer}>
+                <Icon
+                  name="search"
+                  size={16}
+                  color={COLORS.textTertiary}
+                  type="ionicons"
+                />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Rechercher par nom..."
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholderTextColor={COLORS.textTertiary}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery("")}>
+                    <Icon
+                      name="close"
+                      size={16}
+                      color={COLORS.textTertiary}
+                      type="ionicons"
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={styles.sortContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.sortButton,
+                    sortBy === "date" && styles.sortButtonActive,
+                  ]}
+                  onPress={() => setSortBy("date")}
+                >
+                  <Icon
+                    name="calendar"
+                    size={14}
+                    color={
+                      sortBy === "date"
+                        ? COLORS.textInverse
+                        : COLORS.textSecondary
+                    }
+                    type="ionicons"
+                  />
+                  <Text
+                    style={[
+                      styles.sortButtonText,
+                      sortBy === "date" && styles.sortButtonTextActive,
+                    ]}
+                  >
+                    Date
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.sortButton,
+                    sortBy === "name" && styles.sortButtonActive,
+                  ]}
+                  onPress={() => setSortBy("name")}
+                >
+                  <Icon
+                    name="text"
+                    size={14}
+                    color={
+                      sortBy === "name"
+                        ? COLORS.textInverse
+                        : COLORS.textSecondary
+                    }
+                    type="ionicons"
+                  />
+                  <Text
+                    style={[
+                      styles.sortButtonText,
+                      sortBy === "name" && styles.sortButtonTextActive,
+                    ]}
+                  >
+                    Nom
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {getFilteredAndSortedHistory().length === 0 ? (
             <View style={styles.emptyState}>
               <Icon
                 name="images-outline"
@@ -361,27 +569,29 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
               style={
                 viewMode === "grid"
                   ? styles.gridContainer
+                  : viewMode === "mini-grid"
+                  ? styles.miniGridContainer
                   : styles.listContainer
               }
             >
-              {history.map((item, index) => (
+              {getFilteredAndSortedHistory().map((item, index) => (
                 <TouchableOpacity
                   key={item.id}
                   onPress={() => handleGalleryItemPress(item)}
                   style={
-                    viewMode === "grid" ? styles.gridItem : styles.listItem
+                    viewMode === "grid"
+                      ? styles.gridItem
+                      : viewMode === "mini-grid"
+                      ? styles.miniGridItem
+                      : undefined
                   }
                 >
-                  {viewMode === "grid" ? (
-                    <ImageCard item={item} onPress={handleGalleryItemPress} />
-                  ) : (
-                    <View style={styles.listItemContent}>
-                      <Text style={styles.listItemTitle}>{item.filename}</Text>
-                      <Text style={styles.listItemSubtitle}>
-                        {new Date(item.uploadedAt).toLocaleDateString()}
-                      </Text>
-                    </View>
-                  )}
+                  <ImageCard
+                    item={item}
+                    onPress={handleGalleryItemPress}
+                    onMenuPress={handleMenuPress}
+                    viewMode={viewMode}
+                  />
                 </TouchableOpacity>
               ))}
             </View>
@@ -391,7 +601,9 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
         {/* Message de configuration */}
         {!isConfigured && (
           <View style={styles.configMessage}>
-            <Icon name="warning" size={20} color="#856404" type="ionicons" />
+            <View style={styles.configIconContainer}>
+              <Icon name="warning" size={20} color="#856404" type="ionicons" />
+            </View>
             <Text style={styles.configMessageText}>
               Configurez l'URL du serveur et votre clé API dans les paramètres
               pour commencer.
@@ -411,6 +623,14 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
           onDelete={() => handleDeleteItem(previewImage.id)}
         />
       )}
+
+      {/* Action Drawer */}
+      <ImageActionDrawer
+        ref={actionDrawerRef}
+        onCopyLink={handleCopyLink}
+        onDelete={handleDeleteImage}
+        onShare={handleShareImage}
+      />
     </SafeAreaView>
   );
 };
@@ -448,8 +668,9 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontSize: 16,
-    color: "#666666",
+    color: COLORS.primary,
     marginRight: 8,
+    fontWeight: "600",
   },
   appName: {
     fontSize: 28,
@@ -460,7 +681,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#F8F9FA",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -476,6 +696,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
   },
+  statusContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   statusText: {
     fontSize: 12,
     fontWeight: "600",
@@ -484,6 +709,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
+  scrollContent: {
+    paddingBottom: 60, // Espace pour la bottom bar
+  },
   quickActionsContainer: {
     marginBottom: 24,
   },
@@ -491,28 +719,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     color: "#333333",
-    marginBottom: 16,
+    flex: 1,
+    textAlignVertical: "center",
   },
   quickActions: {
     flexDirection: "row",
-    gap: 12,
   },
-  quickActionButton: {
+  halfWidthButton: {
     flex: 1,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 56,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginHorizontal: 4,
   },
   primaryAction: {
     backgroundColor: COMPONENT_COLORS.buttonPrimary,
@@ -526,33 +741,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 8,
   },
-  statsContainer: {
-    marginBottom: 24,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#F8F9FA",
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333333",
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#666666",
-    textAlign: "center",
-  },
   galleryContainer: {
-    marginBottom: 24,
+    marginBottom: 0,
   },
   galleryHeader: {
     flexDirection: "row",
@@ -560,6 +750,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
     minHeight: 40,
+    paddingHorizontal: 0,
   },
   emptyState: {
     alignItems: "center",
@@ -585,26 +776,16 @@ const styles = StyleSheet.create({
   gridItem: {
     width: (width - 52) / 2,
   },
-  listContainer: {
+  miniGridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
-  listItem: {
-    backgroundColor: "#F8F9FA",
-    borderRadius: 12,
-    padding: 16,
+  miniGridItem: {
+    width: (width - 40 - 24) / 4, // width - padding (20*2) - (3 gaps de 8px)
   },
-  listItemContent: {
-    flex: 1,
-  },
-  listItemTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333333",
-    marginBottom: 4,
-  },
-  listItemSubtitle: {
-    fontSize: 14,
-    color: "#666666",
+  listContainer: {
+    gap: 8,
   },
   configMessage: {
     backgroundColor: "#FFF3CD",
@@ -614,10 +795,57 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
+  configIconContainer: {
+    paddingRight: 12,
+  },
   configMessageText: {
     flex: 1,
     color: "#856404",
     fontSize: 14,
     lineHeight: 20,
+  },
+  // Styles pour les contrôles de filtre
+  filterContainer: {
+    marginBottom: 16,
+    gap: 12,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textPrimary,
+    paddingVertical: 0,
+  },
+  sortContainer: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+  },
+  sortButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: COLORS.backgroundSecondary,
+    gap: SPACING.xs,
+  },
+  sortButtonActive: {
+    backgroundColor: COLORS.primary,
+  },
+  sortButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+  },
+  sortButtonTextActive: {
+    color: COLORS.textInverse,
   },
 });

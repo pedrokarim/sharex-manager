@@ -84,6 +84,38 @@ export const APP_CONFIG = {
   },
 } as const;
 
+// Informations de l'équipe de développement
+export const TEAM_INFO = {
+  // Développeur principal
+  DEVELOPER: {
+    NAME: "Ahmed Karim",
+    ALIAS: "PedroKarim",
+    ROLE: "Développeur Principal",
+  },
+
+  // Société
+  COMPANY: {
+    NAME: "Ascencia",
+    ROLE: "Société de développement",
+  },
+
+  // Informations de contact
+  CONTACT: {
+    EMAIL: "contact@ascencia.re",
+    WEBSITE: "https://ascencia.re",
+    GITHUB: "https://github.com/PedroKarim",
+  },
+
+  // Informations de l'application
+  APP_INFO: {
+    NAME: "ShareX Manager",
+    VERSION: "1.0.0",
+    DESCRIPTION:
+      "Application mobile pour la gestion et le partage d'images avec serveur ShareX",
+    COPYRIGHT: "© 2024 Ascencia. Tous droits réservés.",
+  },
+} as const;
+
 // Types pour les constantes
 export type AppConfig = typeof APP_CONFIG;
 export type ErrorMessage = keyof typeof APP_CONFIG.ERROR_MESSAGES;

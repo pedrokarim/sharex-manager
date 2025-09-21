@@ -3,13 +3,28 @@
 import React from "react";
 import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
 import { UploadHistoryItem } from "../types";
+import { ViewMode } from "./ViewSelector";
+import { Icon } from "./Icon";
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from "../config/design";
 
 interface ImageCardProps {
   item: UploadHistoryItem;
   onPress: (item: UploadHistoryItem) => void;
+  onMenuPress: (item: UploadHistoryItem) => void;
+  viewMode?: ViewMode;
 }
 
-export const ImageCard: React.FC<ImageCardProps> = ({ item, onPress }) => {
+export const ImageCard: React.FC<ImageCardProps> = ({
+  item,
+  onPress,
+  onMenuPress,
+  viewMode = "grid",
+}) => {
+  const handleMenuPress = (e: any) => {
+    e.stopPropagation();
+    onMenuPress(item);
+  };
+
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleDateString("fr-FR", {
@@ -26,6 +41,63 @@ export const ImageCard: React.FC<ImageCardProps> = ({ item, onPress }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
+  if (viewMode === "list") {
+    return (
+      <TouchableOpacity
+        style={styles.listContainer}
+        onPress={() => onPress(item)}
+      >
+        <View style={styles.listImageContainer}>
+          <Image
+            source={{ uri: item.localUri }}
+            style={styles.listImage}
+            resizeMode="cover"
+          />
+        </View>
+
+        <View style={styles.listInfoContainer}>
+          <View style={styles.listTextContainer}>
+            <View style={styles.listFirstLine}>
+              <Text style={styles.listFilename} numberOfLines={1}>
+                {item.filename}
+              </Text>
+              <TouchableOpacity
+                style={styles.menuButton}
+                onPress={handleMenuPress}
+              >
+                <Icon
+                  name="ellipsis-vertical"
+                  size={16}
+                  color={COLORS.textSecondary}
+                  type="ionicons"
+                />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.listSizeText}>{formatFileSize(item.size)}</Text>
+            <Text style={styles.listDateText}>
+              {formatDate(item.uploadedAt)}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  if (viewMode === "mini-grid") {
+    return (
+      <TouchableOpacity
+        style={styles.miniContainer}
+        onPress={() => onPress(item)}
+      >
+        <Image
+          source={{ uri: item.localUri }}
+          style={styles.miniImage}
+          resizeMode="cover"
+        />
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity style={styles.container} onPress={() => onPress(item)}>
       <View style={styles.imageContainer}>
@@ -40,10 +112,25 @@ export const ImageCard: React.FC<ImageCardProps> = ({ item, onPress }) => {
       </View>
 
       <View style={styles.infoContainer}>
-        <Text style={styles.filename} numberOfLines={1}>
-          {item.filename}
-        </Text>
-        <Text style={styles.sizeText}>{formatFileSize(item.size)}</Text>
+        <View style={styles.gridTextContainer}>
+          <View style={styles.gridFirstLine}>
+            <Text style={styles.filename} numberOfLines={1}>
+              {item.filename}
+            </Text>
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={handleMenuPress}
+            >
+              <Icon
+                name="ellipsis-vertical"
+                size={16}
+                color={COLORS.textSecondary}
+                type="ionicons"
+              />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.sizeText}>{formatFileSize(item.size)}</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -96,9 +183,94 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#333333",
     marginBottom: 4,
+    flex: 1,
+    marginRight: 8,
   },
   sizeText: {
     fontSize: 12,
     color: "#666666",
+  },
+  // Styles pour le mode liste
+  listContainer: {
+    flexDirection: "row",
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    marginBottom: 8,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    alignItems: "center",
+  },
+  listImageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    overflow: "hidden",
+    marginRight: 12,
+  },
+  listImage: {
+    width: "100%",
+    height: "100%",
+  },
+  listInfoContainer: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  listFilename: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#333333",
+    marginBottom: 4,
+    flex: 1,
+    marginRight: 8,
+  },
+  listSizeText: {
+    fontSize: 12,
+    color: "#666666",
+    marginBottom: 2,
+  },
+  listDateText: {
+    fontSize: 11,
+    color: "#999999",
+  },
+  // Styles pour le mode mini-grille
+  miniContainer: {
+    aspectRatio: 1,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#f5f5f5",
+  },
+  miniImage: {
+    width: "100%",
+    height: "100%",
+  },
+  // Styles pour le menu contextuel
+  listTextContainer: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  listFirstLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  gridTextContainer: {
+    flex: 1,
+  },
+  gridFirstLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  menuButton: {
+    padding: 8,
+    borderRadius: 4,
+    backgroundColor: "transparent",
   },
 });

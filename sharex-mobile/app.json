@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/logo-sxm-simple.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -70,7 +70,7 @@
     "scheme": "sharex-manager",
     "extra": {
       "eas": {
-        "projectId": "79f6ffc6-3660-4e77-b09a-2f3d0337d4fb"
+        "projectId": "5e704252-dcac-471c-8629-91b29f5efdf3"
       }
     },
     "owner": "pedrokarim"

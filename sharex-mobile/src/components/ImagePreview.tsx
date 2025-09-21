@@ -46,10 +46,10 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
       "Êtes-vous sûr de vouloir supprimer cette image de l'historique ?",
       [
         { text: "Annuler", style: "cancel" },
-        { 
-          text: "Supprimer", 
+        {
+          text: "Supprimer",
           style: "destructive",
-          onPress: onDelete
+          onPress: onDelete,
         },
       ]
     );
@@ -87,14 +87,20 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
           {/* Actions */}
           <View style={styles.actions}>
             {url && (
-              <TouchableOpacity style={styles.actionButton} onPress={handleCopyUrl}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleCopyUrl}
+              >
                 <Icon name="copy" size={20} color="#007AFF" type="ionicons" />
                 <Text style={styles.actionText}>Copier l'URL</Text>
               </TouchableOpacity>
             )}
-            
+
             {onDelete && (
-              <TouchableOpacity style={styles.actionButton} onPress={handleDelete}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleDelete}
+              >
                 <Icon name="trash" size={20} color="#FF3B30" type="ionicons" />
                 <Text style={[styles.actionText, { color: "#FF3B30" }]}>
                   Supprimer

@@ -141,12 +141,16 @@ export const ModernButton: React.FC<ModernButtonProps> = ({
       ) : (
         <View style={styles.buttonContent}>
           {icon && (
-            <Icon
-              name={icon}
-              size={20}
-              color={variant === "ghost" ? COLORS.primary : COLORS.textInverse}
-              type={iconType}
-            />
+            <View style={styles.icon}>
+              <Icon
+                name={icon}
+                size={20}
+                color={
+                  variant === "ghost" ? COLORS.primary : COLORS.textInverse
+                }
+                type={iconType}
+              />
+            </View>
           )}
           <Text style={[getTextStyle(), textStyle]}>{title}</Text>
         </View>
@@ -160,5 +164,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+  },
+  icon: {
+    marginRight: SPACING.sm,
   },
 });
