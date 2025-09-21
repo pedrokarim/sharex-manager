@@ -66,18 +66,22 @@ export function CreateAlbumDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] max-w-md mx-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{t("albums.create_album")}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">
+              {t("albums.create_album")}
+            </DialogTitle>
+            <DialogDescription className="text-sm">
               Créez un nouvel album pour organiser vos fichiers
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="album-name">{t("albums.album_name")}</Label>
+              <Label htmlFor="album-name" className="text-sm">
+                {t("albums.album_name")}
+              </Label>
               <Input
                 id="album-name"
                 value={name}
@@ -85,11 +89,12 @@ export function CreateAlbumDialog({
                 placeholder="Vacances 2024, Projet, etc."
                 required
                 disabled={loading}
+                className="text-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="album-description">
+              <Label htmlFor="album-description" className="text-sm">
                 {t("albums.album_description")}
               </Label>
               <Textarea
@@ -99,21 +104,29 @@ export function CreateAlbumDialog({
                 placeholder="Description de l'album (optionnel)"
                 rows={3}
                 disabled={loading}
+                className="text-sm"
               />
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={handleClose}
               disabled={loading}
+              className="w-full sm:w-auto text-sm"
             >
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={loading || !name.trim()}>
-              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            <Button
+              type="submit"
+              disabled={loading || !name.trim()}
+              className="w-full sm:w-auto text-sm"
+            >
+              {loading && (
+                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
+              )}
               {t("albums.create")}
             </Button>
           </DialogFooter>
@@ -122,5 +135,3 @@ export function CreateAlbumDialog({
     </Dialog>
   );
 }
-
-

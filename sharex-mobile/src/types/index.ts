@@ -39,10 +39,13 @@ export interface ImageInfo {
 export interface UploadHistoryItem {
   id: string;
   filename: string;
-  url: string;
+  url: string; // URL du serveur pour le partage
+  localUri: string; // URI locale pour l'affichage
   uploadedAt: string;
   size: number;
   type: string;
+  width?: number;
+  height?: number;
 }
 
 export interface AppSettings {

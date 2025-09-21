@@ -14,6 +14,9 @@ export class UploadHistoryService {
     url: string;
     size: number;
     type: string;
+    localUri: string;
+    width?: number;
+    height?: number;
   }): Promise<void> {
     try {
       const history = await this.getHistory();
@@ -21,9 +24,12 @@ export class UploadHistoryService {
         id: Date.now().toString(),
         filename: uploadData.filename,
         url: uploadData.url,
+        localUri: uploadData.localUri,
         uploadedAt: new Date().toISOString(),
         size: uploadData.size,
         type: uploadData.type,
+        width: uploadData.width,
+        height: uploadData.height,
       };
 
       // Ajouter au début de la liste (plus récent en premier)
@@ -111,4 +117,3 @@ export class UploadHistoryService {
     }
   }
 }
-

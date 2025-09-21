@@ -18,6 +18,7 @@ import { UploadHistoryService } from "../services/uploadHistory";
 import { ClipboardService } from "../services/clipboard";
 import { ViewSelector, ViewMode } from "../components/ViewSelector";
 import { ImageCard } from "../components/ImageCard";
+import { Icon } from "../components/Icon";
 
 export const GalleryScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const [history, setHistory] = useState<UploadHistoryItem[]>([]);
@@ -118,7 +119,7 @@ export const GalleryScreen: React.FC<NavigationProps> = ({ navigation }) => {
         onPress={() => handleItemPress(item)}
       >
         <View style={styles.itemIcon}>
-          <Text style={styles.itemIconText}>🖼️</Text>
+          <Icon name="images" size={20} color="#666666" type="ionicons" />
         </View>
 
         <View style={styles.itemContent}>
@@ -170,12 +171,13 @@ export const GalleryScreen: React.FC<NavigationProps> = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>← Retour</Text>
+          <Icon name="arrow-back" size={20} color="#ffffff" type="ionicons" />
+          <Text style={styles.backButtonText}>Retour</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Galerie</Text>
         {history.length > 0 && (
           <TouchableOpacity onPress={handleClearHistory}>
-            <Text style={styles.clearButton}>🗑️</Text>
+            <Icon name="trash" size={20} color="#ffffff" type="ionicons" />
           </TouchableOpacity>
         )}
       </View>
@@ -206,7 +208,7 @@ export const GalleryScreen: React.FC<NavigationProps> = ({ navigation }) => {
         </View>
       ) : history.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>📷</Text>
+          <Icon name="camera" size={48} color="#8E8E93" type="ionicons" />
           <Text style={styles.emptyTitle}>Aucune image</Text>
           <Text style={styles.emptySubtitle}>
             Vos images uploadées apparaîtront ici
@@ -267,7 +269,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   clearButton: {
-    fontSize: 20,
     padding: 8,
   },
   statsContainer: {
@@ -304,10 +305,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 40,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
   },
   emptyTitle: {
     fontSize: 20,
@@ -351,9 +348,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
-  },
-  itemIconText: {
-    fontSize: 24,
   },
   itemContent: {
     flex: 1,

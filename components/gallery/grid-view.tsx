@@ -87,7 +87,7 @@ export function GridView({
   };
 
   return (
-    <div className={cn("grid gap-4", gridSizeClasses[thumbnailSize])}>
+    <div className={cn("grid gap-2 sm:gap-4", gridSizeClasses[thumbnailSize])}>
       {files.map((file) => (
         <SelectableFileCard
           key={file.url}

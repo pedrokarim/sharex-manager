@@ -103,35 +103,48 @@ export default function ApiKeysPage() {
 
   return (
     <>
-      <div className="p-8">
-        <div className="mb-8 flex items-center justify-between">
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-xl sm:text-2xl font-bold">
               {t("settings.sections.api_keys.title")}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm sm:text-base">
               {t("settings.sections.api_keys.description")}
             </p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="mr-2 h-4 w-4" />
+          <Button
+            onClick={() => setShowCreateDialog(true)}
+            className="w-full sm:w-auto text-sm"
+          >
+            <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             {t("settings.api_keys.new_key")}
           </Button>
         </div>
 
-        <div className="rounded-lg border">
+        <div className="rounded-lg border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("settings.api_keys.table.name")}</TableHead>
-                <TableHead>{t("settings.api_keys.table.key")}</TableHead>
-                <TableHead>{t("settings.api_keys.table.created_at")}</TableHead>
-                <TableHead>{t("settings.api_keys.table.expires_at")}</TableHead>
-                <TableHead>
+                <TableHead className="text-xs sm:text-sm">
+                  {t("settings.api_keys.table.name")}
+                </TableHead>
+                <TableHead className="text-xs sm:text-sm">
+                  {t("settings.api_keys.table.key")}
+                </TableHead>
+                <TableHead className="text-xs sm:text-sm hidden sm:table-cell">
+                  {t("settings.api_keys.table.created_at")}
+                </TableHead>
+                <TableHead className="text-xs sm:text-sm hidden lg:table-cell">
+                  {t("settings.api_keys.table.expires_at")}
+                </TableHead>
+                <TableHead className="text-xs sm:text-sm hidden lg:table-cell">
                   {t("settings.api_keys.table.permissions")}
                 </TableHead>
-                <TableHead>{t("settings.api_keys.table.last_used")}</TableHead>
-                <TableHead className="text-right">
+                <TableHead className="text-xs sm:text-sm hidden xl:table-cell">
+                  {t("settings.api_keys.table.last_used")}
+                </TableHead>
+                <TableHead className="text-right text-xs sm:text-sm">
                   {t("settings.api_keys.table.actions")}
                 </TableHead>
               </TableRow>
@@ -141,8 +154,8 @@ export default function ApiKeysPage() {
                 <TableRow>
                   <TableCell colSpan={7}>
                     <div className="flex flex-col items-center justify-center gap-2 py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      <p className="text-sm text-muted-foreground">
+                      <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         {t("settings.api_keys.loading")}
                       </p>
                     </div>
@@ -152,15 +165,18 @@ export default function ApiKeysPage() {
                 <TableRow>
                   <TableCell colSpan={7}>
                     <div className="flex flex-col items-center justify-center py-6 text-center">
-                      <Key className="h-12 w-12 text-muted-foreground" />
-                      <h3 className="mt-4 text-lg font-semibold">
+                      <Key className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground" />
+                      <h3 className="mt-4 text-base sm:text-lg font-semibold">
                         {t("settings.api_keys.no_keys.title")}
                       </h3>
-                      <p className="mb-4 text-sm text-muted-foreground">
+                      <p className="mb-4 text-xs sm:text-sm text-muted-foreground">
                         {t("settings.api_keys.no_keys.description")}
                       </p>
-                      <Button onClick={() => setShowCreateDialog(true)}>
-                        <Plus className="mr-2 h-4 w-4" />
+                      <Button
+                        onClick={() => setShowCreateDialog(true)}
+                        className="text-sm"
+                      >
+                        <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                         {t("settings.api_keys.create_key")}
                       </Button>
                     </div>
@@ -169,74 +185,76 @@ export default function ApiKeysPage() {
               ) : (
                 keys.map((key) => (
                   <TableRow key={key.id}>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium text-xs sm:text-sm">
                       <Button
                         variant="link"
-                        className="p-0"
+                        className="p-0 text-xs sm:text-sm"
                         onClick={() => setSelectedKeyForDetails(key)}
                       >
                         {key.name}
                       </Button>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <code className="rounded bg-muted px-2 py-1">
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <code className="rounded bg-muted px-1 sm:px-2 py-1 text-xs">
                           {showKey === key.id ? key.key : "••••••••"}
                         </code>
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-6 w-6 sm:h-8 sm:w-8"
                           onClick={() =>
                             setShowKey(showKey === key.id ? null : key.id)
                           }
                         >
                           {showKey === key.id ? (
-                            <EyeOff className="h-4 w-4" />
+                            <EyeOff className="h-3 w-3 sm:h-4 sm:w-4" />
                           ) : (
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
                           )}
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-6 w-6 sm:h-8 sm:w-8"
                           onClick={() => copyToClipboard(key.key)}
                         >
-                          <Copy className="h-4 w-4" />
+                          <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-xs sm:text-sm hidden sm:table-cell">
                       {format(new Date(key.createdAt), "dd/MM/yyyy", {
                         locale,
                       })}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-xs sm:text-sm hidden lg:table-cell">
                       {key.expiresAt
                         ? format(new Date(key.expiresAt), "dd/MM/yyyy", {
                             locale,
                           })
                         : t("settings.api_keys.never")}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <div className="flex flex-wrap gap-1">
                         {key.permissions.uploadImages && (
-                          <Badge variant="secondary">
+                          <Badge variant="secondary" className="text-xs">
                             {t("settings.api_keys.permissions.images")}
                           </Badge>
                         )}
                         {key.permissions.uploadText && (
-                          <Badge variant="secondary">
+                          <Badge variant="secondary" className="text-xs">
                             {t("settings.api_keys.permissions.text")}
                           </Badge>
                         )}
                         {key.permissions.uploadFiles && (
-                          <Badge variant="secondary">
+                          <Badge variant="secondary" className="text-xs">
                             {t("settings.api_keys.permissions.files")}
                           </Badge>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-xs sm:text-sm hidden xl:table-cell">
                       {key.lastUsed
                         ? format(new Date(key.lastUsed), "dd/MM/yyyy HH:mm", {
                             locale,
@@ -244,23 +262,24 @@ export default function ApiKeysPage() {
                         : t("settings.api_keys.never")}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1 sm:gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-6 w-6 sm:h-8 sm:w-8"
                           onClick={() => setSelectedKeyForDetails(key)}
                           title={t("settings.api_keys.actions.view_details")}
                         >
-                          <Info className="h-4 w-4" />
+                          <Info className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="text-destructive"
+                          className="h-6 w-6 sm:h-8 sm:w-8 text-destructive"
                           onClick={() => setSelectedKeyId(key.id)}
                           title={t("settings.api_keys.actions.delete")}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                       </div>
                     </TableCell>

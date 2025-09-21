@@ -37,14 +37,14 @@ export function ViewSelector() {
         <Button
           variant="outline"
           size="icon"
-          className="backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200"
+          className="h-8 w-8 backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200"
         >
           {view === "grid" ? (
-            <Grid2X2 className="h-4 w-4" />
+            <Grid2X2 className="h-3 w-3 sm:h-4 sm:w-4" />
           ) : view === "list" ? (
-            <List className="h-4 w-4" />
+            <List className="h-3 w-3 sm:h-4 sm:w-4" />
           ) : (
-            <LayoutList className="h-4 w-4" />
+            <LayoutList className="h-3 w-3 sm:h-4 sm:w-4" />
           )}
         </Button>
       </DropdownMenuTrigger>

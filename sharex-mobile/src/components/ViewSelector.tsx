@@ -2,6 +2,7 @@
 
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Icon } from "./Icon";
 
 export type ViewMode = "grid" | "list";
 
@@ -20,13 +21,19 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
         style={[styles.button, currentView === "grid" && styles.activeButton]}
         onPress={() => onViewChange("grid")}
       >
+        <Icon
+          name="grid"
+          size={16}
+          color={currentView === "grid" ? "#ffffff" : "#8E8E93"}
+          type="ionicons"
+        />
         <Text
           style={[
             styles.buttonText,
             currentView === "grid" && styles.activeButtonText,
           ]}
         >
-          ⊞ Grille
+          Grille
         </Text>
       </TouchableOpacity>
 
@@ -34,13 +41,19 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
         style={[styles.button, currentView === "list" && styles.activeButton]}
         onPress={() => onViewChange("list")}
       >
+        <Icon
+          name="list"
+          size={16}
+          color={currentView === "list" ? "#ffffff" : "#8E8E93"}
+          type="ionicons"
+        />
         <Text
           style={[
             styles.buttonText,
             currentView === "list" && styles.activeButtonText,
           ]}
         >
-          ☰ Liste
+          Liste
         </Text>
       </TouchableOpacity>
     </View>
@@ -62,6 +75,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    minHeight: 36,
   },
   activeButton: {
     backgroundColor: "#007AFF",
@@ -70,9 +86,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#666666",
+    marginLeft: 6,
   },
   activeButtonText: {
     color: "#ffffff",
   },
 });
-

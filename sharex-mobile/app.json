@@ -39,27 +39,7 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
       ],
-      "package": "com.anonymous.sharexmobile",
-      "intentFilters": [
-        {
-          "action": "android.intent.action.SEND",
-          "category": [
-            "android.intent.category.DEFAULT"
-          ],
-          "data": {
-            "mimeType": "image/*"
-          }
-        },
-        {
-          "action": "android.intent.action.SEND_MULTIPLE",
-          "category": [
-            "android.intent.category.DEFAULT"
-          ],
-          "data": {
-            "mimeType": "image/*"
-          }
-        }
-      ]
+      "package": "com.anonymous.sharexmobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"

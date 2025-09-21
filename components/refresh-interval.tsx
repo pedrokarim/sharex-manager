@@ -3,13 +3,14 @@
 import { useAtom } from "jotai";
 import { useQueryState } from "nuqs";
 import { autoRefreshIntervalAtom } from "@/lib/atoms/preferences";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Clock, RotateCcw } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
 export function RefreshInterval() {
@@ -37,18 +38,58 @@ export function RefreshInterval() {
     setDefaultAutoRefreshInterval(parseInt(value));
   };
 
+  const getDisplayText = (value: string) => {
+    const intervals = {
+      "0": "Aucun",
+      "5": "5s",
+      "10": "10s",
+      "15": "15s",
+      "30": "30s",
+    };
+    return intervals[value as keyof typeof intervals] || value;
+  };
+
+  const getIcon = () => {
+    if (autoRefreshInterval === "0") {
+      return <Clock className="h-3 w-3 sm:h-4 sm:w-4" />;
+    }
+    return <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4" />;
+  };
+
   return (
-    <Select value={autoRefreshInterval} onValueChange={handleChange}>
-      <SelectTrigger className="w-[200px] backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200">
-        <SelectValue placeholder={t("gallery.refresh.intervals.placeholder")} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="0">{t("gallery.refresh.intervals.none")}</SelectItem>
-        <SelectItem value="5">{t("gallery.refresh.intervals.5s")}</SelectItem>
-        <SelectItem value="10">{t("gallery.refresh.intervals.10s")}</SelectItem>
-        <SelectItem value="15">{t("gallery.refresh.intervals.15s")}</SelectItem>
-        <SelectItem value="30">{t("gallery.refresh.intervals.30s")}</SelectItem>
-      </SelectContent>
-    </Select>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8 backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200"
+          title={t("gallery.refresh.intervals.placeholder")}
+        >
+          {getIcon()}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-32">
+        <DropdownMenuItem onClick={() => handleChange("0")}>
+          <Clock className="mr-2 h-4 w-4" />
+          Aucun
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleChange("5")}>
+          <RotateCcw className="mr-2 h-4 w-4" />
+          5s
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleChange("10")}>
+          <RotateCcw className="mr-2 h-4 w-4" />
+          10s
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleChange("15")}>
+          <RotateCcw className="mr-2 h-4 w-4" />
+          15s
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleChange("30")}>
+          <RotateCcw className="mr-2 h-4 w-4" />
+          30s
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

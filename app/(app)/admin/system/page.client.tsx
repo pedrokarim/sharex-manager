@@ -111,26 +111,26 @@ export default function SystemPageClient() {
   };
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Settings className="h-8 w-8" />
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+          <Settings className="h-6 w-6 sm:h-8 sm:w-8" />
           {t("admin.system.title")}
         </h1>
-        <p className="text-muted-foreground mt-2">
+        <p className="text-sm sm:text-base text-muted-foreground mt-2">
           {t("admin.system.description")}
         </p>
       </div>
 
       {/* Statistiques système */}
-      <Card className="mb-6 max-w-4xl">
-        <CardHeader className="flex flex-row items-center justify-between">
+      <Card className="mb-4 sm:mb-6 max-w-4xl">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-6">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <Server className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Server className="h-4 w-4 sm:h-5 sm:w-5" />
               {t("admin.system.stats.title")}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               {t("admin.system.stats.subtitle")}
             </CardDescription>
           </div>
@@ -139,16 +139,19 @@ export default function SystemPageClient() {
             size="icon"
             onClick={refreshSystemStats}
             disabled={isLoading}
+            className="h-8 w-8 sm:h-9 sm:w-9"
           >
             <RefreshCw
-              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+              className={`h-3 w-3 sm:h-4 sm:w-4 ${
+                isLoading ? "animate-spin" : ""
+              }`}
             />
           </Button>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
+        <CardContent className="p-4 sm:p-6 pt-0">
+          <div className="space-y-4 sm:space-y-6">
             <div className="space-y-2">
-              <div className="flex justify-between">
+              <div className="flex justify-between text-sm">
                 <span>{t("admin.system.stats.cpu")}</span>
                 <span>{systemStats.cpuUsage}%</span>
               </div>
@@ -156,7 +159,7 @@ export default function SystemPageClient() {
             </div>
 
             <div className="space-y-2">
-              <div className="flex justify-between">
+              <div className="flex justify-between text-sm">
                 <span>{t("admin.system.stats.memory")}</span>
                 <span>{systemStats.memoryUsage}%</span>
               </div>
@@ -164,7 +167,7 @@ export default function SystemPageClient() {
             </div>
 
             <div className="space-y-2">
-              <div className="flex justify-between">
+              <div className="flex justify-between text-sm">
                 <span>{t("admin.system.stats.disk")}</span>
                 <span>{systemStats.diskUsage}%</span>
               </div>
@@ -172,38 +175,39 @@ export default function SystemPageClient() {
             </div>
           </div>
         </CardContent>
-        <CardFooter>
-          <div className="text-sm text-muted-foreground">
+        <CardFooter className="p-4 sm:p-6 pt-0">
+          <div className="text-xs sm:text-sm text-muted-foreground">
             {t("admin.system.stats.uptime")}: {systemStats.uptime}
           </div>
         </CardFooter>
       </Card>
 
-      <div className="grid gap-6 max-w-4xl">
+      <div className="grid gap-4 sm:gap-6 max-w-4xl">
         {/* Gestion des modules */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Package className="h-4 w-4 sm:h-5 sm:w-5" />
               Gestion des modules
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               Gérez les modules et leurs dépendances
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <div className="space-y-4">
-              <p>
+              <p className="text-sm">
                 Installez les dépendances NPM de tous les modules en une seule
                 fois.
               </p>
               <Button
                 onClick={installAllModuleDependencies}
                 disabled={isInstallingDependencies}
+                className="w-full sm:w-auto text-sm"
               >
                 {isInstallingDependencies ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                     Installation en cours...
                   </>
                 ) : (
@@ -212,7 +216,7 @@ export default function SystemPageClient() {
               </Button>
 
               {dependencyResults.length > 0 && (
-                <div className="mt-4 border rounded-md p-4">
+                <div className="mt-4 border rounded-md p-3 sm:p-4">
                   <h3 className="text-sm font-medium mb-2">
                     Résultats de l'installation
                   </h3>
@@ -220,7 +224,7 @@ export default function SystemPageClient() {
                     {dependencyResults.map((result, index) => (
                       <div
                         key={index}
-                        className={`text-sm p-2 rounded-md ${
+                        className={`text-xs sm:text-sm p-2 rounded-md ${
                           result.success
                             ? "bg-green-50 text-green-700"
                             : "bg-red-50 text-red-700"
@@ -239,19 +243,21 @@ export default function SystemPageClient() {
 
         {/* Configuration des uploads */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
               {t("admin.system.upload_config.title")}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               {t("admin.system.upload_config.subtitle")}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <div className="space-y-4">
-              <p>{t("admin.system.upload_config.description")}</p>
-              <Button asChild>
+              <p className="text-sm">
+                {t("admin.system.upload_config.description")}
+              </p>
+              <Button asChild className="w-full sm:w-auto text-sm">
                 <Link href="/uploads/config">
                   {t("admin.system.upload_config.button")}
                 </Link>
@@ -262,19 +268,21 @@ export default function SystemPageClient() {
 
         {/* Configuration système */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5" />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Database className="h-4 w-4 sm:h-5 sm:w-5" />
               {t("admin.system.advanced_config.title")}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               {t("admin.system.advanced_config.subtitle")}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <div className="space-y-4">
-              <p>{t("admin.system.advanced_config.description")}</p>
-              <ul className="list-disc pl-6 space-y-2">
+              <p className="text-sm">
+                {t("admin.system.advanced_config.description")}
+              </p>
+              <ul className="list-disc pl-4 sm:pl-6 space-y-1 sm:space-y-2 text-sm">
                 <li>{t("admin.system.features.database")}</li>
                 <li>{t("admin.system.features.cache")}</li>
                 <li>{t("admin.system.features.performance")}</li>
@@ -282,7 +290,7 @@ export default function SystemPageClient() {
                 <li>{t("admin.system.features.scheduled_tasks")}</li>
                 <li>{t("admin.system.features.notifications")}</li>
               </ul>
-              <p className="text-muted-foreground mt-4">
+              <p className="text-muted-foreground mt-4 text-sm">
                 {t("admin.system.advanced_config.coming_soon")}
               </p>
             </div>

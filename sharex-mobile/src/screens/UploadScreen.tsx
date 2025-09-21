@@ -19,6 +19,10 @@ import { getApiService } from "../services/api";
 import { ImageService } from "../services/imageService";
 import { UploadHistoryService } from "../services/uploadHistory";
 import { ClipboardService } from "../services/clipboard";
+import { Icon } from "../components/Icon";
+import { ModernButton } from "../components/ModernButton";
+import { ModernCard } from "../components/ModernCard";
+import { COLORS, COMPONENT_COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from "../config/design";
 
 export const UploadScreen: React.FC<NavigationProps> = ({
   navigation,
@@ -68,6 +72,9 @@ export const UploadScreen: React.FC<NavigationProps> = ({
           url: result.url || "",
           size: image.size,
           type: image.type,
+          localUri: image.uri,
+          width: image.width,
+          height: image.height,
         });
 
         Alert.alert(
@@ -168,13 +175,18 @@ export const UploadScreen: React.FC<NavigationProps> = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleCancel}>
-            <Text style={styles.backButtonText}>← Retour</Text>
+            <Icon
+              name="arrow-back"
+              size={24}
+              color={COLORS.primary}
+              type="ionicons"
+            />
           </TouchableOpacity>
           <Text style={styles.title}>Upload d'image</Text>
         </View>
@@ -185,9 +197,7 @@ export const UploadScreen: React.FC<NavigationProps> = ({
         </View>
 
         {/* Informations sur l'image */}
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>Informations de l'image</Text>
-
+        <ModernCard title="Informations de l'image" variant="elevated">
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Nom:</Text>
             <Text style={styles.infoValue}>{image.name}</Text>
@@ -213,7 +223,7 @@ export const UploadScreen: React.FC<NavigationProps> = ({
               </Text>
             </View>
           )}
-        </View>
+        </ModernCard>
 
         {/* Résultat de l'upload */}
         {uploadResult && (
@@ -226,10 +236,28 @@ export const UploadScreen: React.FC<NavigationProps> = ({
             <Text
               style={[
                 styles.resultTitle,
-                { color: uploadResult.success ? "#2E7D32" : "#C62828" },
+                {
+                  color: uploadResult.success
+                    ? COMPONENT_COLORS.statusSuccess
+                    : COMPONENT_COLORS.statusError,
+                },
               ]}
             >
-              {uploadResult.success ? "✓ Upload réussi" : "✗ Upload échoué"}
+              <Icon
+                name={
+                  uploadResult.success ? "checkmark-circle" : "close-circle"
+                }
+                size={16}
+                color={
+                  uploadResult.success
+                    ? COMPONENT_COLORS.statusSuccess
+                    : COMPONENT_COLORS.statusError
+                }
+                type="ionicons"
+              />
+              <Text style={{ marginLeft: 8 }}>
+                {uploadResult.success ? "Upload réussi" : "Upload échoué"}
+              </Text>
             </Text>
 
             {uploadResult.success && uploadResult.url && (
@@ -249,47 +277,46 @@ export const UploadScreen: React.FC<NavigationProps> = ({
         <View style={styles.actionsContainer}>
           {!uploadResult && (
             <>
-              <TouchableOpacity
-                style={[
-                  styles.uploadButton,
-                  isUploading && styles.disabledButton,
-                ]}
+              <ModernButton
+                title={isUploading ? "Upload en cours..." : "Uploader l'image"}
                 onPress={handleUpload}
+                variant="primary"
+                size="lg"
                 disabled={isUploading}
-              >
-                {isUploading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator color="#ffffff" size="small" />
-                    <Text style={styles.uploadButtonText}>
-                      Upload en cours...
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={styles.uploadButtonText}>
-                    📤 Uploader l'image
-                  </Text>
-                )}
-              </TouchableOpacity>
+                loading={isUploading}
+                icon="cloud-upload"
+                iconType="ionicons"
+              />
 
-              <TouchableOpacity
-                style={styles.cropButton}
+              <ModernButton
+                title="Crop/Modifier"
                 onPress={handleCropImage}
+                variant="accent"
+                size="lg"
                 disabled={isUploading}
-              >
-                <Text style={styles.cropButtonText}>✂️ Crop/Modifier</Text>
-              </TouchableOpacity>
+                icon="cut"
+                iconType="ionicons"
+              />
             </>
           )}
 
           {uploadResult && !uploadResult.success && (
-            <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-              <Text style={styles.retryButtonText}>🔄 Réessayer</Text>
-            </TouchableOpacity>
+            <ModernButton
+              title="Réessayer"
+              onPress={handleRetry}
+              variant="accent"
+              size="lg"
+              icon="refresh"
+              iconType="ionicons"
+            />
           )}
 
-          <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-            <Text style={styles.cancelButtonText}>Annuler</Text>
-          </TouchableOpacity>
+          <ModernButton
+            title="Annuler"
+            onPress={handleCancel}
+            variant="ghost"
+            size="lg"
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -299,7 +326,7 @@ export const UploadScreen: React.FC<NavigationProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -312,15 +339,17 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginRight: 16,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: "#007AFF",
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.primaryBg,
+    borderRadius: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333333",
+    color: COLORS.textPrimary,
   },
   imageContainer: {
     alignItems: "center",
@@ -394,58 +423,5 @@ const styles = StyleSheet.create({
   actionsContainer: {
     marginTop: 20,
   },
-  uploadButton: {
-    backgroundColor: "#007AFF",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  uploadButtonText: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  cropButton: {
-    backgroundColor: "#FF9500",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  cropButtonText: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  retryButton: {
-    backgroundColor: "#FF9500",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  retryButtonText: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  cancelButton: {
-    backgroundColor: "#8E8E93",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-  },
-  cancelButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  loadingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  // Style uniforme pour tous les boutons
 });

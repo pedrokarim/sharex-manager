@@ -16,6 +16,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { NavigationProps, AppSettings } from "../types";
 import { StorageService } from "../services/storage";
 import { ShareXApiService } from "../services/api";
+import { Icon } from "../components/Icon";
+import { ModernButton } from "../components/ModernButton";
+import { ModernCard } from "../components/ModernCard";
+import { COLORS, COMPONENT_COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from "../config/design";
 
 export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const [settings, setSettings] = useState<AppSettings>({
@@ -138,7 +142,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
@@ -147,15 +151,18 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backButtonText}>← Retour</Text>
+            <Icon
+              name="arrow-back"
+              size={24}
+              color={COLORS.primary}
+              type="ionicons"
+            />
           </TouchableOpacity>
           <Text style={styles.title}>Paramètres</Text>
         </View>
 
         {/* Configuration du serveur */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Configuration du serveur</Text>
-
+        <ModernCard title="Configuration du serveur" variant="elevated">
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>URL du serveur *</Text>
             <TextInput
@@ -186,26 +193,24 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             />
           </View>
 
-          <TouchableOpacity
-            style={[
-              styles.testButton,
-              isTestingConnection && styles.disabledButton,
-            ]}
-            onPress={handleTestConnection}
-            disabled={isTestingConnection}
-          >
-            <Text style={styles.testButtonText}>
-              {isTestingConnection
+          <ModernButton
+            title={
+              isTestingConnection
                 ? "Test en cours..."
-                : "Tester l'URL du serveur"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+                : "Tester l'URL du serveur"
+            }
+            onPress={handleTestConnection}
+            variant="secondary"
+            size="md"
+            disabled={isTestingConnection}
+            loading={isTestingConnection}
+            icon="wifi"
+            iconType="ionicons"
+          />
+        </ModernCard>
 
         {/* Options de l'application */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Options de l'application</Text>
-
+        <ModernCard title="Options de l'application" variant="elevated">
           <View style={styles.switchContainer}>
             <Text style={styles.switchLabel}>Upload automatique</Text>
             <Switch
@@ -243,26 +248,29 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
               }
             />
           </View>
-        </View>
+        </ModernCard>
 
         {/* Actions */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.saveButton, isSaving && styles.disabledButton]}
+          <ModernButton
+            title={isSaving ? "Sauvegarde..." : "Sauvegarder"}
             onPress={handleSave}
+            variant="primary"
+            size="lg"
             disabled={isSaving}
-          >
-            <Text style={styles.saveButtonText}>
-              {isSaving ? "Sauvegarde..." : "Sauvegarder"}
-            </Text>
-          </TouchableOpacity>
+            loading={isSaving}
+            icon="save"
+            iconType="ionicons"
+          />
 
-          <TouchableOpacity
-            style={styles.clearButton}
+          <ModernButton
+            title="Supprimer les données"
             onPress={handleClearData}
-          >
-            <Text style={styles.clearButtonText}>Supprimer les données</Text>
-          </TouchableOpacity>
+            variant="danger"
+            size="lg"
+            icon="trash"
+            iconType="ionicons"
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -272,7 +280,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: COLORS.background,
   },
   loadingContainer: {
     flex: 1,
@@ -294,15 +302,17 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginRight: 16,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: "#007AFF",
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.primaryBg,
+    borderRadius: 20,
   },
   title: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#333333",
+    color: COLORS.textPrimary,
   },
   section: {
     marginBottom: 30,

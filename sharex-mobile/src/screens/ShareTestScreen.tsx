@@ -13,6 +13,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NavigationProps } from "../types";
 import { SimpleShareIntentService } from "../services/simpleShareIntent";
+import { Icon } from "../components/Icon";
+import { COLORS } from "../config/design";
 
 export const ShareTestScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const [testResults, setTestResults] = useState<string[]>([]);
@@ -32,7 +34,7 @@ export const ShareTestScreen: React.FC<NavigationProps> = ({ navigation }) => {
 
     Alert.alert(
       "Test Share Intent",
-      `Pour tester le Share Intent:\n\n${instructionText}\n\n⚠️ IMPORTANT: L'app n'apparaîtra dans la liste de partage qu'avec un build natif (pas Expo Go) !`,
+      `Pour tester le Share Intent:\n\n${instructionText}\n\nIMPORTANT: L'app n'apparaîtra dans la liste de partage qu'avec un build natif (pas Expo Go) !`,
       [
         { text: "OK" },
         {
@@ -71,7 +73,13 @@ export const ShareTestScreen: React.FC<NavigationProps> = ({ navigation }) => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backButtonText}>← Retour</Text>
+            <Icon
+              name="arrow-back"
+              size={20}
+              color={COLORS.primary}
+              type="ionicons"
+            />
+            <Text style={styles.backButtonText}>Retour</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Test Share Intent</Text>
         </View>

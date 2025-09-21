@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: "notifications",
   THEME: "theme",
   ALLOW_IMAGE_EDITING: "allow_image_editing",
+  ONBOARDING_COMPLETED: "onboarding_completed",
 } as const;
 
 export class StorageService {
@@ -160,6 +161,36 @@ export class StorageService {
   }
 
   /**
+   * Marque l'onboarding comme complété
+   */
+  static async setOnboardingCompleted(completed: boolean): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(
+        STORAGE_KEYS.ONBOARDING_COMPLETED,
+        completed.toString()
+      );
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde de l'onboarding:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Vérifie si l'onboarding a été complété
+   */
+  static async getOnboardingCompleted(): Promise<boolean> {
+    try {
+      const completed = await SecureStore.getItemAsync(
+        STORAGE_KEYS.ONBOARDING_COMPLETED
+      );
+      return completed === "true";
+    } catch (error) {
+      console.error("Erreur lors de la récupération de l'onboarding:", error);
+      return false;
+    }
+  }
+
+  /**
    * Supprime toutes les données stockées
    */
   static async clearAll(): Promise<void> {
@@ -171,6 +202,7 @@ export class StorageService {
         SecureStore.deleteItemAsync(STORAGE_KEYS.NOTIFICATIONS),
         SecureStore.deleteItemAsync(STORAGE_KEYS.THEME),
         SecureStore.deleteItemAsync(STORAGE_KEYS.ALLOW_IMAGE_EDITING),
+        SecureStore.deleteItemAsync(STORAGE_KEYS.ONBOARDING_COMPLETED),
       ]);
     } catch (error) {
       console.error("Erreur lors de la suppression des données:", error);

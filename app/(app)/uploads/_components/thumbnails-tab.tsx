@@ -44,21 +44,25 @@ export function ThumbnailsTab({ form }: ThumbnailsTabProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>{t("uploads.config.thumbnails.title")}</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">
+            {t("uploads.config.thumbnails.title")}
+          </CardTitle>
+          <CardDescription className="text-sm">
             {t("uploads.config.thumbnails.description")}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-4 sm:p-6 pt-0">
           <FormField
             control={form.control}
             name="thumbnails.enabled"
             render={({ field }) => (
               <FormItem className="flex items-center justify-between">
-                <FormLabel>{t("uploads.config.thumbnails.enable")}</FormLabel>
+                <FormLabel className="text-sm">
+                  {t("uploads.config.thumbnails.enable")}
+                </FormLabel>
                 <FormControl>
                   <Switch
                     checked={field.value ?? false}

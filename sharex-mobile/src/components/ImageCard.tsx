@@ -30,7 +30,7 @@ export const ImageCard: React.FC<ImageCardProps> = ({ item, onPress }) => {
     <TouchableOpacity style={styles.container} onPress={() => onPress(item)}>
       <View style={styles.imageContainer}>
         <Image
-          source={{ uri: item.url }}
+          source={{ uri: item.localUri }}
           style={styles.image}
           resizeMode="cover"
         />
@@ -102,4 +102,3 @@ const styles = StyleSheet.create({
     color: "#666666",
   },
 });
-

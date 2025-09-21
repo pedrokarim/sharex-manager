@@ -867,16 +867,56 @@ export function GalleryClient({
 
   return (
     <>
-      <div className="p-8">
-        <div className="mb-8 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">
-            {secureOnly
-              ? t("gallery.secure_files")
-              : starredOnly
-              ? t("gallery.starred_files")
-              : t("gallery.title")}
-          </h1>
-          <div className="flex items-center gap-4">
+      <div className="p-4 sm:p-8">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <h1 className="text-xl sm:text-2xl font-bold">
+              {secureOnly
+                ? t("gallery.secure_files")
+                : starredOnly
+                ? t("gallery.starred_files")
+                : t("gallery.title")}
+            </h1>
+
+            {/* Contrôles principaux - toujours visibles */}
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+              <Button
+                variant={isSelectionMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setIsSelectionMode(!isSelectionMode);
+                  if (isSelectionMode) clearSelection();
+                }}
+                className={cn(
+                  "shrink-0 text-xs sm:text-sm min-w-0",
+                  !isSelectionMode &&
+                    "backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200"
+                )}
+              >
+                {isSelectionMode ? (
+                  <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                ) : (
+                  <Square className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                )}
+                <span className="hidden sm:inline truncate">
+                  {isSelectionMode
+                    ? t("multiselect.exit_selection_mode")
+                    : t("multiselect.selection_mode")}
+                </span>
+              </Button>
+
+              <Button
+                onClick={() => setIsUploadModalOpen(true)}
+                size="sm"
+                className="text-xs sm:text-sm flex-shrink-0"
+              >
+                {t("gallery.upload")}
+              </Button>
+            </div>
+          </div>
+
+          {/* Contrôles secondaires - responsive */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4">
             <ViewSelector />
             <SortSelector />
             <RefreshInterval />
@@ -885,50 +925,25 @@ export function GalleryClient({
               size="icon"
               onClick={handleRefresh}
               className={cn(
-                "shrink-0 transition-all duration-200",
+                "shrink-0 transition-all duration-200 h-8 w-8",
                 "backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20",
                 isRefreshing && "animate-spin text-primary"
               )}
               disabled={isRefreshing}
             >
-              <RefreshCcw className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={isSelectionMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setIsSelectionMode(!isSelectionMode);
-                if (isSelectionMode) clearSelection();
-              }}
-              className={cn(
-                "shrink-0",
-                !isSelectionMode &&
-                  "backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200"
-              )}
-            >
-              {isSelectionMode ? (
-                <CheckSquare className="h-4 w-4 mr-2" />
-              ) : (
-                <Square className="h-4 w-4 mr-2" />
-              )}
-              {isSelectionMode
-                ? t("multiselect.exit_selection_mode")
-                : t("multiselect.selection_mode")}
-            </Button>
-            <Button onClick={() => setIsUploadModalOpen(true)}>
-              {t("gallery.upload")}
+              <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </div>
         </div>
 
         {files.length === 0 ? (
-          <div className="flex flex-col items-center justify-center space-y-4 py-24 text-center">
-            <ImageOff className="h-12 w-12 text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center space-y-4 py-12 sm:py-24 text-center px-4">
+            <ImageOff className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground" />
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold">
+              <h3 className="text-base sm:text-lg font-semibold">
                 {t("gallery.empty.title")}
               </h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground max-w-md">
                 {t("gallery.empty.description")}
               </p>
             </div>
@@ -937,8 +952,8 @@ export function GalleryClient({
           <>
             <UploadZone onFinishUpload={handleFinishUpload}>
               {Object.entries(groupedFiles).map(([date, filesInGroup]) => (
-                <div key={date} className="mb-8">
-                  <h2 className="mb-4 text-xl font-semibold text-muted-foreground">
+                <div key={date} className="mb-6 sm:mb-8">
+                  <h2 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold text-muted-foreground px-2 sm:px-0">
                     {capitalize(date)}
                   </h2>
                   {!viewMode || viewMode === "grid" ? (

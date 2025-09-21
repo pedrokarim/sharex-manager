@@ -28,23 +28,23 @@ export function GeneralTab({ form }: GeneralTabProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">
             {t("uploads.config.general.allowed_types.title")}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             {t("uploads.config.general.allowed_types.description")}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-4 sm:p-6 pt-0">
           <FormField
             control={form.control}
             name="allowedTypes.images"
             render={({ field }) => (
               <FormItem className="flex items-center justify-between">
-                <FormLabel>
+                <FormLabel className="text-sm">
                   {t("uploads.config.general.allowed_types.images")}
                 </FormLabel>
                 <FormControl>
@@ -61,7 +61,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
             name="allowedTypes.documents"
             render={({ field }) => (
               <FormItem className="flex items-center justify-between">
-                <FormLabel>
+                <FormLabel className="text-sm">
                   {t("uploads.config.general.allowed_types.documents")}
                 </FormLabel>
                 <FormControl>
@@ -78,7 +78,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
             name="allowedTypes.archives"
             render={({ field }) => (
               <FormItem className="flex items-center justify-between">
-                <FormLabel>
+                <FormLabel className="text-sm">
                   {t("uploads.config.general.allowed_types.archives")}
                 </FormLabel>
                 <FormControl>
@@ -94,20 +94,22 @@ export function GeneralTab({ form }: GeneralTabProps) {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t("uploads.config.general.limits.title")}</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">
+            {t("uploads.config.general.limits.title")}
+          </CardTitle>
+          <CardDescription className="text-sm">
             {t("uploads.config.general.limits.description")}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-4 sm:p-6 pt-0">
           <div className="grid gap-4">
             <FormField
               control={form.control}
               name="limits.maxFileSize"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
+                  <FormLabel className="text-sm">
                     {t("uploads.config.general.limits.max_file_size")}
                   </FormLabel>
                   <FormControl>
@@ -116,6 +118,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
                       min="1"
                       value={field.value ?? ""}
                       onChange={(e) => field.onChange(Number(e.target.value))}
+                      className="text-sm"
                     />
                   </FormControl>
                 </FormItem>
@@ -127,7 +130,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
               name="limits.minFileSize"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
+                  <FormLabel className="text-sm">
                     {t("uploads.config.general.limits.min_file_size")}
                   </FormLabel>
                   <FormControl>
@@ -136,6 +139,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
                       min="1"
                       value={field.value ?? ""}
                       onChange={(e) => field.onChange(Number(e.target.value))}
+                      className="text-sm"
                     />
                   </FormControl>
                 </FormItem>
@@ -147,7 +151,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
               name="limits.maxFilesPerUpload"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
+                  <FormLabel className="text-sm">
                     {t("uploads.config.general.limits.max_files_per_upload")}
                   </FormLabel>
                   <FormControl>
@@ -156,6 +160,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
                       min="1"
                       value={field.value ?? ""}
                       onChange={(e) => field.onChange(Number(e.target.value))}
+                      className="text-sm"
                     />
                   </FormControl>
                 </FormItem>

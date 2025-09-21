@@ -15,6 +15,15 @@ import { NavigationProps } from "../types";
 import { StorageService } from "../services/storage";
 import { ImageService } from "../services/imageService";
 import { getApiService } from "../services/api";
+import { Icon } from "../components/Icon";
+import { ModernButton } from "../components/ModernButton";
+import {
+  COLORS,
+  COMPONENT_COLORS,
+  SPACING,
+  BORDER_RADIUS,
+  TYPOGRAPHY,
+} from "../config/design";
 
 export const HomeScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const [isConfigured, setIsConfigured] = useState(false);
@@ -134,7 +143,15 @@ export const HomeScreen: React.FC<NavigationProps> = ({ navigation }) => {
                 { color: isConfigured ? "#4CAF50" : "#F44336" },
               ]}
             >
-              {isConfigured ? "✓ Configuré" : "✗ Non configuré"}
+              <Icon
+                name={isConfigured ? "checkmark-circle" : "close-circle"}
+                size={12}
+                color={isConfigured ? "#2E7D32" : "#C62828"}
+                type="ionicons"
+              />
+              <Text style={{ marginLeft: 4 }}>
+                {isConfigured ? "Configuré" : "Non configuré"}
+              </Text>
             </Text>
           </View>
 
@@ -147,7 +164,15 @@ export const HomeScreen: React.FC<NavigationProps> = ({ navigation }) => {
                   { color: isConnected ? "#4CAF50" : "#F44336" },
                 ]}
               >
-                {isConnected ? "✓ Connecté" : "✗ Déconnecté"}
+                <Icon
+                  name={isConnected ? "checkmark-circle" : "close-circle"}
+                  size={12}
+                  color={isConnected ? "#2E7D32" : "#C62828"}
+                  type="ionicons"
+                />
+                <Text style={{ marginLeft: 4 }}>
+                  {isConnected ? "Connecté" : "Déconnecté"}
+                </Text>
               </Text>
             </View>
           )}
@@ -155,48 +180,61 @@ export const HomeScreen: React.FC<NavigationProps> = ({ navigation }) => {
 
         {/* Actions principales */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.primaryButton]}
+          <ModernButton
+            title="Sélectionner une image"
             onPress={handleSelectImage}
+            variant="primary"
+            size="lg"
             disabled={!isConfigured}
-          >
-            <Text style={styles.primaryButtonText}>
-              📷 Sélectionner une image
-            </Text>
-          </TouchableOpacity>
+            icon="images"
+            iconType="ionicons"
+            style={styles.actionButton}
+          />
 
-          <TouchableOpacity
-            style={[styles.actionButton, styles.secondaryButton]}
+          <ModernButton
+            title="Prendre une photo"
             onPress={handleTakePhoto}
+            variant="accent"
+            size="lg"
             disabled={!isConfigured}
-          >
-            <Text style={styles.secondaryButtonText}>📸 Prendre une photo</Text>
-          </TouchableOpacity>
+            icon="camera"
+            iconType="ionicons"
+            style={styles.actionButton}
+          />
         </View>
 
         {/* Actions secondaires */}
         <View style={styles.secondaryActionsContainer}>
-          <TouchableOpacity
-            style={styles.secondaryActionButton}
+          <ModernButton
+            title="Galerie"
             onPress={handleGallery}
-          >
-            <Text style={styles.secondaryActionText}>🖼️ Galerie</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
+            variant="ghost"
+            size="md"
+            icon="images"
+            iconType="ionicons"
             style={styles.secondaryActionButton}
+          />
+
+          <ModernButton
+            title="Paramètres"
             onPress={handleSettings}
-          >
-            <Text style={styles.secondaryActionText}>⚙️ Paramètres</Text>
-          </TouchableOpacity>
+            variant="ghost"
+            size="md"
+            icon="settings"
+            iconType="ionicons"
+            style={styles.secondaryActionButton}
+          />
         </View>
 
         {/* Message de configuration */}
         {!isConfigured && (
           <View style={styles.configMessage}>
             <Text style={styles.configMessageText}>
-              ⚠️ Veuillez configurer l'URL du serveur et votre clé API dans les
-              paramètres.
+              <Icon name="warning" size={20} color="#856404" type="ionicons" />
+              <Text style={{ marginLeft: 8, flex: 1 }}>
+                Veuillez configurer l'URL du serveur et votre clé API dans les
+                paramètres.
+              </Text>
             </Text>
           </View>
         )}
@@ -262,26 +300,43 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   actionButton: {
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
     marginBottom: 16,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: 56,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   primaryButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: COMPONENT_COLORS.buttonPrimary,
   },
   secondaryButton: {
-    backgroundColor: "#34C759",
+    backgroundColor: COMPONENT_COLORS.buttonSecondary,
   },
   primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 18,
+    color: COLORS.textInverse,
+    fontSize: 16,
     fontWeight: "600",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   secondaryButtonText: {
-    color: "#ffffff",
-    fontSize: 18,
+    color: COLORS.textInverse,
+    fontSize: 16,
     fontWeight: "600",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   secondaryActionsContainer: {
     flexDirection: "row",
@@ -289,14 +344,20 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   secondaryActionButton: {
-    backgroundColor: "#f8f9fa",
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: COMPONENT_COLORS.buttonOutline,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     flex: 0.48,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: COMPONENT_COLORS.buttonOutlineBorder,
   },
   secondaryActionText: {
-    color: "#333333",
+    color: COMPONENT_COLORS.buttonOutlineText,
     fontSize: 16,
     fontWeight: "500",
   },
