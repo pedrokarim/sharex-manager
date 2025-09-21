@@ -60,16 +60,18 @@ export function AdminPageClient() {
   ];
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Shield className="h-8 w-8" />
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+          <Shield className="h-6 w-6 sm:h-8 sm:w-8" />
           {t("admin.title")}
         </h1>
-        <p className="text-muted-foreground mt-2">{t("admin.description")}</p>
+        <p className="text-sm sm:text-base text-muted-foreground mt-2">
+          {t("admin.description")}
+        </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {adminSections.map((section) => (
           <Link
             key={section.href}
@@ -81,12 +83,18 @@ export function AdminPageClient() {
                 section.disabled ? "opacity-60" : "hover:bg-muted/50"
               }`}
             >
-              <CardHeader>
+              <CardHeader className="p-4 sm:p-6">
                 <div className="flex items-center gap-2">
-                  <section.icon className={`h-5 w-5 ${section.color}`} />
-                  <CardTitle>{section.title}</CardTitle>
+                  <section.icon
+                    className={`h-4 w-4 sm:h-5 sm:w-5 ${section.color}`}
+                  />
+                  <CardTitle className="text-base sm:text-lg">
+                    {section.title}
+                  </CardTitle>
                 </div>
-                <CardDescription>{section.description}</CardDescription>
+                <CardDescription className="text-sm">
+                  {section.description}
+                </CardDescription>
               </CardHeader>
             </Card>
           </Link>

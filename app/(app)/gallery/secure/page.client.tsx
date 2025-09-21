@@ -46,7 +46,8 @@ export function SecureGalleryClient() {
       const response = await fetch(
         `/api/files/secure?${searchParams.toString()}`
       );
-      if (!response.ok) throw new Error("Erreur lors du chargement des fichiers");
+      if (!response.ok)
+        throw new Error("Erreur lors du chargement des fichiers");
       return response.json();
     },
     getNextPageParam: (lastPage, pages) => {
@@ -66,28 +67,30 @@ export function SecureGalleryClient() {
   const totalFiles = data?.pages[0]?.total ?? 0;
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Fichiers Sécurisés ({totalFiles})</h1>
+    <div className="container mx-auto py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-4 sm:gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h1 className="text-xl sm:text-2xl font-bold">
+            Fichiers Sécurisés ({totalFiles})
+          </h1>
           <div className="flex items-center gap-4">
             <Input
               type="search"
               placeholder="Rechercher..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-64"
+              className="w-full sm:w-64 text-sm"
             />
           </div>
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin" />
+          <div className="flex justify-center py-8 sm:py-12">
+            <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin" />
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {files.map((file) => (
                 <FileCard
                   key={file.url}
@@ -98,12 +101,9 @@ export function SecureGalleryClient() {
               ))}
             </div>
 
-            <div
-              ref={ref}
-              className="flex justify-center p-4"
-            >
+            <div ref={ref} className="flex justify-center p-4">
               {isFetchingNextPage && (
-                <Loader2 className="h-6 w-6 animate-spin" />
+                <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" />
               )}
             </div>
           </>
@@ -111,4 +111,4 @@ export function SecureGalleryClient() {
       </div>
     </div>
   );
-} 
+}

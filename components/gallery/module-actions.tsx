@@ -404,7 +404,10 @@ export function ModuleActions({
     return (
       <>
         <motion.div
-          className="flex items-center bg-black/20 dark:bg-white/10 backdrop-blur-md border border-black/20 dark:border-white/20 rounded-xl shadow-2xl overflow-hidden"
+          className={cn(
+            "flex items-center bg-black/20 dark:bg-white/10 backdrop-blur-md border border-black/20 dark:border-white/20 rounded-xl shadow-2xl overflow-hidden",
+            !isExpanded && "my-4"
+          )}
           initial={{ width: "auto" }}
           animate={{ width: isExpanded ? "auto" : "auto" }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
@@ -413,7 +416,9 @@ export function ModuleActions({
           <Button
             variant="ghost"
             size="icon"
-            className="h-12 w-12 bg-black/20 dark:bg-white/10 hover:bg-black/30 dark:hover:bg-white/20 border-r border-black/20 dark:border-white/20 rounded-l-xl rounded-r-none flex-shrink-0"
+            className={cn(
+              "h-12 w-12 flex-shrink-0 bg-transparent focus:bg-transparent dark:focus:bg-transparent hover:bg-black/30 dark:hover:bg-white/20 active:bg-transparent dark:active:bg-transparent"
+            )}
             onClick={() => setIsExpanded(!isExpanded)}
           >
             <motion.div
@@ -428,9 +433,6 @@ export function ModuleActions({
             </motion.div>
           </Button>
 
-          {/* Séparateur */}
-          <div className="w-px h-10 bg-black/20 dark:bg-white/20 flex-shrink-0 my-1" />
-
           {/* Contenu expandable */}
           <AnimatePresence>
             {isExpanded && (
@@ -439,7 +441,7 @@ export function ModuleActions({
                 animate={{ width: "auto", opacity: 1 }}
                 exit={{ width: 0, opacity: 0 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="flex flex-col gap-3 p-3 min-w-[300px]"
+                className="flex flex-col gap-3 p-3 min-w-[300px] border-l-[1px] border-black/20 dark:border-white/20"
               >
                 {categories.length > 1 && (
                   <Tabs

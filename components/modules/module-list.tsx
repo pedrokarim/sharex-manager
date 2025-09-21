@@ -90,15 +90,15 @@ export const ModuleList = () => {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="flex justify-center items-center h-48 sm:h-64">
+        <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="space-y-6 sm:space-y-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {Array.isArray(modules) ? (
           modules.map((module) => (
             <ModuleCard
@@ -109,8 +109,8 @@ export const ModuleList = () => {
             />
           ))
         ) : (
-          <div className="col-span-3 text-center p-8 border border-dashed rounded-lg">
-            <p className="text-gray-500 dark:text-gray-400">
+          <div className="col-span-3 text-center p-6 sm:p-8 border border-dashed rounded-lg">
+            <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
               Erreur lors du chargement des modules. Veuillez rafraîchir la
               page.
             </p>
@@ -119,15 +119,15 @@ export const ModuleList = () => {
       </div>
 
       {Array.isArray(modules) && modules.length === 0 && (
-        <div className="text-center p-8 border border-dashed rounded-lg">
-          <p className="text-gray-500 dark:text-gray-400">
+        <div className="text-center p-6 sm:p-8 border border-dashed rounded-lg">
+          <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
             Aucun module n'est installé. Installez votre premier module
             ci-dessous.
           </p>
         </div>
       )}
 
-      <div className="mt-8">
+      <div className="mt-6 sm:mt-8">
         <ModuleUpload onUploadSuccess={fetchModules} />
       </div>
     </div>

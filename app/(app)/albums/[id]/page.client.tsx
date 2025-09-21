@@ -135,77 +135,95 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Breadcrumb */}
-      <Breadcrumb className="mb-6">
+      <Breadcrumb className="mb-4 sm:mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="/albums">{t("albums.title")}</BreadcrumbLink>
+            <BreadcrumbLink href="/albums" className="text-sm">
+              {t("albums.title")}
+            </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>{album.name}</BreadcrumbPage>
+            <BreadcrumbPage className="text-sm truncate">
+              {album.name}
+            </BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
       {/* En-tête de l'album */}
-      <div className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4" />
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => router.back()}
+            className="h-8 w-8 sm:h-9 sm:w-9"
+          >
+            <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
 
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">{album.name}</h1>
-              <Badge variant="secondary">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <h1 className="text-lg sm:text-2xl font-bold truncate">
+                {album.name}
+              </h1>
+              <Badge variant="secondary" className="text-xs sm:text-sm w-fit">
                 {t("albums.files_count", { count: files.length })}
               </Badge>
             </div>
             {album.description && (
-              <p className="text-muted-foreground mt-1">{album.description}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">
+                {album.description}
+              </p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
           <ViewSelector />
 
-          <Button variant="outline" size="icon">
-            <Edit2 className="h-4 w-4" />
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 sm:h-9 sm:w-9"
+          >
+            <Edit2 className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
 
           <Button
             variant="outline"
             size="icon"
             onClick={handleDeleteAlbum}
-            className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            className="h-8 w-8 sm:h-9 sm:w-9 text-destructive hover:bg-destructive hover:text-destructive-foreground"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
 
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Ajouter des fichiers
+          <Button className="text-xs sm:text-sm h-8 sm:h-9">
+            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Ajouter des fichiers</span>
+            <span className="sm:hidden">Ajouter</span>
           </Button>
         </div>
       </div>
 
       {/* Contenu de l'album */}
       {files.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-            <Plus className="h-8 w-8 text-primary" />
+        <div className="flex flex-col items-center justify-center py-12 sm:py-24 text-center px-4">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg bg-primary/10 flex items-center justify-center mb-3 sm:mb-4">
+            <Plus className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-lg font-semibold">Album vide</h3>
-            <p className="text-sm text-muted-foreground max-w-md">
+            <h3 className="text-base sm:text-lg font-semibold">Album vide</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground max-w-md">
               Cet album ne contient aucun fichier. Ajoutez des fichiers depuis
               la galerie ou utilisez le bouton "Ajouter des fichiers".
             </p>
-            <Button className="mt-4">
-              <Plus className="h-4 w-4 mr-2" />
+            <Button className="mt-3 sm:mt-4 text-sm">
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
               Ajouter des fichiers
             </Button>
           </div>
@@ -238,5 +256,3 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     </div>
   );
 }
-
-

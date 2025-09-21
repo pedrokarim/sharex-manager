@@ -173,40 +173,48 @@ export function PreferencesPageClient() {
   };
 
   return (
-    <div className="flex flex-col h-full p-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="flex flex-col h-full p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Settings2 className="h-8 w-8" />
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+            <Settings2 className="h-6 w-6 sm:h-8 sm:w-8" />
             {t("settings.preferences")}
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
             {t("settings.preferences_description")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <LanguageSelector />
-          <Button variant="outline" onClick={handleReset}>
-            <RotateCcw className="h-4 w-4 mr-2" />
+          <Button
+            variant="outline"
+            onClick={handleReset}
+            className="text-xs sm:text-sm"
+          >
+            <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
             {t("settings.reset")}
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 flex-1">
+      <div className="grid gap-4 sm:gap-6 flex-1">
         {/* Apparence */}
         <Card>
-          <CardHeader>
-            <CardTitle>{t("settings.appearance")}</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-3 sm:pb-6">
+            <CardTitle className="text-lg sm:text-xl">
+              {t("settings.appearance")}
+            </CardTitle>
+            <CardDescription className="text-sm">
               {t("settings.appearance_description")}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <Label>{t("settings.theme")}</Label>
-                <div className="flex gap-4 max-w-md">
+          <CardContent className="pt-0">
+            <div className="space-y-4 sm:space-y-6">
+              <div className="space-y-3 sm:space-y-4">
+                <Label className="text-sm sm:text-base">
+                  {t("settings.theme")}
+                </Label>
+                <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-4 max-w-md">
                   {Object.entries(themeIcons).map(([themeKey, Icon]) => (
                     <TooltipProvider key={themeKey}>
                       <Tooltip>
@@ -217,13 +225,19 @@ export function PreferencesPageClient() {
                                 ? "default"
                                 : "outline"
                             }
-                            className="flex-1"
+                            className="flex-1 text-xs sm:text-sm"
                             onClick={() => {
                               handleThemeChange(themeKey as ThemeMode);
                             }}
                           >
-                            <Icon className="h-4 w-4 mr-2" />
-                            {themeLabels[themeKey as keyof typeof themeLabels]}
+                            <Icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                            <span className="text-xs sm:text-sm">
+                              {
+                                themeLabels[
+                                  themeKey as keyof typeof themeLabels
+                                ]
+                              }
+                            </span>
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -245,12 +259,14 @@ export function PreferencesPageClient() {
                 </div>
 
                 {preferredThemeMode === "time-based" && (
-                  <div className="space-y-4 mt-4 border rounded-lg p-4">
+                  <div className="space-y-3 sm:space-y-4 mt-4 border rounded-lg p-3 sm:p-4">
                     <div className="flex items-center gap-2">
-                      <Sun className="h-4 w-4" />
-                      <Label>{t("settings.theme_options.light")}</Label>
+                      <Sun className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <Label className="text-sm sm:text-base">
+                        {t("settings.theme_options.light")}
+                      </Label>
                     </div>
-                    <div className="flex gap-4">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                       <div className="flex-1">
                         <TimePicker
                           label={t("common.start")}
@@ -284,7 +300,7 @@ export function PreferencesPageClient() {
                         />
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-2">
                       {t("settings.theme_options.time_based_description", {
                         start: timeBasedTheme.dayStartHour,
                         end: timeBasedTheme.dayEndHour,
@@ -295,24 +311,26 @@ export function PreferencesPageClient() {
 
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="w-full text-xs sm:text-sm"
                   onClick={() => router.push("/settings/theme")}
                 >
-                  <Settings2 className="h-4 w-4 mr-2" />
+                  <Settings2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                   {t("settings.theme_advanced")}
                 </Button>
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
                 <div className="flex items-center gap-2">
-                  <Languages className="h-4 w-4" />
-                  <Label>{t("settings.language")}</Label>
+                  <Languages className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <Label className="text-sm sm:text-base">
+                    {t("settings.language")}
+                  </Label>
                 </div>
                 <Select
                   value={language}
                   onValueChange={(value) => setLanguage(value as Language)}
                 >
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder={t("settings.language_select")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -327,16 +345,20 @@ export function PreferencesPageClient() {
 
         {/* Galerie */}
         <Card>
-          <CardHeader>
-            <CardTitle>{t("navigation.gallery")}</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-3 sm:pb-6">
+            <CardTitle className="text-lg sm:text-xl">
+              {t("navigation.gallery")}
+            </CardTitle>
+            <CardDescription className="text-sm">
               {t("settings.gallery_description")}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <Label>{t("settings.gallery.view_mode")}</Label>
-              <div className="flex gap-4 max-w-md">
+          <CardContent className="pt-0 space-y-4 sm:space-y-6">
+            <div className="space-y-3 sm:space-y-4">
+              <Label className="text-sm sm:text-base">
+                {t("settings.gallery.view_mode")}
+              </Label>
+              <div className="grid grid-cols-3 sm:flex gap-2 sm:gap-4 max-w-md">
                 {Object.entries(viewModeIcons).map(([mode, Icon]) => (
                   <TooltipProvider key={mode}>
                     <Tooltip>
@@ -345,13 +367,15 @@ export function PreferencesPageClient() {
                           variant={
                             galleryViewMode === mode ? "default" : "outline"
                           }
-                          className="flex-1"
+                          className="flex-1 text-xs sm:text-sm"
                           onClick={() =>
                             setGalleryViewMode(mode as GalleryViewMode)
                           }
                         >
-                          <Icon className="h-4 w-4 mr-2" />
-                          {t(`gallery.view_modes.${mode}`)}
+                          <Icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                          <span className="text-xs sm:text-sm">
+                            {t(`gallery.view_modes.${mode}`)}
+                          </span>
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -363,7 +387,7 @@ export function PreferencesPageClient() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="thumbnailSize">
+                <Label htmlFor="thumbnailSize" className="text-sm sm:text-base">
                   {t("settings.gallery.thumbnail_size")}
                 </Label>
                 <Select
@@ -372,7 +396,7 @@ export function PreferencesPageClient() {
                     setThumbnailSize(value)
                   }
                 >
-                  <SelectTrigger className="w-[200px]">
+                  <SelectTrigger className="w-full sm:w-[200px]">
                     <SelectValue placeholder={t("settings.select_size")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -382,8 +406,8 @@ export function PreferencesPageClient() {
                         return (
                           <SelectItem key={value} value={value}>
                             <div className="flex items-center gap-2">
-                              <Icon className="h-4 w-4 shrink-0" />
-                              <span>{label}</span>
+                              <Icon className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                              <span className="text-sm">{label}</span>
                             </div>
                           </SelectItem>
                         );
@@ -393,11 +417,13 @@ export function PreferencesPageClient() {
                 </Select>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    <Label>{t("settings.gallery.show_file_info")}</Label>
+                    <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <Label className="text-sm sm:text-base">
+                      {t("settings.gallery.show_file_info")}
+                    </Label>
                   </div>
                   <Switch
                     checked={showFileInfo}
@@ -407,8 +433,10 @@ export function PreferencesPageClient() {
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <ArrowUpDown className="h-4 w-4" />
-                    <Label>{t("settings.gallery.show_file_size")}</Label>
+                    <ArrowUpDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <Label className="text-sm sm:text-base">
+                      {t("settings.gallery.show_file_size")}
+                    </Label>
                   </div>
                   <Switch
                     checked={showFileSize}
@@ -418,8 +446,10 @@ export function PreferencesPageClient() {
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <Label>{t("settings.gallery.show_upload_date")}</Label>
+                    <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <Label className="text-sm sm:text-base">
+                      {t("settings.gallery.show_upload_date")}
+                    </Label>
                   </div>
                   <Switch
                     checked={showUploadDate}
@@ -430,14 +460,16 @@ export function PreferencesPageClient() {
 
               <Separator />
 
-              <div className="space-y-4">
-                <Label>{t("settings.gallery.sort_by")}</Label>
-                <div className="flex gap-4">
+              <div className="space-y-3 sm:space-y-4">
+                <Label className="text-sm sm:text-base">
+                  {t("settings.gallery.sort_by")}
+                </Label>
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <Select
                     value={sortBy}
                     onValueChange={(value) => setSortBy(value as SortBy)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full sm:flex-1">
                       <SelectValue
                         placeholder={t("settings.gallery.sort_by")}
                       />
@@ -459,7 +491,7 @@ export function PreferencesPageClient() {
                     value={sortOrder}
                     onValueChange={(value) => setSortOrder(value as SortOrder)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full sm:flex-1">
                       <SelectValue
                         placeholder={t("settings.gallery.sort_order")}
                       />
@@ -481,17 +513,21 @@ export function PreferencesPageClient() {
 
         {/* Notifications */}
         <Card>
-          <CardHeader>
-            <CardTitle>{t("settings.notifications")}</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-3 sm:pb-6">
+            <CardTitle className="text-lg sm:text-xl">
+              {t("settings.notifications")}
+            </CardTitle>
+            <CardDescription className="text-sm">
               {t("settings.notifications_description")}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="pt-0 space-y-4 sm:space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4" />
-                <Label>{t("settings.notifications")}</Label>
+                <Bell className="h-3 w-3 sm:h-4 sm:w-4" />
+                <Label className="text-sm sm:text-base">
+                  {t("settings.notifications")}
+                </Label>
               </div>
               <Switch
                 checked={showNotifications}
@@ -501,8 +537,10 @@ export function PreferencesPageClient() {
 
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <RefreshCcw className="h-4 w-4" />
-                <Label>{t("settings.gallery.auto_refresh")}</Label>
+                <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4" />
+                <Label className="text-sm sm:text-base">
+                  {t("settings.gallery.auto_refresh")}
+                </Label>
               </div>
               <div className="pt-2">
                 <Slider
@@ -513,7 +551,7 @@ export function PreferencesPageClient() {
                   className="w-full"
                   onValueChange={([value]) => setAutoRefreshInterval(value)}
                 />
-                <div className="flex justify-between mt-1 text-sm text-muted-foreground">
+                <div className="flex justify-between mt-1 text-xs sm:text-sm text-muted-foreground">
                   <span>{t("common.disabled")}</span>
                   <span>30s</span>
                   <span>60s</span>

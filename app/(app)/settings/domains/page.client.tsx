@@ -181,30 +181,32 @@ export default function DomainsPage({
   };
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>{t("settings.domains.config.title")}</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-lg sm:text-xl">
+            {t("settings.domains.config.title")}
+          </CardTitle>
+          <CardDescription className="text-sm">
             {t("settings.domains.config.description")}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0">
           <Form {...configForm}>
             <form
               onSubmit={configForm.handleSubmit(onSubmitConfig)}
-              className="space-y-4"
+              className="space-y-4 sm:space-y-6"
             >
               <FormField
                 control={configForm.control}
                 name="useSSL"
                 render={({ field }) => (
-                  <FormItem className="flex items-center justify-between">
+                  <FormItem className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
                     <div className="space-y-0.5">
-                      <FormLabel>
+                      <FormLabel className="text-sm sm:text-base">
                         {t("settings.domains.config.force_https")}
                       </FormLabel>
-                      <FormDescription>
+                      <FormDescription className="text-xs sm:text-sm">
                         {t("settings.domains.config.force_https_description")}
                       </FormDescription>
                     </div>
@@ -222,49 +224,57 @@ export default function DomainsPage({
                 name="pathPrefix"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
+                    <FormLabel className="text-sm sm:text-base">
                       {t("settings.domains.config.path_prefix")}
                     </FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="/uploads" />
+                      <Input
+                        {...field}
+                        placeholder="/uploads"
+                        className="text-sm"
+                      />
                     </FormControl>
-                    <FormDescription>
+                    <FormDescription className="text-xs sm:text-sm">
                       {t("settings.domains.config.path_prefix_description")}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit">{t("settings.domains.config.save")}</Button>
+              <Button type="submit" className="w-full sm:w-auto text-sm">
+                {t("settings.domains.config.save")}
+              </Button>
             </form>
           </Form>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle>{t("settings.domains.list.title")}</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-lg sm:text-xl">
+                {t("settings.domains.list.title")}
+              </CardTitle>
+              <CardDescription className="text-sm">
                 {t("settings.domains.list.description")}
               </CardDescription>
             </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
+                <Button className="w-full sm:w-auto text-sm">
+                  <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                   {t("settings.domains.list.add")}
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="w-[95vw] max-w-md mx-auto">
                 <DialogHeader>
-                  <DialogTitle>
+                  <DialogTitle className="text-lg sm:text-xl">
                     {editingDomain
                       ? t("settings.domains.form.edit_title")
                       : t("settings.domains.form.add_title")}
                   </DialogTitle>
-                  <DialogDescription>
+                  <DialogDescription className="text-sm">
                     {editingDomain
                       ? t("settings.domains.form.edit_description")
                       : t("settings.domains.form.add_description")}
@@ -280,11 +290,17 @@ export default function DomainsPage({
                       name="id"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t("settings.domains.form.id")}</FormLabel>
+                          <FormLabel className="text-sm">
+                            {t("settings.domains.form.id")}
+                          </FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="my-domain" />
+                            <Input
+                              {...field}
+                              placeholder="my-domain"
+                              className="text-sm"
+                            />
                           </FormControl>
-                          <FormDescription>
+                          <FormDescription className="text-xs sm:text-sm">
                             {t("settings.domains.form.id_description")}
                           </FormDescription>
                           <FormMessage />
@@ -296,13 +312,17 @@ export default function DomainsPage({
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>
+                          <FormLabel className="text-sm">
                             {t("settings.domains.form.name")}
                           </FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="My Domain" />
+                            <Input
+                              {...field}
+                              placeholder="My Domain"
+                              className="text-sm"
+                            />
                           </FormControl>
-                          <FormDescription>
+                          <FormDescription className="text-xs sm:text-sm">
                             {t("settings.domains.form.name_description")}
                           </FormDescription>
                           <FormMessage />
@@ -314,16 +334,17 @@ export default function DomainsPage({
                       name="url"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>
+                          <FormLabel className="text-sm">
                             {t("settings.domains.form.url")}
                           </FormLabel>
                           <FormControl>
                             <Input
                               {...field}
                               placeholder="https://example.com"
+                              className="text-sm"
                             />
                           </FormControl>
-                          <FormDescription>
+                          <FormDescription className="text-xs sm:text-sm">
                             {t("settings.domains.form.url_description")}
                           </FormDescription>
                           <FormMessage />
@@ -334,12 +355,12 @@ export default function DomainsPage({
                       control={domainForm.control}
                       name="isDefault"
                       render={({ field }) => (
-                        <FormItem className="flex items-center justify-between">
+                        <FormItem className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
                           <div className="space-y-0.5">
-                            <FormLabel>
+                            <FormLabel className="text-sm">
                               {t("settings.domains.form.default")}
                             </FormLabel>
-                            <FormDescription>
+                            <FormDescription className="text-xs sm:text-sm">
                               {t("settings.domains.form.default_description")}
                             </FormDescription>
                           </div>
@@ -352,8 +373,11 @@ export default function DomainsPage({
                         </FormItem>
                       )}
                     />
-                    <DialogFooter>
-                      <Button type="submit">
+                    <DialogFooter className="flex-col sm:flex-row gap-2">
+                      <Button
+                        type="submit"
+                        className="w-full sm:w-auto text-sm"
+                      >
                         {editingDomain ? t("common.edit") : t("common.create")}
                       </Button>
                     </DialogFooter>
@@ -363,48 +387,68 @@ export default function DomainsPage({
             </Dialog>
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("settings.domains.table.id")}</TableHead>
-                <TableHead>{t("settings.domains.table.name")}</TableHead>
-                <TableHead>{t("settings.domains.table.url")}</TableHead>
-                <TableHead>{t("settings.domains.table.default")}</TableHead>
-                <TableHead className="text-right">
-                  {t("settings.domains.table.actions")}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {domains.map((domain) => (
-                <TableRow key={domain.id}>
-                  <TableCell>{domain.id}</TableCell>
-                  <TableCell>{domain.name}</TableCell>
-                  <TableCell>{domain.url}</TableCell>
-                  <TableCell>
-                    {domain.isDefault ? t("common.yes") : t("common.no")}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEdit(domain)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(domain.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+        <CardContent className="p-4 sm:p-6 pt-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs sm:text-sm">
+                    {t("settings.domains.table.id")}
+                  </TableHead>
+                  <TableHead className="text-xs sm:text-sm">
+                    {t("settings.domains.table.name")}
+                  </TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden sm:table-cell">
+                    {t("settings.domains.table.url")}
+                  </TableHead>
+                  <TableHead className="text-xs sm:text-sm">
+                    {t("settings.domains.table.default")}
+                  </TableHead>
+                  <TableHead className="text-right text-xs sm:text-sm">
+                    {t("settings.domains.table.actions")}
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {domains.map((domain) => (
+                  <TableRow key={domain.id}>
+                    <TableCell className="text-xs sm:text-sm font-medium">
+                      {domain.id}
+                    </TableCell>
+                    <TableCell className="text-xs sm:text-sm">
+                      {domain.name}
+                    </TableCell>
+                    <TableCell className="text-xs sm:text-sm hidden sm:table-cell truncate max-w-[150px]">
+                      {domain.url}
+                    </TableCell>
+                    <TableCell className="text-xs sm:text-sm">
+                      {domain.isDefault ? t("common.yes") : t("common.no")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1 sm:gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 sm:h-8 sm:w-8"
+                          onClick={() => handleEdit(domain)}
+                        >
+                          <Pencil className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 sm:h-8 sm:w-8 text-destructive"
+                          onClick={() => handleDelete(domain.id)}
+                        >
+                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

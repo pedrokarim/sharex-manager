@@ -21,10 +21,12 @@ export default async function RootLayout({
         <div className="flex h-screen">
           <AppSidebar />
 
-          <div className="flex-1 relative">
-            <SidebarInset className="h-full">
-              <SidebarHeader showSearch={true} />
-              {children}
+          <div className="flex-1 relative min-w-0">
+            <SidebarInset className="h-full overflow-hidden">
+              <SidebarHeader />
+              <div className="h-[calc(100vh-var(--header-height))] overflow-y-auto">
+                {children}
+              </div>
             </SidebarInset>
           </div>
         </div>

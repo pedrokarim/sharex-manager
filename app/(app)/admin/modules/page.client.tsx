@@ -179,42 +179,55 @@ export function ModulesPageClient({ initialModules }: ModulesPageClientProps) {
       : modules.filter((module) => !module.enabled);
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Package className="h-8 w-8" />
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+          <Package className="h-6 w-6 sm:h-8 sm:w-8" />
           Gestion des modules
         </h1>
-        <p className="text-muted-foreground mt-2">
+        <p className="text-sm sm:text-base text-muted-foreground mt-2">
           Gérez les modules installés dans ShareX Manager
         </p>
       </div>
 
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
-          className="w-[400px]"
+          className="w-full sm:w-[400px]"
         >
-          <TabsList>
-            <TabsTrigger value="all">Tous</TabsTrigger>
-            <TabsTrigger value="enabled">Activés</TabsTrigger>
-            <TabsTrigger value="disabled">Désactivés</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 sm:w-auto">
+            <TabsTrigger value="all" className="text-xs sm:text-sm">
+              Tous
+            </TabsTrigger>
+            <TabsTrigger value="enabled" className="text-xs sm:text-sm">
+              Activés
+            </TabsTrigger>
+            <TabsTrigger value="disabled" className="text-xs sm:text-sm">
+              Désactivés
+            </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        <Button variant="outline" onClick={refreshModules} disabled={isLoading}>
+        <Button
+          variant="outline"
+          onClick={refreshModules}
+          disabled={isLoading}
+          className="w-full sm:w-auto text-sm"
+        >
           <RefreshCw
-            className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+            className={`h-3 w-3 sm:h-4 sm:w-4 mr-2 ${
+              isLoading ? "animate-spin" : ""
+            }`}
           />
           Rafraîchir
         </Button>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {filteredModules.length === 0 ? (
           <Card>
-            <CardContent className="pt-6 text-center text-muted-foreground">
+            <CardContent className="pt-4 sm:pt-6 text-center text-muted-foreground text-sm">
               Aucun module{" "}
               {activeTab === "enabled"
                 ? "activé"
@@ -227,41 +240,57 @@ export function ModulesPageClient({ initialModules }: ModulesPageClientProps) {
         ) : (
           filteredModules.map((module) => (
             <Card key={module.name}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      {module.name}
-                      <Badge variant={module.enabled ? "default" : "secondary"}>
+              <CardHeader className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="flex flex-col sm:flex-row sm:items-center gap-2 text-base sm:text-lg">
+                      <span className="truncate">{module.name}</span>
+                      <Badge
+                        variant={module.enabled ? "default" : "secondary"}
+                        className="text-xs w-fit"
+                      >
                         {module.enabled ? "Activé" : "Désactivé"}
                       </Badge>
                     </CardTitle>
-                    <CardDescription>{module.description}</CardDescription>
+                    <CardDescription className="text-sm">
+                      {module.description}
+                    </CardDescription>
                   </div>
                   <Switch
                     checked={module.enabled}
                     onCheckedChange={() =>
                       toggleModuleStatus(module.name, module.enabled)
                     }
+                    className="flex-shrink-0"
                   />
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6 pt-0">
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-sm font-medium mb-2">Informations</h3>
-                    <Table>
-                      <TableBody>
-                        <TableRow>
-                          <TableCell className="font-medium">Version</TableCell>
-                          <TableCell>{module.version}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="font-medium">Auteur</TableCell>
-                          <TableCell>{module.author}</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell className="font-medium text-xs sm:text-sm">
+                              Version
+                            </TableCell>
+                            <TableCell className="text-xs sm:text-sm">
+                              {module.version}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium text-xs sm:text-sm">
+                              Auteur
+                            </TableCell>
+                            <TableCell className="text-xs sm:text-sm">
+                              {module.author}
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
 
                   {module.npmDependencies &&
@@ -270,29 +299,39 @@ export function ModulesPageClient({ initialModules }: ModulesPageClientProps) {
                         <h3 className="text-sm font-medium mb-2">
                           Dépendances NPM
                         </h3>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Nom</TableHead>
-                              <TableHead>Version</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {Object.entries(module.npmDependencies).map(
-                              ([name, version]) => (
-                                <TableRow key={name}>
-                                  <TableCell>{name}</TableCell>
-                                  <TableCell>{version}</TableCell>
-                                </TableRow>
-                              )
-                            )}
-                          </TableBody>
-                        </Table>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs sm:text-sm">
+                                  Nom
+                                </TableHead>
+                                <TableHead className="text-xs sm:text-sm">
+                                  Version
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {Object.entries(module.npmDependencies).map(
+                                ([name, version]) => (
+                                  <TableRow key={name}>
+                                    <TableCell className="text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">
+                                      {name}
+                                    </TableCell>
+                                    <TableCell className="text-xs sm:text-sm">
+                                      {version}
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
                     )}
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end gap-2">
+              <CardFooter className="flex flex-col sm:flex-row justify-end gap-2 p-4 sm:p-6">
                 {module.npmDependencies &&
                   Object.keys(module.npmDependencies).length > 0 && (
                     <Button
@@ -300,22 +339,28 @@ export function ModulesPageClient({ initialModules }: ModulesPageClientProps) {
                       size="sm"
                       onClick={() => installDependencies(module.name)}
                       disabled={isInstallingDependencies[module.name]}
+                      className="w-full sm:w-auto text-xs sm:text-sm"
                     >
                       {isInstallingDependencies[module.name] ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                           Installation...
                         </>
                       ) : (
                         <>
-                          <Download className="mr-2 h-4 w-4" />
+                          <Download className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                           Installer les dépendances
                         </>
                       )}
                     </Button>
                   )}
-                <Button variant="outline" size="sm" disabled>
-                  <Settings className="mr-2 h-4 w-4" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  className="w-full sm:w-auto text-xs sm:text-sm"
+                >
+                  <Settings className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                   Configurer
                 </Button>
               </CardFooter>

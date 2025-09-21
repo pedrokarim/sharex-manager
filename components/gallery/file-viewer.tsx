@@ -226,7 +226,7 @@ export function FileViewer({
 
   return (
     <Dialog open={!!file} onOpenChange={() => file && onClose()}>
-      <DialogContent className="max-w-[95vw] w-full border-none bg-background/95 p-0 backdrop-blur-xl">
+      <DialogContent className="max-w-[95vw] w-full max-h-[95vh] border-none bg-background/95 p-0 gap-0 backdrop-blur-xl overflow-hidden">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -237,11 +237,11 @@ export function FileViewer({
             damping: 30,
             duration: 0.2,
           }}
-          className="w-full h-full"
+          className="w-full h-full overflow-hidden"
         >
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between p-4">
-              <span>{file.name}</span>
+            <DialogTitle className="flex items-center justify-between p-4 overflow-hidden">
+              <span className="truncate">{file.name}</span>
             </DialogTitle>
           </DialogHeader>
           <DialogDescription>
@@ -253,9 +253,14 @@ export function FileViewer({
               })}
             </VisuallyHidden>
           </DialogDescription>
-          <div className="relative flex h-[85vh] overflow-hidden rounded-lg">
-            {/* Zone principale */}
-            <div className="relative flex-1">
+          <div className="relative flex h-[85vh] overflow-hidden rounded-lg w-full">
+            {/* Zone principale - Image */}
+            <div
+              className={cn(
+                "relative flex-1",
+                showDetails && "hidden lg:block"
+              )}
+            >
               <div className="absolute inset-0 flex items-center justify-center bg-background/80">
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -313,88 +318,6 @@ export function FileViewer({
                   />
                 )}
               </div>
-
-              {/* Barre d'actions flottante en bas */}
-              <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between gap-4 bg-gradient-to-t from-background/80 to-transparent p-4">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full bg-background/50 hover:bg-blue-600 hover:text-white text-blue-600"
-                    onClick={() => setShowDetails(!showDetails)}
-                  >
-                    <Info className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(
-                      "rounded-full bg-background/50 hover:bg-yellow-500 hover:text-white",
-                      file?.isStarred && "text-yellow-500"
-                    )}
-                    onClick={() => file && onToggleStar(file)}
-                  >
-                    <Star className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full bg-background/50 hover:bg-background/80"
-                    onClick={() => file && onCopy(file.url)}
-                  >
-                    <Copy className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full bg-background/50 hover:bg-background/80"
-                    asChild
-                  >
-                    <a
-                      href={file?.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <ExternalLink className="h-5 w-5" />
-                    </a>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(
-                      "rounded-full bg-background/50",
-                      file?.isSecure &&
-                        "text-yellow-500 hover:bg-yellow-500 hover:text-white"
-                    )}
-                    onClick={() => file && onToggleSecurity(file)}
-                  >
-                    {file?.isSecure ? (
-                      <Lock className="h-4 w-4" />
-                    ) : (
-                      <Unlock className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </Button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full bg-background/50 hover:bg-red-600 hover:text-white"
-                    onClick={() => file && onDelete(file.name)}
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full bg-background/50 hover:bg-background/80"
-                    onClick={onClose}
-                  >
-                    <X className="h-5 w-5" />
-                  </Button>
-                </div>
-              </div>
             </div>
 
             {/* Panneau latéral pour les détails */}
@@ -410,17 +333,17 @@ export function FileViewer({
                     damping: 30,
                     duration: 0.3,
                   }}
-                  className="w-80 bg-background/95 p-4 overflow-y-auto border-l border-border/50"
+                  className="w-full lg:w-80 bg-background/95 p-4 overflow-y-auto border-l border-border/50 min-w-0"
                 >
                   <h3 className="text-lg font-semibold mb-4">
                     {t("gallery.file_viewer.details")}
                   </h3>
-                  <div className="space-y-4">
+                  <div className="space-y-4 min-w-0">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">
                         {t("gallery.file_viewer.name")}
                       </p>
-                      <p className="text-sm">{file.name}</p>
+                      <p className="text-sm break-all">{file.name}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">
@@ -458,7 +381,7 @@ export function FileViewer({
                       <p className="text-sm font-medium text-muted-foreground">
                         {t("gallery.file_viewer.path")}
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground break-all">
                         {getFileStoragePath(file.name)}
                       </p>
                     </div>
@@ -478,7 +401,7 @@ export function FileViewer({
                       <p className="text-sm font-medium text-muted-foreground mb-2">
                         {t("gallery.file_viewer.actions")}
                       </p>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-2 w-full">
                         <Button
                           variant="outline"
                           size="sm"
@@ -566,6 +489,142 @@ export function FileViewer({
             </AnimatePresence>
           </div>
         </motion.div>
+
+        {/* Barre d'actions flottante en bas */}
+        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between gap-4 bg-gradient-to-t from-background/80 to-transparent px-4 py-2">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-background/50 hover:bg-blue-600 hover:text-white text-blue-600"
+              onClick={() => setShowDetails(!showDetails)}
+            >
+              <Info className="h-5 w-5" />
+            </Button>
+            <AnimatePresence>
+              {!showDetails && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.5, x: 20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.5, x: 20 }}
+                    transition={{
+                      delay: 0,
+                      duration: 0.3,
+                      type: "spring",
+                      stiffness: 300,
+                    }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "rounded-full bg-background/50 hover:bg-yellow-500 hover:text-white",
+                        file?.isStarred && "text-yellow-500"
+                      )}
+                      onClick={() => file && onToggleStar(file)}
+                    >
+                      <Star className="h-5 w-5" />
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.5, x: 20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.5, x: 20 }}
+                    transition={{
+                      delay: 0.1,
+                      duration: 0.3,
+                      type: "spring",
+                      stiffness: 300,
+                    }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full bg-background/50 hover:bg-background/80"
+                      onClick={() => file && onCopy(file.url)}
+                    >
+                      <Copy className="h-5 w-5" />
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.5, x: 20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.5, x: 20 }}
+                    transition={{
+                      delay: 0.2,
+                      duration: 0.3,
+                      type: "spring",
+                      stiffness: 300,
+                    }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full bg-background/50 hover:bg-background/80"
+                      asChild
+                    >
+                      <a
+                        href={file?.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <ExternalLink className="h-5 w-5" />
+                      </a>
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.5, x: 20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.5, x: 20 }}
+                    transition={{
+                      delay: 0.3,
+                      duration: 0.3,
+                      type: "spring",
+                      stiffness: 300,
+                    }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "rounded-full bg-background/50",
+                        file?.isSecure &&
+                          "text-yellow-500 hover:bg-yellow-500 hover:text-white"
+                      )}
+                      onClick={() => file && onToggleSecurity(file)}
+                    >
+                      {file?.isSecure ? (
+                        <Lock className="h-4 w-4" />
+                      ) : (
+                        <Unlock className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-background/50 hover:bg-red-600 hover:text-white"
+              onClick={() => file && onDelete(file.name)}
+            >
+              <Trash2 className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-background/50 hover:bg-background/80"
+              onClick={onClose}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
       </DialogContent>
 
       {/* Dialogs pour les albums */}

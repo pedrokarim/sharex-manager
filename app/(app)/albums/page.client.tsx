@@ -104,62 +104,71 @@ export function AlbumsClient() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* En-tête */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">{t("albums.title")}</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold">{t("albums.title")}</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Organisez vos fichiers en albums pour un accès facile
           </p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+        <Button
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="w-full sm:w-auto text-sm"
+        >
+          <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
           {t("albums.create")}
         </Button>
       </div>
 
       {/* Barre de recherche et contrôles */}
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           <Input
             placeholder="Rechercher un album..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-8 sm:pl-10 text-sm"
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant={viewMode === "grid" ? "default" : "outline"}
-            size="icon"
-            onClick={() => setViewMode("grid")}
-          >
-            <Grid className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={viewMode === "list" ? "default" : "outline"}
-            size="icon"
-            onClick={() => setViewMode("list")}
-          >
-            <List className="h-4 w-4" />
-          </Button>
-        </div>
+        <div className="flex items-center justify-between sm:justify-start gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button
+              variant={viewMode === "grid" ? "default" : "outline"}
+              size="icon"
+              className="h-8 w-8 sm:h-9 sm:w-9"
+              onClick={() => setViewMode("grid")}
+            >
+              <Grid className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "default" : "outline"}
+              size="icon"
+              className="h-8 w-8 sm:h-9 sm:w-9"
+              onClick={() => setViewMode("list")}
+            >
+              <List className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
+          </div>
 
-        <Badge variant="secondary">{filteredAlbums.length} album(s)</Badge>
+          <Badge variant="secondary" className="text-xs sm:text-sm">
+            {filteredAlbums.length} album(s)
+          </Badge>
+        </div>
       </div>
 
       {/* Contenu */}
       {filteredAlbums.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
+        <div className="flex flex-col items-center justify-center py-12 sm:py-24 text-center px-4">
+          <FolderOpen className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
           <div className="space-y-2">
-            <h3 className="text-lg font-semibold">
+            <h3 className="text-base sm:text-lg font-semibold">
               {searchQuery ? "Aucun album trouvé" : t("albums.no_albums.title")}
             </h3>
-            <p className="text-sm text-muted-foreground max-w-md">
+            <p className="text-xs sm:text-sm text-muted-foreground max-w-md">
               {searchQuery
                 ? `Aucun album ne correspond à "${searchQuery}"`
                 : t("albums.no_albums.description")}
@@ -167,9 +176,9 @@ export function AlbumsClient() {
             {!searchQuery && (
               <Button
                 onClick={() => setIsCreateDialogOpen(true)}
-                className="mt-4"
+                className="mt-3 sm:mt-4 text-sm"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                 {t("albums.create")}
               </Button>
             )}
@@ -179,8 +188,8 @@ export function AlbumsClient() {
         <div
           className={
             viewMode === "grid"
-              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-              : "space-y-4"
+              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
+              : "space-y-3 sm:space-y-4"
           }
         >
           {filteredAlbums.map((album) => (
@@ -207,5 +216,3 @@ export function AlbumsClient() {
     </div>
   );
 }
-
-

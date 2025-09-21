@@ -1,0 +1,78 @@
+{
+  "expo": {
+    "name": "ShareX Manager",
+    "slug": "sharex-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/logo-sxm-simple.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Cette application a besoin d'accéder à l'appareil photo pour prendre des photos à uploader.",
+        "NSPhotoLibraryUsageDescription": "Cette application a besoin d'accéder à la galerie pour sélectionner des images à uploader."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ],
+      "package": "com.anonymous.sharexmobile"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "L'application a besoin d'accéder à vos photos pour les uploader vers ShareX Manager.",
+          "cameraPermission": "L'application a besoin d'accéder à l'appareil photo pour prendre des photos à uploader."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "L'application a besoin d'accéder à l'appareil photo pour prendre des photos à uploader."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "L'application a besoin d'accéder à vos photos pour les uploader vers ShareX Manager.",
+          "savePhotosPermission": "L'application a besoin de sauvegarder des photos dans votre galerie.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
+    ],
+    "scheme": "sharex-manager",
+    "extra": {
+      "eas": {
+        "projectId": "5e704252-dcac-471c-8629-91b29f5efdf3"
+      }
+    },
+    "owner": "pedrokarim"
+  }
+}

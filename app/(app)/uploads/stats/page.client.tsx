@@ -353,15 +353,15 @@ export function StatsPageClient() {
   if (!stats) return null;
 
   return (
-    <main className="p-8">
+    <main className="p-4 sm:p-6 lg:p-8">
       <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex flex-col gap-4 py-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div className="flex flex-col gap-2">
-              <h1 className="text-3xl font-bold tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
                 {t("uploads.stats.title")}
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm sm:text-base">
                 {t("uploads.stats.description")}
               </p>
             </div>
@@ -374,7 +374,7 @@ export function StatsPageClient() {
                 />
                 <Label
                   htmlFor="test-mode"
-                  className="text-sm text-muted-foreground"
+                  className="text-xs sm:text-sm text-muted-foreground"
                 >
                   {useTestData ? "Données de test" : "Données réelles"}
                 </Label>
@@ -384,17 +384,19 @@ export function StatsPageClient() {
         </div>
       </div>
 
-      <div className="grid gap-6 mt-8">
+      <div className="grid gap-4 sm:gap-6 mt-6 sm:mt-8">
         {/* Cartes de statistiques générales */}
-        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 {t("uploads.stats.cards.total_uploads")}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalUploads}</div>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">
+                {stats.totalUploads}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {t("uploads.stats.labels.total")}
               </p>
@@ -402,13 +404,13 @@ export function StatsPageClient() {
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 {t("uploads.stats.cards.total_size")}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">
                 {formatFileSize(stats.totalSize)}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -418,13 +420,13 @@ export function StatsPageClient() {
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 {t("uploads.stats.labels.api")}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">
                 {stats.uploadsByMethod.api}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -434,13 +436,13 @@ export function StatsPageClient() {
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 {t("uploads.stats.labels.web")}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">
                 {stats.uploadsByMethod.web}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -451,13 +453,13 @@ export function StatsPageClient() {
 
           {/* Nouvelles cartes */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 {t("uploads.stats.labels.oldest_file")}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold">
                 {format(new Date(stats.oldestFile.date), "dd/MM/yyyy", {
                   locale,
                 })}
@@ -472,13 +474,13 @@ export function StatsPageClient() {
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 {t("uploads.stats.labels.newest_file")}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold">
                 {format(new Date(stats.newestFile.date), "dd/MM/yyyy", {
                   locale,
                 })}
@@ -496,9 +498,11 @@ export function StatsPageClient() {
         {/* Graphique des uploads par jour */}
         <Card className="col-span-full">
           <CardHeader className="flex flex-col items-stretch space-y-0 border-b p-0 sm:flex-row">
-            <div className="flex flex-1 flex-col justify-center gap-1 px-6 py-5 sm:py-6">
-              <CardTitle>{t("uploads.stats.charts.uploads_by_day")}</CardTitle>
-              <p className="text-sm text-muted-foreground">
+            <div className="flex flex-1 flex-col justify-center gap-1 px-4 py-4 sm:px-6 sm:py-5 lg:py-6">
+              <CardTitle className="text-base sm:text-lg">
+                {t("uploads.stats.charts.uploads_by_day")}
+              </CardTitle>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 {t("uploads.stats.charts.uploads_by_method")}
               </p>
             </div>
@@ -514,7 +518,7 @@ export function StatsPageClient() {
                     )
                   }
                   className={cn(
-                    "relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-6 py-4 text-left even:border-l sm:border-l sm:border-t-0 sm:px-8 sm:py-6 transition-colors",
+                    "relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-4 py-3 text-left even:border-l sm:border-l sm:border-t-0 sm:px-6 sm:py-4 lg:px-8 lg:py-6 transition-colors",
                     activeView === method || activeView === null
                       ? "hover:bg-muted/50"
                       : "opacity-50 hover:opacity-75 bg-muted/10"
@@ -523,7 +527,7 @@ export function StatsPageClient() {
                   <span className="text-xs text-muted-foreground">
                     {t(`uploads.stats.labels.${method}`)}
                   </span>
-                  <span className="text-lg font-bold leading-none sm:text-3xl">
+                  <span className="text-base sm:text-lg lg:text-3xl font-bold leading-none">
                     {
                       stats.uploadsByMethod[
                         method as keyof typeof stats.uploadsByMethod
@@ -534,9 +538,9 @@ export function StatsPageClient() {
               ))}
             </div>
           </CardHeader>
-          <CardContent className="!p-6">
+          <CardContent className="!p-4 sm:!p-6">
             <ChartContainer config={chartConfig}>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={stats.uploadsByDay}>
                   <CartesianGrid vertical={false} />
                   <XAxis
@@ -634,12 +638,14 @@ export function StatsPageClient() {
 
         {/* Graphique de la taille moyenne des fichiers par jour */}
         <Card className="col-span-full">
-          <CardHeader>
-            <CardTitle>{t("uploads.stats.cards.average_size")}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">
+              {t("uploads.stats.cards.average_size")}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <ChartContainer config={chartConfig}>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={stats.averageSizeByDay}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
@@ -712,15 +718,17 @@ export function StatsPageClient() {
         </Card>
 
         {/* Graphiques côte à côte */}
-        <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
           {/* Types de fichiers */}
           <Card>
-            <CardHeader>
-              <CardTitle>{t("uploads.stats.charts.uploads_by_type")}</CardTitle>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-base sm:text-lg">
+                {t("uploads.stats.charts.uploads_by_type")}
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
               <ChartContainer config={chartConfig}>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={250}>
                   <PieChart>
                     <ChartTooltip
                       content={({ active, payload }) => {
@@ -784,12 +792,14 @@ export function StatsPageClient() {
 
           {/* Uploads par heure */}
           <Card>
-            <CardHeader>
-              <CardTitle>{t("uploads.stats.charts.uploads_by_hour")}</CardTitle>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-base sm:text-lg">
+                {t("uploads.stats.charts.uploads_by_hour")}
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
               <ChartContainer config={chartConfig}>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={stats.uploadsByHour}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis
@@ -837,14 +847,14 @@ export function StatsPageClient() {
 
         {/* Uploads par jour de la semaine */}
         <Card className="col-span-full">
-          <CardHeader>
-            <CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">
               {t("uploads.stats.charts.uploads_by_weekday")}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <ChartContainer config={chartConfig}>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={stats.uploadsByWeekday}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="weekday" tickLine={false} axisLine={false} />
@@ -884,12 +894,14 @@ export function StatsPageClient() {
 
         {/* Distribution des tailles de fichiers */}
         <Card className="col-span-full">
-          <CardHeader>
-            <CardTitle>{t("uploads.stats.charts.size_distribution")}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">
+              {t("uploads.stats.charts.size_distribution")}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <ChartContainer config={chartConfig}>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={stats.sizeDistribution}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="range" tickLine={false} axisLine={false} />
@@ -939,12 +951,14 @@ export function StatsPageClient() {
 
         {/* Croissance mensuelle */}
         <Card className="col-span-full">
-          <CardHeader>
-            <CardTitle>{t("uploads.stats.charts.monthly_growth")}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">
+              {t("uploads.stats.charts.monthly_growth")}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <ChartContainer config={chartConfig}>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250}>
                 <AreaChart data={stats.monthlyGrowth}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis

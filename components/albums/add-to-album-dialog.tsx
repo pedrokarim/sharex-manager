@@ -167,10 +167,12 @@ export function AddToAlbumDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[95vw] max-w-md mx-auto">
           <DialogHeader>
-            <DialogTitle>Ajouter à un album</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">
+              Ajouter à un album
+            </DialogTitle>
+            <DialogDescription className="text-sm">
               Sélectionnez un ou plusieurs albums pour y ajouter{" "}
               {selectedFiles.length} fichier(s)
             </DialogDescription>
@@ -179,32 +181,32 @@ export function AddToAlbumDialog({
           <div className="space-y-4">
             {/* Recherche */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher un album..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-8 sm:pl-10 text-sm"
               />
             </div>
 
             {/* Liste des albums */}
             {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin" />
+              <div className="flex items-center justify-center py-6 sm:py-8">
+                <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" />
               </div>
             ) : (
-              <ScrollArea className="h-64">
+              <ScrollArea className="h-48 sm:h-64">
                 <div className="space-y-2">
                   {filteredAlbums.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
+                    <div className="text-center py-6 sm:py-8 text-muted-foreground text-sm">
                       {searchQuery ? "Aucun album trouvé" : "Aucun album créé"}
                     </div>
                   ) : (
                     filteredAlbums.map((album) => (
                       <div
                         key={album.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${
                           selectedAlbums.has(album.id)
                             ? "border-primary bg-primary/5"
                             : "border-border hover:bg-accent/50"
@@ -212,14 +214,14 @@ export function AddToAlbumDialog({
                         onClick={() => toggleAlbum(album.id)}
                       >
                         <div className="flex-shrink-0">
-                          <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center">
-                            <FolderOpen className="h-4 w-4 text-primary" />
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded bg-primary/10 flex items-center justify-center">
+                            <FolderOpen className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                           </div>
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <span className="font-medium truncate text-sm sm:text-base">
                               {album.name}
                             </span>
                             <Badge variant="secondary" className="text-xs">
@@ -227,14 +229,14 @@ export function AddToAlbumDialog({
                             </Badge>
                           </div>
                           {album.description && (
-                            <p className="text-sm text-muted-foreground truncate">
+                            <p className="text-xs sm:text-sm text-muted-foreground truncate">
                               {album.description}
                             </p>
                           )}
                         </div>
 
                         {selectedAlbums.has(album.id) && (
-                          <Check className="h-4 w-4 text-primary" />
+                          <Check className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                         )}
                       </div>
                     ))
@@ -248,10 +250,10 @@ export function AddToAlbumDialog({
               <Separator className="mb-3" />
               <Button
                 variant="outline"
-                className="w-full"
+                className="w-full text-sm"
                 onClick={() => setIsCreateDialogOpen(true)}
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                 {t("albums.create")}
               </Button>
             </div>
@@ -259,19 +261,27 @@ export function AddToAlbumDialog({
 
           <DialogFooter className="flex-col gap-2">
             {selectedAlbums.size > 0 && (
-              <div className="text-sm text-muted-foreground">
+              <div className="text-xs sm:text-sm text-muted-foreground">
                 {selectedAlbums.size} album(s) sélectionné(s)
               </div>
             )}
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleClose} disabled={adding}>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                disabled={adding}
+                className="w-full sm:w-auto text-sm"
+              >
                 {t("common.cancel")}
               </Button>
               <Button
                 onClick={handleAddToAlbums}
                 disabled={selectedAlbums.size === 0 || adding}
+                className="w-full sm:w-auto text-sm"
               >
-                {adding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {adding && (
+                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
+                )}
                 {selectedAlbums.size === 1
                   ? "Ajouter à l'album"
                   : `Ajouter à ${selectedAlbums.size} albums`}

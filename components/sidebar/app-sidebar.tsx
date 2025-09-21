@@ -233,7 +233,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <span className="truncate font-semibold">
                     {t("sidebar.app_name")}
                   </span>
-                  <span className="truncate text-xs">
+                  <span className="truncate text-xs hidden sm:block">
                     {t("sidebar.app_description")}
                   </span>
                 </div>

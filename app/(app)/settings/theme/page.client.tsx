@@ -337,83 +337,98 @@ export function ThemeConfigClient() {
   };
 
   return (
-    <div className="flex flex-col h-full p-8">
-      <div className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4" />
+    <div className="flex flex-col h-full p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.back()}
+            className="h-8 w-8 sm:h-9 sm:w-9"
+          >
+            <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Paintbrush className="h-8 w-8" />
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold flex items-center gap-2">
+              <Paintbrush className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8" />
               {t("settings.theme_advanced")}
             </h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
               {t("settings.theme_advanced_description")}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-4 mb-6">
-        <Button
-          variant={activeTheme === "light" ? "default" : "outline"}
-          onClick={() => setActiveTheme("light")}
-        >
-          <Sun className="h-4 w-4 mr-2" />
-          {t("settings.theme_options.light")}
-        </Button>
-        <Button
-          variant={activeTheme === "dark" ? "default" : "outline"}
-          onClick={() => setActiveTheme("dark")}
-        >
-          <Moon className="h-4 w-4 mr-2" />
-          {t("settings.theme_options.dark")}
-        </Button>
-        <div className="flex items-center gap-2 ml-auto">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="flex gap-2 sm:gap-4">
+          <Button
+            variant={activeTheme === "light" ? "default" : "outline"}
+            onClick={() => setActiveTheme("light")}
+            className="flex-1 sm:flex-none text-sm"
+          >
+            <Sun className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+            {t("settings.theme_options.light")}
+          </Button>
+          <Button
+            variant={activeTheme === "dark" ? "default" : "outline"}
+            onClick={() => setActiveTheme("dark")}
+            className="flex-1 sm:flex-none text-sm"
+          >
+            <Moon className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+            {t("settings.theme_options.dark")}
+          </Button>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 sm:ml-auto">
           <Select
             onValueChange={(value: keyof typeof presets) =>
               setSelectedCategory(value)
             }
             value={selectedCategory}
           >
-            <SelectTrigger className="w-[180px]">
-              <Palette className="h-4 w-4 mr-2" />
+            <SelectTrigger className="w-full sm:w-[180px] text-sm">
+              <Palette className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
               <SelectValue
                 placeholder={t("settings.theme_config.choose_category")}
               />
             </SelectTrigger>
             <SelectContent>
               {Object.keys(presets).map((category) => (
-                <SelectItem key={category} value={category}>
+                <SelectItem key={category} value={category} className="text-sm">
                   {category}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={handleReset}>
-            <Settings2 className="h-4 w-4 mr-2" />
+          <Button
+            variant="outline"
+            onClick={handleReset}
+            className="w-full sm:w-auto text-sm"
+          >
+            <Settings2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
             {t("common.reset")}
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 flex-1">
+      <div className="grid gap-4 sm:gap-6 flex-1">
         <Card>
-          <CardHeader>
-            <CardTitle>{t("settings.theme_config.presets")}</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">
+              {t("settings.theme_config.presets")}
+            </CardTitle>
+            <CardDescription className="text-sm">
               {t("settings.theme_config.presets_description")}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
+          <CardContent className="p-4 sm:p-6 pt-0">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 sm:gap-3">
               {Object.entries(presets[selectedCategory]).map(
                 ([name, preset]) => (
                   <div
                     key={name}
                     className={cn(
-                      "flex flex-col gap-1.5 p-2 rounded-lg border cursor-pointer hover:bg-accent transition-colors",
+                      "flex flex-col gap-1.5 p-2 sm:p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors",
                       {
                         "border-primary": config.theme === name,
                       }
@@ -440,16 +455,20 @@ export function ThemeConfigClient() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>{t("settings.theme_config.general")}</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">
+              {t("settings.theme_config.general")}
+            </CardTitle>
+            <CardDescription className="text-sm">
               {t("settings.theme_config.general_description")}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>{t("settings.theme_config.radius")}</Label>
+          <CardContent className="p-4 sm:p-6 pt-0">
+            <div className="space-y-4 sm:space-y-6">
+              <div className="space-y-2 sm:space-y-3">
+                <Label className="text-sm sm:text-base">
+                  {t("settings.theme_config.radius")}
+                </Label>
                 <div className="pt-2">
                   <SliderWithStops
                     value={[parseFloat(config.cssVars[activeTheme].radius)]}
@@ -460,7 +479,7 @@ export function ThemeConfigClient() {
                     className="w-full"
                     onValueChange={([value]) => handleRadiusChange(value)}
                   />
-                  <div className="flex justify-between mt-4 text-sm text-muted-foreground">
+                  <div className="flex justify-between mt-4 text-xs sm:text-sm text-muted-foreground">
                     <span>{t("settings.theme_config.square")}</span>
                     <span>{t("settings.theme_config.rounded")}</span>
                   </div>
@@ -472,17 +491,22 @@ export function ThemeConfigClient() {
 
         {colorGroups.map((group) => (
           <Card key={group.title}>
-            <CardHeader>
-              <CardTitle>{group.title}</CardTitle>
-              <CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-lg sm:text-xl">
+                {group.title}
+              </CardTitle>
+              <CardDescription className="text-sm">
                 {t("settings.theme_config.general_description")}
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="grid gap-3 sm:gap-4">
                 {group.colors.map((colorKey) => (
-                  <div key={colorKey} className="flex items-center gap-4">
-                    <div className="flex-1">
+                  <div
+                    key={colorKey}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
                       <Label htmlFor={colorKey} className="text-sm font-medium">
                         {getColorLabel(colorKey)}{" "}
                         <code className="text-xs px-1 py-0.5 rounded bg-muted">
@@ -492,7 +516,7 @@ export function ThemeConfigClient() {
                     </div>
                     <div className="flex items-center gap-2">
                       <div
-                        className="w-6 h-6 rounded border"
+                        className="w-6 h-6 rounded border flex-shrink-0"
                         style={{
                           backgroundColor: `hsl(${
                             config.cssVars[activeTheme][
@@ -509,7 +533,7 @@ export function ThemeConfigClient() {
                             colorKey as keyof ColorVars
                           ] as string
                         )}
-                        className="w-[100px]"
+                        className="w-[80px] sm:w-[100px]"
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           handleColorChange(
                             colorKey as keyof ColorVars,
@@ -527,18 +551,23 @@ export function ThemeConfigClient() {
         ))}
 
         <Card>
-          <CardHeader>
-            <CardTitle>{t("settings.theme_config.chart_colors")}</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">
+              {t("settings.theme_config.chart_colors")}
+            </CardTitle>
+            <CardDescription className="text-sm">
               {t("settings.theme_config.chart_colors_description")}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-6">
-              <div className="grid gap-4">
+          <CardContent className="p-4 sm:p-6 pt-0">
+            <div className="grid gap-4 sm:gap-6">
+              <div className="grid gap-3 sm:gap-4">
                 {chartColors.map((colorKey) => (
-                  <div key={colorKey} className="flex items-center gap-4">
-                    <div className="flex-1">
+                  <div
+                    key={colorKey}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
                       <Label htmlFor={colorKey} className="text-sm font-medium">
                         {getColorLabel(colorKey)}{" "}
                         <code className="text-xs px-1 py-0.5 rounded bg-muted">
@@ -548,7 +577,7 @@ export function ThemeConfigClient() {
                     </div>
                     <div className="flex items-center gap-2">
                       <div
-                        className="w-6 h-6 rounded border"
+                        className="w-6 h-6 rounded border flex-shrink-0"
                         style={{
                           backgroundColor: `hsl(${
                             config.cssVars[activeTheme][
@@ -565,7 +594,7 @@ export function ThemeConfigClient() {
                             colorKey as keyof ColorVars
                           ] as string
                         )}
-                        className="w-[100px]"
+                        className="w-[80px] sm:w-[100px]"
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           handleColorChange(
                             colorKey as keyof ColorVars,
@@ -579,23 +608,25 @@ export function ThemeConfigClient() {
                 ))}
               </div>
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-4 sm:mt-6 space-y-4">
                 <Label className="text-sm font-medium">
                   {t("common.preview")}
                 </Label>
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                   {chartExamples.map((example, i) => (
                     <div
                       key={i}
                       className={cn(
-                        "rounded-lg border p-4",
-                        i > 0 && "hidden xl:block"
+                        "rounded-lg border p-3 sm:p-4",
+                        i > 1 && "hidden xl:block"
                       )}
                     >
-                      <p className="text-sm font-medium mb-4">
+                      <p className="text-xs sm:text-sm font-medium mb-3 sm:mb-4">
                         {example.title}
                       </p>
-                      {example.render("w-full")}
+                      <div className="overflow-x-auto">
+                        {example.render("w-full min-w-[250px]")}
+                      </div>
                     </div>
                   ))}
                 </div>

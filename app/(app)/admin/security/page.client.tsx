@@ -31,32 +31,36 @@ export default function SecurityPageClient() {
   };
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Shield className="h-8 w-8" />
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+          <Shield className="h-6 w-6 sm:h-8 sm:w-8" />
           {t("admin.security.title")}
         </h1>
-        <p className="text-muted-foreground mt-2">
+        <p className="text-muted-foreground mt-2 text-sm sm:text-base">
           {t("admin.security.description")}
         </p>
       </div>
 
-      <Card className="max-w-2xl mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
+      <Card className="max-w-2xl mb-4 sm:mb-6">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
             {t("admin.security.scan.title")}
           </CardTitle>
-          <CardDescription>{t("admin.security.scan.subtitle")}</CardDescription>
+          <CardDescription className="text-sm">
+            {t("admin.security.scan.subtitle")}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0">
           <div className="space-y-4">
-            <p>{t("admin.security.scan.description")}</p>
+            <p className="text-sm sm:text-base">
+              {t("admin.security.scan.description")}
+            </p>
             <Button
               onClick={handleSecurityScan}
               disabled={isLoading}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto text-sm"
             >
               {isLoading ? (
                 <>
@@ -72,19 +76,21 @@ export default function SecurityPageClient() {
       </Card>
 
       <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
             {t("admin.security.coming_soon.title")}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             {t("admin.security.coming_soon.subtitle")}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0">
           <div className="space-y-4">
-            <p>{t("admin.security.coming_soon.description")}</p>
-            <ul className="list-disc pl-6 space-y-2">
+            <p className="text-sm sm:text-base">
+              {t("admin.security.coming_soon.description")}
+            </p>
+            <ul className="list-disc pl-4 sm:pl-6 space-y-1 sm:space-y-2 text-sm sm:text-base">
               <li>{t("admin.security.features.password_policies")}</li>
               <li>{t("admin.security.features.two_factor")}</li>
               <li>{t("admin.security.features.ip_restrictions")}</li>
@@ -92,7 +98,7 @@ export default function SecurityPageClient() {
               <li>{t("admin.security.features.login_attempts")}</li>
               <li>{t("admin.security.features.security_alerts")}</li>
             </ul>
-            <p className="text-muted-foreground mt-4">
+            <p className="text-muted-foreground mt-4 text-sm sm:text-base">
               {t("admin.security.coming_soon.check_back")}
             </p>
           </div>

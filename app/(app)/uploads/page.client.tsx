@@ -41,28 +41,36 @@ export function UploadsPageClient() {
   ];
 
   return (
-    <main className="p-8">
+    <main className="p-4 sm:p-6 lg:p-8">
       <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex flex-col gap-4 py-4">
           <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
               {t("uploads.title")}
             </h1>
-            <p className="text-muted-foreground">{t("uploads.description")}</p>
+            <p className="text-muted-foreground text-sm sm:text-base">
+              {t("uploads.description")}
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
         {features.map((feature) => (
           <Link key={feature.href} href={feature.href}>
             <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-              <CardHeader>
+              <CardHeader className="p-4 sm:p-6">
                 <div className="flex items-center gap-2">
-                  <feature.icon className={`h-5 w-5 ${feature.color}`} />
-                  <CardTitle>{feature.title}</CardTitle>
+                  <feature.icon
+                    className={`h-4 w-4 sm:h-5 sm:w-5 ${feature.color}`}
+                  />
+                  <CardTitle className="text-base sm:text-lg">
+                    {feature.title}
+                  </CardTitle>
                 </div>
-                <CardDescription>{feature.description}</CardDescription>
+                <CardDescription className="text-sm">
+                  {feature.description}
+                </CardDescription>
               </CardHeader>
             </Card>
           </Link>

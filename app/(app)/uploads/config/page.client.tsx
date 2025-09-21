@@ -35,21 +35,21 @@ export function ConfigPageClient() {
 
   if (isLoading) {
     return (
-      <main className="flex items-center justify-center flex-1">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <main className="flex items-center justify-center flex-1 p-4 sm:p-6 lg:p-8">
+        <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin" />
       </main>
     );
   }
 
   return (
-    <main className="p-8">
+    <main className="p-4 sm:p-6 lg:p-8">
       <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex flex-col gap-4 py-4">
           <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
               {t("uploads.config.title")}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm sm:text-base">
               {t("uploads.config.description")}
             </p>
           </div>
@@ -57,16 +57,19 @@ export function ConfigPageClient() {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="space-y-6 sm:space-y-8"
+        >
           <Tabs defaultValue="general" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="general">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="general" className="text-xs sm:text-sm">
                 {t("uploads.config.tabs.general")}
               </TabsTrigger>
-              <TabsTrigger value="thumbnails">
+              <TabsTrigger value="thumbnails" className="text-xs sm:text-sm">
                 {t("uploads.config.tabs.thumbnails")}
               </TabsTrigger>
-              <TabsTrigger value="storage">
+              <TabsTrigger value="storage" className="text-xs sm:text-sm">
                 {t("uploads.config.tabs.storage")}
               </TabsTrigger>
             </TabsList>
@@ -85,8 +88,10 @@ export function ConfigPageClient() {
           </Tabs>
 
           <div className="flex justify-end">
-            <Button type="submit" disabled={isSaving}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" disabled={isSaving} className="text-sm">
+              {isSaving && (
+                <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+              )}
               {t("common.save")}
             </Button>
           </div>

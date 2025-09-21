@@ -1004,5 +1004,126 @@
       "reset": "Réinitialiser",
       "preview": "Aperçu"
     }
+  },
+  "support": {
+    "title": "Support & Aide",
+    "description": "Besoin d'aide avec ShareX Manager ? Nous sommes là pour vous accompagner ! Choisissez le canal de support qui vous convient le mieux.",
+    "discord": {
+      "title": "Discord Community",
+      "description": "Rejoignez notre communauté Discord pour obtenir de l'aide en temps réel, partager vos expériences et discuter avec d'autres utilisateurs.",
+      "benefits": "Avantages :",
+      "benefits_list": [
+        "Support en temps réel",
+        "Communauté active",
+        "Partages d'astuces et conseils",
+        "Annonces des nouvelles fonctionnalités"
+      ],
+      "join_button": "Rejoindre Discord"
+    },
+    "github": {
+      "title": "GitHub Repository",
+      "description": "Consultez le code source, signalez des bugs, proposez des améliorations ou contribuez au développement de ShareX Manager.",
+      "available": "Disponible :",
+      "available_list": [
+        "Code source complet",
+        "Issue tracker pour les bugs",
+        "Pull requests pour les contributions",
+        "Documentation technique"
+      ],
+      "view_button": "Voir sur GitHub"
+    },
+    "faq": {
+      "title": "Questions Fréquentes",
+      "description": "Quelques réponses rapides aux questions les plus courantes.",
+      "questions": [
+        {
+          "question": "Comment installer ShareX Manager ?",
+          "answer": "Consultez la documentation sur GitHub ou demandez de l'aide sur Discord."
+        },
+        {
+          "question": "Comment configurer les modules ?",
+          "answer": "Allez dans la section \"Modules\" de l'interface d'administration."
+        },
+        {
+          "question": "Comment signaler un bug ?",
+          "answer": "Ouvrez une issue sur GitHub avec une description détaillée du problème."
+        }
+      ]
+    },
+    "footer": "ShareX Manager - Développé avec ❤️ par l'équipe Ascencia"
+  },
+  "about": {
+    "title": "À propos de ShareX Manager",
+    "description": "Découvrez l'équipe derrière ShareX Manager et notre vision pour simplifier la gestion de vos uploads.",
+    "project": {
+      "title": "À propos du projet",
+      "description": "ShareX Manager est un outil conçu pour simplifier la gestion de vos uploads ShareX. Cette application vous permet de gérer facilement vos fichiers téléchargés tout en garantissant la sécurité de vos données."
+    },
+    "contact": {
+      "title": "Contact",
+      "website": "Site web",
+      "email": "Email"
+    },
+    "footer": "Développé avec ❤️ par"
+  },
+  "upgrade": {
+    "title": "Passer à Pro",
+    "description": "Découvrez les avantages de la version Pro de ShareX Manager",
+    "coming_soon": {
+      "title": "Bientôt disponible",
+      "description": "Cette fonctionnalité sera bientôt disponible. Restez à l'écoute !"
+    },
+    "features": {
+      "title": "Fonctionnalités Pro",
+      "list": [
+        "Stockage illimité",
+        "Support prioritaire",
+        "Fonctionnalités avancées",
+        "Analytics détaillés"
+      ]
+    }
+  },
+  "account": {
+    "title": "Mon compte",
+    "description": "Gérez vos informations personnelles et vos préférences",
+    "coming_soon": {
+      "title": "En cours de construction",
+      "description": "Cette page est en cours de construction. Revenez bientôt !"
+    },
+    "profile": {
+      "title": "Profil utilisateur",
+      "description": "Gérez vos informations personnelles"
+    },
+    "security": {
+      "title": "Sécurité",
+      "description": "Gérez votre mot de passe et la sécurité de votre compte"
+    },
+    "preferences": {
+      "title": "Préférences",
+      "description": "Personnalisez votre expérience utilisateur"
+    }
+  },
+  "feedback": {
+    "title": "Feedback & Suggestions",
+    "description": "Partagez vos idées et aidez-nous à améliorer ShareX Manager",
+    "forms": {
+      "title": "Formulaire de feedback",
+      "description": "Dites-nous ce que vous pensez de l'application",
+      "name": "Nom (optionnel)",
+      "email": "Email (optionnel)",
+      "subject": "Sujet",
+      "message": "Message",
+      "submit": "Envoyer le feedback"
+    },
+    "channels": {
+      "title": "Autres canaux",
+      "description": "Vous pouvez aussi nous contacter via :",
+      "discord": "Discord Community",
+      "github": "GitHub Issues"
+    },
+    "thank_you": {
+      "title": "Merci pour votre feedback !",
+      "description": "Votre message a été envoyé avec succès. Nous l'examinerons et vous répondrons si nécessaire."
+    }
   }
 }

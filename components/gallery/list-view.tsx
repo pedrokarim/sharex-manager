@@ -64,7 +64,7 @@ export function ListView({
   newFileIds,
 }: ListViewProps) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1 sm:space-y-2">
       {files.map((file) => (
         <SelectableListItemCard
           key={file.name}

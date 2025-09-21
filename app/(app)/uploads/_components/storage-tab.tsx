@@ -29,23 +29,31 @@ export function StorageTab({ form }: StorageTabProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>{t("uploads.config.storage.title")}</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">
+            {t("uploads.config.storage.title")}
+          </CardTitle>
+          <CardDescription className="text-sm">
             {t("uploads.config.storage.description")}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-4 sm:p-6 pt-0">
           <FormField
             control={form.control}
             name="storage.path"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t("uploads.config.storage.path")}</FormLabel>
+                <FormLabel className="text-sm">
+                  {t("uploads.config.storage.path")}
+                </FormLabel>
                 <FormControl>
-                  <Input value={field.value ?? ""} onChange={field.onChange} />
+                  <Input
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    className="text-sm"
+                  />
                 </FormControl>
               </FormItem>
             )}
