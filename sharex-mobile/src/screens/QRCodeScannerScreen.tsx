@@ -243,20 +243,20 @@ const styles = StyleSheet.create({
     paddingTop: StatusBar.currentHeight || 44,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.md,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    backgroundColor: COLORS.backgroundSecondary,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: COLORS.primaryBg,
     alignItems: "center",
     justifyContent: "center",
   },
   headerTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.background,
+    color: COLORS.textPrimary,
   },
   placeholder: {
     width: 40,

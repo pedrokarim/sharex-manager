@@ -9,7 +9,13 @@ import {
   Dimensions,
 } from "react-native";
 import { Icon } from "./Icon";
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from "../config/design";
+import {
+  COLORS,
+  COMPONENT_COLORS,
+  SPACING,
+  BORDER_RADIUS,
+  TYPOGRAPHY,
+} from "../config/design";
 
 const { width } = Dimensions.get("window");
 
@@ -105,7 +111,7 @@ const styles = StyleSheet.create({
   },
   bar: {
     flexDirection: "row",
-    backgroundColor: COLORS.white,
+    backgroundColor: COMPONENT_COLORS.cardBackground,
     borderRadius: BORDER_RADIUS.xl,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.sm,

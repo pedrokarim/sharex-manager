@@ -44,12 +44,12 @@ export const ShareTestScreen: React.FC<NavigationProps> = ({ navigation }) => {
             // Simuler la navigation vers l'écran d'upload
             navigation.navigate("Upload", {
               image: {
-                uri: "https://via.placeholder.com/300x200/007AFF/FFFFFF?text=Test+Image",
+                uri: "https://picsum.photos/800/600",
                 name: "test_shared_image.jpg",
                 type: "image/jpeg",
-                size: 1024,
-                width: 300,
-                height: 200,
+                size: 245760, // ~240 KB - taille plus réaliste
+                width: 800,
+                height: 600,
               },
             });
           },
@@ -64,7 +64,10 @@ export const ShareTestScreen: React.FC<NavigationProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={COLORS.backgroundSecondary}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
@@ -171,6 +174,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 30,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: COLORS.backgroundSecondary,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
   },
   backButton: {
     marginRight: 16,

@@ -1,25 +1,41 @@
 // Service simplifié pour les Share Intents
 
+import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system";
 import { ImageInfo } from "../types";
 
 export class SimpleShareIntentService {
   /**
-   * Simule le traitement d'un Share Intent
-   * Pour l'instant, on retourne des données de test
+   * Traite les données partagées via Share Intent
    */
-  static async processSharedData(): Promise<ImageInfo | null> {
+  static async processSharedData(sharedData?: any): Promise<ImageInfo | null> {
     try {
-      console.log("Traitement d'un Share Intent simulé...");
-      
-      // Pour l'instant, on simule avec des données de test
-      // Dans une vraie implémentation, on récupérerait les données du Share Intent
+      console.log("Traitement d'un Share Intent...", sharedData);
+
+      // Si on a des données partagées, on les utilise
+      if (sharedData && sharedData.uri) {
+        const imageInfo: ImageInfo = {
+          uri: sharedData.uri,
+          name: sharedData.name || "shared_image.jpg",
+          type: sharedData.type || "image/jpeg",
+          size: sharedData.size || 0,
+          width: sharedData.width || 0,
+          height: sharedData.height || 0,
+        };
+
+        console.log("Image partagée traitée:", imageInfo);
+        return imageInfo;
+      }
+
+      // Sinon, on simule avec des données de test pour les tests
+      console.log("Aucune donnée partagée, simulation pour les tests...");
       const mockImageInfo: ImageInfo = {
-        uri: "https://via.placeholder.com/300x200/007AFF/FFFFFF?text=Shared+Image",
+        uri: "https://picsum.photos/800/600",
         name: "shared_image.jpg",
         type: "image/jpeg",
-        size: 1024,
-        width: 300,
-        height: 200,
+        size: 245760, // ~240 KB - taille plus réaliste
+        width: 800,
+        height: 600,
       };
 
       console.log("Image simulée créée:", mockImageInfo);
@@ -51,5 +67,26 @@ export class SimpleShareIntentService {
       "5. L'image devrait s'ouvrir directement dans l'app !",
     ];
   }
-}
 
+  /**
+   * Vérifie si l'app a été lancée via un Share Intent
+   */
+  static async checkForSharedContent(): Promise<any | null> {
+    try {
+      // Cette méthode sera appelée au démarrage de l'app
+      // pour vérifier si elle a été lancée via un Share Intent
+      console.log("Vérification des contenus partagés...");
+
+      // Pour l'instant, on retourne null
+      // Dans une vraie implémentation, on utiliserait expo-sharing
+      // pour récupérer les données partagées
+      return null;
+    } catch (error) {
+      console.error(
+        "Erreur lors de la vérification des contenus partagés:",
+        error
+      );
+      return null;
+    }
+  }
+}

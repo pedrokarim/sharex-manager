@@ -3,7 +3,10 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as Linking from "expo-linking";
@@ -19,6 +22,7 @@ import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { AboutScreen } from "./src/screens/AboutScreen";
 import { UploadScreen } from "./src/screens/UploadScreen";
 import { ShareTestScreen } from "./src/screens/ShareTestScreen";
+import { TestScreen } from "./src/screens/TestScreen";
 
 // Import des services
 import { SimpleShareIntentService } from "./src/services/simpleShareIntent";
@@ -31,6 +35,7 @@ export type RootStackParamList = {
   MainTabs: undefined;
   Upload: { image: ImageInfo };
   ShareTest: undefined;
+  Test: undefined;
 };
 
 export type MainTabParamList = {
@@ -45,16 +50,19 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 // Composant Custom Bottom Bar pour React Navigation
 function CustomTabBar({ state, descriptors, navigation }: any) {
+  const insets = useSafeAreaInsets();
+
   return (
     <View
       style={{
         flexDirection: "row",
         backgroundColor: COLORS.white,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        height: 80,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        paddingBottom: Math.max(insets.bottom, 8),
+        height: 60 + Math.max(insets.bottom, 8),
         position: "absolute",
         bottom: 0,
         left: 0,
@@ -62,11 +70,11 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         shadowColor: "#000",
         shadowOffset: {
           width: 0,
-          height: -4,
+          height: -2,
         },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 8,
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 6,
       }}
     >
       {state.routes.map((route: any, index: number) => {
@@ -109,24 +117,24 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
               flex: 1,
               alignItems: "center",
               justifyContent: "center",
-              paddingVertical: 8,
-              paddingHorizontal: 12,
-              borderRadius: 12,
+              paddingVertical: 6,
+              paddingHorizontal: 8,
+              borderRadius: 10,
               backgroundColor: isFocused ? COLORS.primary : "transparent",
             }}
           >
             <Icon
               name={iconName}
-              size={24}
+              size={20}
               color={isFocused ? COLORS.white : COLORS.textTertiary}
               type="ionicons"
             />
             {isFocused && (
               <Text
                 style={{
-                  fontSize: 10,
-                  fontWeight: "600",
-                  marginTop: 4,
+                  fontSize: 9,
+                  fontWeight: "500",
+                  marginTop: 2,
                   color: COLORS.white,
                 }}
               >
@@ -206,10 +214,9 @@ export default function App() {
 
   const handleOnboardingComplete = async () => {
     try {
-      console.log("Onboarding terminé, navigation vers MainTabs...");
+      console.log("Onboarding terminé, sauvegarde de l'état...");
       await StorageService.setOnboardingCompleted(true);
       setHasCompletedOnboarding(true);
-      setInitialRoute("MainTabs");
     } catch (error) {
       console.error("Erreur lors de la sauvegarde de l'onboarding:", error);
     }
@@ -219,7 +226,15 @@ export default function App() {
     try {
       console.log("Vérification des contenus partagés...");
 
-      // Vérifier si l'app a été lancée via un lien/Share Intent
+      // Vérifier si l'app a été lancée via un Share Intent
+      const sharedContent =
+        await SimpleShareIntentService.checkForSharedContent();
+      if (sharedContent) {
+        console.log("Contenu partagé détecté:", sharedContent);
+        await handleSharedContent(sharedContent);
+      }
+
+      // Vérifier aussi les URLs (pour les liens profonds)
       const initialUrl = await Linking.getInitialURL();
       if (initialUrl) {
         console.log("URL initiale détectée:", initialUrl);
@@ -240,31 +255,41 @@ export default function App() {
     }
   };
 
-  const handleSharedContent = async (url: string) => {
+  const handleSharedContent = async (data: string | any) => {
     try {
-      console.log("Traitement du contenu partagé:", url);
+      console.log("Traitement du contenu partagé:", data);
 
-      // Parser l'URL pour extraire les données
-      const parsedUrl = Linking.parse(url);
-      console.log("URL parsée:", parsedUrl);
+      let sharedData = null;
 
-      // Vérifier si c'est un Share Intent avec des données d'image
-      if (parsedUrl.queryParams) {
-        const { uri, type, name } = parsedUrl.queryParams;
+      // Si c'est une URL, on la parse
+      if (typeof data === "string") {
+        const parsedUrl = Linking.parse(data);
+        console.log("URL parsée:", parsedUrl);
 
-        if (uri && type && type.toString().startsWith("image/")) {
-          const sharedData = {
-            uri: uri.toString(),
-            type: type.toString(),
-            name: name?.toString() || "shared_image.jpg",
-          };
-
-          const imageInfo = await SimpleShareIntentService.processSharedData();
-          if (imageInfo) {
-            setSharedImage(imageInfo);
-            setInitialRoute("Upload");
-            console.log("Image partagée traitée avec succès:", imageInfo);
+        if (parsedUrl.queryParams) {
+          const { uri, type, name } = parsedUrl.queryParams;
+          if (uri && type && type.toString().startsWith("image/")) {
+            sharedData = {
+              uri: uri.toString(),
+              type: type.toString(),
+              name: name?.toString() || "shared_image.jpg",
+            };
           }
+        }
+      } else {
+        // Si c'est déjà un objet de données partagées
+        sharedData = data;
+      }
+
+      // Traiter les données partagées
+      if (sharedData) {
+        const imageInfo = await SimpleShareIntentService.processSharedData(
+          sharedData
+        );
+        if (imageInfo) {
+          setSharedImage(imageInfo);
+          setInitialRoute("Upload");
+          console.log("Image partagée traitée avec succès:", imageInfo);
         }
       }
     } catch (error) {
@@ -316,12 +341,14 @@ export default function App() {
                   <OnboardingScreen
                     {...props}
                     onComplete={handleOnboardingComplete}
+                    navigation={props.navigation}
                   />
                 )}
               </Stack.Screen>
               <Stack.Screen name="MainTabs" component={MainTabNavigator} />
               <Stack.Screen name="Upload" component={UploadScreen} />
               <Stack.Screen name="ShareTest" component={ShareTestScreen} />
+              <Stack.Screen name="Test" component={TestScreen} />
             </Stack.Navigator>
           </NavigationContainer>
           <StatusBar style="dark" />

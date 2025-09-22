@@ -1,6 +1,6 @@
 // Composant de prévisualisation d'image
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import {
 import { Modal } from "react-native";
 import { Icon } from "./Icon";
 import { ClipboardService } from "../services/clipboard";
+import { extractDominantColor, withOpacity } from "../services/colorExtractor";
+import { COMPONENT_COLORS } from "../config/design";
 
 const { width, height } = Dimensions.get("window");
 
@@ -33,6 +35,19 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
   onClose,
   onDelete,
 }) => {
+  const [dominantColor, setDominantColor] = useState<string>("#6366F1");
+  const [isDark, setIsDark] = useState<boolean>(false);
+
+  // Extraire la couleur dominante quand l'image change
+  useEffect(() => {
+    if (visible && imageUri) {
+      extractDominantColor(imageUri).then((result) => {
+        setDominantColor(result.dominant);
+        setIsDark(result.isDark);
+      });
+    }
+  }, [visible, imageUri]);
+
   const handleCopyUrl = async () => {
     if (url) {
       await ClipboardService.copyUrl(url);
@@ -64,12 +79,28 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
     >
       <View style={styles.overlay}>
         <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
+          {/* Header avec couleur dominante */}
+          <View
+            style={[
+              styles.header,
+              { backgroundColor: withOpacity(dominantColor, 0.95) },
+            ]}
+          >
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Icon name="close" size={24} color="#ffffff" type="ionicons" />
+              <Icon
+                name="close"
+                size={24}
+                color={isDark ? "#ffffff" : "#000000"}
+                type="ionicons"
+              />
             </TouchableOpacity>
-            <Text style={styles.filename} numberOfLines={1}>
+            <Text
+              style={[
+                styles.filename,
+                { color: isDark ? "#ffffff" : "#000000" },
+              ]}
+              numberOfLines={1}
+            >
               {filename}
             </Text>
             <View style={styles.placeholder} />
@@ -124,7 +155,7 @@ const styles = StyleSheet.create({
   container: {
     width: width * 0.9,
     height: height * 0.8,
-    backgroundColor: "#ffffff",
+    backgroundColor: COMPONENT_COLORS.cardBackground,
     borderRadius: 16,
     overflow: "hidden",
   },
@@ -132,14 +163,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
-    backgroundColor: "#000000",
+    // backgroundColor sera défini dynamiquement
   },
   closeButton: {
     padding: 4,
   },
   filename: {
     flex: 1,
-    color: "#ffffff",
+    // color sera défini dynamiquement
     fontSize: 16,
     fontWeight: "500",
     marginHorizontal: 12,
@@ -161,7 +192,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     padding: 16,
-    backgroundColor: "#ffffff",
+    backgroundColor: COMPONENT_COLORS.cardBackground,
     borderTopWidth: 1,
     borderTopColor: "#E5E5EA",
   },

@@ -14,7 +14,13 @@ import {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { Icon } from "./Icon";
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from "../config/design";
+import {
+  COLORS,
+  COMPONENT_COLORS,
+  SPACING,
+  BORDER_RADIUS,
+  TYPOGRAPHY,
+} from "../config/design";
 import { UploadHistoryItem } from "../types";
 
 interface ImageActionDrawerProps {
@@ -259,7 +265,7 @@ const formatDate = (dateString: string): string => {
 
 const styles = StyleSheet.create({
   background: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COMPONENT_COLORS.cardBackground,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },

@@ -46,6 +46,15 @@ const SettingsScreenComponent: React.FC<NavigationProps> = ({ navigation }) => {
     loadSettings();
   }, []);
 
+  // Recharger les paramètres quand on revient sur l'écran
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      loadSettings();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   const loadSettings = async () => {
     try {
       const savedSettings = await StorageService.getSettings();
@@ -150,7 +159,10 @@ const SettingsScreenComponent: React.FC<NavigationProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={COLORS.backgroundSecondary}
+      />
 
       {/* Header */}
       <View style={styles.header}>
@@ -285,6 +297,17 @@ const SettingsScreenComponent: React.FC<NavigationProps> = ({ navigation }) => {
             iconType="ionicons"
           />
 
+          {__DEV__ && (
+            <ModernButton
+              title="Tests & Debug"
+              onPress={() => navigation.navigate("Test")}
+              variant="secondary"
+              size="lg"
+              icon="bug"
+              iconType="ionicons"
+            />
+          )}
+
           <ModernButton
             title="Supprimer les données"
             onPress={handleClearData}
@@ -310,6 +333,8 @@ const SettingsScreenComponent: React.FC<NavigationProps> = ({ navigation }) => {
         visible={showQRScanner}
         onClose={() => {
           setShowQRScanner(false);
+          // Recharger les paramètres après la fermeture du scanner
+          loadSettings();
         }}
       />
     </SafeAreaView>
@@ -336,7 +361,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     padding: 20,
-    paddingBottom: 60, // Espace pour la bottom bar
+    paddingBottom: 50, // Espace pour la bottom bar
   },
   header: {
     flexDirection: "row",
@@ -346,7 +371,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderLight,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.backgroundSecondary,
   },
   backButton: {
     padding: SPACING.sm,

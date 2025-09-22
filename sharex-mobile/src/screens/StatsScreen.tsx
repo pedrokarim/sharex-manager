@@ -148,7 +148,10 @@ export const StatsScreen: React.FC<NavigationProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={COLORS.backgroundSecondary}
+      />
 
       {/* Header */}
       <View style={styles.header}>
@@ -340,7 +343,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderLight,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.backgroundSecondary,
   },
   backButton: {
     padding: SPACING.sm,

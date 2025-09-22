@@ -40,7 +40,7 @@ export const ModernCard: React.FC<ModernCardProps> = memo(
     const cardStyle = useMemo((): ViewStyle => {
       const baseStyle: ViewStyle = {
         borderRadius: BORDER_RADIUS.lg,
-        backgroundColor: COLORS.background,
+        backgroundColor: COMPONENT_COLORS.cardBackground,
         marginBottom: SPACING.lg,
         ...SHADOWS.sm,
       };

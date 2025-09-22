@@ -77,16 +77,16 @@ export const ModernButton: React.FC<ModernButtonProps> = ({
     // Tailles
     switch (size) {
       case "sm":
+        baseStyle.paddingVertical = SPACING.sm;
+        baseStyle.paddingHorizontal = SPACING.md;
+        break;
+      case "md":
         baseStyle.paddingVertical = SPACING.md;
         baseStyle.paddingHorizontal = SPACING.lg;
         break;
-      case "md":
+      case "lg":
         baseStyle.paddingVertical = SPACING.lg;
         baseStyle.paddingHorizontal = SPACING.xl;
-        break;
-      case "lg":
-        baseStyle.paddingVertical = SPACING.xl;
-        baseStyle.paddingHorizontal = SPACING.xxl;
         break;
     }
 
@@ -100,7 +100,7 @@ export const ModernButton: React.FC<ModernButtonProps> = ({
 
   const getTextStyle = (): TextStyle => {
     const baseStyle: TextStyle = {
-      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      fontWeight: TYPOGRAPHY.fontWeight.medium,
       textAlign: "center",
       color: COLORS.textInverse,
     };
@@ -108,13 +108,13 @@ export const ModernButton: React.FC<ModernButtonProps> = ({
     // Tailles de texte
     switch (size) {
       case "sm":
-        baseStyle.fontSize = TYPOGRAPHY.fontSize.sm;
+        baseStyle.fontSize = TYPOGRAPHY.fontSize.xs;
         break;
       case "md":
-        baseStyle.fontSize = TYPOGRAPHY.fontSize.md;
+        baseStyle.fontSize = TYPOGRAPHY.fontSize.sm;
         break;
       case "lg":
-        baseStyle.fontSize = TYPOGRAPHY.fontSize.lg;
+        baseStyle.fontSize = TYPOGRAPHY.fontSize.md;
         break;
     }
 
@@ -144,7 +144,7 @@ export const ModernButton: React.FC<ModernButtonProps> = ({
             <View style={styles.icon}>
               <Icon
                 name={icon}
-                size={20}
+                size={16}
                 color={
                   variant === "ghost" ? COLORS.primary : COLORS.textInverse
                 }
@@ -166,6 +166,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   icon: {
-    marginRight: SPACING.sm,
+    marginRight: SPACING.xs,
   },
 });
