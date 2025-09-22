@@ -12,6 +12,7 @@ import {
   Alert,
   TextInput,
   Animated,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NavigationProps, ImageInfo } from "../types";
@@ -58,8 +59,12 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const waveAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    checkConfiguration();
+    // Charger l'historique immédiatement
     loadHistory();
+    // Vérifier la configuration en arrière-plan
+    checkConfiguration();
+    // Arrêter le loading immédiatement
+    setIsLoading(false);
   }, []);
 
   // Recharger l'historique quand on revient sur l'écran
@@ -76,12 +81,19 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
       const configured = await StorageService.isConfigured();
       setIsConfigured(configured);
 
+      // Test de connexion en arrière-plan, sans bloquer l'interface
       if (configured) {
         const config = await StorageService.getServerConfig();
         if (config) {
           const apiService = getApiService(config);
-          const connected = await apiService.testConnection();
-          setIsConnected(connected);
+          // Test de connexion non-bloquant
+          apiService
+            .testConnection()
+            .then((connected) => setIsConnected(connected))
+            .catch((error) => {
+              console.error("Erreur lors du test de connexion:", error);
+              setIsConnected(false);
+            });
         }
       }
     } catch (error) {
@@ -89,8 +101,6 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
         "Erreur lors de la vérification de la configuration:",
         error
       );
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -294,7 +304,10 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={COLORS.backgroundSecondary}
+      />
 
       {/* Header moderne */}
       <View style={styles.header}>
@@ -327,7 +340,14 @@ export const MainScreen: React.FC<NavigationProps> = ({ navigation }) => {
                 />
               </Animated.View>
             </TouchableOpacity>
-            <Text style={styles.appName}>ShareX Manager</Text>
+            <View style={styles.appTitleContainer}>
+              <Image
+                source={require("../../assets/logo-sxm-simple.png")}
+                style={styles.appLogo}
+                resizeMode="contain"
+              />
+              <Text style={styles.appName}>ShareX Manager</Text>
+            </View>
           </View>
           <TouchableOpacity
             style={styles.settingsButton}
@@ -653,7 +673,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 20,
-    backgroundColor: "#ffffff",
+    backgroundColor: COLORS.backgroundSecondary,
   },
   headerTop: {
     flexDirection: "row",
@@ -671,6 +691,16 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     marginRight: 8,
     fontWeight: "600",
+  },
+  appTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  appLogo: {
+    width: 32,
+    height: 32,
+    marginRight: 12,
   },
   appName: {
     fontSize: 28,
@@ -710,7 +740,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   scrollContent: {
-    paddingBottom: 60, // Espace pour la bottom bar
+    paddingBottom: 50, // Espace pour la bottom bar
   },
   quickActionsContainer: {
     marginBottom: 24,

@@ -11,14 +11,17 @@ import {
   Image,
   StatusBar,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Icon } from "../components/Icon";
-import { ModernButton } from "../components/ModernButton";
 
 const { width, height } = Dimensions.get("window");
 
 interface OnboardingScreenProps {
   onComplete: () => void;
+  navigation: any;
 }
 
 interface OnboardingSlide {
@@ -76,9 +79,11 @@ const slides: OnboardingSlide[] = [
 
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
   onComplete,
+  navigation,
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
 
   const handleNext = () => {
     if (currentSlide < slides.length - 1) {
@@ -89,12 +94,24 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         animated: true,
       });
     } else {
+      // Sauvegarder l'état d'onboarding
       onComplete();
+      // Naviguer directement vers MainTabs
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "MainTabs" }],
+      });
     }
   };
 
   const handleSkip = () => {
+    // Sauvegarder l'état d'onboarding
     onComplete();
+    // Naviguer directement vers MainTabs
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "MainTabs" }],
+    });
   };
 
   const handleScroll = (event: any) => {
@@ -105,7 +122,12 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
   const renderSlide = (slide: OnboardingSlide, index: number) => (
     <View
       key={slide.id}
-      style={[styles.slide, { backgroundColor: slide.backgroundColor }]}
+      style={[
+        styles.slide,
+        {
+          backgroundColor: slide.backgroundColor,
+        },
+      ]}
     >
       <View style={styles.slideContent}>
         {/* Icône principale */}
@@ -194,7 +216,6 @@ const styles = StyleSheet.create({
   },
   slide: {
     width,
-    height: height - 100,
     justifyContent: "center",
     alignItems: "center",
   },

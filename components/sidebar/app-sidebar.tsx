@@ -20,6 +20,7 @@ import {
   Sliders,
   Key,
   Share2,
+  TestTube,
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -149,6 +150,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             title: "Modules",
             url: "/modules",
             icon: FileImage,
+          },
+          {
+            title: "Test Couleurs",
+            url: "/test-colors",
+            icon: TestTube,
           },
         ],
       },

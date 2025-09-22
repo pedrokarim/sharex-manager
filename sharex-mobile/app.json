@@ -8,15 +8,21 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/logo-sxm-simple.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#6366F1"
     },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Cette application a besoin d'accéder à l'appareil photo pour prendre des photos à uploader.",
-        "NSPhotoLibraryUsageDescription": "Cette application a besoin d'accéder à la galerie pour sélectionner des images à uploader."
+        "NSPhotoLibraryUsageDescription": "Cette application a besoin d'accéder à la galerie pour sélectionner des images à uploader.",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "sharex-manager",
+            "CFBundleURLSchemes": ["sharex-manager"]
+          }
+        ]
       }
     },
     "android": {
@@ -39,7 +45,23 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
       ],
-      "package": "com.anonymous.sharexmobile"
+      "package": "re.ascencia.sharexmanager",
+      "intentFilters": [
+        {
+          "action": "android.intent.action.SEND",
+          "category": ["android.intent.category.DEFAULT"],
+          "data": {
+            "mimeType": "image/*"
+          }
+        },
+        {
+          "action": "android.intent.action.SEND_MULTIPLE",
+          "category": ["android.intent.category.DEFAULT"],
+          "data": {
+            "mimeType": "image/*"
+          }
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

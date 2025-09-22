@@ -2,6 +2,7 @@ export interface ApiKeyPermissions {
   uploadImages: boolean;
   uploadText: boolean;
   uploadFiles: boolean;
+  extractColors?: boolean;
 }
 
 export interface ApiKey {

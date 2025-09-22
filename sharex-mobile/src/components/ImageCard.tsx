@@ -5,7 +5,13 @@ import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
 import { UploadHistoryItem } from "../types";
 import { ViewMode } from "./ViewSelector";
 import { Icon } from "./Icon";
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from "../config/design";
+import {
+  COLORS,
+  COMPONENT_COLORS,
+  SPACING,
+  BORDER_RADIUS,
+  TYPOGRAPHY,
+} from "../config/design";
 
 interface ImageCardProps {
   item: UploadHistoryItem;
@@ -140,7 +146,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     margin: 4,
-    backgroundColor: "#ffffff",
+    backgroundColor: COMPONENT_COLORS.cardBackground,
     borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: {
@@ -193,7 +199,7 @@ const styles = StyleSheet.create({
   // Styles pour le mode liste
   listContainer: {
     flexDirection: "row",
-    backgroundColor: "#ffffff",
+    backgroundColor: COMPONENT_COLORS.cardBackground,
     borderRadius: 12,
     marginBottom: 8,
     padding: 12,

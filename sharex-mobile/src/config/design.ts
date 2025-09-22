@@ -81,13 +81,13 @@ export const COLORS = {
 
 export const SPACING = {
   xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  xxxl: 32,
-  huge: 40,
+  sm: 6,
+  md: 8,
+  lg: 12,
+  xl: 16,
+  xxl: 20,
+  xxxl: 24,
+  huge: 32,
 } as const;
 
 export const BORDER_RADIUS = {
@@ -135,14 +135,14 @@ export const SHADOWS = {
 export const TYPOGRAPHY = {
   // Tailles de police
   fontSize: {
-    xs: 12,
-    sm: 14,
-    md: 16,
-    lg: 18,
-    xl: 20,
-    xxl: 24,
-    xxxl: 28,
-    huge: 32,
+    xs: 10,
+    sm: 12,
+    md: 14,
+    lg: 16,
+    xl: 18,
+    xxl: 20,
+    xxxl: 24,
+    huge: 28,
   },
 
   // Poids de police
@@ -196,10 +196,10 @@ export const LAYOUT = {
   cardPadding: 16,
 
   // Hauteurs
-  headerHeight: 60,
-  tabBarHeight: 80,
-  buttonHeight: 48,
-  inputHeight: 44,
+  headerHeight: 56,
+  tabBarHeight: 70,
+  buttonHeight: 40,
+  inputHeight: 40,
 } as const;
 
 // Couleurs spécifiques aux composants
@@ -227,7 +227,7 @@ export const COMPONENT_COLORS = {
   statusWarningBg: COLORS.warningLight,
 
   // Cartes
-  cardBackground: COLORS.white,
+  cardBackground: COLORS.gray50,
   cardBorder: COLORS.border,
   cardShadow: COLORS.shadow,
 
