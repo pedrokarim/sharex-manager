@@ -21,42 +21,50 @@ async function extractColorFromAPI(
 ): Promise<ColorResult | null> {
   try {
     // Récupérer la configuration du serveur
-    const StorageService = require("../services/storageService").StorageService;
+    const StorageService = require("./storage").StorageService;
     const config = await StorageService.getServerConfig();
 
     if (!config) {
-      console.log("Aucune configuration serveur trouvée");
       return null;
     }
 
     // Récupérer la clé API stockée
     const apiKey = await StorageService.getApiKey();
     if (!apiKey) {
-      console.log("Aucune clé API trouvée");
       return null;
     }
 
     // Télécharger l'image
     const response = await fetch(imageUri);
     if (!response.ok) {
-      throw new Error(`Erreur HTTP: ${response.status}`);
+      throw new Error(`Erreur HTTP lors du téléchargement: ${response.status}`);
     }
 
     const imageBlob = await response.blob();
 
     // Créer FormData pour l'API
     const formData = new FormData();
-    formData.append("image", imageBlob, "image.jpg");
+    formData.append("image", {
+      uri: imageUri,
+      type: "image/jpeg",
+      name: "image.jpg",
+    } as any);
     formData.append("apiKey", apiKey); // Vraie clé API
 
+    const apiUrl = `${config.url}/api/colors`;
+
     // Appeler l'API d'extraction de couleurs
-    const apiResponse = await fetch(`${config.baseUrl}/api/colors`, {
+    const apiResponse = await fetch(apiUrl, {
       method: "POST",
       body: formData,
+      headers: {
+        Accept: "application/json",
+      },
     });
 
     if (!apiResponse.ok) {
-      throw new Error(`Erreur API: ${apiResponse.status}`);
+      const errorText = await apiResponse.text();
+      throw new Error(`Erreur API: ${apiResponse.status} - ${errorText}`);
     }
 
     const result = await apiResponse.json();
@@ -92,32 +100,17 @@ export const extractDominantColor = async (
     // Essayer d'abord l'API du serveur
     const apiResult = await extractColorFromAPI(imageUri);
     if (apiResult) {
-      console.log("🎨 Couleur dominante extraite via API:", {
-        uri: imageUri,
-        hex: apiResult.dominant,
-        isDark: apiResult.isDark,
-      });
-
       // Mettre en cache
       colorCache.set(imageUri, apiResult);
       return apiResult;
     }
   } catch (error) {
-    console.log(
-      "API d'extraction de couleur non disponible, utilisation du fallback"
-    );
+    // API non disponible, utilisation du fallback
   }
 
   try {
     // Fallback : Générer une couleur basée sur l'URI
     const fallbackColor = generateColorFromUri(imageUri);
-
-    // Log de la couleur de fallback
-    console.log("🔄 Couleur de fallback utilisée:", {
-      uri: imageUri,
-      hex: fallbackColor,
-      isDark: isDarkColor(fallbackColor),
-    });
 
     const fallback: ColorResult = {
       dominant: fallbackColor,
