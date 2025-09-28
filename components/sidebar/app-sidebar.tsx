@@ -21,6 +21,7 @@ import {
   Key,
   Share2,
   TestTube,
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -117,6 +118,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ],
       },
       {
+        title: t("sidebar.main.tools"),
+        url: "/tools",
+        icon: Wrench,
+        items: [
+          {
+            title: t("tools.minecraft_skin.title"),
+            url: "/tools/minecraft-skin",
+          },
+          {
+            title: "Color Palette",
+            url: "/tools/color-palette",
+          },
+          {
+            title: "Image Converter",
+            url: "/tools/image-converter",
+          },
+          {
+            title: "QR Generator",
+            url: "/tools/qr-generator",
+          },
+        ],
+      },
+      {
         title: t("sidebar.main.settings"),
         url: "/settings",
         icon: Settings2,
@@ -180,6 +204,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           {
             title: t("sidebar.admin.security"),
             url: "/admin/security",
+          },
+          {
+            title: "Outils Minecraft",
+            url: "/admin/tools",
           },
         ],
       },
