@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { GalleryClient } from "../page.client";
 
 export const metadata: Metadata = {
@@ -17,10 +17,11 @@ interface SearchParams {
 export default async function SecureGalleryPage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
   const session = await auth();
-  const cookieStore = cookies();
+  const headersList = await headers();
+  const resolvedSearchParams = await searchParams;
 
   if (!session?.user) {
     redirect("/login");
@@ -29,12 +30,12 @@ export default async function SecureGalleryPage({
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/api/files?page=1&limit=20&q=${
-        searchParams.q || ""
+        resolvedSearchParams.q || ""
       }&secure=true`,
       {
         cache: "no-store",
         headers: {
-          Cookie: cookieStore.toString(),
+          Cookie: headersList.get("cookie") || "",
         },
       }
     );
@@ -45,8 +46,8 @@ export default async function SecureGalleryPage({
       <GalleryClient
         initialFiles={data.files}
         initialHasMore={data.hasMore}
-        initialView={searchParams.view as "grid" | "list" | "details"}
-        initialSearch={searchParams.q}
+        initialView={resolvedSearchParams.view as "grid" | "list" | "details"}
+        initialSearch={resolvedSearchParams.q}
         initialPage={1}
         secureOnly
       />
@@ -57,11 +58,11 @@ export default async function SecureGalleryPage({
       <GalleryClient
         initialFiles={[]}
         initialHasMore={false}
-        initialView={searchParams.view as "grid" | "list" | "details"}
-        initialSearch={searchParams.q}
+        initialView={resolvedSearchParams.view as "grid" | "list" | "details"}
+        initialSearch={resolvedSearchParams.q}
         initialPage={1}
         secureOnly
       />
     );
   }
-} 
+}

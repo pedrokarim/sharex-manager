@@ -52,7 +52,7 @@ export function NavUser() {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
+              <Avatar className="h-8 w-8 min-w-8 min-h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
                 <AvatarImage
                   src={session.user.image || ""}
                   alt={session.user.name || ""}

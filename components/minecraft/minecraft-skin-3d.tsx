@@ -155,15 +155,16 @@ export function MinecraftSkin3DVanilla({
 
         animate();
 
-        // Contrôles de souris
+        // Contrôles de souris (comme NameMC)
         let isMouseDown = false;
         let mouseX = 0;
         let mouseY = 0;
 
         const onMouseDown = (event: MouseEvent) => {
+          event.preventDefault();
           isMouseDown = true;
-          mouseX = event.clientX;
-          mouseY = event.clientY;
+          mouseX = event.screenX;
+          mouseY = event.screenY;
         };
 
         const onMouseUp = () => {
@@ -173,19 +174,62 @@ export function MinecraftSkin3DVanilla({
         const onMouseMove = (event: MouseEvent) => {
           if (!isMouseDown) return;
 
-          const deltaX = event.clientX - mouseX;
-          const deltaY = event.clientY - mouseY;
+          // Utiliser screenX/screenY comme NameMC et appliquer directement la différence
+          const deltaX = event.screenX - mouseX;
+          const deltaY = event.screenY - mouseY;
 
-          setTheta((prev) => prev + deltaX * 0.5);
-          setPhi((prev) => Math.max(-90, Math.min(90, prev - deltaY * 0.5)));
+          setTheta((prev) => prev + deltaX);
+          setPhi((prev) => {
+            const newPhi = prev + deltaY;
+            // Limiter phi entre -90 et 90 comme NameMC
+            return Math.max(-90, Math.min(90, newPhi));
+          });
 
-          mouseX = event.clientX;
-          mouseY = event.clientY;
+          mouseX = event.screenX;
+          mouseY = event.screenY;
+        };
+
+        // Support tactile (comme NameMC)
+        const onTouchStart = (event: TouchEvent) => {
+          event.preventDefault();
+          for (let i = 0; i < event.changedTouches.length; i++) {
+            const touch = event.changedTouches[i];
+            isMouseDown = true;
+            mouseX = touch.screenX;
+            mouseY = touch.screenY;
+          }
+        };
+
+        const onTouchMove = (event: TouchEvent) => {
+          if (!isMouseDown) return;
+
+          for (let i = 0; i < event.changedTouches.length; i++) {
+            const touch = event.changedTouches[i];
+            const deltaX = touch.screenX - mouseX;
+            const deltaY = touch.screenY - mouseY;
+
+            setTheta((prev) => prev + deltaX);
+            setPhi((prev) => {
+              const newPhi = prev + deltaY;
+              return Math.max(-90, Math.min(90, newPhi));
+            });
+
+            mouseX = touch.screenX;
+            mouseY = touch.screenY;
+          }
+          event.preventDefault();
+        };
+
+        const onTouchEnd = () => {
+          isMouseDown = false;
         };
 
         canvas.addEventListener("mousedown", onMouseDown);
         canvas.addEventListener("mouseup", onMouseUp);
         canvas.addEventListener("mousemove", onMouseMove);
+        canvas.addEventListener("touchstart", onTouchStart);
+        canvas.addEventListener("touchmove", onTouchMove);
+        canvas.addEventListener("touchend", onTouchEnd);
 
         setIsLoaded(true);
 
@@ -195,6 +239,9 @@ export function MinecraftSkin3DVanilla({
           canvas.removeEventListener("mousedown", onMouseDown);
           canvas.removeEventListener("mouseup", onMouseUp);
           canvas.removeEventListener("mousemove", onMouseMove);
+          canvas.removeEventListener("touchstart", onTouchStart);
+          canvas.removeEventListener("touchmove", onTouchMove);
+          canvas.removeEventListener("touchend", onTouchEnd);
           renderer.dispose();
         };
       } catch (error) {

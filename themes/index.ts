@@ -1,22 +1,16 @@
 import { defaultTheme } from "./default";
 import { shadcnThemes } from "./shadcn";
 import { colorThemes } from "./colors";
+import { tweakcnThemes } from "./tweakcn";
 import type { Presets } from "./types";
 
 export const presets: Presets = {
   "Thèmes par défaut": {
-    "Rose (Défaut)": {
+    Défaut: {
       light: defaultTheme.light,
       dark: defaultTheme.dark,
       preview: defaultTheme.preview,
     },
-  },
-  "Thèmes Shadcn": {
-    Zinc: shadcnThemes.Zinc,
-    Slate: shadcnThemes.Slate,
-    Stone: shadcnThemes.Stone,
-    Gray: shadcnThemes.Gray,
-    Neutral: shadcnThemes.Neutral,
     Red: shadcnThemes.Red,
     Orange: shadcnThemes.Orange,
     Green: shadcnThemes.Green,
@@ -32,6 +26,14 @@ export const presets: Presets = {
     "Rose Garden": colorThemes["Rose Garden"],
     "Ocean Blue": colorThemes["Ocean Blue"],
     Emerald: colorThemes.Emerald,
+  },
+  "Thèmes tweakcn": {
+    Claymorphism: tweakcnThemes.Claymorphism,
+    "t3-chat": tweakcnThemes["t3-chat"],
+    "retro-arcade": tweakcnThemes["retro-arcade"],
+    perpetuity: tweakcnThemes.perpetuity,
+    "sunset-horizon": tweakcnThemes["sunset-horizon"],
+    "amber-minimal": tweakcnThemes["amber-minimal"],
   },
 } as const;
 

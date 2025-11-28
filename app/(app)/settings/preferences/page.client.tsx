@@ -173,7 +173,7 @@ export function PreferencesPageClient() {
   };
 
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 lg:p-8">
+    <div className="flex flex-col h-full">
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">

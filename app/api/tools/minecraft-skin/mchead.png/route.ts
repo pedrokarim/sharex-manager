@@ -1,26 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { drawSkin2DHead } from "@/lib/minecraft/skin-renderer";
-import { getPlayerDataByUUID } from "@/lib/minecraft/player-service";
+import {
+  validateSkinParam,
+  validateDimensions,
+  parseBooleanParam,
+  parseNumberParam,
+} from "@/lib/minecraft/api-validation";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const skin = searchParams.get("skin");
-    const width = parseInt(searchParams.get("width") || "32");
-    const height = parseInt(searchParams.get("height") || "32");
-    const flip =
-      searchParams.get("flip") === "1" || searchParams.get("flip") === "true";
+    const width = parseNumberParam(
+      searchParams.get("width"),
+      32,
+      8,
+      1000
+    ).value;
+    const height = parseNumberParam(
+      searchParams.get("height"),
+      32,
+      8,
+      1000
+    ).value;
+    const flip = parseBooleanParam(searchParams.get("flip"), false);
 
-    if (!skin) {
+    // Validation du paramètre skin
+    const skinValidation = validateSkinParam(skin);
+    if (!skinValidation.isValid) {
       return NextResponse.json(
-        { error: true, message: "Paramètre skin manquant" },
+        { error: true, message: skinValidation.error },
         { status: 400 }
       );
     }
 
-    if (width < 8 || width > 1000 || height < 8 || height > 1000) {
+    // Validation des dimensions
+    const dimensionsValidation = validateDimensions(width, height, 8, 1000);
+    if (!dimensionsValidation.isValid) {
       return NextResponse.json(
-        { error: true, message: "Dimensions invalides (8-1000px)" },
+        { error: true, message: dimensionsValidation.error },
         { status: 400 }
       );
     }

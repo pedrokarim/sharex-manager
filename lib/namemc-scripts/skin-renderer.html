@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Minecraft Skin Renderer</title>
+  <style>
+    body { 
+      margin: 0; 
+      padding: 0; 
+      background: transparent;
+    }
+    canvas { 
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="skinCanvas" width="400" height="600"></canvas>
+  
+  <script>
+    <!-- INJECT-THREEJS -->
+  </script>
+  <script>
+    // Variables globales
+    let skinData = null;
+    let modelType = 'classic'; // Sera injecté par la route
+    
+    <!-- INJECT-NAMEMC-SCRIPT -->
+    
+    // Fonction d'initialisation simplifiée
+    function initializeSkinRenderer() {
+      try {
+        const canvas = document.getElementById('skinCanvas');
+        if (!canvas) return false;
+        
+        // Les données du skin sont injectées par la route
+        const playerSkin = { uuid: 'placeholder', base64: 'placeholder' }; // Sera remplacé par la route
+        
+        // Configurer les données du skin
+        window.namemc = {
+          images: {
+            [playerSkin.uuid]: playerSkin.base64
+          }
+        };
+        
+        // Initialiser le renderer NameMC
+        const success = initSkinRenderer('skinCanvas', playerSkin.uuid, modelType);
+        
+        if (success) {
+          console.log('Skin rendu avec succès !');
+          return true;
+        } else {
+          console.error('Erreur initialisation renderer');
+          return false;
+        }
+        
+      } catch (error) {
+        console.error('Erreur initializeSkinRenderer:', error);
+        return false;
+      }
+    }
+    
+    // Attendre que Three.js et le script NameMC soient chargés puis initialiser
+    function waitForThree() {
+      if (typeof THREE !== 'undefined' && typeof initSkinRenderer !== 'undefined') {
+        initializeSkinRenderer();
+      } else {
+        setTimeout(waitForThree, 100);
+      }
+    }
+    
+    waitForThree();
+  </script>
+</body>
+</html>

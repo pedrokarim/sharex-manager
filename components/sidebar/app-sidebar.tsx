@@ -22,6 +22,8 @@ import {
   Share2,
   TestTube,
   Wrench,
+  AudioWaveform,
+  Palette,
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -32,7 +34,6 @@ import { NavMain } from "./nav-main";
 import { NavProjects } from "./nav-projects";
 import { NavSecondary } from "./nav-secondary";
 import { NavUser } from "./nav-user";
-import { ThemeToggle } from "../theme-toggle";
 import {
   Sidebar,
   SidebarContent,
@@ -41,6 +42,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
 } from "../ui/sidebar";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -151,6 +153,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             icon: Sliders,
           },
           {
+            title: "New Theme",
+            url: "/settings/new-theme",
+            icon: Palette,
+          },
+          {
             title: t("sidebar.settings.general"),
             url: "/settings/general",
             icon: Settings,
@@ -253,9 +260,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
+            <SidebarMenuButton
+              size="lg"
+              asChild
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
               <Link href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground overflow-hidden">
+                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                   <Image
                     src="/images/logo-sxm-simple.png"
                     alt="ShareX Manager Logo"
@@ -264,10 +275,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">
+                  <span className="truncate font-medium">
                     {t("sidebar.app_name")}
                   </span>
-                  <span className="truncate text-xs hidden sm:block">
+                  <span className="truncate text-xs">
                     {t("sidebar.app_description")}
                   </span>
                 </div>
@@ -288,11 +299,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <div className="p-2">
-          <ThemeToggle />
-        </div>
         <NavUser />
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

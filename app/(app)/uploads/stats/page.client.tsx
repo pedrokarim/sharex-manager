@@ -1,9 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AppSidebar } from "@/components/sidebar/app-sidebar";
-import { SidebarHeader } from "@/components/sidebar/sibebar-header";
-import { SidebarInset } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart,
@@ -353,7 +350,7 @@ export function StatsPageClient() {
   if (!stats) return null;
 
   return (
-    <main className="p-4 sm:p-6 lg:p-8">
+    <main className="flex flex-col h-full">
       <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex flex-col gap-4 py-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">

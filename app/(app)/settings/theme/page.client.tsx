@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { SliderWithStops } from "@/components/ui/slider-with-stops";
 import { toast } from "sonner";
-import { cn, hslToHex, hexToHsl } from "@/lib/utils";
+import { cn, oklchToHex, hexToOklch } from "@/lib/utils";
 import { useThemeConfig } from "@/hooks/use-theme-config";
 import type { ColorVars } from "@/hooks/use-theme-config";
 import {
@@ -73,7 +73,7 @@ export function ThemeConfigClient() {
     value: string,
     theme: "light" | "dark"
   ) => {
-    const hslValue = hexToHsl(value);
+    const oklchValue = hexToOklch(value);
 
     setConfig((prev) => ({
       ...prev,
@@ -81,16 +81,15 @@ export function ThemeConfigClient() {
         ...prev.cssVars,
         [theme]: {
           ...prev.cssVars[theme],
-          [key]: hslValue,
+          [key]: oklchValue,
         },
       },
     }));
   };
 
-  const getHexColor = (hslString: string) => {
-    if (!hslString) return "#000000";
-    const [h, s, l] = hslString.split(" ").map((v) => parseFloat(v));
-    return hslToHex(h, s, l);
+  const getHexColor = (oklchString: string) => {
+    if (!oklchString) return "#000000";
+    return oklchToHex(oklchString);
   };
 
   const handlePresetChange = (preset: string) => {
@@ -173,7 +172,7 @@ export function ThemeConfigClient() {
 
   const getChartColor = (index: number) => {
     const colorKey = `chart-${index + 1}` as keyof ColorVars;
-    return `hsl(${config.cssVars[activeTheme][colorKey]})`;
+    return config.cssVars[activeTheme][colorKey];
   };
 
   const chartExamples = [
@@ -337,7 +336,7 @@ export function ThemeConfigClient() {
   };
 
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 lg:p-8">
+    <div className="flex flex-col h-full">
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2 sm:gap-4">
           <Button
@@ -518,11 +517,10 @@ export function ThemeConfigClient() {
                       <div
                         className="w-6 h-6 rounded border flex-shrink-0"
                         style={{
-                          backgroundColor: `hsl(${
+                          backgroundColor:
                             config.cssVars[activeTheme][
                               colorKey as keyof ColorVars
-                            ]
-                          })`,
+                            ],
                         }}
                       />
                       <Input
@@ -579,11 +577,10 @@ export function ThemeConfigClient() {
                       <div
                         className="w-6 h-6 rounded border flex-shrink-0"
                         style={{
-                          backgroundColor: `hsl(${
+                          backgroundColor:
                             config.cssVars[activeTheme][
                               colorKey as keyof ColorVars
-                            ]
-                          })`,
+                            ],
                         }}
                       />
                       <Input

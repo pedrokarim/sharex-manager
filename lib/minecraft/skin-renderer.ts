@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createCanvas, loadImage } from "canvas";
+import { createCanvas, loadImage } from "node-canvas-webgl";
 import { skinLayout, type SkinVersion } from "./skin-layout";
 
 const TAU = 2 * Math.PI;
@@ -94,12 +94,12 @@ async function getCapeTextureUrl(uuid: string): Promise<string | null> {
 }
 
 function toCanvas(image: any, x = 0, y = 0, w?: number, h?: number): any {
-  w = w ?? image.width;
-  h = h ?? image.height;
+  const width = w ?? image.width;
+  const height = h ?? image.height;
 
-  const canvas = createCanvas(w, h);
+  const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(image, x, y, w, h, 0, 0, w, h);
+  ctx.drawImage(image, x, y, width, height, 0, 0, width, height);
 
   return canvas;
 }
@@ -305,9 +305,7 @@ export async function drawSkin2DHead(options: {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
-  ctx.mozImageSmoothingEnabled = false;
-  ctx.webkitImageSmoothingEnabled = false;
-  ctx.msImageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = false;
   ctx.imageSmoothingEnabled = false;
 
   if (flip) {
@@ -340,9 +338,7 @@ export async function drawSkin2DCape(options: {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
-  ctx.mozImageSmoothingEnabled = false;
-  ctx.webkitImageSmoothingEnabled = false;
-  ctx.msImageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = false;
   ctx.imageSmoothingEnabled = false;
 
   if (flip) {
@@ -373,9 +369,7 @@ export async function drawSkin2DFull(options: {
   const ctx = canvas.getContext("2d");
 
   ctx.save();
-  ctx.mozImageSmoothingEnabled = false;
-  ctx.webkitImageSmoothingEnabled = false;
-  ctx.msImageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = false;
   ctx.imageSmoothingEnabled = false;
 
   if (flip) {
@@ -472,8 +466,10 @@ export async function drawSkin3D(options: {
     );
     if (!model3D) throw new Error("Failed to build 3D model");
 
-    // Create renderer
+    // Créer le canvas de rendu (comme ton ancien code)
     const canvas = createCanvas(width, height);
+
+    // Créer le renderer Three.js (comme ton ancien code)
     const renderer = new THREE.WebGLRenderer({
       canvas: canvas as any,
       alpha: true,
@@ -481,9 +477,14 @@ export async function drawSkin3D(options: {
     });
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(32, width / height, 52, 92);
+    const camera = new THREE.PerspectiveCamera(
+      32,
+      width / height,
+      72 - 20,
+      72 + 20
+    );
 
-    // Position camera
+    // Positionner la caméra (comme ton ancien code)
     const cosPhi = Math.cos(radians(phi));
     camera.position.x = 72 * cosPhi * Math.sin(radians(theta));
     camera.position.z = 72 * cosPhi * Math.cos(radians(theta));
@@ -492,13 +493,14 @@ export async function drawSkin3D(options: {
 
     scene.add(model3D);
 
-    // Add lighting
+    // Ajouter l'éclairage
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(10, 10, 5);
     scene.add(ambientLight);
     scene.add(directionalLight);
 
+    // Rendu (comme ton ancien code)
     renderer.render(scene, camera);
 
     return canvas;

@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -23,7 +24,7 @@ export function ThemeToggle() {
   const [preferredThemeMode, setPreferredThemeMode] = useAtom(
     preferredThemeModeAtom
   );
-
+  const isMobile = useIsMobile();
   // Utiliser le hook pour activer le thème basé sur le temps
   useTimeBasedTheme();
 
@@ -57,7 +58,7 @@ export function ThemeToggle() {
           <span className="sr-only">Changer le thème</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent side={isMobile ? "bottom" : "right"} align="end">
         <DropdownMenuItem onClick={() => handleThemeChange("light")}>
           <Sun className="mr-2 h-4 w-4" />
           Clair

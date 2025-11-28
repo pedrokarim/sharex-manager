@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { GalleryClient } from "./page.client";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 
 interface SearchParams {
   q?: string;
@@ -12,10 +12,11 @@ interface SearchParams {
 export default async function GalleryPage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
   const session = await auth();
-  const cookieStore = cookies();
+  const headersList = await headers();
+  const resolvedSearchParams = await searchParams;
 
   if (!session) {
     redirect("/login");
@@ -24,12 +25,12 @@ export default async function GalleryPage({
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/api/files?page=1&limit=20&q=${
-        searchParams.q || ""
+        resolvedSearchParams.q || ""
       }`,
       {
         cache: "no-store",
         headers: {
-          Cookie: cookieStore.toString(),
+          Cookie: headersList.get("cookie") || "",
         },
       }
     );
@@ -40,8 +41,8 @@ export default async function GalleryPage({
       <GalleryClient
         initialFiles={data.files}
         initialHasMore={data.hasMore}
-        initialView={searchParams.view as "grid" | "list" | "details"}
-        initialSearch={searchParams.q}
+        initialView={resolvedSearchParams.view as "grid" | "list" | "details"}
+        initialSearch={resolvedSearchParams.q}
         initialPage={1}
       />
     );
@@ -51,8 +52,8 @@ export default async function GalleryPage({
       <GalleryClient
         initialFiles={[]}
         initialHasMore={false}
-        initialView={searchParams.view as "grid" | "list" | "details"}
-        initialSearch={searchParams.q}
+        initialView={resolvedSearchParams.view as "grid" | "list" | "details"}
+        initialSearch={resolvedSearchParams.q}
         initialPage={1}
       />
     );

@@ -29,6 +29,41 @@ export type ColorVars = {
   "chart-3"?: string;
   "chart-4"?: string;
   "chart-5"?: string;
+  sidebar?: string;
+  "sidebar-foreground"?: string;
+  "sidebar-primary"?: string;
+  "sidebar-primary-foreground"?: string;
+  "sidebar-accent"?: string;
+  "sidebar-accent-foreground"?: string;
+  "sidebar-border"?: string;
+  "sidebar-ring"?: string;
+  "font-sans"?: string;
+  "font-serif"?: string;
+  "font-mono"?: string;
+  "shadow-x"?: string;
+  "shadow-y"?: string;
+  "shadow-blur"?: string;
+  "shadow-spread"?: string;
+  "shadow-opacity"?: string;
+  "shadow-color"?: string;
+  "shadow-2xs"?: string;
+  "shadow-xs"?: string;
+  "shadow-sm"?: string;
+  shadow?: string;
+  "shadow-md"?: string;
+  "shadow-lg"?: string;
+  "shadow-xl"?: string;
+  "shadow-2xl"?: string;
+  "tracking-normal"?: string;
+  "tracking-tighter"?: string;
+  "tracking-tight"?: string;
+  "tracking-wide"?: string;
+  "tracking-wider"?: string;
+  "tracking-widest"?: string;
+  "shadow-offset-x"?: string;
+  "shadow-offset-y"?: string;
+  "letter-spacing"?: string;
+  spacing?: string;
 };
 
 type ThemeConfig = {
@@ -43,48 +78,74 @@ const defaultConfig: ThemeConfig = {
   theme: "default",
   cssVars: {
     light: {
-      background: "0 0% 100%",
-      foreground: "240 10% 3.9%",
-      primary: "346.8 77.2% 49.8%",
-      "primary-foreground": "355.7 100% 97.3%",
-      secondary: "240 4.8% 95.9%",
-      "secondary-foreground": "240 5.9% 10%",
-      muted: "240 4.8% 95.9%",
-      "muted-foreground": "240 3.8% 46.1%",
-      accent: "240 4.8% 95.9%",
-      "accent-foreground": "240 5.9% 10%",
-      destructive: "0 84.2% 60.2%",
-      "destructive-foreground": "0 0% 98%",
-      border: "240 5.9% 90%",
-      input: "240 5.9% 90%",
-      ring: "346.8 77.2% 49.8%",
-      radius: "0.5",
-      card: "0 0% 100%",
-      "card-foreground": "240 10% 3.9%",
-      popover: "0 0% 100%",
-      "popover-foreground": "240 10% 3.9%",
+      background: "oklch(1 0 0)",
+      foreground: "oklch(0.141 0.005 285.823)",
+      primary: "oklch(0.21 0.006 285.885)",
+      "primary-foreground": "oklch(0.985 0 0)",
+      secondary: "oklch(0.967 0.001 286.375)",
+      "secondary-foreground": "oklch(0.21 0.006 285.885)",
+      muted: "oklch(0.967 0.001 286.375)",
+      "muted-foreground": "oklch(0.552 0.016 285.938)",
+      accent: "oklch(0.967 0.001 286.375)",
+      "accent-foreground": "oklch(0.21 0.006 285.885)",
+      destructive: "oklch(0.577 0.245 27.325)",
+      "destructive-foreground": "oklch(0.985 0 0)",
+      border: "oklch(0.92 0.004 286.32)",
+      input: "oklch(0.92 0.004 286.32)",
+      ring: "oklch(0.705 0.015 286.067)",
+      radius: "0.625",
+      card: "oklch(1 0 0)",
+      "card-foreground": "oklch(0.141 0.005 285.823)",
+      popover: "oklch(1 0 0)",
+      "popover-foreground": "oklch(0.141 0.005 285.823)",
+      "chart-1": "oklch(0.646 0.222 41.116)",
+      "chart-2": "oklch(0.6 0.118 184.704)",
+      "chart-3": "oklch(0.398 0.07 227.392)",
+      "chart-4": "oklch(0.828 0.189 84.429)",
+      "chart-5": "oklch(0.769 0.188 70.08)",
+      sidebar: "oklch(0.985 0 0)",
+      "sidebar-foreground": "oklch(0.141 0.005 285.823)",
+      "sidebar-primary": "oklch(0.21 0.006 285.885)",
+      "sidebar-primary-foreground": "oklch(0.985 0 0)",
+      "sidebar-accent": "oklch(0.967 0.001 286.375)",
+      "sidebar-accent-foreground": "oklch(0.21 0.006 285.885)",
+      "sidebar-border": "oklch(0.92 0.004 286.32)",
+      "sidebar-ring": "oklch(0.705 0.015 286.067)",
     },
     dark: {
-      background: "20 14.3% 4.1%",
-      foreground: "0 0% 95%",
-      primary: "346.8 77.2% 49.8%",
-      "primary-foreground": "355.7 100% 97.3%",
-      secondary: "240 3.7% 15.9%",
-      "secondary-foreground": "0 0% 98%",
-      muted: "0 0% 15%",
-      "muted-foreground": "240 5% 64.9%",
-      accent: "12 6.5% 15.1%",
-      "accent-foreground": "0 0% 98%",
-      destructive: "0 62.8% 30.6%",
-      "destructive-foreground": "0 85.7% 97.3%",
-      border: "240 3.7% 15.9%",
-      input: "240 3.7% 15.9%",
-      ring: "346.8 77.2% 49.8%",
-      radius: "0.5",
-      card: "24 9.8% 10%",
-      "card-foreground": "0 0% 95%",
-      popover: "0 0% 9%",
-      "popover-foreground": "0 0% 95%",
+      background: "oklch(0.141 0.005 285.823)",
+      foreground: "oklch(0.985 0 0)",
+      primary: "oklch(0.92 0.004 286.32)",
+      "primary-foreground": "oklch(0.21 0.006 285.885)",
+      secondary: "oklch(0.274 0.006 286.033)",
+      "secondary-foreground": "oklch(0.985 0 0)",
+      muted: "oklch(0.274 0.006 286.033)",
+      "muted-foreground": "oklch(0.705 0.015 286.067)",
+      accent: "oklch(0.274 0.006 286.033)",
+      "accent-foreground": "oklch(0.985 0 0)",
+      destructive: "oklch(0.704 0.191 22.216)",
+      "destructive-foreground": "oklch(0.985 0 0)",
+      border: "oklch(1 0 0 / 10%)",
+      input: "oklch(1 0 0 / 15%)",
+      ring: "oklch(0.552 0.016 285.938)",
+      radius: "0.625",
+      card: "oklch(0.21 0.006 285.885)",
+      "card-foreground": "oklch(0.985 0 0)",
+      popover: "oklch(0.21 0.006 285.885)",
+      "popover-foreground": "oklch(0.985 0 0)",
+      "chart-1": "oklch(0.488 0.243 264.376)",
+      "chart-2": "oklch(0.696 0.17 162.48)",
+      "chart-3": "oklch(0.769 0.188 70.08)",
+      "chart-4": "oklch(0.627 0.265 303.9)",
+      "chart-5": "oklch(0.645 0.246 16.439)",
+      sidebar: "oklch(0.21 0.006 285.885)",
+      "sidebar-foreground": "oklch(0.985 0 0)",
+      "sidebar-primary": "oklch(0.488 0.243 264.376)",
+      "sidebar-primary-foreground": "oklch(0.985 0 0)",
+      "sidebar-accent": "oklch(0.274 0.006 286.033)",
+      "sidebar-accent-foreground": "oklch(0.985 0 0)",
+      "sidebar-border": "oklch(1 0 0 / 10%)",
+      "sidebar-ring": "oklch(0.552 0.016 285.938)",
     },
   },
 };

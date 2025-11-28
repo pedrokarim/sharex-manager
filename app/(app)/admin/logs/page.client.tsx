@@ -149,7 +149,7 @@ export default function LogsPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div>
       <div className="mb-6 sm:mb-8 space-y-4">
         <div className="flex flex-col gap-4">
           {/* Filtres principaux */}

@@ -12,6 +12,6 @@ export type ThemeCategory = {
 
 export type Presets = {
   "Thèmes par défaut": ThemeCategory;
-  "Thèmes Shadcn": ThemeCategory;
   "Thèmes colorés": ThemeCategory;
+  "Thèmes tweakcn": ThemeCategory;
 };

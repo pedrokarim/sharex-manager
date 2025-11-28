@@ -1,0 +1,142 @@
+#!/usr/bin/env node
+
+const { createCanvas } = require("canvas");
+const THREE = require("three");
+const gl = require("gl");
+const fs = require("fs");
+const path = require("path");
+
+// Fonction pour parser les arguments
+function parseArgs() {
+    const args = process.argv.slice(2);
+    const params = {
+        player: "pedrokarim64",
+        model: "default",
+        width: 400,
+        height: 600,
+        output: "output.png"
+    };
+
+    args.forEach(arg => {
+        if (arg.startsWith("--player=")) {
+            params.player = arg.split("=")[1];
+        } else if (arg.startsWith("--model=")) {
+            params.model = arg.split("=")[1];
+        } else if (arg.startsWith("--width=")) {
+            params.width = parseInt(arg.split("=")[1]);
+        } else if (arg.startsWith("--height=")) {
+            params.height = parseInt(arg.split("=")[1]);
+        } else if (arg.startsWith("--output=")) {
+            params.output = arg.split("=")[1];
+        }
+    });
+
+    return params;
+}
+
+async function renderSkin() {
+    try {
+        const params = parseArgs();
+        console.log("Paramètres reçus:", params);
+
+        // Validation des paramètres
+        if (params.width < 100 || params.width > 2000 || params.height < 100 || params.height > 2000) {
+            throw new Error("Dimensions invalides");
+        }
+
+        // Dimensions
+        const width = params.width;
+        const height = params.height;
+
+        // Créer le contexte WebGL headless
+        const glContext = gl(width, height, {
+            preserveDrawingBuffer: true,
+        });
+
+        // Créer le renderer Three.js
+        const renderer = new THREE.WebGLRenderer({
+            context: glContext,
+            canvas: {
+                width,
+                height,
+                style: {},
+                addEventListener: () => { },
+                removeEventListener: () => { },
+                clientHeight: height,
+                clientWidth: width,
+            },
+        });
+
+        renderer.setSize(width, height);
+        renderer.setClearColor(0x000000, 1.0);
+
+        // Créer la scène
+        const scene = new THREE.Scene();
+
+        // Créer la caméra
+        const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+        camera.position.z = 5;
+
+        // Créer un cube simple pour tester
+        const geometry = new THREE.BoxGeometry(2, 2, 2);
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x00ff00,
+            wireframe: true,
+        });
+        const cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
+
+        // Rotation du cube
+        cube.rotation.x = 0.5;
+        cube.rotation.y = 0.5;
+
+        // Rendre la scène
+        renderer.render(scene, camera);
+
+        // Récupérer les pixels
+        const pixels = new Uint8Array(width * height * 4);
+        glContext.readPixels(
+            0,
+            0,
+            width,
+            height,
+            glContext.RGBA,
+            glContext.UNSIGNED_BYTE,
+            pixels
+        );
+
+        // Créer un canvas Node.js pour convertir en PNG
+        const canvas = createCanvas(width, height);
+        const ctx = canvas.getContext("2d");
+
+        // Créer ImageData et remplir avec les pixels
+        const imageData = ctx.createImageData(width, height);
+
+        // Inverser les pixels (WebGL a l'origine en bas à gauche)
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const srcIndex = ((height - 1 - y) * width + x) * 4;
+                const dstIndex = (y * width + x) * 4;
+
+                imageData.data[dstIndex] = pixels[srcIndex]; // R
+                imageData.data[dstIndex + 1] = pixels[srcIndex + 1]; // G
+                imageData.data[dstIndex + 2] = pixels[srcIndex + 2]; // B
+                imageData.data[dstIndex + 3] = pixels[srcIndex + 3]; // A
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+
+        // Convertir en buffer PNG et sauvegarder
+        const buffer = canvas.toBuffer("image/png");
+        fs.writeFileSync(params.output, buffer);
+
+        console.log("Rendu terminé avec succès !");
+        console.log("Image sauvegardée:", params.output);
+    } catch (error) {
+        console.error("Erreur dans le script:", error);
+        process.exit(1);
+    }
+}
+
+renderSkin();

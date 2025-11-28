@@ -38,9 +38,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { AppSidebar } from "@/components/sidebar/app-sidebar";
-import { SidebarInset } from "@/components/ui/sidebar";
-import { SidebarHeader } from "@/components/sidebar/sibebar-header";
 import { ApiKeyDetailsDialog } from "@/components/api-keys/api-key-details-dialog";
 import { useTranslation } from "@/lib/i18n";
 import { useDateLocale } from "@/lib/i18n/date-locales";
@@ -103,7 +100,7 @@ export default function ApiKeysPage() {
 
   return (
     <>
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex flex-col h-full">
         <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold">

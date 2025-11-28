@@ -179,7 +179,7 @@ export function ModulesPageClient({ initialModules }: ModulesPageClientProps) {
       : modules.filter((module) => !module.enabled);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div>
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
           <Package className="h-6 w-6 sm:h-8 sm:w-8" />

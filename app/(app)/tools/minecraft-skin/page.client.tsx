@@ -170,7 +170,7 @@ export function MinecraftSkinPageClient() {
   }, [options.uuid, generateImage]);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto space-y-6">
       <div className="space-y-2">
         <div className="flex items-center space-x-2">
           <Gamepad2 className="h-8 w-8 text-primary" />
