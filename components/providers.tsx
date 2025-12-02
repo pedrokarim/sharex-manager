@@ -2,10 +2,11 @@
 
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { SessionProvider } from "next-auth/react";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider } from "@/components/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { TranslationProvider } from "./providers/TranslationProvider";
+import { ChatProvider } from "@/hooks/use-chat-context";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -22,18 +23,15 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NuqsAdapter>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <TranslationProvider>
-            <SessionProvider>{children}</SessionProvider>
-          </TranslationProvider>
-        </ThemeProvider>
-      </NuqsAdapter>
+      <ChatProvider>
+        <NuqsAdapter>
+          <ThemeProvider>
+            <TranslationProvider>
+              <SessionProvider>{children}</SessionProvider>
+            </TranslationProvider>
+          </ThemeProvider>
+        </NuqsAdapter>
+      </ChatProvider>
     </QueryClientProvider>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme-provider";
 import { useAtom } from "jotai";
 import {
   timeBasedThemeAtom,
@@ -19,7 +19,7 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, toggleTheme } = useTheme();
   const [timeBasedTheme] = useAtom(timeBasedThemeAtom);
   const [preferredThemeMode, setPreferredThemeMode] = useAtom(
     preferredThemeModeAtom
@@ -35,19 +35,32 @@ export function ThemeToggle() {
     "time-based": Clock,
   };
 
-  // Utiliser le mode préféré pour l'icône plutôt que le thème actuel
-  const Icon = themeIcons[preferredThemeMode as keyof typeof themeIcons] || Sun;
+  // Pour l'instant, simplifier et utiliser le thème actuel pour l'icône
+  const Icon = themeIcons[theme as keyof typeof themeIcons] || Sun;
   const { dayStartHour, dayEndHour } = timeBasedTheme;
 
   // Fonction pour gérer le changement de thème
   const handleThemeChange = (newTheme: ThemeMode) => {
     setPreferredThemeMode(newTheme);
 
-    // Si le thème n'est pas basé sur le temps, le définir directement
-    if (newTheme !== "time-based") {
-      setTheme(newTheme);
+    // Pour l'instant, simplifier : si c'est light ou dark, utiliser setTheme
+    if (newTheme === "light") {
+      setTheme("light");
+    } else if (newTheme === "dark") {
+      setTheme("dark");
+    } else if (newTheme === "system") {
+      // Pour system, on pourrait détecter les préférences système
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+      setTheme(prefersDark ? "dark" : "light");
     }
-    // Pour le thème basé sur le temps, le hook useTimeBasedTheme s'en chargera
+    // time-based peut être géré plus tard
+  };
+
+  // Aussi permettre le toggle simple avec clic sur le bouton principal
+  const handleToggle = () => {
+    toggleTheme();
   };
 
   return (
