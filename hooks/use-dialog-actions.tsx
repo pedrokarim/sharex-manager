@@ -8,7 +8,8 @@ import { useAIThemeGenerationCore } from "@/hooks/use-ai-theme-generation-core";
 import { usePostLoginAction } from "@/hooks/use-post-login-action";
 import { authClient } from "@/lib/auth-client";
 import { useAuthStore } from "@/store/auth-store";
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom, setThemeStateAtom, applyThemePresetAtom, hasThemeChangedFromCheckpointAtom } from "@/lib/atoms/editor";
 import { useThemePresetStore } from "@/store/theme-preset-store";
 import { parseCssInput } from "@/utils/parse-css-input";
 import { usePostHog } from "posthog-js/react";
@@ -47,8 +48,10 @@ function useDialogActionsStore(): DialogActionsContextType {
   const [shareUrl, setShareUrl] = useState("");
   const [dialogKey, _setDialogKey] = useState(0);
 
-  const { themeState, setThemeState, applyThemePreset, hasThemeChangedFromCheckpoint } =
-    useEditorStore();
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, setThemeState] = useAtom(setThemeStateAtom);
+  const [, applyThemePreset] = useAtom(applyThemePresetAtom);
+  const [hasThemeChangedFromCheckpoint] = useAtom(hasThemeChangedFromCheckpointAtom);
   const { getPreset } = useThemePresetStore();
   const { data: session } = authClient.useSession();
   const { openAuthDialog } = useAuthStore();
@@ -120,7 +123,7 @@ function useDialogActionsStore(): DialogActionsContextType {
   };
 
   const handleShareClick = async (id?: string) => {
-    if (hasThemeChangedFromCheckpoint()) {
+    if (hasThemeChangedFromCheckpoint) {
       handleSaveClick({ shareAfterSave: true });
       return;
     }
@@ -180,7 +183,7 @@ function useDialogActionsStore(): DialogActionsContextType {
 export const DialogActionsContext = createContext<DialogActionsContextType | null>(null);
 
 export function DialogActionsProvider({ children }: { children: ReactNode }) {
-  const { themeState } = useEditorStore();
+  const [themeState] = useAtom(themeEditorStateAtom);
   const store = useDialogActionsStore();
 
   return (

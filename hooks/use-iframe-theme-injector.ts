@@ -1,4 +1,5 @@
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom } from "@/lib/atoms/editor";
 import { EmbedMessage, IframeStatus, MESSAGE } from "@/types/live-preview-embed";
 import { applyThemeToElement } from "@/utils/apply-theme";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -22,7 +23,7 @@ export const useIframeThemeInjector = ({
   const internalRef = useRef<HTMLIFrameElement | null>(null);
   const ref = iframeRef ?? internalRef;
 
-  const { themeState } = useEditorStore();
+  const [themeState] = useAtom(themeEditorStateAtom);
   const [status, setStatus] = useState<IframeStatus>("unknown");
   const [themeInjectionError, setThemeInjectionError] = useState<string | null>(null);
   const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

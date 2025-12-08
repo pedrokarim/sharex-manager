@@ -20,7 +20,8 @@ import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { COMMON_STYLES, defaultThemeState } from "@/config/theme";
 import { useAIThemeGenerationCore } from "@/hooks/use-ai-theme-generation-core";
 import { useControlsTabFromUrl, type ControlTab } from "@/hooks/use-controls-tab-from-url";
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom } from "@/lib/atoms/editor";
 import { type FontInfo } from "@/types/fonts";
 import { ThemeEditorControlsProps, ThemeStyleProps } from "@/types/theme";
 import { buildFontFamily } from "@/utils/fonts";
@@ -32,7 +33,7 @@ const ThemeControlPanel = ({
   onChange,
   themePromise,
 }: ThemeEditorControlsProps) => {
-  const { themeState } = useEditorStore();
+  const [themeState] = useAtom(themeEditorStateAtom);
   const { tab, handleSetTab } = useControlsTabFromUrl();
   const { isGeneratingTheme } = useAIThemeGenerationCore();
 

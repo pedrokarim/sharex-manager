@@ -7,7 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom } from "@/lib/atoms/editor";
 import { MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { MCPDialog } from "./mcp-dialog";
@@ -16,7 +17,7 @@ interface MoreOptionsProps extends React.ComponentProps<typeof DropdownMenuTrigg
 
 export function MoreOptions({ ...props }: MoreOptionsProps) {
   const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
-  const { themeState } = useEditorStore();
+  const [themeState] = useAtom(themeEditorStateAtom);
 
   return (
     <>

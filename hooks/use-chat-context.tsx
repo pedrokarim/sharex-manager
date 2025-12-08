@@ -5,6 +5,8 @@ import { toast } from "@/hooks/use-toast";
 import { useAIChatStore } from "@/store/ai-chat-store";
 import { ChatMessage } from "@/types/ai";
 import { applyGeneratedTheme } from "@/utils/ai/apply-theme";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom, setThemeStateAtom } from "@/lib/atoms/editor";
 
 import { parseAiSdkTransportError } from "@/lib/ai/parse-ai-sdk-transport-error";
 import { useChat } from "@ai-sdk/react";
@@ -23,6 +25,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const storedMessages = useAIChatStore((s) => s.messages);
   const setStoredMessages = useAIChatStore((s) => s.setMessages);
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, setThemeState] = useAtom(setThemeStateAtom);
 
   const hasStoreHydrated = useAIChatStore((s) => s.hasHydrated);
   const hasInitializedRef = useRef(false);
@@ -44,7 +48,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     onData: (dataPart) => {
       const { type, data } = dataPart;
       if (type === "data-generated-theme-styles") {
-        if (data.status === "ready") applyGeneratedTheme(data.themeStyles);
+        if (data.status === "ready") applyGeneratedTheme(data.themeStyles, themeState, setThemeState);
       }
     },
     onFinish: () => {

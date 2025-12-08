@@ -1,6 +1,6 @@
-import { useEditorStore } from "@/store/editor-store";
 import { useThemePresetStore } from "@/store/theme-preset-store";
 import { AIPromptData, MentionReference, PromptImage } from "@/types/ai";
+import { ThemeStyles } from "@/types/theme";
 import { JSONContent } from "@tiptap/react";
 
 export const getTextContent = (promptData: AIPromptData | null) => {
@@ -14,11 +14,16 @@ export const buildMentionStringForAPI = (mention: MentionReference) => {
 };
 
 export const buildPromptForAPI = (promptData: AIPromptData) => {
-  const mentionReferences = promptData.mentions.map((mention) => buildMentionStringForAPI(mention));
+  const mentionReferences = promptData.mentions.map((mention) =>
+    buildMentionStringForAPI(mention)
+  );
   return `${promptData.content}\n\n${mentionReferences.join("\n")}`;
 };
 
-export const buildAIPromptRender = (promptData: AIPromptData): React.ReactNode => {
+export const buildAIPromptRender = (
+  promptData: AIPromptData,
+  themeStyles: ThemeStyles
+): React.ReactNode => {
   // Create a regex that matches all possible mention patterns from the actual mentions
   const mentionPatterns = promptData.mentions.map(
     (m) => `@${m.label.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}`
@@ -38,14 +43,19 @@ export const buildAIPromptRender = (promptData: AIPromptData): React.ReactNode =
     // Split by \n and interleave <br /> to show line breaks in the messages UI
     // without this, the line breaks are not shown and the user message looks messy.
     const lines = part.split("\n");
-    return lines.flatMap((line, i) => (i === 0 ? line : [<br key={`br-${index}-${i}`} />, line]));
+    return lines.flatMap((line, i) =>
+      i === 0 ? line : [<br key={`br-${index}-${i}`} />, line]
+    );
   });
 
   return textContent;
 };
 
-export function attachCurrentThemeMention(promptData: AIPromptData): AIPromptData {
-  const currentThemeData = useEditorStore.getState().themeState.styles;
+export function attachCurrentThemeMention(
+  promptData: AIPromptData,
+  themeStyles: ThemeStyles
+): AIPromptData {
+  const currentThemeData = themeStyles;
 
   const mentionReference: MentionReference = {
     id: "editor:current-changes",
@@ -60,8 +70,14 @@ export function attachCurrentThemeMention(promptData: AIPromptData): AIPromptDat
   return promptDataWithMention;
 }
 
-export function createCurrentThemePrompt({ prompt }: { prompt: string }): AIPromptData {
-  const currentThemeData = useEditorStore.getState().themeState.styles;
+export function createCurrentThemePrompt({
+  prompt,
+  themeStyles,
+}: {
+  prompt: string;
+  themeStyles: ThemeStyles;
+}): AIPromptData {
+  const currentThemeData = themeStyles;
 
   const mentionReference: MentionReference = {
     id: "editor:current-changes",
@@ -76,16 +92,22 @@ export function createCurrentThemePrompt({ prompt }: { prompt: string }): AIProm
 }
 
 export function mentionsCurrentTheme(promptData: AIPromptData): boolean {
-  return promptData.mentions.some((mention) => mention.id === "editor:current-changes");
+  return promptData.mentions.some(
+    (mention) => mention.id === "editor:current-changes"
+  );
 }
 
-export function createPromptDataFromMentions(content: string, mentionIds: string[]): AIPromptData {
+export function createPromptDataFromMentions(
+  content: string,
+  mentionIds: string[],
+  themeStyles: ThemeStyles
+): AIPromptData {
   const mentions: MentionReference[] = mentionIds.map((id) => {
     if (id === "editor:current-changes") {
       return {
         id,
         label: "Current Theme",
-        themeData: useEditorStore.getState().themeState.styles,
+        themeData: themeStyles,
       };
     }
 
@@ -107,7 +129,10 @@ export function createPromptDataFromMentions(content: string, mentionIds: string
   };
 }
 
-export function createPromptDataFromPreset(prompt: string, presetName: string): AIPromptData {
+export function createPromptDataFromPreset(
+  prompt: string,
+  presetName: string
+): AIPromptData {
   const preset = useThemePresetStore.getState().getPreset(presetName);
 
   if (!preset) {
@@ -150,7 +175,7 @@ export function extractTextContentAndMentions(node: JSONContent): {
       const label = n.attrs?.label;
       let themeData;
       if (id === "editor:current-changes") {
-        themeData = useEditorStore.getState().themeState.styles;
+        themeData = themeStyles;
       } else {
         const preset = useThemePresetStore.getState().getPreset(id);
         themeData = preset?.styles || { light: {}, dark: {} };
@@ -182,7 +207,9 @@ export function extractTextContentAndMentions(node: JSONContent): {
   return { content: formattedText, mentions: mentionsArr };
 }
 
-export function convertJSONContentToPromptData(jsonContent: JSONContent): AIPromptData {
+export function convertJSONContentToPromptData(
+  jsonContent: JSONContent
+): AIPromptData {
   const { content, mentions } = extractTextContentAndMentions(jsonContent);
   return { content, mentions };
 }
@@ -192,7 +219,9 @@ export function convertJSONContentToPromptData(jsonContent: JSONContent): AIProm
  * Mentions are inserted as inline nodes, and line breaks are preserved as hardBreak nodes.
  * This matches the structure produced by Tiptap for multi-line content.
  */
-export function convertPromptDataToJSONContent(promptData: AIPromptData): JSONContent {
+export function convertPromptDataToJSONContent(
+  promptData: AIPromptData
+): JSONContent {
   const { content, mentions } = promptData;
 
   if (!content) {
@@ -245,8 +274,11 @@ export function convertPromptDataToJSONContent(promptData: AIPromptData): JSONCo
 
   lines.forEach((line, lineIdx) => {
     // Find all mention positions in the line
-    const mentionPositions: Array<{ index: number; mention: MentionReference; length: number }> =
-      [];
+    const mentionPositions: Array<{
+      index: number;
+      mention: MentionReference;
+      length: number;
+    }> = [];
 
     uniqueMentions.forEach((mention) => {
       const mentionText = `@${mention.label}`;
@@ -336,13 +368,17 @@ export function isEmptyPromptData(
   promptData?: AIPromptData,
   uploadedImages?: PromptImage[]
 ): boolean {
-  const isEmptyPromptDataContent = !promptData?.content?.trim() || promptData?.content.length === 0;
-  const isEmptyPromptDataImages = !!uploadedImages && uploadedImages.length === 0;
+  const isEmptyPromptDataContent =
+    !promptData?.content?.trim() || promptData?.content.length === 0;
+  const isEmptyPromptDataImages =
+    !!uploadedImages && uploadedImages.length === 0;
 
   return isEmptyPromptDataImages && isEmptyPromptDataContent;
 }
 
-export function dedupeMentionReferences(mentions: MentionReference[]): MentionReference[] {
+export function dedupeMentionReferences(
+  mentions: MentionReference[]
+): MentionReference[] {
   const uniqueMentions = new Map<string, MentionReference>();
   for (const m of mentions) {
     if (!uniqueMentions.has(m.id)) {

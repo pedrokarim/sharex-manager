@@ -43,6 +43,13 @@ export const defaultThemeState = {
         "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
       "font-mono":
         "ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace",
+
+      "shadow-color": "hsl(0 0% 0%)",
+      "shadow-opacity": "0.1",
+      "shadow-blur": "3px",
+      "shadow-spread": "0px",
+      "shadow-offset-x": "0",
+      "shadow-offset-y": "1px",
     },
     dark: {
       primary: "hsl(210 40% 98%)",
@@ -73,6 +80,13 @@ export const defaultThemeState = {
         "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
       "font-mono":
         "ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace",
+
+      "shadow-color": "hsl(0 0% 0%)",
+      "shadow-opacity": "0.1",
+      "shadow-blur": "3px",
+      "shadow-spread": "0px",
+      "shadow-offset-x": "0",
+      "shadow-offset-y": "1px",
     },
   },
   currentMode: "light" as const,

@@ -1,10 +1,11 @@
 import { useQueryState } from "nuqs";
 import React from "react";
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { applyThemePresetAtom } from "@/lib/atoms/editor";
 
 export const useThemePresetFromUrl = () => {
   const [preset, setPreset] = useQueryState("theme");
-  const applyThemePreset = useEditorStore((state) => state.applyThemePreset);
+  const [, applyThemePreset] = useAtom(applyThemePresetAtom);
 
   // Apply theme preset if it exists in URL and remove it
   React.useEffect(() => {

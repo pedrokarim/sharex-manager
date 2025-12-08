@@ -1,7 +1,8 @@
 import Logo from "@/assets/logo.svg";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom } from "@/lib/atoms/editor";
 import { AIPromptData, type ChatMessage } from "@/types/ai";
 import { buildAIPromptRender } from "@/utils/ai/ai-prompt";
 import ColorPreview from "../theme-preview/color-preview";
@@ -83,7 +84,7 @@ interface AssistantMessageProps {
 }
 
 function AssistantMessage({ message, isLastMessageStreaming }: AssistantMessageProps) {
-  const { themeState } = useEditorStore();
+  const [themeState] = useAtom(themeEditorStateAtom);
 
   return (
     <div className="flex items-start gap-1.5">
@@ -168,12 +169,13 @@ function UserMessage({
   onEditCancel,
   isGeneratingTheme,
 }: UserMessageProps) {
+  const [themeState] = useAtom(themeEditorStateAtom);
   const promptData = message.metadata?.promptData;
   const shouldDisplayMsgContent = promptData?.content?.trim() != "";
 
   const getDisplayContent = () => {
     if (promptData) {
-      return buildAIPromptRender(promptData);
+      return buildAIPromptRender(promptData, themeState.styles);
     }
 
     return message.parts.map((part) => (part.type === "text" ? part.text : "")).join("");

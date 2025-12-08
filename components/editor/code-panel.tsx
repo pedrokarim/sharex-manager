@@ -19,7 +19,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { usePostHog } from "posthog-js/react";
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom, hasUnsavedChangesAtom } from "@/lib/atoms/editor";
 import { usePreferencesStore } from "@/store/preferences-store";
 import { generateThemeCode, generateTailwindConfigCode } from "@/utils/theme-style-generator";
 import { useThemePresetStore } from "@/store/theme-preset-store";
@@ -37,14 +38,15 @@ const CodePanel: React.FC<CodePanelProps> = ({ themeEditorState }) => {
   const posthog = usePostHog();
   const { handleSaveClick } = useDialogActions();
 
-  const preset = useEditorStore((state) => state.themeState.preset);
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const preset = themeState.preset;
+  const [hasUnsavedChanges] = useAtom(hasUnsavedChangesAtom);
   const colorFormat = usePreferencesStore((state) => state.colorFormat);
   const tailwindVersion = usePreferencesStore((state) => state.tailwindVersion);
   const packageManager = usePreferencesStore((state) => state.packageManager);
   const setColorFormat = usePreferencesStore((state) => state.setColorFormat);
   const setTailwindVersion = usePreferencesStore((state) => state.setTailwindVersion);
   const setPackageManager = usePreferencesStore((state) => state.setPackageManager);
-  const hasUnsavedChanges = useEditorStore((state) => state.hasUnsavedChanges);
 
   const isSavedPreset = useThemePresetStore(
     (state) => preset && state.getPreset(preset)?.source === "SAVED"
@@ -102,7 +104,7 @@ const CodePanel: React.FC<CodePanelProps> = ({ themeEditorState }) => {
   };
 
   const showRegistryCommand = useMemo(() => {
-    return preset && preset !== "default" && !hasUnsavedChanges();
+    return preset && preset !== "default" && !hasUnsavedChanges;
   }, [preset, hasUnsavedChanges]);
 
   const PackageManagerHeader = ({ actionButton }: { actionButton: React.ReactNode }) => (

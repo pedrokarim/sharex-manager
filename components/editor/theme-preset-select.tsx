@@ -8,7 +8,8 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom, applyThemePresetAtom, hasUnsavedChangesAtom } from "@/lib/atoms/editor";
 import { useThemePresetStore } from "@/store/theme-preset-store";
 import { ThemePreset } from "@/types/theme";
 import { getPresetThemeStyles } from "@/utils/theme-preset-helper";
@@ -65,7 +66,7 @@ const isThemeNew = (preset: ThemePreset) => {
 };
 
 const ThemeControls = () => {
-  const applyThemePreset = useEditorStore((store) => store.applyThemePreset);
+  const [, applyThemePreset] = useAtom(applyThemePresetAtom);
   const presets = useThemePresetStore((store) => store.getAllPresets());
 
   const presetNames = useMemo(() => ["default", ...Object.keys(presets)], [presets]);
@@ -130,7 +131,7 @@ const ThemePresetCycleControls: React.FC<ThemePresetCycleControlsProps> = ({
   className,
   ...props
 }) => {
-  const applyThemePreset = useEditorStore((store) => store.applyThemePreset);
+  const [, applyThemePreset] = useAtom(applyThemePresetAtom);
 
   const currentIndex =
     useMemo(
@@ -178,9 +179,9 @@ const ThemePresetSelect: React.FC<ThemePresetSelectProps> = ({
   className,
   ...props
 }) => {
-  const themeState = useEditorStore((store) => store.themeState);
-  const applyThemePreset = useEditorStore((store) => store.applyThemePreset);
-  const hasUnsavedChanges = useEditorStore((store) => store.hasUnsavedChanges);
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, applyThemePreset] = useAtom(applyThemePresetAtom);
+  const [hasUnsavedChanges] = useAtom(hasUnsavedChangesAtom);
   const currentPreset = themeState.preset;
   const mode = themeState.currentMode;
 
@@ -269,7 +270,7 @@ const ThemePresetSelect: React.FC<ThemePresetSelectProps> = ({
               {currentPresetName !== "default" &&
                 currentPresetName &&
                 isSavedTheme(currentPresetName) &&
-                !hasUnsavedChanges() && (
+                !hasUnsavedChanges && (
                   <div className="bg-muted rounded-full p-1">
                     <Heart
                       className="size-1"
@@ -279,7 +280,7 @@ const ThemePresetSelect: React.FC<ThemePresetSelectProps> = ({
                   </div>
                 )}
               <span className="truncate text-left font-medium capitalize">
-                {hasUnsavedChanges() ? (
+                {hasUnsavedChanges ? (
                   <>Custom (Unsaved)</>
                 ) : (
                   presets[currentPresetName || "default"]?.label || "default"

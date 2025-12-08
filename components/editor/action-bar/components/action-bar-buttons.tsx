@@ -1,6 +1,7 @@
 import { Separator } from "@/components/ui/separator";
 import { useAIThemeGenerationCore } from "@/hooks/use-ai-theme-generation-core";
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom, resetToCurrentPresetAtom, hasUnsavedChangesAtom } from "@/lib/atoms/editor";
 import { useThemePresetStore } from "@/store/theme-preset-store";
 import { CodeButton } from "./code-button";
 import { EditButton } from "./edit-button";
@@ -27,7 +28,9 @@ export function ActionBarButtons({
   onShareClick,
   isSaving,
 }: ActionBarButtonsProps) {
-  const { themeState, resetToCurrentPreset, hasUnsavedChanges } = useEditorStore();
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, resetToCurrentPreset] = useAtom(resetToCurrentPresetAtom);
+  const [hasUnsavedChanges] = useAtom(hasUnsavedChangesAtom);
   const { isGeneratingTheme } = useAIThemeGenerationCore();
   const { getPreset } = useThemePresetStore();
   const currentPreset = themeState?.preset ? getPreset(themeState?.preset) : undefined;
@@ -45,7 +48,7 @@ export function ActionBarButtons({
       <Separator orientation="vertical" className="mx-1 h-8" />
       <UndoRedoButtons disabled={isGeneratingTheme} />
       <Separator orientation="vertical" className="mx-1 h-8" />
-      <ResetButton onClick={handleReset} disabled={!hasUnsavedChanges() || isGeneratingTheme} />
+      <ResetButton onClick={handleReset} disabled={!hasUnsavedChanges || isGeneratingTheme} />
       <div className="hidden items-center gap-1 md:flex">
         <ImportButton onClick={onImportClick} disabled={isGeneratingTheme} />
       </div>

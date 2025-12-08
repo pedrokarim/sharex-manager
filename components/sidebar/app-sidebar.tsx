@@ -153,8 +153,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             icon: Sliders,
           },
           {
-            title: "New Theme",
-            url: "/settings/new-theme",
+            title: t("sidebar.secondary.theme"),
+            url: "/settings/theme",
             icon: Palette,
           },
           {

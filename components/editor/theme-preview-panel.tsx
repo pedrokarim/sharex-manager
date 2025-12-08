@@ -15,7 +15,9 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { useThemeInspector } from "@/hooks/use-theme-inspector";
+import { applyThemeToElement } from "@/utils/apply-theme";
 import { cn } from "@/lib/utils";
+import { useEffect } from "react";
 import { ThemeEditorPreviewProps } from "@/types/theme";
 import { Inspect, Maximize, Minimize, MoreVertical } from "lucide-react";
 import Link from "next/link";
@@ -30,10 +32,15 @@ const DemoCards = lazy(() => import("@/components/examples/cards"));
 const DemoMail = lazy(() => import("@/components/examples/mail"));
 const DemoDashboard = lazy(() => import("@/components/examples/dashboard"));
 const DemoPricing = lazy(() => import("@/components/examples/pricing/pricing"));
-const TypographyDemo = lazy(() => import("@/components/examples/typography/typography-demo"));
+const TypographyDemo = lazy(
+  () => import("@/components/examples/typography/typography-demo")
+);
 const CustomDemo = lazy(() => import("@/components/examples/custom"));
 
-const ThemePreviewPanel = ({ styles, currentMode }: ThemeEditorPreviewProps) => {
+const ThemePreviewPanel = ({
+  styles,
+  currentMode,
+}: ThemeEditorPreviewProps) => {
   const { isFullscreen, toggleFullscreen } = useFullscreen();
   const [activeTab, setActiveTab] = useQueryState("p", {
     defaultValue: "cards",
@@ -51,6 +58,20 @@ const ThemePreviewPanel = ({ styles, currentMode }: ThemeEditorPreviewProps) => 
   if (!styles || !styles[currentMode]) {
     return null;
   }
+
+  // Apply theme styles to the preview container
+  useEffect(() => {
+    if (rootRef.current) {
+      // Create a theme state object for applyThemeToElement
+      const themeState = {
+        currentMode,
+        styles,
+        preset: null,
+        hslAdjustments: { hueShift: 0, saturationScale: 1, lightnessScale: 1 },
+      };
+      applyThemeToElement(themeState, rootRef.current);
+    }
+  }, [styles, currentMode, rootRef]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -90,7 +111,9 @@ const ThemePreviewPanel = ({ styles, currentMode }: ThemeEditorPreviewProps) => 
                   </TooltipWrapper>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleTabChange("typography")}>
+                  <DropdownMenuItem
+                    onClick={() => handleTabChange("typography")}
+                  >
                     Typography
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -113,11 +136,14 @@ const ThemePreviewPanel = ({ styles, currentMode }: ThemeEditorPreviewProps) => 
                   onClick={toggleInspector}
                   className={cn(
                     "group size-8",
-                    inspectorEnabled && "bg-accent text-accent-foreground w-auto"
+                    inspectorEnabled &&
+                      "bg-accent text-accent-foreground w-auto"
                   )}
                 >
                   <Inspect className="transition-all group-hover:scale-120" />
-                  {inspectorEnabled && <span className="text-xs tracking-wide uppercase">on</span>}
+                  {inspectorEnabled && (
+                    <span className="text-xs tracking-wide uppercase">on</span>
+                  )}
                 </Button>
               </TooltipWrapper>
               <TooltipWrapper
@@ -162,7 +188,10 @@ const ThemePreviewPanel = ({ styles, currentMode }: ThemeEditorPreviewProps) => 
                 </ExamplesPreviewContainer>
               </TabsContent>
 
-              <TabsContent value="dashboard" className="@container m-0 size-full">
+              <TabsContent
+                value="dashboard"
+                className="@container m-0 size-full"
+              >
                 <ExamplesPreviewContainer className="size-full">
                   <ScrollArea className="size-full">
                     <div className="size-full min-w-[1400px]">
@@ -173,14 +202,20 @@ const ThemePreviewPanel = ({ styles, currentMode }: ThemeEditorPreviewProps) => 
                 </ExamplesPreviewContainer>
               </TabsContent>
 
-              <TabsContent value="pricing" className="@container mt-0 h-full space-y-6">
+              <TabsContent
+                value="pricing"
+                className="@container mt-0 h-full space-y-6"
+              >
                 <ExamplesPreviewContainer className="size-full">
                   <div className="absolute top-4 right-4 z-10">
                     <Link
                       href="https://shadcnblocks.com?utm_source=tweakcn&utm_medium=theme-editor-preview"
                       target="_blank"
                     >
-                      <Button variant="outline" className="group h-12 shadow-sm">
+                      <Button
+                        variant="outline"
+                        className="group h-12 shadow-sm"
+                      >
                         <div className="flex items-center gap-2">
                           <ShadcnBlocksLogo
                             className="shrink-0"
@@ -233,7 +268,11 @@ const ThemePreviewPanel = ({ styles, currentMode }: ThemeEditorPreviewProps) => 
         </Tabs>
       </div>
 
-      <InspectorOverlay inspector={inspector} enabled={inspectorEnabled} rootRef={rootRef} />
+      <InspectorOverlay
+        inspector={inspector}
+        enabled={inspectorEnabled}
+        rootRef={rootRef}
+      />
     </>
   );
 };

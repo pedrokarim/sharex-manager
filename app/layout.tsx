@@ -3,7 +3,7 @@ import localFont from "next/font/local";
 import "./global.css";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
-import { ThemeWrapper } from "@/components/theme-wrapper";
+// import { ThemeWrapper } from "@/components/theme-wrapper"; // Disabled - themes now handled by Jotai
 import { initModules } from "@/lib/modules/init";
 
 // Initialiser les modules au démarrage de l'application
@@ -40,12 +40,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <ThemeWrapper>
-            <div className="relative min-h-screen">
-              <main>{children}</main>
-              <Toaster />
-            </div>
-          </ThemeWrapper>
+          {/* ThemeWrapper disabled - themes now handled by ThemeProvider in components/theme-provider.tsx */}
+          <div className="relative min-h-screen">
+            <main>{children}</main>
+            <Toaster />
+          </div>
         </Providers>
       </body>
     </html>

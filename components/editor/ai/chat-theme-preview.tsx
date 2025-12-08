@@ -3,6 +3,8 @@ import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useFeedbackText } from "@/hooks/use-feedback-text";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom, setThemeStateAtom } from "@/lib/atoms/editor";
 import { cn } from "@/lib/utils";
 import { ThemeStyles } from "@/types/theme";
 import { applyGeneratedTheme } from "@/utils/ai/apply-theme";
@@ -39,6 +41,8 @@ export function ChatThemePreview({
 }: ChatThemePreviewProps) {
   const [isExpanded, setIsExpanded] = useState(expanded);
   const { theme: mode } = useTheme();
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, setThemeState] = useAtom(setThemeStateAtom);
   const loading = status === "loading";
 
   const feedbackText = useFeedbackText({
@@ -76,7 +80,7 @@ export function ChatThemePreview({
   const handleApplyTheme = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    if (status === "complete") applyGeneratedTheme(themeStyles);
+    if (status === "complete") applyGeneratedTheme(themeStyles, themeState, setThemeState);
   };
 
   if (status === "complete")

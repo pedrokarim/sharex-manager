@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect } from "react";
-import { useEditorStore } from "../store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom, setThemeStateAtom } from "@/lib/atoms/editor";
 import { applyThemeToElement } from "@/utils/apply-theme";
 import { useThemePresetFromUrl } from "@/hooks/use-theme-preset-from-url";
 
@@ -29,14 +30,15 @@ const initialState: ThemeProviderState = {
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-  const { themeState, setThemeState } = useEditorStore();
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, setThemeState] = useAtom(setThemeStateAtom);
 
   // Handle theme preset from URL
   useThemePresetFromUrl();
 
   useEffect(() => {
     const root = document.documentElement;
-    if (!root) return;
+    if (!root || !themeState || !themeState.styles) return;
 
     applyThemeToElement(themeState, root);
   }, [themeState]);

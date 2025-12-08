@@ -69,9 +69,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
-import { useTheme } from "next-themes";
+// import { useTheme } from "next-themes"; // DISABLED: Ancien système next-themes désactivé
 import { useRouter } from "next/navigation";
-import { useTimeBasedTheme } from "@/hooks/use-time-based-theme";
+// import { useTimeBasedTheme } from "@/hooks/use-time-based-theme"; // Non utilisé
 import { TimePicker } from "@/components/ui/time-picker";
 import { useTranslation } from "@/lib/i18n";
 import { LanguageSelector } from "@/components/LanguageSelector";
@@ -97,7 +97,7 @@ export function PreferencesPageClient() {
     preferredThemeModeAtom
   );
 
-  const { setTheme } = useTheme();
+  // const { setTheme } = useTheme(); // DISABLED: Ancien système next-themes désactivé
   const router = useRouter();
   const { t } = useTranslation();
 

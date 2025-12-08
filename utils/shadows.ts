@@ -11,12 +11,41 @@ export const getShadowMap = (themeEditorState: ThemeEditorState) => {
   };
 
   const shadowColor = styles["shadow-color"];
-  const hsl = colorFormatter(shadowColor, "hsl", "3");
+  if (!shadowColor || typeof shadowColor !== "string") {
+    console.warn("Invalid or missing shadow-color, using default");
+    return {}; // Return empty map to avoid errors
+  }
+
+  let hsl: string;
+  try {
+    hsl = colorFormatter(shadowColor, "hsl", "3");
+  } catch (error) {
+    console.warn(`Failed to parse shadow-color: ${shadowColor}`, error);
+    return {}; // Return empty map to avoid errors
+  }
   const offsetX = styles["shadow-offset-x"];
   const offsetY = styles["shadow-offset-y"];
   const blur = styles["shadow-blur"];
   const spread = styles["shadow-spread"];
-  const opacity = parseFloat(styles["shadow-opacity"]);
+  const opacityValue = styles["shadow-opacity"];
+
+  // Validate all shadow properties
+  if (
+    typeof offsetX !== "string" ||
+    typeof offsetY !== "string" ||
+    typeof blur !== "string" ||
+    typeof spread !== "string" ||
+    typeof opacityValue !== "string"
+  ) {
+    console.warn("Invalid shadow properties, using defaults");
+    return {};
+  }
+
+  const opacity = parseFloat(opacityValue);
+  if (isNaN(opacity)) {
+    console.warn("Invalid shadow opacity, using default");
+    return {};
+  }
   const color = (opacityMultiplier: number) =>
     `hsl(${hsl} / ${(opacity * opacityMultiplier).toFixed(2)})`;
 

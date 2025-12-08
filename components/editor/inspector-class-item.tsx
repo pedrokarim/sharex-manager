@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 import { SquarePen } from "lucide-react";
 import { FocusColorId, useColorControlFocus } from "@/store/color-control-focus-store";
 import { segmentClassName } from "@/lib/inspector/segment-classname";
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom } from "@/lib/atoms/editor";
 
 interface InspectorClassItemProps {
   className: string;
@@ -13,7 +14,7 @@ interface InspectorClassItemProps {
 
 const InspectorClassItem = memo(({ className }: InspectorClassItemProps) => {
   const { focusColor } = useColorControlFocus();
-  const { themeState } = useEditorStore();
+  const [themeState] = useAtom(themeEditorStateAtom);
   const styles = themeState.styles[themeState.currentMode];
   const segments = useMemo(() => segmentClassName(className), [className]);
 

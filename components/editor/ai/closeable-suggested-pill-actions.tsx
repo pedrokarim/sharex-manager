@@ -2,6 +2,8 @@
 
 import { HorizontalScrollArea } from "@/components/horizontal-scroll-area";
 import { Button } from "@/components/ui/button";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom } from "@/lib/atoms/editor";
 import { usePreferencesStore } from "@/store/preferences-store";
 import { AIPromptData } from "@/types/ai";
 import { createCurrentThemePrompt } from "@/utils/ai/ai-prompt";
@@ -16,10 +18,11 @@ export function ClosableSuggestedPillActions({
   onGenerateTheme: (promptData: AIPromptData) => void;
   isGeneratingTheme: boolean;
 }) {
+  const [themeState] = useAtom(themeEditorStateAtom);
   const { chatSuggestionsOpen, setChatSuggestionsOpen } = usePreferencesStore();
 
   const handleSetPrompt = async (prompt: string) => {
-    const promptData = createCurrentThemePrompt({ prompt });
+    const promptData = createCurrentThemePrompt({ prompt, themeStyles: themeState.styles });
     onGenerateTheme(promptData);
   };
 

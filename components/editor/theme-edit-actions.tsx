@@ -2,7 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUpdateTheme } from "@/hooks/themes";
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom, applyThemePresetAtom } from "@/lib/atoms/editor";
 import { Theme } from "@/types/theme";
 import { Check, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -18,7 +19,8 @@ const ThemeEditActions: React.FC<ThemeEditActionsProps> = ({ theme, disabled = f
   const router = useRouter();
   const searchParams = useSearchParams();
   const updateThemeMutation = useUpdateTheme();
-  const { themeState, applyThemePreset } = useEditorStore();
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, applyThemePreset] = useAtom(applyThemePresetAtom);
   const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
 
   const mainEditorUrl = `/editor/theme?${searchParams}`;

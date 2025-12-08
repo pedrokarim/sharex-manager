@@ -7,6 +7,7 @@ import {
   preferredThemeModeAtom,
   type ThemeMode,
 } from "@/lib/atoms/preferences";
+import { themeEditorStateAtom, setThemeStateAtom } from "@/lib/atoms/editor";
 import { useTimeBasedTheme } from "@/hooks/use-time-based-theme";
 import { Moon, Sun, Monitor, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,9 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function ThemeToggle() {
-  const { theme, setTheme, toggleTheme } = useTheme();
+  const { toggleTheme } = useTheme();
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, setThemeState] = useAtom(setThemeStateAtom);
   const [timeBasedTheme] = useAtom(timeBasedThemeAtom);
   const [preferredThemeMode, setPreferredThemeMode] = useAtom(
     preferredThemeModeAtom
@@ -35,38 +38,39 @@ export function ThemeToggle() {
     "time-based": Clock,
   };
 
-  // Pour l'instant, simplifier et utiliser le thème actuel pour l'icône
-  const Icon = themeIcons[theme as keyof typeof themeIcons] || Sun;
+  // Utiliser le mode actuel du thème pour l'icône
+  const Icon = themeIcons[themeState.currentMode as keyof typeof themeIcons] || Sun;
   const { dayStartHour, dayEndHour } = timeBasedTheme;
 
   // Fonction pour gérer le changement de thème
   const handleThemeChange = (newTheme: ThemeMode) => {
     setPreferredThemeMode(newTheme);
 
-    // Pour l'instant, simplifier : si c'est light ou dark, utiliser setTheme
+    // Changer le mode selon la sélection
     if (newTheme === "light") {
-      setTheme("light");
+      setThemeState({ ...themeState, currentMode: "light" });
     } else if (newTheme === "dark") {
-      setTheme("dark");
+      setThemeState({ ...themeState, currentMode: "dark" });
     } else if (newTheme === "system") {
-      // Pour system, on pourrait détecter les préférences système
+      // Pour system, détecter les préférences système
       const prefersDark = window.matchMedia(
         "(prefers-color-scheme: dark)"
       ).matches;
-      setTheme(prefersDark ? "dark" : "light");
+      setThemeState({ ...themeState, currentMode: prefersDark ? "dark" : "light" });
     }
-    // time-based peut être géré plus tard
+    // time-based est géré automatiquement par useTimeBasedTheme
   };
 
-  // Aussi permettre le toggle simple avec clic sur le bouton principal
-  const handleToggle = () => {
-    toggleTheme();
+  // Toggle simple entre light et dark avec animation
+  const handleToggle = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const { clientX: x, clientY: y } = event;
+    toggleTheme({ x, y });
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" onClick={handleToggle}>
           <Icon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all" />
           <span className="sr-only">Changer le thème</span>
         </Button>

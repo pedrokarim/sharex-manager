@@ -2,7 +2,8 @@
 
 import React, { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import { SliderWithInput } from "./slider-with-input";
-import { useEditorStore } from "../../store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom, setThemeStateAtom, saveThemeCheckpointAtom, themeCheckpointAtom } from "@/lib/atoms/editor";
 import { COMMON_STYLES, defaultThemeState } from "../../config/theme";
 import { ThemeEditorState } from "@/types/editor";
 import { converter, formatHex, Hsl } from "culori";
@@ -66,7 +67,10 @@ const HSL_PRESETS = [
 ];
 
 const HslAdjustmentControls = () => {
-  const { themeState, setThemeState, saveThemeCheckpoint, themeCheckpoint } = useEditorStore();
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, setThemeState] = useAtom(setThemeStateAtom);
+  const [, saveThemeCheckpoint] = useAtom(saveThemeCheckpointAtom);
+  const [themeCheckpoint] = useAtom(themeCheckpointAtom);
   const debouncedUpdateRef = useRef<ReturnType<typeof debounce> | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
 

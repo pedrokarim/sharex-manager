@@ -2,6 +2,8 @@ import { HorizontalScrollArea } from "@/components/horizontal-scroll-area";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom } from "@/lib/atoms/editor";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { AIPromptData } from "@/types/ai";
@@ -18,6 +20,7 @@ export function NoMessagesPlaceholder({
   onGenerateTheme: (promptData: AIPromptData) => void;
   isGeneratingTheme: boolean;
 }) {
+  const [themeState] = useAtom(themeEditorStateAtom);
   const { data: session } = authClient.useSession();
   const userName = session?.user.name?.split(" ")[0];
   const heading = `What can I help you theme${userName ? `, ${userName}` : ""}?`;
@@ -86,7 +89,7 @@ export function NoMessagesPlaceholder({
             <Fragment key={`variant-${index}`}>
               <PromptButton
                 disabled={isGeneratingTheme}
-                onClick={() => onGenerateTheme(createCurrentThemePrompt({ prompt: prompt.prompt }))}
+                onClick={() => onGenerateTheme(createCurrentThemePrompt({ prompt: prompt.prompt, themeStyles: themeState.styles }))}
               >
                 {prompt.displayContent}
               </PromptButton>

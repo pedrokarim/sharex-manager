@@ -2,7 +2,8 @@
 
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEditorStore } from "@/store/editor-store";
+import { useAtom } from "jotai";
+import { themeEditorStateAtom, setThemeStateAtom } from "@/lib/atoms/editor";
 import { Theme, ThemeStyles } from "@/types/theme";
 import { Sliders } from "lucide-react";
 import React, { use, useEffect } from "react";
@@ -26,30 +27,28 @@ const isThemeStyles = (styles: unknown): styles is ThemeStyles => {
 };
 
 const Editor: React.FC<EditorProps> = ({ themePromise }) => {
-  const themeState = useEditorStore((state) => state.themeState);
-  const setThemeState = useEditorStore((state) => state.setThemeState);
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, setThemeState] = useAtom(setThemeStateAtom);
   const isMobile = useIsMobile();
 
   const initialTheme = themePromise ? use(themePromise) : null;
 
   const handleStyleChange = React.useCallback(
     (newStyles: ThemeStyles) => {
-      const prev = useEditorStore.getState().themeState;
-      setThemeState({ ...prev, styles: newStyles });
+      setThemeState({ ...themeState, styles: newStyles });
     },
-    [setThemeState]
+    [setThemeState, themeState]
   );
 
   useEffect(() => {
     if (initialTheme && isThemeStyles(initialTheme.styles)) {
-      const prev = useEditorStore.getState().themeState;
       setThemeState({
-        ...prev,
+        ...themeState,
         styles: initialTheme.styles,
         preset: initialTheme.id,
       });
     }
-  }, [initialTheme, setThemeState]);
+  }, [initialTheme, setThemeState, themeState]);
 
   if (initialTheme && !isThemeStyles(initialTheme.styles)) {
     return (

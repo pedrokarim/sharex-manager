@@ -449,6 +449,7 @@
     },
     "secondary": {
       "preferences": "Préférences",
+      "theme": "Éditeur de thème",
       "support": "Support",
       "feedback": "Feedback",
       "about_app": "À propos de l'application"
