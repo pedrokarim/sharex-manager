@@ -40,7 +40,6 @@ yarn-error.log*
 # Volumes qui seront montés
 uploads/*
 uploads/thumbnails/*
-config/*
 data/*
 
 # Divers

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "bun --bun next dev",
-    "build": "bun --bun next build",
+    "build": "bun --bun next build --webpack",
     "start": "bun --bun next start",
     "lint": "bun --bun next lint",
     "test": "bun --bun vitest",
