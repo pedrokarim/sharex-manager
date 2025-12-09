@@ -39,56 +39,79 @@ export function ThemeToggle() {
   };
 
   // Utiliser le mode actuel du thème pour l'icône
-  const Icon = themeIcons[themeState.currentMode as keyof typeof themeIcons] || Sun;
+  const Icon =
+    themeIcons[themeState.currentMode as keyof typeof themeIcons] || Sun;
   const { dayStartHour, dayEndHour } = timeBasedTheme;
 
+  // Fonction pour appliquer un thème avec animation
+  const applyThemeWithAnimation = (
+    newMode: "light" | "dark",
+    coords?: { x: number; y: number }
+  ) => {
+    const root = document.documentElement;
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    if (!document.startViewTransition || prefersReducedMotion) {
+      setThemeState({ ...themeState, currentMode: newMode });
+      return;
+    }
+
+    if (coords) {
+      root.style.setProperty("--x", `${coords.x}px`);
+      root.style.setProperty("--y", `${coords.y}px`);
+    }
+
+    document.startViewTransition(() => {
+      setThemeState({ ...themeState, currentMode: newMode });
+    });
+  };
+
   // Fonction pour gérer le changement de thème
-  const handleThemeChange = (newTheme: ThemeMode) => {
+  const handleThemeChange = (newTheme: ThemeMode, event?: React.MouseEvent) => {
     setPreferredThemeMode(newTheme);
 
     // Changer le mode selon la sélection
     if (newTheme === "light") {
-      setThemeState({ ...themeState, currentMode: "light" });
+      const coords = event ? { x: event.clientX, y: event.clientY } : undefined;
+      applyThemeWithAnimation("light", coords);
     } else if (newTheme === "dark") {
-      setThemeState({ ...themeState, currentMode: "dark" });
+      const coords = event ? { x: event.clientX, y: event.clientY } : undefined;
+      applyThemeWithAnimation("dark", coords);
     } else if (newTheme === "system") {
       // Pour system, détecter les préférences système
       const prefersDark = window.matchMedia(
         "(prefers-color-scheme: dark)"
       ).matches;
-      setThemeState({ ...themeState, currentMode: prefersDark ? "dark" : "light" });
+      const coords = event ? { x: event.clientX, y: event.clientY } : undefined;
+      applyThemeWithAnimation(prefersDark ? "dark" : "light", coords);
     }
     // time-based est géré automatiquement par useTimeBasedTheme
-  };
-
-  // Toggle simple entre light et dark avec animation
-  const handleToggle = (event: React.MouseEvent<HTMLButtonElement>) => {
-    const { clientX: x, clientY: y } = event;
-    toggleTheme({ x, y });
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" onClick={handleToggle}>
+        <Button variant="ghost" size="icon">
           <Icon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all" />
           <span className="sr-only">Changer le thème</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side={isMobile ? "bottom" : "right"} align="end">
-        <DropdownMenuItem onClick={() => handleThemeChange("light")}>
+        <DropdownMenuItem onClick={(e) => handleThemeChange("light", e)}>
           <Sun className="mr-2 h-4 w-4" />
           Clair
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleThemeChange("dark")}>
+        <DropdownMenuItem onClick={(e) => handleThemeChange("dark", e)}>
           <Moon className="mr-2 h-4 w-4" />
           Sombre
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleThemeChange("system")}>
+        <DropdownMenuItem onClick={(e) => handleThemeChange("system", e)}>
           <Monitor className="mr-2 h-4 w-4" />
           Système
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleThemeChange("time-based")}>
+        <DropdownMenuItem onClick={(e) => handleThemeChange("time-based", e)}>
           <Clock className="mr-2 h-4 w-4" />
           Automatique ({dayStartHour}h-{dayEndHour}h)
         </DropdownMenuItem>
