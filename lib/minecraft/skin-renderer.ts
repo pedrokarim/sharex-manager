@@ -1,6 +1,9 @@
-import * as THREE from "three";
-import { createCanvas, loadImage } from "node-canvas-webgl";
-import { skinLayout, type SkinVersion } from "./skin-layout";
+// NOTE: Les packages node-canvas-webgl et gl ont été supprimés car ils ne fonctionnent pas en production
+// Cette fonctionnalité de rendu 3D côté serveur est désactivée
+
+// import * as THREE from "three";
+// import { createCanvas, loadImage } from "node-canvas-webgl";
+// import { skinLayout, type SkinVersion } from "./skin-layout";
 
 const TAU = 2 * Math.PI;
 const EPSILON = 1e-3;
@@ -296,31 +299,9 @@ export async function drawSkin2DHead(options: {
   height?: number;
   flip?: boolean;
 }): Promise<any> {
-  const { skin, width = 32, height = 32, flip = false } = options;
-
-  const url = await getSkinTextureUrl(skin);
-  if (!url) throw new Error("Skin texture URL not found");
-
-  const image = await loadImage(url);
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext("2d");
-
-  ctx.imageSmoothingEnabled = false;
-  ctx.imageSmoothingEnabled = false;
-
-  if (flip) {
-    ctx.translate(width, height);
-    ctx.scale(-1, -1);
-  }
-
-  const opaque = makeOpaque(image);
-  ctx.drawImage(opaque, 8, 8, 8, 8, 0, 0, width, height);
-
-  if (hasAlphaLayer(image)) {
-    ctx.drawImage(image, 40, 8, 8, 8, 0, 0, width, height);
-  }
-
-  return canvas;
+  throw new Error(
+    "Le rendu 3D des skins Minecraft côté serveur a été désactivé car les dépendances node-canvas-webgl et gl ne fonctionnent pas en production. Utilisez le rendu côté client à la place."
+  );
 }
 
 export async function drawSkin2DCape(options: {
@@ -329,28 +310,9 @@ export async function drawSkin2DCape(options: {
   height?: number;
   flip?: boolean;
 }): Promise<any> {
-  const { skin, width = 40, height = 64, flip = false } = options;
-
-  const url = await getCapeTextureUrl(skin);
-  if (!url) throw new Error("Cape texture URL not found");
-
-  const image = await loadImage(url);
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext("2d");
-
-  ctx.imageSmoothingEnabled = false;
-  ctx.imageSmoothingEnabled = false;
-
-  if (flip) {
-    ctx.translate(width, height);
-    ctx.scale(-1, -1);
-  }
-
-  const cs = capeScale(image.height);
-  const opaque = makeOpaque(image);
-  ctx.drawImage(opaque, cs, cs, 10 * cs, 16 * cs, 0, 0, width, height);
-
-  return canvas;
+  throw new Error(
+    "Le rendu 3D des skins Minecraft côté serveur a été désactivé car les dépendances node-canvas-webgl et gl ne fonctionnent pas en production. Utilisez le rendu côté client à la place."
+  );
 }
 
 export async function drawSkin2DFull(options: {
@@ -359,71 +321,9 @@ export async function drawSkin2DFull(options: {
   height?: number;
   flip?: boolean;
 }): Promise<any> {
-  const { skin, width = 600, height = 800, flip = false } = options;
-
-  const url = await getSkinTextureUrl(skin);
-  if (!url) throw new Error("Skin texture URL not found");
-
-  const image = await loadImage(url);
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext("2d");
-
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
-  ctx.imageSmoothingEnabled = false;
-
-  if (flip) {
-    ctx.translate(canvas.width, canvas.height);
-    ctx.scale(-1, -1);
-  }
-
-  ctx.translate(canvas.width / 2, canvas.height / 2);
-
-  const scale =
-    Math.min(Math.floor(canvas.width / 16), Math.floor(canvas.height / 32)) - 1;
-  ctx.scale(scale, scale);
-
-  const opaque = makeOpaque(image);
-
-  // Draw skin parts
-  ctx.drawImage(opaque, 8, 8, 8, 8, -4, -16, 8, 8); // face
-  ctx.drawImage(opaque, 20, 20, 8, 12, -4, -8, 8, 12); // chest
-  ctx.drawImage(opaque, 44, 20, 4, 12, -8, -8, 4, 12); // right arm
-
-  const version = image.height >= 64 ? 1 : 0;
-  if (version === 0) {
-    ctx.save();
-    ctx.scale(-1, 1);
-    ctx.drawImage(opaque, 44, 20, 4, 12, -8, -8, 4, 12); // left arm
-    ctx.restore();
-  } else {
-    ctx.drawImage(opaque, 36, 52, 4, 12, 4, -8, 4, 12); // left arm
-  }
-
-  ctx.drawImage(opaque, 4, 20, 4, 12, -4, 4, 4, 12); // right leg
-
-  if (version === 0) {
-    ctx.save();
-    ctx.scale(-1, 1);
-    ctx.drawImage(opaque, 4, 20, 4, 12, -4, 4, 4, 12); // left leg
-    ctx.restore();
-  } else {
-    ctx.drawImage(opaque, 20, 52, 4, 12, 0, 4, 4, 12); // left leg
-  }
-
-  if (hasAlphaLayer(image)) {
-    ctx.drawImage(image, 40, 8, 8, 8, -4, -16, 8, 8); // mask
-    if (version >= 1) {
-      ctx.drawImage(image, 20, 36, 8, 12, -4, -8, 8, 12); // jacket
-      ctx.drawImage(image, 44, 36, 4, 12, -8, -8, 4, 12); // right sleeve
-      ctx.drawImage(image, 52, 52, 4, 12, 4, -8, 4, 12); // left sleeve
-      ctx.drawImage(image, 4, 36, 4, 12, -4, 4, 4, 12); // right pant
-      ctx.drawImage(image, 4, 52, 4, 12, 0, 4, 4, 12); // left pant
-    }
-  }
-
-  ctx.restore();
-  return canvas;
+  throw new Error(
+    "Le rendu 3D des skins Minecraft côté serveur a été désactivé car les dépendances node-canvas-webgl et gl ne fonctionnent pas en production. Utilisez le rendu côté client à la place."
+  );
 }
 
 export async function drawSkin3D(options: {
@@ -436,76 +336,7 @@ export async function drawSkin3D(options: {
   time?: number;
   flip?: boolean;
 }): Promise<any> {
-  const {
-    skin,
-    model = "slim",
-    width = 600,
-    height = 800,
-    theta = -30,
-    phi = 20,
-    time = 90,
-    flip = false,
-  } = options;
-
-  try {
-    console.log(`Rendering 3D skin for UUID: ${skin}`);
-
-    const skinUrl = await getSkinTextureUrl(skin);
-    if (!skinUrl) throw new Error("Skin texture URL not found");
-
-    const capeUrl = await getCapeTextureUrl(skin);
-
-    const skinImage = await loadImage(skinUrl);
-    const capeImage = capeUrl ? await loadImage(capeUrl) : null;
-
-    const model3D = buildMinecraftModel(
-      skinImage,
-      capeImage,
-      model === "slim",
-      flip
-    );
-    if (!model3D) throw new Error("Failed to build 3D model");
-
-    // Créer le canvas de rendu (comme ton ancien code)
-    const canvas = createCanvas(width, height);
-
-    // Créer le renderer Three.js (comme ton ancien code)
-    const renderer = new THREE.WebGLRenderer({
-      canvas: canvas as any,
-      alpha: true,
-      antialias: true,
-    });
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      32,
-      width / height,
-      72 - 20,
-      72 + 20
-    );
-
-    // Positionner la caméra (comme ton ancien code)
-    const cosPhi = Math.cos(radians(phi));
-    camera.position.x = 72 * cosPhi * Math.sin(radians(theta));
-    camera.position.z = 72 * cosPhi * Math.cos(radians(theta));
-    camera.position.y = 72 * Math.sin(radians(phi));
-    camera.lookAt(0, 0, 0);
-
-    scene.add(model3D);
-
-    // Ajouter l'éclairage
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 10, 5);
-    scene.add(ambientLight);
-    scene.add(directionalLight);
-
-    // Rendu (comme ton ancien code)
-    renderer.render(scene, camera);
-
-    return canvas;
-  } catch (error) {
-    console.error("Error rendering 3D skin:", error);
-    throw error;
-  }
+  throw new Error(
+    "Le rendu 3D des skins Minecraft côté serveur a été désactivé car les dépendances node-canvas-webgl et gl ne fonctionnent pas en production. Utilisez le rendu côté client à la place."
+  );
 }
