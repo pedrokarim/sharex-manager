@@ -1,3 +1,5 @@
+"use client";
+
 import { TooltipWrapper } from "@/components/tooltip-wrapper";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
