@@ -23,6 +23,7 @@ const ModuleConfigSchema = z.object({
   dependencies: z.array(z.string()).optional(), // Dépendances d'autres modules
   npmDependencies: z.record(z.string()).optional(), // Dépendances npm
   settings: z.record(z.any()).optional(), // Paramètres du module
+  capabilities: z.array(z.string()).optional(), // Capacités du module
 });
 
 class ModuleManagerImpl implements ModuleManager {

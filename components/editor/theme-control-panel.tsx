@@ -22,10 +22,17 @@ import { useAIThemeGenerationCore } from "@/hooks/use-ai-theme-generation-core";
 import { useControlsTabFromUrl, type ControlTab } from "@/hooks/use-controls-tab-from-url";
 import { useAtom } from "jotai";
 import { themeEditorStateAtom } from "@/lib/atoms/editor";
+import { Suspense } from "react";
 import { type FontInfo } from "@/types/fonts";
 import { ThemeEditorControlsProps, ThemeStyleProps } from "@/types/theme";
 import { buildFontFamily } from "@/utils/fonts";
 import { getAppliedThemeFont } from "@/utils/theme-fonts";
+
+// Component to handle tab state from URL with Suspense boundary
+function TabHandler({ children }: { children: (tab: ControlTab, handleSetTab: (tab: ControlTab) => void) => React.ReactNode }) {
+  const { tab, handleSetTab } = useControlsTabFromUrl();
+  return <>{children(tab, handleSetTab)}</>;
+}
 
 const ThemeControlPanel = ({
   styles,
@@ -34,7 +41,6 @@ const ThemeControlPanel = ({
   themePromise,
 }: ThemeEditorControlsProps) => {
   const [themeState] = useAtom(themeEditorStateAtom);
-  const { tab, handleSetTab } = useControlsTabFromUrl();
   const { isGeneratingTheme } = useAIThemeGenerationCore();
 
   const currentStyles = React.useMemo(
@@ -87,11 +93,13 @@ const ThemeControlPanel = ({
         )}
       </div>
       <div className="flex min-h-0 flex-1 flex-col space-y-4">
-        <Tabs
-          value={tab}
-          onValueChange={(v) => handleSetTab(v as ControlTab)}
-          className="flex min-h-0 w-full flex-1 flex-col"
-        >
+        <TabHandler>
+          {(tab, handleSetTab) => (
+            <Tabs
+              value={tab}
+              onValueChange={(v) => handleSetTab(v as ControlTab)}
+              className="flex min-h-0 w-full flex-1 flex-col"
+            >
           <HorizontalScrollArea className="mt-2 mb-1 px-4">
             <TabsList className="bg-background text-muted-foreground inline-flex w-fit items-center justify-center rounded-full px-0">
               <TabsTriggerPill value="colors">Colors</TabsTriggerPill>
@@ -474,7 +482,9 @@ const ThemeControlPanel = ({
           <TabsContent value="ai" className="mt-1 size-full overflow-hidden">
             <ChatInterface />
           </TabsContent>
-        </Tabs>
+            </Tabs>
+          )}
+        </TabHandler>
       </div>
     </>
   );

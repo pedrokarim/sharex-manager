@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import { useMinecraftSkinParams } from "@/lib/minecraft/url-params.client";
 import {
   Card,
@@ -71,7 +71,8 @@ interface MinecraftSkinPageClientProps {
   initialUsername?: string;
 }
 
-export function MinecraftSkinPageClient({
+// Component to handle URL params from nuqs with Suspense boundary
+function MinecraftSkinPageContent({
   initialUsername,
 }: MinecraftSkinPageClientProps = {}) {
   const { t } = useTranslation();
@@ -741,5 +742,13 @@ export function MinecraftSkinPageClient({
         </Card>
       </div>
     </div>
+  );
+}
+
+export function MinecraftSkinPageClient(props: MinecraftSkinPageClientProps = {}) {
+  return (
+    <Suspense fallback={<div className="container mx-auto p-6">Chargement...</div>}>
+      <MinecraftSkinPageContent {...props} />
+    </Suspense>
   );
 }

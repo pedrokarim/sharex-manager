@@ -1,4 +1,4 @@
-import { defaultThemeState } from "../config/theme";
+import { defaultThemeState } from "@/config/theme";
 import { ThemeStyles } from "../types/theme";
 import { useThemePresetStore } from "../store/theme-preset-store";
 

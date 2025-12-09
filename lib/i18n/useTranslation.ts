@@ -5,7 +5,7 @@ import { TranslationParams } from "./types";
 /**
  * Récupère une valeur de traduction à partir d'une clé de chemin (ex: "common.welcome")
  */
-const getNestedValue = (obj: any, path: string): string => {
+const getNestedValue = (obj: any, path: string): any => {
   const keys = path.split(".");
   let result = obj;
 
@@ -16,7 +16,7 @@ const getNestedValue = (obj: any, path: string): string => {
     result = result[key];
   }
 
-  return typeof result === "string" ? result : path;
+  return result;
 };
 
 /**
@@ -44,9 +44,16 @@ export const useTranslation = () => {
    * @param params - Paramètres optionnels pour la substitution
    * @returns La traduction ou la clé si la traduction n'est pas trouvée
    */
-  const t = (key: string, params?: TranslationParams): string => {
+  const t = (key: string, params?: TranslationParams): any => {
     const translation = getNestedValue(translations, key);
-    return replaceParams(translation, params);
+
+    // Si c'est une string, on applique les paramètres
+    if (typeof translation === "string") {
+      return replaceParams(translation, params);
+    }
+
+    // Sinon on retourne la valeur telle quelle (tableau, objet, etc.)
+    return translation;
   };
 
   return { t };

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, Suspense } from "react";
 import { useAtom } from "jotai";
 import { themeEditorStateAtom, setThemeStateAtom } from "@/lib/atoms/editor";
 import { applyThemeToElement } from "@/utils/apply-theme";
@@ -29,12 +29,15 @@ const initialState: ThemeProviderState = {
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
+// Component to handle theme preset from URL with Suspense boundary
+function ThemePresetHandler() {
+  useThemePresetFromUrl();
+  return null;
+}
+
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   const [themeState] = useAtom(themeEditorStateAtom);
   const [, setThemeState] = useAtom(setThemeStateAtom);
-
-  // Handle theme preset from URL
-  useThemePresetFromUrl();
 
   useEffect(() => {
     const root = document.documentElement;
@@ -78,6 +81,9 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 
   return (
     <ThemeProviderContext.Provider {...props} value={value}>
+      <Suspense fallback={null}>
+        <ThemePresetHandler />
+      </Suspense>
       {children}
     </ThemeProviderContext.Provider>
   );
