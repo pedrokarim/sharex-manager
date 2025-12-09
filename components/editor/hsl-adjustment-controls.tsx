@@ -4,7 +4,7 @@ import React, { useCallback, useMemo, useRef, useEffect, useState } from "react"
 import { SliderWithInput } from "./slider-with-input";
 import { useAtom } from "jotai";
 import { themeEditorStateAtom, setThemeStateAtom, saveThemeCheckpointAtom, themeCheckpointAtom } from "@/lib/atoms/editor";
-import { COMMON_STYLES, defaultThemeState } from "../../config/theme";
+import { COMMON_STYLES, defaultThemeState } from "@/config/theme";
 import { ThemeEditorState } from "@/types/editor";
 import { converter, formatHex, Hsl } from "culori";
 import { debounce } from "@/utils/debounce";
