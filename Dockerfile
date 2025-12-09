@@ -3,7 +3,7 @@ WORKDIR /app
 
 # Installation des dépendances
 FROM base AS deps
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 RUN bun install
 
 # Installation des dépendances des modules
