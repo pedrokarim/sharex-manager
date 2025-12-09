@@ -12,6 +12,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Fragment } from "react";
 import { useTranslation } from "@/lib/i18n";
+import { SlashIcon } from "lucide-react";
 
 export function BreadcrumbNav() {
   const { t } = useTranslation();
@@ -65,7 +66,9 @@ export function BreadcrumbNav() {
 
           return (
             <Fragment key={href}>
-              <BreadcrumbSeparator />
+              <BreadcrumbSeparator>
+                <SlashIcon className="size-3.5" />
+              </BreadcrumbSeparator>
               <BreadcrumbItem>
                 {isLast ? (
                   <BreadcrumbPage>{getRouteName(path)}</BreadcrumbPage>

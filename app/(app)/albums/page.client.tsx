@@ -104,7 +104,7 @@ export function AlbumsClient() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div>
       {/* En-tête */}
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

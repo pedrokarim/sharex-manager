@@ -4,14 +4,29 @@ const nextConfig = {
     typescript: {
         ignoreBuildErrors: true,
     },
-    eslint: {
-        ignoreDuringBuilds: true,
-    },
+    // Configuration Turbopack pour Next.js 16
+    turbopack: {},
     output: 'standalone',
     webpack: (config, { isServer }) => {
         if (isServer) {
             config.externals = [...config.externals, 'bun:sqlite'];
         }
+
+        // Configuration pour gérer les fichiers .node
+        config.module.rules.push({
+            test: /\.node$/,
+            use: 'node-loader',
+        });
+
+        // Configuration pour node-canvas-webgl
+        if (!isServer) {
+            config.resolve.fallback = {
+                ...config.resolve.fallback,
+                canvas: false,
+                'node-canvas-webgl': false,
+            };
+        }
+
         return config;
     },
     images: {

@@ -31,6 +31,7 @@ export const config = {
     "/api/auth/callback/credentials",
     "/api/auth/signout",
   ],
+  runtime: "nodejs",
 };
 
 // Fonction de journalisation sécurisée pour le middleware

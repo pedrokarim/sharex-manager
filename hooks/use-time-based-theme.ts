@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTheme } from "next-themes";
 import { useAtom } from "jotai";
 import {
   timeBasedThemeAtom,
   preferredThemeModeAtom,
 } from "@/lib/atoms/preferences";
+import { themeEditorStateAtom, setThemeStateAtom } from "@/lib/atoms/editor";
 
 export function useTimeBasedTheme() {
-  const { setTheme } = useTheme();
   const [timeBasedTheme] = useAtom(timeBasedThemeAtom);
   const [preferredThemeMode] = useAtom(preferredThemeModeAtom);
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, setThemeState] = useAtom(setThemeStateAtom);
   const [currentHour, setCurrentHour] = useState(() => new Date().getHours());
 
   useEffect(() => {
@@ -28,7 +29,24 @@ export function useTimeBasedTheme() {
     if (preferredThemeMode === "time-based") {
       const { dayStartHour, dayEndHour } = timeBasedTheme;
       const isDayTime = currentHour >= dayStartHour && currentHour < dayEndHour;
-      setTheme(isDayTime ? "light" : "dark");
+      const newMode = isDayTime ? "light" : "dark";
+
+      // Ne changer que si le mode actuel est différent
+      if (themeState.currentMode !== newMode) {
+        setThemeState({ ...themeState, currentMode: newMode });
+      }
     }
-  }, [currentHour, timeBasedTheme, setTheme, preferredThemeMode]);
+  }, [
+    currentHour,
+    timeBasedTheme,
+    setThemeState,
+    preferredThemeMode,
+    themeState,
+  ]);
+
+  return {
+    currentHour,
+    timeBasedTheme,
+    preferredThemeMode,
+  };
 }

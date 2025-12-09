@@ -40,7 +40,7 @@ export function SecureGalleryClient() {
     queryKey: ["secureFiles", debouncedSearch],
     queryFn: async ({ pageParam = 1 }) => {
       const searchParams = new URLSearchParams();
-      searchParams.set("page", pageParam.toString());
+      searchParams.set("page", pageParam as string);
       if (debouncedSearch) searchParams.set("q", debouncedSearch);
 
       const response = await fetch(
@@ -96,7 +96,6 @@ export function SecureGalleryClient() {
                   key={file.url}
                   file={file}
                   onDelete={() => refetch()}
-                  isSecure
                 />
               ))}
             </div>

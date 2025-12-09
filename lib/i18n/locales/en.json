@@ -422,7 +422,8 @@
       "organization": "Organization",
       "folders": "Folders",
       "tags": "Tags",
-      "collections": "Collections"
+      "collections": "Collections",
+      "tools": "Tools"
     },
     "admin": {
       "administration": "Administration",
@@ -448,6 +449,101 @@
     "settings": {
       "general": "General",
       "integrations": "Integrations"
+    }
+  },
+  "tools": {
+    "title": "Tools",
+    "description": "Additional features to enhance your experience",
+    "minecraft_skin": {
+      "title": "Minecraft Skin Renderer",
+      "description": "Minecraft skin image generator in 2D and 3D with cape support",
+      "configuration": "Configuration",
+      "configuration_description": "Configure rendering settings for your Minecraft skin",
+      "results": "Results",
+      "results_description": "Images generated from your configuration",
+      "uuid_placeholder": "Enter player UUID (without dashes)",
+      "uuid_help": "You can find the UUID on",
+      "model": "Model",
+      "model_slim": "Slim (Alex)",
+      "model_classic": "Classic (Steve)",
+      "flip": "Flip",
+      "flip_yes": "Yes",
+      "flip_no": "No",
+      "width": "Width",
+      "height": "Height",
+      "theta": "Theta (3D)",
+      "phi": "Phi (3D)",
+      "time": "Time (3D)",
+      "generate_all": "Generate All",
+      "generating": "Generating...",
+      "head": "Head",
+      "body": "3D Model",
+      "skin": "2D Skin",
+      "cape": "Cape",
+      "no_image": "No image generated",
+      "generated_successfully": "Generated successfully",
+      "use_tool": "Use Tool",
+      "coming_soon": "Coming Soon",
+      "generate": "Generate",
+      "download": "Download",
+      "refresh": "Refresh"
+    }
+  },
+  "home": {
+    "title": "ShareX Manager",
+    "subtitle": "Manage your screenshots and images with ease",
+    "cta": {
+      "gallery": "View my gallery",
+      "configure": "Configure ShareX"
+    },
+    "features": {
+      "upload": {
+        "title": "Fast upload",
+        "description": "Upload your images instantly via ShareX",
+        "fast": "One-click upload",
+        "history": "Complete history"
+      },
+      "security": {
+        "title": "Security",
+        "description": "Your images are protected and private",
+        "private": "Private access",
+        "api_keys": "Secure API keys"
+      },
+      "management": {
+        "title": "Management",
+        "description": "Organize and manage your images easily",
+        "customization": "Customization",
+        "stats": "Detailed statistics"
+      },
+      "tools": {
+        "title": "Tools",
+        "description": "Additional features for your images",
+        "minecraft": "Minecraft skin generator",
+        "more": "And much more coming"
+      }
+    },
+    "tools_section": {
+      "title": "Additional tools",
+      "subtitle": "Discover our bonus features",
+      "cta": "View all tools"
+    },
+    "configuration": {
+      "title": "ShareX Configuration",
+      "badge": "Easy",
+      "intro": "Configure ShareX to use your personal instance:",
+      "steps": {
+        "step1": "Download and install ShareX",
+        "step2": "Open ShareX settings",
+        "step3": "Add a new destination with these parameters:",
+        "step4": "Test your configuration by taking a screenshot"
+      },
+      "config_items": {
+        "request_url": "Request URL",
+        "method": "Method",
+        "file_form": "File field name"
+      },
+      "download_config": "Download config",
+      "get_api_key": "Get API key"
     }
   },
   "loading": {

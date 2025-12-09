@@ -16,21 +16,19 @@ export default async function RootLayout({
   }
 
   return (
-    <div className="[--header-height:calc(theme(spacing.14))]">
-      <SidebarProvider className="flex flex-col">
-        <div className="flex h-screen">
-          <AppSidebar />
-
-          <div className="flex-1 relative min-w-0">
-            <SidebarInset className="h-full overflow-hidden">
-              <SidebarHeader />
-              <div className="h-[calc(100vh-var(--header-height))] overflow-y-auto">
-                {children}
-              </div>
-            </SidebarInset>
-          </div>
-        </div>
-      </SidebarProvider>
-    </div>
+    <SidebarProvider
+      style={
+        {
+          "--sidebar-width": "calc(var(--spacing) * 72)",
+          "--header-height": "calc(var(--spacing) * 12)",
+        } as React.CSSProperties
+      }
+    >
+      <AppSidebar variant="inset" />
+      <SidebarInset>
+        <SidebarHeader />
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">{children}</div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

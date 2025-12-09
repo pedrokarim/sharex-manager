@@ -1,8 +1,5 @@
 "use client";
 
-import { AppSidebar } from "@/components/sidebar/app-sidebar";
-import { SidebarHeader } from "@/components/sidebar/sibebar-header";
-import { SidebarInset } from "@/components/ui/sidebar";
 import {
   Card,
   CardHeader,
@@ -41,7 +38,7 @@ export function UploadsPageClient() {
   ];
 
   return (
-    <main className="p-4 sm:p-6 lg:p-8">
+    <main className="flex flex-col h-full">
       <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex flex-col gap-4 py-4">
           <div className="flex flex-col gap-2">

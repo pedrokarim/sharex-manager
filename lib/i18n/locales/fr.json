@@ -437,7 +437,8 @@
       "organization": "Organisation",
       "folders": "Dossiers",
       "tags": "Tags",
-      "collections": "Collections"
+      "collections": "Collections",
+      "tools": "Outils"
     },
     "admin": {
       "administration": "Administration",
@@ -448,6 +449,7 @@
     },
     "secondary": {
       "preferences": "Préférences",
+      "theme": "Éditeur de thème",
       "support": "Support",
       "feedback": "Feedback",
       "about_app": "À propos de l'application"
@@ -463,6 +465,101 @@
     "settings": {
       "general": "Général",
       "integrations": "Intégrations"
+    }
+  },
+  "tools": {
+    "title": "Outils",
+    "description": "Fonctionnalités supplémentaires pour améliorer votre expérience",
+    "minecraft_skin": {
+      "title": "Minecraft Skin Renderer",
+      "description": "Générateur d'images de skins Minecraft en 2D et 3D avec support des capes",
+      "configuration": "Configuration",
+      "configuration_description": "Configurez les paramètres de rendu pour votre skin Minecraft",
+      "results": "Résultats",
+      "results_description": "Images générées à partir de votre configuration",
+      "uuid_placeholder": "Entrez l'UUID du joueur (sans tirets)",
+      "uuid_help": "Vous pouvez trouver l'UUID sur",
+      "model": "Modèle",
+      "model_slim": "Slim (Alex)",
+      "model_classic": "Classic (Steve)",
+      "flip": "Retourner",
+      "flip_yes": "Oui",
+      "flip_no": "Non",
+      "width": "Largeur",
+      "height": "Hauteur",
+      "theta": "Theta (3D)",
+      "phi": "Phi (3D)",
+      "time": "Temps (3D)",
+      "generate_all": "Générer tout",
+      "generating": "Génération...",
+      "head": "Tête",
+      "body": "Modèle 3D",
+      "skin": "Skin 2D",
+      "cape": "Cape",
+      "no_image": "Aucune image générée",
+      "generated_successfully": "Généré avec succès",
+      "use_tool": "Utiliser l'outil",
+      "coming_soon": "Bientôt disponible",
+      "generate": "Générer",
+      "download": "Télécharger",
+      "refresh": "Actualiser"
+    }
+  },
+  "home": {
+    "title": "ShareX Manager",
+    "subtitle": "Gérez vos captures d'écran et images avec facilité",
+    "cta": {
+      "gallery": "Voir ma galerie",
+      "configure": "Configurer ShareX"
+    },
+    "features": {
+      "upload": {
+        "title": "Upload rapide",
+        "description": "Téléchargez vos images instantanément via ShareX",
+        "fast": "Upload en un clic",
+        "history": "Historique complet"
+      },
+      "security": {
+        "title": "Sécurité",
+        "description": "Vos images sont protégées et privées",
+        "private": "Accès privé",
+        "api_keys": "Clés API sécurisées"
+      },
+      "management": {
+        "title": "Gestion",
+        "description": "Organisez et gérez vos images facilement",
+        "customization": "Personnalisation",
+        "stats": "Statistiques détaillées"
+      },
+      "tools": {
+        "title": "Outils",
+        "description": "Fonctionnalités supplémentaires pour vos images",
+        "minecraft": "Générateur de skins Minecraft",
+        "more": "Et bien plus à venir"
+      }
+    },
+    "tools_section": {
+      "title": "Outils supplémentaires",
+      "subtitle": "Découvrez nos fonctionnalités bonus",
+      "cta": "Voir tous les outils"
+    },
+    "configuration": {
+      "title": "Configuration ShareX",
+      "badge": "Facile",
+      "intro": "Configurez ShareX pour utiliser votre instance personnelle :",
+      "steps": {
+        "step1": "Téléchargez et installez ShareX",
+        "step2": "Ouvrez les paramètres de ShareX",
+        "step3": "Ajoutez une nouvelle destination avec ces paramètres :",
+        "step4": "Testez votre configuration en prenant une capture"
+      },
+      "config_items": {
+        "request_url": "URL de requête",
+        "method": "Méthode",
+        "file_form": "Nom du champ fichier"
+      },
+      "download_config": "Télécharger la config",
+      "get_api_key": "Obtenir une clé API"
     }
   },
   "loading": {
@@ -512,52 +609,6 @@
     "forbidden": "Accès interdit",
     "validation": "Erreur de validation",
     "upload_failed": "Échec du téléversement"
-  },
-  "home": {
-    "title": "ShareX Manager",
-    "subtitle": "Une interface moderne et puissante pour gérer vos captures d'écran et fichiers uploadés via ShareX",
-    "cta": {
-      "gallery": "Accéder à la galerie",
-      "configure": "Configurer ShareX"
-    },
-    "features": {
-      "upload": {
-        "title": "Upload Instantané",
-        "description": "Uploadez vos fichiers instantanément avec une configuration simple et rapide. Support des images, vidéos et fichiers.",
-        "fast": "Upload ultra-rapide",
-        "history": "Historique complet"
-      },
-      "security": {
-        "title": "Sécurité Avancée",
-        "description": "Protection complète de vos fichiers avec authentification et gestion des accès personnalisée.",
-        "private": "Fichiers privés",
-        "api_keys": "Clés API sécurisées"
-      },
-      "management": {
-        "title": "Gestion Intelligente",
-        "description": "Interface intuitive avec des fonctionnalités avancées pour organiser et analyser vos uploads.",
-        "customization": "Personnalisation complète",
-        "stats": "Statistiques détaillées"
-      }
-    },
-    "configuration": {
-      "title": "Configuration ShareX",
-      "badge": "Documentation",
-      "intro": "Configurez ShareX en quelques étapes simples pour commencer à uploader vos fichiers :",
-      "steps": {
-        "step1": "Ouvrez ShareX et accédez aux paramètres",
-        "step2": "Naviguez vers Destinations → Destination Settings",
-        "step3": "Dans Custom Uploader Settings, configurez :",
-        "step4": "Validez la configuration avec le bouton \"Test\""
-      },
-      "config_items": {
-        "request_url": "Request URL:",
-        "method": "Method:",
-        "file_form": "File form name:"
-      },
-      "download_config": "Télécharger la configuration",
-      "get_api_key": "Obtenir une clé API"
-    }
   },
   "layout": {
     "metadata": {
@@ -1081,26 +1132,6 @@
         "Fonctionnalités avancées",
         "Analytics détaillés"
       ]
-    }
-  },
-  "account": {
-    "title": "Mon compte",
-    "description": "Gérez vos informations personnelles et vos préférences",
-    "coming_soon": {
-      "title": "En cours de construction",
-      "description": "Cette page est en cours de construction. Revenez bientôt !"
-    },
-    "profile": {
-      "title": "Profil utilisateur",
-      "description": "Gérez vos informations personnelles"
-    },
-    "security": {
-      "title": "Sécurité",
-      "description": "Gérez votre mot de passe et la sécurité de votre compte"
-    },
-    "preferences": {
-      "title": "Préférences",
-      "description": "Personnalisez votre expérience utilisateur"
     }
   },
   "feedback": {

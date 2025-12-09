@@ -8,7 +8,7 @@ import {
   SidebarMenuItem,
 } from "../ui/sidebar";
 import { useTranslation } from "@/lib/i18n";
-
+import { ThemeToggle } from "../theme-toggle";
 export function NavSecondary({
   items,
   ...props
@@ -25,6 +25,8 @@ export function NavSecondary({
     <SidebarGroup {...props}>
       <SidebarGroupContent>
         <SidebarMenu>
+          <ThemeToggle />
+
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton asChild size="sm">

@@ -1,7 +1,7 @@
 "use client";
 
 import { SidebarIcon } from "lucide-react";
-import { useSidebar } from "../ui/sidebar";
+import { SidebarTrigger, useSidebar } from "../ui/sidebar";
 import { Button } from "../ui/button";
 import {
   Breadcrumb,
@@ -43,19 +43,14 @@ export function SidebarHeader({
     showSearch !== undefined ? showSearch : pathname.startsWith("/gallery");
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background">
-      <div className="flex h-[--header-height] w-full items-center gap-2 px-2 sm:px-4">
-        <Button
-          className="h-8 w-8 shrink-0"
-          variant="ghost"
-          size="icon"
-          onClick={toggleSidebar}
-          aria-label={t("sidebar.toggle")}
-        >
-          <SidebarIcon />
-        </Button>
+    <header className="flex h-16 shrink-0 items-center gap-2">
+      <div className="flex w-full items-center gap-2 px-2 sm:px-4">
+        <SidebarTrigger className="-ml-1" />
 
-        <Separator orientation="vertical" className="mr-1 sm:mr-2 h-4" />
+        <Separator
+          orientation="vertical"
+          className="mr-2 data-[orientation=vertical]:h-4"
+        />
 
         <div className="flex flex-1 items-center gap-2 sm:gap-4 min-w-0">
           {showBreadcrumbs && (

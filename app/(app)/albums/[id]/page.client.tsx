@@ -135,7 +135,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div>
       {/* Breadcrumb */}
       <Breadcrumb className="mb-4 sm:mb-6">
         <BreadcrumbList>

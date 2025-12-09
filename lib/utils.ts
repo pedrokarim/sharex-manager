@@ -38,6 +38,38 @@ export function capitalize(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+export function isDeepEqual(obj1: any, obj2: any): boolean {
+  if (obj1 === obj2) return true;
+
+  if (obj1 == null || obj2 == null) return obj1 === obj2;
+
+  if (typeof obj1 !== typeof obj2) return false;
+
+  if (typeof obj1 !== 'object') return obj1 === obj2;
+
+  if (Array.isArray(obj1) !== Array.isArray(obj2)) return false;
+
+  if (Array.isArray(obj1)) {
+    if (obj1.length !== obj2.length) return false;
+    for (let i = 0; i < obj1.length; i++) {
+      if (!isDeepEqual(obj1[i], obj2[i])) return false;
+    }
+    return true;
+  }
+
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+
+  if (keys1.length !== keys2.length) return false;
+
+  for (const key of keys1) {
+    if (!keys2.includes(key)) return false;
+    if (!isDeepEqual(obj1[key], obj2[key])) return false;
+  }
+
+  return true;
+}
+
 export function hslToHex(h: number, s: number, l: number): string {
   s /= 100;
   l /= 100;
@@ -91,4 +123,74 @@ export function hexToHsl(hex: string): string {
   const lPercent = Math.round(l * 100);
 
   return `${h} ${s}% ${lPercent}%`;
+}
+
+export function hslToOklch(h: number, s: number, l: number): string {
+  // Convert HSL to RGB first
+  s /= 100;
+  l /= 100;
+
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+  };
+
+  const r = f(0);
+  const g = f(8);
+  const b = f(4);
+
+  // Convert RGB to OKLCH
+  // Using a simplified conversion (for more accuracy, would need a proper color library)
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const chroma = max - min;
+
+  // Lightness (L) in OKLCH is similar to L in HSL but normalized differently
+  const lightness = (max + min) / 2;
+
+  // Chroma calculation (simplified)
+  const chromaOklch = chroma;
+
+  // Hue stays the same
+  const hue = h;
+
+  return `oklch(${lightness.toFixed(3)} ${chromaOklch.toFixed(3)} ${hue})`;
+}
+
+export function hexToOklch(hex: string): string {
+  const hsl = hexToHsl(hex);
+  const [h, s, l] = hsl.split(' ').map(val =>
+    val.includes('%') ? parseFloat(val.replace('%', '')) : parseFloat(val)
+  );
+  return hslToOklch(h, s, l);
+}
+
+export function oklchToHex(oklch: string): string {
+  // Extract values from oklch string
+  const match = oklch.match(/oklch\(([^)]+)\)/);
+  if (!match) return "#000000";
+
+  const [lightness, chroma, hue] = match[1].split(' ').map(val => parseFloat(val));
+
+  // Simplified conversion back to RGB (approximate)
+  // This is a basic approximation - for production use, consider a proper color library
+  const l = lightness;
+  const c = chroma;
+  const h = hue;
+
+  // Convert back to RGB approximation
+  const a = c * Math.cos((h * Math.PI) / 180);
+  const b = c * Math.sin((h * Math.PI) / 180);
+
+  // Simplified RGB calculation
+  const r = l + 0.3963377774 * a + 0.2158037573 * b;
+  const g = l - 0.1055613458 * a - 0.0638541728 * b;
+  const bl = l - 0.0894841775 * a - 1.2914855480 * b;
+
+  // Clamp to [0, 1] and convert to hex
+  const clamp = (val: number) => Math.max(0, Math.min(1, val));
+  const toHex = (val: number) => Math.round(clamp(val) * 255).toString(16).padStart(2, '0');
+
+  return `#${toHex(r)}${toHex(g)}${toHex(bl)}`;
 }

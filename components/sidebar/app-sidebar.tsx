@@ -21,6 +21,9 @@ import {
   Key,
   Share2,
   TestTube,
+  Wrench,
+  AudioWaveform,
+  Palette,
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -31,7 +34,6 @@ import { NavMain } from "./nav-main";
 import { NavProjects } from "./nav-projects";
 import { NavSecondary } from "./nav-secondary";
 import { NavUser } from "./nav-user";
-import { ThemeToggle } from "../theme-toggle";
 import {
   Sidebar,
   SidebarContent,
@@ -40,6 +42,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
 } from "../ui/sidebar";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -117,6 +120,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ],
       },
       {
+        title: t("sidebar.main.tools"),
+        url: "/tools",
+        icon: Wrench,
+        items: [
+          {
+            title: t("tools.minecraft_skin.title"),
+            url: "/tools/minecraft-skin",
+          },
+          {
+            title: "Color Palette",
+            url: "/tools/color-palette",
+          },
+          {
+            title: "Image Converter",
+            url: "/tools/image-converter",
+          },
+          {
+            title: "QR Generator",
+            url: "/tools/qr-generator",
+          },
+        ],
+      },
+      {
         title: t("sidebar.main.settings"),
         url: "/settings",
         icon: Settings2,
@@ -125,6 +151,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             title: t("sidebar.secondary.preferences"),
             url: "/settings/preferences",
             icon: Sliders,
+          },
+          {
+            title: t("sidebar.secondary.theme"),
+            url: "/settings/theme",
+            icon: Palette,
           },
           {
             title: t("sidebar.settings.general"),
@@ -181,6 +212,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             title: t("sidebar.admin.security"),
             url: "/admin/security",
           },
+          {
+            title: "Outils Minecraft",
+            url: "/admin/tools",
+          },
         ],
       },
     ],
@@ -225,9 +260,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
+            <SidebarMenuButton
+              size="lg"
+              asChild
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
               <Link href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground overflow-hidden">
+                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                   <Image
                     src="/images/logo-sxm-simple.png"
                     alt="ShareX Manager Logo"
@@ -236,10 +275,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">
+                  <span className="truncate font-medium">
                     {t("sidebar.app_name")}
                   </span>
-                  <span className="truncate text-xs hidden sm:block">
+                  <span className="truncate text-xs">
                     {t("sidebar.app_description")}
                   </span>
                 </div>
@@ -260,11 +299,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <div className="p-2">
-          <ThemeToggle />
-        </div>
         <NavUser />
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

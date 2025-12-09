@@ -13,6 +13,9 @@ import {
   Key,
   History,
   Lock,
+  Wrench,
+  Gamepad2,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { Footer } from "@/components/layout/footer";
@@ -69,7 +72,7 @@ export default function HomePage() {
           </div>
 
           {/* Features avec plus de détails */}
-          <div className="mb-8 sm:mb-16 grid gap-6 sm:gap-8 grid-cols-1 md:grid-cols-3">
+          <div className="mb-8 sm:mb-16 grid gap-6 sm:gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
             <Card className="group hover:shadow-lg transition-all">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -141,6 +144,143 @@ export default function HomePage() {
                 </ul>
               </CardContent>
             </Card>
+
+            <Card className="group hover:shadow-lg transition-all">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wrench className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
+                  {t("home.features.tools.title")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  {t("home.features.tools.description")}
+                </p>
+                <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-center gap-2">
+                    <Gamepad2 className="h-4 w-4 text-primary" />
+                    {t("home.features.tools.minecraft")}
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    {t("home.features.tools.more")}
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Section Outils */}
+          <div className="mb-8 sm:mb-16">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold mb-4">
+                {t("home.tools_section.title")}
+              </h2>
+              <p className="text-muted-foreground text-lg max-w-2xl mx-auto px-4">
+                {t("home.tools_section.subtitle")}
+              </p>
+            </div>
+
+            <div className="grid gap-6 sm:gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto px-4">
+              {/* Minecraft Skin Tool */}
+              <Card className="group hover:shadow-lg transition-all border-2 hover:border-primary/20">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                        <Gamepad2 className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">
+                          {t("tools.minecraft_skin.title")}
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">Gaming</p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant="default"
+                      className="bg-green-100 text-green-800"
+                    >
+                      Disponible
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    {t("tools.minecraft_skin.description")}
+                  </p>
+                  <Link href="/tools/minecraft-skin" className="w-full">
+                    <Button className="w-full group-hover:bg-primary/90 transition-colors">
+                      {t("tools.minecraft_skin.use_tool")}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+
+              {/* Coming Soon Tools */}
+              <Card className="group hover:shadow-lg transition-all border-2 border-dashed border-muted-foreground/25">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-muted/50 rounded-lg">
+                        <Sparkles className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg text-muted-foreground">
+                          Plus d'outils
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">Bientôt</p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="bg-gray-100 text-gray-600"
+                    >
+                      Bientôt
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    D'autres outils géniaux arrivent bientôt pour améliorer
+                    votre expérience !
+                  </p>
+                  <Button variant="outline" className="w-full" disabled>
+                    Bientôt disponible
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* View All Tools */}
+              <Card className="group hover:shadow-lg transition-all border-2 hover:border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/20 rounded-lg group-hover:bg-primary/30 transition-colors">
+                      <Wrench className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Tous les outils</CardTitle>
+                      <p className="text-sm text-muted-foreground">Découvrir</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    Explorez tous nos outils et fonctionnalités supplémentaires
+                  </p>
+                  <Link href="/tools" className="w-full">
+                    <Button
+                      variant="outline"
+                      className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+                    >
+                      {t("home.tools_section.cta")}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Configuration ShareX avec un design amélioré */}
