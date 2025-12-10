@@ -13,12 +13,24 @@ const UNAUTHORIZED_PATH = join(process.cwd(), "public", "unauthorized.png");
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { filename: string } }
+  { params }: { params: { filename?: string } }
 ) {
   const clientInfo = getClientInfo(request);
 
+  console.log('=== IMG HANDLER DEBUG ===');
+  console.log('Request URL:', request.url);
+  console.log('Params:', params);
+  console.log('Filename param:', params?.filename);
+
+  // Vérifier si le paramètre filename existe
+  if (!params?.filename) {
+    console.error('ERROR: params.filename is undefined');
+    return new Response('Filename parameter is missing', { status: 400 });
+  }
+
   // Sécurisation : on ne prend que le nom du fichier, sans chemin
   const filename = params.filename.replace(/[/\\]/g, "");
+  console.log('Cleaned filename:', filename);
   const filePath = join(UPLOADS_DIR, filename);
 
   // Vérifier si le fichier existe
