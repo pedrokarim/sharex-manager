@@ -8,7 +8,6 @@ import {
   Settings2,
   FileImage,
   History,
-  Star,
   Settings,
   FolderOpen,
   Users,
@@ -24,6 +23,7 @@ import {
   Wrench,
   AudioWaveform,
   Palette,
+  MoreHorizontal,
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -31,7 +31,6 @@ import Image from "next/image";
 import { useTranslation } from "@/lib/i18n";
 
 import { NavMain } from "./nav-main";
-import { NavProjects } from "./nav-projects";
 import { NavSecondary } from "./nav-secondary";
 import { NavUser } from "./nav-user";
 import {
@@ -120,29 +119,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ],
       },
       {
-        title: t("sidebar.main.tools"),
-        url: "/tools",
-        icon: Wrench,
-        items: [
-          {
-            title: t("tools.minecraft_skin.title"),
-            url: "/tools/minecraft-skin",
-          },
-          {
-            title: "Color Palette",
-            url: "/tools/color-palette",
-          },
-          {
-            title: "Image Converter",
-            url: "/tools/image-converter",
-          },
-          {
-            title: "QR Generator",
-            url: "/tools/qr-generator",
-          },
-        ],
-      },
-      {
         title: t("sidebar.main.settings"),
         url: "/settings",
         icon: Settings2,
@@ -219,6 +195,31 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ],
       },
     ],
+    navOther: [
+      {
+        title: "Outils",
+        url: "/tools",
+        icon: MoreHorizontal,
+        items: [
+          {
+            title: t("tools.minecraft_skin.title"),
+            url: "/tools/minecraft-skin",
+          },
+          {
+            title: "Color Palette",
+            url: "/tools/color-palette",
+          },
+          {
+            title: "Image Converter",
+            url: "/tools/image-converter",
+          },
+          {
+            title: "QR Generator",
+            url: "/tools/qr-generator",
+          },
+        ],
+      },
+    ],
     navSecondary: [
       {
         title: t("sidebar.secondary.preferences"),
@@ -239,18 +240,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         title: t("sidebar.secondary.about_app"),
         url: "/about-app",
         icon: Info,
-      },
-    ],
-    projects: [
-      {
-        name: t("sidebar.projects.starred_images"),
-        url: "/gallery/starred",
-        icon: Star,
-      },
-      {
-        name: t("sidebar.projects.secure_images"),
-        url: "/gallery/secure",
-        icon: Shield,
       },
     ],
   };
@@ -295,7 +284,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             items={data.navAdmin}
           />
         )}
-        <NavProjects projects={data.projects} />
+        <NavMain title="Autre" items={data.navOther} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

@@ -10,6 +10,11 @@ import { revalidatePath } from "next/cache";
 import { getAbsoluteUploadPath } from "@/lib/config";
 import fs from "fs/promises";
 import { logDb } from "@/lib/utils/db";
+import { gallerySSEManager } from "@/lib/sse";
+import { stat } from "fs/promises";
+import { join } from "path";
+import { getSecureFiles } from "@/lib/secure-files";
+import { getStarredFiles } from "@/lib/starred-files";
 
 const API_KEYS_FILE = path.join(process.cwd(), "data/api-keys.json");
 
@@ -363,6 +368,75 @@ export async function POST(request: NextRequest) {
 
     // Après l'upload réussi
     revalidatePath("/uploads");
+
+    // Préparer les données du fichier pour SSE
+    try {
+      // Extraire le nom du fichier depuis l'URL de manière plus robuste
+      let filename = file.name; // fallback par défaut
+
+      if (uploadResult.fileUrl) {
+        // Essayer d'extraire le nom du fichier depuis l'URL
+        const urlParts = uploadResult.fileUrl.split("/");
+        const lastPart = urlParts[urlParts.length - 1];
+        if (lastPart && lastPart.includes(".")) {
+          filename = lastPart;
+        }
+      }
+
+      console.log(
+        "[SSE] Extracted filename:",
+        filename,
+        "from URL:",
+        uploadResult.fileUrl
+      );
+
+      const UPLOADS_DIR = getAbsoluteUploadPath();
+      const filePath = join(UPLOADS_DIR, filename);
+      const stats = await stat(filePath);
+      const secureFiles = await getSecureFiles();
+      const starredFiles = await getStarredFiles();
+      const isSecure = secureFiles.includes(filename);
+      const isStarred = starredFiles.includes(filename);
+
+      const fileData = {
+        name: filename,
+        url: uploadResult.fileUrl,
+        size: stats.size,
+        createdAt: stats.mtime.toISOString(),
+        isSecure,
+        isStarred,
+      };
+
+      // Émettre l'événement SSE pour tous les clients connectés
+      const sseData = {
+        type: "new_file",
+        file: fileData,
+        timestamp: new Date().toISOString(),
+      };
+      console.log(
+        `[SSE] Broadcasting new file to ${gallerySSEManager.getClientCount()} client(s)`
+      );
+      gallerySSEManager.broadcast("gallery", sseData);
+
+      // Émettre l'événement de mise à jour des stats
+      const statsUpdateData = {
+        type: "stats_update",
+        action: "file_uploaded",
+        file: {
+          name: filename,
+          size: stats.size,
+          uploadMethod: validKey ? "api" : "unknown",
+        },
+        timestamp: new Date().toISOString(),
+      };
+      gallerySSEManager.broadcast("stats", statsUpdateData);
+    } catch (sseError) {
+      console.error(
+        "[SSE] Erreur lors de la préparation des données SSE:",
+        sseError
+      );
+      // Ne pas échouer l'upload pour autant
+    }
 
     return new Response(
       JSON.stringify({

@@ -65,23 +65,33 @@
     "sections": {
       "upload_config": {
         "title": "Configuration des uploads",
+        "badge": "Uploads",
         "description": "Gérez les paramètres de vos uploads ShareX"
       },
       "api_keys": {
         "title": "Clés API",
+        "badge": "API",
         "description": "Gérez vos clés API pour l'upload via ShareX"
       },
       "domains": {
         "title": "Domaines",
+        "badge": "Domaines",
         "description": "Gérez les domaines pour vos fichiers"
       },
       "cleanup": {
         "title": "Nettoyage",
+        "badge": "Nettoyage",
         "description": "Supprimez les fichiers inutilisés"
       },
       "security": {
         "title": "Sécurité",
+        "badge": "Sécurité",
         "description": "Configurez les paramètres de sécurité"
+      },
+      "theme_editor": {
+        "title": "Éditeur de thème",
+        "badge": "Thème",
+        "description": "Personnalisez l'apparence de votre application"
       }
     },
     "domains": {
@@ -622,6 +632,7 @@
     "sections": {
       "users": {
         "title": "Gestion des utilisateurs",
+        "badge": "Utilisateurs",
         "description": "Gérez les utilisateurs et leurs permissions"
       },
       "logs": {
@@ -795,19 +806,23 @@
     "features": {
       "history": {
         "title": "Historique",
+        "badge": "Historique",
         "description": "Consultez l'historique de tous vos uploads"
       },
       "stats": {
         "title": "Statistiques",
+        "badge": "Stats",
         "description": "Visualisez les statistiques de vos uploads"
       },
       "config": {
         "title": "Configuration",
+        "badge": "Config",
         "description": "Configurez vos paramètres d'upload"
       }
     },
     "history": {
       "title": "Historique des uploads",
+      "badge": "Historique",
       "description": "Consultez l'historique de tous les fichiers uploadés via ShareX",
       "filters": {
         "title": "Filtres",
@@ -944,6 +959,7 @@
     },
     "stats": {
       "title": "Statistiques des uploads",
+      "badge": "Stats",
       "description": "Visualisez les statistiques de vos uploads ShareX",
       "cards": {
         "total_uploads": "Total des uploads",

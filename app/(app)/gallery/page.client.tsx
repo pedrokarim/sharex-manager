@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import { toast } from "sonner";
@@ -323,6 +323,7 @@ export function GalleryClient({
     loading,
     ref,
     reset,
+    prependItem,
   } = useInfiniteScroll<FileInfo>({
     initialData: initialFiles,
     fetchMore: useCallback(
@@ -335,6 +336,119 @@ export function GalleryClient({
     ),
     hasMore,
   });
+
+  // Refs pour accéder aux valeurs actuelles dans les callbacks SSE
+  const fetchFilesRef = useRef(fetchFiles);
+  const resetRef = useRef(reset);
+  const setHasMoreRef = useRef(setHasMore);
+  const enableUploadNotificationsRef = useRef(enableUploadNotifications);
+  const tRef = useRef(t);
+
+  // Mettre à jour les refs quand les valeurs changent
+  useEffect(() => {
+    fetchFilesRef.current = fetchFiles;
+    resetRef.current = reset;
+    setHasMoreRef.current = setHasMore;
+    enableUploadNotificationsRef.current = enableUploadNotifications;
+    tRef.current = t;
+  }, [fetchFiles, reset, setHasMore, enableUploadNotifications, t]);
+
+  // SSE pour les nouveaux fichiers en temps réel
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let isReconnecting = false;
+    let isDestroyed = false;
+
+    const cleanup = () => {
+      isDestroyed = true;
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+      isReconnecting = false;
+    };
+
+    const connectSSE = () => {
+      if (isDestroyed || isReconnecting) {
+        return;
+      }
+
+      eventSource = new EventSource("/api/gallery/stream");
+
+      eventSource.onopen = () => {
+        if (isDestroyed) return;
+        console.log("[Gallery SSE] Connexion établie");
+        isReconnecting = false;
+      };
+
+      // Écouter les événements nommés "gallery"
+      eventSource.addEventListener("gallery", (event: any) => {
+        if (isDestroyed) return;
+
+        try {
+          // Ignorer les heartbeats vides
+          if (event.data.trim() === "") return;
+
+          const data = JSON.parse(event.data);
+
+          if (data.type === "new_file" && data.file) {
+            // Recharger la première page pour avoir les données à jour
+            fetchFilesRef
+              .current(1)
+              .then(({ files: newFiles, hasMore: newHasMore }) => {
+                setHasMoreRef.current(newHasMore);
+                resetRef.current(newFiles);
+              })
+              .catch((error) => {
+                console.error(
+                  "[Gallery SSE] Erreur lors du rechargement:",
+                  error
+                );
+              });
+
+            // Notification si activée
+            if (enableUploadNotificationsRef.current) {
+              toast.success(
+                tRef.current("gallery.notifications.new_file", {
+                  filename: data.file.name,
+                })
+              );
+            }
+          }
+        } catch (error) {
+          console.error("[Gallery SSE] Erreur parsing message:", error);
+        }
+      });
+
+      eventSource.onerror = (error) => {
+        if (isDestroyed) return;
+
+        console.error("[Gallery SSE] Erreur de connexion");
+        if (!isReconnecting) {
+          isReconnecting = true;
+          reconnectTimeout = setTimeout(() => {
+            if (!isDestroyed) {
+              console.log("[Gallery SSE] Tentative de reconnexion...");
+              connectSSE();
+            }
+          }, 5000);
+        }
+      };
+    };
+
+    // Établir la connexion SSE seulement si le composant n'est pas détruit
+    if (!isDestroyed) {
+      connectSSE();
+    }
+
+    // Nettoyer la connexion à la destruction du composant
+    return cleanup;
+  }, [prependItem, enableUploadNotifications, t]);
 
   const handleFinishUpload = useCallback(async () => {
     const { files: newFiles, hasMore: newHasMore } = await fetchFiles(1);
@@ -814,7 +928,6 @@ export function GalleryClient({
   );
 
   const handleCreateAlbum = useCallback((fileName?: string) => {
-    console.log("🔍 handleCreateAlbum appelé avec fileName:", fileName);
     // Si un fileName est fourni, passer directement ce fichier au dialog
     if (fileName) {
       setFilesToAddToAlbum([fileName]);

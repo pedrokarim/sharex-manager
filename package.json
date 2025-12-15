@@ -87,7 +87,7 @@
     "input-otp": "^1.4.2",
     "jotai": "^2.15.1",
     "lru-cache": "^11.2.2",
-    "lucide-react": "^0.488.0",
+    "lucide-react": "^0.561.0",
     "nanoid": "^5.1.6",
     "next": "16.0.7",
     "next-auth": "5.0.0-beta.25",
@@ -107,7 +107,7 @@
     "react-intersection-observer": "^10.0.0",
     "react-resizable-panels": "^3.0.6",
     "react-syntax-highlighter": "^16.1.0",
-    "recharts": "^2.15.2",
+    "recharts": "2.15.4",
     "screenfull": "^6.0.2",
     "sharp": "^0.34.5",
     "simple-icons": "^15.21.0",
@@ -120,7 +120,7 @@
     "use-stick-to-bottom": "^1.1.1",
     "uuid": "^13.0.0",
     "vaul": "^1.1.2",
-    "zod": "^4.1.12",
+    "zod": "^4.2.0",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

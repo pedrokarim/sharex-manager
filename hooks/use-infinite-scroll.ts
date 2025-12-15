@@ -34,10 +34,15 @@ export function useInfiniteScroll<T>({
     setPage(2); // On commence à 2 car les premières données sont déjà chargées
   };
 
+  const prependItem = (item: T) => {
+    setData((prev) => [item, ...prev]);
+  };
+
   return {
     data,
     loading,
     ref,
     reset,
+    prependItem,
   };
 }

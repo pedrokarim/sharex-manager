@@ -64,23 +64,33 @@
     "sections": {
       "upload_config": {
         "title": "Upload Configuration",
+        "badge": "Uploads",
         "description": "Manage your ShareX upload settings"
       },
       "api_keys": {
         "title": "API Keys",
+        "badge": "API",
         "description": "Manage your API keys for ShareX uploads"
       },
       "domains": {
         "title": "Domains",
+        "badge": "Domains",
         "description": "Manage domains for your files"
       },
       "cleanup": {
         "title": "Cleanup",
+        "badge": "Cleanup",
         "description": "Delete unused files"
       },
       "security": {
         "title": "Security",
+        "badge": "Security",
         "description": "Configure security settings"
+      },
+      "theme_editor": {
+        "title": "Theme Editor",
+        "badge": "Theme",
+        "description": "Customize your application appearance"
       }
     },
     "domains": {
@@ -652,6 +662,7 @@
     "sections": {
       "users": {
         "title": "User Management",
+        "badge": "Users",
         "description": "Manage users and their permissions"
       },
       "logs": {
@@ -825,19 +836,23 @@
     "features": {
       "history": {
         "title": "History",
+        "badge": "History",
         "description": "View the history of all your uploads"
       },
       "stats": {
         "title": "Statistics",
+        "badge": "Stats",
         "description": "Visualize statistics of your uploads"
       },
       "config": {
         "title": "Configuration",
+        "badge": "Config",
         "description": "Configure your upload settings"
       }
     },
     "history": {
       "title": "Upload History",
+      "badge": "History",
       "description": "View the history of all files uploaded via ShareX",
       "filters": {
         "title": "Filters",
@@ -974,6 +989,7 @@
     },
     "stats": {
       "title": "Upload Statistics",
+      "badge": "Stats",
       "description": "Visualize statistics of your ShareX uploads",
       "cards": {
         "total_uploads": "Total Uploads",
