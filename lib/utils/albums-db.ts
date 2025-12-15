@@ -11,6 +11,8 @@ export interface Album {
   userId?: string;
   thumbnailFile?: string;
   fileCount: number;
+  isPublic?: boolean;
+  publicSlug?: string;
 }
 
 export interface AlbumFile {
@@ -62,9 +64,33 @@ export class AlbumsDatabase {
         updated_at TEXT NOT NULL,
         user_id TEXT,
         thumbnail_file TEXT,
-        file_count INTEGER DEFAULT 0
+        file_count INTEGER DEFAULT 0,
+        is_public INTEGER DEFAULT 0,
+        public_slug TEXT UNIQUE
       )
     `);
+
+    // Migration : Ajouter les colonnes is_public et public_slug si elles n'existent pas
+    try {
+      db.run(`ALTER TABLE albums ADD COLUMN is_public INTEGER DEFAULT 0`);
+    } catch (e) {
+      // La colonne existe déjà, ignorer l'erreur
+    }
+    try {
+      // SQLite ne permet pas d'ajouter UNIQUE directement dans ALTER TABLE
+      db.run(`ALTER TABLE albums ADD COLUMN public_slug TEXT`);
+    } catch (e) {
+      // La colonne existe déjà, ignorer l'erreur
+    }
+
+    // Index pour les recherches publiques
+    // Note: L'unicité du slug est gérée au niveau applicatif dans generateUniqueSlug
+    db.run(
+      `CREATE INDEX IF NOT EXISTS idx_albums_public_slug ON albums(public_slug)`
+    );
+    db.run(
+      `CREATE INDEX IF NOT EXISTS idx_albums_is_public ON albums(is_public)`
+    );
 
     // Table de liaison albums-fichiers
     db.run(`
@@ -129,6 +155,19 @@ export class AlbumsDatabase {
     return result ? AlbumsDatabase.mapAlbumFromDb(result) : null;
   }
 
+  public static getAlbumByPublicSlug(publicSlug: string): Album | null {
+    const db = AlbumsDatabase.getConnection();
+    AlbumsDatabase.initTables(db);
+
+    const query = db.prepare(`
+      SELECT * FROM albums 
+      WHERE public_slug = ? AND is_public = 1
+    `);
+    const result = query.get(publicSlug);
+
+    return result ? AlbumsDatabase.mapAlbumFromDb(result) : null;
+  }
+
   public static getAlbums(userId?: string): Album[] {
     const db = AlbumsDatabase.getConnection();
     AlbumsDatabase.initTables(db);
@@ -184,6 +223,16 @@ export class AlbumsDatabase {
     if (updates.thumbnailFile !== undefined) {
       fields.push("thumbnail_file = ?");
       values.push(updates.thumbnailFile);
+    }
+
+    if (updates.isPublic !== undefined) {
+      fields.push("is_public = ?");
+      values.push(updates.isPublic ? 1 : 0);
+    }
+
+    if (updates.publicSlug !== undefined) {
+      fields.push("public_slug = ?");
+      values.push(updates.publicSlug || null);
     }
 
     if (fields.length === 0) {
@@ -367,6 +416,46 @@ export class AlbumsDatabase {
     updateQuery.run(fileCount, new Date().toISOString(), albumId);
   }
 
+  public static generateUniqueSlug(
+    baseName: string,
+    excludeId?: number
+  ): string {
+    const db = AlbumsDatabase.getConnection();
+
+    // Générer un slug à partir du nom
+    const baseSlug = baseName
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Supprimer les accents
+      .replace(/[^a-z0-9]+/g, "-") // Remplacer les caractères spéciaux par des tirets
+      .replace(/^-+|-+$/g, "") // Supprimer les tirets en début/fin
+      .substring(0, 50); // Limiter la longueur
+
+    let slug = baseSlug || "album";
+    let counter = 0;
+    let isUnique = false;
+
+    while (!isUnique) {
+      const checkQuery = db.prepare(`
+        SELECT id FROM albums WHERE public_slug = ? AND (? IS NULL OR id != ?)
+      `);
+      const existing = checkQuery.get(
+        slug,
+        excludeId || null,
+        excludeId || null
+      );
+
+      if (!existing) {
+        isUnique = true;
+      } else {
+        counter++;
+        slug = `${baseSlug}-${counter}`;
+      }
+    }
+
+    return slug;
+  }
+
   private static mapAlbumFromDb(row: any): Album {
     return {
       id: row.id,
@@ -377,6 +466,13 @@ export class AlbumsDatabase {
       userId: row.user_id,
       thumbnailFile: row.thumbnail_file,
       fileCount: row.file_count || 0,
+      // Gérer les colonnes qui pourraient ne pas exister dans les anciennes bases de données
+      isPublic: row.hasOwnProperty("is_public")
+        ? Boolean(row.is_public)
+        : false,
+      publicSlug: row.hasOwnProperty("public_slug")
+        ? row.public_slug || undefined
+        : undefined,
     };
   }
 

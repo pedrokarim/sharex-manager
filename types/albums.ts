@@ -7,6 +7,8 @@ export interface Album {
   userId?: string;
   thumbnailFile?: string;
   fileCount: number;
+  isPublic?: boolean;
+  publicSlug?: string;
 }
 
 export interface AlbumFile {
@@ -25,6 +27,7 @@ export interface UpdateAlbumRequest {
   name?: string;
   description?: string;
   thumbnailFile?: string;
+  isPublic?: boolean;
 }
 
 export interface AddFilesToAlbumRequest {
@@ -50,11 +53,11 @@ export interface MultiSelection {
   selectedFiles: Set<string>;
   isSelecting: boolean;
   lastSelected?: string;
-  selectMode: 'single' | 'multi' | 'range';
+  selectMode: "single" | "multi" | "range";
 }
 
 export interface SelectionAction {
-  type: 'add' | 'remove' | 'clear' | 'range' | 'all' | 'toggle';
+  type: "add" | "remove" | "clear" | "range" | "all" | "toggle";
   fileNames?: string[];
   rangeStart?: string;
   rangeEnd?: string;
@@ -68,5 +71,3 @@ export interface SelectionToolbarActions {
   toggleSecuritySelected: () => void;
   downloadSelected: () => void;
 }
-
-

@@ -24,6 +24,13 @@ import {
   AudioWaveform,
   Palette,
   MoreHorizontal,
+  Clock,
+  Star,
+  Lock,
+  Cog,
+  BarChart3,
+  Tag,
+  Grid3X3,
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -65,18 +72,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           {
             title: t("sidebar.main.recent"),
             url: "/gallery?sort=recent",
+            icon: Clock,
           },
           {
             title: t("sidebar.main.starred"),
             url: "/gallery/starred",
+            icon: Star,
           },
           {
             title: t("sidebar.main.secure"),
             url: "/gallery/secure",
+            icon: Lock,
           },
           {
             title: t("sidebar.main.settings"),
             url: "/gallery/settings",
+            icon: Cog,
           },
         ],
       },
@@ -88,14 +99,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           {
             title: t("sidebar.main.history"),
             url: "/uploads/history",
+            icon: History,
           },
           {
             title: t("sidebar.main.configuration"),
             url: "/uploads/config",
+            icon: Settings,
           },
           {
             title: t("sidebar.main.stats"),
             url: "/uploads/stats",
+            icon: BarChart3,
           },
         ],
       },
@@ -107,14 +121,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           {
             title: t("albums.title"),
             url: "/albums",
+            icon: FolderOpen,
           },
           {
             title: t("sidebar.main.tags"),
             url: "/organization/tags",
+            icon: Tag,
           },
           {
             title: t("sidebar.main.collections"),
             url: "/organization/collections",
+            icon: Grid3X3,
           },
         ],
       },

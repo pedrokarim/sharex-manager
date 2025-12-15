@@ -3,9 +3,9 @@ import { auth } from "@/auth";
 import { AlbumViewClient } from "./page.client";
 
 interface AlbumPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function AlbumPage({ params }: AlbumPageProps) {
@@ -15,12 +15,11 @@ export default async function AlbumPage({ params }: AlbumPageProps) {
     redirect("/login");
   }
 
-  const albumId = parseInt(params.id);
+  const { id } = await params;
+  const albumId = parseInt(id);
   if (isNaN(albumId)) {
     redirect("/albums");
   }
 
   return <AlbumViewClient albumId={albumId} />;
 }
-
-

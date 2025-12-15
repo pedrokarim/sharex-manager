@@ -292,16 +292,24 @@ export function FileCard({
           size === "small" && "p-2 pt-0 gap-1",
           !showFileInfo && "pt-4"
         )}
+        onClick={(e) => e.stopPropagation()}
       >
         <Button variant="secondary" className="w-full" asChild>
-          <a href={file.url} download>
+          <a href={file.url} download onClick={(e) => e.stopPropagation()}>
             <Download
               className={cn("mr-2 h-4 w-4", size === "small" && "mr-0 h-3 w-3")}
             />
           </a>
         </Button>
         {onCopy && (
-          <Button variant="secondary" className="w-full" onClick={onCopy}>
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCopy();
+            }}
+          >
             <Copy className={cn("h-4 w-4", size === "small" && "h-3 w-3")} />
           </Button>
         )}
@@ -310,6 +318,7 @@ export function FileCard({
             href={getGalleryImageUrl(file.name)}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
           >
             <ExternalLink
               className={cn("h-4 w-4", size === "small" && "h-3 w-3")}
@@ -322,6 +331,7 @@ export function FileCard({
               variant="destructive"
               className="w-full"
               disabled={isDeleting}
+              onClick={(e) => e.stopPropagation()}
             >
               <Trash2
                 className={cn("h-4 w-4", size === "small" && "h-3 w-3")}

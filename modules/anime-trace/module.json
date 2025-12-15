@@ -8,9 +8,18 @@
   "icon": "https://img.ascencia.re/kUHNekXzLfQb.png",
   "category": "analysis",
   "hasUI": true,
-  "supportedFileTypes": ["jpg", "jpeg", "png", "gif", "webp"],
+  "supportedFileTypes": [
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "webp"
+  ],
   "settings": {
     "cacheSize": 1000,
     "similarityThreshold": 0.85
-  }
+  },
+  "capabilities": [
+    "initModule"
+  ]
 }

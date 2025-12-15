@@ -16,7 +16,7 @@
     "webp"
   ],
   "settings": {
-    "aspectRatio": null,
+    "aspectRatio": "free",
     "circularCrop": false,
     "quality": 90
   },

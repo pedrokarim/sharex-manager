@@ -20,10 +20,10 @@ const ModuleConfigSchema = z.object({
   category: z.string().optional(), // Catégorie du module
   hasUI: z.boolean().default(false), // Indique si le module a une interface utilisateur
   supportedFileTypes: z.array(z.string()).default([]), // Types de fichiers supportés
-  settings: z.record(z.any()).default({}), // Paramètres du module
-  dependencies: z.array(z.string()).optional(), // Dépendances entre modules
-  npmDependencies: z.record(z.string()).optional(), // Dépendances npm
-  capabilities: z.array(z.string()).optional(), // Capacités du module
+  settings: z.unknown(), // Paramètres du module - validation complètement libre
+  dependencies: z.unknown().optional(), // Dépendances entre modules
+  npmDependencies: z.unknown().optional(), // Dépendances npm
+  capabilities: z.unknown().optional(), // Capacités du module
 });
 
 /**

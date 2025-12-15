@@ -5,7 +5,7 @@ import { logDb } from "@/lib/utils/db";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { filename: string } }
+  { params }: { params: Promise<{ filename: string }> }
 ) {
   try {
     const session = await auth();
@@ -13,7 +13,7 @@ export async function GET(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const { filename } = params;
+    const { filename } = await params;
     if (!filename) {
       return NextResponse.json(
         { error: "Nom de fichier requis" },

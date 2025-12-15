@@ -10,7 +10,7 @@ const API_KEYS_FILE = join(process.cwd(), "data/api-keys.json");
 // DELETE /api/api-keys/[id]
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
   try {
@@ -25,10 +25,11 @@ export async function DELETE(
       return new Response("Non autorisé", { status: 401 });
     }
 
+    const { id } = await params;
     const content = await readFile(API_KEYS_FILE, "utf-8");
     const keys: ApiKey[] = JSON.parse(content);
 
-    const keyToDelete = keys.find((key) => key.id === params.id);
+    const keyToDelete = keys.find((key) => key.id === id);
     if (!keyToDelete) {
       logDb.createLog({
         level: "warning",
@@ -36,12 +37,12 @@ export async function DELETE(
         message: "Tentative de suppression d'une clé API inexistante",
         userId: session.user.id || undefined,
         userEmail: session.user.email || undefined,
-        metadata: { keyId: params.id },
+        metadata: { keyId: id },
       });
       return new Response("Clé non trouvée", { status: 404 });
     }
 
-    const newKeys = keys.filter((key) => key.id !== params.id);
+    const newKeys = keys.filter((key) => key.id !== id);
     await writeFile(API_KEYS_FILE, JSON.stringify(newKeys, null, 2));
 
     logDb.createLog({

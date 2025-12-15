@@ -14,7 +14,7 @@ const FileNamesSchema = z.object({
 // GET /api/albums/[id]/files - Récupérer les fichiers d'un album
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
 
@@ -30,7 +30,8 @@ export async function GET(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const albumId = IdSchema.parse(params.id);
+    const { id } = await params;
+    const albumId = IdSchema.parse(id);
     const album = albumsDb.getAlbum(albumId);
 
     if (!album) {
@@ -75,7 +76,7 @@ export async function GET(
       userEmail: session?.user?.email || undefined,
       metadata: {
         error: error instanceof Error ? error.message : "Unknown error",
-        albumId: params.id,
+        albumId: (await params).id,
       },
     });
 
@@ -90,7 +91,7 @@ export async function GET(
 // POST /api/albums/[id]/files - Ajouter des fichiers à un album
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
 
@@ -106,7 +107,8 @@ export async function POST(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const albumId = IdSchema.parse(params.id);
+    const { id } = await params;
+    const albumId = IdSchema.parse(id);
     const body = await request.json();
     const { fileNames } = FileNamesSchema.parse(body);
 
@@ -169,7 +171,7 @@ export async function POST(
       userEmail: session?.user?.email || undefined,
       metadata: {
         error: error instanceof Error ? error.message : "Unknown error",
-        albumId: params.id,
+        albumId: (await params).id,
       },
     });
 
@@ -187,7 +189,7 @@ export async function POST(
 // DELETE /api/albums/[id]/files - Retirer des fichiers d'un album
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
 
@@ -203,7 +205,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const albumId = IdSchema.parse(params.id);
+    const { id } = await params;
+    const albumId = IdSchema.parse(id);
     const body = await request.json();
     const { fileNames } = FileNamesSchema.parse(body);
 
@@ -266,7 +269,7 @@ export async function DELETE(
       userEmail: session?.user?.email || undefined,
       metadata: {
         error: error instanceof Error ? error.message : "Unknown error",
-        albumId: params.id,
+        albumId: (await params).id,
       },
     });
 

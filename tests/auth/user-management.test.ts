@@ -4,7 +4,7 @@ import { join } from "path";
 import bcrypt from "bcryptjs";
 import type { User } from "@/types/user";
 
-const testUsersPath = join(process.cwd(), "data/users.test.json");
+const testUsersPath = join(process.cwd(), "data/users-management.test.json");
 
 describe("User Management", () => {
   // Données de test
@@ -16,12 +16,21 @@ describe("User Management", () => {
 
   // Réinitialiser le fichier de test avant chaque test
   beforeEach(() => {
-    writeFileSync(testUsersPath, JSON.stringify([], null, 2));
+    // S'assurer que le fichier n'existe pas ou est vide
+    try {
+      writeFileSync(testUsersPath, JSON.stringify([], null, 2));
+    } catch (error) {
+      // Ignore les erreurs d'écriture
+    }
   });
 
   // Nettoyer après chaque test
   afterEach(() => {
-    writeFileSync(testUsersPath, JSON.stringify([], null, 2));
+    try {
+      writeFileSync(testUsersPath, JSON.stringify([], null, 2));
+    } catch (error) {
+      // Ignore les erreurs d'écriture
+    }
   });
 
   it("should create a new user with hashed password", async () => {

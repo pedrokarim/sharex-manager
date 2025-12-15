@@ -257,12 +257,12 @@ export function GalleryClient({
 
   // Fonction pour charger les albums des fichiers visibles
   const loadFileAlbums = useCallback(
-    async (fileNames: string[]) => {
+    async (fileNames: string[], forceReload = false) => {
       try {
-        // Filtrer les fichiers qui ne sont pas encore dans le cache
-        const uncachedFiles = fileNames.filter(
-          (fileName) => !fileAlbumsCache[fileName]
-        );
+        // Filtrer les fichiers qui ne sont pas encore dans le cache (sauf si forceReload)
+        const uncachedFiles = forceReload
+          ? fileNames
+          : fileNames.filter((fileName) => !fileAlbumsCache[fileName]);
 
         if (uncachedFiles.length === 0) return;
 
@@ -1197,6 +1197,16 @@ export function GalleryClient({
         }}
         selectedFiles={filesToAddToAlbum}
         onSuccess={() => {
+          // Invalider le cache des albums pour les fichiers ajoutés et recharger
+          setFileAlbumsCache((prev) => {
+            const newCache = { ...prev };
+            filesToAddToAlbum.forEach((fileName) => {
+              delete newCache[fileName];
+            });
+            return newCache;
+          });
+          // Forcer le rechargement des albums pour les fichiers ajoutés
+          loadFileAlbums(filesToAddToAlbum, true);
           clearSelection();
           setIsSelectionMode(false);
           setFilesToAddToAlbum([]);

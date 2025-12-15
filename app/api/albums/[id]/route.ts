@@ -9,6 +9,7 @@ const UpdateAlbumSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional(),
   thumbnailFile: z.string().optional(),
+  isPublic: z.boolean().optional(),
 });
 
 const IdSchema = z.coerce.number().int().positive();
@@ -16,7 +17,7 @@ const IdSchema = z.coerce.number().int().positive();
 // GET /api/albums/[id] - Récupérer un album spécifique
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
 
@@ -32,7 +33,8 @@ export async function GET(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const albumId = IdSchema.parse(params.id);
+    const { id } = await params;
+    const albumId = IdSchema.parse(id);
     const album = albumsDb.getAlbum(albumId);
 
     if (!album) {
@@ -81,6 +83,16 @@ export async function GET(
       files,
     });
   } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    console.error(
+      "Erreur lors de la récupération de l'album:",
+      errorMessage,
+      errorStack
+    );
+
     logDb.createLog({
       level: "error",
       action: "system.error" as LogAction,
@@ -88,23 +100,33 @@ export async function GET(
       userId: session?.user?.id || undefined,
       userEmail: session?.user?.email || undefined,
       metadata: {
-        error: error instanceof Error ? error.message : "Unknown error",
-        albumId: params.id,
+        error: errorMessage,
+        stack: errorStack,
+        albumId: (await params).id,
       },
     });
 
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "ID invalide" }, { status: 400 });
+      return NextResponse.json(
+        { error: "ID invalide", details: error.errors },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "Erreur serveur",
+        message: errorMessage,
+      },
+      { status: 500 }
+    );
   }
 }
 
 // PUT /api/albums/[id] - Modifier un album
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
 
@@ -120,7 +142,8 @@ export async function PUT(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const albumId = IdSchema.parse(params.id);
+    const { id } = await params;
+    const albumId = IdSchema.parse(id);
     const body = await request.json();
     const updates = UpdateAlbumSchema.parse(body);
 
@@ -143,7 +166,22 @@ export async function PUT(
       return NextResponse.json({ error: "Accès interdit" }, { status: 403 });
     }
 
-    const updatedAlbum = albumsDb.updateAlbum(albumId, updates);
+    // Gérer la visibilité publique
+    const finalUpdates = { ...updates };
+    if (updates.isPublic !== undefined) {
+      if (updates.isPublic && !existingAlbum.publicSlug) {
+        // Générer un slug unique si l'album devient public
+        finalUpdates.publicSlug = albumsDb.generateUniqueSlug(
+          existingAlbum.name,
+          albumId
+        );
+      } else if (!updates.isPublic) {
+        // Supprimer le slug si l'album devient privé
+        finalUpdates.publicSlug = undefined;
+      }
+    }
+
+    const updatedAlbum = albumsDb.updateAlbum(albumId, finalUpdates);
 
     if (!updatedAlbum) {
       return NextResponse.json(
@@ -175,7 +213,7 @@ export async function PUT(
       userEmail: session?.user?.email || undefined,
       metadata: {
         error: error instanceof Error ? error.message : "Unknown error",
-        albumId: params.id,
+        albumId: (await params).id,
       },
     });
 
@@ -193,7 +231,7 @@ export async function PUT(
 // DELETE /api/albums/[id] - Supprimer un album
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
 
@@ -209,7 +247,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const albumId = IdSchema.parse(params.id);
+    const { id } = await params;
+    const albumId = IdSchema.parse(id);
 
     // Vérifier que l'album existe
     const existingAlbum = albumsDb.getAlbum(albumId);
@@ -262,7 +301,7 @@ export async function DELETE(
       userEmail: session?.user?.email || undefined,
       metadata: {
         error: error instanceof Error ? error.message : "Unknown error",
-        albumId: params.id,
+        albumId: (await params).id,
       },
     });
 

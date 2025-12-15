@@ -7,7 +7,7 @@ import {
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { moduleName: string } }
+  { params }: { params: Promise<{ moduleName: string }> }
 ) {
   const session = await auth();
   try {
@@ -15,7 +15,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const { moduleName } = params;
+    const { moduleName } = await params;
 
     // Initialiser le gestionnaire de modules API
     await initApiModuleManager();
