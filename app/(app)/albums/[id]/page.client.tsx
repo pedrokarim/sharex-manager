@@ -3,17 +3,35 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Edit2, Trash2, Plus } from "lucide-react";
+import {
+  ArrowLeft,
+  Edit2,
+  Trash2,
+  Plus,
+  Globe,
+  GlobeLock,
+  Copy,
+  Check,
+  ExternalLink,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { GridView } from "@/components/gallery/grid-view";
 import { ListView } from "@/components/gallery/list-view";
 import { ViewSelector } from "@/components/view-selector";
@@ -34,6 +52,8 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [isTogglingPublic, setIsTogglingPublic] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   const fetchAlbumData = useCallback(async () => {
     try {
@@ -42,12 +62,31 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       // Récupérer les données de l'album
       const albumResponse = await fetch(`/api/albums/${albumId}`);
       if (!albumResponse.ok) {
+        const errorData = await albumResponse.json().catch(() => ({}));
+        const errorMessage =
+          errorData.error || "Erreur lors du chargement de l'album";
+
         if (albumResponse.status === 404) {
           toast.error("Album introuvable");
           router.push("/albums");
           return;
         }
-        throw new Error("Erreur lors du chargement de l'album");
+
+        if (albumResponse.status === 401) {
+          toast.error("Vous devez être connecté pour accéder à cet album");
+          router.push("/login");
+          return;
+        }
+
+        if (albumResponse.status === 403) {
+          toast.error("Vous n'avez pas l'autorisation d'accéder à cet album");
+          router.push("/albums");
+          return;
+        }
+
+        toast.error(errorMessage);
+        console.error("Erreur API:", errorMessage, albumResponse.status);
+        return;
       }
 
       const albumData = await albumResponse.json();
@@ -56,7 +95,12 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       // Récupérer les fichiers de l'album
       const filesResponse = await fetch(`/api/albums/${albumId}/files`);
       if (!filesResponse.ok) {
-        throw new Error("Erreur lors du chargement des fichiers");
+        const errorData = await filesResponse.json().catch(() => ({}));
+        const errorMessage =
+          errorData.error || "Erreur lors du chargement des fichiers";
+        toast.error(errorMessage);
+        console.error("Erreur lors du chargement des fichiers:", errorMessage);
+        return;
       }
 
       const filesData = await filesResponse.json();
@@ -75,8 +119,12 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
 
       setFiles(fileInfos);
     } catch (error) {
-      console.error("Erreur:", error);
-      toast.error("Erreur lors du chargement de l'album");
+      console.error("Erreur lors du chargement de l'album:", error);
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Erreur lors du chargement de l'album");
+      }
     } finally {
       setLoading(false);
     }
@@ -126,6 +174,53 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     }
   };
 
+  const handleTogglePublic = async () => {
+    setIsTogglingPublic(true);
+    try {
+      const response = await fetch(`/api/albums/${albumId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          isPublic: !album?.isPublic,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la mise à jour");
+      }
+
+      const updatedAlbum = await response.json();
+      setAlbum(updatedAlbum);
+      toast.success(
+        updatedAlbum.isPublic
+          ? "Album rendu public avec succès"
+          : "Album rendu privé avec succès"
+      );
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors de la mise à jour de la visibilité");
+    } finally {
+      setIsTogglingPublic(false);
+    }
+  };
+
+  const handleCopyPublicUrl = async () => {
+    if (!album?.publicSlug) return;
+
+    const publicUrl = `${window.location.origin}/public/albums/${album.publicSlug}`;
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setCopiedUrl(true);
+      toast.success("URL publique copiée dans le presse-papiers");
+      setTimeout(() => setCopiedUrl(false), 2000);
+    } catch (error) {
+      console.error("Erreur lors de la copie:", error);
+      toast.error("Erreur lors de la copie de l'URL");
+    }
+  };
+
   if (loading) {
     return <Loading fullHeight />;
   }
@@ -136,23 +231,6 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
 
   return (
     <div>
-      {/* Breadcrumb */}
-      <Breadcrumb className="mb-4 sm:mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/albums" className="text-sm">
-              {t("albums.title")}
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="text-sm truncate">
-              {album.name}
-            </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
       {/* En-tête de l'album */}
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3 sm:gap-4">
@@ -170,6 +248,15 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
               <h1 className="text-lg sm:text-2xl font-bold truncate">
                 {album.name}
               </h1>
+              {album.isPublic && (
+                <Badge
+                  variant="default"
+                  className="text-xs sm:text-sm w-fit bg-green-600"
+                >
+                  <Globe className="h-2.5 w-2.5 mr-1" />
+                  Public
+                </Badge>
+              )}
               <Badge variant="secondary" className="text-xs sm:text-sm w-fit">
                 {t("albums.files_count", { count: files.length })}
               </Badge>
@@ -184,6 +271,74 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
 
         <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
           <ViewSelector />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 sm:h-9 sm:w-9"
+              >
+                {album.isPublic ? (
+                  <Globe className="h-3 w-3 sm:h-4 sm:w-4" />
+                ) : (
+                  <GlobeLock className="h-3 w-3 sm:h-4 sm:w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={handleTogglePublic}
+                disabled={isTogglingPublic}
+                className="text-sm"
+              >
+                {album.isPublic ? (
+                  <>
+                    <GlobeLock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                    Rendre privé
+                  </>
+                ) : (
+                  <>
+                    <Globe className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                    Rendre public
+                  </>
+                )}
+              </DropdownMenuItem>
+              {album.isPublic && album.publicSlug && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleCopyPublicUrl}
+                    className="text-sm"
+                  >
+                    {copiedUrl ? (
+                      <>
+                        <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                        URL copiée
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                        Copier l'URL publique
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      window.open(
+                        `/public/albums/${album.publicSlug}`,
+                        "_blank"
+                      );
+                    }}
+                    className="text-sm"
+                  >
+                    <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                    Ouvrir dans un nouvel onglet
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button
             variant="outline"
@@ -209,6 +364,67 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           </Button>
         </div>
       </div>
+
+      {/* Section de configuration publique */}
+      {album.isPublic && album.publicSlug && (
+        <Card className="mb-6 sm:mb-8">
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+              <Globe className="h-4 w-4 sm:h-5 sm:w-5" />
+              Album public
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              Cet album est accessible publiquement via l'URL ci-dessous
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="public-url" className="text-xs sm:text-sm">
+                  URL publique
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="public-url"
+                    readOnly
+                    value={
+                      typeof window !== "undefined"
+                        ? `${window.location.origin}/public/albums/${album.publicSlug}`
+                        : `/public/albums/${album.publicSlug}`
+                    }
+                    className="text-xs sm:text-sm font-mono"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleCopyPublicUrl}
+                    className="flex-shrink-0"
+                  >
+                    {copiedUrl ? (
+                      <Check className="h-3 w-3 sm:h-4 sm:w-4" />
+                    ) : (
+                      <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      window.open(
+                        `/public/albums/${album.publicSlug}`,
+                        "_blank"
+                      );
+                    }}
+                    className="flex-shrink-0"
+                  >
+                    <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Contenu de l'album */}
       {files.length === 0 ? (

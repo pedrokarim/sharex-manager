@@ -6,7 +6,7 @@ import { getAbsoluteUploadPath } from "@/lib/config";
 
 export async function PUT(
   request: Request,
-  { params }: { params: { filename: string } }
+  { params }: { params: Promise<{ filename: string }> }
 ) {
   try {
     const session = await auth();
@@ -14,6 +14,7 @@ export async function PUT(
       return new Response("Non autorisé", { status: 401 });
     }
 
+    const { filename } = await params;
     const formData = await request.formData();
     const isSecure = formData.get("isSecure") === "true";
 
@@ -24,8 +25,8 @@ export async function PUT(
       ? path.join(getAbsoluteUploadPath(), "secure")
       : getAbsoluteUploadPath();
 
-    const sourcePath = path.join(sourceDir, params.filename);
-    const targetPath = path.join(targetDir, params.filename);
+    const sourcePath = path.join(sourceDir, filename);
+    const targetPath = path.join(targetDir, filename);
 
     // Vérifier si le fichier existe
     try {
@@ -42,9 +43,9 @@ export async function PUT(
 
     // Construire la nouvelle URL
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
-    const newUrl = `${baseUrl}/api/files${isSecure ? "/secure" : ""}/${
-      params.filename
-    }`;
+    const newUrl = `${baseUrl}/api/files${
+      isSecure ? "/secure" : ""
+    }/${filename}`;
 
     return NextResponse.json({
       success: true,

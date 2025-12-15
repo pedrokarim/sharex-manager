@@ -10,10 +10,11 @@ const THUMBNAIL_SIZE = 300;
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { filename: string } }
+  { params }: { params: Promise<{ filename: string }> }
 ) {
   try {
-    const filePath = join(UPLOADS_DIR, params.filename);
+    const { filename } = await params;
+    const filePath = join(UPLOADS_DIR, filename);
 
     // Vérifier si le fichier existe
     try {
@@ -23,7 +24,7 @@ export async function GET(
     }
 
     // Vérifier si c'est une image
-    if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(params.filename)) {
+    if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(filename)) {
       return new Response("Ce fichier n'est pas une image", { status: 400 });
     }
 

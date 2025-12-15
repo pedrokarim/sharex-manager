@@ -23,6 +23,7 @@ import { useSession } from "next-auth/react";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
+import { CatalogAccessButton } from "@/components/catalog/catalog-access-button";
 
 export default function HomePage() {
   const { data: session } = useSession();
@@ -30,6 +31,9 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-screen flex flex-col">
+      {/* Bouton d'accès au catalogue public */}
+      <CatalogAccessButton />
+
       <main className="flex-1">
         {/* Hero Section avec un design plus moderne */}
         <div className="container mx-auto px-4 py-8 sm:py-16">

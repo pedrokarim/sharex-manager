@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { format, parseISO } from "date-fns";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import {
@@ -11,6 +12,10 @@ import {
   Trash2,
   Calendar,
   Image as ImageIcon,
+  Globe,
+  GlobeLock,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -35,6 +40,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { toast } from "sonner";
 import type { Album } from "@/types/albums";
 
 interface AlbumCardProps {
@@ -53,6 +59,43 @@ export function AlbumCard({
   const { t } = useTranslation();
   const locale = useDateLocale();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [imageFiles, setImageFiles] = useState<string[]>([]);
+  const [isTogglingPublic, setIsTogglingPublic] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  // Charger les fichiers de l'album et filtrer les images
+  useEffect(() => {
+    const loadAlbumImages = async () => {
+      if (album.fileCount === 0) {
+        setImageFiles([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/albums/${album.id}/files`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const files: string[] = data.files || [];
+
+        // Filtrer uniquement les images
+        const images = files.filter((fileName: string) =>
+          /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName)
+        );
+
+        // Prendre les 4 premières images
+        setImageFiles(images.slice(0, 4));
+      } catch (error) {
+        console.error(
+          "Erreur lors du chargement des images de l'album:",
+          error
+        );
+        setImageFiles([]);
+      }
+    };
+
+    loadAlbumImages();
+  }, [album.id, album.fileCount]);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -62,6 +105,55 @@ export function AlbumCard({
       // L'erreur est gérée par le parent
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleTogglePublic = async () => {
+    setIsTogglingPublic(true);
+    try {
+      const response = await fetch(`/api/albums/${album.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          isPublic: !album.isPublic,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la mise à jour");
+      }
+
+      const updatedAlbum = await response.json();
+      toast.success(
+        updatedAlbum.isPublic
+          ? "Album rendu public avec succès"
+          : "Album rendu privé avec succès"
+      );
+
+      // Recharger la page pour mettre à jour l'état
+      window.location.reload();
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors de la mise à jour de la visibilité");
+    } finally {
+      setIsTogglingPublic(false);
+    }
+  };
+
+  const handleCopyPublicUrl = async () => {
+    if (!album.publicSlug) return;
+
+    const publicUrl = `${window.location.origin}/public/albums/${album.publicSlug}`;
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setCopiedUrl(true);
+      toast.success("URL publique copiée dans le presse-papiers");
+      setTimeout(() => setCopiedUrl(false), 2000);
+    } catch (error) {
+      console.error("Erreur lors de la copie:", error);
+      toast.error("Erreur lors de la copie de l'URL");
     }
   };
 
@@ -120,6 +212,42 @@ export function AlbumCard({
                     Modifier
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleTogglePublic}
+                    disabled={isTogglingPublic}
+                    className="text-sm"
+                  >
+                    {album.isPublic ? (
+                      <>
+                        <GlobeLock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                        Rendre privé
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                        Rendre public
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  {album.isPublic && album.publicSlug && (
+                    <DropdownMenuItem
+                      onClick={handleCopyPublicUrl}
+                      className="text-sm"
+                    >
+                      {copiedUrl ? (
+                        <>
+                          <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                          URL copiée
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                          Copier l'URL publique
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <DropdownMenuItem
@@ -160,20 +288,80 @@ export function AlbumCard({
     );
   }
 
+  // Fonction pour rendre la miniature de l'album
+  const renderThumbnail = () => {
+    if (imageFiles.length === 0) {
+      // Aucune image : afficher l'icône de dossier
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+          <FolderOpen className="h-8 w-8 sm:h-12 sm:w-12 text-primary/50" />
+        </div>
+      );
+    }
+
+    if (imageFiles.length === 1) {
+      // Une seule image : afficher en plein
+      return (
+        <div className="w-full h-full relative">
+          <Image
+            src={`/api/files/${encodeURIComponent(imageFiles[0])}`}
+            alt={album.name}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+          />
+        </div>
+      );
+    }
+
+    // 2, 3 ou 4 images : grille de 2x2
+    return (
+      <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
+        {[0, 1, 2, 3].map((index) => {
+          const imageFile = imageFiles[index];
+          if (imageFile) {
+            return (
+              <div key={index} className="relative w-full h-full">
+                <Image
+                  src={`/api/files/${encodeURIComponent(imageFile)}`}
+                  alt={`${album.name} - Image ${index + 1}`}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 12.5vw"
+                />
+              </div>
+            );
+          } else {
+            // Case vide : afficher l'icône de dossier
+            return (
+              <div
+                key={index}
+                className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5"
+              >
+                <FolderOpen className="h-4 w-4 sm:h-6 sm:w-6 text-primary/50" />
+              </div>
+            );
+          }
+        })}
+      </div>
+    );
+  };
+
   return (
     <Card className="group hover:shadow-md transition-all duration-200 hover:scale-105">
       <CardHeader className="p-0">
         <Link href={`/albums/${album.id}`}>
-          <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 rounded-t-lg flex items-center justify-center relative overflow-hidden">
-            {album.thumbnailFile ? (
-              // TODO: Afficher la miniature de l'album
-              <ImageIcon className="h-8 w-8 sm:h-12 sm:w-12 text-primary/50" />
-            ) : (
-              <FolderOpen className="h-8 w-8 sm:h-12 sm:w-12 text-primary/50" />
-            )}
+          <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 rounded-t-lg relative overflow-hidden">
+            {renderThumbnail()}
 
             {/* Badge du nombre de fichiers */}
-            <div className="absolute top-1 right-1 sm:top-2 sm:right-2">
+            <div className="absolute top-1 right-1 sm:top-2 sm:right-2 z-10 flex gap-1">
+              {album.isPublic && (
+                <Badge variant="default" className="text-xs bg-green-600">
+                  <Globe className="h-2.5 w-2.5 mr-1" />
+                  Public
+                </Badge>
+              )}
               <Badge variant="secondary" className="text-xs">
                 {album.fileCount}
               </Badge>
@@ -222,6 +410,42 @@ export function AlbumCard({
                 <Edit2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                 Modifier
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleTogglePublic}
+                disabled={isTogglingPublic}
+                className="text-sm"
+              >
+                {album.isPublic ? (
+                  <>
+                    <GlobeLock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                    Rendre privé
+                  </>
+                ) : (
+                  <>
+                    <Globe className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                    Rendre public
+                  </>
+                )}
+              </DropdownMenuItem>
+              {album.isPublic && album.publicSlug && (
+                <DropdownMenuItem
+                  onClick={handleCopyPublicUrl}
+                  className="text-sm"
+                >
+                  {copiedUrl ? (
+                    <>
+                      <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                      URL copiée
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                      Copier l'URL publique
+                    </>
+                  )}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <AlertDialog>
                 <AlertDialogTrigger asChild>

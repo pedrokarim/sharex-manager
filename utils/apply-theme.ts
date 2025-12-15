@@ -47,8 +47,12 @@ const updateThemeClass = (root: HTMLElement, mode: Theme) => {
   }
 };
 
-const applyCommonStyles = (root: HTMLElement, themeStyles: ThemeStyleProps) => {
-  Object.entries(themeStyles)
+const applyCommonStyles = (
+  root: HTMLElement,
+  themeStyles: ThemeStyles,
+  mode: Theme
+) => {
+  Object.entries(themeStyles[mode])
     .filter(([key]) =>
       COMMON_NON_COLOR_KEYS.includes(
         key as (typeof COMMON_NON_COLOR_KEYS)[number]
@@ -94,8 +98,8 @@ export const applyThemeToElement = (
   if (!rootElement || !themeStyles || !themeStyles[mode]) return;
 
   updateThemeClass(rootElement, mode);
-  // Apply common styles (like border-radius) based on the 'light' mode definition
-  applyCommonStyles(rootElement, themeStyles.light);
+  // Apply common styles (like border-radius) based on the current mode
+  applyCommonStyles(rootElement, themeStyles, mode);
   // Apply mode-specific colors
   applyThemeColors(rootElement, themeStyles, mode);
   // Apply shadow variables

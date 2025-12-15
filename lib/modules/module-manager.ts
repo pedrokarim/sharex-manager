@@ -20,10 +20,10 @@ const ModuleConfigSchema = z.object({
   category: z.string().optional(), // Catégorie du module
   supportedFileTypes: z.array(z.string()).default([]), // Types de fichiers supportés
   hasUI: z.boolean().default(false), // Indique si le module a une interface utilisateur
-  dependencies: z.array(z.string()).optional(), // Dépendances d'autres modules
-  npmDependencies: z.record(z.string()).optional(), // Dépendances npm
-  settings: z.record(z.any()).optional(), // Paramètres du module
-  capabilities: z.array(z.string()).optional(), // Capacités du module
+  dependencies: z.unknown().optional(), // Dépendances d'autres modules
+  npmDependencies: z.unknown().optional(), // Dépendances npm
+  settings: z.unknown(), // Paramètres du module - validation complètement libre
+  capabilities: z.unknown().optional(), // Capacités du module
 });
 
 class ModuleManagerImpl implements ModuleManager {

@@ -4,7 +4,7 @@ import { toggleFileStarred } from "@/lib/starred-files";
 
 export async function PUT(
   request: Request,
-  { params }: { params: { filename: string } }
+  { params }: { params: Promise<{ filename: string }> }
 ) {
   try {
     const session = await auth();
@@ -12,10 +12,11 @@ export async function PUT(
       return new Response("Non autorisé", { status: 401 });
     }
 
+    const { filename } = await params;
     const formData = await request.formData();
     const isStarred = formData.get("isStarred") === "true";
 
-    await toggleFileStarred(params.filename, isStarred);
+    await toggleFileStarred(filename, isStarred);
 
     return NextResponse.json({
       success: true,
