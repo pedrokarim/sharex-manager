@@ -43,16 +43,58 @@ const nextConfig = {
     async rewrites() {
         return [
             {
-                // Pour le dev
-                source: "/:path*",
-                has: [{ type: "host", value: "img.ascencia.io" }],
-                destination: `http://sxm.ascencia.io/img-handler/:path*`,
+                // Redirection pour le domaine images vers le handler
+                source: '/:path*',
+                has: [{ type: "host", value: "img.ascencia.re" }],
+                destination: '/img-handler/:path*',
+            },
+        ];
+    },
+    async headers() {
+        return [
+            {
+                // Headers CORS pour le domaine d'images
+                source: '/img-handler/:path*',
+                headers: [
+                    {
+                        key: 'Access-Control-Allow-Origin',
+                        value: '*',
+                    },
+                    {
+                        key: 'Access-Control-Allow-Methods',
+                        value: 'GET, OPTIONS',
+                    },
+                    {
+                        key: 'Access-Control-Allow-Headers',
+                        value: 'Content-Type',
+                    },
+                    {
+                        key: 'Cache-Control',
+                        value: 'public, max-age=31536000, immutable',
+                    },
+                ],
             },
             {
-                // Pour la prod
-                source: "/:path*",
-                has: [{ type: "host", value: "img.ascencia.re" }],
-                destination: `https://sxm.ascencia.re/img-handler/:path*`,
+                // Headers pour toutes les routes (utile pour le domaine principal)
+                source: '/:path*',
+                headers: [
+                    {
+                        key: 'Access-Control-Allow-Origin',
+                        value: 'https://sxm.ascencia.re',
+                    },
+                    {
+                        key: 'Access-Control-Allow-Credentials',
+                        value: 'true',
+                    },
+                    {
+                        key: 'Access-Control-Allow-Headers',
+                        value: 'Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range',
+                    },
+                    {
+                        key: 'Access-Control-Allow-Methods',
+                        value: 'GET,POST,OPTIONS,PUT,DELETE,PATCH',
+                    },
+                ],
             },
         ];
     },
