@@ -11,7 +11,12 @@ import type { Album } from "@/types/albums";
 
 interface CatalogData {
   albums: (Album & { coverImages?: string[] })[];
-  heroImages: string[];
+  heroImages: Array<{
+    name: string;
+    addedAt?: string;
+    albumSlug?: string;
+    albumName?: string;
+  }>;
   total: number;
 }
 
@@ -47,7 +52,7 @@ export function CatalogLanding() {
     <div className="relative">
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        <HeroBackground images={data?.heroImages || []} />
+        <HeroBackground images={(data?.heroImages || []).map((img) => img.name)} />
 
         <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="max-w-4xl mx-auto space-y-8">
