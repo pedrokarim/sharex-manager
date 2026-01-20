@@ -193,3 +193,34 @@
 .animate-ken-burns {
   animation: ken-burns 8s ease-out forwards;
 }
+
+/* Catalog album 3D floating stack */
+@keyframes sxm-album-rotate {
+  0% {
+    transform: rotateX(14deg) rotateY(-18deg) rotateZ(-2deg);
+  }
+  100% {
+    transform: rotateX(10deg) rotateY(18deg) rotateZ(2deg);
+  }
+}
+
+@keyframes sxm-album-float {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-sxm-album-rotate {
+  animation: sxm-album-rotate 9s ease-in-out infinite alternate;
+  transform-style: preserve-3d;
+}
+
+.animate-sxm-album-float {
+  animation: sxm-album-float 6s ease-in-out infinite;
+}

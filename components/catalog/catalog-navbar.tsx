@@ -51,12 +51,12 @@ export function CatalogNavbar() {
       )}
     >
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center h-16 sm:h-20">
           {/* Logo */}
           <Link
             href="/catalog"
             className={cn(
-              "flex items-center gap-2 text-lg sm:text-xl font-bold tracking-tight transition-colors",
+              "flex items-center gap-2 text-lg sm:text-xl font-bold tracking-tight transition-colors justify-self-start min-w-0",
               useTransparentStyle ? "text-white" : "text-foreground"
             )}
           >
@@ -71,7 +71,7 @@ export function CatalogNavbar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-1 col-start-2 justify-self-center">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (
@@ -96,7 +96,7 @@ export function CatalogNavbar() {
           </div>
 
           {/* CTA Button */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2 col-start-3 justify-self-end min-w-0">
             <Link href="/">
               <Button
                 variant={useTransparentStyle ? "secondary" : "outline"}
@@ -139,7 +139,7 @@ export function CatalogNavbar() {
             variant="ghost"
             size="icon"
             className={cn(
-              "md:hidden",
+              "md:hidden col-start-3 justify-self-end",
               useTransparentStyle ? "text-white" : "text-foreground"
             )}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

@@ -349,13 +349,30 @@ export class AlbumsDatabase {
     AlbumsDatabase.initTables(db);
 
     const query = db.prepare(`
-      SELECT file_name FROM album_files 
-      WHERE album_id = ? 
+      SELECT file_name FROM album_files
+      WHERE album_id = ?
       ORDER BY added_at DESC
     `);
 
     const results = query.all(albumId);
     return results.map((row: any) => row.file_name);
+  }
+
+  public static getAlbumFileEntries(albumId: number): Array<{ fileName: string; addedAt: string }> {
+    const db = AlbumsDatabase.getConnection();
+    AlbumsDatabase.initTables(db);
+
+    const query = db.prepare(`
+      SELECT file_name, added_at FROM album_files
+      WHERE album_id = ?
+      ORDER BY added_at DESC
+    `);
+
+    const results = query.all(albumId);
+    return results.map((row: any) => ({
+      fileName: row.file_name,
+      addedAt: row.added_at,
+    }));
   }
 
   public static getFileAlbums(fileName: string): Album[] {

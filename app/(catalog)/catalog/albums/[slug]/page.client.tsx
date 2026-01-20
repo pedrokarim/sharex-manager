@@ -4,8 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Grid2X2, Images, List, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, Grid2X2, Images, List } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -14,18 +13,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Loading } from "@/components/ui/loading";
+import { PublicImageViewer } from "@/components/catalog/public-image-viewer";
 import type { Album } from "@/types/albums";
 
 interface CatalogAlbumDetailPageProps {
   slug: string;
 }
 
+interface AlbumImage {
+  name: string;
+  url: string;
+  addedAt: string;
+}
+
 export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
   const [album, setAlbum] = useState<Album | null>(null);
-  const [files, setFiles] = useState<string[]>([]);
+  const [files, setFiles] = useState<AlbumImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "masonry">("grid");
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const fetchAlbumData = useCallback(async () => {
     try {
@@ -43,10 +49,14 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
       const data = await response.json();
       setAlbum(data);
 
-      // Filtrer uniquement les images
-      const imageFiles = (data.files || []).filter((fileName: string) =>
-        /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName)
-      );
+      // Transformer les fichiers avec leurs métadonnées
+      const imageFiles: AlbumImage[] = (data.files || [])
+        .filter((entry: any) => /\.(jpg|jpeg|png|gif|webp)$/i.test(entry.fileName))
+        .map((entry: any) => ({
+          name: entry.fileName,
+          url: `/api/files/${encodeURIComponent(entry.fileName)}`,
+          addedAt: entry.addedAt,
+        }));
       setFiles(imageFiles);
     } catch (error) {
       console.error("Erreur:", error);
@@ -60,29 +70,17 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
     fetchAlbumData();
   }, [fetchAlbumData]);
 
-  // Lightbox keyboard navigation
-  useEffect(() => {
-    if (!selectedImage) return;
+  const handleImageClick = (index: number) => {
+    setSelectedIndex(index);
+  };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setSelectedImage(null);
-      } else if (e.key === "ArrowRight") {
-        const currentIndex = files.indexOf(selectedImage);
-        if (currentIndex < files.length - 1) {
-          setSelectedImage(files[currentIndex + 1]);
-        }
-      } else if (e.key === "ArrowLeft") {
-        const currentIndex = files.indexOf(selectedImage);
-        if (currentIndex > 0) {
-          setSelectedImage(files[currentIndex - 1]);
-        }
-      }
-    };
+  const handleCloseViewer = () => {
+    setSelectedIndex(null);
+  };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedImage, files]);
+  const handleIndexChange = (newIndex: number) => {
+    setSelectedIndex(newIndex);
+  };
 
   if (loading) {
     return (
@@ -189,16 +187,16 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
             >
               {files.map((file, index) => (
                 <div
-                  key={file}
+                  key={file.name}
                   className={
                     viewMode === "grid"
                       ? "aspect-square relative overflow-hidden rounded-lg cursor-pointer group"
                       : "break-inside-avoid relative overflow-hidden rounded-lg cursor-pointer group"
                   }
-                  onClick={() => setSelectedImage(file)}
+                  onClick={() => handleImageClick(index)}
                 >
                   <Image
-                    src={`/api/files/${encodeURIComponent(file)}`}
+                    src={file.url}
                     alt={`Image ${index + 1}`}
                     fill={viewMode === "grid"}
                     width={viewMode === "masonry" ? 400 : undefined}
@@ -217,55 +215,16 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
         </div>
       </div>
 
-      {/* Lightbox */}
-      {selectedImage && (
-        <div
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
-          onClick={() => setSelectedImage(null)}
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4 text-white hover:bg-white/10"
-            onClick={() => setSelectedImage(null)}
-          >
-            <X className="h-6 w-6" />
-          </Button>
-
-          <a
-            href={`/api/files/${encodeURIComponent(selectedImage)}`}
-            download
-            onClick={(e) => e.stopPropagation()}
-            className="absolute top-4 right-16"
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/10"
-            >
-              <Download className="h-5 w-5" />
-            </Button>
-          </a>
-
-          <div
-            className="relative max-w-[90vw] max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Image
-              src={`/api/files/${encodeURIComponent(selectedImage)}`}
-              alt=""
-              width={1200}
-              height={800}
-              className="max-w-full max-h-[90vh] object-contain"
-            />
-          </div>
-
-          {/* Navigation hints */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-sm">
-            Utilisez les flèches ← → pour naviguer • Échap pour fermer
-          </div>
-        </div>
-      )}
+      {/* Image Viewer */}
+      <PublicImageViewer
+        items={files.map(file => ({
+          ...file,
+          album: album ? { name: album.name, slug: album.publicSlug || '' } : undefined,
+        }))}
+        index={selectedIndex}
+        onClose={handleCloseViewer}
+        onIndexChange={handleIndexChange}
+      />
     </>
   );
 }

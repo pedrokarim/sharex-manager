@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { FolderOpen, Images, Search } from "lucide-react";
+import { FolderOpen, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/loading";
+import { AlbumStackCard } from "@/components/catalog/album-stack-card";
 import type { Album } from "@/types/albums";
 
 interface CatalogData {
@@ -47,8 +47,8 @@ export function CatalogAlbumsPage() {
 
   if (loading) {
     return (
-      <div className="pt-24">
-        <Loading fullHeight />
+      <div className="pt-24 min-h-[calc(100vh-6rem)] flex items-center justify-center">
+        <Loading />
       </div>
     );
   }
@@ -100,7 +100,7 @@ export function CatalogAlbumsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredAlbums.map((album) => (
-              <AlbumCard key={album.id} album={album} />
+              <AlbumStackCard key={album.id} album={album} />
             ))}
           </div>
         )}
@@ -108,76 +108,3 @@ export function CatalogAlbumsPage() {
     </div>
   );
 }
-
-function AlbumCard({ album }: { album: Album & { coverImages?: string[] } }) {
-  const hasImages = album.coverImages && album.coverImages.length > 0;
-
-  return (
-    <Link href={`/catalog/albums/${album.publicSlug}`}>
-      <article className="group relative overflow-hidden rounded-xl bg-card border border-border/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
-        {/* Image */}
-        <div className="aspect-[4/3] relative overflow-hidden bg-gradient-to-br from-muted to-muted/50">
-          {hasImages ? (
-            album.coverImages!.length === 1 ? (
-              <Image
-                src={`/api/files/${encodeURIComponent(album.coverImages![0])}`}
-                alt={album.name}
-                fill
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
-              />
-            ) : (
-              <div className="grid grid-cols-2 grid-rows-2 h-full gap-px bg-border/20">
-                {[0, 1, 2, 3].map((index) => {
-                  const image = album.coverImages?.[index];
-                  if (image) {
-                    return (
-                      <div key={index} className="relative overflow-hidden">
-                        <Image
-                          src={`/api/files/${encodeURIComponent(image)}`}
-                          alt=""
-                          fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      </div>
-                    );
-                  }
-                  return (
-                    <div
-                      key={index}
-                      className="bg-muted/50 flex items-center justify-center"
-                    >
-                      <FolderOpen className="h-4 w-4 text-muted-foreground/20" />
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <FolderOpen className="h-12 w-12 text-muted-foreground/20" />
-            </div>
-          )}
-        </div>
-
-        {/* Content */}
-        <div className="p-4">
-          <h3 className="font-semibold truncate group-hover:text-primary transition-colors">
-            {album.name}
-          </h3>
-          {album.description && (
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-              {album.description}
-            </p>
-          )}
-          <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-            <Images className="h-3.5 w-3.5" />
-            <span>
-              {album.fileCount} {album.fileCount === 1 ? "image" : "images"}
-            </span>
-          </div>
-        </div>
-      </article>
-    </Link>
-  );
-}
-
