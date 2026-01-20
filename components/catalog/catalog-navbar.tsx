@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   LayoutDashboard,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -60,7 +61,7 @@ export function CatalogNavbar() {
             )}
           >
             <img
-              src="/images/logo-sxm-simple.png"
+              src="/images/logo-sxm-catalog.png"
               alt="SXM"
               className="h-8 w-8"
             />
@@ -95,7 +96,22 @@ export function CatalogNavbar() {
           </div>
 
           {/* CTA Button */}
-          <div className="hidden md:block">
+          <div className="hidden md:flex items-center gap-2">
+            <Link href="/">
+              <Button
+                variant={useTransparentStyle ? "secondary" : "outline"}
+                size="sm"
+                className={cn(
+                  "rounded-full px-5 transition-all duration-300 gap-2",
+                  useTransparentStyle &&
+                    "bg-white/10 hover:bg-white/20 text-white border-0"
+                )}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Retour à l&apos;accueil
+              </Button>
+            </Link>
+
             <Link href={session?.user ? "/gallery" : "/login"}>
               <Button
                 variant={useTransparentStyle ? "secondary" : "default"}
@@ -184,6 +200,20 @@ export function CatalogNavbar() {
                 ) : (
                   "Connexion"
                 )}
+              </Button>
+            </Link>
+
+            <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="block">
+              <Button
+                variant={useTransparentStyle ? "secondary" : "outline"}
+                className={cn(
+                  "w-full rounded-lg gap-2",
+                  useTransparentStyle &&
+                    "bg-white/10 hover:bg-white/20 text-white border-0"
+                )}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Retour à l&apos;accueil
               </Button>
             </Link>
           </div>

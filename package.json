@@ -82,7 +82,7 @@
     "date-fns-tz": "^3.2.0",
     "drizzle-orm": "^0.44.7",
     "embla-carousel-react": "^8.6.0",
-    "framer-motion": "^12.23.24",
+    "framer-motion": "^12.27.3",
     "idb-keyval": "^6.2.2",
     "input-otp": "^1.4.2",
     "jotai": "^2.15.1",

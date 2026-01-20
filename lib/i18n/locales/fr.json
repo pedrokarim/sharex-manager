@@ -518,6 +518,32 @@
   "home": {
     "title": "ShareX Manager",
     "subtitle": "Gérez vos captures d'écran et images avec facilité",
+    "new": {
+      "features_eyebrow": "Pourquoi ShareX Manager",
+      "features_title": "Tout pour gérer vos uploads",
+      "features_subtitle": "Une interface moderne, rapide et configurable, pensée pour votre workflow.",
+      "code_eyebrow": "Style Tailwind",
+      "code_window_title": "Exemple de configuration",
+      "code_tab_sharex": "ShareX",
+      "code_tab_curl": "cURL",
+      "code_copy_sharex": "Copier la config ShareX",
+      "code_copy_curl": "Copier la commande cURL",
+      "showcase_eyebrow": "Aperçu",
+      "showcase_aria_label": "Aperçu de l’interface",
+      "showcase_title": "Un aperçu de l’expérience",
+      "showcase_subtitle": "Des écrans et états UI, pour un rendu propre en clair comme en sombre.",
+      "tools_all_title": "Tous les outils",
+      "tools_all_description": "Explorez l’ensemble des outils et fonctionnalités bonus.",
+      "coming_soon_title": "Plus d’outils",
+      "coming_soon_description": "De nouvelles fonctionnalités arrivent bientôt pour booster votre workflow.",
+      "coming_soon_badge": "Bientôt",
+      "available_badge": "Disponible",
+      "cta_title": "Prêt à centraliser vos uploads ?",
+      "cta_subtitle": "Galerie, sécurité, organisation et outils — avec un thème qui vous ressemble.",
+      "stats_uploads": "Uploads",
+      "stats_storage": "Stockage",
+      "stats_modules": "Modules"
+    },
     "cta": {
       "gallery": "Voir ma galerie",
       "configure": "Configurer ShareX"
@@ -570,6 +596,47 @@
       },
       "download_config": "Télécharger la config",
       "get_api_key": "Obtenir une clé API"
+    }
+  },
+  "branding": {
+    "title": "Branding",
+    "hero": {
+      "title": "Identité visuelle ShareX Manager"
+    },
+    "subtitle": "Logos, palette et composants — compatibles avec vos thèmes personnalisés.",
+    "logo": {
+      "title": "Logo",
+      "description": "Nos logos officiels pour différents usages.",
+      "primary": "Logo principal",
+      "simplified": "Logo simplifié",
+      "svg": "Logo SVG",
+      "download": "Télécharger"
+    },
+    "colors": {
+      "title": "Palette de couleurs",
+      "description": "Les couleurs affichées ici suivent le thème de l’utilisateur (aucune couleur hardcodée).",
+      "groups": {
+        "main": "Couleurs principales",
+        "background": "Arrière-plans",
+        "text": "Texte",
+        "ui": "Interface"
+      }
+    },
+    "typography": {
+      "title": "Typographie",
+      "description": "Hiérarchie, styles et exemples de texte."
+    },
+    "components": {
+      "title": "Composants",
+      "description": "Exemples de composants UI cohérents avec le thème."
+    },
+    "assets": {
+      "title": "Téléchargements",
+      "description": "Téléchargez les assets essentiels pour vos projets.",
+      "download_kit": "Kit (bientôt)",
+      "download_logo_png": "Logo (PNG)",
+      "download_logo_simple_png": "Logo simple (PNG)",
+      "download_logo_svg": "Logo (SVG)"
     }
   },
   "loading": {

@@ -502,6 +502,32 @@
   "home": {
     "title": "ShareX Manager",
     "subtitle": "Manage your screenshots and images with ease",
+    "new": {
+      "features_eyebrow": "Why ShareX Manager",
+      "features_title": "Everything to manage your uploads",
+      "features_subtitle": "A modern, fast and customizable interface, built for your workflow.",
+      "code_eyebrow": "Tailwind-style",
+      "code_window_title": "Configuration example",
+      "code_tab_sharex": "ShareX",
+      "code_tab_curl": "cURL",
+      "code_copy_sharex": "Copy ShareX config",
+      "code_copy_curl": "Copy cURL command",
+      "showcase_eyebrow": "Preview",
+      "showcase_aria_label": "UI preview",
+      "showcase_title": "A glimpse of the experience",
+      "showcase_subtitle": "Screens and UI states — clean in light and dark.",
+      "tools_all_title": "All tools",
+      "tools_all_description": "Explore all tools and bonus features.",
+      "coming_soon_title": "More tools",
+      "coming_soon_description": "New features are coming soon to boost your workflow.",
+      "coming_soon_badge": "Coming soon",
+      "available_badge": "Available",
+      "cta_title": "Ready to centralize your uploads?",
+      "cta_subtitle": "Gallery, security, organization and tools — with a theme that fits you.",
+      "stats_uploads": "Uploads",
+      "stats_storage": "Storage",
+      "stats_modules": "Modules"
+    },
     "cta": {
       "gallery": "View my gallery",
       "configure": "Configure ShareX"
@@ -607,6 +633,32 @@
   "home": {
     "title": "ShareX Manager",
     "subtitle": "A modern and powerful interface to manage your screenshots and files uploaded via ShareX",
+    "new": {
+      "features_eyebrow": "Why ShareX Manager",
+      "features_title": "Everything to manage your uploads",
+      "features_subtitle": "A modern, fast and customizable interface, built for your workflow.",
+      "code_eyebrow": "Tailwind-style",
+      "code_window_title": "Configuration example",
+      "code_tab_sharex": "ShareX",
+      "code_tab_curl": "cURL",
+      "code_copy_sharex": "Copy ShareX config",
+      "code_copy_curl": "Copy cURL command",
+      "showcase_eyebrow": "Preview",
+      "showcase_aria_label": "UI preview",
+      "showcase_title": "A glimpse of the experience",
+      "showcase_subtitle": "Screens and UI states — clean in light and dark.",
+      "tools_all_title": "All tools",
+      "tools_all_description": "Explore all tools and bonus features.",
+      "coming_soon_title": "More tools",
+      "coming_soon_description": "New features are coming soon to boost your workflow.",
+      "coming_soon_badge": "Coming soon",
+      "available_badge": "Available",
+      "cta_title": "Ready to centralize your uploads?",
+      "cta_subtitle": "Gallery, security, organization and tools — with a theme that fits you.",
+      "stats_uploads": "Uploads",
+      "stats_storage": "Storage",
+      "stats_modules": "Modules"
+    },
     "cta": {
       "gallery": "Access Gallery",
       "configure": "Configure ShareX"
@@ -648,6 +700,47 @@
       },
       "download_config": "Download configuration",
       "get_api_key": "Get API key"
+    }
+  },
+  "branding": {
+    "title": "Branding",
+    "hero": {
+      "title": "ShareX Manager visual identity"
+    },
+    "subtitle": "Logos, palette and components — compatible with your custom themes.",
+    "logo": {
+      "title": "Logo",
+      "description": "Official logos for different uses.",
+      "primary": "Primary logo",
+      "simplified": "Simplified logo",
+      "svg": "SVG logo",
+      "download": "Download"
+    },
+    "colors": {
+      "title": "Color palette",
+      "description": "Colors below follow the user's theme (no hard-coded colors).",
+      "groups": {
+        "main": "Main colors",
+        "background": "Backgrounds",
+        "text": "Text",
+        "ui": "UI"
+      }
+    },
+    "typography": {
+      "title": "Typography",
+      "description": "Hierarchy, styles and text examples."
+    },
+    "components": {
+      "title": "Components",
+      "description": "UI components examples that follow the theme."
+    },
+    "assets": {
+      "title": "Downloads",
+      "description": "Download the essential assets for your projects.",
+      "download_kit": "Kit (soon)",
+      "download_logo_png": "Logo (PNG)",
+      "download_logo_simple_png": "Simple logo (PNG)",
+      "download_logo_svg": "Logo (SVG)"
     }
   },
   "layout": {

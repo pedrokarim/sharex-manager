@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode, Suspense } from "react";
 import { TranslationProvider } from "./providers/TranslationProvider";
 import { ChatProvider } from "@/hooks/use-chat-context";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -28,7 +29,9 @@ export function Providers({ children }: { children: ReactNode }) {
           <NuqsAdapter>
             <ThemeProvider>
               <TranslationProvider>
-                <SessionProvider>{children}</SessionProvider>
+                <SessionProvider>
+                  <TooltipProvider delayDuration={150}>{children}</TooltipProvider>
+                </SessionProvider>
               </TranslationProvider>
             </ThemeProvider>
           </NuqsAdapter>

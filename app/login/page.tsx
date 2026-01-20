@@ -1,4 +1,4 @@
-import { Image } from "lucide-react";
+import Image from "next/image";
 
 import { LoginForm } from "@/components/login-form";
 
@@ -22,7 +22,14 @@ export default function LoginPage() {
         <div className="relative z-10 flex justify-center gap-2 md:justify-start">
           <a href="/" className="flex items-center gap-2 font-medium">
             <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Image className="size-4" />
+              <Image
+                src="/images/logo-sxm-simple.png"
+                alt="ShareX Manager"
+                width={16}
+                height={16}
+                className="h-4 w-4"
+                priority
+              />
             </div>
             ShareX Manager
           </a>
