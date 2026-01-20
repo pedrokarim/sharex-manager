@@ -6,6 +6,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { ArrowLeft, Grid2X2, Images, List } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Images } from "lucide-react";
 import { Loading } from "@/components/ui/loading";
@@ -19,25 +19,48 @@ interface GalleryImage {
 export function CatalogGalleryPage() {
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [total, setTotal] = useState<number | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const dedupeByName = (items: GalleryImage[]) => {
+    const map = new Map<string, GalleryImage>();
+    for (const item of items) {
+      if (!map.has(item.name)) map.set(item.name, item);
+    }
+    return Array.from(map.values());
+  };
+
+  const fetchPage = async (offset: number) => {
+    const response = await fetch(
+      `/api/public/catalog?images=true&imagesLimit=60&imagesOffset=${offset}`,
+    );
+    if (!response.ok) throw new Error("Impossible de charger la galerie");
+    return response.json();
+  };
 
   useEffect(() => {
     const fetchGallery = async () => {
       try {
-        const response = await fetch("/api/public/catalog?randomImages=100");
-        if (response.ok) {
-          const data = await response.json();
-          const galleryImages: GalleryImage[] = (data.heroImages || []).map((item: any) => ({
-            name: item.name,
-            url: `/api/files/${encodeURIComponent(item.name)}`,
-            addedAt: item.addedAt,
-            album: item.albumSlug ? {
-              name: item.albumName,
-              slug: item.albumSlug,
-            } : undefined,
-          }));
-          setImages(galleryImages);
-        }
+        const data = await fetchPage(0);
+        const pageImages: GalleryImage[] = (data.images || []).map((item: any) => ({
+          name: item.name,
+          url: `/api/files/${encodeURIComponent(item.name)}`,
+          addedAt: item.addedAt,
+          album: item.albumSlug
+            ? {
+                name: item.albumName,
+                slug: item.albumSlug,
+              }
+            : undefined,
+        }));
+        setImages(dedupeByName(pageImages));
+        setHasMore(Boolean(data.imagesHasMore));
+        setNextOffset(typeof data.imagesNextOffset === "number" ? data.imagesNextOffset : pageImages.length);
+        setTotal(typeof data.imagesTotal === "number" ? data.imagesTotal : null);
       } catch (error) {
         console.error("Erreur:", error);
       } finally {
@@ -47,6 +70,50 @@ export function CatalogGalleryPage() {
 
     fetchGallery();
   }, []);
+
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    if (!hasMore) return;
+
+    const el = sentinelRef.current;
+    const observer = new IntersectionObserver(
+      async (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting) return;
+        if (loading || loadingMore || !hasMore) return;
+
+        setLoadingMore(true);
+        try {
+          const data = await fetchPage(nextOffset);
+          const pageImages: GalleryImage[] = (data.images || []).map((item: any) => ({
+            name: item.name,
+            url: `/api/files/${encodeURIComponent(item.name)}`,
+            addedAt: item.addedAt,
+            album: item.albumSlug
+              ? {
+                  name: item.albumName,
+                  slug: item.albumSlug,
+                }
+              : undefined,
+          }));
+
+          setImages((prev) => dedupeByName([...prev, ...pageImages]));
+          setHasMore(Boolean(data.imagesHasMore));
+          setNextOffset(typeof data.imagesNextOffset === "number" ? data.imagesNextOffset : nextOffset + pageImages.length);
+          setTotal(typeof data.imagesTotal === "number" ? data.imagesTotal : total);
+        } catch (error) {
+          console.error("Erreur:", error);
+          setHasMore(false);
+        } finally {
+          setLoadingMore(false);
+        }
+      },
+      { root: null, rootMargin: "800px 0px", threshold: 0 },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, nextOffset, total]);
 
   const handleImageClick = (index: number) => {
     setSelectedIndex(index);
@@ -111,6 +178,26 @@ export function CatalogGalleryPage() {
               ))}
             </div>
           )}
+
+          {/* Infinite scroll sentinel */}
+          {images.length > 0 && hasMore ? (
+            <div className="pt-10 flex justify-center">
+              <div ref={sentinelRef} className="h-10 w-full" aria-hidden />
+            </div>
+          ) : null}
+
+          {loadingMore ? (
+            <div className="py-10 flex items-center justify-center">
+              <Loading />
+            </div>
+          ) : null}
+
+          {!loading && !loadingMore && images.length > 0 && !hasMore ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              Fin de la galerie
+              {typeof total === "number" ? ` — ${images.length}/${total} images chargées` : null}
+            </div>
+          ) : null}
         </div>
       </div>
 
