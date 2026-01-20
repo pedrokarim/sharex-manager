@@ -18,7 +18,7 @@ interface CodePreviewSectionProps {
 }
 
 export const CodePreviewSection = ({
-  eyebrow = "Style Tailwind",
+  eyebrow = "Style ShareXManager",
   title,
   subtitle,
   apiBaseUrl,

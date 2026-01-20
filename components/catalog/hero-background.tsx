@@ -43,7 +43,7 @@ export function HeroBackground({
     <div className="absolute inset-0 overflow-hidden">
       {images.map((image, index) => (
         <div
-          key={image}
+          key={`${image}-${index}`}
           className={cn(
             "absolute inset-0 transition-opacity duration-1000",
             index === currentIndex ? "opacity-100" : "opacity-0"

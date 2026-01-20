@@ -14,15 +14,20 @@ export async function GET(request: NextRequest) {
     const publicAlbums = allAlbums.filter((album) => album.isPublic);
 
     // Si on veut des images aléatoires pour le hero
-    let heroImages: string[] = [];
+    let heroImages: Array<{ name: string; addedAt: string; albumSlug: string; albumName: string }> = [];
     if (randomImages > 0) {
-      const allImages: string[] = [];
+      const allImages: Array<{ name: string; addedAt: string; albumSlug: string; albumName: string }> = [];
 
       for (const album of publicAlbums) {
-        const files = albumsDb.getAlbumFiles(album.id);
-        const images = files.filter((fileName) =>
-          /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName)
-        );
+        const fileEntries = albumsDb.getAlbumFileEntries(album.id);
+        const images = fileEntries
+          .filter((entry) => /\.(jpg|jpeg|png|gif|webp)$/i.test(entry.fileName))
+          .map((entry) => ({
+            name: entry.fileName,
+            addedAt: entry.addedAt,
+            albumSlug: album.publicSlug || '',
+            albumName: album.name,
+          }));
         allImages.push(...images);
       }
 

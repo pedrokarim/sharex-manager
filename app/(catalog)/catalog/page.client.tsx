@@ -2,16 +2,21 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight, FolderOpen, Images, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HeroBackground } from "@/components/catalog/hero-background";
 import { Loading } from "@/components/ui/loading";
+import { AlbumStackCard } from "@/components/catalog/album-stack-card";
 import type { Album } from "@/types/albums";
 
 interface CatalogData {
   albums: (Album & { coverImages?: string[] })[];
-  heroImages: string[];
+  heroImages: Array<{
+    name: string;
+    addedAt?: string;
+    albumSlug?: string;
+    albumName?: string;
+  }>;
   total: number;
 }
 
@@ -40,14 +45,14 @@ export function CatalogLanding() {
   }, []);
 
   if (loading) {
-    return <Loading fullHeight />;
+    return <Loading fullScreen />;
   }
 
   return (
     <div className="relative">
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        <HeroBackground images={data?.heroImages || []} />
+        <HeroBackground images={(data?.heroImages || []).map((img) => img.name)} />
 
         <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="max-w-4xl mx-auto space-y-8">
@@ -150,7 +155,7 @@ export function CatalogLanding() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
               {data.albums.map((album) => (
-                <AlbumCard key={album.id} album={album} />
+                <AlbumStackCard key={album.id} album={album} />
               ))}
             </div>
 
@@ -166,80 +171,5 @@ export function CatalogLanding() {
         </section>
       )}
     </div>
-  );
-}
-
-function AlbumCard({ album }: { album: Album & { coverImages?: string[] } }) {
-  const hasImages = album.coverImages && album.coverImages.length > 0;
-
-  return (
-    <Link href={`/catalog/albums/${album.publicSlug}`}>
-      <article className="group relative overflow-hidden rounded-2xl bg-card border border-border/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 hover:-translate-y-1">
-        {/* Image Grid */}
-        <div className="aspect-[4/3] relative overflow-hidden bg-gradient-to-br from-muted to-muted/50">
-          {hasImages ? (
-            album.coverImages!.length === 1 ? (
-              <Image
-                src={`/api/files/${encodeURIComponent(album.coverImages![0])}`}
-                alt={album.name}
-                fill
-                className="object-cover transition-transform duration-700 group-hover:scale-110"
-              />
-            ) : (
-              <div className="grid grid-cols-2 grid-rows-2 h-full gap-0.5">
-                {[0, 1, 2, 3].map((index) => {
-                  const image = album.coverImages?.[index];
-                  if (image) {
-                    return (
-                      <div key={index} className="relative overflow-hidden">
-                        <Image
-                          src={`/api/files/${encodeURIComponent(image)}`}
-                          alt=""
-                          fill
-                          className="object-cover transition-transform duration-700 group-hover:scale-110"
-                        />
-                      </div>
-                    );
-                  }
-                  return (
-                    <div
-                      key={index}
-                      className="bg-gradient-to-br from-muted to-muted/30 flex items-center justify-center"
-                    >
-                      <FolderOpen className="h-6 w-6 text-muted-foreground/30" />
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <FolderOpen className="h-16 w-16 text-muted-foreground/30" />
-            </div>
-          )}
-
-          {/* Overlay gradient */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-        </div>
-
-        {/* Content */}
-        <div className="p-5">
-          <h3 className="font-semibold text-lg truncate group-hover:text-primary transition-colors">
-            {album.name}
-          </h3>
-          {album.description && (
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-              {album.description}
-            </p>
-          )}
-          <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-            <Images className="h-3.5 w-3.5" />
-            <span>
-              {album.fileCount} {album.fileCount === 1 ? "image" : "images"}
-            </span>
-          </div>
-        </div>
-      </article>
-    </Link>
   );
 }

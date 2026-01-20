@@ -1,15 +1,25 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Download, Images, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Images } from "lucide-react";
 import { Loading } from "@/components/ui/loading";
+import { PublicImageViewer } from "@/components/catalog/public-image-viewer";
+
+interface GalleryImage {
+  name: string;
+  url: string;
+  addedAt?: string;
+  album?: {
+    name: string;
+    slug: string;
+  };
+}
 
 export function CatalogGalleryPage() {
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchGallery = async () => {
@@ -17,7 +27,16 @@ export function CatalogGalleryPage() {
         const response = await fetch("/api/public/catalog?randomImages=100");
         if (response.ok) {
           const data = await response.json();
-          setImages(data.heroImages || []);
+          const galleryImages: GalleryImage[] = (data.heroImages || []).map((item: any) => ({
+            name: item.name,
+            url: `/api/files/${encodeURIComponent(item.name)}`,
+            addedAt: item.addedAt,
+            album: item.albumSlug ? {
+              name: item.albumName,
+              slug: item.albumSlug,
+            } : undefined,
+          }));
+          setImages(galleryImages);
         }
       } catch (error) {
         console.error("Erreur:", error);
@@ -29,34 +48,22 @@ export function CatalogGalleryPage() {
     fetchGallery();
   }, []);
 
-  // Lightbox keyboard navigation
-  useEffect(() => {
-    if (!selectedImage) return;
+  const handleImageClick = (index: number) => {
+    setSelectedIndex(index);
+  };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setSelectedImage(null);
-      } else if (e.key === "ArrowRight") {
-        const currentIndex = images.indexOf(selectedImage);
-        if (currentIndex < images.length - 1) {
-          setSelectedImage(images[currentIndex + 1]);
-        }
-      } else if (e.key === "ArrowLeft") {
-        const currentIndex = images.indexOf(selectedImage);
-        if (currentIndex > 0) {
-          setSelectedImage(images[currentIndex - 1]);
-        }
-      }
-    };
+  const handleCloseViewer = () => {
+    setSelectedIndex(null);
+  };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedImage, images]);
+  const handleIndexChange = (newIndex: number) => {
+    setSelectedIndex(newIndex);
+  };
 
   if (loading) {
     return (
-      <div className="pt-24">
-        <Loading fullHeight />
+      <div className="pt-24 min-h-[calc(100vh-6rem)] flex items-center justify-center">
+        <Loading />
       </div>
     );
   }
@@ -86,14 +93,14 @@ export function CatalogGalleryPage() {
             </div>
           ) : (
             <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3 sm:gap-4 space-y-3 sm:space-y-4">
-              {images.map((file, index) => (
+              {images.map((image, index) => (
                 <div
-                  key={file}
+                  key={image.name}
                   className="break-inside-avoid relative overflow-hidden rounded-lg cursor-pointer group"
-                  onClick={() => setSelectedImage(file)}
+                  onClick={() => handleImageClick(index)}
                 >
                   <Image
-                    src={`/api/files/${encodeURIComponent(file)}`}
+                    src={image.url}
                     alt={`Image ${index + 1}`}
                     width={400}
                     height={300}
@@ -107,55 +114,13 @@ export function CatalogGalleryPage() {
         </div>
       </div>
 
-      {/* Lightbox */}
-      {selectedImage && (
-        <div
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
-          onClick={() => setSelectedImage(null)}
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4 text-white hover:bg-white/10"
-            onClick={() => setSelectedImage(null)}
-          >
-            <X className="h-6 w-6" />
-          </Button>
-
-          <a
-            href={`/api/files/${encodeURIComponent(selectedImage)}`}
-            download
-            onClick={(e) => e.stopPropagation()}
-            className="absolute top-4 right-16"
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/10"
-            >
-              <Download className="h-5 w-5" />
-            </Button>
-          </a>
-
-          <div
-            className="relative max-w-[90vw] max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Image
-              src={`/api/files/${encodeURIComponent(selectedImage)}`}
-              alt=""
-              width={1200}
-              height={800}
-              className="max-w-full max-h-[90vh] object-contain"
-            />
-          </div>
-
-          {/* Navigation hints */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-sm">
-            Utilisez les flèches ← → pour naviguer • Échap pour fermer
-          </div>
-        </div>
-      )}
+      {/* Image Viewer */}
+      <PublicImageViewer
+        items={images}
+        index={selectedIndex}
+        onClose={handleCloseViewer}
+        onIndexChange={handleIndexChange}
+      />
     </>
   );
 }

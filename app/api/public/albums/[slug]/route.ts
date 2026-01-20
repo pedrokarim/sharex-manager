@@ -29,8 +29,8 @@ export async function GET(
       return NextResponse.json({ error: "Album introuvable" }, { status: 404 });
     }
 
-    // Récupérer les fichiers de l'album
-    const files = albumsDb.getAlbumFiles(album.id);
+    // Récupérer les fichiers de l'album avec leurs dates d'ajout
+    const files = albumsDb.getAlbumFileEntries(album.id);
 
     logDb.createLog({
       level: "info",
