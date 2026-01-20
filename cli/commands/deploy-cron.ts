@@ -125,6 +125,9 @@ function parseArgs(args: string[]) {
     composeCommand: get("--compose-command"),
     composeFile: get("--compose-file"),
     clean: has("--no-clean") ? "false" : undefined,
+    dockerStop: has("--no-stop") ? "false" : undefined,
+    dockerBuild: has("--no-build") ? "false" : undefined,
+    dockerBuildNoCache: has("--build-no-cache") ? "true" : undefined,
   };
 }
 
@@ -153,13 +156,24 @@ export default async function deployCron(args: string[], _interactive: boolean) 
     parsed.clean ? parsed.clean === "true" : true
   );
 
-  // Commande docker compose configurable pour s'adapter aux serveurs:
-  // - "docker compose" (plugin)
-  // - "docker-compose" (legacy)
+  // On standardise sur "docker compose" (docker-compose n'existe plus sur ton serveur)
   const composeCmd =
     parsed.composeCommand ?? readEnv("DEPLOY_DOCKER_COMPOSE_COMMAND", "docker compose");
   const composeFile =
     parsed.composeFile ?? readEnv("DEPLOY_DOCKER_COMPOSE_FILE", "docker-compose.yml");
+
+  const dockerStop = readEnvBool(
+    "DEPLOY_DOCKER_STOP",
+    parsed.dockerStop ? parsed.dockerStop === "true" : true
+  );
+  const dockerBuild = readEnvBool(
+    "DEPLOY_DOCKER_BUILD",
+    parsed.dockerBuild ? parsed.dockerBuild === "true" : true
+  );
+  const dockerBuildNoCache = readEnvBool(
+    "DEPLOY_DOCKER_BUILD_NO_CACHE",
+    parsed.dockerBuildNoCache ? parsed.dockerBuildNoCache === "true" : false
+  );
 
   acquireLock(lockFile, lockStaleMinutes);
 
@@ -192,7 +206,17 @@ export default async function deployCron(args: string[], _interactive: boolean) 
     if (gitClean) shInherit(`git clean -fd`);
 
     console.log(chalk.blue(`[${nowIso()}] Rebuild & restart via Docker Compose...`));
-    shInherit(`${composeCmd} -f ${composeFile} up -d --build --remove-orphans`);
+
+    if (dockerStop) {
+      shInherit(`${composeCmd} -f ${composeFile} stop`);
+    }
+
+    if (dockerBuild) {
+      const noCacheFlag = dockerBuildNoCache ? " --no-cache" : "";
+      shInherit(`${composeCmd} -f ${composeFile} build${noCacheFlag}`);
+    }
+
+    shInherit(`${composeCmd} -f ${composeFile} up -d --remove-orphans`);
 
     console.log(chalk.green(`[${nowIso()}] Déploiement terminé (HEAD=${remoteSha}).`));
   } finally {

@@ -8,9 +8,7 @@ La commande CLI fournie est `cli/commands/deploy-cron.ts` (via `bun run deploy:c
 
 - **Git** (repo cloné sur le serveur)
 - **Bun** (pour exécuter le script)
-- **Docker** + **Docker Compose**
-  - soit `docker compose` (plugin)
-  - soit `docker-compose` (legacy)
+- **Docker** + **Docker Compose** (commande `docker compose`)
 
 ### Préparation du projet
 
@@ -59,11 +57,14 @@ Le script supporte ces variables d’environnement:
 - **`DEPLOY_GIT_CLEAN`**: si `true`, exécute `git clean -fd` après le reset (défaut: `true`)
 - **`DEPLOY_DOCKER_COMPOSE_COMMAND`**: commande compose (défaut: `docker compose`)
 - **`DEPLOY_DOCKER_COMPOSE_FILE`**: fichier compose (défaut: `docker-compose.yml`)
+- **`DEPLOY_DOCKER_STOP`**: si `true`, exécute `docker compose stop` avant rebuild (défaut: `true`)
+- **`DEPLOY_DOCKER_BUILD`**: si `true`, exécute `docker compose build` avant `up` (défaut: `true`)
+- **`DEPLOY_DOCKER_BUILD_NO_CACHE`**: si `true`, ajoute `--no-cache` au build (défaut: `false`)
 
-Exemple cron avec `docker-compose` (legacy) et une autre branche:
+Exemple cron (autre branche + build `--no-cache`):
 
 ```bash
-0 */2 * * * cd /chemin/vers/sharex-manager && DEPLOY_BRANCH=dev DEPLOY_DOCKER_COMPOSE_COMMAND=docker-compose bun run deploy:cron >> /var/log/sharex-manager-deploy.log 2>&1
+0 */2 * * * cd /chemin/vers/sharex-manager && DEPLOY_BRANCH=dev DEPLOY_DOCKER_BUILD_NO_CACHE=true bun run deploy:cron >> /var/log/sharex-manager-deploy.log 2>&1
 ```
 
 ### Comportement exact en cas de mise à jour
@@ -74,7 +75,9 @@ Si `HEAD` est différent de `origin/<branche>`:
 - `git checkout -f <branche>`
 - `git reset --hard origin/<branche>`
 - optionnel: `git clean -fd`
-- `docker compose up -d --build --remove-orphans`
+- `docker compose stop` (optionnel)
+- `docker compose build` (optionnel, avec `--no-cache` possible)
+- `docker compose up -d --remove-orphans`
 
 ### Sécurité / bonnes pratiques
 

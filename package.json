@@ -12,7 +12,7 @@
     "test:coverage": "bun --bun vitest run --coverage",
     "test:watch": "bun --bun vitest watch",
     "cli": "bun cli/index.ts",
-    "clean": "bun scripts/clean.ts",
+    "clean": "bun cli/index.ts --no-interactive -c clean",
     "deploy:cron": "bun cli/index.ts --no-interactive -c deploy-cron"
   },
   "dependencies": {
