@@ -62,8 +62,8 @@ ENV PORT=3089
 
 EXPOSE 3089
 
-# xvfb-run: starts a virtual X11 server in memory
-#   -ac             : disable X11 access control (safe in Docker)
-#   -screen 0       : screen number 0
-#   1280x1024x24    : resolution + 24-bit true color depth
-CMD ["xvfb-run", "-s", "-ac -screen 0 1280x1024x24", "node", "server.js"]
+# Start Xvfb manually then run Node.
+# xvfb-run is unreliable in Docker (stale lock files, silent failures).
+# Instead we start Xvfb in the background, wait for it, then exec node.
+ENV DISPLAY=:99
+CMD rm -f /tmp/.X99-lock && Xvfb :99 -ac -screen 0 1280x1024x24 -nolisten tcp & sleep 1 && exec node server.js
