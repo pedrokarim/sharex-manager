@@ -34,9 +34,11 @@ import {
 } from "@/components/ui/card";
 import { GridView } from "@/components/gallery/grid-view";
 import { ListView } from "@/components/gallery/list-view";
+import { FileViewer } from "@/components/gallery/file-viewer";
 import { ViewSelector } from "@/components/view-selector";
 import { useTranslation } from "@/lib/i18n";
 import { Loading } from "@/components/ui/loading";
+import { useQueryState } from "nuqs";
 import type { Album } from "@/types/albums";
 import type { FileInfo } from "@/types/files";
 
@@ -51,9 +53,18 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   const [album, setAlbum] = useState<Album | null>(null);
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isTogglingPublic, setIsTogglingPublic] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
+  const [viewMode] = useQueryState<"grid" | "list" | "details">("view", {
+    defaultValue: "grid",
+    parse: (value): "grid" | "list" | "details" => {
+      if (value === "grid" || value === "list" || value === "details") {
+        return value;
+      }
+      return "grid";
+    },
+  });
 
   const fetchAlbumData = useCallback(async () => {
     try {
@@ -64,71 +75,51 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       if (!albumResponse.ok) {
         const errorData = await albumResponse.json().catch(() => ({}));
         const errorMessage =
-          errorData.error || "Erreur lors du chargement de l'album";
+          errorData.error || t("albums.errors.loading");
 
         if (albumResponse.status === 404) {
-          toast.error("Album introuvable");
+          toast.error(t("albums.errors.not_found"));
           router.push("/albums");
           return;
         }
 
         if (albumResponse.status === 401) {
-          toast.error("Vous devez être connecté pour accéder à cet album");
           router.push("/login");
           return;
         }
 
         if (albumResponse.status === 403) {
-          toast.error("Vous n'avez pas l'autorisation d'accéder à cet album");
+          toast.error(t("albums.errors.forbidden"));
           router.push("/albums");
           return;
         }
 
         toast.error(errorMessage);
-        console.error("Erreur API:", errorMessage, albumResponse.status);
         return;
       }
 
       const albumData = await albumResponse.json();
       setAlbum(albumData);
 
-      // Récupérer les fichiers de l'album
-      const filesResponse = await fetch(`/api/albums/${albumId}/files`);
+      // Récupérer les fichiers avec les détails complets
+      const filesResponse = await fetch(
+        `/api/albums/${albumId}/files?details=true`
+      );
       if (!filesResponse.ok) {
         const errorData = await filesResponse.json().catch(() => ({}));
-        const errorMessage =
-          errorData.error || "Erreur lors du chargement des fichiers";
-        toast.error(errorMessage);
-        console.error("Erreur lors du chargement des fichiers:", errorMessage);
+        toast.error(errorData.error || t("albums.errors.loading_files"));
         return;
       }
 
       const filesData = await filesResponse.json();
-
-      // Transformer les noms de fichiers en objets FileInfo
-      // Pour l'instant, on simule les données FileInfo
-      // TODO: Implémenter une vraie API qui retourne les FileInfo complets
-      const fileInfos: FileInfo[] = filesData.files.map((fileName: string) => ({
-        name: fileName,
-        url: `/api/files/${encodeURIComponent(fileName)}`,
-        size: 0, // TODO: Récupérer la vraie taille
-        createdAt: new Date().toISOString(), // TODO: Récupérer la vraie date
-        isSecure: false, // TODO: Récupérer le vrai statut
-        isStarred: false, // TODO: Récupérer le vrai statut
-      }));
-
-      setFiles(fileInfos);
+      setFiles(filesData.files);
     } catch (error) {
       console.error("Erreur lors du chargement de l'album:", error);
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error("Erreur lors du chargement de l'album");
-      }
+      toast.error(t("albums.errors.loading"));
     } finally {
       setLoading(false);
     }
-  }, [albumId, router]);
+  }, [albumId, router, t]);
 
   useEffect(() => {
     fetchAlbumData();
@@ -145,14 +136,13 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la suppression du fichier de l'album");
+        throw new Error();
       }
 
-      setFiles(files.filter((file) => file.name !== fileName));
-      toast.success("Fichier retiré de l'album");
-    } catch (error) {
-      console.error("Erreur:", error);
-      toast.error("Erreur lors de la suppression du fichier de l'album");
+      setFiles((prev) => prev.filter((file) => file.name !== fileName));
+      toast.success(t("albums.file_removed"));
+    } catch {
+      toast.error(t("albums.errors.remove_file"));
     }
   };
 
@@ -163,14 +153,13 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la suppression de l'album");
+        throw new Error();
       }
 
-      toast.success("Album supprimé avec succès");
+      toast.success(t("albums.deleted"));
       router.push("/albums");
-    } catch (error) {
-      console.error("Erreur:", error);
-      toast.error("Erreur lors de la suppression de l'album");
+    } catch {
+      toast.error(t("albums.errors.delete"));
     }
   };
 
@@ -188,19 +177,18 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la mise à jour");
+        throw new Error();
       }
 
       const updatedAlbum = await response.json();
       setAlbum(updatedAlbum);
       toast.success(
         updatedAlbum.isPublic
-          ? "Album rendu public avec succès"
-          : "Album rendu privé avec succès"
+          ? t("albums.now_public")
+          : t("albums.now_private")
       );
-    } catch (error) {
-      console.error("Erreur:", error);
-      toast.error("Erreur lors de la mise à jour de la visibilité");
+    } catch {
+      toast.error(t("albums.errors.toggle_visibility"));
     } finally {
       setIsTogglingPublic(false);
     }
@@ -213,12 +201,109 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     try {
       await navigator.clipboard.writeText(publicUrl);
       setCopiedUrl(true);
-      toast.success("URL publique copiée dans le presse-papiers");
+      toast.success(t("albums.url_copied"));
       setTimeout(() => setCopiedUrl(false), 2000);
-    } catch (error) {
-      console.error("Erreur lors de la copie:", error);
-      toast.error("Erreur lors de la copie de l'URL");
+    } catch {
+      toast.error(t("albums.errors.copy_url"));
     }
+  };
+
+  const copyToClipboard = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(t("gallery.file_actions.copy_url"));
+    } catch {
+      toast.error(t("gallery.file_actions.copy_error"));
+    }
+  };
+
+  const handleToggleSecurity = async (file: FileInfo) => {
+    try {
+      const formData = new FormData();
+      formData.append("isSecure", (!file.isSecure).toString());
+
+      const response = await fetch(
+        `/api/files?filename=${encodeURIComponent(file.name)}`,
+        {
+          method: "PUT",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) throw new Error();
+
+      const data = await response.json();
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.name === file.name ? { ...f, isSecure: data.isSecure } : f
+        )
+      );
+
+      toast.success(
+        file.isSecure
+          ? t("gallery.file_actions.now_public")
+          : t("gallery.file_actions.now_private")
+      );
+    } catch {
+      toast.error(t("gallery.file_actions.error_occurred"));
+    }
+  };
+
+  const handleToggleStar = async (file: FileInfo) => {
+    try {
+      const formData = new FormData();
+      formData.append("isStarred", (!file.isStarred).toString());
+
+      const response = await fetch(
+        `/api/files/${encodeURIComponent(file.name)}/star`,
+        {
+          method: "PUT",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) throw new Error();
+
+      const data = await response.json();
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.name === file.name ? { ...f, isStarred: data.isStarred } : f
+        )
+      );
+
+      toast.success(
+        file.isStarred
+          ? t("gallery.file_actions.removed_from_favorites")
+          : t("gallery.file_actions.added_to_favorites")
+      );
+    } catch {
+      toast.error(t("gallery.file_actions.error_occurred"));
+    }
+  };
+
+  // Navigation dans le FileViewer
+  const findCurrentFileIndex = () => {
+    if (!selectedFile) return -1;
+    return files.findIndex((f) => f.name === selectedFile.name);
+  };
+
+  const handlePrevious = () => {
+    const currentIndex = findCurrentFileIndex();
+    if (currentIndex > 0) {
+      setSelectedFile(files[currentIndex - 1]);
+    }
+  };
+
+  const handleNext = () => {
+    const currentIndex = findCurrentFileIndex();
+    if (currentIndex < files.length - 1) {
+      setSelectedFile(files[currentIndex + 1]);
+    }
+  };
+
+  const handleDeleteFile = async (filename: string) => {
+    await handleRemoveFromAlbum(filename);
+    setSelectedFile(null);
   };
 
   if (loading) {
@@ -295,12 +380,12 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
                 {album.isPublic ? (
                   <>
                     <GlobeLock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    Rendre privé
+                    {t("albums.make_private")}
                   </>
                 ) : (
                   <>
                     <Globe className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    Rendre public
+                    {t("albums.make_public")}
                   </>
                 )}
               </DropdownMenuItem>
@@ -314,12 +399,12 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
                     {copiedUrl ? (
                       <>
                         <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                        URL copiée
+                        {t("albums.url_copied")}
                       </>
                     ) : (
                       <>
                         <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                        Copier l'URL publique
+                        {t("albums.copy_public_url")}
                       </>
                     )}
                   </DropdownMenuItem>
@@ -333,7 +418,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
                     className="text-sm"
                   >
                     <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    Ouvrir dans un nouvel onglet
+                    {t("albums.open_new_tab")}
                   </DropdownMenuItem>
                 </>
               )}
@@ -343,24 +428,10 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 sm:h-9 sm:w-9"
-          >
-            <Edit2 className="h-3 w-3 sm:h-4 sm:w-4" />
-          </Button>
-
-          <Button
-            variant="outline"
-            size="icon"
             onClick={handleDeleteAlbum}
             className="h-8 w-8 sm:h-9 sm:w-9 text-destructive hover:bg-destructive hover:text-destructive-foreground"
           >
             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-          </Button>
-
-          <Button className="text-xs sm:text-sm h-8 sm:h-9">
-            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-            <span className="hidden sm:inline">Ajouter des fichiers</span>
-            <span className="sm:hidden">Ajouter</span>
           </Button>
         </div>
       </div>
@@ -371,17 +442,17 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           <CardHeader>
             <CardTitle className="text-base sm:text-lg flex items-center gap-2">
               <Globe className="h-4 w-4 sm:h-5 sm:w-5" />
-              Album public
+              {t("albums.public_album")}
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              Cet album est accessible publiquement via l'URL ci-dessous
+              {t("albums.public_album_description")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="space-y-2">
                 <Label htmlFor="public-url" className="text-xs sm:text-sm">
-                  URL publique
+                  {t("albums.public_url")}
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -433,42 +504,54 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
             <Plus className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-base sm:text-lg font-semibold">Album vide</h3>
+            <h3 className="text-base sm:text-lg font-semibold">
+              {t("albums.empty_album")}
+            </h3>
             <p className="text-xs sm:text-sm text-muted-foreground max-w-md">
-              Cet album ne contient aucun fichier. Ajoutez des fichiers depuis
-              la galerie ou utilisez le bouton "Ajouter des fichiers".
+              {t("albums.empty_album_description")}
             </p>
-            <Button className="mt-3 sm:mt-4 text-sm">
-              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-              Ajouter des fichiers
-            </Button>
           </div>
         </div>
       ) : (
         <div>
-          {viewMode === "grid" ? (
+          {!viewMode || viewMode === "grid" ? (
             <GridView
               files={files}
-              onCopy={() => {}} // TODO: Implémenter
+              onCopy={copyToClipboard}
               onDelete={handleRemoveFromAlbum}
-              onSelect={() => {}} // TODO: Implémenter
-              onToggleSecurity={() => Promise.resolve()} // TODO: Implémenter
-              onToggleStar={() => Promise.resolve()} // TODO: Implémenter
+              onSelect={setSelectedFile}
+              onToggleSecurity={handleToggleSecurity}
+              onToggleStar={handleToggleStar}
               newFileIds={[]}
             />
           ) : (
             <ListView
               files={files}
-              onCopy={() => {}} // TODO: Implémenter
+              onCopy={copyToClipboard}
               onDelete={handleRemoveFromAlbum}
-              onSelect={() => {}} // TODO: Implémenter
-              onToggleSecurity={() => Promise.resolve()} // TODO: Implémenter
-              onToggleStar={() => Promise.resolve()} // TODO: Implémenter
+              onSelect={setSelectedFile}
+              onToggleSecurity={handleToggleSecurity}
+              onToggleStar={handleToggleStar}
+              detailed={viewMode === "details"}
               newFileIds={[]}
             />
           )}
         </div>
       )}
+
+      {/* Visionneuse de fichiers */}
+      <FileViewer
+        file={selectedFile}
+        onClose={() => setSelectedFile(null)}
+        onDelete={handleDeleteFile}
+        onCopy={copyToClipboard}
+        onToggleSecurity={handleToggleSecurity}
+        onToggleStar={handleToggleStar}
+        onPrevious={handlePrevious}
+        onNext={handleNext}
+        hasPrevious={findCurrentFileIndex() > 0}
+        hasNext={findCurrentFileIndex() < files.length - 1}
+      />
     </div>
   );
 }

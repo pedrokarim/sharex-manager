@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import {
-  apiModuleManager,
-  initApiModuleManager,
-} from "@/lib/modules/module-manager.api";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 
@@ -21,8 +18,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Initialiser le gestionnaire de modules API
-    await initApiModuleManager();
+    await apiModuleManager.ensureInitialized();
 
     // Récupérer la liste des modules
     const modules = await apiModuleManager.getModules();

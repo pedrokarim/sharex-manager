@@ -4,6 +4,11 @@ import { albumsDb } from "@/lib/utils/albums-db";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 import { z } from "zod";
+import { stat } from "fs/promises";
+import { join } from "path";
+import { getAbsoluteUploadPath } from "@/lib/config";
+import { isFileSecure } from "@/lib/secure-files";
+import { isFileStarred } from "@/lib/starred-files";
 
 const IdSchema = z.coerce.number().int().positive();
 
@@ -51,7 +56,36 @@ export async function GET(
       return NextResponse.json({ error: "Accès interdit" }, { status: 403 });
     }
 
-    const files = albumsDb.getAlbumFiles(albumId);
+    const fileNames = albumsDb.getAlbumFiles(albumId);
+    const details = request.nextUrl.searchParams.get("details") === "true";
+
+    let files: any = fileNames;
+
+    if (details) {
+      const uploadsDir = getAbsoluteUploadPath();
+      files = await Promise.all(
+        fileNames.map(async (fileName) => {
+          try {
+            const filePath = join(uploadsDir, fileName);
+            const stats = await stat(filePath);
+            const secure = await isFileSecure(fileName);
+            const starred = await isFileStarred(fileName);
+            return {
+              name: fileName,
+              url: `/api/files/${encodeURIComponent(fileName)}`,
+              size: stats.size,
+              createdAt: stats.mtime.toISOString(),
+              isSecure: secure,
+              isStarred: starred,
+            };
+          } catch {
+            // Le fichier n'existe plus sur le disque
+            return null;
+          }
+        })
+      );
+      files = files.filter((f: any) => f !== null);
+    }
 
     logDb.createLog({
       level: "info",
@@ -62,7 +96,7 @@ export async function GET(
       metadata: {
         albumId,
         albumName: album.name,
-        fileCount: files.length,
+        fileCount: Array.isArray(files) ? files.length : 0,
       },
     });
 

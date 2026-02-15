@@ -1,0 +1,19 @@
+{
+  "name": "minecraft-skin-api",
+  "version": "1.0.0",
+  "description": "Standalone Minecraft skin rendering microservice (3D body, 2D head, cape, full skin). Extracted from Ascencia project.",
+  "main": "server.js",
+  "private": true,
+  "engines": {
+    "node": ">=13.0.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "node-canvas-webgl": "^0.2.6",
+    "node-fetch": "^2.6.1",
+    "three": "0.124.0"
+  }
+}

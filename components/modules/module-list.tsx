@@ -1,14 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ModuleConfig } from "@/types/modules";
 import { ModuleCard } from "./module-card";
 import { ModuleUpload } from "./module-upload";
 import { toast } from "sonner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty";
+import { Puzzle, RefreshCw } from "lucide-react";
 
 export const ModuleList = () => {
   const [modules, setModules] = useState<ModuleConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchModules = async () => {
     try {
@@ -29,6 +42,12 @@ export const ModuleList = () => {
     }
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchModules();
+    setIsRefreshing(false);
+  };
+
   useEffect(() => {
     fetchModules();
   }, []);
@@ -43,7 +62,6 @@ export const ModuleList = () => {
         throw new Error("Erreur lors de l'activation/désactivation du module");
       }
 
-      // Mettre à jour l'état local
       if (Array.isArray(modules)) {
         setModules(
           modules.map((module) =>
@@ -53,7 +71,6 @@ export const ModuleList = () => {
           )
         );
       } else {
-        // Recharger les modules si la structure n'est pas celle attendue
         fetchModules();
       }
     } catch (error) {
@@ -75,11 +92,9 @@ export const ModuleList = () => {
         throw new Error("Erreur lors de la suppression du module");
       }
 
-      // Mettre à jour l'état local
       if (Array.isArray(modules)) {
         setModules(modules.filter((module) => module.name !== moduleName));
       } else {
-        // Recharger les modules si la structure n'est pas celle attendue
         fetchModules();
       }
     } catch (error) {
@@ -87,6 +102,27 @@ export const ModuleList = () => {
       throw error;
     }
   };
+
+  const activeCount = useMemo(
+    () => modules.filter((m) => m.enabled).length,
+    [modules]
+  );
+  const inactiveCount = useMemo(
+    () => modules.filter((m) => !m.enabled).length,
+    [modules]
+  );
+
+  const filteredModules = useMemo(() => {
+    if (!Array.isArray(modules)) return [];
+    switch (filter) {
+      case "active":
+        return modules.filter((m) => m.enabled);
+      case "inactive":
+        return modules.filter((m) => !m.enabled);
+      default:
+        return modules;
+    }
+  }, [modules, filter]);
 
   if (isLoading) {
     return (
@@ -96,38 +132,113 @@ export const ModuleList = () => {
     );
   }
 
+  const scrollToUpload = () => {
+    document
+      .getElementById("module-upload")
+      ?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {Array.isArray(modules) ? (
-          modules.map((module) => (
-            <ModuleCard
-              key={module.name}
-              module={module}
-              onToggle={handleToggleModule}
-              onDelete={handleDeleteModule}
-            />
-          ))
-        ) : (
-          <div className="col-span-3 text-center p-6 sm:p-8 border border-dashed rounded-lg">
-            <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
-              Erreur lors du chargement des modules. Veuillez rafraîchir la
-              page.
-            </p>
-          </div>
-        )}
-      </div>
+      {Array.isArray(modules) && modules.length > 0 && (
+        <div className="flex items-center justify-between gap-4">
+          <Tabs
+            value={filter}
+            onValueChange={(v) => setFilter(v as typeof filter)}
+          >
+            <TabsList>
+              <TabsTrigger value="all" className="gap-1.5">
+                Tous
+                <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">
+                  {modules.length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="active" className="gap-1.5">
+                Actifs
+                <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">
+                  {activeCount}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="inactive" className="gap-1.5">
+                Inactifs
+                <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">
+                  {inactiveCount}
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-      {Array.isArray(modules) && modules.length === 0 && (
-        <div className="text-center p-6 sm:p-8 border border-dashed rounded-lg">
-          <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
-            Aucun module n'est installé. Installez votre premier module
-            ci-dessous.
-          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            Rafraîchir
+          </Button>
         </div>
       )}
 
-      <div className="mt-6 sm:mt-8">
+      {Array.isArray(modules) && modules.length > 0 ? (
+        filteredModules.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {filteredModules.map((module) => (
+              <ModuleCard
+                key={module.name}
+                module={module}
+                onToggle={handleToggleModule}
+                onDelete={handleDeleteModule}
+              />
+            ))}
+          </div>
+        ) : (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Puzzle />
+              </EmptyMedia>
+              <EmptyTitle>Aucun module {filter === "active" ? "actif" : "inactif"}</EmptyTitle>
+              <EmptyDescription>
+                {filter === "active"
+                  ? "Activez un module pour le voir apparaître ici."
+                  : "Désactivez un module pour le voir apparaître ici."}
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )
+      ) : !Array.isArray(modules) ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Puzzle />
+            </EmptyMedia>
+            <EmptyTitle>Erreur de chargement</EmptyTitle>
+            <EmptyDescription>
+              Erreur lors du chargement des modules. Veuillez rafraîchir la page.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Puzzle />
+            </EmptyMedia>
+            <EmptyTitle>Aucun module installé</EmptyTitle>
+            <EmptyDescription>
+              Installez votre premier module pour commencer.
+            </EmptyDescription>
+          </EmptyHeader>
+          <Button variant="outline" onClick={scrollToUpload}>
+            Installer un module
+          </Button>
+        </Empty>
+      )}
+
+      <div id="module-upload" className="mt-6 sm:mt-8">
         <ModuleUpload onUploadSuccess={fetchModules} />
       </div>
     </div>

@@ -8,7 +8,18 @@ import {
 } from "../../types/modules";
 import { z } from "zod";
 
-// Schéma de validation pour module.json
+const ModulePageConfigSchema = z.object({
+  path: z.string(),
+  title: z.string(),
+  component: z.string(),
+});
+
+const ModuleNavItemSchema = z.object({
+  title: z.string(),
+  icon: z.string().optional(),
+  url: z.string().optional(),
+});
+
 const ModuleConfigSchema = z.object({
   name: z.string(),
   version: z.string(),
@@ -16,24 +27,27 @@ const ModuleConfigSchema = z.object({
   author: z.string(),
   enabled: z.boolean(),
   entry: z.string(),
-  icon: z.string().optional(), // Chemin vers l'icône du module ou URL
-  category: z.string().optional(), // Catégorie du module
-  hasUI: z.boolean().default(false), // Indique si le module a une interface utilisateur
-  supportedFileTypes: z.array(z.string()).default([]), // Types de fichiers supportés
-  settings: z.unknown(), // Paramètres du module - validation complètement libre
-  dependencies: z.unknown().optional(), // Dépendances entre modules
-  npmDependencies: z.unknown().optional(), // Dépendances npm
-  capabilities: z.unknown().optional(), // Capacités du module
+  icon: z.string().optional(),
+  category: z.string().optional(),
+  hasUI: z.boolean().default(false),
+  supportedFileTypes: z.array(z.string()).default([]),
+  settings: z.unknown(),
+  dependencies: z.unknown().optional(),
+  npmDependencies: z.unknown().optional(),
+  capabilities: z.unknown().optional(),
+  pages: z.array(ModulePageConfigSchema).optional(),
+  navItems: z.array(ModuleNavItemSchema).optional(),
 });
 
-/**
- * Implémentation du gestionnaire de modules côté API
- * Ce gestionnaire peut charger dynamiquement les modules et traiter les images
- */
+const PROCESS_TIMEOUT_MS = 30_000;
+
 class ApiModuleManagerImpl implements ModuleManager {
   private modulesDir: string;
   private loadedModules: Map<string, LoadedModule> = new Map();
   private static instance: ApiModuleManagerImpl;
+
+  private initialized = false;
+  private initPromise: Promise<void> | null = null;
 
   private constructor() {
     this.modulesDir = path.join(process.cwd(), "modules");
@@ -46,255 +60,231 @@ class ApiModuleManagerImpl implements ModuleManager {
     return ApiModuleManagerImpl.instance;
   }
 
-  /**
-   * Charge tous les modules valides
-   */
-  public async loadModules(): Promise<LoadedModule[]> {
+  public async ensureInitialized(): Promise<void> {
+    if (this.initialized) return;
+    if (this.initPromise) return this.initPromise;
+    this.initPromise = this.loadModules().then(() => {
+      this.initialized = true;
+    });
+    await this.initPromise;
+  }
+
+  private async loadModules(): Promise<void> {
     try {
-      // Réinitialiser les modules chargés
       this.loadedModules.clear();
 
-      // Vérifier si le dossier modules existe
       if (!fs.existsSync(this.modulesDir)) {
-        console.warn("Le dossier modules n'existe pas");
         fs.mkdirSync(this.modulesDir, { recursive: true });
-        return [];
+        return;
       }
 
-      // Lire tous les dossiers dans le dossier modules
       const moduleFolders = fs
         .readdirSync(this.modulesDir, { withFileTypes: true })
         .filter((dirent) => dirent.isDirectory())
         .map((dirent) => dirent.name);
 
-      const loadedModules: LoadedModule[] = [];
-
-      // Charger chaque module
-      for (const moduleName of moduleFolders) {
-        console.log(`Chargement du module ${moduleName}`);
+      for (const folderName of moduleFolders) {
         try {
-          const modulePath = path.join(this.modulesDir, moduleName);
+          const modulePath = path.join(this.modulesDir, folderName);
           const configPath = path.join(modulePath, "module.json");
 
-          // Vérifier si le fichier module.json existe
           if (!fs.existsSync(configPath)) {
-            console.warn(
-              `Le module ${moduleName} n'a pas de fichier module.json`
-            );
             continue;
           }
 
-          // Lire et valider le fichier module.json
           const configContent = fs.readFileSync(configPath, "utf-8");
           let config: ModuleConfig;
 
           try {
-            const parsedConfig = JSON.parse(configContent);
-            config = ModuleConfigSchema.parse(parsedConfig);
-          } catch (error) {
+            config = ModuleConfigSchema.parse(JSON.parse(configContent));
+          } catch {
             console.error(
-              `Le fichier module.json du module ${moduleName} est invalide:`,
-              error
+              `Module ${folderName}: invalid module.json, skipping`
             );
             continue;
           }
 
-          // Vérifier si le module est activé
+          // Disabled modules: store with status 'disabled', no dynamic import
           if (!config.enabled) {
-            console.log(`Le module ${moduleName} est désactivé, ignoré`);
+            this.loadedModules.set(config.name, {
+              name: config.name,
+              config,
+              module: {},
+              path: modulePath,
+              status: "disabled",
+            });
             continue;
           }
 
-          // Vérifier si le fichier d'entrée existe
+          // Check entry file exists
           const entryPath = path.join(modulePath, config.entry);
           if (!fs.existsSync(entryPath)) {
             console.warn(
-              `Le fichier d'entrée ${config.entry} du module ${moduleName} n'existe pas`
+              `Module ${folderName}: entry file ${config.entry} not found`
             );
+            this.loadedModules.set(config.name, {
+              name: config.name,
+              config,
+              module: {},
+              path: modulePath,
+              status: "error",
+            });
             continue;
           }
 
-          // Charger dynamiquement le module
-          let moduleInstance: ModuleHooks;
+          // Dynamic import
+          let moduleExports: Record<string, any>;
           try {
-            console.log(`Chargement dynamique du module depuis: ${entryPath}`);
-
-            // Charger le module dynamiquement (côté serveur uniquement)
-            const moduleExports = await import(
-              `@/modules/${moduleName}/index.process.ts`
+            moduleExports = await import(
+              `@/modules/${folderName}/index.process.ts`
             );
-
-            // Détecter automatiquement les capacités du module
-            const detectedCapabilities: string[] = [];
-            for (const funcName of Object.keys(moduleExports)) {
-              if (typeof moduleExports[funcName] === "function") {
-                detectedCapabilities.push(funcName);
-              }
-            }
-
-            // Mettre à jour les capacités dans la configuration
-            if (detectedCapabilities.length > 0) {
-              config.capabilities = detectedCapabilities;
-              // Sauvegarder les capacités détectées dans le fichier module.json
-              const configPath = path.join(modulePath, "module.json");
-              fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-              console.log(
-                `Capacités détectées pour ${moduleName}: ${detectedCapabilities.join(
-                  ", "
-                )}`
-              );
-            }
-
-            // Vérifier si le module a une fonction d'initialisation
-            if (typeof moduleExports.initModule === "function") {
-              console.log(
-                `Initialisation du module ${moduleName} avec sa fonction initModule`
-              );
-              moduleInstance = moduleExports.initModule(config);
-            }
-            // Sinon, utiliser l'export par défaut s'il existe
-            else if (moduleExports.default) {
-              console.log(
-                `Utilisation de l'export par défaut pour le module ${moduleName}`
-              );
-              moduleInstance = moduleExports.default;
-            }
-            // Si aucun des deux n'existe, créer une instance de base
-            else {
-              console.log(
-                `Création d'une instance de base pour le module ${moduleName}`
-              );
-              moduleInstance = {
-                onInit: () =>
-                  console.log(
-                    `Module ${moduleName} initialisé (instance de base)`
-                  ),
-                onEnable: () =>
-                  console.log(`Module ${moduleName} activé (instance de base)`),
-                onDisable: () =>
-                  console.log(
-                    `Module ${moduleName} désactivé (instance de base)`
-                  ),
-                processImage: async (imageBuffer: Buffer, settings?: any) => {
-                  console.log(
-                    `Traitement d'image avec le module ${moduleName} (instance de base)`
-                  );
-
-                  // Essayer d'utiliser n'importe quelle fonction d'exportation qui pourrait traiter des images
-                  for (const funcName of Object.keys(moduleExports)) {
-                    if (
-                      typeof moduleExports[funcName] === "function" &&
-                      (funcName.toLowerCase().includes("image") ||
-                        funcName.toLowerCase().includes("process"))
-                    ) {
-                      try {
-                        console.log(
-                          `Tentative d'utilisation de la fonction ${funcName}`
-                        );
-                        const result = await moduleExports[funcName](
-                          imageBuffer,
-                          settings
-                        );
-                        if (Buffer.isBuffer(result)) {
-                          return result;
-                        }
-                      } catch (error) {
-                        console.error(
-                          `Erreur lors de l'utilisation de ${funcName}:`,
-                          error
-                        );
-                      }
-                    }
-                  }
-
-                  // Si aucune fonction n'a fonctionné, retourner l'image originale
-                  return imageBuffer;
-                },
-                renderUI: () => null,
-                getActionIcon: () => {
-                  // Utiliser une icône par défaut
-                  const { FileQuestion } = require("lucide-react");
-                  return { icon: FileQuestion, tooltip: moduleName };
-                },
-                getCapabilities: () => detectedCapabilities,
-              };
-            }
-
-            // Stocker les exports du module pour un accès ultérieur
-            moduleInstance._exports = moduleExports;
-
-            console.log(`Module ${moduleName} chargé avec succès`);
           } catch (error) {
             console.error(
-              `Erreur lors du chargement dynamique du module ${moduleName}:`,
+              `Module ${folderName}: failed to import`,
               error
             );
-
-            // Créer une instance de secours en cas d'erreur
-            moduleInstance = {
-              onInit: () =>
-                console.log(`Module ${moduleName} initialisé (mode secours)`),
-              onEnable: () =>
-                console.log(`Module ${moduleName} activé (mode secours)`),
-              onDisable: () =>
-                console.log(`Module ${moduleName} désactivé (mode secours)`),
-              processImage: async (imageBuffer: Buffer) => {
-                console.log(
-                  `Traitement d'image avec le module ${moduleName} (mode secours)`
-                );
-                return imageBuffer;
-              },
-              renderUI: () => null,
-              getActionIcon: () => {
-                // Utiliser une icône par défaut
-                const { FileQuestion } = require("lucide-react");
-                return { icon: FileQuestion, tooltip: moduleName };
-              },
-            };
+            this.loadedModules.set(config.name, {
+              name: config.name,
+              config,
+              module: {},
+              path: modulePath,
+              status: "error",
+            });
+            continue;
           }
 
-          // Créer un objet LoadedModule
-          const loadedModule: LoadedModule = {
+          // Detect capabilities in memory only (no write to module.json)
+          const detectedCapabilities: string[] = [];
+          for (const key of Object.keys(moduleExports)) {
+            if (typeof moduleExports[key] === "function") {
+              detectedCapabilities.push(key);
+            }
+          }
+          config.capabilities = detectedCapabilities;
+
+          // Resolve module hooks
+          let moduleInstance: ModuleHooks;
+          if (typeof moduleExports.initModule === "function") {
+            moduleInstance = moduleExports.initModule(config);
+          } else if (moduleExports.default) {
+            moduleInstance = moduleExports.default;
+          } else {
+            // Build a minimal hooks object that delegates to processImage export
+            moduleInstance = {};
+            if (typeof moduleExports.processImage === "function") {
+              moduleInstance.processImage = moduleExports.processImage;
+            }
+          }
+
+          // Store the raw exports on the instance for callModuleFunction
+          // Using a symbol-like approach to avoid polluting the interface
+          (moduleInstance as any).__exports = moduleExports;
+
+          this.loadedModules.set(config.name, {
             name: config.name,
-            path: modulePath,
             config,
             module: moduleInstance,
-          };
+            path: modulePath,
+            status: "loaded",
+          });
 
-          // Ajouter le module à la liste des modules chargés
-          this.loadedModules.set(config.name, loadedModule);
-          loadedModules.push(loadedModule);
-
-          console.log(`Module ${config.name} chargé avec succès`);
+          console.log(`Module ${config.name} loaded`);
         } catch (error) {
-          console.error(
-            `Erreur lors du chargement du module ${moduleName}:`,
-            error
-          );
+          console.error(`Module ${folderName}: unexpected error`, error);
         }
       }
 
-      console.log(`${loadedModules.length} modules chargés avec succès`);
-      return loadedModules;
+      console.log(
+        `${Array.from(this.loadedModules.values()).filter((m) => m.status === "loaded").length} modules loaded`
+      );
     } catch (error) {
-      console.error("Erreur lors du chargement des modules:", error);
-      return [];
+      console.error("Error loading modules:", error);
     }
   }
 
-  /**
-   * Récupère la liste de tous les modules (activés ou non)
-   */
-  public async getModules(): Promise<ModuleConfig[]> {
+  private async reloadModule(moduleName: string): Promise<void> {
+    const existing = this.loadedModules.get(moduleName);
+    if (!existing) return;
+
+    const folderName = path.basename(existing.path);
+    const configPath = path.join(existing.path, "module.json");
+
+    if (!fs.existsSync(configPath)) return;
+
+    const configContent = fs.readFileSync(configPath, "utf-8");
+    let config: ModuleConfig;
     try {
-      // Vérifier si le dossier modules existe
+      config = ModuleConfigSchema.parse(JSON.parse(configContent));
+    } catch {
+      return;
+    }
+
+    if (!config.enabled) {
+      this.loadedModules.set(config.name, {
+        name: config.name,
+        config,
+        module: {},
+        path: existing.path,
+        status: "disabled",
+      });
+      return;
+    }
+
+    // Re-import the module
+    try {
+      const moduleExports = await import(
+        `@/modules/${folderName}/index.process.ts`
+      );
+
+      const detectedCapabilities: string[] = [];
+      for (const key of Object.keys(moduleExports)) {
+        if (typeof moduleExports[key] === "function") {
+          detectedCapabilities.push(key);
+        }
+      }
+      config.capabilities = detectedCapabilities;
+
+      let moduleInstance: ModuleHooks;
+      if (typeof moduleExports.initModule === "function") {
+        moduleInstance = moduleExports.initModule(config);
+      } else if (moduleExports.default) {
+        moduleInstance = moduleExports.default;
+      } else {
+        moduleInstance = {};
+        if (typeof moduleExports.processImage === "function") {
+          moduleInstance.processImage = moduleExports.processImage;
+        }
+      }
+
+      (moduleInstance as any).__exports = moduleExports;
+
+      this.loadedModules.set(config.name, {
+        name: config.name,
+        config,
+        module: moduleInstance,
+        path: existing.path,
+        status: "loaded",
+      });
+    } catch (error) {
+      console.error(`Module ${moduleName}: failed to reload`, error);
+      this.loadedModules.set(config.name, {
+        name: config.name,
+        config,
+        module: {},
+        path: existing.path,
+        status: "error",
+      });
+    }
+  }
+
+  public async getModules(): Promise<ModuleConfig[]> {
+    await this.ensureInitialized();
+
+    try {
       if (!fs.existsSync(this.modulesDir)) {
-        console.warn("Le dossier modules n'existe pas");
-        fs.mkdirSync(this.modulesDir, { recursive: true });
         return [];
       }
 
-      // Lire tous les dossiers dans le dossier modules
       const moduleFolders = fs
         .readdirSync(this.modulesDir, { withFileTypes: true })
         .filter((dirent) => dirent.isDirectory())
@@ -302,329 +292,243 @@ class ApiModuleManagerImpl implements ModuleManager {
 
       const modules: ModuleConfig[] = [];
 
-      // Récupérer la configuration de chaque module
-      for (const moduleName of moduleFolders) {
+      for (const folderName of moduleFolders) {
         try {
-          const modulePath = path.join(this.modulesDir, moduleName);
-          const configPath = path.join(modulePath, "module.json");
-
-          // Vérifier si le fichier module.json existe
-          if (!fs.existsSync(configPath)) {
-            console.warn(
-              `Le module ${moduleName} n'a pas de fichier module.json`
-            );
-            continue;
-          }
-
-          // Lire et valider le fichier module.json
-          const configContent = fs.readFileSync(configPath, "utf-8");
-          let config: ModuleConfig;
-
-          try {
-            const parsedConfig = JSON.parse(configContent);
-            config = ModuleConfigSchema.parse(parsedConfig);
-            modules.push(config);
-          } catch (error) {
-            console.error(
-              `Le fichier module.json du module ${moduleName} est invalide:`,
-              error
-            );
-          }
-        } catch (error) {
-          console.error(
-            `Erreur lors de la récupération des informations du module ${moduleName}:`,
-            error
+          const configPath = path.join(
+            this.modulesDir,
+            folderName,
+            "module.json"
           );
+          if (!fs.existsSync(configPath)) continue;
+
+          const configContent = fs.readFileSync(configPath, "utf-8");
+          const config = ModuleConfigSchema.parse(JSON.parse(configContent));
+          modules.push(config);
+        } catch {
+          // Skip invalid modules
         }
       }
 
       return modules;
     } catch (error) {
-      console.error("Erreur lors de la récupération des modules:", error);
+      console.error("Error getting modules:", error);
       return [];
     }
   }
 
-  /**
-   * Récupère un module chargé par son nom
-   */
   public getLoadedModule(moduleName: string): LoadedModule | undefined {
     return this.loadedModules.get(moduleName);
   }
 
-  /**
-   * Récupère tous les modules chargés
-   */
   public getAllLoadedModules(): LoadedModule[] {
-    return Array.from(this.loadedModules.values());
+    return Array.from(this.loadedModules.values()).filter(
+      (m) => m.status === "loaded"
+    );
   }
 
-  /**
-   * Récupère les modules qui supportent un type de fichier donné
-   */
-  public async getModulesByFileType(fileType: string): Promise<ModuleConfig[]> {
+  public async getModulesByFileType(
+    fileType: string
+  ): Promise<ModuleConfig[]> {
     const modules = await this.getModules();
+    const normalizedType = fileType.toLowerCase().replace(".", "");
     return modules.filter((m) => {
       if (!m.enabled) return false;
-
-      // Si le module supporte tous les types de fichiers (*)
       if (m.supportedFileTypes.includes("*")) return true;
-
-      // Sinon, vérifier si le type de fichier spécifique est supporté
-      return m.supportedFileTypes.includes(
-        fileType.toLowerCase().replace(".", "")
-      );
+      return m.supportedFileTypes.includes(normalizedType);
     });
   }
 
-  /**
-   * Traite une image avec un module spécifique
-   */
   public async processImageWithModule(
     moduleName: string,
     imageBuffer: Buffer,
     settings?: any
   ): Promise<Buffer> {
     try {
-      // Récupérer le module
-      const loadedModule = this.getLoadedModule(moduleName);
-      if (!loadedModule) {
-        console.warn(`Module ${moduleName} non trouvé`);
+      await this.ensureInitialized();
+
+      const loadedModule = this.loadedModules.get(moduleName);
+      if (!loadedModule || loadedModule.status !== "loaded") {
+        console.warn(`Module ${moduleName} not found or not loaded`);
         return imageBuffer;
       }
 
-      console.log(`Traitement d'image avec le module ${moduleName}`);
-      console.log(`Paramètres:`, settings);
-
-      // Récupérer les exports du module
-      const moduleExports = loadedModule.module._exports;
+      const moduleExports = (loadedModule.module as any).__exports;
       if (!moduleExports) {
-        console.warn(`Module ${moduleName} n'a pas d'exports`);
+        console.warn(`Module ${moduleName} has no exports`);
         return imageBuffer;
       }
 
-      // Déterminer la fonction à utiliser en fonction des capacités du module
-      let processedBuffer = imageBuffer;
-      const capabilities = loadedModule.config.capabilities || [];
-
-      // Si le module a une fonction processImage, l'utiliser
-      if (typeof moduleExports.processImage === "function") {
-        console.log(
-          `Utilisation de la fonction processImage du module ${moduleName}`
-        );
-        processedBuffer = await moduleExports.processImage(
-          imageBuffer,
-          settings
-        );
-      }
-      // Sinon, essayer de trouver une fonction spécifique basée sur le type de traitement
-      else if (
-        settings &&
-        settings.type &&
-        typeof moduleExports[settings.type] === "function"
+      // 1. If settings.functionName is provided and exists, call it
+      if (
+        settings?.functionName &&
+        typeof moduleExports[settings.functionName] === "function"
       ) {
-        console.log(
-          `Utilisation de la fonction ${settings.type} du module ${moduleName}`
+        return await this.withTimeout(
+          moduleExports[settings.functionName](imageBuffer, settings),
+          moduleName
         );
-        processedBuffer = await moduleExports[settings.type](
-          imageBuffer,
-          settings
-        );
-      }
-      // Sinon, essayer de trouver une fonction basée sur le nom du module
-      else if (typeof moduleExports[moduleName.toLowerCase()] === "function") {
-        console.log(
-          `Utilisation de la fonction ${moduleName.toLowerCase()} du module ${moduleName}`
-        );
-        processedBuffer = await moduleExports[moduleName.toLowerCase()](
-          imageBuffer,
-          settings
-        );
-      }
-      // Sinon, parcourir toutes les fonctions exportées qui pourraient traiter des images
-      else {
-        for (const funcName of Object.keys(moduleExports)) {
-          if (
-            typeof moduleExports[funcName] === "function" &&
-            (funcName.toLowerCase().includes("image") ||
-              funcName.toLowerCase().includes("process") ||
-              capabilities.includes(funcName))
-          ) {
-            try {
-              console.log(`Tentative d'utilisation de la fonction ${funcName}`);
-              const result = await moduleExports[funcName](
-                imageBuffer,
-                settings
-              );
-              if (Buffer.isBuffer(result)) {
-                processedBuffer = result;
-                break;
-              }
-            } catch (error) {
-              console.error(
-                `Erreur lors de l'utilisation de ${funcName}:`,
-                error
-              );
-            }
-          }
-        }
       }
 
-      return processedBuffer;
+      // 2. Otherwise, call processImage (the standard contract)
+      if (typeof moduleExports.processImage === "function") {
+        return await this.withTimeout(
+          moduleExports.processImage(imageBuffer, settings),
+          moduleName
+        );
+      }
+
+      console.warn(
+        `Module ${moduleName}: no processImage function found`
+      );
+      return imageBuffer;
     } catch (error) {
       console.error(
-        `Erreur lors du traitement d'image avec le module ${moduleName}:`,
+        `Error processing image with module ${moduleName}:`,
         error
       );
       return imageBuffer;
     }
   }
 
-  /**
-   * Traite une image avec tous les modules activés
-   */
   public async processImage(imageBuffer: Buffer): Promise<Buffer> {
+    await this.ensureInitialized();
+
     let processedBuffer = imageBuffer;
 
     for (const loadedModule of this.loadedModules.values()) {
-      if (loadedModule.config.enabled) {
-        try {
-          processedBuffer = await loadedModule.module.processImage(
-            processedBuffer
-          );
-        } catch (error) {
-          console.error(
-            `Erreur lors du traitement de l'image avec le module ${loadedModule.name}:`,
-            error
-          );
-        }
+      if (loadedModule.status !== "loaded") continue;
+      if (!loadedModule.module.processImage) continue;
+
+      try {
+        processedBuffer = await this.withTimeout(
+          loadedModule.module.processImage(processedBuffer, {}),
+          loadedModule.name
+        );
+      } catch (error) {
+        console.error(
+          `Error processing image with module ${loadedModule.name}:`,
+          error
+        );
       }
     }
 
     return processedBuffer;
   }
 
+  private async withTimeout(
+    promise: Promise<Buffer>,
+    moduleName: string
+  ): Promise<Buffer> {
+    return Promise.race([
+      promise,
+      new Promise<Buffer>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Module ${moduleName}: timeout after ${PROCESS_TIMEOUT_MS}ms`)),
+          PROCESS_TIMEOUT_MS
+        )
+      ),
+    ]);
+  }
+
   public async toggleModule(moduleName: string): Promise<boolean> {
     try {
-      const module = this.getLoadedModule(moduleName);
-      if (!module) {
-        console.warn(`Module ${moduleName} non trouvé`);
+      await this.ensureInitialized();
+
+      // Find the module on the filesystem (not just in loadedModules)
+      const modulePath = this.findModulePathByName(moduleName);
+      if (!modulePath) {
+        console.error(`Module ${moduleName} not found on filesystem`);
         return false;
       }
 
-      const configPath = path.join(module.path, "module.json");
+      const configPath = path.join(modulePath, "module.json");
       if (!fs.existsSync(configPath)) {
-        console.warn(
-          `Le fichier module.json du module ${moduleName} n'existe pas`
-        );
         return false;
       }
 
-      // Lire le fichier de configuration
       const configContent = fs.readFileSync(configPath, "utf-8");
       const config = JSON.parse(configContent);
 
-      // Inverser l'état d'activation
+      // Toggle enabled state
       config.enabled = !config.enabled;
-
-      // Écrire la nouvelle configuration
       fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
       console.log(
-        `Module ${moduleName} ${config.enabled ? "activé" : "désactivé"}`
+        `Module ${moduleName} ${config.enabled ? "enabled" : "disabled"}`
       );
 
-      // Recharger les modules
-      await this.loadModules();
+      // Reload only this specific module
+      await this.reloadModule(moduleName);
 
       return true;
     } catch (error) {
-      console.error(
-        `Erreur lors de la modification de l'état du module ${moduleName}:`,
-        error
-      );
+      console.error(`Error toggling module ${moduleName}:`, error);
       return false;
     }
   }
 
   public async deleteModule(moduleName: string): Promise<boolean> {
     try {
-      const module = this.getLoadedModule(moduleName);
-      if (!module) {
-        console.warn(`Module ${moduleName} non trouvé`);
+      await this.ensureInitialized();
+
+      const modulePath = this.findModulePathByName(moduleName);
+      if (!modulePath) {
+        console.warn(`Module ${moduleName} not found`);
         return false;
       }
 
-      // Désactiver le module avant de le supprimer
-      if (module.module.onDisable) {
-        await module.module.onDisable();
+      // Call onDisable/onUninstall hooks if the module is loaded
+      const loadedModule = this.loadedModules.get(moduleName);
+      if (loadedModule && loadedModule.status === "loaded") {
+        try {
+          await loadedModule.module.onDisable?.();
+          await loadedModule.module.onUninstall?.();
+        } catch {
+          // Ignore hook errors during deletion
+        }
       }
 
-      // Supprimer le dossier du module
-      fs.rmSync(module.path, { recursive: true, force: true });
+      fs.rmSync(modulePath, { recursive: true, force: true });
+      this.loadedModules.delete(moduleName);
 
-      console.log(`Module ${moduleName} supprimé`);
-
-      // Recharger les modules
-      await this.loadModules();
-
+      console.log(`Module ${moduleName} deleted`);
       return true;
     } catch (error) {
-      console.error(
-        `Erreur lors de la suppression du module ${moduleName}:`,
-        error
-      );
+      console.error(`Error deleting module ${moduleName}:`, error);
       return false;
     }
   }
 
   public async installModule(modulePath: string): Promise<boolean> {
     try {
-      // Vérifier si le chemin existe
-      if (!fs.existsSync(modulePath)) {
-        console.warn(`Le chemin ${modulePath} n'existe pas`);
+      if (!fs.existsSync(modulePath) || !fs.statSync(modulePath).isDirectory()) {
+        console.warn(`Path ${modulePath} is not a valid directory`);
         return false;
       }
 
-      // Vérifier si c'est un dossier
-      const stats = fs.statSync(modulePath);
-      if (!stats.isDirectory()) {
-        console.warn(`${modulePath} n'est pas un dossier`);
-        return false;
-      }
-
-      // Vérifier si le module.json existe
       const configPath = path.join(modulePath, "module.json");
       if (!fs.existsSync(configPath)) {
-        console.warn(`Le fichier module.json n'existe pas dans ${modulePath}`);
+        console.warn(`No module.json found in ${modulePath}`);
         return false;
       }
 
-      // Lire et valider le fichier module.json
       const configContent = fs.readFileSync(configPath, "utf-8");
       let config: ModuleConfig;
-
       try {
-        const parsedConfig = JSON.parse(configContent);
-        config = ModuleConfigSchema.parse(parsedConfig);
-      } catch (error) {
-        console.error(`Le fichier module.json est invalide:`, error);
+        config = ModuleConfigSchema.parse(JSON.parse(configContent));
+      } catch {
+        console.error(`Invalid module.json in ${modulePath}`);
         return false;
       }
 
-      // Créer le dossier de destination
       const destPath = path.join(this.modulesDir, config.name);
       if (fs.existsSync(destPath)) {
-        console.warn(`Le module ${config.name} existe déjà`);
+        console.warn(`Module ${config.name} already exists`);
         return false;
       }
 
-      // Copier le dossier du module
       this.copyFolderRecursive(modulePath, destPath);
 
-      console.log(`Module ${config.name} installé avec succès`);
-
-      // Installer les dépendances npm si nécessaire
       if (
         config.npmDependencies &&
         Object.keys(config.npmDependencies).length > 0
@@ -632,66 +536,45 @@ class ApiModuleManagerImpl implements ModuleManager {
         await this.installNpmDependencies(config.name);
       }
 
-      // Recharger les modules
-      await this.loadModules();
+      // Reset init state so next ensureInitialized reloads
+      this.initialized = false;
+      this.initPromise = null;
 
+      console.log(`Module ${config.name} installed`);
       return true;
     } catch (error) {
-      console.error(`Erreur lors de l'installation du module:`, error);
+      console.error(`Error installing module:`, error);
       return false;
-    }
-  }
-
-  private copyFolderRecursive(source: string, destination: string) {
-    // Créer le dossier de destination s'il n'existe pas
-    if (!fs.existsSync(destination)) {
-      fs.mkdirSync(destination, { recursive: true });
-    }
-
-    // Lire tous les fichiers et dossiers
-    const entries = fs.readdirSync(source, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(source, entry.name);
-      const destPath = path.join(destination, entry.name);
-
-      if (entry.isDirectory()) {
-        // Récursion pour les sous-dossiers
-        this.copyFolderRecursive(srcPath, destPath);
-      } else {
-        // Copier les fichiers
-        fs.copyFileSync(srcPath, destPath);
-      }
     }
   }
 
   public async installNpmDependencies(moduleName: string): Promise<boolean> {
     try {
-      const module = this.getLoadedModule(moduleName);
-      if (!module) {
-        console.warn(`Module ${moduleName} non trouvé`);
+      await this.ensureInitialized();
+
+      // Find module path from filesystem
+      const modulePath = this.findModulePathByName(moduleName);
+      if (!modulePath) {
+        console.warn(`Module ${moduleName} not found`);
         return false;
       }
 
-      const { config, path: modulePath } = module;
+      const configPath = path.join(modulePath, "module.json");
+      if (!fs.existsSync(configPath)) return false;
 
-      // Vérifier si le module a des dépendances npm
+      const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+
       if (
         !config.npmDependencies ||
         Object.keys(config.npmDependencies).length === 0
       ) {
-        console.log(`Le module ${moduleName} n'a pas de dépendances npm`);
+        console.log(`Module ${moduleName} has no npm dependencies`);
         return true;
       }
 
-      console.log(
-        `Installation des dépendances npm pour le module ${moduleName}...`
-      );
-
-      // Créer un package.json temporaire
       const packageJson = {
-        name: `module-${moduleName}`,
-        version: "1.0.0",
+        name: `module-${moduleName.toLowerCase().replace(/\s+/g, "-")}`,
+        version: config.version || "1.0.0",
         private: true,
         dependencies: config.npmDependencies,
       };
@@ -699,15 +582,14 @@ class ApiModuleManagerImpl implements ModuleManager {
       const packageJsonPath = path.join(modulePath, "package.json");
       fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
 
-      // Installer les dépendances avec npm
       const { execSync } = require("child_process");
       execSync("npm install", { cwd: modulePath, stdio: "inherit" });
 
-      console.log(`Dépendances npm installées pour le module ${moduleName}`);
+      console.log(`npm dependencies installed for module ${moduleName}`);
       return true;
     } catch (error) {
       console.error(
-        `Erreur lors de l'installation des dépendances npm pour le module ${moduleName}:`,
+        `Error installing npm dependencies for module ${moduleName}:`,
         error
       );
       return false;
@@ -720,49 +602,124 @@ class ApiModuleManagerImpl implements ModuleManager {
     ...args: any[]
   ): Promise<any> {
     try {
-      // Récupérer le module
-      const loadedModule = this.getLoadedModule(moduleName);
-      if (!loadedModule) {
-        console.warn(`Module ${moduleName} non trouvé`);
+      await this.ensureInitialized();
+
+      const loadedModule = this.loadedModules.get(moduleName);
+      if (!loadedModule || loadedModule.status !== "loaded") {
+        console.warn(`Module ${moduleName} not found or not loaded`);
         return null;
       }
 
-      // Vérifier si le module a été chargé dynamiquement
-      const moduleExports = loadedModule.module._exports;
+      const moduleExports = (loadedModule.module as any).__exports;
       if (!moduleExports) {
-        console.warn(`Module ${moduleName} n'a pas d'exports`);
+        console.warn(`Module ${moduleName} has no exports`);
         return null;
       }
 
-      // Vérifier si la fonction existe
       if (typeof moduleExports[functionName] !== "function") {
         console.warn(
-          `Fonction ${functionName} non trouvée dans le module ${moduleName}`
+          `Function ${functionName} not found in module ${moduleName}`
         );
         return null;
       }
 
-      // Appeler la fonction avec les arguments fournis
-      console.log(
-        `Appel de la fonction ${functionName} du module ${moduleName}`
-      );
       return await moduleExports[functionName](...args);
     } catch (error) {
       console.error(
-        `Erreur lors de l'appel de la fonction ${functionName} du module ${moduleName}:`,
+        `Error calling ${functionName} on module ${moduleName}:`,
         error
       );
       return null;
     }
   }
+
+  public async updateModuleSettings(
+    moduleName: string,
+    newSettings: Record<string, any>
+  ): Promise<boolean> {
+    try {
+      await this.ensureInitialized();
+
+      const modulePath = this.findModulePathByName(moduleName);
+      if (!modulePath) {
+        console.error(`Module ${moduleName} not found`);
+        return false;
+      }
+
+      const configPath = path.join(modulePath, "module.json");
+      if (!fs.existsSync(configPath)) return false;
+
+      const configContent = fs.readFileSync(configPath, "utf-8");
+      const config = JSON.parse(configContent);
+
+      // Merge new settings into existing settings
+      config.settings = { ...(config.settings || {}), ...newSettings };
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+      // Reload the module to pick up new settings
+      await this.reloadModule(moduleName);
+
+      console.log(`Settings updated for module ${moduleName}`);
+      return true;
+    } catch (error) {
+      console.error(`Error updating settings for module ${moduleName}:`, error);
+      return false;
+    }
+  }
+
+  private findModulePathByName(moduleName: string): string | null {
+    // First check if it's already in the loaded map
+    const loaded = this.loadedModules.get(moduleName);
+    if (loaded) return loaded.path;
+
+    // Otherwise scan the filesystem
+    if (!fs.existsSync(this.modulesDir)) return null;
+
+    const folders = fs
+      .readdirSync(this.modulesDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+
+    for (const folder of folders) {
+      const configPath = path.join(this.modulesDir, folder, "module.json");
+      if (!fs.existsSync(configPath)) continue;
+
+      try {
+        const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+        if (config.name === moduleName) {
+          return path.join(this.modulesDir, folder);
+        }
+      } catch {
+        // Skip invalid files
+      }
+    }
+
+    return null;
+  }
+
+  private copyFolderRecursive(source: string, destination: string) {
+    if (!fs.existsSync(destination)) {
+      fs.mkdirSync(destination, { recursive: true });
+    }
+
+    const entries = fs.readdirSync(source, { withFileTypes: true });
+    for (const entry of entries) {
+      const srcPath = path.join(source, entry.name);
+      const destPath = path.join(destination, entry.name);
+
+      if (entry.isDirectory()) {
+        this.copyFolderRecursive(srcPath, destPath);
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  }
 }
 
-// Exporter l'instance du gestionnaire de modules côté API
 export const apiModuleManager = ApiModuleManagerImpl.getInstance();
 
-// Fonction pour initialiser le gestionnaire de modules côté API
+// Kept for backward compatibility during migration - delegates to ensureInitialized
 export async function initApiModuleManager() {
-  const moduleManager = ApiModuleManagerImpl.getInstance();
-  await moduleManager.loadModules();
-  return moduleManager;
+  await apiModuleManager.ensureInitialized();
+  return apiModuleManager;
 }

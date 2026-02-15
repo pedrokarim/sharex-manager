@@ -26,10 +26,11 @@ export async function resizeImage(
 
     console.log("Redimensionnement avec les paramètres:", resizeSettings);
 
-    // Obtenir les dimensions de l'image
+    // Obtenir les dimensions et le format de l'image
     const metadata = await sharp(imageBuffer).metadata();
     const originalWidth = metadata.width || 0;
     const originalHeight = metadata.height || 0;
+    const inputFormat = metadata.format;
 
     console.log("Dimensions originales:", originalWidth, "x", originalHeight);
 
@@ -74,14 +75,33 @@ export async function resizeImage(
 
     console.log(`Nouvelles dimensions: ${newWidth}x${newHeight}`);
 
-    // Redimensionner l'image
-    const result = await sharp(imageBuffer)
-      .resize(newWidth, newHeight, {
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .jpeg({ quality: resizeSettings.quality })
-      .toBuffer();
+    // Redimensionner l'image en préservant le format d'entrée
+    let pipeline = sharp(imageBuffer).resize(newWidth, newHeight, {
+      fit: "inside",
+      withoutEnlargement: true,
+    });
+
+    let result: Buffer;
+    switch (inputFormat) {
+      case "png":
+        result = await pipeline.png().toBuffer();
+        break;
+      case "webp":
+        result = await pipeline.webp({ quality: resizeSettings.quality }).toBuffer();
+        break;
+      case "gif":
+        result = await pipeline.gif().toBuffer();
+        break;
+      case "avif":
+        result = await pipeline.avif({ quality: resizeSettings.quality }).toBuffer();
+        break;
+      case "tiff":
+        result = await pipeline.tiff({ quality: resizeSettings.quality }).toBuffer();
+        break;
+      default:
+        result = await pipeline.jpeg({ quality: resizeSettings.quality }).toBuffer();
+        break;
+    }
 
     // Vérifier les dimensions après redimensionnement
     const newMetadata = await sharp(result).metadata();
@@ -100,6 +120,14 @@ export async function resizeImage(
   }
 }
 
+// Top-level processImage export for the module manager
+export async function processImage(
+  imageBuffer: Buffer,
+  data?: any
+): Promise<Buffer> {
+  return await resizeImage(imageBuffer, data);
+}
+
 // Hooks du module
 export const moduleHooks: ModuleHooks = {
   onInit: () => {
@@ -111,9 +139,7 @@ export const moduleHooks: ModuleHooks = {
   onDisable: () => {
     console.log("Module Resize désactivé");
   },
-  processImage: async (imageBuffer: Buffer) => {
-    return await resizeImage(imageBuffer);
-  },
+  processImage,
 };
 
 // Fonction pour initialiser les paramètres du module

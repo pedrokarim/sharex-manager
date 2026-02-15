@@ -74,7 +74,7 @@ async function getUUIDFromUsername(username: string): Promise<string | null> {
   }
 
   try {
-    const response = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(username)}`);
+    const response = await fetch(`https://api.minecraftservices.com/minecraft/profile/lookup/name/${encodeURIComponent(username)}`);
     
     if (!response.ok) {
       if (response.status === 404) {

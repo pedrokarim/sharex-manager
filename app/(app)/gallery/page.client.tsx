@@ -56,6 +56,7 @@ import { Loader2 } from "lucide-react";
 import { RefreshInterval } from "@/components/refresh-interval";
 import { Loading } from "@/components/ui/loading";
 import { SortSelector } from "@/components/sort-selector";
+import { DateRangeFilter } from "@/components/gallery/date-range-filter";
 import { useTranslation } from "@/lib/i18n";
 
 interface FileInfo {
@@ -197,6 +198,8 @@ export function GalleryClient({
   const [sortOrder] = useAtom(sortOrderAtom);
 
   const [search] = useQueryState("q");
+  const [startDate] = useQueryState("start");
+  const [endDate] = useQueryState("end");
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
   const [page, setPage] = useState(initialPage);
@@ -223,6 +226,10 @@ export function GalleryClient({
   const [fileAlbumsCache, setFileAlbumsCache] = useState<Record<string, any[]>>(
     {}
   );
+  const fileAlbumsCacheRef = useRef(fileAlbumsCache);
+  useEffect(() => {
+    fileAlbumsCacheRef.current = fileAlbumsCache;
+  }, [fileAlbumsCache]);
 
   useEffect(() => {
     // Simuler un temps de chargement pour une meilleure expérience utilisateur
@@ -262,7 +269,7 @@ export function GalleryClient({
         // Filtrer les fichiers qui ne sont pas encore dans le cache (sauf si forceReload)
         const uncachedFiles = forceReload
           ? fileNames
-          : fileNames.filter((fileName) => !fileAlbumsCache[fileName]);
+          : fileNames.filter((fileName) => !fileAlbumsCacheRef.current[fileName]);
 
         if (uncachedFiles.length === 0) return;
 
@@ -288,7 +295,7 @@ export function GalleryClient({
         );
       }
     },
-    [fileAlbumsCache]
+    []
   );
 
   const fetchFiles = useCallback(
@@ -299,6 +306,10 @@ export function GalleryClient({
         if (search) searchParams.set("q", search);
         if (secureOnly) searchParams.set("secure", "true");
         if (starredOnly) searchParams.set("starred", "true");
+        searchParams.set("sort", sortBy);
+        searchParams.set("order", sortOrder);
+        if (startDate) searchParams.set("start", startDate);
+        if (endDate) searchParams.set("end", endDate);
 
         const res = await fetch(`/api/files?${searchParams.toString()}`);
         const data = await res.json();
@@ -315,7 +326,7 @@ export function GalleryClient({
         };
       }
     },
-    [search, secureOnly, starredOnly]
+    [search, secureOnly, starredOnly, sortBy, sortOrder, startDate, endDate]
   );
 
   const {
@@ -448,7 +459,8 @@ export function GalleryClient({
 
     // Nettoyer la connexion à la destruction du composant
     return cleanup;
-  }, [prependItem, enableUploadNotifications, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- All values accessed via refs, no deps needed
+  }, []);
 
   const handleFinishUpload = useCallback(async () => {
     const { files: newFiles, hasMore: newHasMore } = await fetchFiles(1);
@@ -460,15 +472,25 @@ export function GalleryClient({
     setPage(1);
     fetchFiles(1).then(({ files, hasMore }) => {
       setHasMore(hasMore);
-      // reset(files);
+      reset(files);
     });
-  }, [fetchFiles]);
+  }, [fetchFiles, reset]);
 
   useEffect(() => {
-    if (search !== initialSearch && search !== undefined) {
+    const currentSearch = search ?? "";
+    if (currentSearch !== initialSearch) {
       resetSearch();
     }
   }, [search, initialSearch, resetSearch]);
+
+  // Réinitialiser quand le tri ou les dates changent
+  useEffect(() => {
+    setPage(1);
+    fetchFiles(1).then(({ files, hasMore }) => {
+      setHasMore(hasMore);
+      reset(files);
+    });
+  }, [sortBy, sortOrder, startDate, endDate]);
 
   // Fonction pour gérer la sélection vide
   const handleSelectionEmpty = useCallback(() => {
@@ -497,13 +519,14 @@ export function GalleryClient({
       const { files: newFiles, hasMore: newHasMore } = await fetchFiles(1);
       setPage(1);
       setHasMore(newHasMore);
+      reset(newFiles);
     } catch (error) {
       console.error("Erreur lors du rafraîchissement:", error);
       toast.error(t("gallery.refresh.error"));
     } finally {
       setIsRefreshing(false);
     }
-  }, [fetchFiles]);
+  }, [fetchFiles, reset]);
 
   useEffect(() => {
     if (autoRefreshInterval === 0) return;
@@ -555,32 +578,8 @@ export function GalleryClient({
     }
   }, [uniqueFiles, loadFileAlbums]);
 
-  const sortFiles = (files: FileInfo[]) => {
-    return [...files].sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case "name":
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case "date":
-          comparison =
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-          break;
-        case "size":
-          comparison = a.size - b.size;
-          break;
-      }
-      return sortOrder === "asc" ? comparison : -comparison;
-    });
-  };
-
-  const sortedFiles = useMemo(
-    () => sortFiles(uniqueFiles),
-    [uniqueFiles, sortBy, sortOrder]
-  );
-
   const groupedFiles = useMemo(() => {
-    return sortedFiles.reduce((acc: GroupedFiles, file) => {
+    return uniqueFiles.reduce((acc: GroupedFiles, file) => {
       const date = format(parseISO(file.createdAt), "MMMM yyyy", {
         locale: fr,
       });
@@ -590,7 +589,7 @@ export function GalleryClient({
       acc[date].push(file);
       return acc;
     }, {});
-  }, [sortedFiles]);
+  }, [uniqueFiles]);
 
   const findCurrentFileIndex = () => {
     if (!selectedFile) return -1;
@@ -1032,6 +1031,7 @@ export function GalleryClient({
           <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4">
             <ViewSelector />
             <SortSelector />
+            <DateRangeFilter />
             <RefreshInterval />
             <Button
               variant="outline"

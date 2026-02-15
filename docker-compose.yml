@@ -15,6 +15,7 @@ services:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3000}
       - NEXT_PUBLIC_IMAGE_DOMAIN=${NEXT_PUBLIC_IMAGE_DOMAIN:-img.ascencia.re}
       - NEXT_PUBLIC_APP_DOMAIN=${NEXT_PUBLIC_APP_DOMAIN:-ascencia.re}
+      - MINECRAFT_SKIN_API_URL=http://minecraft-skin-api:3089
       - TZ=Europe/Paris
     restart: unless-stopped
     user: "${UID:-1000}:${GID:-1000}"
@@ -24,6 +25,24 @@ services:
       - ./uploads:/app/uploads:delegated
       - ./data:/app/data
       - next-cache:/app/.next/cache
+    depends_on:
+      minecraft-skin-api:
+        condition: service_healthy
+
+  minecraft-skin-api:
+    build:
+      context: ./minecraft-skin-api
+      dockerfile: Dockerfile
+    container_name: minecraft-skin-api
+    restart: unless-stopped
+    environment:
+      - PORT=3089
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3089/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
 volumes:
   next-cache:

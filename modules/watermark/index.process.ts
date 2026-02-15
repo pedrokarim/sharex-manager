@@ -168,6 +168,14 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   return { r, g, b };
 }
 
+// Top-level processImage export for the module manager
+export async function processImage(
+  imageBuffer: Buffer,
+  data?: any
+): Promise<Buffer> {
+  return await addWatermark(imageBuffer, data);
+}
+
 // Hooks du module
 export const moduleHooks: ModuleHooks = {
   onInit: () => {
@@ -179,9 +187,7 @@ export const moduleHooks: ModuleHooks = {
   onDisable: () => {
     console.log("Module Watermark désactivé");
   },
-  processImage: async (imageBuffer: Buffer) => {
-    return await addWatermark(imageBuffer);
-  },
+  processImage,
 };
 
 // Fonction pour initialiser les paramètres du module

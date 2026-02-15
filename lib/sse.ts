@@ -12,6 +12,7 @@ class SSEManager {
   private clients: Map<string, SSEClient> = new Map();
   private messageId = 0;
   private cleanupInterval: NodeJS.Timeout | null = null;
+  private static MAX_CLIENTS = 50;
 
   // Singleton global au niveau du processus (globalThis)
   static getInstance(): SSEManager {
@@ -26,8 +27,19 @@ class SSEManager {
     return (globalThis as any)[globalKey];
   }
 
-  addClient(id: string, send: (data: string) => void): void {
-    this.clients.set(id, { id, send });
+  addClient(id: string, send: (data: string) => void, userAgent?: string): void {
+    // Éviter l'accumulation infinie : évincer les plus anciens si on dépasse le max
+    if (this.clients.size >= SSEManager.MAX_CLIENTS) {
+      const oldest = Array.from(this.clients.entries())
+        .sort((a, b) => a[1].lastActivity - b[1].lastActivity);
+      const toRemove = oldest.slice(0, this.clients.size - SSEManager.MAX_CLIENTS + 1);
+      for (const [clientId] of toRemove) {
+        console.log(`[Gallery SSE] Éviction du client le plus ancien: ${clientId}`);
+        this.clients.delete(clientId);
+      }
+    }
+
+    this.clients.set(id, { id, send, lastActivity: Date.now(), userAgent });
     console.log(
       `[Gallery SSE] Client ajouté: ${id}, total: ${this.clients.size}`
     );
@@ -57,6 +69,7 @@ class SSEManager {
     this.clients.forEach((client) => {
       try {
         client.send(message);
+        client.lastActivity = Date.now();
         successCount++;
       } catch (error) {
         console.error(

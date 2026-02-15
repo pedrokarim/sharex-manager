@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import {
-  apiModuleManager,
-  initApiModuleManager,
-} from "@/lib/modules/module-manager.api";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 
 export async function DELETE(
   request: NextRequest,
@@ -17,8 +14,7 @@ export async function DELETE(
 
     const { moduleName } = await params;
 
-    // Initialiser le gestionnaire de modules API
-    await initApiModuleManager();
+    await apiModuleManager.ensureInitialized();
 
     // Supprimer le module
     const success = await apiModuleManager.deleteModule(moduleName);

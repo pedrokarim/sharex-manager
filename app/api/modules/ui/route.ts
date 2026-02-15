@@ -23,6 +23,8 @@ export async function POST(request: NextRequest) {
     // Récupérer les informations du fichier depuis le corps de la requête
     const { fileInfo } = await request.json();
 
+    await apiModuleManager.ensureInitialized();
+
     // Récupérer le module
     const loadedModule = apiModuleManager.getLoadedModule(moduleName);
     if (!loadedModule) {

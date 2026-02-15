@@ -414,6 +414,16 @@
         "too_many_archives": "Vous ne pouvez pas uploader plus de {count} archives à la fois"
       }
     },
+    "notifications": {
+      "new_file": "Nouveau fichier : {filename}"
+    },
+    "date_filter": {
+      "start_date": "Date de début",
+      "end_date": "Date de fin",
+      "from": "Depuis",
+      "until": "Jusqu'au",
+      "reset": "Réinitialiser les dates"
+    },
     "errors": {
       "loading_files": "Erreur lors du chargement des fichiers"
     },
@@ -444,7 +454,7 @@
       "history": "Historique",
       "configuration": "Configuration",
       "stats": "Stats",
-      "organization": "Organisation",
+      "organization": "Albums",
       "folders": "Dossiers",
       "tags": "Tags",
       "collections": "Collections",
@@ -1062,6 +1072,20 @@
         "space_used": "d'espace utilisé",
         "files_via_api": "fichiers via l'API",
         "files_via_web": "fichiers via l'interface"
+      },
+      "tabs": {
+        "overview": "Vue d'ensemble",
+        "analytics": "Analyses",
+        "growth": "Croissance",
+        "network": "Réseau"
+      },
+      "network": {
+        "top_ips_chart": "Top 10 des IPs par uploads",
+        "top_ips_table": "Détails des IPs",
+        "world_map": "Origine des uploads",
+        "location": "Localisation",
+        "private_network": "Réseau privé",
+        "rate_limited": "Certaines adresses IP n'ont pas pu être géolocalisées en raison d'une limitation de débit. Les résultats seront mis en cache pour la prochaine fois."
       }
     }
   },
@@ -1087,6 +1111,30 @@
     "no_albums": {
       "title": "Aucun album",
       "description": "Commencez par créer votre premier album pour organiser vos fichiers"
+    },
+    "file_removed": "Fichier retiré de l'album",
+    "deleted": "Album supprimé avec succès",
+    "now_public": "Album rendu public avec succès",
+    "now_private": "Album rendu privé avec succès",
+    "url_copied": "URL publique copiée",
+    "make_public": "Rendre public",
+    "make_private": "Rendre privé",
+    "copy_public_url": "Copier l'URL publique",
+    "open_new_tab": "Ouvrir dans un nouvel onglet",
+    "public_album": "Album public",
+    "public_album_description": "Cet album est accessible publiquement via l'URL ci-dessous",
+    "public_url": "URL publique",
+    "empty_album": "Album vide",
+    "empty_album_description": "Cet album ne contient aucun fichier. Ajoutez des fichiers depuis la galerie.",
+    "errors": {
+      "loading": "Erreur lors du chargement de l'album",
+      "loading_files": "Erreur lors du chargement des fichiers",
+      "not_found": "Album introuvable",
+      "forbidden": "Vous n'avez pas l'autorisation d'accéder à cet album",
+      "remove_file": "Erreur lors du retrait du fichier de l'album",
+      "delete": "Erreur lors de la suppression de l'album",
+      "toggle_visibility": "Erreur lors de la mise à jour de la visibilité",
+      "copy_url": "Erreur lors de la copie de l'URL"
     }
   },
   "multiselect": {

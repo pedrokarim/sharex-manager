@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    await apiModuleManager.ensureInitialized();
+
     // Désactiver le module
     const success = await apiModuleManager.toggleModule(moduleName);
 
@@ -39,9 +41,6 @@ export async function POST(request: NextRequest) {
         userId: session.user?.id || undefined,
         userEmail: session.user?.email || undefined,
       });
-
-      // Recharger les modules pour s'assurer que le module est correctement désactivé
-      await apiModuleManager.loadModules();
 
       return NextResponse.json({ success: true });
     } else {
