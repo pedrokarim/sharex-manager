@@ -522,7 +522,24 @@
       "coming_soon": "Bientôt disponible",
       "generate": "Générer",
       "download": "Télécharger",
-      "refresh": "Actualiser"
+      "refresh": "Actualiser",
+      "featured_skins": "Skins en vedette",
+      "featured_trending": "Trending",
+      "featured_empty": "Aucun skin en vedette disponible",
+      "recent_skins": "Skins récemment recherchés",
+      "recent_empty": "Aucune recherche récente. Recherchez un joueur pour commencer !",
+      "api_doc": "Documentation API",
+      "api_doc_title": "Minecraft Skin API",
+      "api_doc_description": "API REST pour rechercher des joueurs Minecraft, générer des rendus de skins et télécharger des textures.",
+      "api_doc_back": "Retour au viewer",
+      "api_doc_base_url": "URL de base",
+      "api_doc_endpoints": "Endpoints",
+      "api_doc_params": "Paramètres",
+      "api_doc_response": "Réponse",
+      "api_doc_example_curl": "Exemple cURL",
+      "api_doc_example_response": "Exemple de réponse",
+      "api_doc_required": "Requis",
+      "api_doc_optional": "Optionnel"
     }
   },
   "home": {

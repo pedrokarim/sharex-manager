@@ -506,7 +506,24 @@
       "coming_soon": "Coming Soon",
       "generate": "Generate",
       "download": "Download",
-      "refresh": "Refresh"
+      "refresh": "Refresh",
+      "featured_skins": "Featured Skins",
+      "featured_trending": "Trending",
+      "featured_empty": "No featured skins available",
+      "recent_skins": "Recently Searched Skins",
+      "recent_empty": "No recent searches. Search for a player to get started!",
+      "api_doc": "API Documentation",
+      "api_doc_title": "Minecraft Skin API",
+      "api_doc_description": "REST API to search Minecraft players, generate skin renders and download textures.",
+      "api_doc_back": "Back to viewer",
+      "api_doc_base_url": "Base URL",
+      "api_doc_endpoints": "Endpoints",
+      "api_doc_params": "Parameters",
+      "api_doc_response": "Response",
+      "api_doc_example_curl": "cURL Example",
+      "api_doc_example_response": "Example Response",
+      "api_doc_required": "Required",
+      "api_doc_optional": "Optional"
     }
   },
   "home": {
