@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { Play, Pause, Camera, Download } from "lucide-react";
 import {
   buildSkinModel,
@@ -29,36 +29,85 @@ export function MinecraftSkin3DVanilla({
   className = "",
 }: MinecraftSkin3DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rendererRef = useRef<any>(null);
+  const sceneRef = useRef<any>(null);
+  const cameraRef = useRef<any>(null);
+  const modelRef = useRef<any>(null);
+  const animationIdRef = useRef<number>(0);
+  const thetaRef = useRef(30);
+  const phiRef = useRef(21);
+  const isAnimatingRef = useRef(true);
+
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(true);
-  const [theta, setTheta] = useState(30);
-  const [phi, setPhi] = useState(21);
-  const [time, setTime] = useState(90);
+
+  const toggleAnimation = useCallback(() => {
+    isAnimatingRef.current = !isAnimatingRef.current;
+    setIsAnimating(isAnimatingRef.current);
+  }, []);
+
+  const captureCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Force a render to ensure the canvas is up-to-date
+    if (rendererRef.current && sceneRef.current && cameraRef.current) {
+      rendererRef.current.render(sceneRef.current, cameraRef.current);
+    }
+
+    const dataUrl = canvas.toDataURL("image/png");
+    // Copy to clipboard
+    canvas.toBlob((blob) => {
+      if (blob) {
+        navigator.clipboard
+          .write([new ClipboardItem({ "image/png": blob })])
+          .catch(() => {
+            // Fallback: open in new tab
+            window.open(dataUrl, "_blank");
+          });
+      }
+    });
+  }, []);
+
+  const downloadSnapshot = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Force a render
+    if (rendererRef.current && sceneRef.current && cameraRef.current) {
+      rendererRef.current.render(sceneRef.current, cameraRef.current);
+    }
+
+    const dataUrl = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = dataUrl;
+    link.download = "minecraft-skin-3d.png";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Charger Three.js dynamiquement
-    const loadThreeJS = async () => {
-      try {
-        // Charger Three.js depuis CDN
-        const script = document.createElement("script");
-        script.src =
-          "https://cdnjs.cloudflare.com/ajax/libs/three.js/r124/three.min.js";
-        script.async = true;
+    let cleanup: (() => void) | undefined;
 
-        return new Promise<void>((resolve, reject) => {
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error("Failed to load Three.js"));
-          document.head.appendChild(script);
-        });
-      } catch (error) {
-        console.error("Error loading Three.js:", error);
-        setError("Impossible de charger Three.js");
-        return;
-      }
+    const loadThreeJS = async () => {
+      // Check if Three.js is already loaded
+      if ((window as any).THREE) return;
+
+      const script = document.createElement("script");
+      script.src =
+        "https://cdnjs.cloudflare.com/ajax/libs/three.js/r124/three.min.js";
+      script.async = true;
+
+      return new Promise<void>((resolve, reject) => {
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("Failed to load Three.js"));
+        document.head.appendChild(script);
+      });
     };
 
     const init3D = async () => {
@@ -72,7 +121,6 @@ export function MinecraftSkin3DVanilla({
 
         const THREE = (window as any).THREE;
 
-        // Configuration de la scène (comme NameMC)
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(
           75,
@@ -80,82 +128,77 @@ export function MinecraftSkin3DVanilla({
           0.1,
           1000
         );
-        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+        const renderer = new THREE.WebGLRenderer({
+          canvas,
+          alpha: true,
+          preserveDrawingBuffer: true,
+        });
 
         renderer.setSize(width, height);
         renderer.setClearColor(0x000000, 0);
 
-        // Éclairage (comme NameMC)
+        sceneRef.current = scene;
+        cameraRef.current = camera;
+        rendererRef.current = renderer;
+
+        // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.3);
         directionalLight.position.set(0.678, 0.284, 0.678);
         scene.add(ambientLight);
         scene.add(directionalLight);
 
-        // Charger les images
+        // Load images
         const skinImage = await loadSkinImage(skinUrl);
         const capeImage = capeUrl ? await loadCapeImage(capeUrl) : null;
 
-        // Construire le modèle avec le système NameMC
+        // Build model
         const model = buildSkinModel(skinImage, capeImage, isSlim, false);
 
         if (!model) {
-          setError("Impossible de construire le modèle 3D");
+          setError("Impossible de construire le modele 3D");
           return;
         }
 
         scene.add(model);
+        modelRef.current = model;
 
-        // Position de la caméra (comme NameMC)
         camera.position.set(0, 0, 30);
         camera.lookAt(0, 0, 0);
 
-        // Animation (comme NameMC)
-        let animationId: number;
+        // Animation
         let startTime = performance.now();
 
         const animate = () => {
-          if (isAnimating) {
+          if (isAnimatingRef.current) {
             const currentTime =
               ((performance.now() - startTime) * (360 / 1500)) % 1440;
-            setTime(currentTime);
-
-            // Animation des bras et jambes (comme NameMC)
             const angle = Math.sin(radians(currentTime));
 
-            // Trouver les groupes d'animations
-            const rightArmGroup = model.children.find(
-              (child: any) =>
-                child.position.x < 0 && Math.abs(child.position.x) > 5
-            );
-            const leftArmGroup = model.children.find(
-              (child: any) =>
-                child.position.x > 0 && Math.abs(child.position.x) > 5
-            );
-            const rightLegGroup = model.children.find(
-              (child: any) => child.position.x < 0 && child.position.y < 0
-            );
-            const leftLegGroup = model.children.find(
-              (child: any) => child.position.x > 0 && child.position.y < 0
-            );
+            // Animate arms and legs by index (known structure)
+            // model children: head(0), torso(1), rightArm(2), leftArm(3), rightLeg(4), leftLeg(5), [cape(6)]
+            const rightArm = model.children[2];
+            const leftArm = model.children[3];
+            const rightLeg = model.children[4];
+            const leftLeg = model.children[5];
 
-            if (rightArmGroup) rightArmGroup.rotation.x = -radians(18) * angle;
-            if (leftArmGroup) leftArmGroup.rotation.x = radians(18) * angle;
-            if (rightLegGroup) rightLegGroup.rotation.x = radians(20) * angle;
-            if (leftLegGroup) leftLegGroup.rotation.x = -radians(20) * angle;
+            if (rightArm) rightArm.rotation.x = -radians(18) * angle;
+            if (leftArm) leftArm.rotation.x = radians(18) * angle;
+            if (rightLeg) rightLeg.rotation.x = radians(20) * angle;
+            if (leftLeg) leftLeg.rotation.x = -radians(20) * angle;
           }
 
-          // Rotation du modèle
-          model.rotation.x = radians(phi);
-          model.rotation.y = radians(theta);
+          // Rotation from refs (no state dependency)
+          model.rotation.x = radians(phiRef.current);
+          model.rotation.y = radians(thetaRef.current);
 
           renderer.render(scene, camera);
-          animationId = requestAnimationFrame(animate);
+          animationIdRef.current = requestAnimationFrame(animate);
         };
 
         animate();
 
-        // Contrôles de souris (comme NameMC)
+        // Mouse controls
         let isMouseDown = false;
         let mouseX = 0;
         let mouseY = 0;
@@ -173,27 +216,20 @@ export function MinecraftSkin3DVanilla({
 
         const onMouseMove = (event: MouseEvent) => {
           if (!isMouseDown) return;
-
-          // Utiliser screenX/screenY comme NameMC et appliquer directement la différence
-          const deltaX = event.screenX - mouseX;
-          const deltaY = event.screenY - mouseY;
-
-          setTheta((prev) => prev + deltaX);
-          setPhi((prev) => {
-            const newPhi = prev + deltaY;
-            // Limiter phi entre -90 et 90 comme NameMC
-            return Math.max(-90, Math.min(90, newPhi));
-          });
-
+          thetaRef.current += event.screenX - mouseX;
+          phiRef.current = Math.max(
+            -90,
+            Math.min(90, phiRef.current + (event.screenY - mouseY))
+          );
           mouseX = event.screenX;
           mouseY = event.screenY;
         };
 
-        // Support tactile (comme NameMC)
+        // Touch controls
         const onTouchStart = (event: TouchEvent) => {
           event.preventDefault();
-          for (let i = 0; i < event.changedTouches.length; i++) {
-            const touch = event.changedTouches[i];
+          const touch = event.changedTouches[0];
+          if (touch) {
             isMouseDown = true;
             mouseX = touch.screenX;
             mouseY = touch.screenY;
@@ -202,18 +238,13 @@ export function MinecraftSkin3DVanilla({
 
         const onTouchMove = (event: TouchEvent) => {
           if (!isMouseDown) return;
-
-          for (let i = 0; i < event.changedTouches.length; i++) {
-            const touch = event.changedTouches[i];
-            const deltaX = touch.screenX - mouseX;
-            const deltaY = touch.screenY - mouseY;
-
-            setTheta((prev) => prev + deltaX);
-            setPhi((prev) => {
-              const newPhi = prev + deltaY;
-              return Math.max(-90, Math.min(90, newPhi));
-            });
-
+          const touch = event.changedTouches[0];
+          if (touch) {
+            thetaRef.current += touch.screenX - mouseX;
+            phiRef.current = Math.max(
+              -90,
+              Math.min(90, phiRef.current + (touch.screenY - mouseY))
+            );
             mouseX = touch.screenX;
             mouseY = touch.screenY;
           }
@@ -225,33 +256,36 @@ export function MinecraftSkin3DVanilla({
         };
 
         canvas.addEventListener("mousedown", onMouseDown);
-        canvas.addEventListener("mouseup", onMouseUp);
-        canvas.addEventListener("mousemove", onMouseMove);
-        canvas.addEventListener("touchstart", onTouchStart);
-        canvas.addEventListener("touchmove", onTouchMove);
+        window.addEventListener("mouseup", onMouseUp);
+        window.addEventListener("mousemove", onMouseMove);
+        canvas.addEventListener("touchstart", onTouchStart, { passive: false });
+        canvas.addEventListener("touchmove", onTouchMove, { passive: false });
         canvas.addEventListener("touchend", onTouchEnd);
 
         setIsLoaded(true);
 
-        // Cleanup
-        return () => {
-          cancelAnimationFrame(animationId);
+        cleanup = () => {
+          cancelAnimationFrame(animationIdRef.current);
           canvas.removeEventListener("mousedown", onMouseDown);
-          canvas.removeEventListener("mouseup", onMouseUp);
-          canvas.removeEventListener("mousemove", onMouseMove);
+          window.removeEventListener("mouseup", onMouseUp);
+          window.removeEventListener("mousemove", onMouseMove);
           canvas.removeEventListener("touchstart", onTouchStart);
           canvas.removeEventListener("touchmove", onTouchMove);
           canvas.removeEventListener("touchend", onTouchEnd);
           renderer.dispose();
         };
-      } catch (error) {
-        console.error("Erreur lors de l'initialisation 3D:", error);
+      } catch (err) {
+        console.error("Erreur lors de l'initialisation 3D:", err);
         setError("Erreur lors du rendu 3D");
       }
     };
 
     init3D();
-  }, [skinUrl, capeUrl, isSlim, width, height, isAnimating, theta, phi]);
+
+    return () => {
+      cleanup?.();
+    };
+  }, [skinUrl, capeUrl, isSlim, width, height]);
 
   if (error) {
     return (
@@ -260,7 +294,7 @@ export function MinecraftSkin3DVanilla({
         style={{ width, height }}
       >
         <div className="text-center text-white">
-          <div className="text-red-400 mb-2">⚠️</div>
+          <div className="text-red-400 mb-2">!</div>
           <div className="text-sm">{error}</div>
         </div>
       </div>
@@ -272,14 +306,14 @@ export function MinecraftSkin3DVanilla({
       className={`bg-gray-900 rounded-lg overflow-hidden relative ${className}`}
       style={{ width, height }}
     >
-      {/* Fond à damier comme NameMC */}
+      {/* Checkerboard background */}
       <div
         className="absolute inset-0 opacity-20"
         style={{
           backgroundImage: `
-            linear-gradient(45deg, #333 25%, transparent 25%), 
-            linear-gradient(-45deg, #333 25%, transparent 25%), 
-            linear-gradient(45deg, transparent 75%, #333 75%), 
+            linear-gradient(45deg, #333 25%, transparent 25%),
+            linear-gradient(-45deg, #333 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #333 75%),
             linear-gradient(-45deg, transparent 75%, #333 75%)
           `,
           backgroundSize: "20px 20px",
@@ -301,11 +335,11 @@ export function MinecraftSkin3DVanilla({
         </div>
       )}
 
-      {/* Contrôles comme NameMC */}
+      {/* Controls */}
       {isLoaded && (
         <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
           <button
-            onClick={() => setIsAnimating(!isAnimating)}
+            onClick={toggleAnimation}
             className="bg-black/70 text-white p-2 rounded hover:bg-black/90 transition-colors"
             title={isAnimating ? "Pause" : "Play"}
           >
@@ -316,21 +350,23 @@ export function MinecraftSkin3DVanilla({
             )}
           </button>
           <button
+            onClick={captureCanvas}
             className="bg-black/70 text-white p-2 rounded hover:bg-black/90 transition-colors"
-            title="Capture"
+            title="Copier dans le presse-papier"
           >
             <Camera className="w-4 h-4" />
           </button>
           <button
+            onClick={downloadSnapshot}
             className="bg-black/70 text-white p-2 rounded hover:bg-black/90 transition-colors"
-            title="Télécharger"
+            title="Telecharger"
           >
             <Download className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Badge de cape comme NameMC */}
+      {/* Cape badge */}
       {isLoaded && capeUrl && (
         <div className="absolute top-2 left-2 z-20">
           <div className="bg-green-600 text-white px-2 py-1 rounded text-xs">

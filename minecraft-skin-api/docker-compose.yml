@@ -1,0 +1,32 @@
+# =============================================================================
+# Example: how to plug this service into another project's docker-compose.yml
+#
+# Copy the "minecraft-skin-api" service block below into your own compose file.
+# Other services can then call it internally via:
+#   http://minecraft-skin-api:3089/api/namemc/mchead.png?skin=<UUID>&width=126&height=126
+#   http://minecraft-skin-api:3089/api/namemc/mcbody.png?skin=<UUID>&model=classic&theta=-30&phi=20&time=90
+#   http://minecraft-skin-api:3089/api/namemc/mccape.png?skin=<UUID>&width=100&height=160
+#   http://minecraft-skin-api:3089/api/namemc/mcskin.png?skin=<UUID>
+#   http://minecraft-skin-api:3089/health
+# =============================================================================
+
+version: "3.8"
+
+services:
+  minecraft-skin-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: minecraft-skin-api
+    restart: unless-stopped
+    ports:
+      - "3089:3089"
+    environment:
+      - PORT=3089
+    # Healthcheck so dependent services can wait for readiness
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3089/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

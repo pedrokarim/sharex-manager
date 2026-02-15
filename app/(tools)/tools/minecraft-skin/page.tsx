@@ -2,10 +2,16 @@ import { Metadata } from "next";
 import { MinecraftSkinPageClient } from "./page.client";
 
 export const metadata: Metadata = {
-  title: "Minecraft Skin Renderer - ShareX Manager",
-  description: "Générateur d'images de skins Minecraft en 2D et 3D avec rendu spatial",
+  title: "Minecraft Skin Viewer - ShareX Manager",
+  description:
+    "Visualiseur de skins Minecraft avec rendu 3D interactif et rendus serveur",
 };
 
-export default function MinecraftSkinPage() {
-  return <MinecraftSkinPageClient />;
+export default async function MinecraftSkinPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ username?: string }>;
+}) {
+  const params = await searchParams;
+  return <MinecraftSkinPageClient initialUsername={params.username} />;
 }

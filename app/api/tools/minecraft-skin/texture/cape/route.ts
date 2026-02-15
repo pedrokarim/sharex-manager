@@ -8,5 +8,5 @@ export async function GET(request: NextRequest) {
     params[key] = value;
   });
 
-  return proxySkinApiImage("/api/namemc/mcbody.png", params);
+  return proxySkinApiImage("/api/namemc/texture/cape", params);
 }
