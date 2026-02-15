@@ -25,10 +25,6 @@ services:
       - ./uploads:/app/uploads:delegated
       - ./data:/app/data
       - next-cache:/app/.next/cache
-    depends_on:
-      minecraft-skin-api:
-        condition: service_healthy
-
   minecraft-skin-api:
     build:
       context: ./minecraft-skin-api
