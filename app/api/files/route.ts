@@ -29,6 +29,10 @@ export async function GET(request: Request) {
     const search = searchParams.get("q") || "";
     const secureOnly = searchParams.get("secure") === "true";
     const starredOnly = searchParams.get("starred") === "true";
+    const sort = searchParams.get("sort") || "date"; // name | date | size
+    const order = searchParams.get("order") || "desc"; // asc | desc
+    const startDate = searchParams.get("start");
+    const endDate = searchParams.get("end");
 
     // Force la revalidation du dossier public/uploads
     revalidatePath("/uploads");
@@ -74,15 +78,42 @@ export async function GET(request: Request) {
     );
 
     // Filtrer les fichiers null (ceux qui ont été sautés)
-    const validFiles = filesInfo.filter(
+    let validFiles = filesInfo.filter(
       (file): file is NonNullable<typeof file> => file !== null
     );
 
-    // Trier par date de création décroissante
-    validFiles.sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    // Filtrer par plage de dates
+    if (startDate) {
+      const start = new Date(startDate).getTime();
+      validFiles = validFiles.filter(
+        (file) => new Date(file.createdAt).getTime() >= start
+      );
+    }
+    if (endDate) {
+      const end = new Date(endDate).getTime();
+      validFiles = validFiles.filter(
+        (file) => new Date(file.createdAt).getTime() <= end
+      );
+    }
+
+    // Tri dynamique
+    validFiles.sort((a, b) => {
+      let comparison = 0;
+      switch (sort) {
+        case "name":
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case "size":
+          comparison = a.size - b.size;
+          break;
+        case "date":
+        default:
+          comparison =
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+      }
+      return order === "asc" ? comparison : -comparison;
+    });
 
     // Pagination
     const start = (page - 1) * PAGE_SIZE;

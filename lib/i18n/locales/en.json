@@ -399,6 +399,16 @@
         "too_many_archives": "You cannot upload more than {count} archives at a time"
       }
     },
+    "notifications": {
+      "new_file": "New file: {filename}"
+    },
+    "date_filter": {
+      "start_date": "Start date",
+      "end_date": "End date",
+      "from": "From",
+      "until": "Until",
+      "reset": "Reset dates"
+    },
     "errors": {
       "loading_files": "Error loading files"
     },
@@ -429,7 +439,7 @@
       "history": "History",
       "configuration": "Configuration",
       "stats": "Stats",
-      "organization": "Organization",
+      "organization": "Albums",
       "folders": "Folders",
       "tags": "Tags",
       "collections": "Collections",
@@ -1118,6 +1128,20 @@
         "space_used": "of space used",
         "files_via_api": "files via API",
         "files_via_web": "files via web interface"
+      },
+      "tabs": {
+        "overview": "Overview",
+        "analytics": "Analytics",
+        "growth": "Growth",
+        "network": "Network"
+      },
+      "network": {
+        "top_ips_chart": "Top 10 IPs by Uploads",
+        "top_ips_table": "IP Details",
+        "world_map": "Upload Origins",
+        "location": "Location",
+        "private_network": "Private Network",
+        "rate_limited": "Some IP addresses could not be geolocated due to rate limiting. Results will be cached for next time."
       }
     }
   },
@@ -1143,6 +1167,30 @@
     "no_albums": {
       "title": "No albums",
       "description": "Start by creating your first album to organize your files"
+    },
+    "file_removed": "File removed from album",
+    "deleted": "Album deleted successfully",
+    "now_public": "Album is now public",
+    "now_private": "Album is now private",
+    "url_copied": "Public URL copied",
+    "make_public": "Make public",
+    "make_private": "Make private",
+    "copy_public_url": "Copy public URL",
+    "open_new_tab": "Open in new tab",
+    "public_album": "Public album",
+    "public_album_description": "This album is publicly accessible via the URL below",
+    "public_url": "Public URL",
+    "empty_album": "Empty album",
+    "empty_album_description": "This album has no files. Add files from the gallery.",
+    "errors": {
+      "loading": "Error loading album",
+      "loading_files": "Error loading files",
+      "not_found": "Album not found",
+      "forbidden": "You don't have permission to access this album",
+      "remove_file": "Error removing file from album",
+      "delete": "Error deleting album",
+      "toggle_visibility": "Error updating visibility",
+      "copy_url": "Error copying URL"
     }
   },
   "multiselect": {
