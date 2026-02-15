@@ -1,7 +1,4 @@
-import {
-  apiModuleManager,
-  initApiModuleManager,
-} from "@/lib/modules/module-manager.api";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import { ModuleList } from "@/components/modules/module-list";
 import { Metadata } from "next";
 
@@ -11,8 +8,7 @@ export const metadata = {
 };
 
 export default async function ModulesPage() {
-  // Initialiser le gestionnaire de modules API
-  await initApiModuleManager();
+  await apiModuleManager.ensureInitialized();
 
   // Récupérer la liste des modules
   const modules = await apiModuleManager.getModules();

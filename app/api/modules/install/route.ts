@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import {
-  apiModuleManager,
-  initApiModuleManager,
-} from "@/lib/modules/module-manager.api";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -17,8 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Initialiser le gestionnaire de modules API
-    await initApiModuleManager();
+    await apiModuleManager.ensureInitialized();
 
     // Récupérer le fichier ZIP du module
     const formData = await request.formData();

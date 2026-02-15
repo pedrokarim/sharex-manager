@@ -1,3 +1,15 @@
+export interface ModulePageConfig {
+  path: string;        // segment route: "" = racine, "settings" = /m/<name>/settings
+  title: string;
+  component: string;   // chemin relatif au module: "pages/generate.tsx"
+}
+
+export interface ModuleNavItem {
+  title: string;
+  icon?: string;       // nom d'icone Lucide: "Sparkles", "Settings"
+  url?: string;        // auto-genere en /m/<moduleName> si omis
+}
+
 export interface ModuleConfig {
   name: string;
   version: string;
@@ -13,17 +25,20 @@ export interface ModuleConfig {
   npmDependencies?: Record<string, string>;
   settings?: Record<string, any>;
   capabilities?: string[];
+  pages?: ModulePageConfig[];
+  navItems?: ModuleNavItem[];
 }
 
 export interface LoadedModule {
   name: string;
   config: ModuleConfig;
-  module: any;
+  module: ModuleHooks;
   path: string;
+  status: "loaded" | "error" | "disabled";
 }
 
 export interface ModuleManager {
-  loadModules: () => Promise<LoadedModule[]>;
+  ensureInitialized: () => Promise<void>;
   getModules: () => Promise<ModuleConfig[]>;
   toggleModule: (moduleName: string) => Promise<boolean>;
   deleteModule: (moduleName: string) => Promise<boolean>;
@@ -32,17 +47,21 @@ export interface ModuleManager {
   installNpmDependencies: (moduleName: string) => Promise<boolean>;
   getLoadedModule: (moduleName: string) => LoadedModule | undefined;
   getAllLoadedModules: () => LoadedModule[];
-  processImageWithModule?: (
+  processImageWithModule: (
     moduleName: string,
     imageBuffer: Buffer,
     settings?: any
   ) => Promise<Buffer>;
-  processImage?: (imageBuffer: Buffer) => Promise<Buffer>;
-  callModuleFunction?: (
+  processImage: (imageBuffer: Buffer) => Promise<Buffer>;
+  callModuleFunction: (
     moduleName: string,
     functionName: string,
     ...args: any[]
   ) => Promise<any>;
+  updateModuleSettings: (
+    moduleName: string,
+    newSettings: Record<string, any>
+  ) => Promise<boolean>;
 }
 
 export interface ModuleHooks {
@@ -58,5 +77,4 @@ export interface ModuleHooks {
   ) => React.ReactNode;
   getActionIcon?: () => { icon: React.ComponentType; tooltip: string };
   getCapabilities?: () => string[];
-  _exports?: Record<string, any>;
 }

@@ -4,13 +4,13 @@ import { ModuleConfig } from "@/types/modules";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,12 +25,13 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
-import { Package, Download } from "lucide-react";
+import { Package, Download, Trash2 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 
 interface ModuleCardProps {
   module: ModuleConfig;
@@ -80,15 +81,6 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
     setImageError(true);
   };
 
-  // Formater les types de fichiers supportés
-  const formatSupportedFileTypes = () => {
-    if (!module.supportedFileTypes || module.supportedFileTypes.length === 0) {
-      return "Aucun type de fichier supporté";
-    }
-
-    return module.supportedFileTypes.map((type) => `.${type}`).join(", ");
-  };
-
   // Installer les dépendances NPM
   const handleInstallNpmDeps = async () => {
     try {
@@ -128,11 +120,24 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
   };
 
   return (
-    <Card className="w-full">
+    <Card
+      className={cn(
+        "group w-full transition-all duration-200 hover:shadow-md relative",
+        !module.enabled && "opacity-60"
+      )}
+    >
+      {module.category && (
+        <div className="absolute top-3 right-3 z-10">
+          <Badge variant="outline" className="text-xs">
+            {module.category}
+          </Badge>
+        </div>
+      )}
+
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-md overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+            <div className="h-12 w-12 rounded-md overflow-hidden flex items-center justify-center bg-muted">
               {module.icon && !imageError ? (
                 <Image
                   src={module.icon}
@@ -143,12 +148,22 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
                   onError={handleImageError}
                 />
               ) : (
-                <Package className="h-6 w-6 text-gray-400" />
+                <Package className="h-6 w-6 text-muted-foreground" />
               )}
             </div>
             <div>
-              <CardTitle>{module.name}</CardTitle>
-              <CardDescription>Version {module.version}</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "inline-block h-2 w-2 rounded-full",
+                    module.enabled ? "bg-green-500" : "bg-gray-400"
+                  )}
+                />
+                {module.name}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                v{module.version} · {module.author}
+              </p>
             </div>
           </div>
           <Switch
@@ -159,71 +174,78 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
           />
         </div>
       </CardHeader>
+
       <CardContent>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-muted-foreground line-clamp-2">
           {module.description}
         </p>
-        <div className="mt-4 space-y-2">
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            Auteur: {module.author}
-          </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            Types de fichiers supportés: {formatSupportedFileTypes()}
-          </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            Interface utilisateur: {module.hasUI ? "Oui" : "Non"}
-          </p>
 
-          {module.npmDependencies &&
-            Object.keys(module.npmDependencies).length > 0 && (
-              <Collapsible
-                open={isNpmDepsOpen}
-                onOpenChange={setIsNpmDepsOpen}
-                className="mt-4"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                    Dépendances NPM:{" "}
-                    {Object.keys(module.npmDependencies).length}
-                  </p>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      {isNpmDepsOpen ? "Masquer" : "Afficher"}
+        {module.supportedFileTypes && module.supportedFileTypes.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {module.supportedFileTypes.map((type) => (
+              <Badge key={type} variant="secondary" className="text-xs font-mono">
+                .{type}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {module.npmDependencies &&
+          Object.keys(module.npmDependencies).length > 0 && (
+            <Collapsible
+              open={isNpmDepsOpen}
+              onOpenChange={setIsNpmDepsOpen}
+              className="mt-4"
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Dépendances NPM:{" "}
+                  {Object.keys(module.npmDependencies).length}
+                </p>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    {isNpmDepsOpen ? "Masquer" : "Afficher"}
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent className="mt-2">
+                <div className="text-xs text-muted-foreground space-y-1 border rounded-md p-2">
+                  {Object.entries(module.npmDependencies).map(
+                    ([name, version]) => (
+                      <div key={name} className="flex justify-between">
+                        <span>{name}</span>
+                        <span>{version}</span>
+                      </div>
+                    )
+                  )}
+                  <div className="pt-2 flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleInstallNpmDeps}
+                      disabled={isInstallingDeps}
+                      className="flex items-center gap-1"
+                    >
+                      <Download className="h-3 w-3" />
+                      {isInstallingDeps ? "Installation..." : "Installer"}
                     </Button>
-                  </CollapsibleTrigger>
-                </div>
-                <CollapsibleContent className="mt-2">
-                  <div className="text-xs text-gray-400 dark:text-gray-500 space-y-1 border rounded-md p-2">
-                    {Object.entries(module.npmDependencies).map(
-                      ([name, version]) => (
-                        <div key={name} className="flex justify-between">
-                          <span>{name}</span>
-                          <span>{version}</span>
-                        </div>
-                      )
-                    )}
-                    <div className="pt-2 flex justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleInstallNpmDeps}
-                        disabled={isInstallingDeps}
-                        className="flex items-center gap-1"
-                      >
-                        <Download className="h-3 w-3" />
-                        {isInstallingDeps ? "Installation..." : "Installer"}
-                      </Button>
-                    </div>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-        </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
       </CardContent>
-      <CardFooter className="flex justify-between">
+
+      <CardFooter className="flex justify-end">
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="destructive" disabled={isLoading}>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={isLoading}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4 mr-1.5" />
               Supprimer
             </Button>
           </AlertDialogTrigger>

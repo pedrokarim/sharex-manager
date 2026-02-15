@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import {
-  apiModuleManager,
-  initApiModuleManager,
-} from "@/lib/modules/module-manager.api";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -21,8 +18,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Initialiser le gestionnaire de modules API
-    await initApiModuleManager();
+    await apiModuleManager.ensureInitialized();
 
     // Récupérer les modules compatibles avec le type de fichier
     const modules = await apiModuleManager.getModulesByFileType(fileType);

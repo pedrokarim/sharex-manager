@@ -84,8 +84,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Recharger les modules pour s'assurer que le module est chargé
-      await apiModuleManager.loadModules();
     }
 
     // Installer les dépendances NPM du module

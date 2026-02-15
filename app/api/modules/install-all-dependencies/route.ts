@@ -87,9 +87,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Recharger les modules pour s'assurer que tous les modules sont chargés
-    await apiModuleManager.loadModules();
-
     return NextResponse.json({
       success: true,
       results,

@@ -226,6 +226,10 @@ export function GalleryClient({
   const [fileAlbumsCache, setFileAlbumsCache] = useState<Record<string, any[]>>(
     {}
   );
+  const fileAlbumsCacheRef = useRef(fileAlbumsCache);
+  useEffect(() => {
+    fileAlbumsCacheRef.current = fileAlbumsCache;
+  }, [fileAlbumsCache]);
 
   useEffect(() => {
     // Simuler un temps de chargement pour une meilleure expérience utilisateur
@@ -265,7 +269,7 @@ export function GalleryClient({
         // Filtrer les fichiers qui ne sont pas encore dans le cache (sauf si forceReload)
         const uncachedFiles = forceReload
           ? fileNames
-          : fileNames.filter((fileName) => !fileAlbumsCache[fileName]);
+          : fileNames.filter((fileName) => !fileAlbumsCacheRef.current[fileName]);
 
         if (uncachedFiles.length === 0) return;
 
@@ -291,7 +295,7 @@ export function GalleryClient({
         );
       }
     },
-    [fileAlbumsCache]
+    []
   );
 
   const fetchFiles = useCallback(
@@ -455,7 +459,8 @@ export function GalleryClient({
 
     // Nettoyer la connexion à la destruction du composant
     return cleanup;
-  }, [prependItem, enableUploadNotifications, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- All values accessed via refs, no deps needed
+  }, []);
 
   const handleFinishUpload = useCallback(async () => {
     const { files: newFiles, hasMore: newHasMore } = await fetchFiles(1);
@@ -472,7 +477,8 @@ export function GalleryClient({
   }, [fetchFiles, reset]);
 
   useEffect(() => {
-    if (search !== initialSearch && search !== undefined) {
+    const currentSearch = search ?? "";
+    if (currentSearch !== initialSearch) {
       resetSearch();
     }
   }, [search, initialSearch, resetSearch]);

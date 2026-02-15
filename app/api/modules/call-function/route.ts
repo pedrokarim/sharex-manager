@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import {
-  apiModuleManager,
-  initApiModuleManager,
-} from "@/lib/modules/module-manager.api";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 
@@ -38,8 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // S'assurer que le gestionnaire de modules est initialisé
-    await initApiModuleManager();
+    await apiModuleManager.ensureInitialized();
 
     // Vérifier si le module existe
     const loadedModule = apiModuleManager.getLoadedModule(moduleName);

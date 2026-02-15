@@ -106,13 +106,13 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="mx-auto h-10 w-10 text-gray-400" />
-            <p className="mt-2 text-sm text-gray-500">
+            <Upload className="mx-auto h-10 w-10 text-muted-foreground" />
+            <p className="mt-2 text-sm text-muted-foreground">
               {isDragActive
                 ? "Déposez le fichier ici..."
                 : "Glissez-déposez un fichier ZIP ici, ou cliquez pour sélectionner un fichier"}
             </p>
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-muted-foreground/70">
               Seuls les fichiers ZIP sont acceptés
             </p>
           </div>
@@ -126,7 +126,7 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
                 <p className="text-sm font-medium text-gray-900 truncate dark:text-gray-100">
                   {file.name}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   {(file.size / 1024).toFixed(2)} KB
                 </p>
               </div>
@@ -144,7 +144,7 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
         {file && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <ImageIcon className="h-5 w-5 text-gray-500" />
+              <ImageIcon className="h-5 w-5 text-muted-foreground" />
               <h3 className="text-sm font-medium">
                 Icône du module (optionnel)
               </h3>
@@ -167,7 +167,7 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
                     value={iconUrl}
                     onChange={(e) => setIconUrl(e.target.value)}
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     Entrez l'URL d'une image pour l'utiliser comme icône du
                     module
                   </p>

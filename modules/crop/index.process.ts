@@ -9,6 +9,27 @@ let settings: {
 };
 
 // Fonction pour recadrer une image
+async function toOutputFormat(
+  pipeline: sharp.Sharp,
+  format: string | undefined,
+  quality: number
+): Promise<Buffer> {
+  switch (format) {
+    case "png":
+      return pipeline.png().toBuffer();
+    case "webp":
+      return pipeline.webp({ quality }).toBuffer();
+    case "gif":
+      return pipeline.gif().toBuffer();
+    case "avif":
+      return pipeline.avif({ quality }).toBuffer();
+    case "tiff":
+      return pipeline.tiff({ quality }).toBuffer();
+    default:
+      return pipeline.jpeg({ quality }).toBuffer();
+  }
+}
+
 export async function cropImage(
   imageBuffer: Buffer,
   cropData: any
@@ -23,6 +44,7 @@ export async function cropImage(
     const metadata = await sharp(imageBuffer).metadata();
     const originalWidth = metadata.width || 800;
     const originalHeight = metadata.height || 600;
+    const inputFormat = metadata.format;
     console.log(
       "Métadonnées de l'image originale:",
       originalWidth,
@@ -79,19 +101,7 @@ export async function cropImage(
         ]);
       }
 
-      // Convertir en JPEG avec la qualité spécifiée
-      const result = await processedImage
-        .jpeg({ quality: quality || 90 })
-        .toBuffer();
-
-      // Vérifier les métadonnées de l'image recadrée
-      const newMetadata = await sharp(result).metadata();
-      console.log(
-        "Métadonnées de l'image recadrée:",
-        newMetadata.width,
-        "x",
-        newMetadata.height
-      );
+      const result = await toOutputFormat(processedImage, inputFormat, quality || 90);
 
       console.log("Image recadrée avec succès");
       return result;
@@ -145,19 +155,7 @@ export async function cropImage(
         ]);
       }
 
-      // Convertir en JPEG avec la qualité spécifiée
-      const result = await processedImage
-        .jpeg({ quality: quality || 90 })
-        .toBuffer();
-
-      // Vérifier les métadonnées de l'image recadrée
-      const newMetadata = await sharp(result).metadata();
-      console.log(
-        "Métadonnées de l'image recadrée:",
-        newMetadata.width,
-        "x",
-        newMetadata.height
-      );
+      const result = await toOutputFormat(processedImage, inputFormat, quality || 90);
 
       console.log("Image recadrée avec succès");
       return result;
@@ -171,6 +169,14 @@ export async function cropImage(
   }
 }
 
+// Top-level processImage export for the module manager
+export async function processImage(
+  imageBuffer: Buffer,
+  data?: any
+): Promise<Buffer> {
+  return await cropImage(imageBuffer, data);
+}
+
 // Hooks du module
 export const moduleHooks: ModuleHooks = {
   onInit: () => {
@@ -182,7 +188,7 @@ export const moduleHooks: ModuleHooks = {
   onDisable: () => {
     console.log("Module Crop désactivé");
   },
-  processImage: cropImage,
+  processImage,
 };
 
 // Fonction pour initialiser les paramètres du module

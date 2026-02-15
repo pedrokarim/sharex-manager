@@ -13,15 +13,13 @@ export default function ModulesPage() {
         <h1 className="text-2xl sm:text-3xl font-bold mb-2">
           Gestion des Modules
         </h1>
-        <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
+        <p className="text-muted-foreground text-sm sm:text-base">
           Installez, activez, désactivez et supprimez des modules pour étendre
           les fonctionnalités de votre application.
         </p>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
-        <ModuleList />
-      </div>
+      <ModuleList />
     </div>
   );
 }

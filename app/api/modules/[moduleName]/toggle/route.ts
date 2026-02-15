@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import {
-  apiModuleManager,
-  initApiModuleManager,
-} from "@/lib/modules/module-manager.api";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 
 export async function POST(
   request: NextRequest,
@@ -17,8 +14,7 @@ export async function POST(
 
     const { moduleName } = await params;
 
-    // Initialiser le gestionnaire de modules API
-    await initApiModuleManager();
+    await apiModuleManager.ensureInitialized();
 
     // Activer/désactiver le module
     const success = await apiModuleManager.toggleModule(moduleName);

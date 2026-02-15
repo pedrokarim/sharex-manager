@@ -359,8 +359,8 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
 
       {/* Overlay de drop */}
       {isDragActive && (
-        <div className="fixed left-[--sidebar-width] top-[--header-height] right-0 bottom-0 bg-primary/10 backdrop-blur-sm flex items-center justify-center z-[999]">
-          <div className="bg-background/95 p-8 rounded-lg shadow-lg text-center border-2 border-dashed border-primary -translate-x-[120px] -translate-y-[32px]">
+        <div className="fixed left-(--sidebar-width) top-(--header-height) right-0 bottom-0 bg-primary/10 backdrop-blur-sm flex items-center justify-center z-[999]">
+          <div className="bg-background/95 p-8 rounded-lg shadow-lg text-center border-2 border-dashed border-primary">
             <Upload className="w-16 h-16 mx-auto mb-4 text-primary animate-bounce" />
             <h3 className="text-2xl font-semibold">
               {t("gallery.upload_zone.drop_files")}

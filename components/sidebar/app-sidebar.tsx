@@ -1,6 +1,7 @@
 "use client";
 
 import type * as React from "react";
+import { useState, useEffect } from "react";
 import {
   Home,
   Image as ImageIcon,
@@ -31,11 +32,13 @@ import {
   BarChart3,
   Tag,
   Grid3X3,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import { useTranslation } from "@/lib/i18n";
+import { resolveIcon } from "@/lib/utils/resolve-icon";
 
 import { NavMain } from "./nav-main";
 import { NavSecondary } from "./nav-secondary";
@@ -51,10 +54,39 @@ import {
   SidebarRail,
 } from "../ui/sidebar";
 
+interface ModuleNavApiItem {
+  moduleName: string;
+  title: string;
+  url: string;
+  icon: string;
+  subItems: { title: string; url: string }[];
+}
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
   const { t } = useTranslation();
+  const [moduleNavItems, setModuleNavItems] = useState<ModuleNavApiItem[]>([]);
+
+  useEffect(() => {
+    fetch("/api/modules/nav-items")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.items) setModuleNavItems(data.items);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Convert module nav items to sidebar format
+  const moduleMenuItems = moduleNavItems.map((item) => ({
+    title: item.title,
+    url: item.url,
+    icon: resolveIcon(item.icon),
+    items: item.subItems.map((sub) => ({
+      title: sub.title,
+      url: sub.url,
+    })),
+  }));
 
   const data = {
     user: {
@@ -301,7 +333,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             items={data.navAdmin}
           />
         )}
-        <NavMain title="Autre" items={data.navOther} />
+        <NavMain
+          title="Autre"
+          items={[...data.navOther, ...moduleMenuItems]}
+        />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
