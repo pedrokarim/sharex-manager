@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -49,6 +49,13 @@ interface AlbumViewClientProps {
 export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const routerRef = useRef(router);
+  const tRef = useRef(t);
+
+  useEffect(() => {
+    routerRef.current = router;
+    tRef.current = t;
+  }, [router, t]);
 
   const [album, setAlbum] = useState<Album | null>(null);
   const [files, setFiles] = useState<FileInfo[]>([]);
@@ -75,22 +82,22 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       if (!albumResponse.ok) {
         const errorData = await albumResponse.json().catch(() => ({}));
         const errorMessage =
-          errorData.error || t("albums.errors.loading");
+          errorData.error || tRef.current("albums.errors.loading");
 
         if (albumResponse.status === 404) {
-          toast.error(t("albums.errors.not_found"));
-          router.push("/albums");
+          toast.error(tRef.current("albums.errors.not_found"));
+          routerRef.current.push("/albums");
           return;
         }
 
         if (albumResponse.status === 401) {
-          router.push("/login");
+          routerRef.current.push("/login");
           return;
         }
 
         if (albumResponse.status === 403) {
-          toast.error(t("albums.errors.forbidden"));
-          router.push("/albums");
+          toast.error(tRef.current("albums.errors.forbidden"));
+          routerRef.current.push("/albums");
           return;
         }
 
@@ -107,7 +114,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       );
       if (!filesResponse.ok) {
         const errorData = await filesResponse.json().catch(() => ({}));
-        toast.error(errorData.error || t("albums.errors.loading_files"));
+        toast.error(errorData.error || tRef.current("albums.errors.loading_files"));
         return;
       }
 
@@ -115,11 +122,11 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       setFiles(filesData.files);
     } catch (error) {
       console.error("Erreur lors du chargement de l'album:", error);
-      toast.error(t("albums.errors.loading"));
+      toast.error(tRef.current("albums.errors.loading"));
     } finally {
       setLoading(false);
     }
-  }, [albumId, router, t]);
+  }, [albumId]);
 
   useEffect(() => {
     fetchAlbumData();

@@ -21,8 +21,18 @@ import {
   Copy,
   Check,
   History,
+  Flame,
+  Clock,
+  BookOpen,
 } from "lucide-react";
 import { MinecraftSkin3DVanilla } from "@/components/minecraft/minecraft-skin-3d";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import Link from "next/link";
 
 interface PlayerData {
   uuid: string;
@@ -44,8 +54,72 @@ interface NameHistoryData {
   names: NameHistoryEntry[];
 }
 
+interface RecentSkin {
+  uuid: string;
+  username: string;
+  searchedAt: string;
+  isSlim: boolean;
+}
+
+interface FeaturedSkin {
+  uuid: string;
+  username: string;
+}
+
 interface MinecraftSkinPageClientProps {
   initialUsername?: string;
+}
+
+function SkinThumbnailGrid({
+  skins,
+  onSelect,
+  loading,
+  emptyMessage,
+}: {
+  skins: { uuid: string; username: string }[];
+  onSelect: (username: string) => void;
+  loading: boolean;
+  emptyMessage: string;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (skins.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-4 text-center">
+        {emptyMessage}
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+      {skins.map((skin) => (
+        <button
+          key={skin.uuid}
+          onClick={() => onSelect(skin.username)}
+          className="flex flex-col items-center gap-1.5 group cursor-pointer"
+        >
+          <div className="w-full aspect-[1/2] bg-muted rounded-lg flex items-center justify-center overflow-hidden group-hover:ring-2 group-hover:ring-primary transition-all">
+            <img
+              src={`/api/tools/minecraft-skin/mcbody.png?skin=${skin.uuid}`}
+              alt={skin.username}
+              className="max-w-full max-h-full object-contain"
+              loading="lazy"
+            />
+          </div>
+          <span className="text-xs font-medium truncate w-full text-center group-hover:text-primary transition-colors">
+            {skin.username}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function MinecraftSkinPageContent({
@@ -75,6 +149,86 @@ function MinecraftSkinPageContent({
   // Name history
   const [nameHistory, setNameHistory] = useState<NameHistoryData | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Recent skins
+  const [recentSkins, setRecentSkins] = useState<RecentSkin[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
+
+  // Featured skins
+  const [featuredSkins, setFeaturedSkins] = useState<FeaturedSkin[]>([]);
+  const [loadingFeatured, setLoadingFeatured] = useState(true);
+
+  // API health status: null = checking, true = up, false = down
+  const [apiHealthy, setApiHealthy] = useState<boolean | null>(null);
+
+  // Fetch recent & featured on mount
+  useEffect(() => {
+    fetchRecentSkins();
+    fetchFeaturedSkins();
+  }, []);
+
+  // Health check on mount + poll every 30s
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const res = await fetch("/api/tools/minecraft-skin/health");
+        setApiHealthy(res.ok);
+      } catch {
+        setApiHealthy(false);
+      }
+    };
+    checkHealth();
+    const interval = setInterval(checkHealth, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchRecentSkins = async () => {
+    setLoadingRecent(true);
+    try {
+      const res = await fetch("/api/tools/minecraft-skin/recent");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setRecentSkins(data.skins);
+      }
+    } catch {
+      // Silent fail
+    } finally {
+      setLoadingRecent(false);
+    }
+  };
+
+  const fetchFeaturedSkins = async () => {
+    setLoadingFeatured(true);
+    try {
+      const res = await fetch("/api/tools/minecraft-skin/featured");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setFeaturedSkins(data.skins);
+      }
+    } catch {
+      // Silent fail
+    } finally {
+      setLoadingFeatured(false);
+    }
+  };
+
+  const saveRecentSkin = useCallback(async (player: PlayerData) => {
+    try {
+      await fetch("/api/tools/minecraft-skin/recent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uuid: player.uuid,
+          username: player.username,
+          isSlim: player.isSlim,
+        }),
+      });
+      // Refresh recent list
+      fetchRecentSkins();
+    } catch {
+      // Silent fail
+    }
+  }, []);
 
   const searchPlayer = useCallback(
     async (name: string) => {
@@ -112,6 +266,9 @@ function MinecraftSkinPageContent({
 
           // Fetch name history
           fetchNameHistory(player.uuid);
+
+          // Save to recent skins
+          saveRecentSkin(player);
         } else {
           throw new Error("Joueur non trouve");
         }
@@ -123,7 +280,7 @@ function MinecraftSkinPageContent({
         setIsSearching(false);
       }
     },
-    [setUsername]
+    [setUsername, saveRecentSkin]
   );
 
   // Auto-search on load if username provided
@@ -235,6 +392,14 @@ function MinecraftSkinPageContent({
     setTimeout(() => setCopiedUuid(false), 2000);
   }, [playerData?.uuid]);
 
+  const handleSelectSkin = useCallback(
+    (name: string) => {
+      setSearchInput(name);
+      searchPlayer(name);
+    },
+    [searchPlayer]
+  );
+
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6 max-w-6xl">
       {/* Search bar */}
@@ -269,6 +434,42 @@ function MinecraftSkinPageContent({
             </Button>
           </div>
 
+          {/* API status + Doc link */}
+          <div className="flex items-center justify-between mt-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-default">
+                    <span
+                      className={`inline-block h-2 w-2 rounded-full ${
+                        apiHealthy === null
+                          ? "bg-yellow-500 animate-pulse"
+                          : apiHealthy
+                          ? "bg-green-500"
+                          : "bg-red-500"
+                      }`}
+                    />
+                    Render API
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {apiHealthy === null
+                    ? "Verification du statut de l'API..."
+                    : apiHealthy
+                    ? "L'API de rendu est operationnelle"
+                    : "L'API de rendu est injoignable"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <Link
+              href="/tools/minecraft-skin/api"
+              className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+            >
+              <BookOpen className="h-3 w-3" />
+              Documentation API
+            </Link>
+          </div>
+
           {searchError && (
             <Alert variant="destructive" className="mt-3">
               <AlertDescription>{searchError}</AlertDescription>
@@ -276,6 +477,49 @@ function MinecraftSkinPageContent({
           )}
         </CardContent>
       </Card>
+
+      {/* Featured skins */}
+      {!playerData && (
+        <>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-orange-500" />
+                Skins en vedette
+                <Badge variant="secondary" className="text-xs">
+                  Trending
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SkinThumbnailGrid
+                skins={featuredSkins}
+                onSelect={handleSelectSkin}
+                loading={loadingFeatured}
+                emptyMessage="Aucun skin en vedette disponible"
+              />
+            </CardContent>
+          </Card>
+
+          {/* Recent skins */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Skins recemment recherches
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SkinThumbnailGrid
+                skins={recentSkins}
+                onSelect={handleSelectSkin}
+                loading={loadingRecent}
+                emptyMessage="Aucune recherche recente. Recherchez un joueur pour commencer !"
+              />
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Main content: 3D viewer + player info */}
       {playerData && (
@@ -524,6 +768,26 @@ function MinecraftSkinPageContent({
               </div>
             </CardContent>
           </Card>
+
+          {/* Recent skins (shown below results too) */}
+          {recentSkins.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Skins recemment recherches
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SkinThumbnailGrid
+                  skins={recentSkins}
+                  onSelect={handleSelectSkin}
+                  loading={false}
+                  emptyMessage=""
+                />
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>
