@@ -13,27 +13,63 @@ export function useInfiniteScroll<T>({
   hasMore,
 }: UseInfiniteScrollProps<T>) {
   const [data, setData] = useState<T[]>(initialData);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const { ref, inView } = useInView();
 
-  useEffect(() => {
-    if (inView && hasMore && !loading) {
-      setLoading(true);
-      fetchMore(page)
-        .then((newData) => {
-          setData((prev) => [...prev, ...newData]);
-          setPage((p) => p + 1);
-        })
-        .finally(() => setLoading(false));
-    }
-  }, [inView, hasMore, page, fetchMore, loading]);
+  // Use refs for values that should NOT re-trigger the effect
+  const pageRef = useRef(2); // Start at 2: initialData already contains page 1
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(hasMore);
+  const fetchMoreRef = useRef(fetchMore);
 
+  // Keep refs in sync
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
+
+  useEffect(() => {
+    fetchMoreRef.current = fetchMore;
+  }, [fetchMore]);
+
+  // Core fetch effect: only depends on [inView]
+  useEffect(() => {
+    if (!inView || !hasMoreRef.current || loadingRef.current) return;
+
+    loadingRef.current = true;
+    setLoading(true);
+
+    const currentPage = pageRef.current;
+
+    fetchMoreRef.current(currentPage)
+      .then((newData) => {
+        if (newData.length > 0) {
+          setData((prev) => [...prev, ...newData]);
+          pageRef.current = currentPage + 1;
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching more data:", error);
+      })
+      .finally(() => {
+        loadingRef.current = false;
+        setLoading(false);
+      });
+  }, [inView]);
+
+  // Full reset: replace all data and reset page counter
   const reset = useCallback((newData: T[]) => {
     setData(newData);
-    setPage(2); // On commence à 2 car les premières données sont déjà chargées
+    pageRef.current = 2;
+    loadingRef.current = false;
+    setLoading(false);
   }, []);
 
+  // In-place update: modify data without touching page counter
+  const updateData = useCallback((updater: (prev: T[]) => T[]) => {
+    setData(updater);
+  }, []);
+
+  // Prepend a single item without resetting page counter
   const prependItem = useCallback((item: T) => {
     setData((prev) => [item, ...prev]);
   }, []);
@@ -43,6 +79,7 @@ export function useInfiniteScroll<T>({
     loading,
     ref,
     reset,
+    updateData,
     prependItem,
   };
 }

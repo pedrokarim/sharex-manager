@@ -43,7 +43,7 @@ export default async function GalleryPage({
         initialHasMore={data.hasMore}
         initialView={resolvedSearchParams.view as "grid" | "list" | "details"}
         initialSearch={resolvedSearchParams.q}
-        initialPage={1}
+
       />
     );
   } catch (error) {
@@ -54,7 +54,7 @@ export default async function GalleryPage({
         initialHasMore={false}
         initialView={resolvedSearchParams.view as "grid" | "list" | "details"}
         initialSearch={resolvedSearchParams.q}
-        initialPage={1}
+
       />
     );
   }

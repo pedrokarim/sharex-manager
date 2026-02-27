@@ -77,7 +77,6 @@ interface GalleryClientProps {
   initialHasMore: boolean;
   initialView?: "grid" | "list" | "details";
   initialSearch?: string;
-  initialPage: number;
   secureOnly?: boolean;
   starredOnly?: boolean;
 }
@@ -179,7 +178,6 @@ export function GalleryClient({
   initialHasMore,
   initialView = "grid",
   initialSearch = "",
-  initialPage,
   secureOnly = false,
   starredOnly = false,
 }: GalleryClientProps) {
@@ -202,7 +200,6 @@ export function GalleryClient({
   const [endDate] = useQueryState("end");
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
-  const [page, setPage] = useState(initialPage);
   const [viewMode] = useQueryState<"grid" | "list" | "details">("view", {
     defaultValue: defaultViewMode,
     parse: (value): "grid" | "list" | "details" => {
@@ -334,6 +331,7 @@ export function GalleryClient({
     loading,
     ref,
     reset,
+    updateData,
     prependItem,
   } = useInfiniteScroll<FileInfo>({
     initialData: initialFiles,
@@ -349,20 +347,22 @@ export function GalleryClient({
   });
 
   // Refs pour accéder aux valeurs actuelles dans les callbacks SSE
-  const fetchFilesRef = useRef(fetchFiles);
-  const resetRef = useRef(reset);
-  const setHasMoreRef = useRef(setHasMore);
+  const prependItemRef = useRef(prependItem);
   const enableUploadNotificationsRef = useRef(enableUploadNotifications);
   const tRef = useRef(t);
+  const searchRef = useRef(search);
+  const startDateRef = useRef(startDate);
+  const endDateRef = useRef(endDate);
 
   // Mettre à jour les refs quand les valeurs changent
   useEffect(() => {
-    fetchFilesRef.current = fetchFiles;
-    resetRef.current = reset;
-    setHasMoreRef.current = setHasMore;
+    prependItemRef.current = prependItem;
     enableUploadNotificationsRef.current = enableUploadNotifications;
     tRef.current = t;
-  }, [fetchFiles, reset, setHasMore, enableUploadNotifications, t]);
+    searchRef.current = search;
+    startDateRef.current = startDate;
+    endDateRef.current = endDate;
+  }, [prependItem, enableUploadNotifications, t, search, startDate, endDate]);
 
   // SSE pour les nouveaux fichiers en temps réel
   useEffect(() => {
@@ -408,19 +408,24 @@ export function GalleryClient({
           const data = JSON.parse(event.data);
 
           if (data.type === "new_file" && data.file) {
-            // Recharger la première page pour avoir les données à jour
-            fetchFilesRef
-              .current(1)
-              .then(({ files: newFiles, hasMore: newHasMore }) => {
-                setHasMoreRef.current(newHasMore);
-                resetRef.current(newFiles);
-              })
-              .catch((error) => {
-                console.error(
-                  "[Gallery SSE] Erreur lors du rechargement:",
-                  error
-                );
-              });
+            // Prepend the new file without resetting scroll position
+            const hasActiveFilters =
+              searchRef.current ||
+              startDateRef.current ||
+              endDateRef.current;
+
+            if (!hasActiveFilters) {
+              const newFile: FileInfo = {
+                name: data.file.name,
+                url: `/api/files/${data.file.name}`,
+                size: data.file.size || 0,
+                createdAt:
+                  data.file.createdAt || new Date().toISOString(),
+                isSecure: data.file.isSecure ?? false,
+                isStarred: data.file.isStarred ?? false,
+              };
+              prependItemRef.current(newFile);
+            }
 
             // Notification si activée
             if (enableUploadNotificationsRef.current) {
@@ -468,29 +473,42 @@ export function GalleryClient({
     reset(newFiles);
   }, [fetchFiles, reset]);
 
-  const resetSearch = useCallback(() => {
-    setPage(1);
+  // Track previous filter values to detect real changes (skip mount)
+  const prevFiltersRef = useRef({
+    search: search ?? "",
+    sortBy,
+    sortOrder,
+    startDate,
+    endDate,
+  });
+
+  // Single consolidated effect for all filter/sort/search changes
+  useEffect(() => {
+    const currentFilters = {
+      search: search ?? "",
+      sortBy,
+      sortOrder,
+      startDate,
+      endDate,
+    };
+
+    const prev = prevFiltersRef.current;
+    const hasChanged =
+      currentFilters.search !== prev.search ||
+      currentFilters.sortBy !== prev.sortBy ||
+      currentFilters.sortOrder !== prev.sortOrder ||
+      currentFilters.startDate !== prev.startDate ||
+      currentFilters.endDate !== prev.endDate;
+
+    if (!hasChanged) return;
+
+    prevFiltersRef.current = currentFilters;
+
     fetchFiles(1).then(({ files, hasMore }) => {
       setHasMore(hasMore);
       reset(files);
     });
-  }, [fetchFiles, reset]);
-
-  useEffect(() => {
-    const currentSearch = search ?? "";
-    if (currentSearch !== initialSearch) {
-      resetSearch();
-    }
-  }, [search, initialSearch, resetSearch]);
-
-  // Réinitialiser quand le tri ou les dates changent
-  useEffect(() => {
-    setPage(1);
-    fetchFiles(1).then(({ files, hasMore }) => {
-      setHasMore(hasMore);
-      reset(files);
-    });
-  }, [sortBy, sortOrder, startDate, endDate]);
+  }, [search, sortBy, sortOrder, startDate, endDate, fetchFiles, reset]);
 
   // Fonction pour gérer la sélection vide
   const handleSelectionEmpty = useCallback(() => {
@@ -517,7 +535,6 @@ export function GalleryClient({
     setIsRefreshing(true);
     try {
       const { files: newFiles, hasMore: newHasMore } = await fetchFiles(1);
-      setPage(1);
       setHasMore(newHasMore);
       reset(newFiles);
     } catch (error) {
@@ -701,10 +718,11 @@ export function GalleryClient({
       const data = await response.json();
 
       // Mettre à jour le fichier dans la liste
-      const updatedFiles = files.map((f) =>
-        f.name === file.name ? { ...f, isSecure: data.isSecure } : f
+      updateData((prev) =>
+        prev.map((f) =>
+          f.name === file.name ? { ...f, isSecure: data.isSecure } : f
+        )
       );
-      reset(updatedFiles);
 
       toast.success(
         file.isSecure
@@ -737,10 +755,11 @@ export function GalleryClient({
       const data = await response.json();
 
       // Mettre à jour le fichier dans la liste
-      const updatedFiles = files.map((f) =>
-        f.name === file.name ? { ...f, isStarred: data.isStarred } : f
+      updateData((prev) =>
+        prev.map((f) =>
+          f.name === file.name ? { ...f, isStarred: data.isStarred } : f
+        )
       );
-      reset(updatedFiles);
 
       toast.success(
         file.isStarred
@@ -807,10 +826,9 @@ export function GalleryClient({
       ).length;
 
       if (successful > 0) {
-        const updatedFiles = files.filter(
-          (f) => !selectedFileNames.includes(f.name)
+        updateData((prev) =>
+          prev.filter((f) => !selectedFileNames.includes(f.name))
         );
-        reset(updatedFiles);
         clearSelection();
         toast.success(t("gallery.file_actions.delete_success"));
       }
@@ -822,7 +840,7 @@ export function GalleryClient({
       console.error("Erreur lors de la suppression:", error);
       toast.error(t("gallery.file_actions.error_occurred"));
     }
-  }, [getSelectedFiles, files, reset, clearSelection, t]);
+  }, [getSelectedFiles, updateData, clearSelection, t]);
 
   const handleToggleStarSelected = useCallback(async () => {
     const selectedFilesData = getSelectedFilesData(files);
@@ -842,18 +860,19 @@ export function GalleryClient({
       await Promise.all(promises);
 
       // Mettre à jour tous les fichiers sélectionnés
-      const updatedFiles = files.map((f) => {
-        const selectedFile = selectedFilesData.find((sf) => sf.name === f.name);
-        return selectedFile ? { ...f, isStarred: !selectedFile.isStarred } : f;
-      });
-      reset(updatedFiles);
+      updateData((prev) =>
+        prev.map((f) => {
+          const sel = selectedFilesData.find((sf) => sf.name === f.name);
+          return sel ? { ...f, isStarred: !sel.isStarred } : f;
+        })
+      );
 
       toast.success(t("gallery.file_actions.added_to_favorites"));
     } catch (error) {
       console.error("Erreur lors de la modification des favoris:", error);
       toast.error(t("gallery.file_actions.error_occurred"));
     }
-  }, [getSelectedFilesData, files, reset, t]);
+  }, [getSelectedFilesData, files, updateData, t]);
 
   const handleToggleSecuritySelected = useCallback(async () => {
     const selectedFilesData = getSelectedFilesData(files);
@@ -873,18 +892,19 @@ export function GalleryClient({
       await Promise.all(promises);
 
       // Mettre à jour tous les fichiers sélectionnés
-      const updatedFiles = files.map((f) => {
-        const selectedFile = selectedFilesData.find((sf) => sf.name === f.name);
-        return selectedFile ? { ...f, isSecure: !selectedFile.isSecure } : f;
-      });
-      reset(updatedFiles);
+      updateData((prev) =>
+        prev.map((f) => {
+          const sel = selectedFilesData.find((sf) => sf.name === f.name);
+          return sel ? { ...f, isSecure: !sel.isSecure } : f;
+        })
+      );
 
       toast.success(t("gallery.file_actions.now_private"));
     } catch (error) {
       console.error("Erreur lors de la modification de la sécurité:", error);
       toast.error(t("gallery.file_actions.error_occurred"));
     }
-  }, [getSelectedFilesData, files, reset, t]);
+  }, [getSelectedFilesData, files, updateData, t]);
 
   const handleAddToAlbum = useCallback(() => {
     const selectedFiles = getSelectedFiles();
@@ -1074,7 +1094,7 @@ export function GalleryClient({
                       files={filesInGroup}
                       onCopy={copyToClipboard}
                       onDelete={(name) => {
-                        reset(files.filter((f) => f.name !== name));
+                        updateData((prev) => prev.filter((f) => f.name !== name));
                       }}
                       onSelect={setSelectedFile}
                       onToggleSecurity={handleToggleSecurity}
@@ -1105,7 +1125,7 @@ export function GalleryClient({
                       files={filesInGroup}
                       onCopy={copyToClipboard}
                       onDelete={(name) => {
-                        reset(files.filter((f) => f.name !== name));
+                        updateData((prev) => prev.filter((f) => f.name !== name));
                       }}
                       onSelect={setSelectedFile}
                       onToggleSecurity={handleToggleSecurity}
