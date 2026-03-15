@@ -30,7 +30,6 @@ export function useInfiniteScroll<T>({
   useEffect(() => {
     if (!inView || loading || !hasMore) return;
 
-    let cancelled = false;
     const currentPage = pageRef.current;
     const generation = ++fetchGenRef.current;
 
@@ -38,7 +37,7 @@ export function useInfiniteScroll<T>({
 
     fetchMoreRef.current(currentPage)
       .then(({ data: newData, hasMore: newHasMore }) => {
-        if (cancelled || fetchGenRef.current !== generation) return;
+        if (fetchGenRef.current !== generation) return;
 
         if (newData.length > 0) {
           setData((prev) => [...prev, ...newData]);
@@ -47,18 +46,14 @@ export function useInfiniteScroll<T>({
         setHasMore(newHasMore && newData.length > 0);
       })
       .catch((error) => {
-        if (cancelled || fetchGenRef.current !== generation) return;
+        if (fetchGenRef.current !== generation) return;
         console.error("Error fetching more data:", error);
         setHasMore(false);
       })
       .finally(() => {
-        if (cancelled || fetchGenRef.current !== generation) return;
+        if (fetchGenRef.current !== generation) return;
         setLoading(false);
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [inView, loading, hasMore]);
 
   // Reset: replace all data, update hasMore, reset page counter.
