@@ -198,7 +198,6 @@ export function GalleryClient({
   const [search] = useQueryState("q");
   const [startDate] = useQueryState("start");
   const [endDate] = useQueryState("end");
-  const [hasMore, setHasMore] = useState(initialHasMore);
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
   const [viewMode] = useQueryState<"grid" | "list" | "details">("view", {
     defaultValue: defaultViewMode,
@@ -333,20 +332,22 @@ export function GalleryClient({
     reset,
     updateData,
     prependItem,
+    setHasMore,
   } = useInfiniteScroll<FileInfo>({
     initialData: initialFiles,
     fetchMore: useCallback(
       async (page) => {
         const { files, hasMore } = await fetchFiles(page);
-        setHasMore(hasMore);
-        return files;
+        return { data: files, hasMore };
       },
       [fetchFiles]
     ),
-    hasMore,
+    initialHasMore,
   });
 
-  // Refs pour accéder aux valeurs actuelles dans les callbacks SSE
+  // Refs pour accéder aux valeurs actuelles dans les callbacks
+  const fetchFilesRef = useRef(fetchFiles);
+  const resetRef = useRef(reset);
   const prependItemRef = useRef(prependItem);
   const enableUploadNotificationsRef = useRef(enableUploadNotifications);
   const tRef = useRef(t);
@@ -356,13 +357,15 @@ export function GalleryClient({
 
   // Mettre à jour les refs quand les valeurs changent
   useEffect(() => {
+    fetchFilesRef.current = fetchFiles;
+    resetRef.current = reset;
     prependItemRef.current = prependItem;
     enableUploadNotificationsRef.current = enableUploadNotifications;
     tRef.current = t;
     searchRef.current = search;
     startDateRef.current = startDate;
     endDateRef.current = endDate;
-  }, [prependItem, enableUploadNotifications, t, search, startDate, endDate]);
+  }, [fetchFiles, reset, prependItem, enableUploadNotifications, t, search, startDate, endDate]);
 
   // SSE pour les nouveaux fichiers en temps réel
   useEffect(() => {
@@ -468,10 +471,10 @@ export function GalleryClient({
   }, []);
 
   const handleFinishUpload = useCallback(async () => {
-    const { files: newFiles, hasMore: newHasMore } = await fetchFiles(1);
+    const { files: newFiles, hasMore: newHasMore } = await fetchFilesRef.current(1);
     setHasMore(newHasMore);
-    reset(newFiles);
-  }, [fetchFiles, reset]);
+    resetRef.current(newFiles);
+  }, [setHasMore]);
 
   // Track previous filter values to detect real changes (skip mount)
   const prevFiltersRef = useRef({
@@ -483,6 +486,7 @@ export function GalleryClient({
   });
 
   // Single consolidated effect for all filter/sort/search changes
+  // Uses refs for fetchFiles/reset to avoid re-triggering when their identity changes
   useEffect(() => {
     const currentFilters = {
       search: search ?? "",
@@ -504,11 +508,12 @@ export function GalleryClient({
 
     prevFiltersRef.current = currentFilters;
 
-    fetchFiles(1).then(({ files, hasMore }) => {
+    fetchFilesRef.current(1).then(({ files, hasMore }) => {
       setHasMore(hasMore);
-      reset(files);
+      resetRef.current(files);
     });
-  }, [search, sortBy, sortOrder, startDate, endDate, fetchFiles, reset]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchFiles/reset accessed via refs
+  }, [search, sortBy, sortOrder, startDate, endDate, setHasMore]);
 
   // Fonction pour gérer la sélection vide
   const handleSelectionEmpty = useCallback(() => {
@@ -534,16 +539,16 @@ export function GalleryClient({
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const { files: newFiles, hasMore: newHasMore } = await fetchFiles(1);
+      const { files: newFiles, hasMore: newHasMore } = await fetchFilesRef.current(1);
       setHasMore(newHasMore);
-      reset(newFiles);
+      resetRef.current(newFiles);
     } catch (error) {
       console.error("Erreur lors du rafraîchissement:", error);
       toast.error(t("gallery.refresh.error"));
     } finally {
       setIsRefreshing(false);
     }
-  }, [fetchFiles, reset]);
+  }, [setHasMore, t]);
 
   useEffect(() => {
     if (autoRefreshInterval === 0) return;
@@ -692,8 +697,8 @@ export function GalleryClient({
       throw new Error(errorData.error || t("gallery.upload_zone.upload_error"));
     }
 
-    await fetchFiles(1).then(({ files }) => {
-      reset(files);
+    await fetchFilesRef.current(1).then(({ files }) => {
+      resetRef.current(files);
       setSelectedFile(files[0]);
     });
   };
