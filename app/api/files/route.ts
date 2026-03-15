@@ -121,11 +121,18 @@ export async function GET(request: Request) {
     const paginatedFiles = validFiles.slice(start, end);
     const hasMore = end < validFiles.length;
 
-    return NextResponse.json({
-      files: paginatedFiles,
-      hasMore,
-      total: validFiles.length,
-    });
+    return NextResponse.json(
+      {
+        files: paginatedFiles,
+        hasMore,
+        total: validFiles.length,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
   } catch (error) {
     console.error("Erreur lors de la récupération des fichiers:", error);
     return new Response("Erreur lors de la récupération des fichiers", {

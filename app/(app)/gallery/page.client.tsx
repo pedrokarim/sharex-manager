@@ -307,7 +307,9 @@ export function GalleryClient({
         if (startDate) searchParams.set("start", startDate);
         if (endDate) searchParams.set("end", endDate);
 
-        const res = await fetch(`/api/files?${searchParams.toString()}`);
+        const res = await fetch(`/api/files?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
         const data = await res.json();
         return {
           files: data.files,
