@@ -3,99 +3,80 @@ import { useInView } from "react-intersection-observer";
 
 interface UseInfiniteScrollProps<T> {
   initialData: T[];
-  fetchMore: (page: number) => Promise<{ data: T[]; hasMore: boolean }>;
   initialHasMore: boolean;
+  fetchMore: (page: number) => Promise<{ data: T[]; hasMore: boolean }>;
 }
 
 export function useInfiniteScroll<T>({
   initialData,
-  fetchMore,
   initialHasMore,
+  fetchMore,
 }: UseInfiniteScrollProps<T>) {
   const [data, setData] = useState<T[]>(initialData);
   const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(initialHasMore);
   const { ref, inView } = useInView();
 
-  // Refs for values that should NOT re-trigger effects
-  const pageRef = useRef(2); // Start at 2: initialData already contains page 1
-  const loadingRef = useRef(false);
-  const hasMoreRef = useRef(initialHasMore);
+  const pageRef = useRef(2);
+  const fetchGenRef = useRef(0);
+
+  // Assigned during render — always the latest version when the effect reads it.
   const fetchMoreRef = useRef(fetchMore);
-  const inViewRef = useRef(false);
+  fetchMoreRef.current = fetchMore;
 
-  // Keep refs in sync
+  // Core loading effect.
+  // Depends on [inView, loading, hasMore] so it naturally re-evaluates
+  // when loading finishes while the sentinel is still visible.
   useEffect(() => {
-    fetchMoreRef.current = fetchMore;
-  }, [fetchMore]);
+    if (!inView || loading || !hasMore) return;
 
-  useEffect(() => {
-    inViewRef.current = inView;
-  }, [inView]);
-
-  // Core load function (stored in ref to avoid stale closures)
-  const loadMoreRef = useRef<() => void>();
-  loadMoreRef.current = () => {
-    if (!inViewRef.current || !hasMoreRef.current || loadingRef.current) return;
-
-    loadingRef.current = true;
-    setLoading(true);
-
+    let cancelled = false;
     const currentPage = pageRef.current;
+    const generation = ++fetchGenRef.current;
+
+    setLoading(true);
 
     fetchMoreRef.current(currentPage)
       .then(({ data: newData, hasMore: newHasMore }) => {
-        // Update hasMoreRef synchronously so re-check sees the correct value
-        hasMoreRef.current = newHasMore;
+        if (cancelled || fetchGenRef.current !== generation) return;
 
         if (newData.length > 0) {
           setData((prev) => [...prev, ...newData]);
-          pageRef.current = currentPage + 1;
         }
+        pageRef.current = currentPage + 1;
+        setHasMore(newHasMore && newData.length > 0);
       })
       .catch((error) => {
+        if (cancelled || fetchGenRef.current !== generation) return;
         console.error("Error fetching more data:", error);
+        setHasMore(false);
       })
       .finally(() => {
-        loadingRef.current = false;
+        if (cancelled || fetchGenRef.current !== generation) return;
         setLoading(false);
-
-        // After DOM update, check if sentinel is still visible → load more
-        requestAnimationFrame(() => {
-          if (inViewRef.current && hasMoreRef.current && !loadingRef.current) {
-            loadMoreRef.current?.();
-          }
-        });
       });
-  };
 
-  // Trigger load when sentinel enters view
-  useEffect(() => {
-    if (inView) {
-      loadMoreRef.current?.();
-    }
-  }, [inView]);
+    return () => {
+      cancelled = true;
+    };
+  }, [inView, loading, hasMore]);
 
-  // Full reset: replace all data and reset page counter
-  const reset = useCallback((newData: T[]) => {
+  // Reset: replace all data, update hasMore, reset page counter.
+  // Increments fetchGenRef to invalidate any in-flight fetch.
+  const reset = useCallback((newData: T[], newHasMore: boolean) => {
+    fetchGenRef.current++;
     setData(newData);
-    pageRef.current = 2;
-    loadingRef.current = false;
+    setHasMore(newHasMore);
     setLoading(false);
+    pageRef.current = 2;
   }, []);
 
-  // In-place update: modify data without touching page counter
   const updateData = useCallback((updater: (prev: T[]) => T[]) => {
     setData(updater);
   }, []);
 
-  // Prepend a single item without resetting page counter
   const prependItem = useCallback((item: T) => {
     setData((prev) => [item, ...prev]);
-  }, []);
-
-  // Allow caller to update hasMore (e.g. after a filter reset)
-  const setHasMore = useCallback((value: boolean) => {
-    hasMoreRef.current = value;
   }, []);
 
   return {
@@ -105,6 +86,5 @@ export function useInfiniteScroll<T>({
     reset,
     updateData,
     prependItem,
-    setHasMore,
   };
 }

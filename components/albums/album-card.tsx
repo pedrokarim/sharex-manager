@@ -304,7 +304,7 @@ export function AlbumCard({
       return (
         <div className="w-full h-full relative">
           <Image
-            src={`/api/files/${encodeURIComponent(imageFiles[0])}`}
+            src={`/api/thumbnails/${encodeURIComponent(imageFiles[0])}`}
             alt={album.name}
             fill
             className="object-cover"
@@ -323,7 +323,7 @@ export function AlbumCard({
             return (
               <div key={index} className="relative w-full h-full">
                 <Image
-                  src={`/api/files/${encodeURIComponent(imageFile)}`}
+                  src={`/api/thumbnails/${encodeURIComponent(imageFile)}`}
                   alt={`${album.name} - Image ${index + 1}`}
                   fill
                   className="object-cover"
