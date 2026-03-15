@@ -39,6 +39,7 @@ import { ViewSelector } from "@/components/view-selector";
 import { useTranslation } from "@/lib/i18n";
 import { Loading } from "@/components/ui/loading";
 import { useQueryState } from "nuqs";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import type { Album } from "@/types/albums";
 import type { FileInfo } from "@/types/files";
 
@@ -51,15 +52,11 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   const router = useRouter();
   const routerRef = useRef(router);
   const tRef = useRef(t);
-
-  useEffect(() => {
-    routerRef.current = router;
-    tRef.current = t;
-  }, [router, t]);
+  routerRef.current = router;
+  tRef.current = t;
 
   const [album, setAlbum] = useState<Album | null>(null);
-  const [files, setFiles] = useState<FileInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [albumLoading, setAlbumLoading] = useState(true);
   const [isTogglingPublic, setIsTogglingPublic] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
@@ -73,11 +70,10 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     },
   });
 
-  const fetchAlbumData = useCallback(async () => {
+  // Fetch album metadata (not files — those go through useInfiniteScroll)
+  const fetchAlbumMetadata = useCallback(async () => {
     try {
-      setLoading(true);
-
-      // Récupérer les données de l'album
+      setAlbumLoading(true);
       const albumResponse = await fetch(`/api/albums/${albumId}`);
       if (!albumResponse.ok) {
         const errorData = await albumResponse.json().catch(() => ({}));
@@ -89,48 +85,99 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           routerRef.current.push("/albums");
           return;
         }
-
         if (albumResponse.status === 401) {
           routerRef.current.push("/login");
           return;
         }
-
         if (albumResponse.status === 403) {
           toast.error(tRef.current("albums.errors.forbidden"));
           routerRef.current.push("/albums");
           return;
         }
-
         toast.error(errorMessage);
         return;
       }
 
       const albumData = await albumResponse.json();
       setAlbum(albumData);
-
-      // Récupérer les fichiers avec les détails complets
-      const filesResponse = await fetch(
-        `/api/albums/${albumId}/files?details=true`
-      );
-      if (!filesResponse.ok) {
-        const errorData = await filesResponse.json().catch(() => ({}));
-        toast.error(errorData.error || tRef.current("albums.errors.loading_files"));
-        return;
-      }
-
-      const filesData = await filesResponse.json();
-      setFiles(filesData.files);
     } catch (error) {
       console.error("Erreur lors du chargement de l'album:", error);
       toast.error(tRef.current("albums.errors.loading"));
     } finally {
-      setLoading(false);
+      setAlbumLoading(false);
     }
   }, [albumId]);
 
   useEffect(() => {
-    fetchAlbumData();
-  }, [fetchAlbumData]);
+    fetchAlbumMetadata();
+  }, [fetchAlbumMetadata]);
+
+  // Fetch album files with pagination
+  const fetchAlbumFiles = useCallback(
+    async (page: number) => {
+      try {
+        const res = await fetch(
+          `/api/albums/${albumId}/files?details=true&page=${page}`
+        );
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          toast.error(
+            errorData.error || tRef.current("albums.errors.loading_files")
+          );
+          return { files: [] as FileInfo[], hasMore: false };
+        }
+        const data = await res.json();
+        return {
+          files: data.files as FileInfo[],
+          hasMore: data.hasMore as boolean,
+        };
+      } catch (error) {
+        console.error("Erreur lors du chargement des fichiers:", error);
+        return { files: [] as FileInfo[], hasMore: false };
+      }
+    },
+    [albumId]
+  );
+
+  // Load initial page
+  const [initialData, setInitialData] = useState<{
+    files: FileInfo[];
+    hasMore: boolean;
+    loaded: boolean;
+  }>({ files: [], hasMore: false, loaded: false });
+
+  useEffect(() => {
+    fetchAlbumFiles(1).then(({ files, hasMore }) => {
+      setInitialData({ files, hasMore, loaded: true });
+    });
+  }, [fetchAlbumFiles]);
+
+  const {
+    data: files,
+    loading,
+    ref: sentinelRef,
+    reset,
+    updateData,
+  } = useInfiniteScroll<FileInfo>({
+    initialData: initialData.files,
+    initialHasMore: initialData.hasMore,
+    fetchMore: useCallback(
+      async (page) => {
+        const { files, hasMore } = await fetchAlbumFiles(page);
+        return { data: files, hasMore };
+      },
+      [fetchAlbumFiles]
+    ),
+  });
+
+  // When initialData loads, reset the infinite scroll with real data
+  const initialDataLoadedRef = useRef(false);
+  useEffect(() => {
+    if (initialData.loaded && !initialDataLoadedRef.current) {
+      initialDataLoadedRef.current = true;
+      reset(initialData.files, initialData.hasMore);
+    }
+  }, [initialData, reset]);
 
   const handleRemoveFromAlbum = async (fileName: string) => {
     try {
@@ -146,7 +193,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         throw new Error();
       }
 
-      setFiles((prev) => prev.filter((file) => file.name !== fileName));
+      updateData((prev) => prev.filter((file) => file.name !== fileName));
       toast.success(t("albums.file_removed"));
     } catch {
       toast.error(t("albums.errors.remove_file"));
@@ -240,7 +287,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       if (!response.ok) throw new Error();
 
       const data = await response.json();
-      setFiles((prev) =>
+      updateData((prev) =>
         prev.map((f) =>
           f.name === file.name ? { ...f, isSecure: data.isSecure } : f
         )
@@ -272,7 +319,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       if (!response.ok) throw new Error();
 
       const data = await response.json();
-      setFiles((prev) =>
+      updateData((prev) =>
         prev.map((f) =>
           f.name === file.name ? { ...f, isStarred: data.isStarred } : f
         )
@@ -313,7 +360,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     setSelectedFile(null);
   };
 
-  if (loading) {
+  if (albumLoading || !initialData.loaded) {
     return <Loading fullHeight />;
   }
 
@@ -505,7 +552,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       )}
 
       {/* Contenu de l'album */}
-      {files.length === 0 ? (
+      {files.length === 0 && !loading ? (
         <div className="flex flex-col items-center justify-center py-12 sm:py-24 text-center px-4">
           <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg bg-primary/10 flex items-center justify-center mb-3 sm:mb-4">
             <Plus className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
@@ -543,6 +590,17 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
               newFileIds={[]}
             />
           )}
+
+          <div ref={sentinelRef} className="h-10 flex items-center justify-center">
+            {loading && (
+              <Loading
+                variant="minimal"
+                size="sm"
+                showMessage={true}
+                className="text-xs"
+              />
+            )}
+          </div>
         </div>
       )}
 

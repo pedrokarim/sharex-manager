@@ -10,6 +10,7 @@ import { getAbsoluteUploadPath } from "@/lib/config";
 import { isFileSecure } from "@/lib/secure-files";
 import { isFileStarred } from "@/lib/starred-files";
 
+const PAGE_SIZE = 12;
 const IdSchema = z.coerce.number().int().positive();
 
 const FileNamesSchema = z.object({
@@ -56,15 +57,24 @@ export async function GET(
       return NextResponse.json({ error: "Accès interdit" }, { status: 403 });
     }
 
-    const fileNames = albumsDb.getAlbumFiles(albumId);
+    const allFileNames = albumsDb.getAlbumFiles(albumId);
     const details = request.nextUrl.searchParams.get("details") === "true";
+    const page = parseInt(request.nextUrl.searchParams.get("page") || "0", 10);
 
-    let files: any = fileNames;
+    // If page=0 or not provided, return all files (backwards compatible)
+    // If page>=1, return paginated results
+    const paginated = page >= 1;
+    const start = paginated ? (page - 1) * PAGE_SIZE : 0;
+    const end = paginated ? start + PAGE_SIZE : allFileNames.length;
+    const pageFileNames = allFileNames.slice(start, end);
+    const hasMore = paginated ? end < allFileNames.length : false;
+
+    let files: any = pageFileNames;
 
     if (details) {
       const uploadsDir = getAbsoluteUploadPath();
       files = await Promise.all(
-        fileNames.map(async (fileName) => {
+        pageFileNames.map(async (fileName) => {
           try {
             const filePath = join(uploadsDir, fileName);
             const stats = await stat(filePath);
@@ -100,7 +110,10 @@ export async function GET(
       },
     });
 
-    return NextResponse.json({ files });
+    return NextResponse.json({
+      files,
+      ...(paginated && { hasMore, total: allFileNames.length }),
+    });
   } catch (error) {
     logDb.createLog({
       level: "error",
