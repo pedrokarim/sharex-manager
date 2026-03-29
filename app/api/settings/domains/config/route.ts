@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "fs/promises";
 import { resolve } from "path";
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 
 const CONFIG_PATH = resolve(process.cwd(), "config", "uploads.json");
 
@@ -14,6 +15,11 @@ async function writeConfig(config: any) {
 }
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  }
+
   try {
     const config = await readConfig();
     return NextResponse.json({

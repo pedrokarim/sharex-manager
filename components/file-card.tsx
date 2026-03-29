@@ -160,16 +160,20 @@ export function FileCard({
     >
       <CardHeader className="p-0">
         <div
+          role="button"
+          tabIndex={0}
           className={cn(
             "relative w-full bg-muted cursor-pointer",
             aspectRatioClasses[size]
           )}
           onClick={onSelect}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect?.(); } }}
         >
           {onToggleStar && (
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Toggle favorite"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleStar();
@@ -181,7 +185,7 @@ export function FileCard({
                 "hover:bg-white/20 dark:hover:bg-black/20",
                 "transition-all duration-200",
                 file.isStarred
-                  ? "text-white bg-yellow-500/20 border-yellow-500/30 hover:bg-yellow-500/30"
+                  ? "text-white bg-yellow-500/40 border-yellow-500/30 hover:bg-yellow-500/50"
                   : "text-white hover:text-white"
               )}
             >
@@ -295,7 +299,7 @@ export function FileCard({
         onClick={(e) => e.stopPropagation()}
       >
         <Button variant="secondary" className="w-full" asChild>
-          <a href={file.url} download onClick={(e) => e.stopPropagation()}>
+          <a href={file.url} download aria-label="Download file" onClick={(e) => e.stopPropagation()}>
             <Download
               className={cn("mr-2 h-4 w-4", size === "small" && "mr-0 h-3 w-3")}
             />
@@ -305,6 +309,7 @@ export function FileCard({
           <Button
             variant="secondary"
             className="w-full"
+            aria-label="Copy link"
             onClick={(e) => {
               e.stopPropagation();
               onCopy();
@@ -318,6 +323,7 @@ export function FileCard({
             href={getGalleryImageUrl(file.name)}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="Open in new tab"
             onClick={(e) => e.stopPropagation()}
           >
             <ExternalLink
@@ -330,6 +336,7 @@ export function FileCard({
             <Button
               variant="destructive"
               className="w-full"
+              aria-label="Delete file"
               disabled={isDeleting}
               onClick={(e) => e.stopPropagation()}
             >

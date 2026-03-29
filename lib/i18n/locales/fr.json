@@ -1088,7 +1088,8 @@
         "newest_file": "Fichier le plus récent",
         "space_used": "d'espace utilisé",
         "files_via_api": "fichiers via l'API",
-        "files_via_web": "fichiers via l'interface"
+        "files_via_web": "fichiers via l'interface",
+        "other": "autres"
       },
       "tabs": {
         "overview": "Vue d'ensemble",

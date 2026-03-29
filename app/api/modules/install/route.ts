@@ -27,10 +27,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vérifier que c'est un fichier ZIP
+    // Vérifier que c'est un fichier ZIP (extension + magic bytes)
     if (!file.name.endsWith(".zip")) {
       return NextResponse.json(
         { error: "Le fichier doit être au format ZIP" },
+        { status: 400 }
+      );
+    }
+
+    // Lire le contenu du fichier
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Vérifier les magic bytes ZIP (PK\x03\x04)
+    if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b || buffer[2] !== 0x03 || buffer[3] !== 0x04) {
+      return NextResponse.json(
+        { error: "Le fichier n'est pas un ZIP valide" },
+        { status: 400 }
+      );
+    }
+
+    // Limite de taille : 50 MB
+    const MAX_ZIP_SIZE = 50 * 1024 * 1024;
+    if (buffer.length > MAX_ZIP_SIZE) {
+      return NextResponse.json(
+        { error: "Le fichier ZIP est trop volumineux (max 50 MB)" },
         { status: 400 }
       );
     }
@@ -40,15 +60,32 @@ export async function POST(request: NextRequest) {
     fs.mkdirSync(tempDir, { recursive: true });
 
     try {
-      // Lire le contenu du fichier
-      const buffer = Buffer.from(await file.arrayBuffer());
-
       // Écrire le fichier ZIP dans le dossier temporaire
       const zipPath = path.join(tempDir, "module.zip");
       fs.writeFileSync(zipPath, buffer);
 
-      // Extraire le ZIP
+      // Vérifier les entrées du ZIP avant extraction (protection ZIP bomb + path traversal)
       const zip = new AdmZip(zipPath);
+      const MAX_EXTRACTED_SIZE = 100 * 1024 * 1024; // 100 MB max après extraction
+      let totalSize = 0;
+      for (const entry of zip.getEntries()) {
+        // Protection path traversal
+        if (entry.entryName.includes("..") || path.isAbsolute(entry.entryName)) {
+          return NextResponse.json(
+            { error: "Le ZIP contient des chemins invalides" },
+            { status: 400 }
+          );
+        }
+        // Protection ZIP bomb
+        totalSize += entry.header.size;
+        if (totalSize > MAX_EXTRACTED_SIZE) {
+          return NextResponse.json(
+            { error: "Le ZIP décompressé est trop volumineux (max 100 MB)" },
+            { status: 400 }
+          );
+        }
+      }
+
       zip.extractAllTo(tempDir, true);
 
       // Supprimer le fichier ZIP

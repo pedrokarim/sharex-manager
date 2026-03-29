@@ -251,10 +251,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         icon: MoreHorizontal,
         items: [
           {
-            title: t("tools.minecraft_skin.title"),
-            url: "/tools/minecraft-skin",
-          },
-          {
             title: "Color Palette",
             url: "/tools/color-palette",
           },

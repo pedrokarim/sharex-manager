@@ -69,7 +69,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
-// import { useTheme } from "next-themes"; // DISABLED: Ancien système next-themes désactivé
+import { useTheme } from "@/components/theme-provider";
 import { useRouter } from "next/navigation";
 // import { useTimeBasedTheme } from "@/hooks/use-time-based-theme"; // Non utilisé
 import { TimePicker } from "@/components/ui/time-picker";
@@ -97,9 +97,21 @@ export function PreferencesPageClient() {
     preferredThemeModeAtom
   );
 
-  // const { setTheme } = useTheme(); // DISABLED: Ancien système next-themes désactivé
+  const { setTheme } = useTheme();
   const router = useRouter();
   const { t } = useTranslation();
+
+  const applyThemeMode = (themeMode: Exclude<ThemeMode, "time-based">) => {
+    if (themeMode === "system") {
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+      setTheme(prefersDark ? "dark" : "light");
+      return;
+    }
+
+    setTheme(themeMode);
+  };
 
   const handleReset = () => {
     setPreferences({
@@ -126,7 +138,7 @@ export function PreferencesPageClient() {
       dayEndHour: 19,
     });
     setPreferredThemeMode("system");
-    setTheme("system");
+    applyThemeMode("system");
     toast.success(t("settings.save_success"));
   };
 
@@ -168,7 +180,7 @@ export function PreferencesPageClient() {
     setPreferredThemeMode(newTheme);
 
     if (newTheme !== "time-based") {
-      setTheme(newTheme);
+      applyThemeMode(newTheme);
     }
   };
 
@@ -197,7 +209,7 @@ export function PreferencesPageClient() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:gap-6 flex-1">
+      <div className="mx-auto grid w-full max-w-2xl flex-1 gap-4 sm:gap-6">
         {/* Apparence */}
         <Card>
           <CardHeader className="pb-3 sm:pb-6">
@@ -214,7 +226,7 @@ export function PreferencesPageClient() {
                 <Label className="text-sm sm:text-base">
                   {t("settings.theme")}
                 </Label>
-                <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-4 max-w-md">
+                <div className="flex flex-wrap gap-2 sm:gap-3 max-w-md">
                   {Object.entries(themeIcons).map(([themeKey, Icon]) => (
                     <TooltipProvider key={themeKey}>
                       <Tooltip>
@@ -225,7 +237,7 @@ export function PreferencesPageClient() {
                                 ? "default"
                                 : "outline"
                             }
-                            className="flex-1 text-xs sm:text-sm"
+                            className="text-xs sm:text-sm"
                             onClick={() => {
                               handleThemeChange(themeKey as ThemeMode);
                             }}
@@ -311,7 +323,7 @@ export function PreferencesPageClient() {
 
                 <Button
                   variant="outline"
-                  className="w-full text-xs sm:text-sm"
+                  className="w-fit text-xs sm:text-sm"
                   onClick={() => router.push("/settings/theme")}
                 >
                   <Settings2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
@@ -330,7 +342,7 @@ export function PreferencesPageClient() {
                   value={language}
                   onValueChange={(value) => setLanguage(value as Language)}
                 >
-                  <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectTrigger className="w-[180px] max-w-full">
                     <SelectValue placeholder={t("settings.language_select")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -358,7 +370,7 @@ export function PreferencesPageClient() {
               <Label className="text-sm sm:text-base">
                 {t("settings.gallery.view_mode")}
               </Label>
-              <div className="grid grid-cols-3 sm:flex gap-2 sm:gap-4 max-w-md">
+              <div className="flex flex-wrap gap-2 sm:gap-3 max-w-md">
                 {Object.entries(viewModeIcons).map(([mode, Icon]) => (
                   <TooltipProvider key={mode}>
                     <Tooltip>
@@ -367,7 +379,7 @@ export function PreferencesPageClient() {
                           variant={
                             galleryViewMode === mode ? "default" : "outline"
                           }
-                          className="flex-1 text-xs sm:text-sm"
+                          className="text-xs sm:text-sm"
                           onClick={() =>
                             setGalleryViewMode(mode as GalleryViewMode)
                           }
@@ -396,7 +408,7 @@ export function PreferencesPageClient() {
                     setThumbnailSize(value)
                   }
                 >
-                  <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectTrigger className="w-[200px] max-w-full">
                     <SelectValue placeholder={t("settings.select_size")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -464,12 +476,12 @@ export function PreferencesPageClient() {
                 <Label className="text-sm sm:text-base">
                   {t("settings.gallery.sort_by")}
                 </Label>
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <div className="flex flex-wrap gap-3">
                   <Select
                     value={sortBy}
                     onValueChange={(value) => setSortBy(value as SortBy)}
                   >
-                    <SelectTrigger className="w-full sm:flex-1">
+                    <SelectTrigger className="w-[200px] max-w-full">
                       <SelectValue
                         placeholder={t("settings.gallery.sort_by")}
                       />
@@ -491,7 +503,7 @@ export function PreferencesPageClient() {
                     value={sortOrder}
                     onValueChange={(value) => setSortOrder(value as SortOrder)}
                   >
-                    <SelectTrigger className="w-full sm:flex-1">
+                    <SelectTrigger className="w-[200px] max-w-full">
                       <SelectValue
                         placeholder={t("settings.gallery.sort_order")}
                       />

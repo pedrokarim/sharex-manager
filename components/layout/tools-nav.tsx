@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Image, LogIn, Wrench, Gamepad2, Home } from "lucide-react";
+import { Image, LogIn, Wrench, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -33,13 +33,6 @@ export function ToolsNav() {
               className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
             >
               {t("tools.title")}
-            </Link>
-            <Link
-              href="/tools/minecraft-skin"
-              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-            >
-              <Gamepad2 className="h-4 w-4" />
-              {t("tools.minecraft_skin.title")}
             </Link>
           </nav>
         </div>

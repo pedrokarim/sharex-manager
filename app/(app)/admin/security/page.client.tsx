@@ -31,7 +31,7 @@ export default function SecurityPageClient() {
   };
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-3xl">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
           <Shield className="h-6 w-6 sm:h-8 sm:w-8" />
@@ -42,7 +42,7 @@ export default function SecurityPageClient() {
         </p>
       </div>
 
-      <Card className="max-w-2xl mb-4 sm:mb-6">
+      <Card className="mb-4 sm:mb-6">
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -60,7 +60,7 @@ export default function SecurityPageClient() {
             <Button
               onClick={handleSecurityScan}
               disabled={isLoading}
-              className="w-full sm:w-auto text-sm"
+              className="text-sm"
             >
               {isLoading ? (
                 <>
@@ -75,7 +75,7 @@ export default function SecurityPageClient() {
         </CardContent>
       </Card>
 
-      <Card className="max-w-2xl">
+      <Card>
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Shield className="h-4 w-4 sm:h-5 sm:w-5" />

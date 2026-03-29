@@ -202,6 +202,7 @@ export function AlbumCard({
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 sm:h-8 sm:w-8"
+                    aria-label="Album actions"
                   >
                     <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
@@ -401,6 +402,7 @@ export function AlbumCard({
                   "h-7 w-7 sm:h-8 sm:w-8 opacity-0 group-hover:opacity-100 transition-opacity",
                   "hover:bg-accent"
                 )}
+                aria-label="Album actions"
               >
                 <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>

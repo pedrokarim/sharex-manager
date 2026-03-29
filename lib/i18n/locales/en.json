@@ -1144,7 +1144,8 @@
         "newest_file": "Newest File",
         "space_used": "of space used",
         "files_via_api": "files via API",
-        "files_via_web": "files via web interface"
+        "files_via_web": "files via web interface",
+        "other": "other"
       },
       "tabs": {
         "overview": "Overview",

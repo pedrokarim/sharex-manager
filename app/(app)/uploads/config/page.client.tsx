@@ -42,7 +42,7 @@ export function ConfigPageClient() {
   }
 
   return (
-    <main>
+    <main className="mx-auto w-full max-w-3xl">
       <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex flex-col gap-4 py-4">
           <div className="flex flex-col gap-2">
@@ -62,17 +62,28 @@ export function ConfigPageClient() {
           className="space-y-6 sm:space-y-8"
         >
           <Tabs defaultValue="general" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="general" className="text-xs sm:text-sm">
-                {t("uploads.config.tabs.general")}
-              </TabsTrigger>
-              <TabsTrigger value="thumbnails" className="text-xs sm:text-sm">
-                {t("uploads.config.tabs.thumbnails")}
-              </TabsTrigger>
-              <TabsTrigger value="storage" className="text-xs sm:text-sm">
-                {t("uploads.config.tabs.storage")}
-              </TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto pb-1">
+              <TabsList className="flex h-auto min-w-max justify-start gap-1 sm:grid sm:min-w-0 sm:w-full sm:grid-cols-3 sm:gap-0">
+                <TabsTrigger
+                  value="general"
+                  className="shrink-0 text-xs sm:text-sm"
+                >
+                  {t("uploads.config.tabs.general")}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="thumbnails"
+                  className="shrink-0 text-xs sm:text-sm"
+                >
+                  {t("uploads.config.tabs.thumbnails")}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="storage"
+                  className="shrink-0 text-xs sm:text-sm"
+                >
+                  {t("uploads.config.tabs.storage")}
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="general">
               <GeneralTab form={form} />

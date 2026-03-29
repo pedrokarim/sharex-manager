@@ -51,10 +51,8 @@ data/*.db-*
 # uploads
 /uploads
 .idea
-idée
-
-tweakcn
-webhook-api
 
 # claude code
 .claude/
+.agents/
+skills-lock.json

@@ -3,15 +3,9 @@ import { MinecraftSkinPageClient } from "./page.client";
 
 export const metadata: Metadata = {
   title: "Minecraft Skin Viewer - ShareX Manager",
-  description:
-    "Visualiseur de skins Minecraft avec rendu 3D interactif et rendus serveur",
+  description: "Ce service a été migré vers mcinfo.ascencia.re",
 };
 
-export default async function MinecraftSkinPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ username?: string }>;
-}) {
-  const params = await searchParams;
-  return <MinecraftSkinPageClient initialUsername={params.username} />;
+export default function MinecraftSkinPage() {
+  return <MinecraftSkinPageClient />;
 }

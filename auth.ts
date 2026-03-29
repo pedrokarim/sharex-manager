@@ -4,6 +4,7 @@ import { join } from "path";
 import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 interface User {
   id: string;
@@ -25,51 +26,42 @@ export const {
 } = NextAuth({
   providers: [
     Credentials({
-      async authorize(credentials) {
-        console.log("🔍 Début du processus d'autorisation");
-        console.log("📝 Credentials reçus:", credentials);
-
+      async authorize(credentials, req) {
         try {
           if (!credentials) {
-            console.log("❌ Aucun identifiant fourni");
-            throw new Error("Aucun identifiant fourni");
-          }
-
-          console.log("🔎 Validation du schéma des credentials");
-          const parsed = userSchema.safeParse(credentials);
-          if (!parsed.success) {
-            console.log("❌ Échec de la validation:", parsed.error);
             return null;
           }
-          console.log("✅ Validation du schéma réussie");
 
-          console.log("📂 Lecture du fichier users.json");
+          const parsed = userSchema.safeParse(credentials);
+          if (!parsed.success) {
+            return null;
+          }
+
+          // Rate limiting par username
+          const { allowed } = checkRateLimit(`auth:${parsed.data.username}`);
+          if (!allowed) {
+            return null;
+          }
+
           const users = JSON.parse(
             readFileSync(join(process.cwd(), "data/users.json"), "utf-8")
           ) as User[];
-          console.log("📋 Nombre d'utilisateurs trouvés:", users.length);
 
-          console.log("🔍 Recherche de l'utilisateur:", parsed.data.username);
           const user = users.find((u) => u.username === parsed.data.username);
           if (!user) {
-            throw new Error("UserNotFound");
+            // Message générique pour éviter l'énumération de comptes
+            return null;
           }
-          console.log("✅ Utilisateur trouvé");
 
-          console.log("🔐 Vérification du mot de passe");
           const passwordMatch = await bcrypt.compare(
             parsed.data.password,
             user.password
           );
 
           if (!passwordMatch) {
-            throw new Error("InvalidPassword");
+            return null;
           }
-          console.log("✅ Mot de passe correct");
 
-          console.log(
-            "🎉 Authentification réussie, création du profil utilisateur"
-          );
           return {
             id: user.id,
             name: user.username,
@@ -78,7 +70,6 @@ export const {
             role: user.role,
           };
         } catch (error) {
-          console.log("💥 Erreur critique durant l'authentification:", error);
           return null;
         }
       },

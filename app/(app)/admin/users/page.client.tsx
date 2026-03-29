@@ -256,7 +256,7 @@ export default function UsersPageClient({
                           {user.id.slice(0, 8)}...
                         </span>
                       </TableCell>
-                      <TableCell className="text-sm">{user.username}</TableCell>
+                      <TableCell className="text-sm truncate max-w-[200px]">{user.username}</TableCell>
                       <TableCell>
                         <Badge
                           variant={

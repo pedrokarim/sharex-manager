@@ -403,13 +403,13 @@ export default function LogsPage() {
                         {log.level}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">
+                    <TableCell className="text-xs sm:text-sm truncate max-w-[150px] sm:max-w-[200px]">
                       {log.action}
                     </TableCell>
-                    <TableCell className="text-xs sm:text-sm truncate max-w-[150px] sm:max-w-none">
+                    <TableCell className="text-xs sm:text-sm truncate max-w-[200px] sm:max-w-[300px]">
                       {log.message}
                     </TableCell>
-                    <TableCell className="text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">
+                    <TableCell className="text-xs sm:text-sm truncate max-w-[120px] sm:max-w-[180px]">
                       {log.userEmail || t("admin.logs.system")}
                     </TableCell>
                     <TableCell>

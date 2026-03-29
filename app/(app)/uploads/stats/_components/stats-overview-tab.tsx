@@ -49,7 +49,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
   return (
     <div className="grid gap-4 sm:gap-6">
       {/* Cartes de statistiques générales */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         <Card className="@container">
           <CardHeader className="pb-2 px-4 pt-4">
             <div className="flex items-center gap-2">
@@ -215,7 +215,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
         <CardContent className="p-3 sm:p-4">
           <ChartContainer
             config={chartConfig}
-            className="h-[200px] sm:h-[240px] w-full"
+            className="h-[200px] sm:h-[240px] lg:h-[320px] w-full"
           >
             <BarChart data={stats.uploadsByDay}>
               <CartesianGrid

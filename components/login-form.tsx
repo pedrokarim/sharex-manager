@@ -32,16 +32,7 @@ export function LoginForm({
       });
 
       if (res?.error) {
-        switch (res.error) {
-          case "UserNotFound":
-            toast.error("Cet utilisateur n'existe pas");
-            break;
-          case "InvalidPassword":
-            toast.error("Mot de passe incorrect");
-            break;
-          default:
-            toast.error("Identifiants invalides");
-        }
+        toast.error("Identifiants invalides");
       } else if (res?.url) {
         window.location.href = res.url;
       }

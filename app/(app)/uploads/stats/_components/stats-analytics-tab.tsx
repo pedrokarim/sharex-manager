@@ -34,6 +34,28 @@ interface StatsAnalyticsTabProps {
 export function StatsAnalyticsTab({ stats }: StatsAnalyticsTabProps) {
   const { t } = useTranslation();
 
+  // Group small file types (< 3%) into "autres" to avoid label overlap
+  const otherLabel = t("uploads.stats.labels.other");
+  const { groupedUploadsByType, otherDetails } = (() => {
+    const total = stats.uploadsByType.reduce((sum, e) => sum + e.count, 0);
+    if (total === 0) return { groupedUploadsByType: stats.uploadsByType, otherDetails: [] as typeof stats.uploadsByType };
+    const threshold = total * 0.03;
+    const major: typeof stats.uploadsByType = [];
+    const others: typeof stats.uploadsByType = [];
+    for (const entry of stats.uploadsByType) {
+      if (entry.count >= threshold) {
+        major.push(entry);
+      } else {
+        others.push(entry);
+      }
+    }
+    if (others.length > 0) {
+      const otherCount = others.reduce((sum, e) => sum + e.count, 0);
+      major.push({ type: otherLabel, count: otherCount });
+    }
+    return { groupedUploadsByType: major, otherDetails: others };
+  })();
+
   return (
     <div className="grid gap-4 sm:gap-6">
       {/* Graphiques côte à côte */}
@@ -53,10 +75,34 @@ export function StatsAnalyticsTab({ stats }: StatsAnalyticsTabProps) {
               <PieChart>
                 <ChartTooltip
                   cursor={false}
-                  content={<ChartTooltipContent hideLabel />}
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null;
+                    const data = payload[0].payload;
+                    const isOther = data.type === otherLabel;
+                    return (
+                      <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
+                        {isOther ? (
+                          <div className="space-y-1">
+                            <p className="font-medium">{otherLabel}</p>
+                            {otherDetails.map((d) => (
+                              <div key={d.type} className="flex items-center justify-between gap-4 text-xs">
+                                <span className="text-muted-foreground">.{d.type}</span>
+                                <span className="font-mono tabular-nums">{d.count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-4">
+                            <span>.{data.type}</span>
+                            <span className="font-mono tabular-nums font-medium">{data.count}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }}
                 />
                 <Pie
-                  data={stats.uploadsByType}
+                  data={groupedUploadsByType}
                   dataKey="count"
                   nameKey="type"
                   cx="50%"
@@ -64,11 +110,11 @@ export function StatsAnalyticsTab({ stats }: StatsAnalyticsTabProps) {
                   innerRadius={40}
                   outerRadius={80}
                   paddingAngle={2}
-                  label={(entry) => `.${entry.type}`}
+                  label={(entry) => entry.type === t("uploads.stats.labels.other") ? entry.type : `.${entry.type}`}
                   labelLine={{ strokeWidth: 1 }}
                   animationDuration={1200}
                 >
-                  {stats.uploadsByType.map((entry, index) => {
+                  {groupedUploadsByType.map((entry, index) => {
                     const chartColors = [
                       "var(--chart-1)",
                       "var(--chart-2)",

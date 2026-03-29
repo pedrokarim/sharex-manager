@@ -80,12 +80,12 @@ export const ToolsSection = ({
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">{minecraftDescription}</p>
-              <Link href="/tools/minecraft-skin" className="mt-5 block">
+              <a href="http://mcinfo.ascencia.re/" target="_blank" rel="noopener noreferrer" className="mt-5 block">
                 <Button className="w-full gap-2">
                   {minecraftUseToolLabel}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
-              </Link>
+              </a>
             </CardContent>
           </Card>
         </motion.div>

@@ -32,10 +32,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-[9999] focus:bg-background focus:px-4 focus:py-2 focus:text-foreground"
+        >
+          Skip to main content
+        </a>
         <Providers>
           {/* ThemeWrapper disabled - themes now handled by ThemeProvider in components/theme-provider.tsx */}
           <div className="relative min-h-screen">
-            <main>{children}</main>
+            <main id="main-content">{children}</main>
             <Toaster />
           </div>
         </Providers>

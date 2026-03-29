@@ -111,7 +111,7 @@ export default function SystemPageClient() {
   };
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-3xl">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
           <Settings className="h-6 w-6 sm:h-8 sm:w-8" />
@@ -123,7 +123,7 @@ export default function SystemPageClient() {
       </div>
 
       {/* Statistiques système */}
-      <Card className="mb-4 sm:mb-6 max-w-4xl">
+      <Card className="mb-4 sm:mb-6">
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-6">
           <div>
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
@@ -182,7 +182,7 @@ export default function SystemPageClient() {
         </CardFooter>
       </Card>
 
-      <div className="grid gap-4 sm:gap-6 max-w-4xl">
+      <div className="grid gap-4 sm:gap-6">
         {/* Gestion des modules */}
         <Card>
           <CardHeader className="p-4 sm:p-6">
@@ -203,7 +203,7 @@ export default function SystemPageClient() {
               <Button
                 onClick={installAllModuleDependencies}
                 disabled={isInstallingDependencies}
-                className="w-full sm:w-auto text-sm"
+                className="text-sm"
               >
                 {isInstallingDependencies ? (
                   <>
@@ -257,7 +257,7 @@ export default function SystemPageClient() {
               <p className="text-sm">
                 {t("admin.system.upload_config.description")}
               </p>
-              <Button asChild className="w-full sm:w-auto text-sm">
+              <Button asChild className="text-sm">
                 <Link href="/uploads/config">
                   {t("admin.system.upload_config.button")}
                 </Link>

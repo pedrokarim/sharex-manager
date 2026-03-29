@@ -300,5 +300,7 @@ export async function GET(req: NextRequest) {
   }
 
   const users = JSON.parse(readFileSync(usersPath, "utf-8"));
-  return Response.json(users);
+  // Ne jamais exposer les hash de mots de passe dans la réponse API
+  const sanitizedUsers = users.map(({ password, ...user }: any) => user);
+  return Response.json(sanitizedUsers);
 }

@@ -181,7 +181,7 @@ export default function DomainsPage({
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-4 sm:space-y-6">
       <Card>
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="text-lg sm:text-xl">
@@ -267,7 +267,7 @@ export default function DomainsPage({
                   {t("settings.domains.list.add")}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[95vw] max-w-md mx-auto">
+              <DialogContent className="max-w-md mx-auto">
                 <DialogHeader>
                   <DialogTitle className="text-lg sm:text-xl">
                     {editingDomain
@@ -412,10 +412,10 @@ export default function DomainsPage({
               <TableBody>
                 {domains.map((domain) => (
                   <TableRow key={domain.id}>
-                    <TableCell className="text-xs sm:text-sm font-medium">
+                    <TableCell className="text-xs sm:text-sm font-medium truncate max-w-[120px]">
                       {domain.id}
                     </TableCell>
-                    <TableCell className="text-xs sm:text-sm">
+                    <TableCell className="text-xs sm:text-sm truncate max-w-[120px]">
                       {domain.name}
                     </TableCell>
                     <TableCell className="text-xs sm:text-sm hidden sm:table-cell truncate max-w-[150px]">
@@ -431,6 +431,7 @@ export default function DomainsPage({
                           size="icon"
                           className="h-6 w-6 sm:h-8 sm:w-8"
                           onClick={() => handleEdit(domain)}
+                          aria-label="Edit domain"
                         >
                           <Pencil className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
@@ -439,6 +440,7 @@ export default function DomainsPage({
                           size="icon"
                           className="h-6 w-6 sm:h-8 sm:w-8 text-destructive"
                           onClick={() => handleDelete(domain.id)}
+                          aria-label="Delete domain"
                         >
                           <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
