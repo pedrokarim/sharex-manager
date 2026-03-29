@@ -17,6 +17,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { UseFormReturn } from "react-hook-form";
 import { UploadConfig } from "@/schemas/upload-config";
 import { useTranslation } from "@/lib/i18n";
@@ -64,60 +65,34 @@ export function StorageTab({ form }: StorageTabProps) {
             name="storage.structure"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>
+                <FormLabel className="text-sm">
                   {t("uploads.config.storage.structure.label")}
                 </FormLabel>
                 <FormControl>
-                  <div className="flex gap-4">
+                  <RadioGroup
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    className="flex flex-wrap gap-4"
+                  >
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        id="flat"
-                        value="flat"
-                        checked={field.value === "flat"}
-                        onChange={(e) =>
-                          field.onChange(
-                            e.target.value as "flat" | "date" | "type"
-                          )
-                        }
-                      />
-                      <Label htmlFor="flat">
+                      <RadioGroupItem value="flat" id="storage-structure-flat" />
+                      <Label htmlFor="storage-structure-flat" className="text-sm">
                         {t("uploads.config.storage.structure.flat")}
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        id="date"
-                        value="date"
-                        checked={field.value === "date"}
-                        onChange={(e) =>
-                          field.onChange(
-                            e.target.value as "flat" | "date" | "type"
-                          )
-                        }
-                      />
-                      <Label htmlFor="date">
+                      <RadioGroupItem value="date" id="storage-structure-date" />
+                      <Label htmlFor="storage-structure-date" className="text-sm">
                         {t("uploads.config.storage.structure.date")}
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        id="type"
-                        value="type"
-                        checked={field.value === "type"}
-                        onChange={(e) =>
-                          field.onChange(
-                            e.target.value as "flat" | "date" | "type"
-                          )
-                        }
-                      />
-                      <Label htmlFor="type">
+                      <RadioGroupItem value="type" id="storage-structure-type" />
+                      <Label htmlFor="storage-structure-type" className="text-sm">
                         {t("uploads.config.storage.structure.type")}
                       </Label>
                     </div>
-                  </div>
+                  </RadioGroup>
                 </FormControl>
               </FormItem>
             )}
@@ -174,13 +149,13 @@ export function StorageTab({ form }: StorageTabProps) {
             )}
           />
 
-          <div className="grid gap-4">
+          <div className="grid max-w-md gap-4 sm:gap-6">
             <FormField
               control={form.control}
               name="storage.dateFormat.folderStructure"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
+                  <FormLabel className="text-sm">
                     {t("uploads.config.storage.date_format.folder_structure")}
                   </FormLabel>
                   <FormControl>
@@ -203,7 +178,7 @@ export function StorageTab({ form }: StorageTabProps) {
               name="storage.dateFormat.timezone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
+                  <FormLabel className="text-sm">
                     {t("uploads.config.storage.date_format.timezone")}
                   </FormLabel>
                   <FormControl>
@@ -220,13 +195,13 @@ export function StorageTab({ form }: StorageTabProps) {
             />
           </div>
 
-          <div className="grid gap-4">
+          <div className="grid max-w-md gap-4 sm:gap-6">
             <FormField
               control={form.control}
               name="storage.permissions.files"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
+                  <FormLabel className="text-sm">
                     {t("uploads.config.storage.permissions.files")}
                   </FormLabel>
                   <FormControl>
@@ -247,7 +222,7 @@ export function StorageTab({ form }: StorageTabProps) {
               name="storage.permissions.directories"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
+                  <FormLabel className="text-sm">
                     {t("uploads.config.storage.permissions.directories")}
                   </FormLabel>
                   <FormControl>

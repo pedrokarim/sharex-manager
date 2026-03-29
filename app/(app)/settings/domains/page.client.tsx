@@ -181,7 +181,7 @@ export default function DomainsPage({
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-4 sm:space-y-6">
       <Card>
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="text-lg sm:text-xl">
@@ -267,7 +267,7 @@ export default function DomainsPage({
                   {t("settings.domains.list.add")}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[95vw] max-w-md mx-auto">
+              <DialogContent className="max-w-md mx-auto">
                 <DialogHeader>
                   <DialogTitle className="text-lg sm:text-xl">
                     {editingDomain
