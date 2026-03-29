@@ -358,7 +358,7 @@ export function PreferencesPageClient() {
               <Label className="text-sm sm:text-base">
                 {t("settings.gallery.view_mode")}
               </Label>
-              <div className="grid grid-cols-3 sm:flex gap-2 sm:gap-4 max-w-md">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:flex gap-2 sm:gap-4 max-w-md">
                 {Object.entries(viewModeIcons).map(([mode, Icon]) => (
                   <TooltipProvider key={mode}>
                     <Tooltip>

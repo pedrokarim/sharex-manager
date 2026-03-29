@@ -161,7 +161,7 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
                 />
                 {module.name}
               </CardTitle>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground truncate">
                 v{module.version} · {module.author}
               </p>
             </div>

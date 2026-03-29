@@ -253,7 +253,7 @@ export function FileViewer({
               })}
             </VisuallyHidden>
           </DialogDescription>
-          <div className="relative flex h-[85vh] overflow-hidden rounded-lg w-full">
+          <div className="relative flex h-[85vh] overflow-hidden overscroll-contain rounded-lg w-full">
             {/* Zone principale - Image */}
             <div
               className={cn(
@@ -290,7 +290,8 @@ export function FileViewer({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-background/50 hover:bg-background/80"
+                  aria-label="Previous file"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-background/50 hover:bg-background/80 focus-visible:ring-2 focus-visible:ring-white"
                   onClick={onPrevious}
                 >
                   <ChevronLeft className="h-8 w-8" />
@@ -300,7 +301,8 @@ export function FileViewer({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-background/50 hover:bg-background/80"
+                  aria-label="Next file"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-background/50 hover:bg-background/80 focus-visible:ring-2 focus-visible:ring-white"
                   onClick={onNext}
                 >
                   <ChevronRight className="h-8 w-8" />
@@ -368,6 +370,7 @@ export function FileViewer({
                         <Button
                           variant="ghost"
                           size="icon"
+                          aria-label="Copy URL"
                           className="h-6 w-6"
                           onClick={() =>
                             file && onCopy(getGalleryImageUrl(file.name))
@@ -434,7 +437,7 @@ export function FileViewer({
                           className={cn(
                             "w-full",
                             file?.isSecure &&
-                              "border-yellow-500 text-yellow-500"
+                              "border-yellow-600 text-yellow-600 dark:border-yellow-400 dark:text-yellow-400"
                           )}
                           onClick={() => file && onToggleSecurity(file)}
                         >
@@ -456,7 +459,7 @@ export function FileViewer({
                           className={cn(
                             "w-full",
                             file?.isStarred &&
-                              "border-yellow-500 text-yellow-500"
+                              "border-yellow-600 text-yellow-600 dark:border-yellow-400 dark:text-yellow-400"
                           )}
                           onClick={() => file && onToggleStar(file)}
                         >
@@ -496,7 +499,8 @@ export function FileViewer({
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full bg-background/50 hover:bg-blue-600 hover:text-white text-blue-600"
+              aria-label="Toggle details"
+              className="rounded-full bg-background/50 hover:bg-blue-600 hover:text-white text-blue-600 focus-visible:ring-2 focus-visible:ring-white"
               onClick={() => setShowDetails(!showDetails)}
             >
               <Info className="h-5 w-5" />
@@ -518,9 +522,10 @@ export function FileViewer({
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Toggle favorite"
                       className={cn(
-                        "rounded-full bg-background/50 hover:bg-yellow-500 hover:text-white",
-                        file?.isStarred && "text-yellow-500"
+                        "rounded-full bg-background/50 hover:bg-yellow-500 hover:text-white focus-visible:ring-2 focus-visible:ring-white",
+                        file?.isStarred && "text-yellow-600 dark:text-yellow-400"
                       )}
                       onClick={() => file && onToggleStar(file)}
                     >
@@ -541,7 +546,8 @@ export function FileViewer({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="rounded-full bg-background/50 hover:bg-background/80"
+                      aria-label="Copy URL"
+                      className="rounded-full bg-background/50 hover:bg-background/80 focus-visible:ring-2 focus-visible:ring-white"
                       onClick={() => file && onCopy(file.url)}
                     >
                       <Copy className="h-5 w-5" />
@@ -561,7 +567,8 @@ export function FileViewer({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="rounded-full bg-background/50 hover:bg-background/80"
+                      aria-label="Open in new tab"
+                      className="rounded-full bg-background/50 hover:bg-background/80 focus-visible:ring-2 focus-visible:ring-white"
                       asChild
                     >
                       <a
@@ -587,10 +594,11 @@ export function FileViewer({
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Toggle security"
                       className={cn(
-                        "rounded-full bg-background/50",
+                        "rounded-full bg-background/50 focus-visible:ring-2 focus-visible:ring-white",
                         file?.isSecure &&
-                          "text-yellow-500 hover:bg-yellow-500 hover:text-white"
+                          "text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500 hover:text-white"
                       )}
                       onClick={() => file && onToggleSecurity(file)}
                     >
@@ -610,7 +618,8 @@ export function FileViewer({
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full bg-background/50 hover:bg-red-600 hover:text-white"
+              aria-label="Delete file"
+              className="rounded-full bg-background/50 hover:bg-red-600 hover:text-white focus-visible:ring-2 focus-visible:ring-white"
               onClick={() => file && onDelete(file.name)}
             >
               <Trash2 className="h-5 w-5" />
@@ -618,7 +627,8 @@ export function FileViewer({
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full bg-background/50 hover:bg-background/80"
+              aria-label="Close viewer"
+              className="rounded-full bg-background/50 hover:bg-background/80 focus-visible:ring-2 focus-visible:ring-white"
               onClick={onClose}
             >
               <X className="h-5 w-5" />

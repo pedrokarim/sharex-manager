@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Plus, FolderOpen, Search, Grid, List } from "lucide-react";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
@@ -162,28 +163,30 @@ export function AlbumsClient() {
 
       {/* Contenu */}
       {filteredAlbums.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 sm:py-24 text-center px-4">
-          <FolderOpen className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
-          <div className="space-y-2">
-            <h3 className="text-base sm:text-lg font-semibold">
+        <Empty className="py-12 sm:py-24">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <FolderOpen className="h-5 w-5" />
+            </EmptyMedia>
+            <EmptyTitle>
               {searchQuery ? "Aucun album trouvé" : t("albums.no_albums.title")}
-            </h3>
-            <p className="text-xs sm:text-sm text-muted-foreground max-w-md">
+            </EmptyTitle>
+            <EmptyDescription>
               {searchQuery
                 ? `Aucun album ne correspond à "${searchQuery}"`
                 : t("albums.no_albums.description")}
-            </p>
-            {!searchQuery && (
-              <Button
-                onClick={() => setIsCreateDialogOpen(true)}
-                className="mt-3 sm:mt-4 text-sm"
-              >
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                {t("albums.create")}
-              </Button>
-            )}
-          </div>
-        </div>
+            </EmptyDescription>
+          </EmptyHeader>
+          {!searchQuery && (
+            <Button
+              onClick={() => setIsCreateDialogOpen(true)}
+              className="text-sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {t("albums.create")}
+            </Button>
+          )}
+        </Empty>
       ) : (
         <div
           className={

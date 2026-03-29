@@ -238,6 +238,7 @@ export function PublicImageViewer({
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Zoom out"
               className="h-8 w-8 text-white hover:bg-white/10"
               onClick={handleZoomOut}
               disabled={scale <= 0.5}
@@ -247,6 +248,7 @@ export function PublicImageViewer({
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Reset zoom"
               className="h-8 w-8 text-white hover:bg-white/10"
               onClick={handleZoomReset}
               disabled={scale === 1}
@@ -256,6 +258,7 @@ export function PublicImageViewer({
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Zoom in"
               className="h-8 w-8 text-white hover:bg-white/10"
               onClick={handleZoomIn}
               disabled={scale >= 4}
@@ -268,6 +271,7 @@ export function PublicImageViewer({
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Download image"
             className="h-10 w-10 text-white hover:bg-white/10"
             onClick={handleDownload}
           >
@@ -276,6 +280,7 @@ export function PublicImageViewer({
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Open in new tab"
             className="h-10 w-10 text-white hover:bg-white/10"
             asChild
           >
@@ -286,6 +291,7 @@ export function PublicImageViewer({
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Close viewer"
             className="h-10 w-10 text-white hover:bg-white/10"
             onClick={onClose}
           >
@@ -338,7 +344,8 @@ export function PublicImageViewer({
             <Button
               variant="ghost"
               size="icon"
-              className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/20 hover:bg-black/40 text-white h-12 w-12"
+              aria-label="Previous image"
+              className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/20 hover:bg-black/40 text-white h-12 w-12 focus-visible:ring-2 focus-visible:ring-white"
               onClick={() => onIndexChange(index - 1)}
             >
               <ChevronLeft className="h-8 w-8" />
@@ -348,7 +355,8 @@ export function PublicImageViewer({
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/20 hover:bg-black/40 text-white h-12 w-12"
+              aria-label="Next image"
+              className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/20 hover:bg-black/40 text-white h-12 w-12 focus-visible:ring-2 focus-visible:ring-white"
               onClick={() => onIndexChange(index + 1)}
             >
               <ChevronRight className="h-8 w-8" />

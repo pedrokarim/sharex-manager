@@ -112,11 +112,11 @@ export function ApiKeyDetailsDialog({
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="font-semibold">Nom</div>
-                <div className="col-span-3">{apiKey.name}</div>
+                <div className="col-span-3 truncate">{apiKey.name}</div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="font-semibold">Clé</div>
-                <code className="col-span-3 rounded bg-muted px-2 py-1">
+                <code className="col-span-3 rounded bg-muted px-2 py-1 break-all">
                   {apiKey.key}
                 </code>
               </div>

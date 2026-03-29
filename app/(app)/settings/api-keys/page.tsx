@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
 import {
   Plus,
   Key,
@@ -161,22 +162,26 @@ export default function ApiKeysPage() {
               ) : keys.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7}>
-                    <div className="flex flex-col items-center justify-center py-6 text-center">
-                      <Key className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground" />
-                      <h3 className="mt-4 text-base sm:text-lg font-semibold">
-                        {t("settings.api_keys.no_keys.title")}
-                      </h3>
-                      <p className="mb-4 text-xs sm:text-sm text-muted-foreground">
-                        {t("settings.api_keys.no_keys.description")}
-                      </p>
+                    <Empty className="py-6">
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <Key className="h-5 w-5" />
+                        </EmptyMedia>
+                        <EmptyTitle>
+                          {t("settings.api_keys.no_keys.title")}
+                        </EmptyTitle>
+                        <EmptyDescription>
+                          {t("settings.api_keys.no_keys.description")}
+                        </EmptyDescription>
+                      </EmptyHeader>
                       <Button
                         onClick={() => setShowCreateDialog(true)}
                         className="text-sm"
                       >
-                        <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                        <Plus className="mr-2 h-4 w-4" />
                         {t("settings.api_keys.create_key")}
                       </Button>
-                    </div>
+                    </Empty>
                   </TableCell>
                 </TableRow>
               ) : (

@@ -265,7 +265,7 @@ export function ThumbnailsTab({ form }: ThumbnailsTabProps) {
                     onValueChange={([value]) => field.onChange(value)}
                   />
                 </FormControl>
-                <div className="aspect-video rounded-lg overflow-hidden relative w-full md:w-[250px] h-[250px] border border-black">
+                <div className="aspect-video rounded-lg overflow-hidden relative w-full max-w-[250px] border border-black">
                   <img
                     src="/preview-image.png"
                     alt={t("uploads.config.thumbnails.blur_preview")}

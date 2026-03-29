@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
+  Clock,
 } from "lucide-react";
 import { HistoryEntry } from "@/lib/types/history";
 import { toast } from "sonner";
@@ -39,6 +40,7 @@ import {
 } from "@/components/ui/select";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import { useTranslation } from "@/lib/i18n";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
 
 interface HistoryListProps {
   filters?: URLSearchParams;
@@ -237,11 +239,17 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
           <TableBody>
             {entries.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="text-center py-6 sm:py-8 text-gray-500 text-sm"
-                >
-                  {t("uploads.history.list.no_results")}
+                <TableCell colSpan={7}>
+                  <Empty className="py-6">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Clock className="h-5 w-5" />
+                      </EmptyMedia>
+                      <EmptyTitle>
+                        {t("uploads.history.list.no_results")}
+                      </EmptyTitle>
+                    </EmptyHeader>
+                  </Empty>
                 </TableCell>
               </TableRow>
             ) : (
