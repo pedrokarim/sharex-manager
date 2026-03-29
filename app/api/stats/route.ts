@@ -53,6 +53,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const { searchParams } = new URL(request.url);
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
+    const startDate = startDateParam ? new Date(startDateParam) : null;
+    const endDate = endDateParam ? new Date(endDateParam) : null;
+
     const uploadsDir = getAbsoluteUploadPath();
     const files = await fs.readdir(uploadsDir);
     const history = await getAllHistory();
@@ -110,6 +116,10 @@ export async function GET(request: NextRequest) {
 
       if (!fileStat.isFile()) continue;
 
+      // Filtrage par date si spécifié
+      if (startDate && fileStat.mtime < startDate) continue;
+      if (endDate && fileStat.mtime > endDate) continue;
+
       // Statistiques de base
       fileStats.totalFiles++;
       fileStats.totalSize += fileStat.size;
@@ -145,8 +155,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Filtrer l'historique par date si spécifié
+    const filteredHistory = history.filter((entry) => {
+      const entryDate = new Date(entry.uploadDate);
+      if (startDate && entryDate < startDate) return false;
+      if (endDate && entryDate > endDate) return false;
+      return true;
+    });
+
     // Traitement des statistiques mensuelles depuis l'historique
-    history.forEach((entry) => {
+    filteredHistory.forEach((entry) => {
       const month = entry.uploadDate.substring(0, 7); // Format: YYYY-MM
       const current = monthlyStats.get(month) || { newFiles: 0, totalSize: 0 };
       monthlyStats.set(month, {

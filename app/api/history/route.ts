@@ -18,13 +18,13 @@ export async function GET(request: NextRequest) {
     const sortField = searchParams.get("sortField") || "uploadDate";
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
-    // Si c'est une requête pour les stats, on force les filtres pour les 30 derniers jours
+    // Si c'est une requête pour les stats, on utilise les dates fournies ou les 30 derniers jours par défaut
     const filters = {
-      startDate: isStatsRequest
-        ? new Date(new Date().setDate(new Date().getDate() - 30))
-        : searchParams.get("startDate")
+      startDate: searchParams.get("startDate")
         ? new Date(searchParams.get("startDate")!)
-        : undefined,
+        : isStatsRequest
+          ? new Date(new Date().setDate(new Date().getDate() - 30))
+          : undefined,
       endDate: searchParams.get("endDate")
         ? new Date(searchParams.get("endDate")!)
         : undefined,

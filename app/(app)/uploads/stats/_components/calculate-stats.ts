@@ -2,7 +2,11 @@ import { format } from "date-fns";
 import { HistoryEntry } from "@/lib/types/history";
 import { StatsData } from "./types";
 
-export function calculateStats(historyData: any, fileStats: any): StatsData {
+export function calculateStats(
+  historyData: any,
+  fileStats: any,
+  dateRange?: { startDate?: string; endDate?: string }
+): StatsData {
   const entries: HistoryEntry[] = historyData.items;
 
   const stats: StatsData = {
@@ -30,10 +34,20 @@ export function calculateStats(historyData: any, fileStats: any): StatsData {
     { api: number; web: number; total: number; totalSize: number }
   >();
 
-  // Initialiser les 30 derniers jours avec des valeurs à 0
-  for (let i = 0; i < 30; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
+  // Calculer la plage de jours à afficher
+  const end = dateRange?.endDate ? new Date(dateRange.endDate) : new Date();
+  const start = dateRange?.startDate
+    ? new Date(dateRange.startDate)
+    : new Date(new Date().setDate(new Date().getDate() - 30));
+  const dayCount = Math.max(
+    1,
+    Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  );
+
+  // Initialiser tous les jours de la plage avec des valeurs à 0
+  for (let i = 0; i < dayCount; i++) {
+    const date = new Date(start);
+    date.setDate(date.getDate() + i);
     byDay.set(format(date, "yyyy-MM-dd"), {
       api: 0,
       web: 0,

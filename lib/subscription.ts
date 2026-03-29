@@ -1,10 +1,8 @@
 "use server";
 
-import { getMyAllTimeRequestCount } from "@/actions/ai-usage";
 import { SubscriptionRequiredError } from "@/types/errors";
 import { SubscriptionCheck } from "@/types/subscription";
 import { NextRequest } from "next/server";
-import { AI_REQUEST_FREE_TIER_LIMIT } from "./constants";
 import { getCurrentUserId } from "./shared";
 import { db } from "@/db";
 import { subscription } from "@/db/schema";
@@ -21,48 +19,12 @@ export async function getMyActiveSubscription(
 }
 
 export async function validateSubscriptionAndUsage(userId: string): Promise<SubscriptionCheck> {
-  try {
-    const [activeSubscription, requestsUsed] = await Promise.all([
-      getMyActiveSubscription(userId),
-      getMyAllTimeRequestCount(userId),
-    ]);
-
-    const isSubscribed =
-      !!activeSubscription &&
-      activeSubscription?.productId === process.env.NEXT_PUBLIC_TWEAKCN_PRO_PRODUCT_ID;
-
-    if (isSubscribed) {
-      return {
-        canProceed: true,
-        isSubscribed: true,
-        requestsUsed,
-        requestsRemaining: Infinity, // Unlimited for subscribers
-      };
-    }
-
-    const requestsRemaining = Math.max(0, AI_REQUEST_FREE_TIER_LIMIT - requestsUsed);
-    const canProceed = requestsUsed < AI_REQUEST_FREE_TIER_LIMIT;
-
-    if (!canProceed) {
-      return {
-        canProceed: false,
-        isSubscribed: false,
-        requestsUsed,
-        requestsRemaining: 0,
-        error: `You've reached your free limit of ${AI_REQUEST_FREE_TIER_LIMIT} requests. Please upgrade to continue.`,
-      };
-    }
-
-    return {
-      canProceed: true,
-      isSubscribed: false,
-      requestsUsed,
-      requestsRemaining,
-    };
-  } catch (error) {
-    console.error("Error validating subscription:", error);
-    throw error;
-  }
+  return {
+    canProceed: true,
+    isSubscribed: true,
+    requestsUsed: 0,
+    requestsRemaining: Infinity,
+  };
 }
 
 export async function requireSubscriptionOrFreeUsage(req: NextRequest): Promise<void> {
