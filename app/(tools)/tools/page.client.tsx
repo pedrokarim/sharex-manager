@@ -31,7 +31,7 @@ const getTools = (t: any): Tool[] => [
     description: t("tools.minecraft_skin.description"),
     icon: Gamepad2,
     status: "available",
-    href: "/tools/minecraft-skin",
+    href: "http://mcinfo.ascencia.re/",
     category: "Gaming",
   },
   {

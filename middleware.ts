@@ -9,15 +9,29 @@ const imageDomain = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
 // Liste des routes publiques
 const publicRoutes = ["/img-handler", "/", "/login"];
 
-// Configuration CORS
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+// Configuration CORS — restreint aux domaines autorisés
+const ALLOWED_ORIGINS = [
+  "https://sxm.ascencia.re",
+  "https://ascencia.re",
+  "https://img.ascencia.re",
+];
+
+function getCorsOrigin(req: NextRequest): string {
+  const origin = req.headers.get("origin") || "";
+  if (ALLOWED_ORIGINS.includes(origin)) return origin;
+  // En dev, autoriser localhost
+  if (process.env.NODE_ENV === "development" && origin.startsWith("http://localhost")) return origin;
+  return ALLOWED_ORIGINS[0];
+}
+
+const baseCorsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 } as const;
 
-const setCorsHeaders = (response: NextResponse) => {
-  for (const [key, value] of Object.entries(corsHeaders)) {
+const setCorsHeaders = (response: NextResponse, req: NextRequest) => {
+  response.headers.set("Access-Control-Allow-Origin", getCorsOrigin(req));
+  for (const [key, value] of Object.entries(baseCorsHeaders)) {
     response.headers.set(key, value);
   }
   return response;
@@ -66,7 +80,7 @@ export async function middleware(req: NextRequest) {
 
   // Vérifier si la route est publique
   if (publicRoutes.some((route) => path.startsWith(route))) {
-    return setCorsHeaders(NextResponse.next());
+    return setCorsHeaders(NextResponse.next(), req);
   }
 
   // Gestion des routes API
@@ -81,7 +95,7 @@ export async function middleware(req: NextRequest) {
       apiPublicRoutes.exact.includes(path) ||
       apiPublicRoutes.startsWith.some((route) => path.startsWith(route))
     ) {
-      return setCorsHeaders(NextResponse.next());
+      return setCorsHeaders(NextResponse.next(), req);
     }
 
     // Vérification de l'authentification avec Next Auth 5
@@ -99,11 +113,12 @@ export async function middleware(req: NextRequest) {
         status: 401,
         headers: {
           "Content-Type": "application/json",
-          ...corsHeaders,
+          "Access-Control-Allow-Origin": getCorsOrigin(req),
+          ...baseCorsHeaders,
         },
       });
     }
-    return setCorsHeaders(NextResponse.next());
+    return setCorsHeaders(NextResponse.next(), req);
   }
 
   // Vérification de l'authentification avec Next Auth 5
@@ -134,5 +149,5 @@ export async function middleware(req: NextRequest) {
     });
   }
 
-  return setCorsHeaders(NextResponse.next());
+  return setCorsHeaders(NextResponse.next(), req);
 }

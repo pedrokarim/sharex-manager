@@ -51,9 +51,32 @@ const nextConfig = {
         ];
     },
     async headers() {
+        const securityHeaders = [
+            {
+                key: 'X-Content-Type-Options',
+                value: 'nosniff',
+            },
+            {
+                key: 'X-Frame-Options',
+                value: 'DENY',
+            },
+            {
+                key: 'Referrer-Policy',
+                value: 'strict-origin-when-cross-origin',
+            },
+            {
+                key: 'Strict-Transport-Security',
+                value: 'max-age=31536000; includeSubDomains',
+            },
+            {
+                key: 'Permissions-Policy',
+                value: 'camera=(), microphone=(), geolocation=()',
+            },
+        ];
+
         return [
             {
-                // Headers CORS pour le domaine d'images
+                // Headers CORS pour le domaine d'images (public, lecture seule)
                 source: '/img-handler/:path*',
                 headers: [
                     {
@@ -72,10 +95,11 @@ const nextConfig = {
                         key: 'Cache-Control',
                         value: 'public, max-age=31536000, immutable',
                     },
+                    ...securityHeaders,
                 ],
             },
             {
-                // Headers pour toutes les routes (utile pour le domaine principal)
+                // Security + CORS headers pour toutes les routes
                 source: '/:path*',
                 headers: [
                     {
@@ -94,6 +118,7 @@ const nextConfig = {
                         key: 'Access-Control-Allow-Methods',
                         value: 'GET,POST,OPTIONS,PUT,DELETE,PATCH',
                     },
+                    ...securityHeaders,
                 ],
             },
         ];

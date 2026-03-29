@@ -30,10 +30,11 @@ RUN mkdir -p /app/.next/static \
     /app/uploads/thumbnails \
     /app/data \
     /app/config && \
-    chmod 777 /app/uploads \
+    chmod 755 /app/uploads \
     /app/uploads/thumbnails \
     /app/data \
-    /app/config
+    /app/config && \
+    chown -R 1000:1000 /app/uploads /app/data /app/config
 
 # Copier les fichiers nécessaires
 COPY --from=builder /app/.next/standalone ./

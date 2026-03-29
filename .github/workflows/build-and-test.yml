@@ -26,7 +26,7 @@ jobs:
       - name: Create required directories
         run: |
           mkdir -p data config
-          chmod 777 data config
+          chmod 755 data config
 
       - name: Install dependencies
         run: bun install
@@ -91,7 +91,7 @@ jobs:
       - name: Create required directories
         run: |
           mkdir -p .next/static uploads uploads/thumbnails data config
-          chmod 777 uploads uploads/thumbnails data config
+          chmod 755 uploads uploads/thumbnails data config
 
       - name: Install dependencies
         run: bun install
@@ -125,7 +125,7 @@ jobs:
           ls -la .next/static
 
       - name: Create cache directory
-        run: mkdir -p .next/cache && chmod 777 .next/cache
+        run: mkdir -p .next/cache && chmod 755 .next/cache
 
       - name: Cache build output
         uses: actions/cache@v4
