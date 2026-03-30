@@ -1,12 +1,12 @@
-import Editor from "@/components/editor/editor";
-import { Metadata } from "next";
+import type { Metadata } from "next";
+import ThemeSettingsPageClient from "./page.client";
 
 export const metadata: Metadata = {
-  title: "ShareX Manager - Éditeur de thème",
+  title: "ShareX Manager - Thème utilisateur",
   description:
-    "Personnalisez et prévisualisez votre thème ShareX Manager. Modifiez les couleurs, polices et styles en temps réel.",
+    "Choisissez votre priorité de thème et personnalisez votre palette personnelle sans modifier le thème global du site.",
 };
 
 export default function ThemePage() {
-  return <Editor themePromise={Promise.resolve(null)} />;
+  return <ThemeSettingsPageClient />;
 }

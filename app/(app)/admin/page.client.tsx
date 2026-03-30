@@ -39,6 +39,15 @@ export function AdminPageClient() {
       accent: "from-emerald-500/15 via-emerald-500/5 to-transparent",
     },
     {
+      title: "Thème global",
+      description:
+        "Publier la base visuelle du site et préparer les futures extensions de branding.",
+      icon: Settings,
+      href: "/admin/theme",
+      meta: "Design system",
+      accent: "from-cyan-500/15 via-cyan-500/5 to-transparent",
+    },
+    {
       title: t("admin.sections.system.title"),
       description: t("admin.sections.system.description"),
       icon: Settings,

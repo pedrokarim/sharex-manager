@@ -1,7 +1,6 @@
 import { MouseEvent } from "react";
 import { FileInfo } from "@/types/files";
 import { Button } from "../ui/button";
-import { Checkbox } from "../ui/checkbox";
 import { FileContextMenu } from "@/components/gallery/file-context-menu";
 import { AlbumIndicator } from "@/components/gallery/album-indicator";
 import {
@@ -30,7 +29,7 @@ interface SelectableListItemCardProps {
   onToggleSelection?: (
     fileName: string,
     ctrlKey: boolean,
-    shiftKey: boolean
+    shiftKey: boolean,
   ) => void;
   onAddToAlbum?: () => void;
   onCreateAlbum?: (fileName?: string) => void;
@@ -82,6 +81,8 @@ export function SelectableListItemCard({
   isNew,
 }: SelectableListItemCardProps) {
   const locale = useDateLocale();
+  const showSelectionControl =
+    isSelectionMode || showSelectionCheckbox || isSelected;
 
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     // Si Ctrl + clic gauche et pas en mode sélection, activer le mode sélection
@@ -101,10 +102,16 @@ export function SelectableListItemCard({
     }
   };
 
-  const handleCheckboxChange = (checked: boolean) => {
-    if (onToggleSelection) {
-      onToggleSelection(file.name, true, false); // Simulate Ctrl+Click pour toggle
+  const handleSelectionControlClick = (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isSelectionMode) {
+      onStartSelectionMode?.(file.name);
+      return;
     }
+
+    onToggleSelection?.(file.name, e.ctrlKey || e.metaKey, e.shiftKey);
   };
 
   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
@@ -126,38 +133,40 @@ export function SelectableListItemCard({
     >
       <div
         className={cn(
-          "flex items-center gap-4 p-4 rounded-lg border transition-all hover:bg-accent/50 cursor-pointer relative",
+          "group relative flex items-center gap-4 rounded-lg border p-4 transition-all hover:bg-accent/50 cursor-pointer",
           isNew && "animate-in fade-in-0 zoom-in-95",
           isSelected && "bg-accent border-primary ring-1 ring-primary",
-          (isSelectionMode || showSelectionCheckbox) && "cursor-pointer"
+          (isSelectionMode || showSelectionCheckbox) && "cursor-pointer",
         )}
         onClick={handleClick}
       >
-        {/* Checkbox de sélection */}
-        {(showSelectionCheckbox || (isSelectionMode && isSelected)) && (
-          <div className="flex-shrink-0">
-            <div
-              className={cn(
-                "w-6 h-6 rounded border-2 bg-background",
-                "flex items-center justify-center transition-all",
-                isSelected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border hover:border-primary/50"
-              )}
-            >
-              {isSelected ? (
-                <Check className="h-3 w-3" />
-              ) : (
-                <Checkbox
-                  checked={isSelected}
-                  onCheckedChange={handleCheckboxChange}
-                  className="w-4 h-4 border-0 bg-transparent"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              )}
-            </div>
-          </div>
-        )}
+        <div className="flex w-7 flex-shrink-0 items-center justify-center">
+          <button
+            type="button"
+            aria-label={
+              isSelected ? "Retirer de la sélection" : "Ajouter à la sélection"
+            }
+            aria-pressed={isSelected}
+            tabIndex={showSelectionControl ? 0 : -1}
+            className={cn(
+              "flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-200",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2",
+              showSelectionControl
+                ? "pointer-events-auto scale-100 opacity-100"
+                : "pointer-events-none scale-90 opacity-0 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100",
+              isSelected
+                ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                : "border-border/70 bg-background/90 text-muted-foreground hover:border-primary/50 hover:text-foreground",
+            )}
+            onClick={handleSelectionControlClick}
+          >
+            {isSelected ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <span className="h-3 w-3 rounded-full border-2 border-current/70" />
+            )}
+          </button>
+        </div>
 
         {/* Thumbnail */}
         <div className="flex-shrink-0">
@@ -250,7 +259,7 @@ export function SelectableListItemCard({
             }}
             className={cn(
               "bg-background/50 hover:bg-yellow-500 hover:text-white",
-              file.isSecure && "text-yellow-500"
+              file.isSecure && "text-yellow-500",
             )}
           >
             {file.isSecure ? (
@@ -268,7 +277,7 @@ export function SelectableListItemCard({
             }}
             className={cn(
               "bg-background/50 hover:bg-red-500 hover:text-white",
-              "text-destructive"
+              "text-destructive",
             )}
           >
             <Trash2 className="h-4 w-4" />

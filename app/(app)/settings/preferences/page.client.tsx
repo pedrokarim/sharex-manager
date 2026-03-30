@@ -13,21 +13,15 @@ import {
   sortOrderAtom,
   autoRefreshIntervalAtom,
   showNotificationsAtom,
-  timeBasedThemeAtom,
-  preferredThemeModeAtom,
   type GalleryViewMode,
   type ThumbnailSize,
   type Language,
   type SortBy,
   type SortOrder,
-  type ThemeMode,
 } from "@/lib/atoms/preferences";
 import {
   Settings2,
   RotateCcw,
-  Sun,
-  Moon,
-  Monitor,
   Grid2X2,
   List,
   LayoutList,
@@ -66,10 +60,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
-import { useTheme } from "@/components/theme-provider";
-import { useRouter } from "next/navigation";
-import { TimePicker } from "@/components/ui/time-picker";
 import { useTranslation } from "@/lib/i18n";
+import { ThemeModePreferencesPanel } from "@/components/settings/theme-mode-preferences-panel";
 
 const settingsCardClassName = "rounded-2xl border-border/70 shadow-sm";
 const settingsCardHeaderClassName =
@@ -94,26 +86,8 @@ export function PreferencesPageClient() {
   const [showNotifications, setShowNotifications] = useAtom(
     showNotificationsAtom,
   );
-  const [timeBasedTheme, setTimeBasedTheme] = useAtom(timeBasedThemeAtom);
-  const [preferredThemeMode, setPreferredThemeMode] = useAtom(
-    preferredThemeModeAtom,
-  );
 
-  const { setTheme } = useTheme();
-  const router = useRouter();
   const { t } = useTranslation();
-
-  const applyThemeMode = (themeMode: Exclude<ThemeMode, "time-based">) => {
-    if (themeMode === "system") {
-      const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)",
-      ).matches;
-      setTheme(prefersDark ? "dark" : "light");
-      return;
-    }
-
-    setTheme(themeMode);
-  };
 
   const handleReset = () => {
     setPreferences({
@@ -139,24 +113,8 @@ export function PreferencesPageClient() {
       dayStartHour: 7,
       dayEndHour: 19,
     });
-    setPreferredThemeMode("system");
-    applyThemeMode("system");
     toast.success(t("settings.save_success"));
   };
-
-  const themeIcons = {
-    light: Sun,
-    dark: Moon,
-    system: Monitor,
-    "time-based": Clock,
-  };
-
-  const themeLabels = {
-    light: t("settings.theme_options.light"),
-    dark: t("settings.theme_options.dark"),
-    system: t("settings.theme_options.system"),
-    "time-based": t("settings.theme_options.time_based"),
-  } as const;
 
   const viewModeIcons = {
     grid: Grid2X2,
@@ -177,14 +135,6 @@ export function PreferencesPageClient() {
     small: t("settings.gallery.thumbnail_sizes.small"),
     tiny: t("settings.gallery.thumbnail_sizes.tiny"),
   } as const;
-
-  const handleThemeChange = (newTheme: ThemeMode) => {
-    setPreferredThemeMode(newTheme);
-
-    if (newTheme !== "time-based") {
-      applyThemeMode(newTheme);
-    }
-  };
 
   return (
     <div className="flex h-full flex-col gap-6">
@@ -225,115 +175,7 @@ export function PreferencesPageClient() {
               </CardDescription>
             </CardHeader>
             <CardContent className={settingsCardContentClassName}>
-              <div className={settingsBlockClassName}>
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium sm:text-base">
-                    {t("settings.theme")}
-                  </Label>
-                  <p className="text-xs text-muted-foreground sm:text-sm">
-                    Choisissez le mode d'affichage global de l'interface.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(themeIcons).map(([themeKey, Icon]) => (
-                    <TooltipProvider key={themeKey}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant={
-                              preferredThemeMode === themeKey
-                                ? "default"
-                                : "outline"
-                            }
-                            className="text-xs sm:text-sm"
-                            onClick={() =>
-                              handleThemeChange(themeKey as ThemeMode)
-                            }
-                          >
-                            <Icon className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
-                            <span className="text-xs sm:text-sm">
-                              {
-                                themeLabels[
-                                  themeKey as keyof typeof themeLabels
-                                ]
-                              }
-                            </span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>
-                            {themeKey === "time-based"
-                              ? `${t("settings.theme_options.time_based")} (${
-                                  timeBasedTheme.dayStartHour
-                                }h-${timeBasedTheme.dayEndHour}h)`
-                              : `${t("settings.theme")} ${
-                                  themeLabels[
-                                    themeKey as keyof typeof themeLabels
-                                  ]
-                                }`}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ))}
-                </div>
-
-                {preferredThemeMode === "time-based" && (
-                  <div className="space-y-4 rounded-xl border border-border/60 bg-background px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <Sun className="h-4 w-4" />
-                      <Label className="text-sm font-medium sm:text-base">
-                        {t("settings.theme_options.light")}
-                      </Label>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <TimePicker
-                        label={t("common.start")}
-                        value={`${timeBasedTheme.dayStartHour
-                          .toString()
-                          .padStart(2, "0")}:00`}
-                        onChange={(value) => {
-                          const [hours] = value.split(":").map(Number);
-                          setTimeBasedTheme({
-                            ...timeBasedTheme,
-                            dayStartHour: hours,
-                          });
-                        }}
-                        format="24h"
-                      />
-                      <TimePicker
-                        label={t("common.end")}
-                        value={`${timeBasedTheme.dayEndHour
-                          .toString()
-                          .padStart(2, "0")}:00`}
-                        onChange={(value) => {
-                          const [hours] = value.split(":").map(Number);
-                          setTimeBasedTheme({
-                            ...timeBasedTheme,
-                            dayEndHour: hours,
-                          });
-                        }}
-                        format="24h"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground sm:text-sm">
-                      {t("settings.theme_options.time_based_description", {
-                        start: timeBasedTheme.dayStartHour,
-                        end: timeBasedTheme.dayEndHour,
-                      })}
-                    </p>
-                  </div>
-                )}
-
-                <Button
-                  variant="outline"
-                  className="text-xs sm:text-sm"
-                  onClick={() => router.push("/settings/theme")}
-                >
-                  <Settings2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                  {t("settings.theme_advanced")}
-                </Button>
-              </div>
+              <ThemeModePreferencesPanel />
 
               <div className="flex flex-col gap-4 rounded-xl border border-border/60 bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
