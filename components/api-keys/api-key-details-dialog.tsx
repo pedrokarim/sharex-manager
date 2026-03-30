@@ -93,16 +93,16 @@ export function ApiKeyDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
+      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-4xl overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+        <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
           <DialogTitle>Détails de la clé API</DialogTitle>
           <DialogDescription>
             Informations et configuration pour {apiKey.name}
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="details">
-          <TabsList>
+        <Tabs defaultValue="details" className="px-5 py-5 sm:px-6">
+          <TabsList className="grid h-auto w-full grid-cols-3 rounded-xl border border-border/60 bg-muted/20 p-1">
             <TabsTrigger value="details">Détails</TabsTrigger>
             <TabsTrigger value="config">Configuration ShareX</TabsTrigger>
             <TabsTrigger value="qrcode">QR Code Mobile</TabsTrigger>
@@ -110,48 +110,70 @@ export function ApiKeyDetailsDialog({
 
           <TabsContent value="details" className="space-y-4">
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-semibold">Nom</div>
-                <div className="col-span-3 truncate">{apiKey.name}</div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                  <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Nom
+                  </div>
+                  <div className="mt-2 truncate text-sm">{apiKey.name}</div>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                  <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Créée le
+                  </div>
+                  <div className="mt-2 text-sm">
+                    {format(new Date(apiKey.createdAt), "PPP", { locale: fr })}
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-semibold">Clé</div>
-                <code className="col-span-3 rounded bg-muted px-2 py-1 break-all">
+
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  Clé
+                </div>
+                <code className="mt-2 block rounded-xl border border-border/60 bg-background px-3 py-3 break-all text-xs">
                   {apiKey.key}
                 </code>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-semibold">Créée le</div>
-                <div className="col-span-3">
-                  {format(new Date(apiKey.createdAt), "PPP", { locale: fr })}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                  <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Expire le
+                  </div>
+                  <div className="mt-2 text-sm">
+                    {apiKey.expiresAt
+                      ? format(new Date(apiKey.expiresAt), "PPP", {
+                          locale: fr,
+                        })
+                      : "Jamais"}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                  <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Permissions
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {apiKey.permissions.uploadImages && (
+                      <Badge variant="secondary">Images</Badge>
+                    )}
+                    {apiKey.permissions.uploadText && (
+                      <Badge variant="secondary">Texte</Badge>
+                    )}
+                    {apiKey.permissions.uploadFiles && (
+                      <Badge variant="secondary">Fichiers</Badge>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-semibold">Expire le</div>
-                <div className="col-span-3">
-                  {apiKey.expiresAt
-                    ? format(new Date(apiKey.expiresAt), "PPP", { locale: fr })
-                    : "Jamais"}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-semibold">Permissions</div>
-                <div className="col-span-3 flex gap-2">
-                  {apiKey.permissions.uploadImages && (
-                    <Badge variant="secondary">Images</Badge>
-                  )}
-                  {apiKey.permissions.uploadText && (
-                    <Badge variant="secondary">Texte</Badge>
-                  )}
-                  {apiKey.permissions.uploadFiles && (
-                    <Badge variant="secondary">Fichiers</Badge>
-                  )}
-                </div>
-              </div>
+
               {apiKey.lastUsed && (
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <div className="font-semibold">Dernière utilisation</div>
-                  <div className="col-span-3">
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                  <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Dernière utilisation
+                  </div>
+                  <div className="mt-2 text-sm">
                     {format(new Date(apiKey.lastUsed), "PPP à HH:mm", {
                       locale: fr,
                     })}
@@ -162,7 +184,7 @@ export function ApiKeyDetailsDialog({
           </TabsContent>
 
           <TabsContent value="config" className="space-y-6">
-            <div className="rounded-lg border bg-muted/50 p-4 space-y-4">
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-4">
               <p className="text-sm text-muted-foreground">
                 Cette configuration ShareX vous permet d'uploader directement
                 des fichiers vers notre service. Les URLs de vos fichiers seront
@@ -206,7 +228,7 @@ export function ApiKeyDetailsDialog({
                     size="sm"
                     onClick={() =>
                       copyToClipboard(
-                        JSON.stringify(generateSxcuConfig(), null, 2)
+                        JSON.stringify(generateSxcuConfig(), null, 2),
                       )
                     }
                   >
@@ -214,12 +236,12 @@ export function ApiKeyDetailsDialog({
                     Copier
                   </Button>
                 </div>
-                <pre className="rounded-lg bg-muted p-4 overflow-auto">
+                <pre className="overflow-auto rounded-xl border border-border/60 bg-muted/20 p-4">
                   <code>{JSON.stringify(generateSxcuConfig(), null, 2)}</code>
                 </pre>
               </div>
             ) : (
-              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center">
+              <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-4 text-center">
                 <p className="text-sm text-destructive">
                   Cette clé n'a aucune permission d'upload activée. Aucune
                   configuration ShareX n'est disponible.
@@ -229,7 +251,7 @@ export function ApiKeyDetailsDialog({
           </TabsContent>
 
           <TabsContent value="qrcode" className="space-y-6">
-            <div className="rounded-lg border bg-muted/50 p-4 space-y-4">
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-4">
               <p className="text-sm text-muted-foreground">
                 Scannez ce QR code avec l'application mobile ShareX Manager pour
                 configurer automatiquement la connexion au serveur et la clé
@@ -274,7 +296,7 @@ export function ApiKeyDetailsDialog({
 
               <div className="flex justify-center">
                 {qrCodeDataUrl ? (
-                  <div className="p-4 bg-white rounded-lg border">
+                  <div className="rounded-xl border border-border/60 bg-white p-4">
                     <img
                       src={qrCodeDataUrl}
                       alt="QR Code de configuration"
@@ -282,7 +304,7 @@ export function ApiKeyDetailsDialog({
                     />
                   </div>
                 ) : (
-                  <div className="w-64 h-64 bg-muted rounded-lg flex items-center justify-center">
+                  <div className="flex h-64 w-64 items-center justify-center rounded-xl border border-border/60 bg-muted/20">
                     <QrCode className="h-12 w-12 text-muted-foreground" />
                   </div>
                 )}

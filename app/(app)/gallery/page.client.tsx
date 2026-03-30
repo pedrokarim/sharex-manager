@@ -220,7 +220,7 @@ export function GalleryClient({
     Array<{ id: number; name: string }>
   >([]);
   const [fileAlbumsCache, setFileAlbumsCache] = useState<Record<string, any[]>>(
-    {}
+    {},
   );
   const fileAlbumsCacheRef = useRef(fileAlbumsCache);
   useEffect(() => {
@@ -247,7 +247,7 @@ export function GalleryClient({
             data.albums?.map((album: any) => ({
               id: album.id,
               name: album.name,
-            })) || []
+            })) || [],
           );
         }
       } catch (error) {
@@ -265,7 +265,9 @@ export function GalleryClient({
         // Filtrer les fichiers qui ne sont pas encore dans le cache (sauf si forceReload)
         const uncachedFiles = forceReload
           ? fileNames
-          : fileNames.filter((fileName) => !fileAlbumsCacheRef.current[fileName]);
+          : fileNames.filter(
+              (fileName) => !fileAlbumsCacheRef.current[fileName],
+            );
 
         if (uncachedFiles.length === 0) return;
 
@@ -287,11 +289,11 @@ export function GalleryClient({
       } catch (error) {
         console.error(
           "Erreur lors du chargement des albums des fichiers:",
-          error
+          error,
         );
       }
     },
-    []
+    [],
   );
 
   const fetchFiles = useCallback(
@@ -324,7 +326,7 @@ export function GalleryClient({
         };
       }
     },
-    [search, secureOnly, starredOnly, sortBy, sortOrder, startDate, endDate]
+    [search, secureOnly, starredOnly, sortBy, sortOrder, startDate, endDate],
   );
 
   const {
@@ -342,7 +344,7 @@ export function GalleryClient({
         const { files, hasMore } = await fetchFiles(page);
         return { data: files, hasMore };
       },
-      [fetchFiles]
+      [fetchFiles],
     ),
   });
 
@@ -415,17 +417,14 @@ export function GalleryClient({
           if (data.type === "new_file" && data.file) {
             // Prepend the new file without resetting scroll position
             const hasActiveFilters =
-              searchRef.current ||
-              startDateRef.current ||
-              endDateRef.current;
+              searchRef.current || startDateRef.current || endDateRef.current;
 
             if (!hasActiveFilters) {
               const newFile: FileInfo = {
                 name: data.file.name,
                 url: `/api/files/${data.file.name}`,
                 size: data.file.size || 0,
-                createdAt:
-                  data.file.createdAt || new Date().toISOString(),
+                createdAt: data.file.createdAt || new Date().toISOString(),
                 isSecure: data.file.isSecure ?? false,
                 isStarred: data.file.isStarred ?? false,
               };
@@ -437,7 +436,7 @@ export function GalleryClient({
               toast.success(
                 tRef.current("gallery.notifications.new_file", {
                   filename: data.file.name,
-                })
+                }),
               );
             }
           }
@@ -469,11 +468,12 @@ export function GalleryClient({
 
     // Nettoyer la connexion à la destruction du composant
     return cleanup;
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- All values accessed via refs, no deps needed
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- All values accessed via refs, no deps needed
   }, []);
 
   const handleFinishUpload = useCallback(async () => {
-    const { files: newFiles, hasMore: newHasMore } = await fetchFilesRef.current(1);
+    const { files: newFiles, hasMore: newHasMore } =
+      await fetchFilesRef.current(1);
     reset(newFiles, newHasMore);
   }, [reset]);
 
@@ -487,7 +487,7 @@ export function GalleryClient({
     fetchFilesRef.current(1).then(({ files, hasMore }) => {
       reset(files, hasMore);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchFiles accessed via ref
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchFiles accessed via ref
   }, [search, sortBy, sortOrder, startDate, endDate, reset]);
 
   // Fonction pour gérer la sélection vide
@@ -514,7 +514,8 @@ export function GalleryClient({
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const { files: newFiles, hasMore: newHasMore } = await fetchFilesRef.current(1);
+      const { files: newFiles, hasMore: newHasMore } =
+        await fetchFilesRef.current(1);
       reset(newFiles, newHasMore);
     } catch (error) {
       console.error("Erreur lors du rafraîchissement:", error);
@@ -562,7 +563,7 @@ export function GalleryClient({
   const uniqueFiles = useMemo(() => {
     return files.filter(
       (file, index, self) =>
-        index === self.findIndex((f) => f.name === file.name)
+        index === self.findIndex((f) => f.name === file.name),
     );
   }, [files]);
 
@@ -687,7 +688,7 @@ export function GalleryClient({
         {
           method: "PUT",
           body: formData,
-        }
+        },
       );
 
       if (!response.ok) {
@@ -699,14 +700,14 @@ export function GalleryClient({
       // Mettre à jour le fichier dans la liste
       updateData((prev) =>
         prev.map((f) =>
-          f.name === file.name ? { ...f, isSecure: data.isSecure } : f
-        )
+          f.name === file.name ? { ...f, isSecure: data.isSecure } : f,
+        ),
       );
 
       toast.success(
         file.isSecure
           ? t("gallery.file_actions.now_public")
-          : t("gallery.file_actions.now_private")
+          : t("gallery.file_actions.now_private"),
       );
     } catch (error) {
       console.error("Erreur lors de la modification de la sécurité:", error);
@@ -724,7 +725,7 @@ export function GalleryClient({
         {
           method: "PUT",
           body: formData,
-        }
+        },
       );
 
       if (!response.ok) {
@@ -736,14 +737,14 @@ export function GalleryClient({
       // Mettre à jour le fichier dans la liste
       updateData((prev) =>
         prev.map((f) =>
-          f.name === file.name ? { ...f, isStarred: data.isStarred } : f
-        )
+          f.name === file.name ? { ...f, isStarred: data.isStarred } : f,
+        ),
       );
 
       toast.success(
         file.isStarred
           ? t("gallery.file_actions.removed_from_favorites")
-          : t("gallery.file_actions.added_to_favorites")
+          : t("gallery.file_actions.added_to_favorites"),
       );
     } catch (error) {
       console.error("Erreur lors de la modification des favoris:", error);
@@ -759,7 +760,7 @@ export function GalleryClient({
     const urls = selectedFiles
       .map(
         (fileName) =>
-          `${window.location.origin}/api/files/${encodeURIComponent(fileName)}`
+          `${window.location.origin}/api/files/${encodeURIComponent(fileName)}`,
       )
       .join("\n");
 
@@ -796,17 +797,17 @@ export function GalleryClient({
       const promises = selectedFileNames.map((fileName) =>
         fetch(`/api/files/${encodeURIComponent(fileName)}`, {
           method: "DELETE",
-        })
+        }),
       );
 
       const results = await Promise.allSettled(promises);
       const successful = results.filter(
-        (result) => result.status === "fulfilled"
+        (result) => result.status === "fulfilled",
       ).length;
 
       if (successful > 0) {
         updateData((prev) =>
-          prev.filter((f) => !selectedFileNames.includes(f.name))
+          prev.filter((f) => !selectedFileNames.includes(f.name)),
         );
         clearSelection();
         toast.success(t("gallery.file_actions.delete_success"));
@@ -843,7 +844,7 @@ export function GalleryClient({
         prev.map((f) => {
           const sel = selectedFilesData.find((sf) => sf.name === f.name);
           return sel ? { ...f, isStarred: !sel.isStarred } : f;
-        })
+        }),
       );
 
       toast.success(t("gallery.file_actions.added_to_favorites"));
@@ -875,7 +876,7 @@ export function GalleryClient({
         prev.map((f) => {
           const sel = selectedFilesData.find((sf) => sf.name === f.name);
           return sel ? { ...f, isSecure: !sel.isSecure } : f;
-        })
+        }),
       );
 
       toast.success(t("gallery.file_actions.now_private"));
@@ -922,7 +923,7 @@ export function GalleryClient({
         toast.error("Erreur lors de l'ajout du fichier à l'album");
       }
     },
-    [availableAlbums]
+    [availableAlbums],
   );
 
   const handleCreateAlbum = useCallback((fileName?: string) => {
@@ -944,7 +945,7 @@ export function GalleryClient({
       // Sélectionner le fichier
       toggleFile(fileName);
     },
-    [toggleFile]
+    [toggleFile],
   );
 
   const handleShowHelp = useCallback(() => {
@@ -976,21 +977,65 @@ export function GalleryClient({
     return <Loading fullHeight />;
   }
 
+  const galleryTitle = secureOnly
+    ? t("gallery.secure_files")
+    : starredOnly
+      ? t("gallery.starred_files")
+      : t("gallery.title");
+
+  const galleryEyebrow = secureOnly
+    ? "Fichiers protégés"
+    : starredOnly
+      ? "Sélection personnelle"
+      : "Bibliothèque active";
+
+  const galleryDescription = secureOnly
+    ? "Rassemblez ici les éléments sécurisés sans perdre les outils de tri, de filtrage et de sélection."
+    : starredOnly
+      ? "Travaillez vos favoris comme une collection à part entière, avec les mêmes commandes de vue et d’action."
+      : "Pilotez toute la bibliothèque depuis un vrai bandeau d’atelier, avec les actions et filtres les plus utilisés à portée de main.";
+
+  const hasActiveFilters = Boolean(search || startDate || endDate);
+  const activeFilterLabel = hasActiveFilters
+    ? `${[Boolean(search), Boolean(startDate || endDate)].filter(Boolean).length} filtre(s) actif(s)`
+    : "Aucun filtre";
+
   return (
     <>
       <div>
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <h1 className="text-xl sm:text-2xl font-bold">
-              {secureOnly
-                ? t("gallery.secure_files")
-                : starredOnly
-                ? t("gallery.starred_files")
-                : t("gallery.title")}
-            </h1>
+        <section className="mb-6 space-y-5 rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:mb-8 sm:p-6">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+                {galleryEyebrow}
+              </div>
+              <div className="space-y-2">
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                  {galleryTitle}
+                </h1>
+                <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+                  {galleryDescription}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <div className="rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground sm:text-sm">
+                  {files.length} fichier(s) chargés
+                </div>
+                <div className="rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground sm:text-sm">
+                  Vue {t(`gallery.view_modes.${viewMode || "grid"}`)}
+                </div>
+                <div className="rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground sm:text-sm">
+                  {activeFilterLabel}
+                </div>
+                {isSelectionMode && (
+                  <div className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary sm:text-sm">
+                    {selectedCount} sélectionné(s)
+                  </div>
+                )}
+              </div>
+            </div>
 
-            {/* Contrôles principaux - toujours visibles */}
-            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+            <div className="flex w-full flex-col gap-2 sm:flex-row xl:w-auto xl:flex-col">
               <Button
                 variant={isSelectionMode ? "default" : "outline"}
                 size="sm"
@@ -998,11 +1043,7 @@ export function GalleryClient({
                   setIsSelectionMode(!isSelectionMode);
                   if (isSelectionMode) clearSelection();
                 }}
-                className={cn(
-                  "shrink-0 text-xs sm:text-sm min-w-0",
-                  !isSelectionMode &&
-                    "backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200"
-                )}
+                className="min-w-0 justify-center text-xs sm:text-sm xl:min-w-[170px]"
               >
                 {isSelectionMode ? (
                   <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
@@ -1019,34 +1060,37 @@ export function GalleryClient({
               <Button
                 onClick={() => setIsUploadModalOpen(true)}
                 size="sm"
-                className="text-xs sm:text-sm flex-shrink-0"
+                className="text-xs sm:text-sm xl:min-w-[170px]"
               >
                 {t("gallery.upload")}
               </Button>
             </div>
           </div>
 
-          {/* Contrôles secondaires - responsive */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4">
-            <ViewSelector />
-            <SortSelector />
-            <DateRangeFilter />
-            <RefreshInterval />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleRefresh}
-              className={cn(
-                "shrink-0 transition-all duration-200 h-8 w-8",
-                "backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20",
-                isRefreshing && "animate-spin text-primary"
-              )}
-              disabled={isRefreshing}
-            >
-              <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
+          <div className="rounded-xl border border-border/60 bg-background/75 p-3 shadow-sm sm:p-4">
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              Outils de navigation
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <ViewSelector />
+              <SortSelector />
+              <DateRangeFilter />
+              <RefreshInterval />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleRefresh}
+                className={cn(
+                  "h-9 w-9 rounded-xl border border-border/60 bg-background shadow-sm transition-colors hover:bg-muted/70",
+                  isRefreshing && "animate-spin text-primary",
+                )}
+                disabled={isRefreshing}
+              >
+                <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+            </div>
           </div>
-        </div>
+        </section>
 
         {files.length === 0 ? (
           <div className="flex flex-col items-center justify-center space-y-4 py-12 sm:py-24 text-center px-4">
@@ -1073,7 +1117,9 @@ export function GalleryClient({
                       files={filesInGroup}
                       onCopy={copyToClipboard}
                       onDelete={(name) => {
-                        updateData((prev) => prev.filter((f) => f.name !== name));
+                        updateData((prev) =>
+                          prev.filter((f) => f.name !== name),
+                        );
                       }}
                       onSelect={setSelectedFile}
                       onToggleSecurity={handleToggleSecurity}
@@ -1104,7 +1150,9 @@ export function GalleryClient({
                       files={filesInGroup}
                       onCopy={copyToClipboard}
                       onDelete={(name) => {
-                        updateData((prev) => prev.filter((f) => f.name !== name));
+                        updateData((prev) =>
+                          prev.filter((f) => f.name !== name),
+                        );
                       }}
                       onSelect={setSelectedFile}
                       onToggleSecurity={handleToggleSecurity}

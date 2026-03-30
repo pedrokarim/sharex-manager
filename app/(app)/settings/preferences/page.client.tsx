@@ -31,7 +31,6 @@ import {
   Grid2X2,
   List,
   LayoutList,
-  Image as ImageIcon,
   ArrowUpDown,
   Clock,
   FileText,
@@ -59,9 +58,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -71,13 +68,18 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { useTheme } from "@/components/theme-provider";
 import { useRouter } from "next/navigation";
-// import { useTimeBasedTheme } from "@/hooks/use-time-based-theme"; // Non utilisé
 import { TimePicker } from "@/components/ui/time-picker";
 import { useTranslation } from "@/lib/i18n";
-import { LanguageSelector } from "@/components/LanguageSelector";
+
+const settingsCardClassName = "rounded-2xl border-border/70 shadow-sm";
+const settingsCardHeaderClassName =
+  "space-y-2 border-b border-border/60 px-5 py-5 sm:px-6";
+const settingsCardContentClassName = "space-y-4 px-5 py-5 sm:px-6";
+const settingsBlockClassName =
+  "space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4";
 
 export function PreferencesPageClient() {
-  const [preferences, setPreferences] = useAtom(preferencesAtom);
+  const [, setPreferences] = useAtom(preferencesAtom);
   const [language, setLanguage] = useAtom(languageAtom);
   const [galleryViewMode, setGalleryViewMode] = useAtom(galleryViewModeAtom);
   const [thumbnailSize, setThumbnailSize] = useAtom(thumbnailSizeAtom);
@@ -87,14 +89,14 @@ export function PreferencesPageClient() {
   const [sortBy, setSortBy] = useAtom(sortByAtom);
   const [sortOrder, setSortOrder] = useAtom(sortOrderAtom);
   const [autoRefreshInterval, setAutoRefreshInterval] = useAtom(
-    autoRefreshIntervalAtom
+    autoRefreshIntervalAtom,
   );
   const [showNotifications, setShowNotifications] = useAtom(
-    showNotificationsAtom
+    showNotificationsAtom,
   );
   const [timeBasedTheme, setTimeBasedTheme] = useAtom(timeBasedThemeAtom);
   const [preferredThemeMode, setPreferredThemeMode] = useAtom(
-    preferredThemeModeAtom
+    preferredThemeModeAtom,
   );
 
   const { setTheme } = useTheme();
@@ -104,7 +106,7 @@ export function PreferencesPageClient() {
   const applyThemeMode = (themeMode: Exclude<ThemeMode, "time-based">) => {
     if (themeMode === "system") {
       const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
+        "(prefers-color-scheme: dark)",
       ).matches;
       setTheme(prefersDark ? "dark" : "light");
       return;
@@ -185,48 +187,54 @@ export function PreferencesPageClient() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-            <Settings2 className="h-6 w-6 sm:h-8 sm:w-8" />
-            {t("settings.preferences")}
-          </h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-            {t("settings.preferences_description")}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <LanguageSelector />
+    <div className="flex h-full flex-col gap-6">
+      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+              <Settings2 className="h-3.5 w-3.5" />
+              {t("settings.preferences")}
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {t("settings.preferences")}
+            </h1>
+            <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+              {t("settings.preferences_description")}
+            </p>
+          </div>
           <Button
             variant="outline"
             onClick={handleReset}
             className="text-xs sm:text-sm"
           >
-            <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+            <RotateCcw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             {t("settings.reset")}
           </Button>
         </div>
-      </div>
+      </section>
 
-      <div className="mx-auto grid w-full max-w-2xl flex-1 gap-4 sm:gap-6">
-        {/* Apparence */}
-        <Card>
-          <CardHeader className="pb-3 sm:pb-6">
-            <CardTitle className="text-lg sm:text-xl">
-              {t("settings.appearance")}
-            </CardTitle>
-            <CardDescription className="text-sm">
-              {t("settings.appearance_description")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-4 sm:space-y-6">
-              <div className="space-y-3 sm:space-y-4">
-                <Label className="text-sm sm:text-base">
-                  {t("settings.theme")}
-                </Label>
-                <div className="flex flex-wrap gap-2 sm:gap-3 max-w-md">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+        <div className="space-y-6">
+          <Card className={settingsCardClassName}>
+            <CardHeader className={settingsCardHeaderClassName}>
+              <CardTitle className="text-xl">
+                {t("settings.appearance")}
+              </CardTitle>
+              <CardDescription>
+                {t("settings.appearance_description")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className={settingsCardContentClassName}>
+              <div className={settingsBlockClassName}>
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium sm:text-base">
+                    {t("settings.theme")}
+                  </Label>
+                  <p className="text-xs text-muted-foreground sm:text-sm">
+                    Choisissez le mode d'affichage global de l'interface.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
                   {Object.entries(themeIcons).map(([themeKey, Icon]) => (
                     <TooltipProvider key={themeKey}>
                       <Tooltip>
@@ -238,11 +246,11 @@ export function PreferencesPageClient() {
                                 : "outline"
                             }
                             className="text-xs sm:text-sm"
-                            onClick={() => {
-                              handleThemeChange(themeKey as ThemeMode);
-                            }}
+                            onClick={() =>
+                              handleThemeChange(themeKey as ThemeMode)
+                            }
                           >
-                            <Icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                            <Icon className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
                             <span className="text-xs sm:text-sm">
                               {
                                 themeLabels[
@@ -271,48 +279,44 @@ export function PreferencesPageClient() {
                 </div>
 
                 {preferredThemeMode === "time-based" && (
-                  <div className="space-y-3 sm:space-y-4 mt-4 border rounded-lg p-3 sm:p-4">
+                  <div className="space-y-4 rounded-xl border border-border/60 bg-background px-4 py-4">
                     <div className="flex items-center gap-2">
-                      <Sun className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <Label className="text-sm sm:text-base">
+                      <Sun className="h-4 w-4" />
+                      <Label className="text-sm font-medium sm:text-base">
                         {t("settings.theme_options.light")}
                       </Label>
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                      <div className="flex-1">
-                        <TimePicker
-                          label={t("common.start")}
-                          value={`${timeBasedTheme.dayStartHour
-                            .toString()
-                            .padStart(2, "0")}:00`}
-                          onChange={(value) => {
-                            const [hours] = value.split(":").map(Number);
-                            setTimeBasedTheme({
-                              ...timeBasedTheme,
-                              dayStartHour: hours,
-                            });
-                          }}
-                          format="24h"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <TimePicker
-                          label={t("common.end")}
-                          value={`${timeBasedTheme.dayEndHour
-                            .toString()
-                            .padStart(2, "0")}:00`}
-                          onChange={(value) => {
-                            const [hours] = value.split(":").map(Number);
-                            setTimeBasedTheme({
-                              ...timeBasedTheme,
-                              dayEndHour: hours,
-                            });
-                          }}
-                          format="24h"
-                        />
-                      </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <TimePicker
+                        label={t("common.start")}
+                        value={`${timeBasedTheme.dayStartHour
+                          .toString()
+                          .padStart(2, "0")}:00`}
+                        onChange={(value) => {
+                          const [hours] = value.split(":").map(Number);
+                          setTimeBasedTheme({
+                            ...timeBasedTheme,
+                            dayStartHour: hours,
+                          });
+                        }}
+                        format="24h"
+                      />
+                      <TimePicker
+                        label={t("common.end")}
+                        value={`${timeBasedTheme.dayEndHour
+                          .toString()
+                          .padStart(2, "0")}:00`}
+                        onChange={(value) => {
+                          const [hours] = value.split(":").map(Number);
+                          setTimeBasedTheme({
+                            ...timeBasedTheme,
+                            dayEndHour: hours,
+                          });
+                        }}
+                        format="24h"
+                      />
                     </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-2">
+                    <p className="text-xs text-muted-foreground sm:text-sm">
                       {t("settings.theme_options.time_based_description", {
                         start: timeBasedTheme.dayStartHour,
                         end: timeBasedTheme.dayEndHour,
@@ -323,26 +327,31 @@ export function PreferencesPageClient() {
 
                 <Button
                   variant="outline"
-                  className="w-fit text-xs sm:text-sm"
+                  className="text-xs sm:text-sm"
                   onClick={() => router.push("/settings/theme")}
                 >
-                  <Settings2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                  <Settings2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                   {t("settings.theme_advanced")}
                 </Button>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
-                <div className="flex items-center gap-2">
-                  <Languages className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <Label className="text-sm sm:text-base">
-                    {t("settings.language")}
-                  </Label>
+              <div className="flex flex-col gap-4 rounded-xl border border-border/60 bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Languages className="h-4 w-4" />
+                    <Label className="text-sm font-medium sm:text-base">
+                      {t("settings.language")}
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground sm:text-sm">
+                    Définissez la langue affichée dans l'application.
+                  </p>
                 </div>
                 <Select
                   value={language}
                   onValueChange={(value) => setLanguage(value as Language)}
                 >
-                  <SelectTrigger className="w-[180px] max-w-full">
+                  <SelectTrigger className="w-full sm:w-[220px]">
                     <SelectValue placeholder={t("settings.language_select")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -351,64 +360,77 @@ export function PreferencesPageClient() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Galerie */}
-        <Card>
-          <CardHeader className="pb-3 sm:pb-6">
-            <CardTitle className="text-lg sm:text-xl">
-              {t("navigation.gallery")}
-            </CardTitle>
-            <CardDescription className="text-sm">
-              {t("settings.gallery_description")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-4 sm:space-y-6">
-            <div className="space-y-3 sm:space-y-4">
-              <Label className="text-sm sm:text-base">
-                {t("settings.gallery.view_mode")}
-              </Label>
-              <div className="flex flex-wrap gap-2 sm:gap-3 max-w-md">
-                {Object.entries(viewModeIcons).map(([mode, Icon]) => (
-                  <TooltipProvider key={mode}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={
-                            galleryViewMode === mode ? "default" : "outline"
-                          }
-                          className="text-xs sm:text-sm"
-                          onClick={() =>
-                            setGalleryViewMode(mode as GalleryViewMode)
-                          }
-                        >
-                          <Icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                          <span className="text-xs sm:text-sm">
-                            {t(`gallery.view_modes.${mode}`)}
-                          </span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{t(`gallery.view_modes.${mode}`)}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ))}
+          <Card className={settingsCardClassName}>
+            <CardHeader className={settingsCardHeaderClassName}>
+              <CardTitle className="text-xl">
+                {t("navigation.gallery")}
+              </CardTitle>
+              <CardDescription>
+                {t("settings.gallery_description")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className={settingsCardContentClassName}>
+              <div className={settingsBlockClassName}>
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium sm:text-base">
+                    {t("settings.gallery.view_mode")}
+                  </Label>
+                  <p className="text-xs text-muted-foreground sm:text-sm">
+                    Choisissez la densité de lecture la plus confortable pour
+                    votre galerie.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(viewModeIcons).map(([mode, Icon]) => (
+                    <TooltipProvider key={mode}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant={
+                              galleryViewMode === mode ? "default" : "outline"
+                            }
+                            className="text-xs sm:text-sm"
+                            onClick={() =>
+                              setGalleryViewMode(mode as GalleryViewMode)
+                            }
+                          >
+                            <Icon className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
+                            <span className="text-xs sm:text-sm">
+                              {t(`gallery.view_modes.${mode}`)}
+                            </span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{t(`gallery.view_modes.${mode}`)}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ))}
+                </div>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="thumbnailSize" className="text-sm sm:text-base">
-                  {t("settings.gallery.thumbnail_size")}
-                </Label>
+              <div className="flex flex-col gap-4 rounded-xl border border-border/60 bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="thumbnailSize"
+                    className="text-sm font-medium sm:text-base"
+                  >
+                    {t("settings.gallery.thumbnail_size")}
+                  </Label>
+                  <p className="text-xs text-muted-foreground sm:text-sm">
+                    Ajustez la densité des cartes et la place donnée à l'aperçu.
+                  </p>
+                </div>
                 <Select
                   value={thumbnailSize}
                   onValueChange={(value: ThumbnailSize) =>
                     setThumbnailSize(value)
                   }
                 >
-                  <SelectTrigger className="w-[200px] max-w-full">
+                  <SelectTrigger className="w-full sm:w-[240px]">
                     <SelectValue placeholder={t("settings.select_size")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -418,70 +440,82 @@ export function PreferencesPageClient() {
                         return (
                           <SelectItem key={value} value={value}>
                             <div className="flex items-center gap-2">
-                              <Icon className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                              <Icon className="h-3 w-3 shrink-0 sm:h-4 sm:w-4" />
                               <span className="text-sm">{label}</span>
                             </div>
                           </SelectItem>
                         );
-                      }
+                      },
                     )}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-3 sm:space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <Label className="text-sm sm:text-base">
-                      {t("settings.gallery.show_file_info")}
-                    </Label>
-                  </div>
-                  <Switch
-                    checked={showFileInfo}
-                    onCheckedChange={setShowFileInfo}
-                  />
+              <div className={settingsBlockClassName}>
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium sm:text-base">
+                    Détails affichés
+                  </Label>
+                  <p className="text-xs text-muted-foreground sm:text-sm">
+                    Activez uniquement les métadonnées utiles pour alléger la
+                    lecture visuelle.
+                  </p>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ArrowUpDown className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <Label className="text-sm sm:text-base">
-                      {t("settings.gallery.show_file_size")}
-                    </Label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      <Label className="text-sm sm:text-base">
+                        {t("settings.gallery.show_file_info")}
+                      </Label>
+                    </div>
+                    <Switch
+                      checked={showFileInfo}
+                      onCheckedChange={setShowFileInfo}
+                    />
                   </div>
-                  <Switch
-                    checked={showFileSize}
-                    onCheckedChange={setShowFileSize}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <Label className="text-sm sm:text-base">
-                      {t("settings.gallery.show_upload_date")}
-                    </Label>
+                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpDown className="h-4 w-4" />
+                      <Label className="text-sm sm:text-base">
+                        {t("settings.gallery.show_file_size")}
+                      </Label>
+                    </div>
+                    <Switch
+                      checked={showFileSize}
+                      onCheckedChange={setShowFileSize}
+                    />
                   </div>
-                  <Switch
-                    checked={showUploadDate}
-                    onCheckedChange={setShowUploadDate}
-                  />
+                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      <Label className="text-sm sm:text-base">
+                        {t("settings.gallery.show_upload_date")}
+                      </Label>
+                    </div>
+                    <Switch
+                      checked={showUploadDate}
+                      onCheckedChange={setShowUploadDate}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <Separator />
-
-              <div className="space-y-3 sm:space-y-4">
-                <Label className="text-sm sm:text-base">
-                  {t("settings.gallery.sort_by")}
-                </Label>
-                <div className="flex flex-wrap gap-3">
+              <div className={settingsBlockClassName}>
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium sm:text-base">
+                    {t("settings.gallery.sort_by")}
+                  </Label>
+                  <p className="text-xs text-muted-foreground sm:text-sm">
+                    Organisez la galerie avec un tri clair et prévisible.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <Select
                     value={sortBy}
                     onValueChange={(value) => setSortBy(value as SortBy)}
                   >
-                    <SelectTrigger className="w-[200px] max-w-full">
+                    <SelectTrigger className="w-full sm:w-[240px]">
                       <SelectValue
                         placeholder={t("settings.gallery.sort_by")}
                       />
@@ -498,12 +532,11 @@ export function PreferencesPageClient() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-
                   <Select
                     value={sortOrder}
                     onValueChange={(value) => setSortOrder(value as SortOrder)}
                   >
-                    <SelectTrigger className="w-[200px] max-w-full">
+                    <SelectTrigger className="w-full sm:w-[240px]">
                       <SelectValue
                         placeholder={t("settings.gallery.sort_order")}
                       />
@@ -519,59 +552,71 @@ export function PreferencesPageClient() {
                   </Select>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Notifications */}
-        <Card>
-          <CardHeader className="pb-3 sm:pb-6">
-            <CardTitle className="text-lg sm:text-xl">
-              {t("settings.notifications")}
-            </CardTitle>
-            <CardDescription className="text-sm">
-              {t("settings.notifications_description")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-4 sm:space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bell className="h-3 w-3 sm:h-4 sm:w-4" />
-                <Label className="text-sm sm:text-base">
-                  {t("settings.notifications")}
-                </Label>
-              </div>
-              <Switch
-                checked={showNotifications}
-                onCheckedChange={setShowNotifications}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4" />
-                <Label className="text-sm sm:text-base">
-                  {t("settings.gallery.auto_refresh")}
-                </Label>
-              </div>
-              <div className="pt-2">
-                <Slider
-                  value={[autoRefreshInterval]}
-                  min={0}
-                  max={60}
-                  step={5}
-                  className="w-full"
-                  onValueChange={([value]) => setAutoRefreshInterval(value)}
+        <div className="space-y-6">
+          <Card className={`${settingsCardClassName} xl:sticky xl:top-4`}>
+            <CardHeader className={settingsCardHeaderClassName}>
+              <CardTitle className="text-xl">
+                {t("settings.notifications")}
+              </CardTitle>
+              <CardDescription>
+                {t("settings.notifications_description")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className={settingsCardContentClassName}>
+              <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-4 py-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Bell className="h-4 w-4" />
+                    <Label className="text-sm font-medium sm:text-base">
+                      {t("settings.notifications")}
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground sm:text-sm">
+                    Affiche les retours utiles sans surcharger l&apos;interface.
+                  </p>
+                </div>
+                <Switch
+                  checked={showNotifications}
+                  onCheckedChange={setShowNotifications}
                 />
-                <div className="flex justify-between mt-1 text-xs sm:text-sm text-muted-foreground">
-                  <span>{t("common.disabled")}</span>
-                  <span>30s</span>
-                  <span>60s</span>
+              </div>
+
+              <div className={settingsBlockClassName}>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <RefreshCcw className="h-4 w-4" />
+                    <Label className="text-sm font-medium sm:text-base">
+                      {t("settings.gallery.auto_refresh")}
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground sm:text-sm">
+                    Définissez un rythme de mise à jour sans distraire la
+                    navigation.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Slider
+                    value={[autoRefreshInterval]}
+                    min={0}
+                    max={60}
+                    step={5}
+                    className="w-full"
+                    onValueChange={([value]) => setAutoRefreshInterval(value)}
+                  />
+                  <div className="mt-2 flex justify-between text-xs text-muted-foreground sm:text-sm">
+                    <span>{t("common.disabled")}</span>
+                    <span>30s</span>
+                    <span>60s</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

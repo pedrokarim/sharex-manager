@@ -72,7 +72,7 @@ export function SortSelector() {
         <Button
           variant="outline"
           size="icon"
-          className="h-8 w-8 backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200"
+          className="h-9 w-9 rounded-xl border border-border/60 bg-background shadow-sm transition-colors hover:bg-muted/70"
         >
           <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
         </Button>

@@ -42,7 +42,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Globe2, Plus, Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
 const domainSchema = z.object({
@@ -124,7 +124,7 @@ export default function DomainsPage({
 
       if (editingDomain) {
         setDomains(
-          domains.map((d) => (d.id === updatedDomain.id ? updatedDomain : d))
+          domains.map((d) => (d.id === updatedDomain.id ? updatedDomain : d)),
         );
       } else {
         setDomains([...domains, updatedDomain]);
@@ -136,7 +136,7 @@ export default function DomainsPage({
       toast.success(
         editingDomain
           ? t("settings.domains.messages.updated")
-          : t("settings.domains.messages.added")
+          : t("settings.domains.messages.added"),
       );
     } catch (error) {
       toast.error(t("settings.domains.errors.generic"));
@@ -181,8 +181,24 @@ export default function DomainsPage({
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4 sm:space-y-6">
-      <Card>
+    <div className="grid w-full gap-6 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6 xl:col-span-2">
+        <div className="flex flex-col gap-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+            <Globe2 className="h-3.5 w-3.5" />
+            Configuration des domaines
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {t("settings.domains.list.title")}
+          </h1>
+          <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+            Définissez les domaines de diffusion, les règles SSL et le préfixe
+            d’URL sans laisser la configuration s’éparpiller.
+          </p>
+        </div>
+      </section>
+
+      <Card className="rounded-2xl border-border/70 shadow-sm xl:sticky xl:top-4">
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="text-lg sm:text-xl">
             {t("settings.domains.config.title")}
@@ -191,7 +207,7 @@ export default function DomainsPage({
             {t("settings.domains.config.description")}
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-4 sm:p-6 pt-0">
+        <CardContent className="space-y-4 p-4 sm:p-6 pt-0">
           <Form {...configForm}>
             <form
               onSubmit={configForm.handleSubmit(onSubmitConfig)}
@@ -201,7 +217,7 @@ export default function DomainsPage({
                 control={configForm.control}
                 name="useSSL"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
+                  <FormItem className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="space-y-0.5">
                       <FormLabel className="text-sm sm:text-base">
                         {t("settings.domains.config.force_https")}
@@ -223,7 +239,7 @@ export default function DomainsPage({
                 control={configForm.control}
                 name="pathPrefix"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
                     <FormLabel className="text-sm sm:text-base">
                       {t("settings.domains.config.path_prefix")}
                     </FormLabel>
@@ -241,7 +257,7 @@ export default function DomainsPage({
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full sm:w-auto text-sm">
+              <Button type="submit" className="text-sm">
                 {t("settings.domains.config.save")}
               </Button>
             </form>
@@ -249,8 +265,8 @@ export default function DomainsPage({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="p-4 sm:p-6">
+      <Card className="rounded-2xl border-border/70 shadow-sm">
+        <CardHeader className="border-b border-border/60 p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="text-lg sm:text-xl">
@@ -267,8 +283,8 @@ export default function DomainsPage({
                   {t("settings.domains.list.add")}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md mx-auto">
-                <DialogHeader>
+              <DialogContent className="w-[calc(100vw-1.5rem)] max-w-lg overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+                <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
                   <DialogTitle className="text-lg sm:text-xl">
                     {editingDomain
                       ? t("settings.domains.form.edit_title")
@@ -283,7 +299,7 @@ export default function DomainsPage({
                 <Form {...domainForm}>
                   <form
                     onSubmit={domainForm.handleSubmit(onSubmitDomain)}
-                    className="space-y-4"
+                    className="space-y-4 px-5 py-5 sm:px-6"
                   >
                     <FormField
                       control={domainForm.control}
@@ -373,7 +389,7 @@ export default function DomainsPage({
                         </FormItem>
                       )}
                     />
-                    <DialogFooter className="flex-col sm:flex-row gap-2">
+                    <DialogFooter className="gap-2 border-t border-border/60 px-0 pt-4">
                       <Button
                         type="submit"
                         className="w-full sm:w-auto text-sm"
@@ -388,7 +404,7 @@ export default function DomainsPage({
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 pt-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-border/60">
             <Table>
               <TableHeader>
                 <TableRow>

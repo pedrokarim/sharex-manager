@@ -4,13 +4,11 @@ import { Search, X } from "lucide-react";
 import { Label } from "../ui/label";
 import { SidebarInput } from "../ui/sidebar";
 import { useQueryState } from "nuqs";
-import { useDebounce } from "@/hooks/use-debounce";
 import { Button } from "../ui/button";
 import { useTranslation } from "@/lib/i18n";
 
 export function SearchForm({ ...props }: React.ComponentProps<"form">) {
   const [search, setSearch] = useQueryState("q");
-  const debouncedSearch = useDebounce(search, 300);
   const { t } = useTranslation();
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,14 +30,14 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
           value={search || ""}
           onChange={handleSearch}
           placeholder={t("sidebar.search_placeholder")}
-          className="h-8 pl-7 pr-8"
+          className="h-10 rounded-xl border border-border/60 bg-background/80 pl-9 pr-9 shadow-sm"
         />
-        <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 select-none opacity-50" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 select-none opacity-50" />
         {search && (
           <Button
             variant="ghost"
             size="icon"
-            className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 opacity-60 hover:opacity-100"
+            className="absolute right-1.5 top-1/2 h-7 w-7 -translate-y-1/2 opacity-60 hover:opacity-100"
             onClick={handleClear}
           >
             <X className="h-4 w-4" />
