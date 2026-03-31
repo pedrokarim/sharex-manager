@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -180,14 +179,18 @@ export function SettingsPageClient() {
               </p>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="grid items-start gap-4 xl:grid-cols-2">
               {group.items.map((item) => {
                 const Icon = item.icon;
 
                 return (
-                  <Link key={item.href} href={item.href} className="group">
-                    <Card className="h-full overflow-hidden rounded-2xl border-border/70 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-md">
-                      <CardHeader className="relative overflow-hidden border-b border-border/60 p-5 sm:p-6">
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="group block self-start"
+                  >
+                    <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-md">
+                      <CardHeader className="relative overflow-hidden p-5 sm:p-6">
                         <div
                           className={`absolute inset-0 bg-gradient-to-br ${item.accent}`}
                         />
@@ -211,12 +214,6 @@ export function SettingsPageClient() {
                           </div>
                         </div>
                       </CardHeader>
-                      <CardContent className="p-5 sm:p-6">
-                        <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                          Ouvrir ce panneau pour ajuster ce domaine sans quitter
-                          l’atelier de configuration.
-                        </div>
-                      </CardContent>
                     </Card>
                   </Link>
                 );
