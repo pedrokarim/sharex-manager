@@ -7,7 +7,7 @@ import { uploadConfigSchema, type UploadConfig } from "@/schemas/upload-config";
 import { Form } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { useUploadConfig } from "@/hooks/use-upload-config";
 import { GeneralTab } from "../_components/general-tab";
 import { ThumbnailsTab } from "../_components/thumbnails-tab";
@@ -42,47 +42,60 @@ export function ConfigPageClient() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl">
-      <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex flex-col gap-4 py-4">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              {t("uploads.config.title")}
-            </h1>
-            <p className="text-muted-foreground text-sm sm:text-base">
-              {t("uploads.config.description")}
-            </p>
+    <main className="w-full space-y-6">
+      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+            <Upload className="h-3.5 w-3.5" />
+            Configuration des uploads
           </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            {t("uploads.config.title")}
+          </h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
+            {t("uploads.config.description")}
+          </p>
         </div>
-      </div>
+      </section>
 
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className="space-y-6 sm:space-y-8"
         >
-          <Tabs defaultValue="general" className="space-y-4">
-            <div className="overflow-x-auto pb-1">
-              <TabsList className="flex h-auto min-w-max justify-start gap-1 sm:grid sm:min-w-0 sm:w-full sm:grid-cols-3 sm:gap-0">
-                <TabsTrigger
-                  value="general"
-                  className="shrink-0 text-xs sm:text-sm"
-                >
-                  {t("uploads.config.tabs.general")}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="thumbnails"
-                  className="shrink-0 text-xs sm:text-sm"
-                >
-                  {t("uploads.config.tabs.thumbnails")}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="storage"
-                  className="shrink-0 text-xs sm:text-sm"
-                >
-                  {t("uploads.config.tabs.storage")}
-                </TabsTrigger>
-              </TabsList>
+          <Tabs defaultValue="general" className="space-y-5">
+            <div className="space-y-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
+              <div className="space-y-1">
+                <p className="text-sm font-medium sm:text-base">
+                  Atelier de configuration
+                </p>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  Structurez le pipeline d&apos;upload par usage: règles
+                  globales, génération de vignettes et stratégie de stockage.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <TabsList className="flex h-auto min-w-max justify-start gap-1 bg-transparent p-0 sm:grid sm:min-w-0 sm:w-full sm:grid-cols-3 sm:gap-2">
+                  <TabsTrigger
+                    value="general"
+                    className="shrink-0 rounded-xl border border-transparent px-4 py-2 text-xs sm:text-sm data-[state=active]:border-border/70 data-[state=active]:bg-muted/50"
+                  >
+                    {t("uploads.config.tabs.general")}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="thumbnails"
+                    className="shrink-0 rounded-xl border border-transparent px-4 py-2 text-xs sm:text-sm data-[state=active]:border-border/70 data-[state=active]:bg-muted/50"
+                  >
+                    {t("uploads.config.tabs.thumbnails")}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="storage"
+                    className="shrink-0 rounded-xl border border-transparent px-4 py-2 text-xs sm:text-sm data-[state=active]:border-border/70 data-[state=active]:bg-muted/50"
+                  >
+                    {t("uploads.config.tabs.storage")}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
             </div>
 
             <TabsContent value="general">
@@ -98,7 +111,16 @@ export function ConfigPageClient() {
             </TabsContent>
           </Tabs>
 
-          <div className="flex justify-end">
+          <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-medium sm:text-base">
+                Validation des réglages
+              </p>
+              <p className="text-xs text-muted-foreground sm:text-sm">
+                Enregistrez une fois les trois onglets relus pour garder un
+                comportement cohérent sur l&apos;ensemble du service.
+              </p>
+            </div>
             <Button type="submit" disabled={isSaving} className="text-sm">
               {isSaving && (
                 <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />

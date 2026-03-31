@@ -11,10 +11,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Search, FolderOpen, Plus, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
@@ -67,7 +65,7 @@ export function AddToAlbumDialog({
   }, [open]);
 
   const filteredAlbums = albums.filter((album) =>
-    album.name.toLowerCase().includes(searchQuery.toLowerCase())
+    album.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const handleAddToAlbums = async () => {
@@ -100,11 +98,11 @@ export function AddToAlbumDialog({
 
       if (selectedAlbums.size === 1) {
         toast.success(
-          `${selectedFiles.length} fichier(s) ajouté(s) à l'album "${albumNames}"`
+          `${selectedFiles.length} fichier(s) ajouté(s) à l'album "${albumNames}"`,
         );
       } else {
         toast.success(
-          `${selectedFiles.length} fichier(s) ajouté(s) à ${selectedAlbums.size} albums`
+          `${selectedFiles.length} fichier(s) ajouté(s) à ${selectedAlbums.size} albums`,
         );
       }
 
@@ -167,8 +165,8 @@ export function AddToAlbumDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="w-[95vw] max-w-md mx-auto">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(86vh,720px)] w-[calc(100vw-1.5rem)] max-w-[720px] flex-col gap-0 overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+          <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
             <DialogTitle className="text-lg sm:text-xl">
               Ajouter à un album
             </DialogTitle>
@@ -178,114 +176,124 @@ export function AddToAlbumDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 py-4 sm:px-6">
             {/* Recherche */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Rechercher un album..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 sm:pl-10 text-sm"
+                className="h-11 rounded-xl border-border/70 bg-muted/20 pl-10 text-sm"
               />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground sm:text-sm">
+              <span>
+                {filteredAlbums.length} album
+                {filteredAlbums.length > 1 ? "s" : ""} disponible
+                {filteredAlbums.length > 1 ? "s" : ""}
+              </span>
+              {selectedAlbums.size > 0 && (
+                <Badge variant="secondary" className="rounded-full px-2.5 py-1">
+                  {selectedAlbums.size} sélectionné
+                  {selectedAlbums.size > 1 ? "s" : ""}
+                </Badge>
+              )}
             </div>
 
             {/* Liste des albums */}
             {loading ? (
-              <div className="flex items-center justify-center py-6 sm:py-8">
+              <div className="flex flex-1 items-center justify-center py-6 sm:py-8">
                 <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" />
               </div>
             ) : (
-              <ScrollArea className="h-48 sm:h-64">
-                <div className="space-y-2">
+              <ScrollArea className="min-h-0 flex-1 pr-1">
+                <div className="space-y-2 pb-1">
                   {filteredAlbums.length === 0 ? (
-                    <div className="text-center py-6 sm:py-8 text-muted-foreground text-sm">
+                    <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 py-8 text-center text-sm text-muted-foreground">
                       {searchQuery ? "Aucun album trouvé" : "Aucun album créé"}
                     </div>
                   ) : (
                     filteredAlbums.map((album) => (
-                      <div
+                      <button
+                        type="button"
                         key={album.id}
-                        className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${
+                        className={`flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition-all ${
                           selectedAlbums.has(album.id)
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:bg-accent/50"
+                            ? "border-primary/40 bg-primary/8 shadow-sm"
+                            : "border-border/60 bg-background hover:border-foreground/10 hover:bg-muted/30"
                         }`}
                         onClick={() => toggleAlbum(album.id)}
+                        aria-pressed={selectedAlbums.has(album.id)}
                       >
                         <div className="flex-shrink-0">
-                          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded bg-primary/10 flex items-center justify-center">
-                            <FolderOpen className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-muted/30">
+                            <FolderOpen className="h-4 w-4 text-primary" />
                           </div>
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1 sm:gap-2">
-                            <span className="font-medium truncate text-sm sm:text-base">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium sm:text-base">
                               {album.name}
                             </span>
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="secondary" className="text-[11px]">
                               {album.fileCount}
                             </Badge>
                           </div>
                           {album.description && (
-                            <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                            <p className="mt-1 truncate text-xs text-muted-foreground sm:text-sm">
                               {album.description}
                             </p>
                           )}
                         </div>
 
                         {selectedAlbums.has(album.id) && (
-                          <Check className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
+                            <Check className="h-4 w-4 text-primary" />
+                          </div>
                         )}
-                      </div>
+                      </button>
                     ))
                   )}
                 </div>
               </ScrollArea>
             )}
-
-            {/* Bouton créer un nouvel album */}
-            <div>
-              <Separator className="mb-3" />
-              <Button
-                variant="outline"
-                className="w-full text-sm"
-                onClick={() => setIsCreateDialogOpen(true)}
-              >
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                {t("albums.create")}
-              </Button>
-            </div>
           </div>
 
-          <DialogFooter className="flex-col gap-2">
-            {selectedAlbums.size > 0 && (
-              <div className="text-xs sm:text-sm text-muted-foreground">
-                {selectedAlbums.size} album(s) sélectionné(s)
-              </div>
-            )}
-            <div className="flex flex-col sm:flex-row gap-2">
+          <DialogFooter className="border-t border-border/60 bg-muted/20 px-5 py-4 sm:px-6">
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <Button
                 variant="outline"
-                onClick={handleClose}
-                disabled={adding}
-                className="w-full sm:w-auto text-sm"
+                className="text-sm"
+                onClick={() => setIsCreateDialogOpen(true)}
               >
-                {t("common.cancel")}
+                <Plus className="mr-2 h-4 w-4" />
+                Nouvel album
               </Button>
-              <Button
-                onClick={handleAddToAlbums}
-                disabled={selectedAlbums.size === 0 || adding}
-                className="w-full sm:w-auto text-sm"
-              >
-                {adding && (
-                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
-                )}
-                {selectedAlbums.size === 1
-                  ? "Ajouter à l'album"
-                  : `Ajouter à ${selectedAlbums.size} albums`}
-              </Button>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                <Button
+                  variant="outline"
+                  onClick={handleClose}
+                  disabled={adding}
+                  className="text-sm"
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  onClick={handleAddToAlbums}
+                  disabled={selectedAlbums.size === 0 || adding}
+                  className="text-sm"
+                >
+                  {adding && (
+                    <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
+                  )}
+                  {selectedAlbums.size === 1
+                    ? "Ajouter à l'album"
+                    : `Ajouter à ${selectedAlbums.size} albums`}
+                </Button>
+              </div>
             </div>
           </DialogFooter>
         </DialogContent>

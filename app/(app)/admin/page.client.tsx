@@ -1,20 +1,21 @@
 "use client";
 
+import Link from "next/link";
+import {
+  ArrowRight,
+  Database,
+  Package,
+  Settings,
+  Shield,
+  Users,
+} from "lucide-react";
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Settings,
-  Users,
-  Database,
-  Shield,
-  Upload,
-  Package,
-} from "lucide-react";
-import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 
 export function AdminPageClient() {
@@ -26,79 +27,141 @@ export function AdminPageClient() {
       description: t("admin.sections.users.description"),
       icon: Users,
       href: "/admin/users",
-      color: "text-blue-500",
+      meta: "Utilisateurs",
+      accent: "from-blue-500/15 via-blue-500/5 to-transparent",
     },
     {
       title: t("admin.sections.logs.title"),
       description: t("admin.sections.logs.description"),
       icon: Database,
       href: "/admin/logs",
-      color: "text-green-500",
+      meta: "Observabilité",
+      accent: "from-emerald-500/15 via-emerald-500/5 to-transparent",
+    },
+    {
+      title: "Thème global",
+      description:
+        "Publier la base visuelle du site et préparer les futures extensions de branding.",
+      icon: Settings,
+      href: "/admin/theme",
+      meta: "Design system",
+      accent: "from-cyan-500/15 via-cyan-500/5 to-transparent",
     },
     {
       title: t("admin.sections.system.title"),
       description: t("admin.sections.system.description"),
       icon: Settings,
       href: "/admin/system",
-      color: "text-yellow-500",
+      meta: "Infrastructure",
+      accent: "from-amber-500/15 via-amber-500/5 to-transparent",
     },
     {
       title: "Gestion des modules",
-      description: "Gérer les modules installés et leurs dépendances",
+      description: "Gérer les modules installés et leurs dépendances.",
       icon: Package,
       href: "/admin/modules",
-      color: "text-purple-500",
+      meta: "Extensions",
+      accent: "from-violet-500/15 via-violet-500/5 to-transparent",
     },
     {
       title: t("admin.sections.security.title"),
       description: t("admin.sections.security.description"),
       icon: Shield,
       href: "/admin/security",
-      color: "text-purple-500",
-      disabled: true,
+      meta: "Protection",
+      accent: "from-indigo-500/15 via-indigo-500/5 to-transparent",
     },
   ];
 
   return (
-    <div>
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-          <Shield className="h-6 w-6 sm:h-8 sm:w-8" />
-          {t("admin.title")}
-        </h1>
-        <p className="text-sm sm:text-base text-muted-foreground mt-2">
-          {t("admin.description")}
-        </p>
-      </div>
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
+        <div className="space-y-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+            <Shield className="h-3.5 w-3.5" />
+            Centre d’administration
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {t("admin.title")}
+            </h1>
+            <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+              {t("admin.description")}
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Supervision
+              </p>
+              <p className="mt-1 text-sm">
+                Gardez une vision claire des utilisateurs, des journaux et de
+                l’état global du service.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Organisation
+              </p>
+              <p className="mt-1 text-sm">
+                Chaque panneau isole un métier précis au lieu d’empiler les
+                actions dans une seule vue.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Fiabilité
+              </p>
+              <p className="mt-1 text-sm">
+                Les actions critiques restent visibles, compactes et faciles à
+                relire avant validation.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        {adminSections.map((section) => (
-          <Link
-            key={section.href}
-            href={section.disabled ? "#" : section.href}
-            className={section.disabled ? "cursor-not-allowed" : ""}
-          >
-            <Card
-              className={`h-full transition-colors ${
-                section.disabled ? "opacity-60" : "hover:bg-muted/50"
-              }`}
-            >
-              <CardHeader className="p-4 sm:p-6">
-                <div className="flex items-center gap-2">
-                  <section.icon
-                    className={`h-4 w-4 sm:h-5 sm:w-5 ${section.color}`}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {adminSections.map((section) => {
+          const Icon = section.icon;
+
+          return (
+            <Link key={section.href} href={section.href} className="group">
+              <Card className="h-full overflow-hidden rounded-2xl border-border/70 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-md">
+                <CardHeader className="relative overflow-hidden border-b border-border/60 p-5 sm:p-6">
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-br ${section.accent}`}
                   />
-                  <CardTitle className="text-base sm:text-lg">
-                    {section.title}
-                  </CardTitle>
-                </div>
-                <CardDescription className="text-sm">
-                  {section.description}
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-        ))}
+                  <div className="relative flex items-start justify-between gap-4">
+                    <div className="space-y-3">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-1 text-xs font-medium text-muted-foreground">
+                        <Icon className="h-3.5 w-3.5" />
+                        {section.meta}
+                      </div>
+                      <div className="space-y-1">
+                        <CardTitle className="text-lg sm:text-xl">
+                          {section.title}
+                        </CardTitle>
+                        <CardDescription className="text-sm leading-relaxed">
+                          {section.description}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div className="rounded-full border border-border/60 bg-background/85 p-2 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1">
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-5 sm:p-6">
+                  <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                    Ouvrir ce panneau pour intervenir sans perdre le contexte
+                    administratif global.
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

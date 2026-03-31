@@ -1,3 +1,4 @@
+import { DragEvent } from "react";
 import { FileInfo } from "@/types/files";
 import { Button } from "../ui/button";
 import {
@@ -37,20 +38,28 @@ export function ListItemCard({
   isNew,
 }: ListItemCardProps) {
   const locale = useDateLocale();
+  const preventNativeImageDrag = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+  };
 
   return (
     <div
       className={cn(
         "flex cursor-pointer items-center justify-between rounded-lg border p-4 hover:bg-accent/50 transition-all duration-500",
-        isNew && "animate-in fade-in-0 slide-in-from-left-5"
+        isNew && "animate-in fade-in-0 slide-in-from-left-5",
       )}
       onClick={onSelect}
     >
-      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md">
+      <div
+        className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md"
+        onDragStart={preventNativeImageDrag}
+      >
         <Image
           src={file.url}
           alt={file.name}
           fill
+          draggable={false}
+          onDragStart={preventNativeImageDrag}
           className="object-cover"
           sizes="64px"
         />
@@ -117,7 +126,7 @@ export function ListItemCard({
           }}
           className={cn(
             "bg-background/50 hover:bg-yellow-500 hover:text-white",
-            file.isSecure && "text-yellow-500"
+            file.isSecure && "text-yellow-500",
           )}
         >
           {file.isSecure ? (
@@ -135,7 +144,7 @@ export function ListItemCard({
           }}
           className={cn(
             "bg-background/50 hover:bg-red-500 hover:text-white",
-            "text-destructive"
+            "text-destructive",
           )}
         >
           <Trash2 className="h-4 w-4" />

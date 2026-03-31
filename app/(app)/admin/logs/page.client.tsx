@@ -1,30 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
-import type { LogLevel, LogAction, Log } from "@/lib/types/logs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import { useQueryState } from "nuqs";
-import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import type { Log, LogAction, LogLevel } from "@/lib/types/logs";
+import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n";
+import { useDateLocale } from "@/lib/i18n/date-locales";
+import { Loading } from "@/components/ui/loading";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -36,11 +32,28 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, RefreshCw, Info } from "lucide-react";
-import { format } from "date-fns";
-import { useDateLocale } from "@/lib/i18n/date-locales";
-import { Loading } from "@/components/ui/loading";
-import { useTranslation } from "@/lib/i18n";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  CalendarIcon,
+  Info,
+  RefreshCw,
+  ScrollText,
+  Search,
+} from "lucide-react";
 
 const ITEMS_PER_PAGE = 50;
 
@@ -84,8 +97,8 @@ export default function LogsPage() {
   });
   const [refreshInterval, setRefreshInterval] =
     useState<keyof typeof REFRESH_INTERVALS>("0");
-  const { ref, inView } = useInView();
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
+  const { ref, inView } = useInView();
 
   const { data, fetchNextPage, hasNextPage, isLoading, isError, refetch } =
     useInfiniteQuery({
@@ -94,7 +107,7 @@ export default function LogsPage() {
         const searchParams = new URLSearchParams();
         searchParams.set(
           "offset",
-          String((pageParam as number) * ITEMS_PER_PAGE)
+          String((pageParam as number) * ITEMS_PER_PAGE),
         );
         searchParams.set("limit", String(ITEMS_PER_PAGE));
         if (level !== "all") searchParams.set("level", level);
@@ -104,17 +117,18 @@ export default function LogsPage() {
         if (endDate) searchParams.set("endDate", endDate);
 
         const response = await fetch(
-          `/api/admin/logs?${searchParams.toString()}`
+          `/api/admin/logs?${searchParams.toString()}`,
         );
-        if (!response.ok) throw new Error(t("admin.logs.error"));
+        if (!response.ok) {
+          throw new Error(t("admin.logs.error"));
+        }
         return response.json() as Promise<Log[]>;
       },
       initialPageParam: 0,
-      getNextPageParam: (lastPage: Log[], allPages: Log[][]) => {
-        return lastPage.length === ITEMS_PER_PAGE ? allPages.length : undefined;
-      },
+      getNextPageParam: (lastPage: Log[], allPages: Log[][]) =>
+        lastPage.length === ITEMS_PER_PAGE ? allPages.length : undefined,
       refetchInterval:
-        refreshInterval === "0" ? false : parseInt(refreshInterval) * 1000,
+        refreshInterval === "0" ? false : parseInt(refreshInterval, 10) * 1000,
     });
 
   useEffect(() => {
@@ -140,6 +154,8 @@ export default function LogsPage() {
     }
   };
 
+  const hasDateFilter = Boolean(startDate || endDate);
+
   if (isError) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -149,16 +165,67 @@ export default function LogsPage() {
   }
 
   return (
-    <div>
-      <div className="mb-6 sm:mb-8 space-y-4">
-        <div className="flex flex-col gap-4">
-          {/* Filtres principaux */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
+        <div className="space-y-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+            <ScrollText className="h-3.5 w-3.5" />
+            Journal d’exploitation
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {t("admin.sections.logs.title")}
+            </h1>
+            <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+              Explorez les événements importants avec des filtres regroupés,
+              lisibles et suffisamment d’espace pour parcourir les détails.
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Niveau
+              </p>
+              <p className="mt-1 text-sm">
+                {level === "all" ? "Tous les niveaux" : level}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Fenêtre
+              </p>
+              <p className="mt-1 text-sm">
+                {hasDateFilter ? "Filtre de dates actif" : "Période complète"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Actualisation
+              </p>
+              <p className="mt-1 text-sm">
+                {REFRESH_INTERVALS[refreshInterval]}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Card className="rounded-2xl border-border/70 shadow-sm">
+        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
+          <CardTitle className="text-lg sm:text-xl">
+            Filtres de consultation
+          </CardTitle>
+          <CardDescription className="text-sm">
+            Affinez le journal avant d’ouvrir un événement particulier.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 p-5 sm:p-6">
+          <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 xl:grid-cols-4">
             <Select
               value={level}
               onValueChange={(value) => setLevel(value as LogLevel | "all")}
             >
-              <SelectTrigger className="w-full text-sm">
+              <SelectTrigger className="text-sm">
                 <SelectValue
                   placeholder={t("admin.logs.filters.select_level")}
                 />
@@ -186,7 +253,7 @@ export default function LogsPage() {
               value={action}
               onValueChange={(value) => setAction(value as LogAction | "all")}
             >
-              <SelectTrigger className="w-full text-sm">
+              <SelectTrigger className="text-sm">
                 <SelectValue
                   placeholder={t("admin.logs.filters.select_action")}
                 />
@@ -240,300 +307,293 @@ export default function LogsPage() {
               </SelectContent>
             </Select>
 
-            <Input
-              placeholder={t("admin.logs.filters.search_placeholder")}
-              value={search || ""}
-              onChange={(e) => setSearch(e.target.value || null)}
-              className="w-full text-sm"
-            />
-
-            <div className="flex gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="flex-1 justify-start text-left font-normal text-sm"
-                  >
-                    <CalendarIcon className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                    <span className="hidden sm:inline">
-                      {startDate
-                        ? format(new Date(startDate), "P", { locale })
-                        : t("admin.logs.start_date")}
-                    </span>
-                    <span className="sm:hidden">
-                      {startDate
-                        ? format(new Date(startDate), "dd/MM", { locale })
-                        : "Début"}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={startDate ? new Date(startDate) : undefined}
-                    onSelect={(date) =>
-                      setStartDate(date?.toISOString() || null)
-                    }
-                    initialFocus
-                    locale={locale}
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="flex-1 justify-start text-left font-normal text-sm"
-                  >
-                    <CalendarIcon className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                    <span className="hidden sm:inline">
-                      {endDate
-                        ? format(new Date(endDate), "P", { locale })
-                        : t("admin.logs.end_date")}
-                    </span>
-                    <span className="sm:hidden">
-                      {endDate
-                        ? format(new Date(endDate), "dd/MM", { locale })
-                        : "Fin"}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={endDate ? new Date(endDate) : undefined}
-                    onSelect={(date) => setEndDate(date?.toISOString() || null)}
-                    initialFocus
-                    locale={locale}
-                  />
-                </PopoverContent>
-              </Popover>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={t("admin.logs.filters.search_placeholder")}
+                value={search || ""}
+                onChange={(e) => setSearch(e.target.value || null)}
+                className="pl-9 text-sm"
+              />
             </div>
-          </div>
 
-          {/* Contrôles secondaires */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
             <Select
               value={refreshInterval}
               onValueChange={(value) =>
                 setRefreshInterval(value as keyof typeof REFRESH_INTERVALS)
               }
             >
-              <SelectTrigger className="w-full sm:w-[220px] text-sm">
+              <SelectTrigger className="text-sm">
                 <SelectValue placeholder={t("admin.logs.refresh_interval")} />
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(REFRESH_INTERVALS).map(([value, label]) => (
                   <SelectItem key={value} value={value} className="text-sm">
-                    <span className="flex items-center gap-2">
-                      <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-                      {label}
-                    </span>
+                    {label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="justify-start text-left text-sm font-normal"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {startDate
+                    ? format(new Date(startDate), "P", { locale })
+                    : t("admin.logs.start_date")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={startDate ? new Date(startDate) : undefined}
+                  onSelect={(date) => setStartDate(date?.toISOString() || null)}
+                  initialFocus
+                  locale={locale}
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="justify-start text-left text-sm font-normal"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {endDate
+                    ? format(new Date(endDate), "P", { locale })
+                    : t("admin.logs.end_date")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={endDate ? new Date(endDate) : undefined}
+                  onSelect={(date) => setEndDate(date?.toISOString() || null)}
+                  initialFocus
+                  locale={locale}
+                />
+              </PopoverContent>
+            </Popover>
 
             <Button
               variant="destructive"
               onClick={handleClearLogs}
-              className="w-full sm:w-auto text-sm"
+              className="text-sm"
             >
               {t("admin.logs.clear_logs")}
             </Button>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs sm:text-sm">
-                {t("admin.logs.timestamp")}
-              </TableHead>
-              <TableHead className="text-xs sm:text-sm">
-                {t("admin.logs.level")}
-              </TableHead>
-              <TableHead className="text-xs sm:text-sm">
-                {t("admin.logs.action")}
-              </TableHead>
-              <TableHead className="text-xs sm:text-sm">
-                {t("admin.logs.message")}
-              </TableHead>
-              <TableHead className="text-xs sm:text-sm">
-                {t("admin.logs.user")}
-              </TableHead>
-              <TableHead className="text-xs sm:text-sm">
-                {t("admin.logs.details")}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data?.pages[0]?.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="h-20 sm:h-24 text-center text-sm"
-                >
-                  {t("admin.logs.no_logs")}
-                </TableCell>
-              </TableRow>
-            ) : (
-              data?.pages.map((page) =>
-                page.map((log) => (
-                  <TableRow
-                    key={`${log.id}-${log.timestamp}`}
-                    className="group"
-                  >
-                    <TableCell className="text-xs sm:text-sm">
-                      <span className="hidden sm:inline">
-                        {new Date(log.timestamp).toLocaleString()}
-                      </span>
-                      <span className="sm:hidden">
-                        {new Date(log.timestamp).toLocaleDateString()}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className={`${levelColors[log.level]} text-xs`}
-                      >
-                        {log.level}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs sm:text-sm truncate max-w-[150px] sm:max-w-[200px]">
-                      {log.action}
-                    </TableCell>
-                    <TableCell className="text-xs sm:text-sm truncate max-w-[200px] sm:max-w-[300px]">
-                      {log.message}
-                    </TableCell>
-                    <TableCell className="text-xs sm:text-sm truncate max-w-[120px] sm:max-w-[180px]">
-                      {log.userEmail || t("admin.logs.system")}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedLog(log)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 sm:h-8 sm:w-8"
-                      >
-                        <Info className="h-3 w-3 sm:h-4 sm:w-4" />
-                      </Button>
+      <Card className="rounded-2xl border-border/70 shadow-sm">
+        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
+          <CardTitle className="text-lg sm:text-xl">
+            Flux des événements
+          </CardTitle>
+          <CardDescription className="text-sm">
+            Parcourez les lignes du journal et ouvrez un événement pour voir son
+            contexte complet.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 p-5 sm:p-6">
+          <div className="overflow-x-auto rounded-xl border border-border/60">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs sm:text-sm">
+                    {t("admin.logs.timestamp")}
+                  </TableHead>
+                  <TableHead className="text-xs sm:text-sm">
+                    {t("admin.logs.level")}
+                  </TableHead>
+                  <TableHead className="text-xs sm:text-sm">
+                    {t("admin.logs.action")}
+                  </TableHead>
+                  <TableHead className="text-xs sm:text-sm">
+                    {t("admin.logs.message")}
+                  </TableHead>
+                  <TableHead className="text-xs sm:text-sm">
+                    {t("admin.logs.user")}
+                  </TableHead>
+                  <TableHead className="text-right text-xs sm:text-sm">
+                    {t("admin.logs.details")}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data?.pages[0]?.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="h-24 text-center text-sm text-muted-foreground"
+                    >
+                      {t("admin.logs.no_logs")}
                     </TableCell>
                   </TableRow>
-                ))
-              )
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                ) : (
+                  data?.pages.map((page) =>
+                    page.map((log) => (
+                      <TableRow key={`${log.id}-${log.timestamp}`}>
+                        <TableCell className="text-xs sm:text-sm">
+                          <span className="hidden sm:inline">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </span>
+                          <span className="sm:hidden">
+                            {new Date(log.timestamp).toLocaleDateString()}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={`${levelColors[log.level]} text-xs text-white`}
+                          >
+                            {log.level}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[180px] truncate text-xs sm:text-sm">
+                          {log.action}
+                        </TableCell>
+                        <TableCell className="max-w-[260px] truncate text-xs sm:text-sm">
+                          {log.message}
+                        </TableCell>
+                        <TableCell className="max-w-[180px] truncate text-xs sm:text-sm">
+                          {log.userEmail || t("admin.logs.system")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setSelectedLog(log)}
+                            className="h-8 w-8"
+                          >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )),
+                  )
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-      {/* Dialog pour afficher les détails du log */}
+          {isLoading && (
+            <div className="flex justify-center">
+              <Loading variant="minimal" size="sm" showMessage={true} />
+            </div>
+          )}
+
+          <div ref={ref} className="flex h-10 items-center justify-center">
+            {hasNextPage && (
+              <Loading variant="minimal" size="sm" showMessage={true} />
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
-        <DialogContent className="w-[95vw] max-w-3xl mx-auto">
-          <DialogHeader>
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-3xl overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+          <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
             <DialogTitle className="text-lg sm:text-xl">
               {t("admin.logs.details_dialog.title")}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <p className="font-semibold text-sm">
+          <div className="grid gap-4 px-5 py-5 sm:px-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
                   {t("admin.logs.timestamp")}
                 </p>
-                <p className="text-sm">
+                <p className="mt-2 text-sm">
                   {selectedLog &&
                     new Date(selectedLog.timestamp).toLocaleString()}
                 </p>
               </div>
-              <div>
-                <p className="font-semibold text-sm">{t("admin.logs.level")}</p>
-                <p>
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("admin.logs.level")}
+                </p>
+                <div className="mt-2">
                   {selectedLog && (
                     <Badge
                       variant="secondary"
-                      className={`${levelColors[selectedLog.level]} text-xs`}
+                      className={`${levelColors[selectedLog.level]} text-xs text-white`}
                     >
                       {selectedLog.level}
                     </Badge>
                   )}
-                </p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-sm">
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
                   {t("admin.logs.action")}
                 </p>
-                <p className="text-sm break-all">{selectedLog?.action}</p>
+                <p className="mt-2 break-all text-sm">{selectedLog?.action}</p>
               </div>
-              <div>
-                <p className="font-semibold text-sm">{t("admin.logs.user")}</p>
-                <p className="text-sm break-all">
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("admin.logs.user")}
+                </p>
+                <p className="mt-2 break-all text-sm">
                   {selectedLog?.userEmail || t("admin.logs.system")}
                 </p>
               </div>
-              <div className="col-span-1 sm:col-span-2">
-                <p className="font-semibold text-sm">
-                  {t("admin.logs.message")}
-                </p>
-                <p className="text-sm break-all">{selectedLog?.message}</p>
-              </div>
-              {selectedLog?.ip && (
-                <div>
-                  <p className="font-semibold text-sm">{t("admin.logs.ip")}</p>
-                  <p className="text-sm break-all">{selectedLog.ip}</p>
-                </div>
-              )}
-              {selectedLog?.userAgent && (
-                <div className="col-span-1 sm:col-span-2">
-                  <p className="font-semibold text-sm">
-                    {t("admin.logs.user_agent")}
-                  </p>
-                  <p className="text-sm break-all">{selectedLog.userAgent}</p>
-                </div>
-              )}
-              {selectedLog?.metadata &&
-                Object.keys(selectedLog.metadata).length > 0 && (
-                  <div className="col-span-1 sm:col-span-2">
-                    <p className="font-semibold mb-2 text-sm">
-                      {t("admin.logs.metadata")}
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {t("admin.logs.message")}
+              </p>
+              <p className="mt-2 break-all text-sm">{selectedLog?.message}</p>
+            </div>
+
+            {(selectedLog?.ip || selectedLog?.userAgent) && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {selectedLog?.ip && (
+                  <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      {t("admin.logs.ip")}
                     </p>
-                    <pre className="bg-muted p-3 sm:p-4 rounded-lg overflow-auto max-h-[200px] sm:max-h-[300px] text-xs">
-                      <code>
-                        {JSON.stringify(selectedLog.metadata, null, 2)}
-                      </code>
-                    </pre>
+                    <p className="mt-2 break-all text-sm">{selectedLog.ip}</p>
                   </div>
                 )}
-            </div>
+                {selectedLog?.userAgent && (
+                  <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      {t("admin.logs.user_agent")}
+                    </p>
+                    <p className="mt-2 break-all text-sm">
+                      {selectedLog.userAgent}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedLog?.metadata &&
+              Object.keys(selectedLog.metadata).length > 0 && (
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                  <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    {t("admin.logs.metadata")}
+                  </p>
+                  <pre className="mt-3 max-h-[320px] overflow-auto rounded-xl border border-border/60 bg-background p-4 text-xs">
+                    <code>{JSON.stringify(selectedLog.metadata, null, 2)}</code>
+                  </pre>
+                </div>
+              )}
           </div>
         </DialogContent>
       </Dialog>
-
-      {isLoading && (
-        <div className="mt-4 flex justify-center">
-          <Loading
-            variant="minimal"
-            size="sm"
-            showMessage={true}
-            className="text-xs"
-          />
-        </div>
-      )}
-
-      <div ref={ref} className="h-10 flex items-center justify-center">
-        {hasNextPage && (
-          <Loading
-            variant="minimal"
-            size="sm"
-            showMessage={true}
-            className="text-xs"
-          />
-        )}
-      </div>
     </div>
   );
 }

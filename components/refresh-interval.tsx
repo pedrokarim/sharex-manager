@@ -16,7 +16,7 @@ import { useTranslation } from "@/lib/i18n";
 export function RefreshInterval() {
   const { t } = useTranslation();
   const [defaultAutoRefreshInterval, setDefaultAutoRefreshInterval] = useAtom(
-    autoRefreshIntervalAtom
+    autoRefreshIntervalAtom,
   );
 
   const [autoRefreshInterval, setAutoRefreshInterval] = useQueryState(
@@ -30,7 +30,7 @@ export function RefreshInterval() {
         }
         return defaultAutoRefreshInterval.toString();
       },
-    }
+    },
   );
 
   const handleChange = async (value: string) => {
@@ -62,7 +62,7 @@ export function RefreshInterval() {
         <Button
           variant="outline"
           size="icon"
-          className="h-8 w-8 backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200"
+          className="h-9 w-9 rounded-xl border border-border/60 bg-background shadow-sm transition-colors hover:bg-muted/70"
           title={t("gallery.refresh.intervals.placeholder")}
         >
           {getIcon()}

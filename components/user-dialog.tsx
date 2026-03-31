@@ -3,6 +3,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -33,11 +34,15 @@ export function UserDialog({ user, trigger, onSuccess }: UserDialogProps) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-lg overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+        <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
           <DialogTitle>
             {user ? "Modifier l'utilisateur" : "Ajouter un utilisateur"}
           </DialogTitle>
+          <DialogDescription className="text-sm">
+            Renseignez les informations du compte et son niveau d’accès dans un
+            panneau compact.
+          </DialogDescription>
         </DialogHeader>
         <UserForm
           user={user}

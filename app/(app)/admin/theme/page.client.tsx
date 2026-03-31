@@ -1,0 +1,328 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useAtom } from "jotai";
+import Editor from "@/components/editor/editor";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
+import { defaultThemeState } from "@/config/theme";
+import {
+  loadThemeEditorStateAtom,
+  themeEditorStateAtom,
+} from "@/lib/atoms/editor";
+import { isDeepEqual } from "@/lib/utils";
+import type { GlobalThemeConfig, GlobalThemeMode } from "@/types/theme-runtime";
+import {
+  ArrowUpRight,
+  Clock3,
+  Layers3,
+  Palette,
+  PaintBucket,
+  Sparkles,
+  Wand2,
+} from "lucide-react";
+
+const modeOptions: Array<{
+  value: GlobalThemeMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "light",
+    label: "Clair",
+    description: "Force l’interface publique en light.",
+  },
+  {
+    value: "dark",
+    label: "Sombre",
+    description: "Force l’interface publique en dark.",
+  },
+  {
+    value: "system",
+    label: "Système",
+    description: "Laisse l’app suivre la préférence du device.",
+  },
+];
+
+export default function ThemeAdminPageClient({
+  initialGlobalTheme,
+}: {
+  initialGlobalTheme: GlobalThemeConfig;
+}) {
+  const [themeState] = useAtom(themeEditorStateAtom);
+  const [, loadThemeEditorState] = useAtom(loadThemeEditorStateAtom);
+  const [globalMode, setGlobalMode] = useState<GlobalThemeMode>(
+    initialGlobalTheme.mode
+  );
+  const [publishedTheme, setPublishedTheme] =
+    useState<GlobalThemeConfig>(initialGlobalTheme);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const emptyThemePromise = useMemo(() => Promise.resolve(null), []);
+
+  useEffect(() => {
+    loadThemeEditorState({
+      ...defaultThemeState,
+      preset: undefined,
+      styles: initialGlobalTheme.styles,
+      currentMode: initialGlobalTheme.mode === "dark" ? "dark" : "light",
+      hslAdjustments: defaultThemeState.hslAdjustments,
+    });
+  }, [initialGlobalTheme.mode, initialGlobalTheme.styles, loadThemeEditorState]);
+
+  const hasUnsavedChanges =
+    globalMode !== publishedTheme.mode ||
+    !isDeepEqual(themeState.styles, publishedTheme.styles);
+
+  const handlePublish = async () => {
+    setIsSaving(true);
+
+    try {
+      const response = await fetch("/api/admin/theme", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mode: globalMode,
+          styles: themeState.styles,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Impossible de publier le thème");
+      }
+
+      setPublishedTheme(data.globalTheme);
+      setGlobalMode(data.globalTheme.mode);
+      toast.success("Le thème global a été publié.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Erreur lors de la publication"
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_26%),radial-gradient(circle_at_80%_20%,rgba(249,115,22,0.14),transparent_22%),linear-gradient(135deg,var(--card),color-mix(in_oklab,var(--card)_82%,var(--muted)))] p-6 shadow-sm sm:p-7">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+          <div className="space-y-4">
+            <Badge
+              variant="outline"
+              className="rounded-full border-border/70 bg-background/80 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"
+            >
+              Palette maître
+            </Badge>
+            <div className="space-y-3">
+              <h1 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
+                Panneau de thème global
+              </h1>
+              <p className="max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
+                Cette page pilote la base visuelle de tout le site. Le thème publié
+                sert de source principale, puis les préférences utilisateur viennent
+                éventuellement s&apos;y superposer sans l&apos;écraser.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Publication
+                </p>
+                <p className="mt-2 text-sm">
+                  {hasUnsavedChanges
+                    ? "Des changements locaux attendent une publication."
+                    : "Le draft correspond exactement au thème publié."}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Mode public
+                </p>
+                <p className="mt-2 text-sm">
+                  {modeOptions.find((option) => option.value === globalMode)?.label}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Dernière mise à jour
+                </p>
+                <p className="mt-2 text-sm">
+                  {new Date(publishedTheme.updatedAt).toLocaleString("fr-FR")}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[1.75rem] border border-border/60 bg-background/80 p-5 shadow-sm backdrop-blur">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">État de publication</p>
+                <p className="text-sm text-muted-foreground">
+                  Sélectionnez le mode global, ajustez le thème, puis publiez.
+                </p>
+              </div>
+              <Badge
+                variant={hasUnsavedChanges ? "secondary" : "default"}
+                className="rounded-full px-3 py-1"
+              >
+                {hasUnsavedChanges ? "Draft local" : "Publié"}
+              </Badge>
+            </div>
+
+            <Separator className="my-4" />
+
+            <div className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                Mode global du site
+              </p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {modeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setGlobalMode(option.value)}
+                    className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
+                      globalMode === option.value
+                        ? "border-primary bg-primary/10"
+                        : "border-border/60 bg-background hover:bg-muted/40"
+                    }`}
+                  >
+                    <p className="text-sm font-medium">{option.label}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      {option.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-muted-foreground">
+                {hasUnsavedChanges
+                  ? "Le site n’utilisera ces changements qu’après publication."
+                  : "Le thème publié est déjà en production."}
+              </div>
+              <Button onClick={handlePublish} disabled={!hasUnsavedChanges || isSaving}>
+                <PaintBucket className="mr-2 h-4 w-4" />
+                {isSaving ? "Publication..." : "Publier le thème global"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_360px]">
+        <Card className="overflow-hidden rounded-[2rem] border-border/70 shadow-sm">
+          <CardHeader className="border-b border-border/60 bg-muted/20 px-6 py-5">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Palette className="h-5 w-5" />
+              Atelier du thème publié
+            </CardTitle>
+            <CardDescription className="text-sm">
+              L’éditeur existant pilote ici le thème de référence du site. Les
+              presets servent d’amorçage, mais rien n’est mis en ligne tant que la
+              publication n’a pas été validée.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="h-[75vh] min-h-[680px]">
+              <Editor themePromise={emptyThemePromise} showActionBar={false} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-6 xl:sticky xl:top-4 xl:self-start">
+          <Card className="rounded-[1.75rem] border-border/70 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Layers3 className="h-5 w-5" />
+                Architecture future-ready
+              </CardTitle>
+              <CardDescription>
+                La page est déjà pensée pour accueillir d’autres briques sans
+                devenir un panneau monolithique.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <p className="text-sm font-medium">Brand assets</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Logos, polices de marque, guidelines d’export et variantes de
+                  diffusion.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <p className="text-sm font-medium">Règles par zone</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Possibilité future de surcharger le marketing, le catalogue ou le
+                  back-office sans casser la base commune.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <p className="text-sm font-medium">Historique & publication</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Diffs, brouillons nommés, validation humaine et éventuel rollback.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[1.75rem] border-border/70 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Sparkles className="h-5 w-5" />
+                Roadmap visuelle
+              </CardTitle>
+              <CardDescription>
+                Ce panneau sert déjà de prototype de gouvernance thème pour la suite.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-3 rounded-2xl border border-border/60 bg-background p-4">
+                <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Automatisations</p>
+                  <p className="text-sm text-muted-foreground">
+                    Déclenchement futur par saison, campagne, événement ou A/B test.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 rounded-2xl border border-border/60 bg-background p-4">
+                <Wand2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Assistants d’édition</p>
+                  <p className="text-sm text-muted-foreground">
+                    Suggestions IA, contrôle de contraste et checklists de qualité.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 rounded-2xl border border-border/60 bg-background p-4">
+                <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Distribution multi-surface</p>
+                  <p className="text-sm text-muted-foreground">
+                    Base commune pour le web, les embeds et d’éventuels clients annexes.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

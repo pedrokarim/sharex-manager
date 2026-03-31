@@ -1,6 +1,6 @@
 import { useQueryState } from "nuqs";
 
-export type ControlTab = "colors" | "typography" | "other";
+export type ControlTab = "colors" | "typography" | "other" | "ai";
 
 export function useControlsTabFromUrl() {
   const [tab, setTab] = useQueryState("tab", {

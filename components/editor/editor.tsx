@@ -14,6 +14,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface EditorProps {
   themePromise: Promise<Theme | null>;
+  showActionBar?: boolean;
 }
 
 const isThemeStyles = (styles: unknown): styles is ThemeStyles => {
@@ -26,7 +27,7 @@ const isThemeStyles = (styles: unknown): styles is ThemeStyles => {
   );
 };
 
-const Editor: React.FC<EditorProps> = ({ themePromise }) => {
+const Editor: React.FC<EditorProps> = ({ themePromise, showActionBar = true }) => {
   const [themeState] = useAtom(themeEditorStateAtom);
   const [, setThemeState] = useAtom(setThemeStateAtom);
   const isMobile = useIsMobile();
@@ -87,7 +88,7 @@ const Editor: React.FC<EditorProps> = ({ themePromise }) => {
             </TabsContent>
             <TabsContent value="preview" className="mt-0 h-[calc(100%-2.5rem)]">
               <div className="flex h-full flex-col">
-                <ActionBar />
+                {showActionBar ? <ActionBar /> : null}
                 <ThemePreviewPanel styles={styles} currentMode={themeState.currentMode} />
               </div>
             </TabsContent>
@@ -121,7 +122,7 @@ const Editor: React.FC<EditorProps> = ({ themePromise }) => {
           <ResizablePanel defaultSize={70}>
             <div className="flex h-full flex-col">
               <div className="flex min-h-0 flex-1 flex-col">
-                <ActionBar />
+                {showActionBar ? <ActionBar /> : null}
                 <ThemePreviewPanel styles={styles} currentMode={themeState.currentMode} />
               </div>
             </div>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -83,7 +84,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
       toast.success(
         user
           ? "Utilisateur modifié avec succès"
-          : "Utilisateur créé avec succès"
+          : "Utilisateur créé avec succès",
       );
 
       if (onSuccess) {
@@ -91,7 +92,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
       }
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Une erreur est survenue"
+        error instanceof Error ? error.message : "Une erreur est survenue",
       );
     } finally {
       setIsLoading(false);
@@ -100,66 +101,84 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="username"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nom d'utilisateur</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                {user ? "Nouveau mot de passe" : "Mot de passe"}
-              </FormLabel>
-              <FormControl>
-                <Input type="password" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="role"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Rôle</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-0">
+        <div className="space-y-4 px-5 py-5 sm:px-6">
+          <FormField
+            control={form.control}
+            name="username"
+            render={({ field }) => (
+              <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <FormLabel>Nom d'utilisateur</FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez un rôle" />
-                  </SelectTrigger>
+                  <Input {...field} />
                 </FormControl>
-                <SelectContent>
-                  <SelectItem value="user">Utilisateur</SelectItem>
-                  <SelectItem value="admin">Administrateur</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormDescription>
+                  Nom visible dans l’interface et utilisé pour les recherches.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <Button type="submit" disabled={isLoading}>
-          {isLoading
-            ? "Chargement..."
-            : user
-            ? "Modifier l'utilisateur"
-            : "Créer l'utilisateur"}
-        </Button>
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <FormLabel>
+                  {user ? "Nouveau mot de passe" : "Mot de passe"}
+                </FormLabel>
+                <FormControl>
+                  <Input type="password" {...field} />
+                </FormControl>
+                <FormDescription>
+                  {user
+                    ? "Laissez vide pour conserver le mot de passe actuel."
+                    : "Le mot de passe doit contenir au moins 6 caractères."}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="role"
+            render={({ field }) => (
+              <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <FormLabel>Rôle</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionnez un rôle" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="user">Utilisateur</SelectItem>
+                    <SelectItem value="admin">Administrateur</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  Réservez le rôle administrateur aux accès de supervision.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="flex justify-end border-t border-border/60 px-5 py-4 sm:px-6">
+          <Button type="submit" disabled={isLoading}>
+            {isLoading
+              ? "Chargement..."
+              : user
+                ? "Modifier l'utilisateur"
+                : "Créer l'utilisateur"}
+          </Button>
+        </div>
       </form>
     </Form>
   );

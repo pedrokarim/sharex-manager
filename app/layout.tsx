@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import type { Session } from "next-auth";
 import localFont from "next/font/local";
 import "./global.css";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
+import { auth } from "@/auth";
+import { getResolvedThemePayload } from "@/lib/theme/get-resolved-theme-payload";
 // import { ThemeWrapper } from "@/components/theme-wrapper"; // Disabled - themes now handled by Jotai
 
 const geistSans = localFont({
@@ -22,11 +25,21 @@ export const metadata: Metadata = {
   description: "Gérez vos uploads ShareX facilement et en toute sécurité",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const sessionPromise = auth();
+  const themePromise = sessionPromise.then((session: Session | null) =>
+    getResolvedThemePayload(session?.user?.id ?? null),
+  );
+
+  const [session, initialTheme] = await Promise.all([
+    sessionPromise,
+    themePromise,
+  ]);
+
   return (
     <html lang="fr" suppressHydrationWarning>
       <body
@@ -38,7 +51,7 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <Providers>
+        <Providers initialTheme={initialTheme} session={session}>
           {/* ThemeWrapper disabled - themes now handled by ThemeProvider in components/theme-provider.tsx */}
           <div className="relative min-h-screen">
             <main id="main-content">{children}</main>

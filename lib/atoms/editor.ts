@@ -1,5 +1,4 @@
 import { atom } from "jotai";
-import { atomWithStorage } from "jotai/utils";
 import { ThemeEditorState } from "@/types/editor";
 import { defaultThemeState } from "@/config/theme";
 import { getPresetThemeStyles } from "@/utils/theme-preset-helper";
@@ -14,28 +13,16 @@ interface ThemeHistoryEntry {
 }
 
 // Atome principal pour l'état du thème éditeur
-export const themeEditorStateAtom = atomWithStorage<ThemeEditorState>(
-  "theme-editor-state",
-  defaultThemeState
-);
+export const themeEditorStateAtom = atom<ThemeEditorState>(defaultThemeState);
 
 // Atome pour le checkpoint du thème
-export const themeCheckpointAtom = atomWithStorage<ThemeEditorState | null>(
-  "theme-checkpoint",
-  null
-);
+export const themeCheckpointAtom = atom<ThemeEditorState | null>(null);
 
 // Atome pour l'historique
-export const themeHistoryAtom = atomWithStorage<ThemeHistoryEntry[]>(
-  "theme-history",
-  []
-);
+export const themeHistoryAtom = atom<ThemeHistoryEntry[]>([]);
 
 // Atome pour le futur (pour redo)
-export const themeFutureAtom = atomWithStorage<ThemeHistoryEntry[]>(
-  "theme-future",
-  []
-);
+export const themeFutureAtom = atom<ThemeHistoryEntry[]>([]);
 
 // Fonction setter pour themeState avec logique d'historique
 export const setThemeStateAtom = atom(
@@ -246,6 +233,16 @@ export const canUndoAtom = atom((get) => get(themeHistoryAtom).length > 0);
 
 export const canRedoAtom = atom((get) => get(themeFutureAtom).length > 0);
 
+export const loadThemeEditorStateAtom = atom(
+  null,
+  (_get, set, nextState: ThemeEditorState) => {
+    set(themeEditorStateAtom, nextState);
+    set(themeCheckpointAtom, nextState);
+    set(themeHistoryAtom, []);
+    set(themeFutureAtom, []);
+  }
+);
+
 // Hook-like functions pour une API familière (optionnel)
 export function useThemeEditorStore() {
   return {
@@ -264,5 +261,6 @@ export function useThemeEditorStore() {
     redo: redoThemeAtom,
     canUndo: canUndoAtom,
     canRedo: canRedoAtom,
+    loadThemeEditorState: loadThemeEditorStateAtom,
   };
 }

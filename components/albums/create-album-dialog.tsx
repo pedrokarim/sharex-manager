@@ -66,9 +66,9 @@ export function CreateAlbumDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[95vw] max-w-md mx-auto">
+      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[560px] overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
         <form onSubmit={handleSubmit}>
-          <DialogHeader>
+          <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
             <DialogTitle className="text-lg sm:text-xl">
               {t("albums.create_album")}
             </DialogTitle>
@@ -77,7 +77,7 @@ export function CreateAlbumDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 px-5 py-5 sm:px-6">
             <div className="space-y-2">
               <Label htmlFor="album-name" className="text-sm">
                 {t("albums.album_name")}
@@ -89,7 +89,7 @@ export function CreateAlbumDialog({
                 placeholder="Vacances 2024, Projet, etc."
                 required
                 disabled={loading}
-                className="text-sm"
+                className="h-11 rounded-xl border-border/70 bg-muted/20 text-sm"
               />
             </div>
 
@@ -104,25 +104,25 @@ export function CreateAlbumDialog({
                 placeholder="Description de l'album (optionnel)"
                 rows={3}
                 disabled={loading}
-                className="text-sm"
+                className="min-h-[120px] resize-none rounded-xl border-border/70 bg-muted/20 text-sm"
               />
             </div>
           </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter className="gap-2 border-t border-border/60 bg-muted/20 px-5 py-4 sm:px-6">
             <Button
               type="button"
               variant="outline"
               onClick={handleClose}
               disabled={loading}
-              className="w-full sm:w-auto text-sm"
+              className="text-sm"
             >
               {t("common.cancel")}
             </Button>
             <Button
               type="submit"
               disabled={loading || !name.trim()}
-              className="w-full sm:w-auto text-sm"
+              className="text-sm"
             >
               {loading && (
                 <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />

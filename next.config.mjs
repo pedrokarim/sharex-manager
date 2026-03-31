@@ -5,7 +5,21 @@ const nextConfig = {
         ignoreBuildErrors: true,
     },
     // Configuration Turbopack pour Next.js 16
-    turbopack: {},
+    turbopack: {
+        rules: {
+            '*.svg': {
+                loaders: [
+                    {
+                        loader: '@svgr/webpack',
+                        options: {
+                            icon: true,
+                        },
+                    },
+                ],
+                as: '*.js',
+            },
+        },
+    },
     output: 'standalone',
     webpack: (config, { isServer }) => {
         if (isServer) {

@@ -1,6 +1,4 @@
-import { theme } from "@/db/schema";
-import { InferSelectModel } from "drizzle-orm";
-import { z } from "zod";
+import * as z from "zod";
 
 export const themeStylePropsSchema = z.object({
   background: z.string().describe("The default background color, paired with `foreground`."),
@@ -108,4 +106,11 @@ export type ThemePreset = {
   };
 };
 
-export type Theme = InferSelectModel<typeof theme>;
+export interface Theme {
+  id: string;
+  userId: string;
+  name: string;
+  styles: ThemeStyles;
+  createdAt: Date;
+  updatedAt: Date;
+}

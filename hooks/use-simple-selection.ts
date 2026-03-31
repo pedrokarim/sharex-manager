@@ -16,32 +16,26 @@ export function useSimpleSelection({
     (fileName: string) => {
       return selectedFiles.has(fileName);
     },
-    [selectedFiles]
+    [selectedFiles],
   );
 
   const toggleFile = useCallback(
     (fileName: string) => {
-      if (!enabled) return;
-
-      console.log("Simple toggle:", fileName);
-
       setSelectedFiles((prev) => {
         const newSet = new Set(prev);
         if (newSet.has(fileName)) {
           newSet.delete(fileName);
-          console.log("Removed:", fileName, "New size:", newSet.size);
           // Si la sélection devient vide, appeler le callback
           if (newSet.size === 0 && onSelectionEmpty) {
             setTimeout(() => onSelectionEmpty(), 0);
           }
         } else {
           newSet.add(fileName);
-          console.log("Added:", fileName, "New size:", newSet.size);
         }
         return newSet;
       });
     },
-    [enabled, onSelectionEmpty]
+    [onSelectionEmpty],
   );
 
   const clearSelection = useCallback(() => {
@@ -60,7 +54,35 @@ export function useSimpleSelection({
       }
       setSelectedFiles(new Set(files.map((f) => f.name)));
     },
-    [enabled]
+    [enabled],
+  );
+
+  const selectFiles = useCallback((fileNames: string[]) => {
+    if (!fileNames?.length) return;
+
+    setSelectedFiles((prev) => {
+      const newSet = new Set(prev);
+      fileNames.forEach((fileName) => newSet.add(fileName));
+      return newSet;
+    });
+  }, []);
+
+  const deselectFiles = useCallback(
+    (fileNames: string[]) => {
+      if (!fileNames?.length) return;
+
+      setSelectedFiles((prev) => {
+        const newSet = new Set(prev);
+        fileNames.forEach((fileName) => newSet.delete(fileName));
+
+        if (newSet.size === 0 && onSelectionEmpty) {
+          setTimeout(() => onSelectionEmpty(), 0);
+        }
+
+        return newSet;
+      });
+    },
+    [onSelectionEmpty],
   );
 
   const getSelectedFiles = useCallback(() => {
@@ -72,13 +94,13 @@ export function useSimpleSelection({
       if (!files || !Array.isArray(files)) {
         console.warn(
           "getSelectedFilesData: files is undefined or not an array",
-          files
+          files,
         );
         return [];
       }
       return files.filter((file) => selectedFiles.has(file.name));
     },
-    [selectedFiles]
+    [selectedFiles],
   );
 
   return {
@@ -88,6 +110,8 @@ export function useSimpleSelection({
     toggleFile,
     clearSelection,
     selectAll,
+    selectFiles,
+    deselectFiles,
     getSelectedFiles,
     getSelectedFilesData,
   };

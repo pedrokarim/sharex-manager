@@ -29,8 +29,8 @@ export function GeneralTab({ form }: GeneralTabProps) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card>
-        <CardHeader className="p-4 sm:p-6">
+      <Card className="rounded-2xl border-border/70 shadow-sm">
+        <CardHeader className="border-b border-border/60 p-4 sm:p-6">
           <CardTitle className="text-base sm:text-lg">
             {t("uploads.config.general.allowed_types.title")}
           </CardTitle>
@@ -43,7 +43,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
             control={form.control}
             name="allowedTypes.images"
             render={({ field }) => (
-              <FormItem className="flex items-center justify-between">
+              <FormItem className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 p-4">
                 <FormLabel className="text-sm">
                   {t("uploads.config.general.allowed_types.images")}
                 </FormLabel>
@@ -60,7 +60,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
             control={form.control}
             name="allowedTypes.documents"
             render={({ field }) => (
-              <FormItem className="flex items-center justify-between">
+              <FormItem className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 p-4">
                 <FormLabel className="text-sm">
                   {t("uploads.config.general.allowed_types.documents")}
                 </FormLabel>
@@ -77,7 +77,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
             control={form.control}
             name="allowedTypes.archives"
             render={({ field }) => (
-              <FormItem className="flex items-center justify-between">
+              <FormItem className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 p-4">
                 <FormLabel className="text-sm">
                   {t("uploads.config.general.allowed_types.archives")}
                 </FormLabel>
@@ -93,8 +93,8 @@ export function GeneralTab({ form }: GeneralTabProps) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="p-4 sm:p-6">
+      <Card className="rounded-2xl border-border/70 shadow-sm">
+        <CardHeader className="border-b border-border/60 p-4 sm:p-6">
           <CardTitle className="text-base sm:text-lg">
             {t("uploads.config.general.limits.title")}
           </CardTitle>
@@ -108,7 +108,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
               control={form.control}
               name="limits.maxFileSize"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
                   <FormLabel className="text-sm">
                     {t("uploads.config.general.limits.max_file_size")}
                   </FormLabel>
@@ -129,7 +129,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
               control={form.control}
               name="limits.minFileSize"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
                   <FormLabel className="text-sm">
                     {t("uploads.config.general.limits.min_file_size")}
                   </FormLabel>
@@ -150,7 +150,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
               control={form.control}
               name="limits.maxFilesPerUpload"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
                   <FormLabel className="text-sm">
                     {t("uploads.config.general.limits.max_files_per_upload")}
                   </FormLabel>
@@ -171,7 +171,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
               control={form.control}
               name="limits.maxFilesPerType.images"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
                   <FormLabel className="text-sm">
                     {t("uploads.config.general.limits.max_images")}
                   </FormLabel>
@@ -192,7 +192,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
               control={form.control}
               name="limits.maxFilesPerType.documents"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
                   <FormLabel className="text-sm">
                     {t("uploads.config.general.limits.max_documents")}
                   </FormLabel>
@@ -213,7 +213,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
               control={form.control}
               name="limits.maxFilesPerType.archives"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
                   <FormLabel className="text-sm">
                     {t("uploads.config.general.limits.max_archives")}
                   </FormLabel>
@@ -233,8 +233,8 @@ export function GeneralTab({ form }: GeneralTabProps) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="p-4 sm:p-6">
+      <Card className="rounded-2xl border-border/70 shadow-sm">
+        <CardHeader className="border-b border-border/60 p-4 sm:p-6">
           <CardTitle className="text-base sm:text-lg">
             {t("uploads.config.general.filename.title")}
           </CardTitle>
@@ -247,7 +247,7 @@ export function GeneralTab({ form }: GeneralTabProps) {
             control={form.control}
             name="filenamePattern"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
                 <FormLabel className="text-sm">
                   {t("uploads.config.general.filename.pattern")}
                 </FormLabel>

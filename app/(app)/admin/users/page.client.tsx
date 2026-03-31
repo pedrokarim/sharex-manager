@@ -1,16 +1,20 @@
 "use client";
 
+import { useSession } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import { UserDialog } from "@/components/user-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,13 +26,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useSession } from "next-auth/react";
-import { UserDialog } from "@/components/user-dialog";
-import { useState, useEffect } from "react";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Search, UserPlus, Users, Shield, RefreshCw } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -36,7 +33,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useTranslation } from "@/lib/i18n";
+import { RefreshCw, Search, Shield, UserPlus, Users } from "lucide-react";
 
 interface User {
   id: string;
@@ -71,6 +77,7 @@ export default function UsersPageClient({
       const matchesRole = roleFilter === "all" || user.role === roleFilter;
       return matchesSearch && matchesRole;
     });
+
     setFilteredUsers(filtered);
   }, [users, searchQuery, roleFilter]);
 
@@ -85,11 +92,15 @@ export default function UsersPageClient({
         throw new Error(error.error || t("admin.users.errors.generic"));
       }
 
-      setUsers((users) => users.filter((user) => user.id !== userId));
+      setUsers((currentUsers) =>
+        currentUsers.filter((user) => user.id !== userId),
+      );
       toast.success(t("admin.users.messages.delete_success"));
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : t("admin.users.errors.generic")
+        error instanceof Error
+          ? error.message
+          : t("admin.users.errors.generic"),
       );
     }
   };
@@ -109,85 +120,107 @@ export default function UsersPageClient({
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Stats Cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
-            <CardTitle className="text-xs sm:text-sm font-medium">
-              {t("admin.users.stats.total")}
-            </CardTitle>
-            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-xl sm:text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
-            <CardTitle className="text-xs sm:text-sm font-medium">
-              {t("admin.users.stats.admins")}
-            </CardTitle>
-            <Shield className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-xl sm:text-2xl font-bold">{stats.admins}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
-            <CardTitle className="text-xs sm:text-sm font-medium">
-              {t("admin.users.stats.users")}
-            </CardTitle>
-            <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-xl sm:text-2xl font-bold">{stats.users}</div>
-          </CardContent>
-        </Card>
-      </div>
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+              <Users className="h-3.5 w-3.5" />
+              Gestion des accès
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {t("admin.users.title")}
+            </h1>
+            <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+              Gérez les comptes, les rôles et les interventions sur les accès
+              sans perdre le fil de l’exploitation.
+            </p>
+          </div>
 
-      {/* Main Content */}
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 p-4 sm:p-6">
-          <CardTitle className="text-lg sm:text-xl">
-            {t("admin.users.title")}
-          </CardTitle>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               variant="outline"
-              size="icon"
               onClick={refreshUsers}
               disabled={isLoading}
-              className="h-8 w-8 sm:h-9 sm:w-9"
+              className="text-sm"
             >
               <RefreshCw
-                className={`h-3 w-3 sm:h-4 sm:w-4 ${
-                  isLoading ? "animate-spin" : ""
-                }`}
+                className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
               />
+              Rafraîchir
             </Button>
-            <UserDialog onSuccess={refreshUsers} />
+            <UserDialog
+              onSuccess={refreshUsers}
+              trigger={
+                <Button className="text-sm">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Ajouter un utilisateur
+                </Button>
+              }
+            />
           </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              {t("admin.users.stats.total")}
+            </p>
+            <p className="mt-2 text-2xl font-semibold">{stats.total}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Comptes actuellement disponibles dans l’instance.
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              {t("admin.users.stats.admins")}
+            </p>
+            <p className="mt-2 text-2xl font-semibold">{stats.admins}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Utilisateurs ayant accès aux panneaux sensibles.
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              {t("admin.users.stats.users")}
+            </p>
+            <p className="mt-2 text-2xl font-semibold">{stats.users}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Comptes standard pour l’usage quotidien de la plateforme.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <Card className="rounded-2xl border-border/70 shadow-sm">
+        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
+          <CardTitle className="text-lg sm:text-xl">
+            Répertoire des comptes
+          </CardTitle>
+          <CardDescription className="text-sm">
+            Filtrez rapidement les utilisateurs avant d’éditer un rôle ou de
+            supprimer un accès.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          <div className="mb-4 flex flex-col space-y-3 sm:space-y-4 md:flex-row md:items-center md:space-x-4 md:space-y-0">
-            <div className="relative flex-1">
-              <Search className="absolute left-2 top-2.5 h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+        <CardContent className="space-y-4 p-5 sm:p-6">
+          <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder={t("admin.users.search_placeholder")}
-                className="pl-7 sm:pl-8 text-sm"
+                className="pl-9 text-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+
             <Select
               value={roleFilter}
               onValueChange={(value: "all" | "admin" | "user") =>
                 setRoleFilter(value)
               }
             >
-              <SelectTrigger className="w-full sm:w-[180px] text-sm">
+              <SelectTrigger className="text-sm">
                 <SelectValue placeholder={t("admin.users.filter_by_role")} />
               </SelectTrigger>
               <SelectContent>
@@ -204,7 +237,7 @@ export default function UsersPageClient({
             </Select>
           </div>
 
-          <div className="rounded-md border overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-border/60">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -225,16 +258,19 @@ export default function UsersPageClient({
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
                       <TableCell>
-                        <Skeleton className="h-3 w-16 sm:h-4 sm:w-24" />
+                        <Skeleton className="h-4 w-20" />
                       </TableCell>
                       <TableCell>
-                        <Skeleton className="h-3 w-20 sm:h-4 sm:w-32" />
+                        <Skeleton className="h-4 w-32" />
                       </TableCell>
                       <TableCell>
-                        <Skeleton className="h-3 w-12 sm:h-4 sm:w-16" />
+                        <Skeleton className="h-4 w-20" />
                       </TableCell>
                       <TableCell>
-                        <Skeleton className="h-6 w-20 sm:h-8 sm:w-32" />
+                        <div className="flex justify-end gap-2">
+                          <Skeleton className="h-8 w-16" />
+                          <Skeleton className="h-8 w-20" />
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -242,7 +278,7 @@ export default function UsersPageClient({
                   <TableRow>
                     <TableCell
                       colSpan={4}
-                      className="text-center py-6 sm:py-8 text-muted-foreground text-sm"
+                      className="py-12 text-center text-sm text-muted-foreground"
                     >
                       {t("admin.users.no_users_found")}
                     </TableCell>
@@ -250,13 +286,17 @@ export default function UsersPageClient({
                 ) : (
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-mono text-xs sm:text-sm">
-                        <span className="hidden sm:inline">{user.id}</span>
-                        <span className="sm:hidden">
-                          {user.id.slice(0, 8)}...
+                      <TableCell className="text-xs sm:text-sm">
+                        <span className="inline-flex rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 font-mono">
+                          <span className="hidden sm:inline">{user.id}</span>
+                          <span className="sm:hidden">
+                            {user.id.slice(0, 8)}...
+                          </span>
                         </span>
                       </TableCell>
-                      <TableCell className="text-sm truncate max-w-[200px]">{user.username}</TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {user.username}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant={
@@ -264,13 +304,18 @@ export default function UsersPageClient({
                           }
                           className="text-xs"
                         >
-                          {user.role === "admin"
-                            ? t("admin.users.roles.admin_label")
-                            : t("admin.users.roles.user_label")}
+                          {user.role === "admin" ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Shield className="h-3 w-3" />
+                              {t("admin.users.roles.admin_label")}
+                            </span>
+                          ) : (
+                            t("admin.users.roles.user_label")
+                          )}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end space-x-1 sm:space-x-2">
+                        <div className="flex justify-end gap-2">
                           <UserDialog
                             user={user}
                             onSuccess={refreshUsers}
@@ -278,7 +323,7 @@ export default function UsersPageClient({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="text-xs h-7 sm:h-8"
+                                className="text-xs"
                               >
                                 {t("admin.users.actions.edit")}
                               </Button>
@@ -290,13 +335,13 @@ export default function UsersPageClient({
                                 <Button
                                   variant="destructive"
                                   size="sm"
-                                  className="text-xs h-7 sm:h-8"
+                                  className="text-xs"
                                 >
                                   {t("admin.users.actions.delete")}
                                 </Button>
                               </AlertDialogTrigger>
-                              <AlertDialogContent className="w-[95vw] max-w-md">
-                                <AlertDialogHeader>
+                              <AlertDialogContent className="w-[calc(100vw-1.5rem)] max-w-md overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+                                <AlertDialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
                                   <AlertDialogTitle className="text-lg">
                                     {t("admin.users.delete_dialog.title")}
                                   </AlertDialogTitle>
@@ -304,13 +349,13 @@ export default function UsersPageClient({
                                     {t("admin.users.delete_dialog.description")}
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
-                                <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                                  <AlertDialogCancel className="w-full sm:w-auto text-sm">
+                                <AlertDialogFooter className="gap-2 px-5 py-4 sm:px-6">
+                                  <AlertDialogCancel className="text-sm">
                                     {t("common.cancel")}
                                   </AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => handleDelete(user.id)}
-                                    className="w-full sm:w-auto text-sm"
+                                    className="text-sm"
                                   >
                                     {t("admin.users.actions.delete")}
                                   </AlertDialogAction>

@@ -48,8 +48,8 @@ export function DateRangeFilter() {
             variant="outline"
             size="icon"
             className={cn(
-              "h-8 w-8 backdrop-blur-md border border-white/20 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all duration-200",
-              hasDateFilter && "w-auto px-2 gap-1.5"
+              "h-9 w-9 rounded-xl border border-border/60 bg-background shadow-sm transition-colors hover:bg-muted/70",
+              hasDateFilter && "w-auto gap-1.5 px-3",
             )}
           >
             <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />

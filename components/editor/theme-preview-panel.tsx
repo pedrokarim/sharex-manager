@@ -2,7 +2,7 @@
 
 import ShadcnBlocksLogo from "@/assets/shadcnblocks.svg";
 import { HorizontalScrollArea } from "@/components/horizontal-scroll-area";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { EditorThemeToggle } from "@/components/editor/editor-theme-toggle";
 import { TooltipWrapper } from "@/components/tooltip-wrapper";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,7 +66,7 @@ const ThemePreviewPanel = ({
       const themeState = {
         currentMode,
         styles,
-        preset: null,
+        preset: undefined,
         hslAdjustments: { hueShift: 0, saturationScale: 1, lightnessScale: 1 },
       };
       applyThemeToElement(themeState, rootRef.current);
@@ -122,7 +122,7 @@ const ThemePreviewPanel = ({
 
             <div className="flex items-center gap-0.5">
               {isFullscreen && (
-                <ThemeToggle
+                <EditorThemeToggle
                   variant="ghost"
                   size="icon"
                   className="group size-8 hover:[&>svg]:scale-120 hover:[&>svg]:transition-all"

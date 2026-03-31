@@ -1,6 +1,7 @@
 "use client";
 
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import type { Session } from "next-auth";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -8,8 +9,17 @@ import { useState, type ReactNode, Suspense } from "react";
 import { TranslationProvider } from "./providers/TranslationProvider";
 import { ChatProvider } from "@/hooks/use-chat-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import type { ResolvedThemePayload } from "@/types/theme-runtime";
 
-export function Providers({ children }: { children: ReactNode }) {
+export function Providers({
+  children,
+  initialTheme,
+  session,
+}: {
+  children: ReactNode;
+  initialTheme: ResolvedThemePayload;
+  session: Session | null;
+}) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -27,13 +37,13 @@ export function Providers({ children }: { children: ReactNode }) {
       <ChatProvider>
         <Suspense fallback={null}>
           <NuqsAdapter>
-            <ThemeProvider>
-              <TranslationProvider>
-                <SessionProvider>
+            <SessionProvider session={session}>
+              <ThemeProvider initialTheme={initialTheme}>
+                <TranslationProvider>
                   <TooltipProvider delayDuration={150}>{children}</TooltipProvider>
-                </SessionProvider>
-              </TranslationProvider>
-            </ThemeProvider>
+                </TranslationProvider>
+              </ThemeProvider>
+            </SessionProvider>
           </NuqsAdapter>
         </Suspense>
       </ChatProvider>

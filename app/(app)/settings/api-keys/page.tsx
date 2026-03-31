@@ -1,33 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
-import {
-  Plus,
-  Key,
-  Trash2,
-  Copy,
-  Eye,
-  EyeOff,
-  Loader2,
-  Info,
-} from "lucide-react";
 import { format } from "date-fns";
-import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import { ApiKey } from "@/types/api-key";
+import { useTranslation } from "@/lib/i18n";
+import { useDateLocale } from "@/lib/i18n/date-locales";
 import { CreateApiKeyDialog } from "@/components/api-keys/create-api-key-dialog";
+import { ApiKeyDetailsDialog } from "@/components/api-keys/api-key-details-dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,14 +29,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { ApiKeyDetailsDialog } from "@/components/api-keys/api-key-details-dialog";
-import { useTranslation } from "@/lib/i18n";
-import { useDateLocale } from "@/lib/i18n/date-locales";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Copy,
+  Eye,
+  EyeOff,
+  Info,
+  KeyRound,
+  Loader2,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 export default function ApiKeysPage() {
   const { t } = useTranslation();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -62,6 +67,20 @@ export default function ApiKeysPage() {
 
     fetchKeys();
   }, [status]);
+
+  const summary = useMemo(() => {
+    const now = new Date();
+    const expired = keys.filter(
+      (key) => key.expiresAt && new Date(key.expiresAt) < now,
+    ).length;
+    const permanent = keys.filter((key) => !key.expiresAt).length;
+
+    return {
+      total: keys.length,
+      active: keys.length - expired,
+      permanent,
+    };
+  }, [keys]);
 
   const fetchKeys = async () => {
     try {
@@ -100,235 +119,265 @@ export default function ApiKeysPage() {
   };
 
   return (
-    <>
-      <div className="flex flex-col h-full">
-        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold">
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+              <KeyRound className="h-3.5 w-3.5" />
+              Accès programmatiques
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               {t("settings.sections.api_keys.title")}
             </h1>
-            <p className="text-muted-foreground text-sm sm:text-base">
-              {t("settings.sections.api_keys.description")}
+            <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+              Distribuez des clés d’upload avec un vrai panneau de contrôle:
+              visibilité, durée de vie et permissions lisibles d’un coup d’œil.
             </p>
           </div>
-          <Button
-            onClick={() => setShowCreateDialog(true)}
-            className="w-full sm:w-auto text-sm"
-          >
-            <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+
+          <Button onClick={() => setShowCreateDialog(true)} className="text-sm">
+            <Plus className="mr-2 h-4 w-4" />
             {t("settings.api_keys.new_key")}
           </Button>
         </div>
 
-        <div className="rounded-lg border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs sm:text-sm">
-                  {t("settings.api_keys.table.name")}
-                </TableHead>
-                <TableHead className="text-xs sm:text-sm">
-                  {t("settings.api_keys.table.key")}
-                </TableHead>
-                <TableHead className="text-xs sm:text-sm hidden sm:table-cell">
-                  {t("settings.api_keys.table.created_at")}
-                </TableHead>
-                <TableHead className="text-xs sm:text-sm hidden lg:table-cell">
-                  {t("settings.api_keys.table.expires_at")}
-                </TableHead>
-                <TableHead className="text-xs sm:text-sm hidden lg:table-cell">
-                  {t("settings.api_keys.table.permissions")}
-                </TableHead>
-                <TableHead className="text-xs sm:text-sm hidden xl:table-cell">
-                  {t("settings.api_keys.table.last_used")}
-                </TableHead>
-                <TableHead className="text-right text-xs sm:text-sm">
-                  {t("settings.api_keys.table.actions")}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              Catalogue
+            </p>
+            <p className="mt-2 text-2xl font-semibold">{summary.total}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Clés actuellement enregistrées pour les intégrations.
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              Actives
+            </p>
+            <p className="mt-2 text-2xl font-semibold">{summary.active}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Clés encore utilisables selon leur date d’expiration.
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              Permanentes
+            </p>
+            <p className="mt-2 text-2xl font-semibold">{summary.permanent}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Clés sans date limite, à surveiller plus attentivement.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <Card className="rounded-2xl border-border/70 shadow-sm">
+        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
+          <CardTitle className="text-lg sm:text-xl">
+            Registre des clés
+          </CardTitle>
+          <CardDescription className="text-sm">
+            Consultez les permissions, les dates et les actions disponibles sans
+            vous perdre dans une table brute.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-5 sm:p-6">
+          <div className="overflow-x-auto rounded-xl border border-border/60">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7}>
-                    <div className="flex flex-col items-center justify-center gap-2 py-8">
-                      <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        {t("settings.api_keys.loading")}
-                      </p>
-                    </div>
-                  </TableCell>
+                  <TableHead className="text-xs sm:text-sm">
+                    {t("settings.api_keys.table.name")}
+                  </TableHead>
+                  <TableHead className="text-xs sm:text-sm">
+                    {t("settings.api_keys.table.key")}
+                  </TableHead>
+                  <TableHead className="hidden text-xs sm:table-cell sm:text-sm">
+                    {t("settings.api_keys.table.created_at")}
+                  </TableHead>
+                  <TableHead className="hidden text-xs lg:table-cell sm:text-sm">
+                    {t("settings.api_keys.table.expires_at")}
+                  </TableHead>
+                  <TableHead className="hidden text-xs lg:table-cell sm:text-sm">
+                    {t("settings.api_keys.table.permissions")}
+                  </TableHead>
+                  <TableHead className="hidden text-xs xl:table-cell sm:text-sm">
+                    {t("settings.api_keys.table.last_used")}
+                  </TableHead>
+                  <TableHead className="text-right text-xs sm:text-sm">
+                    {t("settings.api_keys.table.actions")}
+                  </TableHead>
                 </TableRow>
-              ) : keys.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7}>
-                    <Empty className="py-6">
-                      <EmptyHeader>
-                        <EmptyMedia variant="icon">
-                          <Key className="h-5 w-5" />
-                        </EmptyMedia>
-                        <EmptyTitle>
-                          {t("settings.api_keys.no_keys.title")}
-                        </EmptyTitle>
-                        <EmptyDescription>
-                          {t("settings.api_keys.no_keys.description")}
-                        </EmptyDescription>
-                      </EmptyHeader>
-                      <Button
-                        onClick={() => setShowCreateDialog(true)}
-                        className="text-sm"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        {t("settings.api_keys.create_key")}
-                      </Button>
-                    </Empty>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                keys.map((key) => (
-                  <TableRow key={key.id}>
-                    <TableCell className="font-medium text-xs sm:text-sm">
-                      <Button
-                        variant="link"
-                        className="p-0 text-xs sm:text-sm"
-                        onClick={() => setSelectedKeyForDetails(key)}
-                      >
-                        {key.name}
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 sm:gap-2">
-                        <code className="rounded bg-muted px-1 sm:px-2 py-1 text-xs">
-                          {showKey === key.id ? key.key : "••••••••"}
-                        </code>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 sm:h-8 sm:w-8"
-                          onClick={() =>
-                            setShowKey(showKey === key.id ? null : key.id)
-                          }
-                        >
-                          {showKey === key.id ? (
-                            <EyeOff className="h-3 w-3 sm:h-4 sm:w-4" />
-                          ) : (
-                            <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 sm:h-8 sm:w-8"
-                          onClick={() => copyToClipboard(key.key)}
-                        >
-                          <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs sm:text-sm hidden sm:table-cell">
-                      {format(new Date(key.createdAt), "dd/MM/yyyy", {
-                        locale,
-                      })}
-                    </TableCell>
-                    <TableCell className="text-xs sm:text-sm hidden lg:table-cell">
-                      {key.expiresAt
-                        ? format(new Date(key.expiresAt), "dd/MM/yyyy", {
-                            locale,
-                          })
-                        : t("settings.api_keys.never")}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="flex flex-wrap gap-1">
-                        {key.permissions.uploadImages && (
-                          <Badge variant="secondary" className="text-xs">
-                            {t("settings.api_keys.permissions.images")}
-                          </Badge>
-                        )}
-                        {key.permissions.uploadText && (
-                          <Badge variant="secondary" className="text-xs">
-                            {t("settings.api_keys.permissions.text")}
-                          </Badge>
-                        )}
-                        {key.permissions.uploadFiles && (
-                          <Badge variant="secondary" className="text-xs">
-                            {t("settings.api_keys.permissions.files")}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs sm:text-sm hidden xl:table-cell">
-                      {key.lastUsed
-                        ? format(new Date(key.lastUsed), "dd/MM/yyyy HH:mm", {
-                            locale,
-                          })
-                        : t("settings.api_keys.never")}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1 sm:gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 sm:h-8 sm:w-8"
-                          onClick={() => setSelectedKeyForDetails(key)}
-                          title={t("settings.api_keys.actions.view_details")}
-                        >
-                          <Info className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 sm:h-8 sm:w-8 text-destructive"
-                          onClick={() => setSelectedKeyId(key.id)}
-                          title={t("settings.api_keys.actions.delete")}
-                        >
-                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7}>
+                      <div className="flex flex-col items-center justify-center gap-2 py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.api_keys.loading")}
+                        </p>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : keys.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="py-12 text-center text-sm text-muted-foreground"
+                    >
+                      {t("settings.api_keys.no_keys.description")}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  keys.map((key) => (
+                    <TableRow key={key.id}>
+                      <TableCell className="text-sm font-medium">
+                        <Button
+                          variant="link"
+                          className="h-auto p-0 text-sm"
+                          onClick={() => setSelectedKeyForDetails(key)}
+                        >
+                          {key.name}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <code className="rounded-full border border-border/60 bg-muted/30 px-3 py-1 text-xs">
+                            {showKey === key.id ? key.key : "••••••••"}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() =>
+                              setShowKey(showKey === key.id ? null : key.id)
+                            }
+                          >
+                            {showKey === key.id ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => copyToClipboard(key.key)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden text-xs sm:table-cell sm:text-sm">
+                        {format(new Date(key.createdAt), "dd/MM/yyyy", {
+                          locale,
+                        })}
+                      </TableCell>
+                      <TableCell className="hidden text-xs lg:table-cell sm:text-sm">
+                        {key.expiresAt
+                          ? format(new Date(key.expiresAt), "dd/MM/yyyy", {
+                              locale,
+                            })
+                          : t("settings.api_keys.never")}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {key.permissions.uploadImages && (
+                            <Badge variant="secondary" className="text-xs">
+                              {t("settings.api_keys.permissions.images")}
+                            </Badge>
+                          )}
+                          {key.permissions.uploadText && (
+                            <Badge variant="secondary" className="text-xs">
+                              {t("settings.api_keys.permissions.text")}
+                            </Badge>
+                          )}
+                          {key.permissions.uploadFiles && (
+                            <Badge variant="secondary" className="text-xs">
+                              {t("settings.api_keys.permissions.files")}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden text-xs xl:table-cell sm:text-sm">
+                        {key.lastUsed
+                          ? format(new Date(key.lastUsed), "dd/MM/yyyy HH:mm", {
+                              locale,
+                            })
+                          : t("settings.api_keys.never")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setSelectedKeyForDetails(key)}
+                            title={t("settings.api_keys.actions.view_details")}
+                          >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => setSelectedKeyId(key.id)}
+                            title={t("settings.api_keys.actions.delete")}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
-        <CreateApiKeyDialog
-          open={showCreateDialog}
-          onOpenChange={setShowCreateDialog}
-          onSuccess={() => {
-            setShowCreateDialog(false);
-            fetchKeys();
-          }}
-        />
+      <CreateApiKeyDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onSuccess={() => {
+          setShowCreateDialog(false);
+          fetchKeys();
+        }}
+      />
 
-        <AlertDialog
-          open={!!selectedKeyId}
-          onOpenChange={(open) => !open && setSelectedKeyId(null)}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t("common.confirm")}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {t("settings.api_keys.delete_confirmation")}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => selectedKeyId && handleDelete(selectedKeyId)}
-              >
-                {t("common.delete")}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+      <AlertDialog
+        open={!!selectedKeyId}
+        onOpenChange={(open) => !open && setSelectedKeyId(null)}
+      >
+        <AlertDialogContent className="w-[calc(100vw-1.5rem)] max-w-md overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+          <AlertDialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
+            <AlertDialogTitle>{t("common.confirm")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("settings.api_keys.delete_confirmation")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 px-5 py-4 sm:px-6">
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => selectedKeyId && handleDelete(selectedKeyId)}
+            >
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-        <ApiKeyDetailsDialog
-          apiKey={selectedKeyForDetails}
-          open={!!selectedKeyForDetails}
-          onOpenChange={(open) => !open && setSelectedKeyForDetails(null)}
-        />
-      </div>
-    </>
+      <ApiKeyDetailsDialog
+        apiKey={selectedKeyForDetails}
+        open={!!selectedKeyForDetails}
+        onOpenChange={(open) => !open && setSelectedKeyForDetails(null)}
+      />
+    </div>
   );
 }

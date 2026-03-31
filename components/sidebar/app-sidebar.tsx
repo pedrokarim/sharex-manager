@@ -230,6 +230,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             url: "/admin/logs",
           },
           {
+            title: "Thème global",
+            url: "/admin/theme",
+          },
+          {
             title: t("sidebar.admin.system_config"),
             url: "/admin/system",
           },

@@ -3,7 +3,6 @@
 import { MouseEvent } from "react";
 import { Check } from "lucide-react";
 import { FileCard } from "@/components/file-card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { FileContextMenu } from "@/components/gallery/file-context-menu";
 import { MultiSelectContextMenu } from "@/components/gallery/multi-select-context-menu";
 import { AlbumIndicator } from "@/components/gallery/album-indicator";
@@ -21,7 +20,7 @@ interface SelectableFileCardProps {
   onToggleSelection?: (
     fileName: string,
     ctrlKey: boolean,
-    shiftKey: boolean
+    shiftKey: boolean,
   ) => void;
   onAddToAlbum?: () => void;
   onCreateAlbum?: (fileName?: string) => void;
@@ -74,22 +73,13 @@ export function SelectableFileCard({
   onStartSelectionMode,
   fileAlbums = [],
 }: SelectableFileCardProps) {
-  const handleClick = (e: MouseEvent<HTMLDivElement>) => {
-    console.log("Click debug:", {
-      fileName: file.name,
-      isSelectionMode,
-      isSelected,
-      hasOnToggleSelection: !!onToggleSelection,
-      hasOnSelect: !!onSelect,
-      ctrlKey: e.ctrlKey,
-      metaKey: e.metaKey,
-    });
+  const showSelectionControl =
+    isSelectionMode || showSelectionCheckbox || isSelected;
 
-    // Si Ctrl + clic gauche et pas en mode sélection, activer le mode sélection
+  const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     if ((e.ctrlKey || e.metaKey) && !isSelectionMode && onStartSelectionMode) {
       e.preventDefault();
       e.stopPropagation();
-      console.log("Starting selection mode for:", file.name);
       onStartSelectionMode(file.name);
       return;
     }
@@ -97,19 +87,79 @@ export function SelectableFileCard({
     if (isSelectionMode && onToggleSelection) {
       e.preventDefault();
       e.stopPropagation();
-      console.log("Calling toggle for:", file.name);
       onToggleSelection(file.name, e.ctrlKey || e.metaKey, e.shiftKey);
     } else {
-      console.log("Calling onSelect");
       onSelect?.();
     }
   };
 
-  const handleCheckboxChange = (checked: boolean) => {
-    if (onToggleSelection) {
-      onToggleSelection(file.name, true, false); // Simulate Ctrl+Click pour toggle
+  const handleSelectionControlClick = (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isSelectionMode) {
+      onStartSelectionMode?.(file.name);
+      return;
     }
+
+    onToggleSelection?.(file.name, e.ctrlKey || e.metaKey, e.shiftKey);
   };
+
+  const cardContent = (
+    <div
+      className={cn(
+        "relative group cursor-pointer transition-all duration-200",
+        isSelected && "ring-2 ring-primary ring-offset-2",
+      )}
+      onClick={handleClick}
+    >
+      {isSelected && (
+        <div className="absolute inset-0 z-10 rounded-lg bg-primary/10 pointer-events-none" />
+      )}
+
+      {(onStartSelectionMode || onToggleSelection) && (
+        <button
+          type="button"
+          aria-label={
+            isSelected ? "Retirer de la sélection" : "Ajouter à la sélection"
+          }
+          aria-pressed={isSelected}
+          tabIndex={showSelectionControl ? 0 : -1}
+          className={cn(
+            "absolute left-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur-md transition-all duration-200",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2",
+            showSelectionControl
+              ? "pointer-events-auto scale-100 opacity-100"
+              : "pointer-events-none scale-90 opacity-0 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100",
+            isSelected
+              ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+              : "border-white/60 bg-background/85 text-foreground shadow-lg shadow-black/15 hover:border-primary/50 hover:bg-background dark:border-white/15 dark:bg-black/55 dark:text-white",
+          )}
+          onClick={handleSelectionControlClick}
+        >
+          {isSelected ? (
+            <Check className="h-4 w-4" />
+          ) : (
+            <span className="h-3.5 w-3.5 rounded-full border-2 border-current/80" />
+          )}
+        </button>
+      )}
+
+      <FileCard
+        file={file}
+        onDelete={onDelete}
+        onCopy={onCopy}
+        onSelect={isSelectionMode ? undefined : onSelect}
+        onToggleSecurity={onToggleSecurity}
+        onToggleStar={onToggleStar}
+        isNew={isNew}
+        size={size}
+        albumIndicator={
+          <AlbumIndicator fileName={file.name} albums={fileAlbums} />
+        }
+      />
+    </div>
+  );
 
   // Choisir le bon context menu en fonction du mode
   if (isSelectionMode && selectedCount > 0) {
@@ -132,66 +182,7 @@ export function SelectableFileCard({
         onAddToSpecificAlbum={onAddToSpecificAlbum}
         enabled={true}
       >
-        <div
-          className={cn(
-            "relative group transition-all duration-200",
-            isSelected && "ring-2 ring-primary ring-offset-2",
-            (isSelectionMode || showSelectionCheckbox) && "cursor-pointer"
-          )}
-          onClick={handleClick}
-        >
-          {/* Overlay de sélection */}
-          {isSelected && (
-            <div className="absolute inset-0 bg-primary/10 rounded-lg z-10 pointer-events-none" />
-          )}
-
-          {/* Checkbox de sélection */}
-          {(showSelectionCheckbox || (isSelectionMode && isSelected)) && (
-            <div className="absolute top-2 left-2 z-20">
-              <div
-                className={cn(
-                  "w-6 h-6 rounded border-2 bg-background/90 backdrop-blur-sm",
-                  "flex items-center justify-center transition-all",
-                  isSelected
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border hover:border-primary/50"
-                )}
-              >
-                {isSelected ? (
-                  <Check className="h-3 w-3" />
-                ) : (
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={handleCheckboxChange}
-                    className="w-4 h-4 border-0 bg-transparent"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Badge de sélection dans le coin */}
-          {isSelected && !showSelectionCheckbox && (
-            <div className="absolute top-2 right-2 z-20">
-              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                <Check className="h-3 w-3" />
-              </div>
-            </div>
-          )}
-
-          {/* FileCard original */}
-          <FileCard
-            file={file}
-            onDelete={onDelete}
-            onCopy={onCopy}
-            onSelect={isSelectionMode ? undefined : onSelect} // Désactiver le select original en mode sélection
-            onToggleSecurity={onToggleSecurity}
-            onToggleStar={onToggleStar}
-            isNew={isNew}
-            size={size}
-          />
-        </div>
+        {cardContent}
       </MultiSelectContextMenu>
     );
   }
@@ -211,69 +202,7 @@ export function SelectableFileCard({
       isSelectionMode={isSelectionMode}
       disabled={isSelectionMode}
     >
-      <div
-        className={cn(
-          "relative group transition-all duration-200",
-          isSelected && "ring-2 ring-primary ring-offset-2",
-          (isSelectionMode || showSelectionCheckbox) && "cursor-pointer"
-        )}
-        onClick={handleClick}
-      >
-        {/* Overlay de sélection */}
-        {isSelected && (
-          <div className="absolute inset-0 bg-primary/10 rounded-lg z-10 pointer-events-none" />
-        )}
-
-        {/* Checkbox de sélection */}
-        {(showSelectionCheckbox || (isSelectionMode && isSelected)) && (
-          <div className="absolute top-2 left-2 z-20">
-            <div
-              className={cn(
-                "w-6 h-6 rounded border-2 bg-background/90 backdrop-blur-sm",
-                "flex items-center justify-center transition-all",
-                isSelected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border hover:border-primary/50"
-              )}
-            >
-              {isSelected ? (
-                <Check className="h-3 w-3" />
-              ) : (
-                <Checkbox
-                  checked={isSelected}
-                  onCheckedChange={handleCheckboxChange}
-                  className="w-4 h-4 border-0 bg-transparent"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Badge de sélection dans le coin */}
-        {isSelected && !showSelectionCheckbox && (
-          <div className="absolute top-2 right-2 z-20">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-              <Check className="h-3 w-3" />
-            </div>
-          </div>
-        )}
-
-        {/* FileCard original */}
-        <FileCard
-          file={file}
-          onDelete={onDelete}
-          onCopy={onCopy}
-          onSelect={isSelectionMode ? undefined : onSelect} // Désactiver le select original en mode sélection
-          onToggleSecurity={onToggleSecurity}
-          onToggleStar={onToggleStar}
-          isNew={isNew}
-          size={size}
-          albumIndicator={
-            <AlbumIndicator fileName={file.name} albums={fileAlbums} />
-          }
-        />
-      </div>
+      {cardContent}
     </FileContextMenu>
   );
 }

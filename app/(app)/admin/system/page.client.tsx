@@ -91,7 +91,7 @@ export default function SystemPageClient() {
       if (!response.ok) {
         throw new Error(
           data.error ||
-            "Une erreur est survenue lors de l'installation des dépendances"
+            "Une erreur est survenue lors de l'installation des dépendances",
         );
       }
 
@@ -111,8 +111,12 @@ export default function SystemPageClient() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
-      <div className="mb-6 sm:mb-8">
+    <div className="w-full space-y-6">
+      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
+        <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+          <Settings className="h-3.5 w-3.5" />
+          Administration système
+        </div>
         <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
           <Settings className="h-6 w-6 sm:h-8 sm:w-8" />
           {t("admin.system.title")}
@@ -120,11 +124,11 @@ export default function SystemPageClient() {
         <p className="text-sm sm:text-base text-muted-foreground mt-2">
           {t("admin.system.description")}
         </p>
-      </div>
+      </section>
 
       {/* Statistiques système */}
-      <Card className="mb-4 sm:mb-6">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-6">
+      <Card className="rounded-2xl border-border/70 shadow-sm">
+        <CardHeader className="flex flex-col border-b border-border/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-6">
           <div>
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Server className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -149,8 +153,8 @@ export default function SystemPageClient() {
           </Button>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 pt-0">
-          <div className="space-y-4 sm:space-y-6">
-            <div className="space-y-2">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-4">
               <div className="flex justify-between text-sm">
                 <span>{t("admin.system.stats.cpu")}</span>
                 <span>{systemStats.cpuUsage}%</span>
@@ -158,7 +162,7 @@ export default function SystemPageClient() {
               <Progress value={systemStats.cpuUsage} className="h-2" />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-4">
               <div className="flex justify-between text-sm">
                 <span>{t("admin.system.stats.memory")}</span>
                 <span>{systemStats.memoryUsage}%</span>
@@ -166,7 +170,7 @@ export default function SystemPageClient() {
               <Progress value={systemStats.memoryUsage} className="h-2" />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-4">
               <div className="flex justify-between text-sm">
                 <span>{t("admin.system.stats.disk")}</span>
                 <span>{systemStats.diskUsage}%</span>
@@ -182,10 +186,10 @@ export default function SystemPageClient() {
         </CardFooter>
       </Card>
 
-      <div className="grid gap-4 sm:gap-6">
+      <div className="grid gap-6 xl:grid-cols-2">
         {/* Gestion des modules */}
-        <Card>
-          <CardHeader className="p-4 sm:p-6">
+        <Card className="rounded-2xl border-border/70 shadow-sm">
+          <CardHeader className="border-b border-border/60 p-4 sm:p-6">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Package className="h-4 w-4 sm:h-5 sm:w-5" />
               Gestion des modules
@@ -195,7 +199,7 @@ export default function SystemPageClient() {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
               <p className="text-sm">
                 Installez les dépendances NPM de tous les modules en une seule
                 fois.
@@ -216,7 +220,7 @@ export default function SystemPageClient() {
               </Button>
 
               {dependencyResults.length > 0 && (
-                <div className="mt-4 border rounded-md p-3 sm:p-4">
+                <div className="mt-4 rounded-xl border border-border/60 bg-background p-3 sm:p-4">
                   <h3 className="text-sm font-medium mb-2">
                     Résultats de l'installation
                   </h3>
@@ -242,8 +246,8 @@ export default function SystemPageClient() {
         </Card>
 
         {/* Configuration des uploads */}
-        <Card>
-          <CardHeader className="p-4 sm:p-6">
+        <Card className="rounded-2xl border-border/70 shadow-sm">
+          <CardHeader className="border-b border-border/60 p-4 sm:p-6">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
               {t("admin.system.upload_config.title")}
@@ -253,7 +257,7 @@ export default function SystemPageClient() {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
               <p className="text-sm">
                 {t("admin.system.upload_config.description")}
               </p>
@@ -267,8 +271,8 @@ export default function SystemPageClient() {
         </Card>
 
         {/* Configuration système */}
-        <Card>
-          <CardHeader className="p-4 sm:p-6">
+        <Card className="rounded-2xl border-border/70 shadow-sm xl:col-span-2">
+          <CardHeader className="border-b border-border/60 p-4 sm:p-6">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Database className="h-4 w-4 sm:h-5 sm:w-5" />
               {t("admin.system.advanced_config.title")}
@@ -278,7 +282,7 @@ export default function SystemPageClient() {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
               <p className="text-sm">
                 {t("admin.system.advanced_config.description")}
               </p>
