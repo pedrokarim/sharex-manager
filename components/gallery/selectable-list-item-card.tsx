@@ -1,4 +1,4 @@
-import { MouseEvent } from "react";
+import { DragEvent, MouseEvent } from "react";
 import { FileInfo } from "@/types/files";
 import { Button } from "../ui/button";
 import { FileContextMenu } from "@/components/gallery/file-context-menu";
@@ -83,6 +83,9 @@ export function SelectableListItemCard({
   const locale = useDateLocale();
   const showSelectionControl =
     isSelectionMode || showSelectionCheckbox || isSelected;
+  const preventNativeImageDrag = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+  };
 
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     // Si Ctrl + clic gauche et pas en mode sélection, activer le mode sélection
@@ -170,13 +173,18 @@ export function SelectableListItemCard({
 
         {/* Thumbnail */}
         <div className="flex-shrink-0">
-          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+          <div
+            className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-muted"
+            onDragStart={preventNativeImageDrag}
+          >
             {isImage ? (
               <Image
                 src={file.url}
                 alt={file.name}
                 width={48}
                 height={48}
+                draggable={false}
+                onDragStart={preventNativeImageDrag}
                 className="object-cover w-full h-full"
               />
             ) : (

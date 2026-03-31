@@ -176,7 +176,7 @@ export function ThemeModePreferencesPanel({
 
   return (
     <div className="space-y-5 rounded-2xl border border-border/60 bg-muted/20 p-4 sm:p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div className="space-y-4">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
             <Palette className="h-3.5 w-3.5" />

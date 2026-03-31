@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { DragEvent, useState } from "react";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
 import { useDateLocale } from "@/lib/i18n/date-locales";
@@ -132,7 +132,7 @@ export function FileCard({
         `/api/files?id=${encodeURIComponent(file.name)}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (!response.ok) {
@@ -150,12 +150,15 @@ export function FileCard({
   };
 
   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+  const preventNativeImageDrag = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+  };
 
   return (
     <Card
       className={cn(
         "overflow-hidden transition-all duration-500",
-        isNew && "animate-in fade-in-0 zoom-in-95"
+        isNew && "animate-in fade-in-0 zoom-in-95",
       )}
     >
       <CardHeader className="p-0">
@@ -164,10 +167,16 @@ export function FileCard({
           tabIndex={0}
           className={cn(
             "relative w-full bg-muted cursor-pointer",
-            aspectRatioClasses[size]
+            aspectRatioClasses[size],
           )}
           onClick={onSelect}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect?.(); } }}
+          onDragStart={preventNativeImageDrag}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSelect?.();
+            }
+          }}
         >
           {onToggleStar && (
             <Button
@@ -186,7 +195,7 @@ export function FileCard({
                 "transition-all duration-200",
                 file.isStarred
                   ? "text-white bg-yellow-500/40 border-yellow-500/30 hover:bg-yellow-500/50"
-                  : "text-white hover:text-white"
+                  : "text-white hover:text-white",
               )}
             >
               <Star
@@ -201,6 +210,8 @@ export function FileCard({
                 src={file.url}
                 alt={file.name}
                 fill
+                draggable={false}
+                onDragStart={preventNativeImageDrag}
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               />
@@ -220,45 +231,17 @@ export function FileCard({
       </CardHeader>
       {showFileInfo && (
         <CardContent className={cn("p-4", size === "small" && "p-2")}>
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1">
+          <div className="min-w-0">
+            <div className="flex items-start gap-2">
               <p
                 className={cn(
-                  "line-clamp-1 font-medium",
-                  size === "small" && "text-sm"
+                  "min-w-0 flex-1 line-clamp-1 font-medium",
+                  size === "small" && "text-sm",
                 )}
                 title={file.name}
               >
                 {file.name}
               </p>
-              {showFileSize && (
-                <p
-                  className={cn(
-                    "text-sm text-muted-foreground",
-                    size === "small" && "text-xs"
-                  )}
-                >
-                  {formatBytes(file.size)}
-                </p>
-              )}
-              {showUploadDate && (
-                <div className="flex items-center gap-2">
-                  <p
-                    className={cn(
-                      "text-sm text-muted-foreground",
-                      size === "small" && "text-xs"
-                    )}
-                  >
-                    {formatDistanceToNow(new Date(file.createdAt), {
-                      addSuffix: true,
-                      locale,
-                    })}
-                  </p>
-                  {albumIndicator && <>{albumIndicator}</>}
-                </div>
-              )}
-            </div>
-            <div className="flex gap-2">
               {onToggleSecurity && (
                 <Button
                   variant="ghost"
@@ -267,26 +250,56 @@ export function FileCard({
                     e.stopPropagation();
                     onToggleSecurity();
                   }}
-                  className={cn("h-8 w-8", size === "small" && "h-6 w-6")}
+                  className={cn(
+                    "mt-0.5 h-7 w-7 shrink-0 rounded-full text-muted-foreground hover:text-foreground",
+                    size === "small" && "mt-0 h-6 w-6",
+                    file.isSecure && "text-amber-500 hover:text-amber-500",
+                  )}
                 >
                   {file.isSecure ? (
                     <Lock
                       className={cn(
-                        "h-4 w-4 text-muted-foreground",
-                        size === "small" && "h-3 w-3"
+                        "h-4 w-4",
+                        size === "small" && "h-3 w-3",
                       )}
                     />
                   ) : (
                     <Unlock
                       className={cn(
-                        "h-4 w-4 text-muted-foreground",
-                        size === "small" && "h-3 w-3"
+                        "h-4 w-4",
+                        size === "small" && "h-3 w-3",
                       )}
                     />
                   )}
                 </Button>
               )}
             </div>
+            {showFileSize && (
+              <p
+                className={cn(
+                  "mt-1 text-sm text-muted-foreground",
+                  size === "small" && "mt-0.5 text-xs",
+                )}
+              >
+                {formatBytes(file.size)}
+              </p>
+            )}
+            {showUploadDate && (
+              <div className="mt-1 flex items-center gap-2">
+                <p
+                  className={cn(
+                    "text-sm text-muted-foreground",
+                    size === "small" && "text-xs",
+                  )}
+                >
+                  {formatDistanceToNow(new Date(file.createdAt), {
+                    addSuffix: true,
+                    locale,
+                  })}
+                </p>
+                {albumIndicator && <>{albumIndicator}</>}
+              </div>
+            )}
           </div>
         </CardContent>
       )}
@@ -294,12 +307,17 @@ export function FileCard({
         className={cn(
           "grid grid-cols-4 gap-2 p-4 pt-0",
           size === "small" && "p-2 pt-0 gap-1",
-          !showFileInfo && "pt-4"
+          !showFileInfo && "pt-4",
         )}
         onClick={(e) => e.stopPropagation()}
       >
         <Button variant="secondary" className="w-full" asChild>
-          <a href={file.url} download aria-label="Download file" onClick={(e) => e.stopPropagation()}>
+          <a
+            href={file.url}
+            download
+            aria-label="Download file"
+            onClick={(e) => e.stopPropagation()}
+          >
             <Download
               className={cn("mr-2 h-4 w-4", size === "small" && "mr-0 h-3 w-3")}
             />

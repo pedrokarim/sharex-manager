@@ -21,7 +21,7 @@ import {
   sortOrderAtom,
 } from "@/lib/atoms/preferences";
 import { Button } from "@/components/ui/button";
-import { ImageOff, RefreshCcw, Square, CheckSquare } from "lucide-react";
+import { Check, ImageOff, Minus, RefreshCcw } from "lucide-react";
 import { useSimpleSelection } from "@/hooks/use-simple-selection";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { SelectionToolbar } from "@/components/gallery/selection-toolbar";
@@ -57,7 +57,9 @@ import { RefreshInterval } from "@/components/refresh-interval";
 import { Loading } from "@/components/ui/loading";
 import { SortSelector } from "@/components/sort-selector";
 import { DateRangeFilter } from "@/components/gallery/date-range-filter";
+import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "@/lib/i18n";
+import { motion } from "framer-motion";
 
 interface FileInfo {
   name: string;
@@ -214,6 +216,7 @@ export function GalleryClient({
   const [isSecureUpload, setIsSecureUpload] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [activeMonthHeader, setActiveMonthHeader] = useState<string | null>(null);
   const [isAddToAlbumDialogOpen, setIsAddToAlbumDialogOpen] = useState(false);
   const [filesToAddToAlbum, setFilesToAddToAlbum] = useState<string[]>([]);
   const [availableAlbums, setAvailableAlbums] = useState<
@@ -505,6 +508,8 @@ export function GalleryClient({
     getSelectedFilesData,
     toggleFile,
     selectAll,
+    selectFiles,
+    deselectFiles,
     clearSelection,
   } = useSimpleSelection({
     enabled: isSelectionMode,
@@ -948,6 +953,26 @@ export function GalleryClient({
     [toggleFile],
   );
 
+  const handleToggleMonthSelection = useCallback(
+    (groupFiles: FileInfo[]) => {
+      const fileNames = groupFiles.map((file) => file.name);
+      const areAllGroupFilesSelected = fileNames.every((fileName) =>
+        isSelected(fileName),
+      );
+
+      if (!isSelectionMode) {
+        setIsSelectionMode(true);
+      }
+
+      if (areAllGroupFilesSelected) {
+        deselectFiles(fileNames);
+      } else {
+        selectFiles(fileNames);
+      }
+    },
+    [deselectFiles, isSelected, isSelectionMode, selectFiles],
+  );
+
   const handleShowHelp = useCallback(() => {
     // TODO: Ouvrir le modal d'aide des raccourcis
     toast.info("Aide des raccourcis clavier (À implémenter)");
@@ -983,97 +1008,45 @@ export function GalleryClient({
       ? t("gallery.starred_files")
       : t("gallery.title");
 
-  const galleryEyebrow = secureOnly
-    ? "Fichiers protégés"
-    : starredOnly
-      ? "Sélection personnelle"
-      : "Bibliothèque active";
-
-  const galleryDescription = secureOnly
-    ? "Rassemblez ici les éléments sécurisés sans perdre les outils de tri, de filtrage et de sélection."
-    : starredOnly
-      ? "Travaillez vos favoris comme une collection à part entière, avec les mêmes commandes de vue et d’action."
-      : "Pilotez toute la bibliothèque depuis un vrai bandeau d’atelier, avec les actions et filtres les plus utilisés à portée de main.";
-
-  const hasActiveFilters = Boolean(search || startDate || endDate);
-  const activeFilterLabel = hasActiveFilters
-    ? `${[Boolean(search), Boolean(startDate || endDate)].filter(Boolean).length} filtre(s) actif(s)`
-    : "Aucun filtre";
-
   return (
     <>
       <div>
-        <section className="mb-6 space-y-5 rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:mb-8 sm:p-6">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                {galleryEyebrow}
-              </div>
-              <div className="space-y-2">
-                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        <section className="mb-4 flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+            {(secureOnly || starredOnly) && (
+              <>
+                <span className="px-1 text-sm font-medium text-foreground">
                   {galleryTitle}
-                </h1>
-                <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
-                  {galleryDescription}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <div className="rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground sm:text-sm">
-                  {files.length} fichier(s) chargés
-                </div>
-                <div className="rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground sm:text-sm">
-                  Vue {t(`gallery.view_modes.${viewMode || "grid"}`)}
-                </div>
-                <div className="rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground sm:text-sm">
-                  {activeFilterLabel}
-                </div>
-                {isSelectionMode && (
-                  <div className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary sm:text-sm">
-                    {selectedCount} sélectionné(s)
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex w-full flex-col gap-2 sm:flex-row xl:w-auto xl:flex-col">
-              <Button
-                variant={isSelectionMode ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  setIsSelectionMode(!isSelectionMode);
-                  if (isSelectionMode) clearSelection();
-                }}
-                className="min-w-0 justify-center text-xs sm:text-sm xl:min-w-[170px]"
-              >
-                {isSelectionMode ? (
-                  <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
-                ) : (
-                  <Square className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
-                )}
-                <span className="hidden sm:inline truncate">
-                  {isSelectionMode
-                    ? t("multiselect.exit_selection_mode")
-                    : t("multiselect.selection_mode")}
                 </span>
-              </Button>
+                <Separator
+                  orientation="vertical"
+                  className="hidden h-5 sm:block"
+                />
+              </>
+            )}
 
-              <Button
-                onClick={() => setIsUploadModalOpen(true)}
-                size="sm"
-                className="text-xs sm:text-sm xl:min-w-[170px]"
-              >
-                {t("gallery.upload")}
-              </Button>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-border/60 bg-background/75 p-3 shadow-sm sm:p-4">
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              Outils de navigation
-            </div>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2">
+              <span className="px-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                Vue
+              </span>
               <ViewSelector />
+            </div>
+
+            <Separator orientation="vertical" className="hidden h-5 sm:block" />
+
+            <div className="flex items-center gap-2">
+              <span className="px-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                Tri
+              </span>
               <SortSelector />
+            </div>
+
+            <Separator orientation="vertical" className="hidden h-5 sm:block" />
+
+            <div className="flex items-center gap-2">
+              <span className="px-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                Filtres
+              </span>
               <DateRangeFilter />
               <RefreshInterval />
               <Button
@@ -1090,6 +1063,14 @@ export function GalleryClient({
               </Button>
             </div>
           </div>
+
+          <Button
+            onClick={() => setIsUploadModalOpen(true)}
+            size="sm"
+            className="h-9 rounded-xl px-5 text-xs sm:text-sm"
+          >
+            {t("gallery.upload")}
+          </Button>
         </section>
 
         {files.length === 0 ? (
@@ -1109,9 +1090,93 @@ export function GalleryClient({
             <UploadZone onFinishUpload={handleFinishUpload}>
               {Object.entries(groupedFiles).map(([date, filesInGroup]) => (
                 <div key={date} className="mb-6 sm:mb-8">
-                  <h2 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold text-muted-foreground px-2 sm:px-0">
-                    {capitalize(date)}
-                  </h2>
+                  {(() => {
+                    const groupFileNames = filesInGroup.map(
+                      (file) => file.name,
+                    );
+                    const selectedInGroupCount = groupFileNames.filter(
+                      (fileName) => isSelected(fileName),
+                    ).length;
+                    const isGroupFullySelected =
+                      selectedInGroupCount === groupFileNames.length &&
+                      groupFileNames.length > 0;
+                    const hasGroupSelection = selectedInGroupCount > 0;
+                    const isMonthActionVisible = activeMonthHeader === date;
+
+                    return (
+                      <div className="mb-3 px-2 sm:mb-4 sm:px-0">
+                        <motion.div
+                          className="relative inline-flex min-w-0 items-center"
+                          initial={false}
+                          onHoverStart={() => setActiveMonthHeader(date)}
+                          onHoverEnd={() =>
+                            setActiveMonthHeader((current) =>
+                              current === date ? null : current,
+                            )
+                          }
+                        >
+                          <motion.div
+                            className="absolute left-0 top-1/2 -translate-y-1/2"
+                            initial={false}
+                            animate={
+                              isMonthActionVisible
+                                ? { opacity: 1, scale: 1, x: 0 }
+                                : { opacity: 0, scale: 0.85, x: -10 }
+                            }
+                            transition={{ duration: 0.18, ease: "easeOut" }}
+                            style={{
+                              pointerEvents: isMonthActionVisible
+                                ? "auto"
+                                : "none",
+                            }}
+                          >
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              tabIndex={isMonthActionVisible ? 0 : -1}
+                              aria-label={
+                                isGroupFullySelected
+                                  ? `Retirer la sélection pour ${date}`
+                                  : `Sélectionner tout le mois ${date}`
+                              }
+                              onClick={() =>
+                                handleToggleMonthSelection(filesInGroup)
+                              }
+                              className={cn(
+                                "h-8 w-8 shrink-0 rounded-full border transition-colors duration-200",
+                                "focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2",
+                                isGroupFullySelected
+                                  ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                                  : hasGroupSelection
+                                    ? "border-primary/50 bg-background/90 text-primary hover:bg-muted"
+                                    : "border-border/60 bg-background/90 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                              )}
+                            >
+                              {isGroupFullySelected ? (
+                                <Check className="h-4 w-4" />
+                              ) : hasGroupSelection ? (
+                                <Minus className="h-4 w-4" />
+                              ) : (
+                                <span className="h-3.5 w-3.5 rounded-full border-2 border-current/80" />
+                              )}
+                            </Button>
+                          </motion.div>
+
+                          <motion.h2
+                            className="text-lg font-semibold text-muted-foreground sm:text-xl"
+                            initial={false}
+                            animate={{
+                              paddingLeft: isMonthActionVisible ? 40 : 0,
+                            }}
+                            transition={{ duration: 0.18, ease: "easeOut" }}
+                          >
+                            {capitalize(date)}
+                          </motion.h2>
+                        </motion.div>
+                      </div>
+                    );
+                  })()}
                   {!viewMode || viewMode === "grid" ? (
                     <GridView
                       files={filesInGroup}

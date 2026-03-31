@@ -57,6 +57,34 @@ export function useSimpleSelection({
     [enabled],
   );
 
+  const selectFiles = useCallback((fileNames: string[]) => {
+    if (!fileNames?.length) return;
+
+    setSelectedFiles((prev) => {
+      const newSet = new Set(prev);
+      fileNames.forEach((fileName) => newSet.add(fileName));
+      return newSet;
+    });
+  }, []);
+
+  const deselectFiles = useCallback(
+    (fileNames: string[]) => {
+      if (!fileNames?.length) return;
+
+      setSelectedFiles((prev) => {
+        const newSet = new Set(prev);
+        fileNames.forEach((fileName) => newSet.delete(fileName));
+
+        if (newSet.size === 0 && onSelectionEmpty) {
+          setTimeout(() => onSelectionEmpty(), 0);
+        }
+
+        return newSet;
+      });
+    },
+    [onSelectionEmpty],
+  );
+
   const getSelectedFiles = useCallback(() => {
     return Array.from(selectedFiles);
   }, [selectedFiles]);
@@ -82,6 +110,8 @@ export function useSimpleSelection({
     toggleFile,
     clearSelection,
     selectAll,
+    selectFiles,
+    deselectFiles,
     getSelectedFiles,
     getSelectedFilesData,
   };
