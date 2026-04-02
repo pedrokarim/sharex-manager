@@ -1,24 +1,19 @@
 "use client";
 
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
+  FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
-  FormControl,
-  FormDescription,
 } from "@/components/ui/form";
-import { Switch } from "@/components/ui/switch";
+import { BoundedNumberControl } from "@/components/ui/bounded-number-control";
 import { Input } from "@/components/ui/input";
-import { UseFormReturn } from "react-hook-form";
-import { UploadConfig } from "@/schemas/upload-config";
+import { Switch } from "@/components/ui/switch";
 import { useTranslation } from "@/lib/i18n";
+import { UploadConfig } from "@/schemas/upload-config";
+import { UPLOAD_CONFIG_LIMITS } from "@/schemas/upload-config";
+import { UseFormReturn } from "react-hook-form";
 
 interface GeneralTabProps {
   form: UseFormReturn<UploadConfig>;
@@ -29,16 +24,17 @@ export function GeneralTab({ form }: GeneralTabProps) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card className="rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="border-b border-border/60 p-4 sm:p-6">
-          <CardTitle className="text-base sm:text-lg">
+      <section className="space-y-4">
+        <div className="space-y-1 px-1">
+          <h2 className="text-base font-semibold sm:text-lg">
             {t("uploads.config.general.allowed_types.title")}
-          </CardTitle>
-          <CardDescription className="text-sm">
+          </h2>
+          <p className="text-sm text-muted-foreground">
             {t("uploads.config.general.allowed_types.description")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 p-4 sm:p-6 pt-0">
+          </p>
+        </div>
+
+        <div className="space-y-4">
           <FormField
             control={form.control}
             name="allowedTypes.images"
@@ -90,159 +86,169 @@ export function GeneralTab({ form }: GeneralTabProps) {
               </FormItem>
             )}
           />
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <Card className="rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="border-b border-border/60 p-4 sm:p-6">
-          <CardTitle className="text-base sm:text-lg">
+      <section className="space-y-4">
+        <div className="space-y-1 px-1">
+          <h2 className="text-base font-semibold sm:text-lg">
             {t("uploads.config.general.limits.title")}
-          </CardTitle>
-          <CardDescription className="text-sm">
+          </h2>
+          <p className="text-sm text-muted-foreground">
             {t("uploads.config.general.limits.description")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 p-4 sm:p-6 pt-0">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="limits.maxFileSize"
-              render={({ field }) => (
-                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                  <FormLabel className="text-sm">
-                    {t("uploads.config.general.limits.max_file_size")}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={field.value ?? ""}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                      className="max-w-[200px] text-sm"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+          </p>
+        </div>
 
-            <FormField
-              control={form.control}
-              name="limits.minFileSize"
-              render={({ field }) => (
-                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                  <FormLabel className="text-sm">
-                    {t("uploads.config.general.limits.min_file_size")}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={field.value ?? ""}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                      className="max-w-[200px] text-sm"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="limits.maxFileSize"
+            render={({ field }) => (
+              <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <FormLabel className="text-sm">
+                  {t("uploads.config.general.limits.max_file_size")}
+                </FormLabel>
+                <FormControl>
+                  <BoundedNumberControl
+                    value={field.value}
+                    onChange={field.onChange}
+                    min={UPLOAD_CONFIG_LIMITS.maxFileSizeMb.min}
+                    max={UPLOAD_CONFIG_LIMITS.maxFileSizeMb.max}
+                    step={UPLOAD_CONFIG_LIMITS.maxFileSizeMb.step}
+                    unit="MB"
+                    ariaLabel={t("uploads.config.general.limits.max_file_size")}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
 
-            <FormField
-              control={form.control}
-              name="limits.maxFilesPerUpload"
-              render={({ field }) => (
-                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                  <FormLabel className="text-sm">
-                    {t("uploads.config.general.limits.max_files_per_upload")}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={field.value ?? ""}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                      className="max-w-[200px] text-sm"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+          <FormField
+            control={form.control}
+            name="limits.minFileSize"
+            render={({ field }) => (
+              <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <FormLabel className="text-sm">
+                  {t("uploads.config.general.limits.min_file_size")}
+                </FormLabel>
+                <FormControl>
+                  <BoundedNumberControl
+                    value={field.value}
+                    onChange={field.onChange}
+                    min={UPLOAD_CONFIG_LIMITS.minFileSizeKb.min}
+                    max={UPLOAD_CONFIG_LIMITS.minFileSizeKb.max}
+                    step={UPLOAD_CONFIG_LIMITS.minFileSizeKb.step}
+                    unit="KB"
+                    ariaLabel={t("uploads.config.general.limits.min_file_size")}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
 
-            <FormField
-              control={form.control}
-              name="limits.maxFilesPerType.images"
-              render={({ field }) => (
-                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                  <FormLabel className="text-sm">
-                    {t("uploads.config.general.limits.max_images")}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={field.value ?? ""}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                      className="max-w-[200px] text-sm"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+          <FormField
+            control={form.control}
+            name="limits.maxFilesPerUpload"
+            render={({ field }) => (
+              <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <FormLabel className="text-sm">
+                  {t("uploads.config.general.limits.max_files_per_upload")}
+                </FormLabel>
+                <FormControl>
+                  <BoundedNumberControl
+                    value={field.value}
+                    onChange={field.onChange}
+                    min={UPLOAD_CONFIG_LIMITS.maxFilesPerUpload.min}
+                    max={UPLOAD_CONFIG_LIMITS.maxFilesPerUpload.max}
+                    step={UPLOAD_CONFIG_LIMITS.maxFilesPerUpload.step}
+                    ariaLabel={t(
+                      "uploads.config.general.limits.max_files_per_upload",
+                    )}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
 
-            <FormField
-              control={form.control}
-              name="limits.maxFilesPerType.documents"
-              render={({ field }) => (
-                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                  <FormLabel className="text-sm">
-                    {t("uploads.config.general.limits.max_documents")}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={field.value ?? ""}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                      className="max-w-[200px] text-sm"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+          <FormField
+            control={form.control}
+            name="limits.maxFilesPerType.images"
+            render={({ field }) => (
+              <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <FormLabel className="text-sm">
+                  {t("uploads.config.general.limits.max_images")}
+                </FormLabel>
+                <FormControl>
+                  <BoundedNumberControl
+                    value={field.value}
+                    onChange={field.onChange}
+                    min={UPLOAD_CONFIG_LIMITS.maxFilesPerType.min}
+                    max={UPLOAD_CONFIG_LIMITS.maxFilesPerType.max}
+                    step={UPLOAD_CONFIG_LIMITS.maxFilesPerType.step}
+                    ariaLabel={t("uploads.config.general.limits.max_images")}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
 
-            <FormField
-              control={form.control}
-              name="limits.maxFilesPerType.archives"
-              render={({ field }) => (
-                <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                  <FormLabel className="text-sm">
-                    {t("uploads.config.general.limits.max_archives")}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={field.value ?? ""}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                      className="max-w-[200px] text-sm"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-          </div>
-        </CardContent>
-      </Card>
+          <FormField
+            control={form.control}
+            name="limits.maxFilesPerType.documents"
+            render={({ field }) => (
+              <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <FormLabel className="text-sm">
+                  {t("uploads.config.general.limits.max_documents")}
+                </FormLabel>
+                <FormControl>
+                  <BoundedNumberControl
+                    value={field.value}
+                    onChange={field.onChange}
+                    min={UPLOAD_CONFIG_LIMITS.maxFilesPerType.min}
+                    max={UPLOAD_CONFIG_LIMITS.maxFilesPerType.max}
+                    step={UPLOAD_CONFIG_LIMITS.maxFilesPerType.step}
+                    ariaLabel={t("uploads.config.general.limits.max_documents")}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
 
-      <Card className="rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="border-b border-border/60 p-4 sm:p-6">
-          <CardTitle className="text-base sm:text-lg">
+          <FormField
+            control={form.control}
+            name="limits.maxFilesPerType.archives"
+            render={({ field }) => (
+              <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <FormLabel className="text-sm">
+                  {t("uploads.config.general.limits.max_archives")}
+                </FormLabel>
+                <FormControl>
+                  <BoundedNumberControl
+                    value={field.value}
+                    onChange={field.onChange}
+                    min={UPLOAD_CONFIG_LIMITS.maxFilesPerType.min}
+                    max={UPLOAD_CONFIG_LIMITS.maxFilesPerType.max}
+                    step={UPLOAD_CONFIG_LIMITS.maxFilesPerType.step}
+                    ariaLabel={t("uploads.config.general.limits.max_archives")}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="space-y-1 px-1">
+          <h2 className="text-base font-semibold sm:text-lg">
             {t("uploads.config.general.filename.title")}
-          </CardTitle>
-          <CardDescription className="text-sm">
+          </h2>
+          <p className="text-sm text-muted-foreground">
             {t("uploads.config.general.filename.description")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 p-4 sm:p-6 pt-0">
+          </p>
+        </div>
+
+        <div className="space-y-4">
           <FormField
             control={form.control}
             name="filenamePattern"
@@ -262,8 +268,8 @@ export function GeneralTab({ form }: GeneralTabProps) {
               </FormItem>
             )}
           />
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </div>
   );
 }

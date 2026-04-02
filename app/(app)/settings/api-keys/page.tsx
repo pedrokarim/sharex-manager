@@ -13,13 +13,6 @@ import { ApiKeyDetailsDialog } from "@/components/api-keys/api-key-details-dialo
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -176,17 +169,16 @@ export default function ApiKeysPage() {
         </div>
       </section>
 
-      <Card className="rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
-          <CardTitle className="text-lg sm:text-xl">
-            Registre des clés
-          </CardTitle>
-          <CardDescription className="text-sm">
+      <section className="space-y-4">
+        <div className="space-y-2 px-1">
+          <h2 className="text-xl font-semibold">Registre des clés</h2>
+          <p className="text-sm text-muted-foreground">
             Consultez les permissions, les dates et les actions disponibles sans
             vous perdre dans une table brute.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-5 sm:p-6">
+          </p>
+        </div>
+
+        <div>
           <div className="space-y-3 sm:hidden">
             {loading ? (
               <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border/60 bg-muted/20 py-12">
@@ -323,7 +315,7 @@ export default function ApiKeysPage() {
             )}
           </div>
 
-          <div className="hidden overflow-x-auto rounded-xl border border-border/60 sm:block">
+          <div className="hidden overflow-x-auto rounded-2xl border border-border/70 bg-card shadow-sm sm:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -478,8 +470,8 @@ export default function ApiKeysPage() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <CreateApiKeyDialog
         open={showCreateDialog}
