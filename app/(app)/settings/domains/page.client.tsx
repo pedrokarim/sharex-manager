@@ -7,6 +7,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Domain } from "@/lib/types/upload-config";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Form,
   FormControl,
@@ -257,7 +258,7 @@ export default function DomainsPage({
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="text-sm">
+              <Button type="submit" className="w-full text-sm sm:w-auto">
                 {t("settings.domains.config.save")}
               </Button>
             </form>
@@ -283,7 +284,7 @@ export default function DomainsPage({
                   {t("settings.domains.list.add")}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[calc(100vw-1.5rem)] max-w-lg overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+              <DialogContent className="max-h-[90svh] w-[calc(100vw-1.5rem)] max-w-lg overflow-y-auto rounded-2xl border border-border/70 p-0 shadow-2xl">
                 <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
                   <DialogTitle className="text-lg sm:text-xl">
                     {editingDomain
@@ -389,7 +390,7 @@ export default function DomainsPage({
                         </FormItem>
                       )}
                     />
-                    <DialogFooter className="gap-2 border-t border-border/60 px-0 pt-4">
+                    <DialogFooter className="flex-col gap-2 border-t border-border/60 px-0 pt-4 sm:flex-row sm:justify-end">
                       <Button
                         type="submit"
                         className="w-full sm:w-auto text-sm"
@@ -403,8 +404,67 @@ export default function DomainsPage({
             </Dialog>
           </div>
         </CardHeader>
-        <CardContent className="p-4 sm:p-6 pt-0">
-          <div className="overflow-x-auto rounded-xl border border-border/60">
+        <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+          <div className="space-y-3 sm:hidden">
+            {domains.map((domain) => (
+              <div
+                key={domain.id}
+                className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <p className="truncate text-sm font-medium">{domain.name}</p>
+                    <p className="break-all text-xs text-muted-foreground">
+                      {domain.url}
+                    </p>
+                  </div>
+                  {domain.isDefault ? (
+                    <Badge variant="secondary">Par défaut</Badge>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-2 rounded-xl border border-border/60 bg-background px-3 py-3 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">
+                      {t("settings.domains.table.id")}
+                    </span>
+                    <code className="max-w-[55%] truncate rounded-full border border-border/60 bg-muted/30 px-2 py-1 font-mono">
+                      {domain.id}
+                    </code>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">
+                      {t("settings.domains.table.default")}
+                    </span>
+                    <span className="font-medium">
+                      {domain.isDefault ? t("common.yes") : t("common.no")}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    className="text-sm"
+                    onClick={() => handleEdit(domain)}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Modifier
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="text-sm text-destructive"
+                    onClick={() => handleDelete(domain.id)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Supprimer
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-xl border border-border/60 sm:block">
             <Table>
               <TableHeader>
                 <TableRow>

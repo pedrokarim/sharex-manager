@@ -136,13 +136,16 @@ export default function ApiKeysPage() {
             </p>
           </div>
 
-          <Button onClick={() => setShowCreateDialog(true)} className="text-sm">
+          <Button
+            onClick={() => setShowCreateDialog(true)}
+            className="w-full text-sm sm:w-auto"
+          >
             <Plus className="mr-2 h-4 w-4" />
             {t("settings.api_keys.new_key")}
           </Button>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
               Catalogue
@@ -184,7 +187,143 @@ export default function ApiKeysPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-5 sm:p-6">
-          <div className="overflow-x-auto rounded-xl border border-border/60">
+          <div className="space-y-3 sm:hidden">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border/60 bg-muted/20 py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">
+                  {t("settings.api_keys.loading")}
+                </p>
+              </div>
+            ) : keys.length === 0 ? (
+              <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
+                {t("settings.api_keys.no_keys.description")}
+              </div>
+            ) : (
+              keys.map((key) => (
+                <div
+                  key={key.id}
+                  className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <button
+                        type="button"
+                        className="truncate text-left text-sm font-medium text-foreground"
+                        onClick={() => setSelectedKeyForDetails(key)}
+                      >
+                        {key.name}
+                      </button>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(key.createdAt), "dd/MM/yyyy", {
+                          locale,
+                        })}
+                      </p>
+                    </div>
+                    <Badge variant={key.expiresAt ? "secondary" : "default"}>
+                      {key.expiresAt ? "Limitée" : "Permanente"}
+                    </Badge>
+                  </div>
+
+                  <div className="grid gap-2 rounded-xl border border-border/60 bg-background px-3 py-3 text-xs">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Clé</span>
+                      <code className="max-w-[60%] truncate rounded-full border border-border/60 bg-muted/30 px-2 py-1">
+                        {showKey === key.id
+                          ? key.key
+                          : `${key.key.slice(0, 6)}••••${key.key.slice(-4)}`}
+                      </code>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">
+                        {t("settings.api_keys.table.expires_at")}
+                      </span>
+                      <span className="text-right font-medium">
+                        {key.expiresAt
+                          ? format(new Date(key.expiresAt), "dd/MM/yyyy", {
+                              locale,
+                            })
+                          : t("settings.api_keys.never")}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">
+                        {t("settings.api_keys.table.last_used")}
+                      </span>
+                      <span className="text-right font-medium">
+                        {key.lastUsed
+                          ? format(new Date(key.lastUsed), "dd/MM/yyyy HH:mm", {
+                              locale,
+                            })
+                          : t("settings.api_keys.never")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1">
+                    {key.permissions.uploadImages && (
+                      <Badge variant="secondary" className="text-xs">
+                        {t("settings.api_keys.permissions.images")}
+                      </Badge>
+                    )}
+                    {key.permissions.uploadText && (
+                      <Badge variant="secondary" className="text-xs">
+                        {t("settings.api_keys.permissions.text")}
+                      </Badge>
+                    )}
+                    {key.permissions.uploadFiles && (
+                      <Badge variant="secondary" className="text-xs">
+                        {t("settings.api_keys.permissions.files")}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      className="text-sm"
+                      onClick={() => setSelectedKeyForDetails(key)}
+                    >
+                      <Info className="mr-2 h-4 w-4" />
+                      Détails
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="text-sm"
+                      onClick={() =>
+                        setShowKey(showKey === key.id ? null : key.id)
+                      }
+                    >
+                      {showKey === key.id ? (
+                        <EyeOff className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Eye className="mr-2 h-4 w-4" />
+                      )}
+                      {showKey === key.id ? "Masquer" : "Afficher"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="col-span-2 text-sm"
+                      onClick={() => copyToClipboard(key.key)}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copier la clé
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="col-span-2 text-sm text-destructive"
+                      onClick={() => setSelectedKeyId(key.id)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Supprimer la clé
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-xl border border-border/60 sm:block">
             <Table>
               <TableHeader>
                 <TableRow>

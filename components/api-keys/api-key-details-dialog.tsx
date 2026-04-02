@@ -93,7 +93,7 @@ export function ApiKeyDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-4xl overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+      <DialogContent className="max-h-[90svh] w-[calc(100vw-1.5rem)] max-w-4xl overflow-y-auto rounded-2xl border border-border/70 p-0 shadow-2xl">
         <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
           <DialogTitle>Détails de la clé API</DialogTitle>
           <DialogDescription>
@@ -101,11 +101,17 @@ export function ApiKeyDetailsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="details" className="px-5 py-5 sm:px-6">
-          <TabsList className="grid h-auto w-full grid-cols-3 rounded-xl border border-border/60 bg-muted/20 p-1">
-            <TabsTrigger value="details">Détails</TabsTrigger>
-            <TabsTrigger value="config">Configuration ShareX</TabsTrigger>
-            <TabsTrigger value="qrcode">QR Code Mobile</TabsTrigger>
+        <Tabs defaultValue="details" className="px-4 py-4 sm:px-6 sm:py-5">
+          <TabsList className="grid h-auto w-full grid-cols-1 rounded-xl border border-border/60 bg-muted/20 p-1 sm:grid-cols-3">
+            <TabsTrigger value="details" className="justify-start sm:justify-center">
+              Détails
+            </TabsTrigger>
+            <TabsTrigger value="config" className="justify-start sm:justify-center">
+              Configuration ShareX
+            </TabsTrigger>
+            <TabsTrigger value="qrcode" className="justify-start sm:justify-center">
+              QR Code Mobile
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="details" className="space-y-4">
@@ -219,13 +225,14 @@ export function ApiKeyDetailsDialog({
             apiKey.permissions.uploadText ||
             apiKey.permissions.uploadFiles ? (
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">
                     Configuration ShareX
                   </h3>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="w-full sm:w-auto"
                     onClick={() =>
                       copyToClipboard(
                         JSON.stringify(generateSxcuConfig(), null, 2),
@@ -236,7 +243,7 @@ export function ApiKeyDetailsDialog({
                     Copier
                   </Button>
                 </div>
-                <pre className="overflow-auto rounded-xl border border-border/60 bg-muted/20 p-4">
+                <pre className="max-h-[40svh] overflow-auto rounded-xl border border-border/60 bg-muted/20 p-4 text-xs sm:text-sm">
                   <code>{JSON.stringify(generateSxcuConfig(), null, 2)}</code>
                 </pre>
               </div>
@@ -272,13 +279,14 @@ export function ApiKeyDetailsDialog({
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-lg font-semibold">
                   QR Code de configuration
                 </h3>
                 <Button
                   variant="outline"
                   size="sm"
+                  className="w-full sm:w-auto"
                   onClick={() => {
                     if (qrCodeDataUrl) {
                       const link = document.createElement("a");
@@ -300,11 +308,11 @@ export function ApiKeyDetailsDialog({
                     <img
                       src={qrCodeDataUrl}
                       alt="QR Code de configuration"
-                      className="w-64 h-64"
+                      className="h-52 w-52 sm:h-64 sm:w-64"
                     />
                   </div>
                 ) : (
-                  <div className="flex h-64 w-64 items-center justify-center rounded-xl border border-border/60 bg-muted/20">
+                  <div className="flex h-52 w-52 items-center justify-center rounded-xl border border-border/60 bg-muted/20 sm:h-64 sm:w-64">
                     <QrCode className="h-12 w-12 text-muted-foreground" />
                   </div>
                 )}

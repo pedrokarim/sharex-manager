@@ -36,13 +36,6 @@ import {
   Table2,
 } from "lucide-react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -63,12 +56,10 @@ import { Slider } from "@/components/ui/slider";
 import { useTranslation } from "@/lib/i18n";
 import { ThemeModePreferencesPanel } from "@/components/settings/theme-mode-preferences-panel";
 
-const settingsCardClassName = "rounded-2xl border-border/70 shadow-sm";
-const settingsCardHeaderClassName =
-  "space-y-2 border-b border-border/60 px-5 py-5 sm:px-6";
-const settingsCardContentClassName = "space-y-4 px-5 py-5 sm:px-6";
+const settingsPanelClassName =
+  "rounded-2xl border border-border/70 bg-card px-4 py-4 shadow-sm sm:px-5 sm:py-5";
 const settingsBlockClassName =
-  "space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4";
+  "space-y-4 rounded-2xl border border-border/70 bg-card px-4 py-4 shadow-sm sm:px-5 sm:py-5";
 
 export function PreferencesPageClient() {
   const [, setPreferences] = useAtom(preferencesAtom);
@@ -155,7 +146,7 @@ export function PreferencesPageClient() {
           <Button
             variant="outline"
             onClick={handleReset}
-            className="text-xs sm:text-sm"
+            className="w-full text-xs sm:w-auto sm:text-sm"
           >
             <RotateCcw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             {t("settings.reset")}
@@ -165,299 +156,300 @@ export function PreferencesPageClient() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
         <div className="space-y-6">
-          <Card className={settingsCardClassName}>
-            <CardHeader className={settingsCardHeaderClassName}>
-              <CardTitle className="text-xl">
+          <section className="space-y-4">
+            <div className="space-y-2 px-1">
+              <h2 className="text-xl font-semibold">
                 {t("settings.appearance")}
-              </CardTitle>
-              <CardDescription>
+              </h2>
+              <p className="text-sm text-muted-foreground">
                 {t("settings.appearance_description")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className={settingsCardContentClassName}>
-              <ThemeModePreferencesPanel />
+              </p>
+            </div>
 
-              <div className="flex flex-col gap-4 rounded-xl border border-border/60 bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
+            <ThemeModePreferencesPanel />
+
+            <div
+              className={`${settingsPanelClassName} flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between`}
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Languages className="h-4 w-4" />
+                  <Label className="text-sm font-medium sm:text-base">
+                    {t("settings.language")}
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  Définissez la langue affichée dans l'application.
+                </p>
+              </div>
+              <Select
+                value={language}
+                onValueChange={(value) => setLanguage(value as Language)}
+              >
+                <SelectTrigger className="w-full sm:w-[220px]">
+                  <SelectValue placeholder={t("settings.language_select")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fr">Français</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="space-y-2 px-1">
+              <h2 className="text-xl font-semibold">
+                {t("navigation.gallery")}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t("settings.gallery_description")}
+              </p>
+            </div>
+
+            <div className={settingsBlockClassName}>
+              <div className="space-y-1">
+                <Label className="text-sm font-medium sm:text-base">
+                  {t("settings.gallery.view_mode")}
+                </Label>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  Choisissez la densité de lecture la plus confortable pour
+                  votre galerie.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(viewModeIcons).map(([mode, Icon]) => (
+                  <TooltipProvider key={mode}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={
+                            galleryViewMode === mode ? "default" : "outline"
+                          }
+                          className="min-w-[9rem] justify-start text-xs sm:min-w-0 sm:justify-center sm:text-sm"
+                          onClick={() =>
+                            setGalleryViewMode(mode as GalleryViewMode)
+                          }
+                        >
+                          <Icon className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
+                          <span className="text-xs sm:text-sm">
+                            {t(`gallery.view_modes.${mode}`)}
+                          </span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t(`gallery.view_modes.${mode}`)}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ))}
+              </div>
+            </div>
+
+            <div
+              className={`${settingsPanelClassName} flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between`}
+            >
+              <div className="space-y-1">
+                <Label
+                  htmlFor="thumbnailSize"
+                  className="text-sm font-medium sm:text-base"
+                >
+                  {t("settings.gallery.thumbnail_size")}
+                </Label>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  Ajustez la densité des cartes et la place donnée à l'aperçu.
+                </p>
+              </div>
+              <Select
+                value={thumbnailSize}
+                onValueChange={(value: ThumbnailSize) =>
+                  setThumbnailSize(value)
+                }
+              >
+                <SelectTrigger className="w-full sm:w-[240px]">
+                  <SelectValue placeholder={t("settings.select_size")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(thumbnailSizeOptions).map(
+                    ([value, label]) => {
+                      const Icon = thumbnailSizeIcons[value as ThumbnailSize];
+                      return (
+                        <SelectItem key={value} value={value}>
+                          <div className="flex items-center gap-2">
+                            <Icon className="h-3 w-3 shrink-0 sm:h-4 sm:w-4" />
+                            <span className="text-sm">{label}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    },
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className={settingsBlockClassName}>
+              <div className="space-y-1">
+                <Label className="text-sm font-medium sm:text-base">
+                  Détails affichés
+                </Label>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  Activez uniquement les métadonnées utiles pour alléger la
+                  lecture visuelle.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
-                    <Languages className="h-4 w-4" />
-                    <Label className="text-sm font-medium sm:text-base">
-                      {t("settings.language")}
+                    <FileText className="h-4 w-4" />
+                    <Label className="text-sm sm:text-base">
+                      {t("settings.gallery.show_file_info")}
                     </Label>
                   </div>
-                  <p className="text-xs text-muted-foreground sm:text-sm">
-                    Définissez la langue affichée dans l'application.
-                  </p>
+                  <Switch
+                    checked={showFileInfo}
+                    onCheckedChange={setShowFileInfo}
+                  />
                 </div>
-                <Select
-                  value={language}
-                  onValueChange={(value) => setLanguage(value as Language)}
-                >
-                  <SelectTrigger className="w-full sm:w-[220px]">
-                    <SelectValue placeholder={t("settings.language_select")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="fr">Français</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={settingsCardClassName}>
-            <CardHeader className={settingsCardHeaderClassName}>
-              <CardTitle className="text-xl">
-                {t("navigation.gallery")}
-              </CardTitle>
-              <CardDescription>
-                {t("settings.gallery_description")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className={settingsCardContentClassName}>
-              <div className={settingsBlockClassName}>
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium sm:text-base">
-                    {t("settings.gallery.view_mode")}
-                  </Label>
-                  <p className="text-xs text-muted-foreground sm:text-sm">
-                    Choisissez la densité de lecture la plus confortable pour
-                    votre galerie.
-                  </p>
+                <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="h-4 w-4" />
+                    <Label className="text-sm sm:text-base">
+                      {t("settings.gallery.show_file_size")}
+                    </Label>
+                  </div>
+                  <Switch
+                    checked={showFileSize}
+                    onCheckedChange={setShowFileSize}
+                  />
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(viewModeIcons).map(([mode, Icon]) => (
-                    <TooltipProvider key={mode}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant={
-                              galleryViewMode === mode ? "default" : "outline"
-                            }
-                            className="text-xs sm:text-sm"
-                            onClick={() =>
-                              setGalleryViewMode(mode as GalleryViewMode)
-                            }
-                          >
-                            <Icon className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
-                            <span className="text-xs sm:text-sm">
-                              {t(`gallery.view_modes.${mode}`)}
-                            </span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{t(`gallery.view_modes.${mode}`)}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ))}
+                <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <Label className="text-sm sm:text-base">
+                      {t("settings.gallery.show_upload_date")}
+                    </Label>
+                  </div>
+                  <Switch
+                    checked={showUploadDate}
+                    onCheckedChange={setShowUploadDate}
+                  />
                 </div>
               </div>
+            </div>
 
-              <div className="flex flex-col gap-4 rounded-xl border border-border/60 bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                  <Label
-                    htmlFor="thumbnailSize"
-                    className="text-sm font-medium sm:text-base"
-                  >
-                    {t("settings.gallery.thumbnail_size")}
-                  </Label>
-                  <p className="text-xs text-muted-foreground sm:text-sm">
-                    Ajustez la densité des cartes et la place donnée à l'aperçu.
-                  </p>
-                </div>
+            <div className={settingsBlockClassName}>
+              <div className="space-y-1">
+                <Label className="text-sm font-medium sm:text-base">
+                  {t("settings.gallery.sort_by")}
+                </Label>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  Organisez la galerie avec un tri clair et prévisible.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <Select
-                  value={thumbnailSize}
-                  onValueChange={(value: ThumbnailSize) =>
-                    setThumbnailSize(value)
-                  }
+                  value={sortBy}
+                  onValueChange={(value) => setSortBy(value as SortBy)}
                 >
                   <SelectTrigger className="w-full sm:w-[240px]">
-                    <SelectValue placeholder={t("settings.select_size")} />
+                    <SelectValue placeholder={t("settings.gallery.sort_by")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(thumbnailSizeOptions).map(
-                      ([value, label]) => {
-                        const Icon = thumbnailSizeIcons[value as ThumbnailSize];
-                        return (
-                          <SelectItem key={value} value={value}>
-                            <div className="flex items-center gap-2">
-                              <Icon className="h-3 w-3 shrink-0 sm:h-4 sm:w-4" />
-                              <span className="text-sm">{label}</span>
-                            </div>
-                          </SelectItem>
-                        );
-                      },
-                    )}
+                    <SelectItem value="name">
+                      {t("gallery.sort.name")}
+                    </SelectItem>
+                    <SelectItem value="date">
+                      {t("gallery.sort.date")}
+                    </SelectItem>
+                    <SelectItem value="size">
+                      {t("gallery.sort.size")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={sortOrder}
+                  onValueChange={(value) => setSortOrder(value as SortOrder)}
+                >
+                  <SelectTrigger className="w-full sm:w-[240px]">
+                    <SelectValue
+                      placeholder={t("settings.gallery.sort_order")}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="asc">
+                      {t("gallery.sort.asc")}
+                    </SelectItem>
+                    <SelectItem value="desc">
+                      {t("gallery.sort.desc")}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className={settingsBlockClassName}>
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium sm:text-base">
-                    Détails affichés
-                  </Label>
-                  <p className="text-xs text-muted-foreground sm:text-sm">
-                    Activez uniquement les métadonnées utiles pour alléger la
-                    lecture visuelle.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      <Label className="text-sm sm:text-base">
-                        {t("settings.gallery.show_file_info")}
-                      </Label>
-                    </div>
-                    <Switch
-                      checked={showFileInfo}
-                      onCheckedChange={setShowFileInfo}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <ArrowUpDown className="h-4 w-4" />
-                      <Label className="text-sm sm:text-base">
-                        {t("settings.gallery.show_file_size")}
-                      </Label>
-                    </div>
-                    <Switch
-                      checked={showFileSize}
-                      onCheckedChange={setShowFileSize}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <Label className="text-sm sm:text-base">
-                        {t("settings.gallery.show_upload_date")}
-                      </Label>
-                    </div>
-                    <Switch
-                      checked={showUploadDate}
-                      onCheckedChange={setShowUploadDate}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className={settingsBlockClassName}>
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium sm:text-base">
-                    {t("settings.gallery.sort_by")}
-                  </Label>
-                  <p className="text-xs text-muted-foreground sm:text-sm">
-                    Organisez la galerie avec un tri clair et prévisible.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Select
-                    value={sortBy}
-                    onValueChange={(value) => setSortBy(value as SortBy)}
-                  >
-                    <SelectTrigger className="w-full sm:w-[240px]">
-                      <SelectValue
-                        placeholder={t("settings.gallery.sort_by")}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="name">
-                        {t("gallery.sort.name")}
-                      </SelectItem>
-                      <SelectItem value="date">
-                        {t("gallery.sort.date")}
-                      </SelectItem>
-                      <SelectItem value="size">
-                        {t("gallery.sort.size")}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={sortOrder}
-                    onValueChange={(value) => setSortOrder(value as SortOrder)}
-                  >
-                    <SelectTrigger className="w-full sm:w-[240px]">
-                      <SelectValue
-                        placeholder={t("settings.gallery.sort_order")}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="asc">
-                        {t("gallery.sort.asc")}
-                      </SelectItem>
-                      <SelectItem value="desc">
-                        {t("gallery.sort.desc")}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </div>
 
-        <div className="space-y-6">
-          <Card className={`${settingsCardClassName} xl:sticky xl:top-4`}>
-            <CardHeader className={settingsCardHeaderClassName}>
-              <CardTitle className="text-xl">
+        <div className="space-y-6 xl:sticky xl:top-4">
+          <section className="space-y-4">
+            <div className="space-y-2 px-1">
+              <h2 className="text-xl font-semibold">
                 {t("settings.notifications")}
-              </CardTitle>
-              <CardDescription>
+              </h2>
+              <p className="text-sm text-muted-foreground">
                 {t("settings.notifications_description")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className={settingsCardContentClassName}>
-              <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-4 py-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4" />
-                    <Label className="text-sm font-medium sm:text-base">
-                      {t("settings.notifications")}
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground sm:text-sm">
-                    Affiche les retours utiles sans surcharger l&apos;interface.
-                  </p>
-                </div>
-                <Switch
-                  checked={showNotifications}
-                  onCheckedChange={setShowNotifications}
-                />
-              </div>
+              </p>
+            </div>
 
-              <div className={settingsBlockClassName}>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <RefreshCcw className="h-4 w-4" />
-                    <Label className="text-sm font-medium sm:text-base">
-                      {t("settings.gallery.auto_refresh")}
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground sm:text-sm">
-                    Définissez un rythme de mise à jour sans distraire la
-                    navigation.
-                  </p>
+            <div
+              className={`${settingsPanelClassName} flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between`}
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  <Label className="text-sm font-medium sm:text-base">
+                    {t("settings.notifications")}
+                  </Label>
                 </div>
-                <div className="pt-2">
-                  <Slider
-                    value={[autoRefreshInterval]}
-                    min={0}
-                    max={60}
-                    step={5}
-                    className="w-full"
-                    onValueChange={([value]) => setAutoRefreshInterval(value)}
-                  />
-                  <div className="mt-2 flex justify-between text-xs text-muted-foreground sm:text-sm">
-                    <span>{t("common.disabled")}</span>
-                    <span>30s</span>
-                    <span>60s</span>
-                  </div>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  Affiche les retours utiles sans surcharger l&apos;interface.
+                </p>
+              </div>
+              <Switch
+                checked={showNotifications}
+                onCheckedChange={setShowNotifications}
+              />
+            </div>
+
+            <div className={settingsBlockClassName}>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <RefreshCcw className="h-4 w-4" />
+                  <Label className="text-sm font-medium sm:text-base">
+                    {t("settings.gallery.auto_refresh")}
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  Définissez un rythme de mise à jour sans distraire la
+                  navigation.
+                </p>
+              </div>
+              <div className="pt-2">
+                <Slider
+                  value={[autoRefreshInterval]}
+                  min={0}
+                  max={60}
+                  step={5}
+                  className="w-full"
+                  onValueChange={([value]) => setAutoRefreshInterval(value)}
+                />
+                <div className="mt-2 flex justify-between text-xs text-muted-foreground sm:text-sm">
+                  <span>{t("common.disabled")}</span>
+                  <span>30s</span>
+                  <span>60s</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </div>
       </div>
     </div>

@@ -180,8 +180,8 @@ export default function ThemeSettingsPageClient() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" asChild>
+          <div className="grid gap-2 sm:flex sm:flex-wrap">
+            <Button variant="outline" asChild className="w-full sm:w-auto">
               <Link href="/settings/preferences">
                 <Settings2 className="mr-2 h-4 w-4" />
                 Préférences utilisateur
@@ -191,6 +191,7 @@ export default function ThemeSettingsPageClient() {
               variant="outline"
               onClick={handleFollowSite}
               disabled={isSaving}
+              className="w-full sm:w-auto"
             >
               <RotateCcw className="mr-2 h-4 w-4" />
               Désactiver ma palette
@@ -198,6 +199,7 @@ export default function ThemeSettingsPageClient() {
             <Button
               onClick={handleSave}
               disabled={!hasUnsavedChanges || isSaving}
+              className="w-full sm:w-auto"
             >
               <Save className="mr-2 h-4 w-4" />
               {isSaving ? "Enregistrement..." : "Enregistrer mon thème"}
@@ -207,15 +209,15 @@ export default function ThemeSettingsPageClient() {
       </section>
 
       <Card className="overflow-hidden rounded-[1.75rem] border-border/70 shadow-sm">
-        <CardHeader className="border-b border-border/60 bg-muted/20 px-6 py-5">
+        <CardHeader className="border-b border-border/60 bg-muted/20 px-4 py-4 sm:px-6 sm:py-5">
           <CardTitle className="text-xl">Éditeur de thème</CardTitle>
           <CardDescription className="text-sm">
             Sélectionnez une base, ajustez-la, puis enregistrez. Le thème global
             du site reste intact: seul votre compte est concerné.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="h-[75vh] min-h-[680px]">
+        <CardContent className="overflow-hidden p-0">
+          <div className="h-[68svh] min-h-[420px] overflow-hidden sm:h-[75vh] sm:min-h-[680px]">
             <Editor themePromise={emptyThemePromise} showActionBar={false} />
           </div>
         </CardContent>

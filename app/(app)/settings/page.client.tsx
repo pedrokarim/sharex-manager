@@ -179,7 +179,7 @@ export function SettingsPageClient() {
               </p>
             </div>
 
-            <div className="grid items-start gap-4 xl:grid-cols-2">
+            <div className="grid items-start gap-4 lg:grid-cols-2">
               {group.items.map((item) => {
                 const Icon = item.icon;
 
@@ -189,28 +189,30 @@ export function SettingsPageClient() {
                     href={item.href}
                     className="group block self-start"
                   >
-                    <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-md">
+                    <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-md active:scale-[0.995]">
                       <CardHeader className="relative overflow-hidden p-5 sm:p-6">
                         <div
                           className={`absolute inset-0 bg-gradient-to-br ${item.accent}`}
                         />
-                        <div className="relative flex items-start justify-between gap-4">
-                          <div className="space-y-3">
+                        <div className="relative flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0 space-y-3">
                             <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-1 text-xs font-medium text-muted-foreground">
                               <Icon className="h-3.5 w-3.5" />
                               {item.meta}
                             </div>
-                            <div className="space-y-1">
+                            <div className="min-w-0 space-y-1">
                               <CardTitle className="text-lg sm:text-xl">
                                 {item.title}
                               </CardTitle>
-                              <CardDescription className="max-w-xl text-sm leading-relaxed">
+                              <CardDescription className="max-w-xl text-sm leading-relaxed sm:pr-4">
                                 {item.description}
                               </CardDescription>
                             </div>
                           </div>
-                          <div className="rounded-full border border-border/60 bg-background/85 p-2 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1">
-                            <ArrowRight className="h-4 w-4" />
+                          <div className="flex justify-end sm:block">
+                            <div className="rounded-full border border-border/60 bg-background/85 p-2 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1">
+                              <ArrowRight className="h-4 w-4" />
+                            </div>
                           </div>
                         </div>
                       </CardHeader>

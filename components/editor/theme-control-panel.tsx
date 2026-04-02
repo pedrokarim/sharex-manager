@@ -109,7 +109,7 @@ const ThemeControlPanel = ({
   const theme = use(themePromise);
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="border-b">
         {!theme ? (
           <ThemePresetSelect
@@ -120,13 +120,13 @@ const ThemeControlPanel = ({
           <ThemeEditActions theme={theme} disabled={isGeneratingTheme} />
         )}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col space-y-4">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <TabHandler>
           {(tab, handleSetTab) => (
             <Tabs
               value={tab}
               onValueChange={(v) => handleSetTab(v as ControlTab)}
-              className="flex min-h-0 w-full flex-1 flex-col"
+              className="flex min-h-0 w-full flex-1 flex-col overflow-hidden"
             >
               <HorizontalScrollArea className="mt-2 mb-1 px-4">
                 <TabsList className="bg-background text-muted-foreground inline-flex w-fit items-center justify-center rounded-full px-0">
@@ -149,7 +149,7 @@ const ThemeControlPanel = ({
 
               <TabsContent
                 value="colors"
-                className="mt-1 size-full overflow-hidden"
+                className="mt-1 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
               >
                 <ColorsTabContent
                   currentStyles={currentStyles}
@@ -160,7 +160,7 @@ const ThemeControlPanel = ({
 
               <TabsContent
                 value="typography"
-                className="mt-1 size-full overflow-hidden"
+                className="mt-1 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
               >
                 <ScrollArea className="h-full px-4">
                   <div className="text-muted-foreground mb-2 flex items-center gap-2 text-[11px]">
@@ -282,7 +282,7 @@ const ThemeControlPanel = ({
 
               <TabsContent
                 value="other"
-                className="mt-1 size-full overflow-hidden"
+                className="mt-1 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
               >
                 <ScrollArea className="h-full px-4">
                   <ControlSection title="HSL Adjustments" expanded>
@@ -354,7 +354,7 @@ const ThemeControlPanel = ({
 
               <TabsContent
                 value="ai"
-                className="mt-1 size-full overflow-hidden"
+                className="mt-1 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
               >
                 <ChatInterface />
               </TabsContent>
@@ -362,7 +362,7 @@ const ThemeControlPanel = ({
           )}
         </TabHandler>
       </div>
-    </>
+    </div>
   );
 };
 

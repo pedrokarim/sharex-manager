@@ -175,7 +175,7 @@ export function ThemeModePreferencesPanel({
   };
 
   return (
-    <div className="space-y-5 rounded-2xl border border-border/60 bg-muted/20 p-4 sm:p-5">
+    <div className="space-y-5 rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
       <div className="space-y-4">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -192,7 +192,7 @@ export function ThemeModePreferencesPanel({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
           <Badge
             variant={
               formState.modeOverride === "inherit" ? "secondary" : "default"
@@ -205,14 +205,14 @@ export function ThemeModePreferencesPanel({
           <Button
             variant="outline"
             onClick={handleFollowSite}
-            className="text-sm"
+            className="w-full text-sm sm:w-auto"
           >
             Suivre le site
           </Button>
           <Button
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
-            className="text-sm"
+            className="w-full text-sm sm:w-auto"
           >
             <Save className="mr-2 h-4 w-4" />
             {isSaving ? "Enregistrement..." : "Enregistrer"}
@@ -227,7 +227,7 @@ export function ThemeModePreferencesPanel({
             Priorité du mode
           </Label>
         </div>
-        <div className="grid gap-2 lg:grid-cols-5">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           {modeOptions.map((option) => (
             <button
               key={option.value}
@@ -254,7 +254,7 @@ export function ThemeModePreferencesPanel({
       </div>
 
       {formState.modeOverride === "time-based" && (
-        <div className="space-y-4 rounded-2xl border border-border/60 bg-background p-4">
+        <div className="space-y-4 border-t border-border/60 pt-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Clock3 className="h-4 w-4 text-muted-foreground" />
@@ -294,7 +294,7 @@ export function ThemeModePreferencesPanel({
       )}
 
       {showThemeEditorShortcut && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <Label className="text-sm font-medium">Palette personnelle</Label>
             <p className="text-sm text-muted-foreground">
@@ -305,7 +305,7 @@ export function ThemeModePreferencesPanel({
           </div>
           <Button
             variant="outline"
-            className="text-sm"
+            className="w-full text-sm sm:w-auto"
             onClick={() => router.push("/settings/theme")}
           >
             Ouvrir l’atelier thème
