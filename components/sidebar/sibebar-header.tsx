@@ -36,7 +36,7 @@ export function SidebarHeader({
           "border-b border-border/60 bg-background/70 backdrop-blur",
       )}
     >
-      <div className="flex w-full items-center gap-2 px-2 sm:px-4">
+      <div className="flex w-full items-center gap-2 px-4 sm:px-4">
         <SidebarTrigger className="-ml-1" />
 
         <Separator

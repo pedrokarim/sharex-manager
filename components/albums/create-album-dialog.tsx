@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,21 +16,41 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
+interface Album {
+  id: number;
+  name: string;
+  description?: string;
+}
+
 interface CreateAlbumDialogProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: { name: string; description?: string }) => Promise<void>;
+  album?: Album | null;
 }
 
 export function CreateAlbumDialog({
   open,
   onClose,
   onSubmit,
+  album,
 }: CreateAlbumDialogProps) {
   const { t } = useTranslation();
+  const isEditMode = !!album;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Pré-remplir le formulaire en mode édition
+  useEffect(() => {
+    if (open && album) {
+      setName(album.name);
+      setDescription(album.description || "");
+    } else if (open && !album) {
+      setName("");
+      setDescription("");
+    }
+  }, [open, album]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,10 +90,14 @@ export function CreateAlbumDialog({
         <form onSubmit={handleSubmit}>
           <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
             <DialogTitle className="text-lg sm:text-xl">
-              {t("albums.create_album")}
+              {isEditMode
+                ? t("albums.edit_album")
+                : t("albums.create_album")}
             </DialogTitle>
             <DialogDescription className="text-sm">
-              Créez un nouvel album pour organiser vos fichiers
+              {isEditMode
+                ? t("albums.edit_description")
+                : t("albums.create_description")}
             </DialogDescription>
           </DialogHeader>
 
@@ -127,7 +151,7 @@ export function CreateAlbumDialog({
               {loading && (
                 <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
               )}
-              {t("albums.create")}
+              {isEditMode ? t("common.save") : t("albums.create")}
             </Button>
           </DialogFooter>
         </form>

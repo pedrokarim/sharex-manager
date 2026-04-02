@@ -33,6 +33,7 @@ import { GridView } from "@/components/gallery/grid-view";
 import { ListView } from "@/components/gallery/list-view";
 import { FileViewer } from "@/components/gallery/file-viewer";
 import { UploadZone } from "@/components/gallery/upload-zone";
+import { KeyboardShortcutsDialog } from "@/components/gallery/keyboard-shortcuts-dialog";
 import {
   Select,
   SelectContent,
@@ -218,6 +219,7 @@ export function GalleryClient({
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [activeMonthHeader, setActiveMonthHeader] = useState<string | null>(null);
   const [isAddToAlbumDialogOpen, setIsAddToAlbumDialogOpen] = useState(false);
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [filesToAddToAlbum, setFilesToAddToAlbum] = useState<string[]>([]);
   const [availableAlbums, setAvailableAlbums] = useState<
     Array<{ id: number; name: string }>
@@ -974,12 +976,11 @@ export function GalleryClient({
   );
 
   const handleShowHelp = useCallback(() => {
-    // TODO: Ouvrir le modal d'aide des raccourcis
-    toast.info("Aide des raccourcis clavier (À implémenter)");
+    setIsShortcutsHelpOpen(true);
   }, []);
 
   // Raccourcis clavier
-  useKeyboardShortcuts({
+  const { shortcuts } = useKeyboardShortcuts({
     onSelectAll: () => selectAll(files),
     onClearSelection: clearSelection,
     onDeleteSelected: handleDeleteSelected,
@@ -1323,6 +1324,13 @@ export function GalleryClient({
           setIsSelectionMode(false);
           setFilesToAddToAlbum([]);
         }}
+      />
+
+      {/* Dialog d'aide des raccourcis clavier */}
+      <KeyboardShortcutsDialog
+        open={isShortcutsHelpOpen}
+        onClose={() => setIsShortcutsHelpOpen(false)}
+        shortcuts={shortcuts}
       />
     </>
   );

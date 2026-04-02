@@ -22,6 +22,7 @@ export function AlbumsClient() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const fetchAlbums = useCallback(async () => {
@@ -93,6 +94,35 @@ export function AlbumsClient() {
     } catch (error) {
       console.error("Erreur:", error);
       toast.error("Erreur lors de la suppression de l'album");
+    }
+  };
+
+  const handleEditAlbum = async (albumData: {
+    name: string;
+    description?: string;
+  }) => {
+    if (!editingAlbum) return;
+
+    try {
+      const response = await fetch(`/api/albums/${editingAlbum.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(albumData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la modification de l'album");
+      }
+
+      const updatedAlbum = await response.json();
+      setAlbums(
+        albums.map((a) => (a.id === editingAlbum.id ? { ...a, ...updatedAlbum } : a))
+      );
+      setEditingAlbum(null);
+      toast.success(t("albums.edit_success"));
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error(t("albums.edit_error"));
     }
   };
 
@@ -201,10 +231,7 @@ export function AlbumsClient() {
               album={album}
               viewMode={viewMode}
               onDelete={() => handleDeleteAlbum(album.id)}
-              onEdit={() => {
-                // TODO: Implémenter l'édition
-                toast.info("Édition d'album (À implémenter)");
-              }}
+              onEdit={() => setEditingAlbum(album)}
             />
           ))}
         </div>
@@ -215,6 +242,14 @@ export function AlbumsClient() {
         open={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
         onSubmit={handleCreateAlbum}
+      />
+
+      {/* Dialog d'édition d'album */}
+      <CreateAlbumDialog
+        open={!!editingAlbum}
+        onClose={() => setEditingAlbum(null)}
+        onSubmit={handleEditAlbum}
+        album={editingAlbum}
       />
     </div>
   );

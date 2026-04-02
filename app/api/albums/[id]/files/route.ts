@@ -5,7 +5,7 @@ import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 import { z } from "zod";
 import { stat } from "fs/promises";
-import { join } from "path";
+import { join, resolve } from "path";
 import { getAbsoluteUploadPath } from "@/lib/config";
 import { isFileSecure } from "@/lib/secure-files";
 import { isFileStarred } from "@/lib/starred-files";
@@ -178,10 +178,46 @@ export async function POST(
       return NextResponse.json({ error: "Accès interdit" }, { status: 403 });
     }
 
-    // TODO: Ici, on pourrait vérifier que les fichiers existent réellement
-    // en consultant le système de fichiers ou une base de données
+    // Vérifier que les fichiers existent réellement sur le disque
+    const uploadsDir = getAbsoluteUploadPath();
+    const secureDir = join(uploadsDir, "secure");
+    const validFileNames: string[] = [];
+    const invalidFileNames: string[] = [];
 
-    const addedFiles = albumsDb.addFilesToAlbum(albumId, fileNames);
+    await Promise.all(
+      fileNames.map(async (fileName) => {
+        // Protection path traversal
+        const resolvedPath = resolve(uploadsDir, fileName);
+        if (!resolvedPath.startsWith(uploadsDir)) {
+          invalidFileNames.push(fileName);
+          return;
+        }
+
+        try {
+          // Vérifier dans le dossier normal ou sécurisé
+          const normalPath = join(uploadsDir, fileName);
+          const securePath = join(secureDir, fileName);
+          try {
+            await stat(normalPath);
+            validFileNames.push(fileName);
+          } catch {
+            await stat(securePath);
+            validFileNames.push(fileName);
+          }
+        } catch {
+          invalidFileNames.push(fileName);
+        }
+      })
+    );
+
+    if (validFileNames.length === 0) {
+      return NextResponse.json(
+        { error: "Aucun fichier valide trouvé" },
+        { status: 400 }
+      );
+    }
+
+    const addedFiles = albumsDb.addFilesToAlbum(albumId, validFileNames);
 
     logDb.createLog({
       level: "info",
@@ -194,7 +230,11 @@ export async function POST(
         albumName: album.name,
         addedCount: addedFiles.length,
         totalRequested: fileNames.length,
-        fileNames: fileNames.slice(0, 10), // Limiter le log aux 10 premiers
+        skippedCount: invalidFileNames.length,
+        fileNames: validFileNames.slice(0, 10),
+        ...(invalidFileNames.length > 0 && {
+          skippedFiles: invalidFileNames.slice(0, 10),
+        }),
       },
     });
 
