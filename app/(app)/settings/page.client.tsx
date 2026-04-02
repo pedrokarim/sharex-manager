@@ -8,10 +8,8 @@ import {
   History,
   KeyRound,
   Settings2,
-  Shield,
   SlidersHorizontal,
   Upload,
-  Wrench,
 } from "lucide-react";
 import {
   Card,
@@ -94,75 +92,22 @@ export function SettingsPageClient() {
         },
       ],
     },
-    {
-      title: "Administration",
-      description:
-        "Les outils d’exploitation avancée pour superviser le service et renforcer la sécurité.",
-      items: [
-        {
-          title: "Centre d’administration",
-          description:
-            "Accédez aux modules, aux utilisateurs, aux journaux et aux réglages système.",
-          href: "/admin",
-          icon: Wrench,
-          accent: "from-cyan-500/15 via-cyan-500/5 to-transparent",
-          meta: "Back-office",
-        },
-        {
-          title: t("admin.sections.security.title"),
-          description: t("admin.sections.security.description"),
-          href: "/admin/security",
-          icon: Shield,
-          accent: "from-indigo-500/15 via-indigo-500/5 to-transparent",
-          meta: "Protection",
-        },
-      ],
-    },
   ];
 
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
         <div className="space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            Panneau de configuration
-          </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm sm:h-11 sm:w-11">
+                <SlidersHorizontal className="h-5 w-5" />
+              </span>
               {t("settings.title")}
             </h1>
             <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
               {t("settings.description")}
             </p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                Cohérence
-              </p>
-              <p className="mt-1 text-sm">
-                Un même langage visuel pour l’interface, le réseau et
-                l’administration.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                Densité utile
-              </p>
-              <p className="mt-1 text-sm">
-                Plus d’espace pour agir, moins de vide décoratif sur les côtés.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                Parcours clair
-              </p>
-              <p className="mt-1 text-sm">
-                Chaque zone est rangée par intention pour éviter les panneaux
-                fourre-tout.
-              </p>
-            </div>
           </div>
         </div>
       </section>

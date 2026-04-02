@@ -320,6 +320,12 @@
       "accessibility": "Image added on {date}. File size: {size} KB. {navigation}",
       "previous_button": "Use the previous button to see the previous image.",
       "next_button": "Use the next button to see the next image.",
+      "presentation": {
+        "fullscreen": "Fullscreen",
+        "modal": "Modal"
+      },
+      "file_unavailable": "This file is no longer available.",
+      "file_not_in_album": "This file is not available in this album.",
       "info_panel": {
         "title": "Information",
         "filename": "Filename",

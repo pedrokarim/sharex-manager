@@ -61,6 +61,7 @@ import { DateRangeFilter } from "@/components/gallery/date-range-filter";
 import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "@/lib/i18n";
 import { motion } from "framer-motion";
+import { useRoutedFileViewer } from "@/hooks/use-routed-file-viewer";
 
 interface FileInfo {
   name: string;
@@ -74,6 +75,11 @@ interface FileInfo {
 interface GroupedFiles {
   [key: string]: FileInfo[];
 }
+
+const dedupeFilesByName = (input: FileInfo[]) =>
+  input.filter(
+    (file, index, self) => index === self.findIndex((item) => item.name === file.name),
+  );
 
 interface GalleryClientProps {
   initialFiles: FileInfo[];
@@ -201,7 +207,6 @@ export function GalleryClient({
   const [search] = useQueryState("q");
   const [startDate] = useQueryState("start");
   const [endDate] = useQueryState("end");
-  const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
   const [viewMode] = useQueryState<"grid" | "list" | "details">("view", {
     defaultValue: defaultViewMode,
     parse: (value): "grid" | "list" | "details" => {
@@ -227,7 +232,22 @@ export function GalleryClient({
   const [fileAlbumsCache, setFileAlbumsCache] = useState<Record<string, any[]>>(
     {},
   );
+  const {
+    fileName: viewerFileName,
+    presentation: viewerPresentation,
+    openFile: openViewerFile,
+    navigateToFile: navigateViewerFile,
+    closeFile: closeViewerFile,
+    setPresentation: setViewerPresentation,
+  } = useRoutedFileViewer();
+  const [viewerFallbackFile, setViewerFallbackFile] = useState<FileInfo | null>(
+    null,
+  );
+  const [isViewerLoading, setIsViewerLoading] = useState(false);
   const fileAlbumsCacheRef = useRef(fileAlbumsCache);
+  const highestLoadedPageRef = useRef(1);
+  const hasMorePagesRef = useRef(initialHasMore);
+  const viewerResolutionIdRef = useRef(0);
   useEffect(() => {
     fileAlbumsCacheRef.current = fileAlbumsCache;
   }, [fileAlbumsCache]);
@@ -347,6 +367,8 @@ export function GalleryClient({
     fetchMore: useCallback(
       async (page) => {
         const { files, hasMore } = await fetchFiles(page);
+        highestLoadedPageRef.current = Math.max(highestLoadedPageRef.current, page);
+        hasMorePagesRef.current = hasMore;
         return { data: files, hasMore };
       },
       [fetchFiles],
@@ -357,6 +379,15 @@ export function GalleryClient({
   // No useEffect sync needed.
   const fetchFilesRef = useRef(fetchFiles);
   fetchFilesRef.current = fetchFiles;
+
+  const applyReset = useCallback(
+    (nextFiles: FileInfo[], nextHasMore: boolean) => {
+      highestLoadedPageRef.current = 1;
+      hasMorePagesRef.current = nextHasMore;
+      reset(nextFiles, nextHasMore);
+    },
+    [reset],
+  );
 
   const prependItemRef = useRef(prependItem);
   prependItemRef.current = prependItem;
@@ -479,8 +510,8 @@ export function GalleryClient({
   const handleFinishUpload = useCallback(async () => {
     const { files: newFiles, hasMore: newHasMore } =
       await fetchFilesRef.current(1);
-    reset(newFiles, newHasMore);
-  }, [reset]);
+    applyReset(newFiles, newHasMore);
+  }, [applyReset]);
 
   // Reset to page 1 when any filter/sort value changes (skip initial mount)
   const mountedRef = useRef(false);
@@ -490,10 +521,10 @@ export function GalleryClient({
       return;
     }
     fetchFilesRef.current(1).then(({ files, hasMore }) => {
-      reset(files, hasMore);
+      applyReset(files, hasMore);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchFiles accessed via ref
-  }, [search, sortBy, sortOrder, startDate, endDate, reset]);
+  }, [search, sortBy, sortOrder, startDate, endDate, applyReset]);
 
   // Fonction pour gérer la sélection vide
   const handleSelectionEmpty = useCallback(() => {
@@ -523,14 +554,14 @@ export function GalleryClient({
     try {
       const { files: newFiles, hasMore: newHasMore } =
         await fetchFilesRef.current(1);
-      reset(newFiles, newHasMore);
+      applyReset(newFiles, newHasMore);
     } catch (error) {
       console.error("Erreur lors du rafraîchissement:", error);
       toast.error(t("gallery.refresh.error"));
     } finally {
       setIsRefreshing(false);
     }
-  }, [reset, t]);
+  }, [applyReset, t]);
 
   useEffect(() => {
     if (autoRefreshInterval === 0) return;
@@ -568,10 +599,7 @@ export function GalleryClient({
 
   // Éviter les doublons dans les fichiers
   const uniqueFiles = useMemo(() => {
-    return files.filter(
-      (file, index, self) =>
-        index === self.findIndex((f) => f.name === file.name),
-    );
+    return dedupeFilesByName(files);
   }, [files]);
 
   // Charger les albums des fichiers visibles
@@ -581,6 +609,134 @@ export function GalleryClient({
       loadFileAlbums(fileNames);
     }
   }, [uniqueFiles, loadFileAlbums]);
+
+  const fetchViewerFileMetadata = useCallback(async (fileName: string) => {
+    const response = await fetch(
+      `/api/files/${encodeURIComponent(fileName)}/metadata`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(String(response.status));
+    }
+
+    return (await response.json()) as FileInfo;
+  }, []);
+
+  const hydrateViewerFileInList = useCallback(
+    async (fileName: string) => {
+      if (!hasMorePagesRef.current) {
+        return false;
+      }
+
+      let page = highestLoadedPageRef.current + 1;
+      let hasMore = hasMorePagesRef.current;
+
+      while (hasMore) {
+        const { files: nextFiles, hasMore: nextHasMore } =
+          await fetchFilesRef.current(page);
+
+        highestLoadedPageRef.current = Math.max(highestLoadedPageRef.current, page);
+        hasMorePagesRef.current = nextHasMore;
+        hasMore = nextHasMore;
+
+        if (nextFiles.length > 0) {
+          updateData((prev) => dedupeFilesByName([...prev, ...nextFiles]));
+        }
+
+        if (nextFiles.some((item) => item.name === fileName)) {
+          return true;
+        }
+
+        if (nextFiles.length === 0) {
+          return false;
+        }
+
+        page += 1;
+      }
+
+      return false;
+    },
+    [updateData],
+  );
+
+  useEffect(() => {
+    if (!viewerFileName) {
+      setViewerFallbackFile(null);
+      setIsViewerLoading(false);
+      return;
+    }
+
+    const existingFile = uniqueFiles.find((file) => file.name === viewerFileName);
+
+    if (existingFile) {
+      setViewerFallbackFile(null);
+      setIsViewerLoading(false);
+      return;
+    }
+
+    const resolutionId = ++viewerResolutionIdRef.current;
+    let cancelled = false;
+    setIsViewerLoading(true);
+
+    const resolveViewerFile = async () => {
+      try {
+        const metadata = await fetchViewerFileMetadata(viewerFileName);
+        if (cancelled || viewerResolutionIdRef.current !== resolutionId) {
+          return;
+        }
+
+        setViewerFallbackFile(metadata);
+        await hydrateViewerFileInList(viewerFileName);
+      } catch (error) {
+        if (cancelled || viewerResolutionIdRef.current !== resolutionId) {
+          return;
+        }
+
+        console.error("Erreur lors de la résolution du fichier viewer:", error);
+        toast.error(t("gallery.file_viewer.file_unavailable"));
+        closeViewerFile();
+      } finally {
+        if (!cancelled && viewerResolutionIdRef.current === resolutionId) {
+          setIsViewerLoading(false);
+        }
+      }
+    };
+
+    void resolveViewerFile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    viewerFileName,
+    uniqueFiles,
+    fetchViewerFileMetadata,
+    hydrateViewerFileInList,
+    t,
+    closeViewerFile,
+  ]);
+
+  const viewerFile = useMemo(() => {
+    if (!viewerFileName) {
+      return null;
+    }
+
+    return (
+      uniqueFiles.find((file) => file.name === viewerFileName) ??
+      (viewerFallbackFile?.name === viewerFileName ? viewerFallbackFile : null)
+    );
+  }, [viewerFileName, uniqueFiles, viewerFallbackFile]);
+
+  const viewerFileIndex = useMemo(() => {
+    if (!viewerFileName) {
+      return -1;
+    }
+
+    return uniqueFiles.findIndex((file) => file.name === viewerFileName);
+  }, [viewerFileName, uniqueFiles]);
 
   const groupedFiles = useMemo(() => {
     return uniqueFiles.reduce((acc: GroupedFiles, file) => {
@@ -595,40 +751,39 @@ export function GalleryClient({
     }, {});
   }, [uniqueFiles]);
 
-  const findCurrentFileIndex = () => {
-    if (!selectedFile) return -1;
-    return files.findIndex((f) => f.name === selectedFile.name);
-  };
-
-  const handlePrevious = () => {
-    const currentIndex = findCurrentFileIndex();
-    if (currentIndex > 0) {
-      setSelectedFile(files[currentIndex - 1]);
+  const handlePrevious = useCallback(() => {
+    if (viewerFileIndex > 0) {
+      navigateViewerFile(uniqueFiles[viewerFileIndex - 1].name);
     }
-  };
+  }, [viewerFileIndex, navigateViewerFile, uniqueFiles]);
 
-  const handleNext = () => {
-    const currentIndex = findCurrentFileIndex();
-    if (currentIndex < files.length - 1) {
-      setSelectedFile(files[currentIndex + 1]);
+  const handleNext = useCallback(() => {
+    if (viewerFileIndex >= 0 && viewerFileIndex < uniqueFiles.length - 1) {
+      navigateViewerFile(uniqueFiles[viewerFileIndex + 1].name);
     }
-  };
+  }, [viewerFileIndex, navigateViewerFile, uniqueFiles]);
 
-  const handleDelete = async (filename: string) => {
-    try {
-      const response = await fetch(`/api/files/${filename}`, {
-        method: "DELETE",
-      });
+  const handleDelete = useCallback(
+    async (filename: string) => {
+      try {
+        const response = await fetch(`/api/files/${encodeURIComponent(filename)}`, {
+          method: "DELETE",
+        });
 
-      if (response.ok) {
-        toast.success(t("gallery.file_actions.delete_success"));
-        setSelectedFile(null);
-        handleRefresh();
+        if (response.ok) {
+          toast.success(t("gallery.file_actions.delete_success"));
+          if (viewerFileName === filename) {
+            closeViewerFile();
+            setViewerFallbackFile(null);
+          }
+          handleRefresh();
+        }
+      } catch (error) {
+        toast.error(t("gallery.file_actions.delete_error"));
       }
-    } catch (error) {
-      toast.error(t("gallery.file_actions.delete_error"));
-    }
-  };
+    },
+    [closeViewerFile, handleRefresh, t, viewerFileName],
+  );
 
   const copyToClipboard = async (url: string) => {
     try {
@@ -665,25 +820,30 @@ export function GalleryClient({
     }
   };
 
-  const handleUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
+  const handleUpload = useCallback(
+    async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const response = await fetch("/api/gallery/upload", {
-      method: "POST",
-      body: formData,
-    });
+      const response = await fetch("/api/gallery/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || t("gallery.upload_zone.upload_error"));
-    }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || t("gallery.upload_zone.upload_error"));
+      }
 
-    await fetchFilesRef.current(1).then(({ files, hasMore }) => {
-      reset(files, hasMore);
-      setSelectedFile(files[0]);
-    });
-  };
+      await fetchFilesRef.current(1).then(({ files, hasMore }) => {
+        applyReset(files, hasMore);
+        if (files[0]) {
+          openViewerFile(files[0].name);
+        }
+      });
+    },
+    [applyReset, openViewerFile, t],
+  );
 
   const handleToggleSecurity = async (file: FileInfo) => {
     try {
@@ -709,6 +869,9 @@ export function GalleryClient({
         prev.map((f) =>
           f.name === file.name ? { ...f, isSecure: data.isSecure } : f,
         ),
+      );
+      setViewerFallbackFile((prev) =>
+        prev?.name === file.name ? { ...prev, isSecure: data.isSecure } : prev,
       );
 
       toast.success(
@@ -746,6 +909,9 @@ export function GalleryClient({
         prev.map((f) =>
           f.name === file.name ? { ...f, isStarred: data.isStarred } : f,
         ),
+      );
+      setViewerFallbackFile((prev) =>
+        prev?.name === file.name ? { ...prev, isStarred: data.isStarred } : prev,
       );
 
       toast.success(
@@ -816,6 +982,10 @@ export function GalleryClient({
         updateData((prev) =>
           prev.filter((f) => !selectedFileNames.includes(f.name)),
         );
+        if (viewerFileName && selectedFileNames.includes(viewerFileName)) {
+          closeViewerFile();
+          setViewerFallbackFile(null);
+        }
         clearSelection();
         toast.success(t("gallery.file_actions.delete_success"));
       }
@@ -827,7 +997,14 @@ export function GalleryClient({
       console.error("Erreur lors de la suppression:", error);
       toast.error(t("gallery.file_actions.error_occurred"));
     }
-  }, [getSelectedFiles, updateData, clearSelection, t]);
+  }, [
+    getSelectedFiles,
+    updateData,
+    clearSelection,
+    t,
+    viewerFileName,
+    closeViewerFile,
+  ]);
 
   const handleToggleStarSelected = useCallback(async () => {
     const selectedFilesData = getSelectedFilesData(files);
@@ -853,6 +1030,19 @@ export function GalleryClient({
           return sel ? { ...f, isStarred: !sel.isStarred } : f;
         }),
       );
+      setViewerFallbackFile((prev) => {
+        if (!prev) {
+          return prev;
+        }
+
+        const selectedViewerFile = selectedFilesData.find(
+          (file) => file.name === prev.name,
+        );
+
+        return selectedViewerFile
+          ? { ...prev, isStarred: !selectedViewerFile.isStarred }
+          : prev;
+      });
 
       toast.success(t("gallery.file_actions.added_to_favorites"));
     } catch (error) {
@@ -885,6 +1075,19 @@ export function GalleryClient({
           return sel ? { ...f, isSecure: !sel.isSecure } : f;
         }),
       );
+      setViewerFallbackFile((prev) => {
+        if (!prev) {
+          return prev;
+        }
+
+        const selectedViewerFile = selectedFilesData.find(
+          (file) => file.name === prev.name,
+        );
+
+        return selectedViewerFile
+          ? { ...prev, isSecure: !selectedViewerFile.isSecure }
+          : prev;
+      });
 
       toast.success(t("gallery.file_actions.now_private"));
     } catch (error) {
@@ -1187,7 +1390,7 @@ export function GalleryClient({
                           prev.filter((f) => f.name !== name),
                         );
                       }}
-                      onSelect={setSelectedFile}
+                      onSelect={(file) => openViewerFile(file.name)}
                       onToggleSecurity={handleToggleSecurity}
                       onToggleStar={handleToggleStar}
                       onToggleSelection={toggleFile}
@@ -1220,7 +1423,7 @@ export function GalleryClient({
                           prev.filter((f) => f.name !== name),
                         );
                       }}
-                      onSelect={setSelectedFile}
+                      onSelect={(file) => openViewerFile(file.name)}
                       onToggleSecurity={handleToggleSecurity}
                       onToggleStar={handleToggleStar}
                       onToggleSelection={toggleFile}
@@ -1263,16 +1466,20 @@ export function GalleryClient({
       </div>
 
       <FileViewer
-        file={selectedFile}
-        onClose={() => setSelectedFile(null)}
+        file={viewerFile}
+        presentation={viewerPresentation}
+        onPresentationChange={setViewerPresentation}
+        onClose={closeViewerFile}
         onDelete={handleDelete}
         onCopy={copyToClipboard}
         onToggleSecurity={handleToggleSecurity}
         onToggleStar={handleToggleStar}
         onPrevious={handlePrevious}
         onNext={handleNext}
-        hasPrevious={findCurrentFileIndex() > 0}
-        hasNext={findCurrentFileIndex() < files.length - 1}
+        hasPrevious={viewerFileIndex > 0}
+        hasNext={viewerFileIndex >= 0 && viewerFileIndex < uniqueFiles.length - 1}
+        isLoading={isViewerLoading}
+        loadingName={viewerFileName}
       />
 
       <UploadModal

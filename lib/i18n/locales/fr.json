@@ -322,6 +322,12 @@
       "accessibility": "Image ajoutée le {date}. Taille du fichier : {size} Ko. {navigation}",
       "previous_button": "Utilisez le bouton précédent pour voir l'image précédente.",
       "next_button": "Utilisez le bouton suivant pour voir l'image suivante.",
+      "presentation": {
+        "fullscreen": "Plein écran",
+        "modal": "Modal"
+      },
+      "file_unavailable": "Ce fichier n'est plus disponible.",
+      "file_not_in_album": "Ce fichier n'est pas disponible dans cet album.",
       "info_panel": {
         "title": "Informations",
         "filename": "Nom du fichier",
