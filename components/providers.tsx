@@ -38,7 +38,10 @@ export function Providers({
         <Suspense fallback={null}>
           <NuqsAdapter>
             <SessionProvider session={session}>
-              <ThemeProvider initialTheme={initialTheme}>
+              <ThemeProvider
+                initialTheme={initialTheme}
+                isAuthenticated={!!session?.user}
+              >
                 <TranslationProvider>
                   <TooltipProvider delayDuration={150}>{children}</TooltipProvider>
                 </TranslationProvider>

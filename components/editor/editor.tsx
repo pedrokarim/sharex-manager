@@ -4,7 +4,11 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAtom } from "jotai";
 import { themeEditorStateAtom, setThemeStateAtom } from "@/lib/atoms/editor";
-import { Theme, ThemeStyles } from "@/types/theme";
+import {
+  Theme,
+  ThemePresetSelectOptions,
+  ThemeStyles,
+} from "@/types/theme";
 import { Sliders } from "lucide-react";
 import React, { use, useEffect } from "react";
 import { ActionBar } from "./action-bar/action-bar";
@@ -14,6 +18,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface EditorProps {
   themePromise: Promise<Theme | null>;
+  presetSelectOptions?: ThemePresetSelectOptions;
   showActionBar?: boolean;
 }
 
@@ -27,7 +32,11 @@ const isThemeStyles = (styles: unknown): styles is ThemeStyles => {
   );
 };
 
-const Editor: React.FC<EditorProps> = ({ themePromise, showActionBar = true }) => {
+const Editor: React.FC<EditorProps> = ({
+  themePromise,
+  presetSelectOptions,
+  showActionBar = true,
+}) => {
   const [themeState] = useAtom(themeEditorStateAtom);
   const [, setThemeState] = useAtom(setThemeStateAtom);
   const isMobile = useIsMobile();
@@ -87,6 +96,7 @@ const Editor: React.FC<EditorProps> = ({ themePromise, showActionBar = true }) =
                 <ThemeControlPanel
                   styles={styles}
                   onChange={handleStyleChange}
+                  presetSelectOptions={presetSelectOptions}
                   currentMode={themeState.currentMode}
                   themePromise={themePromise}
                 />
@@ -125,6 +135,7 @@ const Editor: React.FC<EditorProps> = ({ themePromise, showActionBar = true }) =
               <ThemeControlPanel
                 styles={styles}
                 onChange={handleStyleChange}
+                presetSelectOptions={presetSelectOptions}
                 currentMode={themeState.currentMode}
                 themePromise={themePromise}
               />

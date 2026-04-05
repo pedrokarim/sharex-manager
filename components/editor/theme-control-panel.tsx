@@ -47,6 +47,7 @@ const ThemeControlPanel = ({
   styles,
   currentMode,
   onChange,
+  presetSelectOptions,
   themePromise,
 }: ThemeEditorControlsProps) => {
   const [themeState] = useAtom(themeEditorStateAtom);
@@ -115,6 +116,7 @@ const ThemeControlPanel = ({
           <ThemePresetSelect
             className="h-14 rounded-none"
             disabled={isGeneratingTheme}
+            {...presetSelectOptions}
           />
         ) : (
           <ThemeEditActions theme={theme} disabled={isGeneratingTheme} />

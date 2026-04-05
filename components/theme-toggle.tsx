@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Clock, Monitor, Moon, Sun } from "lucide-react";
+import { Clock, Globe2, Monitor, Moon, Sun } from "lucide-react";
 
 type ThemeToggleProps = Pick<
   React.ComponentProps<typeof Button>,
@@ -21,10 +21,12 @@ export function ThemeToggle({
   size = "icon",
   className,
 }: ThemeToggleProps) {
-  const { themePreference, setThemePreference, timeWindow } = useTheme();
+  const { isAuthenticated, themePreference, setThemePreference, timeWindow } =
+    useTheme();
   const isMobile = useIsMobile();
 
   const themeIcons = {
+    inherit: Globe2,
     light: Sun,
     dark: Moon,
     system: Monitor,
@@ -34,7 +36,7 @@ export function ThemeToggle({
   const Icon = themeIcons[themePreference] || Sun;
 
   const handleThemeChange = (
-    preference: "light" | "dark" | "system" | "time-based",
+    preference: "inherit" | "light" | "dark" | "system" | "time-based",
     event?: React.MouseEvent
   ) => {
     const coords = event ? { x: event.clientX, y: event.clientY } : undefined;
@@ -50,6 +52,14 @@ export function ThemeToggle({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side={isMobile ? "bottom" : "right"} align="end">
+        {isAuthenticated && (
+          <DropdownMenuItem
+            onClick={(event) => handleThemeChange("inherit", event)}
+          >
+            <Globe2 className="mr-2 h-4 w-4" />
+            Suivre le site
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={(event) => handleThemeChange("light", event)}>
           <Sun className="mr-2 h-4 w-4" />
           Clair
@@ -62,10 +72,14 @@ export function ThemeToggle({
           <Monitor className="mr-2 h-4 w-4" />
           Système
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={(event) => handleThemeChange("time-based", event)}>
-          <Clock className="mr-2 h-4 w-4" />
-          Automatique ({timeWindow.dayStartHour}h-{timeWindow.dayEndHour}h)
-        </DropdownMenuItem>
+        {isAuthenticated && (
+          <DropdownMenuItem
+            onClick={(event) => handleThemeChange("time-based", event)}
+          >
+            <Clock className="mr-2 h-4 w-4" />
+            Automatique ({timeWindow.dayStartHour}h-{timeWindow.dayEndHour}h)
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

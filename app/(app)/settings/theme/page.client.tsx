@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useAtom } from "jotai";
+import { Provider as JotaiProvider, createStore, useAtom } from "jotai";
 import Editor from "@/components/editor/editor";
 import { useTheme } from "@/components/theme-provider";
 import { Badge } from "@/components/ui/badge";
@@ -24,11 +24,12 @@ import {
   getUserThemeDraftStyles,
 } from "@/lib/theme/user-theme-styles";
 import { isDeepEqual } from "@/lib/utils";
+import { findMatchingThemePresetName } from "@/utils/theme-preset-helper";
 import { Palette, RotateCcw, Save, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 
-export default function ThemeSettingsPageClient() {
-  const { resolvedTheme, replaceResolvedTheme } = useTheme();
+function ThemeSettingsPageContent() {
+  const { theme, resolvedTheme, replaceResolvedTheme } = useTheme();
   const [themeState] = useAtom(themeEditorStateAtom);
   const [, loadThemeEditorState] = useAtom(loadThemeEditorStateAtom);
   const [isSaving, setIsSaving] = useState(false);
@@ -40,14 +41,16 @@ export default function ThemeSettingsPageClient() {
   );
 
   useEffect(() => {
+    const matchingPreset = findMatchingThemePresetName(savedDraftStyles);
+
     loadThemeEditorState({
       ...defaultThemeState,
-      preset: undefined,
+      preset: matchingPreset,
       styles: savedDraftStyles,
-      currentMode: resolvedTheme.activeMode,
+      currentMode: theme,
       hslAdjustments: defaultThemeState.hslAdjustments,
     });
-  }, [loadThemeEditorState, resolvedTheme.activeMode, savedDraftStyles]);
+  }, [loadThemeEditorState, savedDraftStyles, theme]);
 
   const hasUnsavedChanges = !isDeepEqual(themeState.styles, savedDraftStyles);
   const currentModePreference =
@@ -217,10 +220,30 @@ export default function ThemeSettingsPageClient() {
         </CardHeader>
         <CardContent className="overflow-hidden p-0">
           <div className="h-[68svh] min-h-[420px] overflow-hidden sm:h-[75vh] sm:min-h-[680px]">
-            <Editor themePromise={emptyThemePromise} showActionBar={false} />
+            <Editor
+              themePromise={emptyThemePromise}
+              presetSelectOptions={{
+                fallbackLabel: resolvedTheme.userPreferences?.overrideEnabled
+                  ? "Palette personnelle"
+                  : "Palette du site",
+                showPresetUnsavedState: false,
+                showSavedThemes: false,
+              }}
+              showActionBar={false}
+            />
           </div>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function ThemeSettingsPageClient() {
+  const editorStore = useMemo(() => createStore(), []);
+
+  return (
+    <JotaiProvider store={editorStore}>
+      <ThemeSettingsPageContent />
+    </JotaiProvider>
   );
 }

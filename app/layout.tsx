@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import type { Session } from "next-auth";
 import localFont from "next/font/local";
+import Script from "next/script";
 import "./global.css";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
 import { auth } from "@/auth";
+import { createThemeBootstrapScript } from "@/lib/theme/create-theme-bootstrap-script";
 import { getResolvedThemePayload } from "@/lib/theme/get-resolved-theme-payload";
 // import { ThemeWrapper } from "@/components/theme-wrapper"; // Disabled - themes now handled by Jotai
 
@@ -39,12 +41,21 @@ export default async function RootLayout({
     sessionPromise,
     themePromise,
   ]);
+  const themeBootstrapScript = createThemeBootstrapScript({
+    initialTheme,
+    isAuthenticated: !!session?.user,
+  });
 
   return (
     <html lang="fr" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Script
+          id="theme-bootstrap"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: themeBootstrapScript }}
+        />
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:z-[9999] focus:bg-background focus:px-4 focus:py-2 focus:text-foreground"

@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAtom } from "jotai";
+import { Provider as JotaiProvider, createStore, useAtom } from "jotai";
+import { useRouter } from "next/navigation";
 import Editor from "@/components/editor/editor";
+import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,7 +22,12 @@ import {
   themeEditorStateAtom,
 } from "@/lib/atoms/editor";
 import { isDeepEqual } from "@/lib/utils";
-import type { GlobalThemeConfig, GlobalThemeMode } from "@/types/theme-runtime";
+import { findMatchingThemePresetName } from "@/utils/theme-preset-helper";
+import type {
+  GlobalThemeConfig,
+  GlobalThemeMode,
+  ThemeRuntimeUpdateResponse,
+} from "@/types/theme-runtime";
 import {
   ArrowUpRight,
   Clock3,
@@ -53,11 +60,33 @@ const modeOptions: Array<{
   },
 ];
 
-export default function ThemeAdminPageClient({
+function resolveEditorPreviewMode(mode: GlobalThemeMode): "light" | "dark" {
+  if (mode === "dark") {
+    return "dark";
+  }
+
+  if (mode === "light") {
+    return "light";
+  }
+
+  if (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    return "dark";
+  }
+
+  return "light";
+}
+
+function ThemeAdminPageContent({
   initialGlobalTheme,
 }: {
   initialGlobalTheme: GlobalThemeConfig;
 }) {
+  const router = useRouter();
+  const { replaceResolvedTheme } = useTheme();
   const [themeState] = useAtom(themeEditorStateAtom);
   const [, loadThemeEditorState] = useAtom(loadThemeEditorStateAtom);
   const [globalMode, setGlobalMode] = useState<GlobalThemeMode>(
@@ -70,14 +99,16 @@ export default function ThemeAdminPageClient({
   const emptyThemePromise = useMemo(() => Promise.resolve(null), []);
 
   useEffect(() => {
+    const matchingPreset = findMatchingThemePresetName(publishedTheme.styles);
+
     loadThemeEditorState({
       ...defaultThemeState,
-      preset: undefined,
-      styles: initialGlobalTheme.styles,
-      currentMode: initialGlobalTheme.mode === "dark" ? "dark" : "light",
+      preset: matchingPreset,
+      styles: publishedTheme.styles,
+      currentMode: resolveEditorPreviewMode(publishedTheme.mode),
       hslAdjustments: defaultThemeState.hslAdjustments,
     });
-  }, [initialGlobalTheme.mode, initialGlobalTheme.styles, loadThemeEditorState]);
+  }, [loadThemeEditorState, publishedTheme.mode, publishedTheme.styles]);
 
   const hasUnsavedChanges =
     globalMode !== publishedTheme.mode ||
@@ -98,7 +129,9 @@ export default function ThemeAdminPageClient({
         }),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as ThemeRuntimeUpdateResponse & {
+        error?: string;
+      };
 
       if (!response.ok) {
         throw new Error(data.error || "Impossible de publier le thème");
@@ -106,6 +139,8 @@ export default function ThemeAdminPageClient({
 
       setPublishedTheme(data.globalTheme);
       setGlobalMode(data.globalTheme.mode);
+      replaceResolvedTheme(data.payload, { animate: false });
+      router.refresh();
       toast.success("Le thème global a été publié.");
     } catch (error) {
       toast.error(
@@ -240,7 +275,15 @@ export default function ThemeAdminPageClient({
           </CardHeader>
           <CardContent className="p-0">
             <div className="h-[75vh] min-h-[680px]">
-              <Editor themePromise={emptyThemePromise} showActionBar={false} />
+              <Editor
+                themePromise={emptyThemePromise}
+                presetSelectOptions={{
+                  fallbackLabel: hasUnsavedChanges ? "Draft global" : "Theme publie",
+                  showPresetUnsavedState: false,
+                  showSavedThemes: false,
+                }}
+                showActionBar={false}
+              />
             </div>
           </CardContent>
         </Card>
@@ -324,5 +367,19 @@ export default function ThemeAdminPageClient({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ThemeAdminPageClient({
+  initialGlobalTheme,
+}: {
+  initialGlobalTheme: GlobalThemeConfig;
+}) {
+  const editorStore = useMemo(() => createStore(), []);
+
+  return (
+    <JotaiProvider store={editorStore}>
+      <ThemeAdminPageContent initialGlobalTheme={initialGlobalTheme} />
+    </JotaiProvider>
   );
 }

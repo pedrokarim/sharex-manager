@@ -1,13 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAtom } from "jotai";
-import {
-  timeBasedThemeAtom,
-  preferredThemeModeAtom,
-  type ThemeMode,
-} from "@/lib/atoms/preferences";
+import { useTheme } from "@/components/theme-provider";
 import { themeEditorStateAtom, setThemeStateAtom } from "@/lib/atoms/editor";
-import { useTimeBasedTheme } from "@/hooks/use-time-based-theme";
 import { Moon, Sun, Monitor, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +14,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+type PreviewThemeMode = "light" | "dark" | "system" | "time-based";
+
 export function EditorThemeToggle({
   variant = "ghost",
   size = "icon",
@@ -25,11 +23,19 @@ export function EditorThemeToggle({
 }: Pick<React.ComponentProps<typeof Button>, "variant" | "size" | "className">) {
   const [themeState] = useAtom(themeEditorStateAtom);
   const [, setThemeState] = useAtom(setThemeStateAtom);
-  const [timeBasedTheme] = useAtom(timeBasedThemeAtom);
-  const [, setPreferredThemeMode] = useAtom(preferredThemeModeAtom);
+  const { timeWindow } = useTheme();
   const isMobile = useIsMobile();
+  const [previewMode, setPreviewMode] = useState<PreviewThemeMode>(
+    themeState.currentMode,
+  );
 
-  useTimeBasedTheme();
+  useEffect(() => {
+    setPreviewMode((current) =>
+      current === "light" || current === "dark"
+        ? themeState.currentMode
+        : current,
+    );
+  }, [themeState.currentMode]);
 
   const themeIcons = {
     light: Sun,
@@ -38,8 +44,8 @@ export function EditorThemeToggle({
     "time-based": Clock,
   };
 
-  const Icon = themeIcons[themeState.currentMode as keyof typeof themeIcons] || Sun;
-  const { dayStartHour, dayEndHour } = timeBasedTheme;
+  const Icon = themeIcons[previewMode] || Sun;
+  const { dayStartHour, dayEndHour } = timeWindow;
 
   const applyThemeWithAnimation = (
     newMode: "light" | "dark",
@@ -65,20 +71,30 @@ export function EditorThemeToggle({
     });
   };
 
-  const handleThemeChange = (newTheme: ThemeMode, event?: React.MouseEvent) => {
-    setPreferredThemeMode(newTheme);
-
-    if (newTheme === "light") {
-      const coords = event ? { x: event.clientX, y: event.clientY } : undefined;
-      applyThemeWithAnimation("light", coords);
-    } else if (newTheme === "dark") {
-      const coords = event ? { x: event.clientX, y: event.clientY } : undefined;
-      applyThemeWithAnimation("dark", coords);
-    } else if (newTheme === "system") {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const coords = event ? { x: event.clientX, y: event.clientY } : undefined;
-      applyThemeWithAnimation(prefersDark ? "dark" : "light", coords);
+  const resolvePreviewMode = (mode: PreviewThemeMode) => {
+    if (mode === "light" || mode === "dark") {
+      return mode;
     }
+
+    if (mode === "system") {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+    }
+
+    const currentHour = new Date().getHours();
+    const isDayTime =
+      currentHour >= dayStartHour && currentHour < dayEndHour;
+    return isDayTime ? "light" : "dark";
+  };
+
+  const handleThemeChange = (
+    newTheme: PreviewThemeMode,
+    event?: React.MouseEvent,
+  ) => {
+    const coords = event ? { x: event.clientX, y: event.clientY } : undefined;
+    setPreviewMode(newTheme);
+    applyThemeWithAnimation(resolvePreviewMode(newTheme), coords);
   };
 
   return (

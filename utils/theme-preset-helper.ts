@@ -1,4 +1,5 @@
 import { defaultThemeState } from "@/config/theme";
+import { isDeepEqual } from "@/lib/utils";
 import { ThemeStyles } from "../types/theme";
 import { useThemePresetStore } from "../store/theme-preset-store";
 
@@ -24,4 +25,13 @@ export function getPresetThemeStyles(name: string): ThemeStyles {
       ...(preset.styles.dark || {}),
     },
   };
+}
+
+export function findMatchingThemePresetName(styles: ThemeStyles): string | undefined {
+  const store = useThemePresetStore.getState();
+  const presetNames = ["default", ...Object.keys(store.getAllPresets())];
+
+  return presetNames.find((presetName) =>
+    isDeepEqual(getPresetThemeStyles(presetName), styles)
+  );
 }

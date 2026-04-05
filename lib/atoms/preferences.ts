@@ -5,11 +5,6 @@ export type ThumbnailSize = "tiny" | "small" | "medium" | "large";
 export type Language = "fr" | "en";
 export type SortOrder = "asc" | "desc";
 export type SortBy = "name" | "date" | "size";
-export type ThemeMode = "light" | "dark" | "system" | "time-based";
-
-interface ColorConfig {
-  [key: string]: string;
-}
 
 interface PreferencesState {
   language: Language;
@@ -27,12 +22,6 @@ interface PreferencesState {
   defaultSortBy: SortBy;
   defaultSortOrder: SortOrder;
   enableUploadNotifications: boolean;
-  theme: ThemeMode;
-  lightColors: ColorConfig;
-  darkColors: ColorConfig;
-  radius: number;
-  dayStartHour: number;
-  dayEndHour: number;
 }
 
 const defaultPreferences: PreferencesState = {
@@ -51,12 +40,6 @@ const defaultPreferences: PreferencesState = {
   defaultSortBy: "date",
   defaultSortOrder: "desc",
   enableUploadNotifications: true,
-  theme: "system",
-  lightColors: {},
-  darkColors: {},
-  radius: 0,
-  dayStartHour: 7,
-  dayEndHour: 19,
 };
 
 // Atome principal pour toutes les préférences
@@ -119,19 +102,4 @@ export const sortingAtom = atomWithStorage<{ by: SortBy; order: SortOrder }>(
     by: "date",
     order: "desc",
   }
-);
-
-// Nouvel atome pour le thème basé sur le temps
-export const timeBasedThemeAtom = atomWithStorage<{
-  dayStartHour: number;
-  dayEndHour: number;
-}>("timeBasedTheme", {
-  dayStartHour: 7,
-  dayEndHour: 19,
-});
-
-// Nouvel atome pour stocker le mode de thème préféré par l'utilisateur
-export const preferredThemeModeAtom = atomWithStorage<ThemeMode>(
-  "preferredThemeMode",
-  "system"
 );

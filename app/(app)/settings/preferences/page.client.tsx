@@ -97,12 +97,6 @@ export function PreferencesPageClient() {
       defaultSortBy: "date",
       defaultSortOrder: "desc",
       enableUploadNotifications: true,
-      theme: "system",
-      lightColors: {},
-      darkColors: {},
-      radius: 0,
-      dayStartHour: 7,
-      dayEndHour: 19,
     });
     toast.success(t("settings.save_success"));
   };
