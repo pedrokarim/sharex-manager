@@ -5,6 +5,7 @@ import type { UploadConfig } from "@/lib/types/upload-config";
 import { logDb } from "@/lib/utils/db";
 import { auth } from "@/auth";
 import { defaultConfig } from "@/lib/defaultConfig";
+import { uploadConfigSchema } from "@/schemas/upload-config";
 
 const CONFIG_PATH = resolve(process.cwd(), "config", "uploads.json");
 
@@ -105,8 +106,36 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
+    const parsedConfig = uploadConfigSchema.safeParse(body);
+
+    if (!parsedConfig.success) {
+      const flattenedErrors = parsedConfig.error.flatten();
+
+      logDb.createLog({
+        level: "warning",
+        action: "config.update",
+        message: "Tentative de sauvegarde d'une configuration invalide",
+        userId: session.user.id,
+        userEmail: session.user.email,
+        metadata: {
+          fieldErrors: flattenedErrors.fieldErrors,
+          formErrors: flattenedErrors.formErrors,
+        },
+      });
+
+      return Response.json(
+        {
+          error:
+            flattenedErrors.formErrors[0] ||
+            Object.values(flattenedErrors.fieldErrors).flat()[0] ||
+            "Configuration invalide",
+        },
+        { status: 400 },
+      );
+    }
+
     const oldConfig = await readConfig();
-    await writeConfig(body);
+    await writeConfig(parsedConfig.data as UploadConfig);
 
     logDb.createLog({
       level: "info",
@@ -117,12 +146,12 @@ export async function PUT(req: NextRequest) {
       metadata: {
         changes: {
           before: oldConfig,
-          after: body,
+          after: parsedConfig.data,
         },
       },
     });
 
-    return Response.json(body);
+    return Response.json(parsedConfig.data);
   } catch (error) {
     logDb.createLog({
       level: "error",

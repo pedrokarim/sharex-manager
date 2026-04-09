@@ -24,6 +24,7 @@ interface AddToAlbumDialogProps {
   onClose: () => void;
   selectedFiles: string[];
   onSuccess?: () => void;
+  excludeAlbumIds?: number[];
 }
 
 export function AddToAlbumDialog({
@@ -31,6 +32,7 @@ export function AddToAlbumDialog({
   onClose,
   selectedFiles,
   onSuccess,
+  excludeAlbumIds,
 }: AddToAlbumDialogProps) {
   const { t } = useTranslation();
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -64,9 +66,11 @@ export function AddToAlbumDialog({
     }
   }, [open]);
 
-  const filteredAlbums = albums.filter((album) =>
-    album.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredAlbums = albums
+    .filter((album) => !(excludeAlbumIds ?? []).includes(album.id))
+    .filter((album) =>
+      album.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
 
   const handleAddToAlbums = async () => {
     if (selectedAlbums.size === 0) return;
@@ -165,7 +169,7 @@ export function AddToAlbumDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="flex max-h-[min(86vh,720px)] w-[calc(100vw-1.5rem)] max-w-[720px] flex-col gap-0 overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+        <DialogContent className="flex h-[min(86vh,720px)] w-[calc(100vw-1.5rem)] max-w-[720px] flex-col gap-0 overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
           <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
             <DialogTitle className="text-lg sm:text-xl">
               Ajouter à un album
@@ -176,7 +180,7 @@ export function AddToAlbumDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 py-4 sm:px-6">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-5 py-4 sm:px-6">
             {/* Recherche */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -208,7 +212,7 @@ export function AddToAlbumDialog({
                 <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" />
               </div>
             ) : (
-              <ScrollArea className="min-h-0 flex-1 pr-1">
+              <ScrollArea className="h-full min-h-0 flex-1 pr-1">
                 <div className="space-y-2 pb-1">
                   {filteredAlbums.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 py-8 text-center text-sm text-muted-foreground">
@@ -233,12 +237,12 @@ export function AddToAlbumDialog({
                           </div>
                         </div>
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                        <div className="w-0 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 min-w-0">
                             <span className="truncate text-sm font-medium sm:text-base">
                               {album.name}
                             </span>
-                            <Badge variant="secondary" className="text-[11px]">
+                            <Badge variant="secondary" className="flex-shrink-0 text-[11px]">
                               {album.fileCount}
                             </Badge>
                           </div>

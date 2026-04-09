@@ -1,13 +1,7 @@
 "use server";
 
 import { z } from "zod";
-// Temporairement désactivé pour éviter la dépendance DB
-// import { db } from "@/db";
-// import { theme as themeTable } from "@/db/schema";
-// import { eq, and } from "drizzle-orm";
 import cuid from "cuid";
-// import { auth } from "@/lib/auth";
-// import { headers } from "next/headers";
 import { themeStylesSchema, type ThemeStyles } from "@/types/theme";
 import { cache } from "react";
 import {
@@ -16,8 +10,6 @@ import {
   ThemeNotFoundError,
   ThemeLimitError,
 } from "@/types/errors";
-// import { MAX_FREE_THEMES } from "@/lib/constants";
-// import { getMyActiveSubscription } from "@/lib/subscription";
 
 // Helper to get user ID with better error handling - TEMPORAIREMENT DÉSACTIVÉ
 async function getCurrentUserId(): Promise<string> {

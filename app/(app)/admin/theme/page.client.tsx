@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAtom } from "jotai";
+import { Provider as JotaiProvider, createStore, useAtom } from "jotai";
+import { useRouter } from "next/navigation";
 import Editor from "@/components/editor/editor";
+import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,16 +22,13 @@ import {
   themeEditorStateAtom,
 } from "@/lib/atoms/editor";
 import { isDeepEqual } from "@/lib/utils";
-import type { GlobalThemeConfig, GlobalThemeMode } from "@/types/theme-runtime";
-import {
-  ArrowUpRight,
-  Clock3,
-  Layers3,
-  Palette,
-  PaintBucket,
-  Sparkles,
-  Wand2,
-} from "lucide-react";
+import { findMatchingThemePresetName } from "@/utils/theme-preset-helper";
+import type {
+  GlobalThemeConfig,
+  GlobalThemeMode,
+  ThemeRuntimeUpdateResponse,
+} from "@/types/theme-runtime";
+import { Palette, PaintBucket } from "lucide-react";
 
 const modeOptions: Array<{
   value: GlobalThemeMode;
@@ -53,11 +52,33 @@ const modeOptions: Array<{
   },
 ];
 
-export default function ThemeAdminPageClient({
+function resolveEditorPreviewMode(mode: GlobalThemeMode): "light" | "dark" {
+  if (mode === "dark") {
+    return "dark";
+  }
+
+  if (mode === "light") {
+    return "light";
+  }
+
+  if (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    return "dark";
+  }
+
+  return "light";
+}
+
+function ThemeAdminPageContent({
   initialGlobalTheme,
 }: {
   initialGlobalTheme: GlobalThemeConfig;
 }) {
+  const router = useRouter();
+  const { replaceResolvedTheme } = useTheme();
   const [themeState] = useAtom(themeEditorStateAtom);
   const [, loadThemeEditorState] = useAtom(loadThemeEditorStateAtom);
   const [globalMode, setGlobalMode] = useState<GlobalThemeMode>(
@@ -70,14 +91,16 @@ export default function ThemeAdminPageClient({
   const emptyThemePromise = useMemo(() => Promise.resolve(null), []);
 
   useEffect(() => {
+    const matchingPreset = findMatchingThemePresetName(publishedTheme.styles);
+
     loadThemeEditorState({
       ...defaultThemeState,
-      preset: undefined,
-      styles: initialGlobalTheme.styles,
-      currentMode: initialGlobalTheme.mode === "dark" ? "dark" : "light",
+      preset: matchingPreset,
+      styles: publishedTheme.styles,
+      currentMode: resolveEditorPreviewMode(publishedTheme.mode),
       hslAdjustments: defaultThemeState.hslAdjustments,
     });
-  }, [initialGlobalTheme.mode, initialGlobalTheme.styles, loadThemeEditorState]);
+  }, [loadThemeEditorState, publishedTheme.mode, publishedTheme.styles]);
 
   const hasUnsavedChanges =
     globalMode !== publishedTheme.mode ||
@@ -98,7 +121,9 @@ export default function ThemeAdminPageClient({
         }),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as ThemeRuntimeUpdateResponse & {
+        error?: string;
+      };
 
       if (!response.ok) {
         throw new Error(data.error || "Impossible de publier le thème");
@@ -106,6 +131,8 @@ export default function ThemeAdminPageClient({
 
       setPublishedTheme(data.globalTheme);
       setGlobalMode(data.globalTheme.mode);
+      replaceResolvedTheme(data.payload, { animate: false });
+      router.refresh();
       toast.success("Le thème global a été publié.");
     } catch (error) {
       toast.error(
@@ -225,104 +252,46 @@ export default function ThemeAdminPageClient({
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_360px]">
-        <Card className="overflow-hidden rounded-[2rem] border-border/70 shadow-sm">
-          <CardHeader className="border-b border-border/60 bg-muted/20 px-6 py-5">
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Palette className="h-5 w-5" />
-              Atelier du thème publié
-            </CardTitle>
-            <CardDescription className="text-sm">
-              L’éditeur existant pilote ici le thème de référence du site. Les
-              presets servent d’amorçage, mais rien n’est mis en ligne tant que la
-              publication n’a pas été validée.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="h-[75vh] min-h-[680px]">
-              <Editor themePromise={emptyThemePromise} showActionBar={false} />
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6 xl:sticky xl:top-4 xl:self-start">
-          <Card className="rounded-[1.75rem] border-border/70 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Layers3 className="h-5 w-5" />
-                Architecture future-ready
-              </CardTitle>
-              <CardDescription>
-                La page est déjà pensée pour accueillir d’autres briques sans
-                devenir un panneau monolithique.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
-                <p className="text-sm font-medium">Brand assets</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Logos, polices de marque, guidelines d’export et variantes de
-                  diffusion.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
-                <p className="text-sm font-medium">Règles par zone</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Possibilité future de surcharger le marketing, le catalogue ou le
-                  back-office sans casser la base commune.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
-                <p className="text-sm font-medium">Historique & publication</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Diffs, brouillons nommés, validation humaine et éventuel rollback.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[1.75rem] border-border/70 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Sparkles className="h-5 w-5" />
-                Roadmap visuelle
-              </CardTitle>
-              <CardDescription>
-                Ce panneau sert déjà de prototype de gouvernance thème pour la suite.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-3 rounded-2xl border border-border/60 bg-background p-4">
-                <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Automatisations</p>
-                  <p className="text-sm text-muted-foreground">
-                    Déclenchement futur par saison, campagne, événement ou A/B test.
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3 rounded-2xl border border-border/60 bg-background p-4">
-                <Wand2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Assistants d’édition</p>
-                  <p className="text-sm text-muted-foreground">
-                    Suggestions IA, contrôle de contraste et checklists de qualité.
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3 rounded-2xl border border-border/60 bg-background p-4">
-                <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Distribution multi-surface</p>
-                  <p className="text-sm text-muted-foreground">
-                    Base commune pour le web, les embeds et d’éventuels clients annexes.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <Card className="overflow-hidden rounded-[2rem] border-border/70 shadow-sm">
+        <CardHeader className="border-b border-border/60 bg-muted/20 px-6 py-5">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Palette className="h-5 w-5" />
+            Atelier du thème publié
+          </CardTitle>
+          <CardDescription className="text-sm">
+            L’éditeur existant pilote ici le thème de référence du site. Les
+            presets servent d’amorçage, mais rien n’est mis en ligne tant que la
+            publication n’a pas été validée.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="h-[75vh] min-h-[680px]">
+            <Editor
+              themePromise={emptyThemePromise}
+              presetSelectOptions={{
+                fallbackLabel: hasUnsavedChanges ? "Draft global" : "Theme publie",
+                showPresetUnsavedState: false,
+                showSavedThemes: false,
+              }}
+              showActionBar={false}
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+export default function ThemeAdminPageClient({
+  initialGlobalTheme,
+}: {
+  initialGlobalTheme: GlobalThemeConfig;
+}) {
+  const editorStore = useMemo(() => createStore(), []);
+
+  return (
+    <JotaiProvider store={editorStore}>
+      <ThemeAdminPageContent initialGlobalTheme={initialGlobalTheme} />
+    </JotaiProvider>
   );
 }

@@ -34,14 +34,21 @@ export function useUploadConfig() {
         body: JSON.stringify(newConfig),
       });
 
-      if (!response.ok) throw new Error("Erreur lors de la sauvegarde");
+      const data = await response.json();
 
-      const updatedConfig = await response.json();
-      setConfig(updatedConfig);
+      if (!response.ok) {
+        throw new Error(data.error || "Erreur lors de la sauvegarde");
+      }
+
+      setConfig(data);
       toast.success("Configuration mise à jour");
     } catch (error) {
       console.error("Erreur lors de la sauvegarde:", error);
-      toast.error("Impossible de sauvegarder la configuration");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Impossible de sauvegarder la configuration",
+      );
     } finally {
       setIsSaving(false);
     }

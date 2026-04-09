@@ -1,16 +1,11 @@
 import { auth } from "@/auth";
-import { readdir, stat, unlink } from "fs/promises";
+import { readdir, unlink } from "fs/promises";
 import { join } from "path";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getAbsoluteUploadPath } from "@/lib/config";
-import {
-  getSecureFiles,
-  isFileSecure,
-  setFileSecure,
-  removeFileFromSecure,
-} from "@/lib/secure-files";
-import { getStarredFiles, isFileStarred } from "@/lib/starred-files";
+import { setFileSecure, removeFileFromSecure } from "@/lib/secure-files";
+import { loadFileFlagSets, getFileMetadata } from "@/lib/file-metadata";
 import type { NextRequest } from "next/server";
 import { logger } from "@/lib/utils/logger";
 
@@ -39,8 +34,7 @@ export async function GET(request: Request) {
 
     // Récupérer tous les fichiers et leurs stats
     const entries = await readdir(UPLOADS_DIR, { withFileTypes: true });
-    const secureFiles = await getSecureFiles();
-    const starredFiles = await getStarredFiles();
+    const fileFlagSets = await loadFileFlagSets();
 
     const filesInfo = await Promise.all(
       entries
@@ -51,29 +45,23 @@ export async function GET(request: Request) {
             : true
         )
         .map(async (entry) => {
-          const filePath = join(UPLOADS_DIR, entry.name);
-          const stats = await stat(filePath);
-          const isSecure = secureFiles.includes(entry.name);
-          const isStarred = starredFiles.includes(entry.name);
+          const fileMetadata = await getFileMetadata(entry.name, fileFlagSets);
+
+          if (!fileMetadata) {
+            return null;
+          }
 
           // Si on veut uniquement les fichiers sécurisés et que ce fichier n'est pas sécurisé, on le saute
-          if (secureOnly && !isSecure) {
+          if (secureOnly && !fileMetadata.isSecure) {
             return null;
           }
 
           // Si on veut uniquement les fichiers favoris et que ce fichier n'est pas favori, on le saute
-          if (starredOnly && !isStarred) {
+          if (starredOnly && !fileMetadata.isStarred) {
             return null;
           }
 
-          return {
-            name: entry.name,
-            url: `/api/files/${entry.name}`,
-            size: stats.size,
-            createdAt: stats.mtime.toISOString(),
-            isSecure,
-            isStarred,
-          };
+          return fileMetadata;
         })
     );
 

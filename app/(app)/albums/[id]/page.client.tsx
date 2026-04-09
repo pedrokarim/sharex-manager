@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -35,17 +35,28 @@ import {
 import { GridView } from "@/components/gallery/grid-view";
 import { ListView } from "@/components/gallery/list-view";
 import { FileViewer } from "@/components/gallery/file-viewer";
+import { SelectionToolbar } from "@/components/gallery/selection-toolbar";
+import { KeyboardShortcutsDialog } from "@/components/gallery/keyboard-shortcuts-dialog";
+import { AddToAlbumDialog } from "@/components/albums/add-to-album-dialog";
 import { ViewSelector } from "@/components/view-selector";
 import { useTranslation } from "@/lib/i18n";
 import { Loading } from "@/components/ui/loading";
 import { useQueryState } from "nuqs";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
+import { useSimpleSelection } from "@/hooks/use-simple-selection";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { Album } from "@/types/albums";
 import type { FileInfo } from "@/types/files";
+import { useRoutedFileViewer } from "@/hooks/use-routed-file-viewer";
 
 interface AlbumViewClientProps {
   albumId: number;
 }
+
+const dedupeFilesByName = (input: FileInfo[]) =>
+  input.filter(
+    (file, index, self) => index === self.findIndex((item) => item.name === file.name),
+  );
 
 export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   const { t } = useTranslation();
@@ -59,7 +70,18 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   const [albumLoading, setAlbumLoading] = useState(true);
   const [isTogglingPublic, setIsTogglingPublic] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
+  const {
+    fileName: viewerFileName,
+    presentation: viewerPresentation,
+    openFile: openViewerFile,
+    navigateToFile: navigateViewerFile,
+    closeFile: closeViewerFile,
+    setPresentation: setViewerPresentation,
+  } = useRoutedFileViewer();
+  const [viewerFallbackFile, setViewerFallbackFile] = useState<FileInfo | null>(
+    null,
+  );
+  const [isViewerLoading, setIsViewerLoading] = useState(false);
   const [viewMode] = useQueryState<"grid" | "list" | "details">("view", {
     defaultValue: "grid",
     parse: (value): "grid" | "list" | "details" => {
@@ -69,6 +91,39 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       return "grid";
     },
   });
+
+  // Selection state
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isAddToAlbumDialogOpen, setIsAddToAlbumDialogOpen] = useState(false);
+  const [filesToAddToAlbum, setFilesToAddToAlbum] = useState<string[]>([]);
+  const [isMoveMode, setIsMoveMode] = useState(false);
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
+
+  const handleSelectionEmpty = useCallback(() => {
+    setIsSelectionMode(false);
+  }, []);
+
+  const {
+    selectedCount,
+    hasSelection,
+    isSelected,
+    toggleFile,
+    clearSelection,
+    selectAll,
+    getSelectedFiles,
+    getSelectedFilesData,
+  } = useSimpleSelection({
+    enabled: isSelectionMode,
+    onSelectionEmpty: handleSelectionEmpty,
+  });
+
+  const handleStartSelectionMode = useCallback(
+    (fileName: string) => {
+      setIsSelectionMode(true);
+      toggleFile(fileName);
+    },
+    [toggleFile],
+  );
 
   // Fetch album metadata (not files — those go through useInfiniteScroll)
   const fetchAlbumMetadata = useCallback(async () => {
@@ -145,9 +200,14 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     hasMore: boolean;
     loaded: boolean;
   }>({ files: [], hasMore: false, loaded: false });
+  const highestLoadedPageRef = useRef(1);
+  const hasMorePagesRef = useRef(false);
+  const viewerResolutionIdRef = useRef(0);
 
   useEffect(() => {
     fetchAlbumFiles(1).then(({ files, hasMore }) => {
+      highestLoadedPageRef.current = 1;
+      hasMorePagesRef.current = hasMore;
       setInitialData({ files, hasMore, loaded: true });
     });
   }, [fetchAlbumFiles]);
@@ -164,20 +224,168 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     fetchMore: useCallback(
       async (page) => {
         const { files, hasMore } = await fetchAlbumFiles(page);
+        highestLoadedPageRef.current = Math.max(highestLoadedPageRef.current, page);
+        hasMorePagesRef.current = hasMore;
         return { data: files, hasMore };
       },
       [fetchAlbumFiles]
     ),
   });
 
+  const applyReset = useCallback(
+    (nextFiles: FileInfo[], nextHasMore: boolean) => {
+      highestLoadedPageRef.current = 1;
+      hasMorePagesRef.current = nextHasMore;
+      reset(nextFiles, nextHasMore);
+    },
+    [reset],
+  );
+
   // When initialData loads, reset the infinite scroll with real data
   const initialDataLoadedRef = useRef(false);
   useEffect(() => {
     if (initialData.loaded && !initialDataLoadedRef.current) {
       initialDataLoadedRef.current = true;
-      reset(initialData.files, initialData.hasMore);
+      applyReset(initialData.files, initialData.hasMore);
     }
-  }, [initialData, reset]);
+  }, [initialData, applyReset]);
+
+  const uniqueFiles = useMemo(() => dedupeFilesByName(files), [files]);
+
+  const fetchViewerFileMetadata = useCallback(async (fileName: string) => {
+    const response = await fetch(
+      `/api/files/${encodeURIComponent(fileName)}/metadata`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(String(response.status));
+    }
+
+    return (await response.json()) as FileInfo;
+  }, []);
+
+  const hydrateViewerFileInList = useCallback(
+    async (fileName: string) => {
+      if (!hasMorePagesRef.current) {
+        return false;
+      }
+
+      let page = highestLoadedPageRef.current + 1;
+      let hasMore = hasMorePagesRef.current;
+
+      while (hasMore) {
+        const { files: nextFiles, hasMore: nextHasMore } =
+          await fetchAlbumFiles(page);
+
+        highestLoadedPageRef.current = Math.max(highestLoadedPageRef.current, page);
+        hasMorePagesRef.current = nextHasMore;
+        hasMore = nextHasMore;
+
+        if (nextFiles.length > 0) {
+          updateData((prev) => dedupeFilesByName([...prev, ...nextFiles]));
+        }
+
+        if (nextFiles.some((item) => item.name === fileName)) {
+          return true;
+        }
+
+        if (nextFiles.length === 0) {
+          return false;
+        }
+
+        page += 1;
+      }
+
+      return false;
+    },
+    [fetchAlbumFiles, updateData],
+  );
+
+  useEffect(() => {
+    if (!viewerFileName) {
+      setViewerFallbackFile(null);
+      setIsViewerLoading(false);
+      return;
+    }
+
+    const existingFile = uniqueFiles.find((file) => file.name === viewerFileName);
+
+    if (existingFile) {
+      setViewerFallbackFile(null);
+      setIsViewerLoading(false);
+      return;
+    }
+
+    const resolutionId = ++viewerResolutionIdRef.current;
+    let cancelled = false;
+    setIsViewerLoading(true);
+
+    const resolveViewerFile = async () => {
+      try {
+        const metadata = await fetchViewerFileMetadata(viewerFileName);
+        if (cancelled || viewerResolutionIdRef.current !== resolutionId) {
+          return;
+        }
+
+        setViewerFallbackFile(metadata);
+        const foundInAlbum = await hydrateViewerFileInList(viewerFileName);
+
+        if (!foundInAlbum && !cancelled && viewerResolutionIdRef.current === resolutionId) {
+          toast.error(t("gallery.file_viewer.file_not_in_album"));
+          closeViewerFile();
+          setViewerFallbackFile(null);
+        }
+      } catch (error) {
+        if (cancelled || viewerResolutionIdRef.current !== resolutionId) {
+          return;
+        }
+
+        console.error("Erreur lors de la résolution du fichier d'album:", error);
+        toast.error(t("gallery.file_viewer.file_unavailable"));
+        closeViewerFile();
+        setViewerFallbackFile(null);
+      } finally {
+        if (!cancelled && viewerResolutionIdRef.current === resolutionId) {
+          setIsViewerLoading(false);
+        }
+      }
+    };
+
+    void resolveViewerFile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    viewerFileName,
+    uniqueFiles,
+    fetchViewerFileMetadata,
+    hydrateViewerFileInList,
+    t,
+    closeViewerFile,
+  ]);
+
+  const viewerFile = useMemo(() => {
+    if (!viewerFileName) {
+      return null;
+    }
+
+    return (
+      uniqueFiles.find((file) => file.name === viewerFileName) ??
+      (viewerFallbackFile?.name === viewerFileName ? viewerFallbackFile : null)
+    );
+  }, [viewerFileName, uniqueFiles, viewerFallbackFile]);
+
+  const viewerFileIndex = useMemo(() => {
+    if (!viewerFileName) {
+      return -1;
+    }
+
+    return uniqueFiles.findIndex((file) => file.name === viewerFileName);
+  }, [viewerFileName, uniqueFiles]);
 
   const handleRemoveFromAlbum = async (fileName: string) => {
     try {
@@ -194,6 +402,10 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       }
 
       updateData((prev) => prev.filter((file) => file.name !== fileName));
+      if (viewerFileName === fileName) {
+        closeViewerFile();
+        setViewerFallbackFile(null);
+      }
       toast.success(t("albums.file_removed"));
     } catch {
       toast.error(t("albums.errors.remove_file"));
@@ -292,6 +504,9 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           f.name === file.name ? { ...f, isSecure: data.isSecure } : f
         )
       );
+      setViewerFallbackFile((prev) =>
+        prev?.name === file.name ? { ...prev, isSecure: data.isSecure } : prev,
+      );
 
       toast.success(
         file.isSecure
@@ -324,6 +539,9 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           f.name === file.name ? { ...f, isStarred: data.isStarred } : f
         )
       );
+      setViewerFallbackFile((prev) =>
+        prev?.name === file.name ? { ...prev, isStarred: data.isStarred } : prev,
+      );
 
       toast.success(
         file.isStarred
@@ -335,30 +553,238 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     }
   };
 
-  // Navigation dans le FileViewer
-  const findCurrentFileIndex = () => {
-    if (!selectedFile) return -1;
-    return files.findIndex((f) => f.name === selectedFile.name);
-  };
-
-  const handlePrevious = () => {
-    const currentIndex = findCurrentFileIndex();
-    if (currentIndex > 0) {
-      setSelectedFile(files[currentIndex - 1]);
+  const handlePrevious = useCallback(() => {
+    if (viewerFileIndex > 0) {
+      navigateViewerFile(uniqueFiles[viewerFileIndex - 1].name);
     }
-  };
+  }, [viewerFileIndex, navigateViewerFile, uniqueFiles]);
 
-  const handleNext = () => {
-    const currentIndex = findCurrentFileIndex();
-    if (currentIndex < files.length - 1) {
-      setSelectedFile(files[currentIndex + 1]);
+  const handleNext = useCallback(() => {
+    if (viewerFileIndex >= 0 && viewerFileIndex < uniqueFiles.length - 1) {
+      navigateViewerFile(uniqueFiles[viewerFileIndex + 1].name);
     }
-  };
+  }, [viewerFileIndex, navigateViewerFile, uniqueFiles]);
 
-  const handleDeleteFile = async (filename: string) => {
-    await handleRemoveFromAlbum(filename);
-    setSelectedFile(null);
-  };
+  const handleDeleteFile = useCallback(
+    async (filename: string) => {
+      await handleRemoveFromAlbum(filename);
+    },
+    [handleRemoveFromAlbum],
+  );
+
+  // Bulk action handlers
+  const handleBulkRemoveFromAlbum = useCallback(async () => {
+    const selectedFileNames = getSelectedFiles();
+    if (selectedFileNames.length === 0) return;
+
+    try {
+      const response = await fetch(`/api/albums/${albumId}/files`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileNames: selectedFileNames }),
+      });
+
+      if (!response.ok) throw new Error();
+
+      updateData((prev) =>
+        prev.filter((f) => !selectedFileNames.includes(f.name)),
+      );
+      if (viewerFileName && selectedFileNames.includes(viewerFileName)) {
+        closeViewerFile();
+        setViewerFallbackFile(null);
+      }
+      clearSelection();
+      setIsSelectionMode(false);
+      toast.success(
+        t("albums.files_removed", { count: selectedFileNames.length }),
+      );
+    } catch {
+      toast.error(t("albums.errors.remove_file"));
+    }
+  }, [getSelectedFiles, albumId, updateData, viewerFileName, closeViewerFile, clearSelection, t]);
+
+  const handleDeleteSelected = useCallback(async () => {
+    const selectedFileNames = getSelectedFiles();
+    if (selectedFileNames.length === 0) return;
+
+    try {
+      const promises = selectedFileNames.map((fileName) =>
+        fetch(`/api/files/${encodeURIComponent(fileName)}`, {
+          method: "DELETE",
+        }),
+      );
+
+      const results = await Promise.allSettled(promises);
+      const successful = results.filter(
+        (result) => result.status === "fulfilled",
+      ).length;
+
+      if (successful > 0) {
+        updateData((prev) =>
+          prev.filter((f) => !selectedFileNames.includes(f.name)),
+        );
+        if (viewerFileName && selectedFileNames.includes(viewerFileName)) {
+          closeViewerFile();
+          setViewerFallbackFile(null);
+        }
+        clearSelection();
+        setIsSelectionMode(false);
+        toast.success(t("gallery.file_actions.delete_success"));
+      }
+
+      if (successful < selectedFileNames.length) {
+        toast.error(t("gallery.file_actions.delete_error"));
+      }
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast.error(t("gallery.file_actions.error_occurred"));
+    }
+  }, [getSelectedFiles, updateData, clearSelection, t, viewerFileName, closeViewerFile]);
+
+  const handleCopySelectedUrls = useCallback(() => {
+    const selectedFileNames = getSelectedFiles();
+    if (selectedFileNames.length === 0) return;
+
+    const urls = selectedFileNames
+      .map(
+        (fileName) =>
+          `${window.location.origin}/api/files/${encodeURIComponent(fileName)}`,
+      )
+      .join("\n");
+
+    try {
+      navigator.clipboard.writeText(urls);
+      toast.success(t("gallery.file_actions.copy_url"));
+    } catch {
+      toast.error(t("gallery.file_actions.copy_error"));
+    }
+  }, [getSelectedFiles, t]);
+
+  const handleToggleStarSelected = useCallback(async () => {
+    const selectedFilesData = getSelectedFilesData(uniqueFiles);
+    if (selectedFilesData.length === 0) return;
+
+    try {
+      const promises = selectedFilesData.map(async (file) => {
+        const formData = new FormData();
+        formData.append("isStarred", (!file.isStarred).toString());
+
+        return fetch(`/api/files/${encodeURIComponent(file.name)}/star`, {
+          method: "PUT",
+          body: formData,
+        });
+      });
+
+      await Promise.all(promises);
+
+      updateData((prev) =>
+        prev.map((f) => {
+          const sel = selectedFilesData.find((sf) => sf.name === f.name);
+          return sel ? { ...f, isStarred: !sel.isStarred } : f;
+        }),
+      );
+      setViewerFallbackFile((prev) => {
+        if (!prev) return prev;
+        const sel = selectedFilesData.find((file) => file.name === prev.name);
+        return sel ? { ...prev, isStarred: !sel.isStarred } : prev;
+      });
+
+      toast.success(t("gallery.file_actions.added_to_favorites"));
+    } catch {
+      toast.error(t("gallery.file_actions.error_occurred"));
+    }
+  }, [getSelectedFilesData, uniqueFiles, updateData, t]);
+
+  const handleToggleSecuritySelected = useCallback(async () => {
+    const selectedFilesData = getSelectedFilesData(uniqueFiles);
+    if (selectedFilesData.length === 0) return;
+
+    try {
+      const promises = selectedFilesData.map(async (file) => {
+        const formData = new FormData();
+        formData.append("isSecure", (!file.isSecure).toString());
+
+        return fetch(`/api/files?filename=${encodeURIComponent(file.name)}`, {
+          method: "PUT",
+          body: formData,
+        });
+      });
+
+      await Promise.all(promises);
+
+      updateData((prev) =>
+        prev.map((f) => {
+          const sel = selectedFilesData.find((sf) => sf.name === f.name);
+          return sel ? { ...f, isSecure: !sel.isSecure } : f;
+        }),
+      );
+      setViewerFallbackFile((prev) => {
+        if (!prev) return prev;
+        const sel = selectedFilesData.find((file) => file.name === prev.name);
+        return sel ? { ...prev, isSecure: !sel.isSecure } : prev;
+      });
+
+      toast.success(t("gallery.file_actions.now_private"));
+    } catch {
+      toast.error(t("gallery.file_actions.error_occurred"));
+    }
+  }, [getSelectedFilesData, uniqueFiles, updateData, t]);
+
+  const handleAddToAlbum = useCallback(() => {
+    const selected = getSelectedFiles();
+    if (selected.length === 0) return;
+    setFilesToAddToAlbum(selected);
+    setIsMoveMode(false);
+    setIsAddToAlbumDialogOpen(true);
+  }, [getSelectedFiles]);
+
+  const handleMoveToAlbum = useCallback(() => {
+    const selected = getSelectedFiles();
+    if (selected.length === 0) return;
+    setFilesToAddToAlbum(selected);
+    setIsMoveMode(true);
+    setIsAddToAlbumDialogOpen(true);
+  }, [getSelectedFiles]);
+
+  const handleAddToAlbumSuccess = useCallback(async () => {
+    if (isMoveMode) {
+      try {
+        await fetch(`/api/albums/${albumId}/files`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileNames: filesToAddToAlbum }),
+        });
+        updateData((prev) =>
+          prev.filter((f) => !filesToAddToAlbum.includes(f.name)),
+        );
+        if (viewerFileName && filesToAddToAlbum.includes(viewerFileName)) {
+          closeViewerFile();
+          setViewerFallbackFile(null);
+        }
+        toast.success(t("albums.files_moved", { count: filesToAddToAlbum.length }));
+      } catch {
+        toast.error(t("albums.errors.remove_file"));
+      }
+    }
+    clearSelection();
+    setIsSelectionMode(false);
+    setFilesToAddToAlbum([]);
+    setIsMoveMode(false);
+    setIsAddToAlbumDialogOpen(false);
+  }, [isMoveMode, albumId, filesToAddToAlbum, updateData, viewerFileName, closeViewerFile, clearSelection, t]);
+
+  const { shortcuts } = useKeyboardShortcuts({
+    onSelectAll: () => selectAll(uniqueFiles),
+    onClearSelection: clearSelection,
+    onDeleteSelected: handleDeleteSelected,
+    onCopySelected: handleCopySelectedUrls,
+    onToggleStarSelected: handleToggleStarSelected,
+    onToggleSecuritySelected: handleToggleSecuritySelected,
+    onAddToAlbum: handleAddToAlbum,
+    onShowHelp: () => setIsShortcutsHelpOpen(true),
+    enabled: isSelectionMode,
+    hasSelection,
+  });
 
   if (albumLoading || !initialData.loaded) {
     return <Loading fullHeight />;
@@ -573,9 +999,23 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
               files={files}
               onCopy={copyToClipboard}
               onDelete={handleRemoveFromAlbum}
-              onSelect={setSelectedFile}
+              onSelect={(file) => openViewerFile(file.name)}
               onToggleSecurity={handleToggleSecurity}
               onToggleStar={handleToggleStar}
+              onToggleSelection={toggleFile}
+              isSelected={isSelected}
+              isSelectionMode={isSelectionMode}
+              showSelectionCheckbox={isSelectionMode}
+              allSelectedFiles={getSelectedFilesData(uniqueFiles)}
+              selectedCount={selectedCount}
+              hasSelection={hasSelection}
+              onClearSelection={clearSelection}
+              onCopyUrls={handleCopySelectedUrls}
+              onDeleteSelected={handleDeleteSelected}
+              onToggleStarSelected={handleToggleStarSelected}
+              onToggleSecuritySelected={handleToggleSecuritySelected}
+              onStartSelectionMode={handleStartSelectionMode}
+              onAddToAlbum={handleAddToAlbum}
               newFileIds={[]}
             />
           ) : (
@@ -583,9 +1023,23 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
               files={files}
               onCopy={copyToClipboard}
               onDelete={handleRemoveFromAlbum}
-              onSelect={setSelectedFile}
+              onSelect={(file) => openViewerFile(file.name)}
               onToggleSecurity={handleToggleSecurity}
               onToggleStar={handleToggleStar}
+              onToggleSelection={toggleFile}
+              isSelected={isSelected}
+              isSelectionMode={isSelectionMode}
+              showSelectionCheckbox={isSelectionMode}
+              allSelectedFiles={getSelectedFilesData(uniqueFiles)}
+              selectedCount={selectedCount}
+              hasSelection={hasSelection}
+              onClearSelection={clearSelection}
+              onCopyUrls={handleCopySelectedUrls}
+              onDeleteSelected={handleDeleteSelected}
+              onToggleStarSelected={handleToggleStarSelected}
+              onToggleSecuritySelected={handleToggleSecuritySelected}
+              onStartSelectionMode={handleStartSelectionMode}
+              onAddToAlbum={handleAddToAlbum}
               detailed={viewMode === "details"}
               newFileIds={[]}
             />
@@ -606,16 +1060,57 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
 
       {/* Visionneuse de fichiers */}
       <FileViewer
-        file={selectedFile}
-        onClose={() => setSelectedFile(null)}
+        file={viewerFile}
+        presentation={viewerPresentation}
+        onPresentationChange={setViewerPresentation}
+        onClose={closeViewerFile}
         onDelete={handleDeleteFile}
         onCopy={copyToClipboard}
         onToggleSecurity={handleToggleSecurity}
         onToggleStar={handleToggleStar}
         onPrevious={handlePrevious}
         onNext={handleNext}
-        hasPrevious={findCurrentFileIndex() > 0}
-        hasNext={findCurrentFileIndex() < files.length - 1}
+        hasPrevious={viewerFileIndex > 0}
+        hasNext={viewerFileIndex >= 0 && viewerFileIndex < uniqueFiles.length - 1}
+        isLoading={isViewerLoading}
+        loadingName={viewerFileName}
+      />
+
+      {/* Toolbar de sélection */}
+      {isSelectionMode && hasSelection && (
+        <SelectionToolbar
+          selectedFiles={getSelectedFilesData(uniqueFiles)}
+          selectedCount={selectedCount}
+          onClearSelection={clearSelection}
+          onCopyUrls={handleCopySelectedUrls}
+          onDeleteSelected={handleDeleteSelected}
+          onToggleStarSelected={handleToggleStarSelected}
+          onToggleSecuritySelected={handleToggleSecuritySelected}
+          onAddToAlbum={handleAddToAlbum}
+          onRemoveFromAlbum={handleBulkRemoveFromAlbum}
+          onMoveToAlbum={handleMoveToAlbum}
+          onShowHelp={() => setIsShortcutsHelpOpen(true)}
+        />
+      )}
+
+      {/* Dialog d'ajout/déplacement vers un album */}
+      <AddToAlbumDialog
+        open={isAddToAlbumDialogOpen}
+        onClose={() => {
+          setIsAddToAlbumDialogOpen(false);
+          setFilesToAddToAlbum([]);
+          setIsMoveMode(false);
+        }}
+        selectedFiles={filesToAddToAlbum}
+        excludeAlbumIds={[albumId]}
+        onSuccess={handleAddToAlbumSuccess}
+      />
+
+      {/* Dialog des raccourcis clavier */}
+      <KeyboardShortcutsDialog
+        open={isShortcutsHelpOpen}
+        onClose={() => setIsShortcutsHelpOpen(false)}
+        shortcuts={shortcuts}
       />
     </div>
   );

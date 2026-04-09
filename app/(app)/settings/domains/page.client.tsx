@@ -7,6 +7,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Domain } from "@/lib/types/upload-config";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Form,
   FormControl,
@@ -184,11 +185,10 @@ export default function DomainsPage({
     <div className="grid w-full gap-6 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
       <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6 xl:col-span-2">
         <div className="flex flex-col gap-2">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <Globe2 className="h-3.5 w-3.5" />
-            Configuration des domaines
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm sm:h-11 sm:w-11">
+              <Globe2 className="h-5 w-5" />
+            </span>
             {t("settings.domains.list.title")}
           </h1>
           <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
@@ -257,7 +257,7 @@ export default function DomainsPage({
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="text-sm">
+              <Button type="submit" className="w-full text-sm sm:w-auto">
                 {t("settings.domains.config.save")}
               </Button>
             </form>
@@ -283,7 +283,7 @@ export default function DomainsPage({
                   {t("settings.domains.list.add")}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[calc(100vw-1.5rem)] max-w-lg overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+              <DialogContent className="max-h-[90svh] w-[calc(100vw-1.5rem)] max-w-lg overflow-y-auto rounded-2xl border border-border/70 p-0 shadow-2xl">
                 <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
                   <DialogTitle className="text-lg sm:text-xl">
                     {editingDomain
@@ -389,7 +389,7 @@ export default function DomainsPage({
                         </FormItem>
                       )}
                     />
-                    <DialogFooter className="gap-2 border-t border-border/60 px-0 pt-4">
+                    <DialogFooter className="flex-col gap-2 border-t border-border/60 px-0 pt-4 sm:flex-row sm:justify-end">
                       <Button
                         type="submit"
                         className="w-full sm:w-auto text-sm"
@@ -403,8 +403,67 @@ export default function DomainsPage({
             </Dialog>
           </div>
         </CardHeader>
-        <CardContent className="p-4 sm:p-6 pt-0">
-          <div className="overflow-x-auto rounded-xl border border-border/60">
+        <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+          <div className="space-y-3 sm:hidden">
+            {domains.map((domain) => (
+              <div
+                key={domain.id}
+                className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <p className="truncate text-sm font-medium">{domain.name}</p>
+                    <p className="break-all text-xs text-muted-foreground">
+                      {domain.url}
+                    </p>
+                  </div>
+                  {domain.isDefault ? (
+                    <Badge variant="secondary">Par défaut</Badge>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-2 rounded-xl border border-border/60 bg-background px-3 py-3 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">
+                      {t("settings.domains.table.id")}
+                    </span>
+                    <code className="max-w-[55%] truncate rounded-full border border-border/60 bg-muted/30 px-2 py-1 font-mono">
+                      {domain.id}
+                    </code>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">
+                      {t("settings.domains.table.default")}
+                    </span>
+                    <span className="font-medium">
+                      {domain.isDefault ? t("common.yes") : t("common.no")}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    className="text-sm"
+                    onClick={() => handleEdit(domain)}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Modifier
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="text-sm text-destructive"
+                    onClick={() => handleDelete(domain.id)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Supprimer
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-xl border border-border/60 sm:block">
             <Table>
               <TableHeader>
                 <TableRow>

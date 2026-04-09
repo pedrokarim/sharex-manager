@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useAtom } from "jotai";
+import { Provider as JotaiProvider, createStore, useAtom } from "jotai";
 import Editor from "@/components/editor/editor";
 import { useTheme } from "@/components/theme-provider";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,11 +22,13 @@ import {
   getUserThemeDraftStyles,
 } from "@/lib/theme/user-theme-styles";
 import { isDeepEqual } from "@/lib/utils";
-import { Palette, RotateCcw, Save, Settings2 } from "lucide-react";
+import { findMatchingThemePresetName } from "@/utils/theme-preset-helper";
+import { ThemeModePreferencesPanel } from "@/components/settings/theme-mode-preferences-panel";
+import { Palette, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 
-export default function ThemeSettingsPageClient() {
-  const { resolvedTheme, replaceResolvedTheme } = useTheme();
+function ThemeSettingsPageContent() {
+  const { theme, resolvedTheme, replaceResolvedTheme } = useTheme();
   const [themeState] = useAtom(themeEditorStateAtom);
   const [, loadThemeEditorState] = useAtom(loadThemeEditorStateAtom);
   const [isSaving, setIsSaving] = useState(false);
@@ -40,28 +40,20 @@ export default function ThemeSettingsPageClient() {
   );
 
   useEffect(() => {
+    const matchingPreset = findMatchingThemePresetName(savedDraftStyles);
+
     loadThemeEditorState({
       ...defaultThemeState,
-      preset: undefined,
+      preset: matchingPreset,
       styles: savedDraftStyles,
-      currentMode: resolvedTheme.activeMode,
+      currentMode: theme,
       hslAdjustments: defaultThemeState.hslAdjustments,
     });
-  }, [loadThemeEditorState, resolvedTheme.activeMode, savedDraftStyles]);
+  }, [loadThemeEditorState, savedDraftStyles, theme]);
 
   const hasUnsavedChanges = !isDeepEqual(themeState.styles, savedDraftStyles);
   const currentModePreference =
     resolvedTheme.userPreferences?.modeOverride ?? "inherit";
-  const currentModeLabel =
-    currentModePreference === "inherit"
-      ? "Par défaut du site"
-      : currentModePreference === "light"
-        ? "Clair"
-        : currentModePreference === "dark"
-          ? "Sombre"
-          : currentModePreference === "system"
-            ? "Système"
-            : "Automatique";
 
   const persistUserTheme = async ({
     overrideEnabled,
@@ -150,47 +142,26 @@ export default function ThemeSettingsPageClient() {
       <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-              <Palette className="h-3.5 w-3.5" />
-              Thème utilisateur
-            </div>
             <div className="space-y-2">
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm sm:h-11 sm:w-11">
+                  <Palette className="h-5 w-5" />
+                </span>
                 Atelier de thème personnel
               </h1>
               <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
-                L’éditeur ci-dessous sert à choisir votre thème utilisateur. La
-                priorité du mode se règle dans les préférences, puis
-                l’enregistrement ici active votre override personnel.
+                Configurez votre mode et personnalisez les couleurs de votre
+                interface. L’enregistrement active votre palette personnelle.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">Priorité: {currentModeLabel}</Badge>
-              <Badge
-                variant={
-                  resolvedTheme.userPreferences?.overrideEnabled
-                    ? "default"
-                    : "secondary"
-                }
-              >
-                {resolvedTheme.userPreferences?.overrideEnabled
-                  ? "Palette perso active"
-                  : "Palette perso inactive"}
-              </Badge>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" asChild>
-              <Link href="/settings/preferences">
-                <Settings2 className="mr-2 h-4 w-4" />
-                Préférences utilisateur
-              </Link>
-            </Button>
+          <div className="grid gap-2 sm:flex sm:flex-wrap">
             <Button
               variant="outline"
               onClick={handleFollowSite}
               disabled={isSaving}
+              className="w-full sm:w-auto"
             >
               <RotateCcw className="mr-2 h-4 w-4" />
               Désactiver ma palette
@@ -198,6 +169,7 @@ export default function ThemeSettingsPageClient() {
             <Button
               onClick={handleSave}
               disabled={!hasUnsavedChanges || isSaving}
+              className="w-full sm:w-auto"
             >
               <Save className="mr-2 h-4 w-4" />
               {isSaving ? "Enregistrement..." : "Enregistrer mon thème"}
@@ -206,20 +178,42 @@ export default function ThemeSettingsPageClient() {
         </div>
       </section>
 
+      <ThemeModePreferencesPanel showThemeEditorShortcut={false} />
+
       <Card className="overflow-hidden rounded-[1.75rem] border-border/70 shadow-sm">
-        <CardHeader className="border-b border-border/60 bg-muted/20 px-6 py-5">
+        <CardHeader className="border-b border-border/60 bg-muted/20 px-4 py-4 sm:px-6 sm:py-5">
           <CardTitle className="text-xl">Éditeur de thème</CardTitle>
           <CardDescription className="text-sm">
             Sélectionnez une base, ajustez-la, puis enregistrez. Le thème global
             du site reste intact: seul votre compte est concerné.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="h-[75vh] min-h-[680px]">
-            <Editor themePromise={emptyThemePromise} showActionBar={false} />
+        <CardContent className="overflow-hidden p-0">
+          <div className="h-[68svh] min-h-[420px] overflow-hidden sm:h-[75vh] sm:min-h-[680px]">
+            <Editor
+              themePromise={emptyThemePromise}
+              presetSelectOptions={{
+                fallbackLabel: resolvedTheme.userPreferences?.overrideEnabled
+                  ? "Palette personnelle"
+                  : "Palette du site",
+                showPresetUnsavedState: false,
+                showSavedThemes: false,
+              }}
+              showActionBar={false}
+            />
           </div>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function ThemeSettingsPageClient() {
+  const editorStore = useMemo(() => createStore(), []);
+
+  return (
+    <JotaiProvider store={editorStore}>
+      <ThemeSettingsPageContent />
+    </JotaiProvider>
   );
 }

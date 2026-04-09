@@ -248,8 +248,8 @@ export function ColorsTabContent({
   }, [search]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="px-4 pb-3">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="shrink-0 px-4 pb-3">
         <div className="bg-muted/50 flex items-center gap-2.5 rounded-xl border border-border/70 px-3">
           <Search className="text-muted-foreground size-4 shrink-0" />
           <input
@@ -272,7 +272,7 @@ export function ColorsTabContent({
         </div>
       </div>
 
-      <ScrollArea className="min-h-0 flex-1 px-4">
+      <ScrollArea className="h-full min-h-0 flex-1 px-4">
         <div className="space-y-1.5 pb-5">
           {filteredGroups.length === 0 && (
             <p className="text-muted-foreground py-8 text-center text-xs">

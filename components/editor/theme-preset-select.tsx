@@ -29,6 +29,9 @@ import { EditorThemeToggle } from "./editor-theme-toggle";
 import { TooltipWrapper } from "../tooltip-wrapper";
 
 interface ThemePresetSelectProps extends React.ComponentProps<typeof Button> {
+  fallbackLabel?: string;
+  showPresetUnsavedState?: boolean;
+  showSavedThemes?: boolean;
   withCycleThemes?: boolean;
 }
 
@@ -175,6 +178,9 @@ const ThemePresetCycleControls: React.FC<ThemePresetCycleControlsProps> = ({
 };
 
 const ThemePresetSelect: React.FC<ThemePresetSelectProps> = ({
+  fallbackLabel = "Custom",
+  showPresetUnsavedState = true,
+  showSavedThemes = true,
   withCycleThemes = true,
   className,
   ...props
@@ -194,12 +200,17 @@ const ThemePresetSelect: React.FC<ThemePresetSelectProps> = ({
   const { data: session } = authClient.useSession();
 
   useEffect(() => {
+    if (!showSavedThemes) {
+      unloadSavedPresets();
+      return;
+    }
+
     if (session?.user) {
       loadSavedPresets();
     } else {
       unloadSavedPresets();
     }
-  }, [loadSavedPresets, unloadSavedPresets, session?.user]);
+  }, [loadSavedPresets, showSavedThemes, unloadSavedPresets, session?.user]);
 
   const isSavedTheme = useCallback(
     (presetId: string) => {
@@ -208,7 +219,14 @@ const ThemePresetSelect: React.FC<ThemePresetSelectProps> = ({
     [presets]
   );
 
-  const presetNames = useMemo(() => ["default", ...Object.keys(presets)], [presets]);
+  const presetNames = useMemo(() => {
+    const presetEntries = Object.entries(presets).filter(
+      ([name, preset]) =>
+        name === "default" || showSavedThemes || preset?.source !== "SAVED"
+    );
+
+    return ["default", ...presetEntries.map(([name]) => name).filter((name) => name !== "default")];
+  }, [presets, showSavedThemes]);
   const currentPresetName = presetNames?.find((name) => name === currentPreset);
 
   const filteredPresets = useMemo(() => {
@@ -267,7 +285,8 @@ const ThemePresetSelect: React.FC<ThemePresetSelectProps> = ({
                 <ColorBox color={themeState.styles[mode].secondary} />
                 <ColorBox color={themeState.styles[mode].border} />
               </div>
-              {currentPresetName !== "default" &&
+              {showSavedThemes &&
+                currentPresetName !== "default" &&
                 currentPresetName &&
                 isSavedTheme(currentPresetName) &&
                 !hasUnsavedChanges && (
@@ -280,10 +299,10 @@ const ThemePresetSelect: React.FC<ThemePresetSelectProps> = ({
                   </div>
                 )}
               <span className="truncate text-left font-medium capitalize">
-                {hasUnsavedChanges ? (
+                {showPresetUnsavedState && hasUnsavedChanges ? (
                   <>Custom (Unsaved)</>
                 ) : (
-                  presets[currentPresetName || "default"]?.label || "default"
+                  presets[currentPresetName || "default"]?.label || fallbackLabel
                 )}
               </span>
             </div>
@@ -315,7 +334,7 @@ const ThemePresetSelect: React.FC<ThemePresetSelectProps> = ({
               <CommandEmpty>No themes found.</CommandEmpty>
 
               {/* Saved Themes Group */}
-              {filteredSavedThemes.length > 0 && (
+              {showSavedThemes && filteredSavedThemes.length > 0 && (
                 <>
                   <CommandGroup
                     heading={
@@ -367,7 +386,9 @@ const ThemePresetSelect: React.FC<ThemePresetSelectProps> = ({
                 </>
               )}
 
-              {filteredSavedThemes.length === 0 && search.trim() === "" && (
+              {showSavedThemes &&
+                filteredSavedThemes.length === 0 &&
+                search.trim() === "" && (
                 <>
                   <div className="text-muted-foreground flex items-center gap-1.5 px-3 py-2 text-xs font-medium">
                     <div className="bg-muted flex items-center gap-1 rounded-md border px-2 py-0.5">

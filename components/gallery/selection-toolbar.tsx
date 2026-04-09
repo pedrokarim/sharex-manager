@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  X, 
-  Star, 
-  Lock, 
-  Unlock, 
-  Trash2, 
-  Copy, 
+import {
+  X,
+  Star,
+  Lock,
+  Unlock,
+  Trash2,
+  Copy,
   Download,
   FolderPlus,
+  FolderMinus,
+  FolderInput,
   MoreHorizontal,
   Keyboard,
 } from "lucide-react";
@@ -37,6 +39,8 @@ interface SelectionToolbarProps {
   onToggleSecuritySelected: () => void;
   onAddToAlbum: () => void;
   onDownloadSelected?: () => void;
+  onRemoveFromAlbum?: () => void;
+  onMoveToAlbum?: () => void;
   onShowHelp: () => void;
   className?: string;
 }
@@ -51,6 +55,8 @@ export function SelectionToolbar({
   onToggleSecuritySelected,
   onAddToAlbum,
   onDownloadSelected,
+  onRemoveFromAlbum,
+  onMoveToAlbum,
   onShowHelp,
   className,
 }: SelectionToolbarProps) {
@@ -152,6 +158,19 @@ export function SelectionToolbar({
           <Copy className="h-4 w-4 mr-1" />
           <span className="hidden sm:inline">{t("gallery.file_viewer.copy_url")}</span>
         </Button>
+
+        {onRemoveFromAlbum && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRemoveFromAlbum}
+            className="h-8 px-2 text-destructive hover:text-destructive"
+            title={t("multiselect.remove_from_album")}
+          >
+            <FolderMinus className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">{t("multiselect.remove_from_album")}</span>
+          </Button>
+        )}
       </div>
 
       <Separator orientation="vertical" className="h-6" />
@@ -170,7 +189,14 @@ export function SelectionToolbar({
               {t("multiselect.actions.download_selected")}
             </DropdownMenuItem>
           )}
-          
+
+          {onMoveToAlbum && (
+            <DropdownMenuItem onClick={onMoveToAlbum}>
+              <FolderInput className="h-4 w-4 mr-2" />
+              {t("multiselect.move_to_album")}
+            </DropdownMenuItem>
+          )}
+
           <DropdownMenuItem onClick={onShowHelp}>
             <Keyboard className="h-4 w-4 mr-2" />
             {t("multiselect.keyboard_shortcuts")}

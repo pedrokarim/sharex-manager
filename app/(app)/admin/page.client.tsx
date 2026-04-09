@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -76,69 +75,43 @@ export function AdminPageClient() {
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
-        <div className="space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <Shield className="h-3.5 w-3.5" />
-            Centre d’administration
-          </div>
+        <div className="space-y-2">
           <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm sm:h-11 sm:w-11">
+                <Shield className="h-5 w-5" />
+              </span>
               {t("admin.title")}
             </h1>
             <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
               {t("admin.description")}
             </p>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                Supervision
-              </p>
-              <p className="mt-1 text-sm">
-                Gardez une vision claire des utilisateurs, des journaux et de
-                l’état global du service.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                Organisation
-              </p>
-              <p className="mt-1 text-sm">
-                Chaque panneau isole un métier précis au lieu d’empiler les
-                actions dans une seule vue.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                Fiabilité
-              </p>
-              <p className="mt-1 text-sm">
-                Les actions critiques restent visibles, compactes et faciles à
-                relire avant validation.
-              </p>
-            </div>
-          </div>
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid items-start gap-4 xl:grid-cols-2">
         {adminSections.map((section) => {
           const Icon = section.icon;
 
           return (
-            <Link key={section.href} href={section.href} className="group">
-              <Card className="h-full overflow-hidden rounded-2xl border-border/70 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-md">
-                <CardHeader className="relative overflow-hidden border-b border-border/60 p-5 sm:p-6">
+            <Link
+              key={section.href}
+              href={section.href}
+              className="group block self-start"
+            >
+              <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-md active:scale-[0.995]">
+                <CardHeader className="relative overflow-hidden space-y-0 px-5 py-4 sm:p-6">
                   <div
                     className={`absolute inset-0 bg-gradient-to-br ${section.accent}`}
                   />
-                  <div className="relative flex items-start justify-between gap-4">
-                    <div className="space-y-3">
+                  <div className="relative flex min-w-0 items-start justify-between gap-3 sm:gap-4">
+                    <div className="min-w-0 space-y-2.5">
                       <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-1 text-xs font-medium text-muted-foreground">
                         <Icon className="h-3.5 w-3.5" />
                         {section.meta}
                       </div>
-                      <div className="space-y-1">
+                      <div className="min-w-0 space-y-1 pr-2 sm:pr-4">
                         <CardTitle className="text-lg sm:text-xl">
                           {section.title}
                         </CardTitle>
@@ -147,17 +120,13 @@ export function AdminPageClient() {
                         </CardDescription>
                       </div>
                     </div>
-                    <div className="rounded-full border border-border/60 bg-background/85 p-2 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1">
-                      <ArrowRight className="h-4 w-4" />
+                    <div className="shrink-0 pt-0.5">
+                      <div className="rounded-full border border-border/60 bg-background/85 p-2 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-5 sm:p-6">
-                  <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                    Ouvrir ce panneau pour intervenir sans perdre le contexte
-                    administratif global.
-                  </div>
-                </CardContent>
               </Card>
             </Link>
           );

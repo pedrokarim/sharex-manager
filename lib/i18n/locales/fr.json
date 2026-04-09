@@ -322,6 +322,12 @@
       "accessibility": "Image ajoutée le {date}. Taille du fichier : {size} Ko. {navigation}",
       "previous_button": "Utilisez le bouton précédent pour voir l'image précédente.",
       "next_button": "Utilisez le bouton suivant pour voir l'image suivante.",
+      "presentation": {
+        "fullscreen": "Plein écran",
+        "modal": "Modal"
+      },
+      "file_unavailable": "Ce fichier n'est plus disponible.",
+      "file_not_in_album": "Ce fichier n'est pas disponible dans cet album.",
       "info_panel": {
         "title": "Informations",
         "filename": "Nom du fichier",
@@ -1119,6 +1125,11 @@
     "remove_from_album": "Retirer de l'album",
     "delete_album": "Supprimer l'album",
     "create_album": "Créer un album",
+    "create_description": "Créez un nouvel album pour organiser vos fichiers",
+    "edit_album": "Modifier l'album",
+    "edit_description": "Modifiez les informations de l'album",
+    "edit_success": "Album modifié avec succès",
+    "edit_error": "Erreur lors de la modification de l'album",
     "album_name": "Nom de l'album",
     "album_description": "Description de l'album (optionnel)",
     "create_success": "Album créé avec succès",
@@ -1131,6 +1142,8 @@
       "description": "Commencez par créer votre premier album pour organiser vos fichiers"
     },
     "file_removed": "Fichier retiré de l'album",
+    "files_removed": "{count} fichier(s) retiré(s) de l'album",
+    "files_moved": "{count} fichier(s) déplacé(s) vers l'album",
     "deleted": "Album supprimé avec succès",
     "now_public": "Album rendu public avec succès",
     "now_private": "Album rendu privé avec succès",
@@ -1162,6 +1175,8 @@
     "select_all": "Tout sélectionner",
     "deselect_all": "Tout désélectionner",
     "add_to_album": "Ajouter à un album",
+    "remove_from_album": "Retirer de l'album",
+    "move_to_album": "Déplacer vers un album",
     "actions": {
       "toggle_favorites": "Basculer favoris",
       "toggle_security": "Basculer sécurité",

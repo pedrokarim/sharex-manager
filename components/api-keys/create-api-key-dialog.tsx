@@ -100,7 +100,7 @@ export function CreateApiKeyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-xl overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+      <DialogContent className="max-h-[90svh] w-[calc(100vw-1.5rem)] max-w-xl overflow-y-auto rounded-2xl border border-border/70 p-0 shadow-2xl">
         <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
           <DialogTitle>Créer une nouvelle clé API</DialogTitle>
           <DialogDescription>
@@ -135,7 +135,7 @@ export function CreateApiKeyDialog({
                 render={({ field }) => (
                   <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
                     <FormLabel>Clé (optionnelle)</FormLabel>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <FormControl>
                         <Input
                           placeholder="Laissez vide pour générer automatiquement"
@@ -145,7 +145,7 @@ export function CreateApiKeyDialog({
                       <Button
                         type="button"
                         variant="outline"
-                        size="icon"
+                        className="w-full shrink-0 gap-2 sm:w-10 sm:px-0"
                         onClick={() => {
                           const newKey = generateApiKey();
                           form.setValue("key", newKey);
@@ -153,6 +153,7 @@ export function CreateApiKeyDialog({
                         title="Générer une nouvelle clé"
                       >
                         <RefreshCw className="h-4 w-4" />
+                        <span className="sm:hidden">Générer une clé</span>
                       </Button>
                     </div>
                     <FormDescription>
@@ -274,7 +275,9 @@ export function CreateApiKeyDialog({
             </div>
 
             <DialogFooter className="border-t border-border/60 px-5 py-4 sm:px-6">
-              <Button type="submit">Créer la clé</Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                Créer la clé
+              </Button>
             </DialogFooter>
           </form>
         </Form>

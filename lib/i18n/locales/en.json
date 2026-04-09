@@ -320,6 +320,12 @@
       "accessibility": "Image added on {date}. File size: {size} KB. {navigation}",
       "previous_button": "Use the previous button to see the previous image.",
       "next_button": "Use the next button to see the next image.",
+      "presentation": {
+        "fullscreen": "Fullscreen",
+        "modal": "Modal"
+      },
+      "file_unavailable": "This file is no longer available.",
+      "file_not_in_album": "This file is not available in this album.",
       "info_panel": {
         "title": "Information",
         "filename": "Filename",
@@ -1175,6 +1181,11 @@
     "remove_from_album": "Remove from album",
     "delete_album": "Delete album",
     "create_album": "Create album",
+    "create_description": "Create a new album to organize your files",
+    "edit_album": "Edit album",
+    "edit_description": "Edit album information",
+    "edit_success": "Album updated successfully",
+    "edit_error": "Error updating album",
     "album_name": "Album name",
     "album_description": "Album description (optional)",
     "create_success": "Album created successfully",
@@ -1187,6 +1198,8 @@
       "description": "Start by creating your first album to organize your files"
     },
     "file_removed": "File removed from album",
+    "files_removed": "{count} file(s) removed from album",
+    "files_moved": "{count} file(s) moved to album",
     "deleted": "Album deleted successfully",
     "now_public": "Album is now public",
     "now_private": "Album is now private",
@@ -1218,6 +1231,8 @@
     "select_all": "Select all",
     "deselect_all": "Deselect all",
     "add_to_album": "Add to album",
+    "remove_from_album": "Remove from album",
+    "move_to_album": "Move to album",
     "actions": {
       "toggle_favorites": "Toggle favorites",
       "toggle_security": "Toggle security",

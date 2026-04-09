@@ -9,37 +9,32 @@ import {
   useRef,
   useState,
 } from "react";
-import { useSession } from "next-auth/react";
-import { defaultThemeState } from "@/config/theme";
-import {
-  DEFAULT_DAY_END_HOUR,
-  DEFAULT_DAY_START_HOUR,
-} from "@/lib/theme/constants";
-import { applyThemeToElement } from "@/utils/apply-theme";
-import { resolveRuntimeThemeMode } from "@/lib/theme/resolve-theme";
 import type {
-  GlobalThemeMode,
   ResolvedThemePayload,
   RuntimeThemeMode,
-  UserThemeMode,
 } from "@/types/theme-runtime";
+import { applyRuntimeThemeToElement } from "@/lib/theme/apply-runtime-theme";
+import {
+  resolveThemeRuntimeState,
+  readAnonymousThemePreference,
+  type ThemePreference,
+  writeAnonymousThemePreference,
+} from "@/lib/theme/runtime-theme";
 import { useThemePresetFromUrl } from "@/hooks/use-theme-preset-from-url";
 
-type ThemePreference = GlobalThemeMode | Exclude<UserThemeMode, "inherit">;
 type Coords = { x: number; y: number };
 
 type ThemeProviderState = {
   theme: RuntimeThemeMode;
   themePreference: ThemePreference;
   resolvedTheme: ResolvedThemePayload;
-  setTheme: (theme: RuntimeThemeMode) => void;
+  isAuthenticated: boolean;
   setThemePreference: (preference: ThemePreference, coords?: Coords) => void;
   toggleTheme: (coords?: Coords) => void;
   replaceResolvedTheme: (
     payload: ResolvedThemePayload,
-    options?: { animate?: boolean; coords?: Coords; keepTemporaryPreference?: boolean }
+    options?: { animate?: boolean; coords?: Coords }
   ) => void;
-  clearTemporaryPreference: () => void;
   timeWindow: {
     dayStartHour: number;
     dayEndHour: number;
@@ -53,121 +48,30 @@ function ThemePresetHandler() {
   return null;
 }
 
-function readStoredValue<T>(key: string): T | null {
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) {
-      return null;
-    }
-
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
-function ThemePreferencesMigration({
-  resolvedTheme,
-  replaceResolvedTheme,
-}: {
-  resolvedTheme: ResolvedThemePayload;
-  replaceResolvedTheme: ThemeProviderState["replaceResolvedTheme"];
-}) {
-  const { data: session, status } = useSession();
-  const hasAttempted = useRef(false);
-
-  useEffect(() => {
-    if (status !== "authenticated" || !session?.user?.id) {
-      return;
-    }
-
-    if (resolvedTheme.userPreferences || hasAttempted.current) {
-      return;
-    }
-
-    const migrationFlag = window.localStorage.getItem("theme-preferences-migrated-v1");
-    if (migrationFlag) {
-      return;
-    }
-
-    const preferredThemeMode = readStoredValue<"light" | "dark" | "system" | "time-based">(
-      "preferredThemeMode"
-    );
-    const timeBasedTheme = readStoredValue<{ dayStartHour?: number; dayEndHour?: number }>(
-      "timeBasedTheme"
-    );
-    const legacyPreferences = readStoredValue<{
-      lightColors?: Record<string, string>;
-      darkColors?: Record<string, string>;
-    }>("preferences");
-
-    const lightColorOverrides = legacyPreferences?.lightColors ?? {};
-    const darkColorOverrides = legacyPreferences?.darkColors ?? {};
-    const hasColorOverrides =
-      Object.keys(lightColorOverrides).length > 0 || Object.keys(darkColorOverrides).length > 0;
-
-    const hasModeOverride =
-      preferredThemeMode && (preferredThemeMode !== "system" || hasColorOverrides);
-    const hasTimeOverride =
-      !!timeBasedTheme &&
-      (timeBasedTheme.dayStartHour !== undefined || timeBasedTheme.dayEndHour !== undefined);
-
-    if (!hasColorOverrides && !hasModeOverride && !hasTimeOverride) {
-      window.localStorage.setItem("theme-preferences-migrated-v1", "skipped");
-      return;
-    }
-
-    hasAttempted.current = true;
-
-    const body = {
-      modeOverride: preferredThemeMode ?? "inherit",
-      overrideEnabled: hasColorOverrides,
-      lightColorOverrides,
-      darkColorOverrides,
-      dayStartHour: timeBasedTheme?.dayStartHour ?? DEFAULT_DAY_START_HOUR,
-      dayEndHour: timeBasedTheme?.dayEndHour ?? DEFAULT_DAY_END_HOUR,
-    };
-
-    void fetch("/api/settings/theme", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error("Migration failed");
-        }
-        const data = (await response.json()) as { payload: ResolvedThemePayload };
-        replaceResolvedTheme(data.payload, { animate: false });
-        window.localStorage.setItem("theme-preferences-migrated-v1", "done");
-      })
-      .catch(() => {
-        hasAttempted.current = false;
-      });
-  }, [replaceResolvedTheme, resolvedTheme, session?.user?.id, status]);
-
-  return null;
-}
-
 export function ThemeProvider({
   children,
   initialTheme,
+  isAuthenticated,
 }: {
   children: React.ReactNode;
   initialTheme: ResolvedThemePayload;
+  isAuthenticated: boolean;
 }) {
   const [resolvedTheme, setResolvedTheme] = useState(initialTheme);
-  const [temporaryPreference, setTemporaryPreference] = useState<ThemePreference | null>(null);
-  const [prefersDark, setPrefersDark] = useState(false);
+  const [anonymousPreference, setAnonymousPreference] = useState(() =>
+    readAnonymousThemePreference(),
+  );
+  const [prefersDark, setPrefersDark] = useState(() =>
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches,
+  );
   const [now, setNow] = useState(() => new Date());
+  const latestPreferenceRequestRef = useRef(0);
 
-  const modePreference = temporaryPreference ?? resolvedTheme.modePreference;
-  const timeWindow = {
-    dayStartHour: resolvedTheme.userPreferences?.dayStartHour ?? 7,
-    dayEndHour: resolvedTheme.userPreferences?.dayEndHour ?? 19,
-  };
+  useEffect(() => {
+    setResolvedTheme(initialTheme);
+  }, [initialTheme]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -178,8 +82,19 @@ export function ThemeProvider({
     return () => media.removeEventListener("change", update);
   }, []);
 
+  const runtimeState = useMemo(
+    () =>
+      resolveThemeRuntimeState(resolvedTheme, {
+        isAuthenticated,
+        anonymousPreference,
+        now,
+        prefersDark,
+      }),
+    [anonymousPreference, isAuthenticated, now, prefersDark, resolvedTheme],
+  );
+
   useEffect(() => {
-    if (modePreference !== "time-based") {
+    if (runtimeState.modePreference !== "time-based") {
       return;
     }
 
@@ -188,30 +103,14 @@ export function ThemeProvider({
     }, 60_000);
 
     return () => window.clearInterval(interval);
-  }, [modePreference]);
-
-  const currentMode = useMemo(
-    () =>
-      resolveRuntimeThemeMode(modePreference, {
-        prefersDark,
-        now,
-        dayStartHour: timeWindow.dayStartHour,
-        dayEndHour: timeWindow.dayEndHour,
-      }),
-    [modePreference, now, prefersDark, timeWindow.dayEndHour, timeWindow.dayStartHour]
-  );
+  }, [runtimeState.modePreference]);
 
   useEffect(() => {
     const root = document.documentElement;
-    applyThemeToElement(
-      {
-        ...defaultThemeState,
-        currentMode,
-        styles: resolvedTheme.styles,
-      },
-      root
-    );
-  }, [currentMode, resolvedTheme.styles]);
+    applyRuntimeThemeToElement(root, resolvedTheme.styles, runtimeState.activeMode);
+    root.dataset.themePreference = runtimeState.themePreference;
+    root.dataset.themeMode = runtimeState.activeMode;
+  }, [resolvedTheme.styles, runtimeState.activeMode, runtimeState.themePreference]);
 
   const runWithTransition = (coords: Coords | undefined, updater: () => void) => {
     const root = document.documentElement;
@@ -232,21 +131,66 @@ export function ThemeProvider({
     });
   };
 
-  const setTheme = (theme: RuntimeThemeMode) => {
-    setTemporaryPreference(theme);
-  };
-
   const setThemePreference = (preference: ThemePreference, coords?: Coords) => {
-    runWithTransition(coords, () => {
-      setTemporaryPreference(preference);
-      if (preference === "time-based") {
-        setNow(new Date());
+    if (preference === runtimeState.themePreference) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      if (
+        preference !== "light" &&
+        preference !== "dark" &&
+        preference !== "system"
+      ) {
+        return;
       }
-    });
+
+      runWithTransition(coords, () => {
+        writeAnonymousThemePreference(preference);
+        setAnonymousPreference(preference);
+      });
+      return;
+    }
+
+    const requestId = latestPreferenceRequestRef.current + 1;
+    latestPreferenceRequestRef.current = requestId;
+
+    void fetch("/api/settings/theme", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        modeOverride: preference,
+      }),
+    })
+      .then(async (response) => {
+        const data = (await response.json()) as {
+          error?: string;
+          payload: ResolvedThemePayload;
+        };
+
+        if (!response.ok) {
+          throw new Error(data.error || "Impossible de mettre à jour le thème");
+        }
+
+        if (requestId !== latestPreferenceRequestRef.current) {
+          return;
+        }
+
+        replaceResolvedTheme(data.payload, { coords });
+      })
+      .catch((error) => {
+        if (requestId !== latestPreferenceRequestRef.current) {
+          return;
+        }
+
+        console.error("Failed to persist theme preference", error);
+      });
   };
 
   const toggleTheme = (coords?: Coords) => {
-    const nextMode = currentMode === "light" ? "dark" : "light";
+    const nextMode = runtimeState.activeMode === "light" ? "dark" : "light";
     setThemePreference(nextMode, coords);
   };
 
@@ -256,9 +200,6 @@ export function ThemeProvider({
   ) => {
     const apply = () => {
       setResolvedTheme(payload);
-      if (!options?.keepTemporaryPreference) {
-        setTemporaryPreference(null);
-      }
     };
 
     if (options?.animate === false) {
@@ -271,17 +212,23 @@ export function ThemeProvider({
 
   const value = useMemo<ThemeProviderState>(
     () => ({
-      theme: currentMode,
-      themePreference: modePreference,
+      theme: runtimeState.activeMode,
+      themePreference: runtimeState.themePreference,
       resolvedTheme,
-      setTheme,
+      isAuthenticated,
       setThemePreference,
       toggleTheme,
       replaceResolvedTheme,
-      clearTemporaryPreference: () => setTemporaryPreference(null),
-      timeWindow,
+      timeWindow: runtimeState.timeWindow,
     }),
-    [currentMode, modePreference, replaceResolvedTheme, resolvedTheme, timeWindow]
+    [
+      isAuthenticated,
+      replaceResolvedTheme,
+      resolvedTheme,
+      runtimeState.activeMode,
+      runtimeState.themePreference,
+      runtimeState.timeWindow,
+    ],
   );
 
   return (
@@ -289,10 +236,6 @@ export function ThemeProvider({
       <Suspense fallback={null}>
         <ThemePresetHandler />
       </Suspense>
-      <ThemePreferencesMigration
-        resolvedTheme={resolvedTheme}
-        replaceResolvedTheme={replaceResolvedTheme}
-      />
       {children}
     </ThemeProviderContext.Provider>
   );

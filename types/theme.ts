@@ -89,11 +89,18 @@ export interface ThemeEditorPreviewProps {
   currentMode: "light" | "dark";
 }
 
+export interface ThemePresetSelectOptions {
+  fallbackLabel?: string;
+  showPresetUnsavedState?: boolean;
+  showSavedThemes?: boolean;
+}
+
 export interface ThemeEditorControlsProps {
   styles: ThemeStyles;
   currentMode: "light" | "dark";
   onChange: (styles: ThemeStyles) => void;
   themePromise: Promise<Theme | null>;
+  presetSelectOptions?: ThemePresetSelectOptions;
 }
 
 export type ThemePreset = {
