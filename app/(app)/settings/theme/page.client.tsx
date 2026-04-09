@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Provider as JotaiProvider, createStore, useAtom } from "jotai";
 import Editor from "@/components/editor/editor";
 import { useTheme } from "@/components/theme-provider";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,7 +23,8 @@ import {
 } from "@/lib/theme/user-theme-styles";
 import { isDeepEqual } from "@/lib/utils";
 import { findMatchingThemePresetName } from "@/utils/theme-preset-helper";
-import { Palette, RotateCcw, Save, Settings2 } from "lucide-react";
+import { ThemeModePreferencesPanel } from "@/components/settings/theme-mode-preferences-panel";
+import { Palette, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 
 function ThemeSettingsPageContent() {
@@ -55,16 +54,6 @@ function ThemeSettingsPageContent() {
   const hasUnsavedChanges = !isDeepEqual(themeState.styles, savedDraftStyles);
   const currentModePreference =
     resolvedTheme.userPreferences?.modeOverride ?? "inherit";
-  const currentModeLabel =
-    currentModePreference === "inherit"
-      ? "Par défaut du site"
-      : currentModePreference === "light"
-        ? "Clair"
-        : currentModePreference === "dark"
-          ? "Sombre"
-          : currentModePreference === "system"
-            ? "Système"
-            : "Automatique";
 
   const persistUserTheme = async ({
     overrideEnabled,
@@ -161,34 +150,13 @@ function ThemeSettingsPageContent() {
                 Atelier de thème personnel
               </h1>
               <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
-                L’éditeur ci-dessous sert à choisir votre thème utilisateur. La
-                priorité du mode se règle dans les préférences, puis
-                l’enregistrement ici active votre override personnel.
+                Configurez votre mode et personnalisez les couleurs de votre
+                interface. L’enregistrement active votre palette personnelle.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">Priorité: {currentModeLabel}</Badge>
-              <Badge
-                variant={
-                  resolvedTheme.userPreferences?.overrideEnabled
-                    ? "default"
-                    : "secondary"
-                }
-              >
-                {resolvedTheme.userPreferences?.overrideEnabled
-                  ? "Palette perso active"
-                  : "Palette perso inactive"}
-              </Badge>
             </div>
           </div>
 
           <div className="grid gap-2 sm:flex sm:flex-wrap">
-            <Button variant="outline" asChild className="w-full sm:w-auto">
-              <Link href="/settings/preferences">
-                <Settings2 className="mr-2 h-4 w-4" />
-                Préférences utilisateur
-              </Link>
-            </Button>
             <Button
               variant="outline"
               onClick={handleFollowSite}
@@ -209,6 +177,8 @@ function ThemeSettingsPageContent() {
           </div>
         </div>
       </section>
+
+      <ThemeModePreferencesPanel showThemeEditorShortcut={false} />
 
       <Card className="overflow-hidden rounded-[1.75rem] border-border/70 shadow-sm">
         <CardHeader className="border-b border-border/60 bg-muted/20 px-4 py-4 sm:px-6 sm:py-5">

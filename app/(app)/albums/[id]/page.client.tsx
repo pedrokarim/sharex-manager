@@ -35,11 +35,16 @@ import {
 import { GridView } from "@/components/gallery/grid-view";
 import { ListView } from "@/components/gallery/list-view";
 import { FileViewer } from "@/components/gallery/file-viewer";
+import { SelectionToolbar } from "@/components/gallery/selection-toolbar";
+import { KeyboardShortcutsDialog } from "@/components/gallery/keyboard-shortcuts-dialog";
+import { AddToAlbumDialog } from "@/components/albums/add-to-album-dialog";
 import { ViewSelector } from "@/components/view-selector";
 import { useTranslation } from "@/lib/i18n";
 import { Loading } from "@/components/ui/loading";
 import { useQueryState } from "nuqs";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
+import { useSimpleSelection } from "@/hooks/use-simple-selection";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { Album } from "@/types/albums";
 import type { FileInfo } from "@/types/files";
 import { useRoutedFileViewer } from "@/hooks/use-routed-file-viewer";
@@ -86,6 +91,39 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       return "grid";
     },
   });
+
+  // Selection state
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isAddToAlbumDialogOpen, setIsAddToAlbumDialogOpen] = useState(false);
+  const [filesToAddToAlbum, setFilesToAddToAlbum] = useState<string[]>([]);
+  const [isMoveMode, setIsMoveMode] = useState(false);
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
+
+  const handleSelectionEmpty = useCallback(() => {
+    setIsSelectionMode(false);
+  }, []);
+
+  const {
+    selectedCount,
+    hasSelection,
+    isSelected,
+    toggleFile,
+    clearSelection,
+    selectAll,
+    getSelectedFiles,
+    getSelectedFilesData,
+  } = useSimpleSelection({
+    enabled: isSelectionMode,
+    onSelectionEmpty: handleSelectionEmpty,
+  });
+
+  const handleStartSelectionMode = useCallback(
+    (fileName: string) => {
+      setIsSelectionMode(true);
+      toggleFile(fileName);
+    },
+    [toggleFile],
+  );
 
   // Fetch album metadata (not files — those go through useInfiniteScroll)
   const fetchAlbumMetadata = useCallback(async () => {
@@ -534,6 +572,220 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     [handleRemoveFromAlbum],
   );
 
+  // Bulk action handlers
+  const handleBulkRemoveFromAlbum = useCallback(async () => {
+    const selectedFileNames = getSelectedFiles();
+    if (selectedFileNames.length === 0) return;
+
+    try {
+      const response = await fetch(`/api/albums/${albumId}/files`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileNames: selectedFileNames }),
+      });
+
+      if (!response.ok) throw new Error();
+
+      updateData((prev) =>
+        prev.filter((f) => !selectedFileNames.includes(f.name)),
+      );
+      if (viewerFileName && selectedFileNames.includes(viewerFileName)) {
+        closeViewerFile();
+        setViewerFallbackFile(null);
+      }
+      clearSelection();
+      setIsSelectionMode(false);
+      toast.success(
+        t("albums.files_removed", { count: selectedFileNames.length }),
+      );
+    } catch {
+      toast.error(t("albums.errors.remove_file"));
+    }
+  }, [getSelectedFiles, albumId, updateData, viewerFileName, closeViewerFile, clearSelection, t]);
+
+  const handleDeleteSelected = useCallback(async () => {
+    const selectedFileNames = getSelectedFiles();
+    if (selectedFileNames.length === 0) return;
+
+    try {
+      const promises = selectedFileNames.map((fileName) =>
+        fetch(`/api/files/${encodeURIComponent(fileName)}`, {
+          method: "DELETE",
+        }),
+      );
+
+      const results = await Promise.allSettled(promises);
+      const successful = results.filter(
+        (result) => result.status === "fulfilled",
+      ).length;
+
+      if (successful > 0) {
+        updateData((prev) =>
+          prev.filter((f) => !selectedFileNames.includes(f.name)),
+        );
+        if (viewerFileName && selectedFileNames.includes(viewerFileName)) {
+          closeViewerFile();
+          setViewerFallbackFile(null);
+        }
+        clearSelection();
+        setIsSelectionMode(false);
+        toast.success(t("gallery.file_actions.delete_success"));
+      }
+
+      if (successful < selectedFileNames.length) {
+        toast.error(t("gallery.file_actions.delete_error"));
+      }
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast.error(t("gallery.file_actions.error_occurred"));
+    }
+  }, [getSelectedFiles, updateData, clearSelection, t, viewerFileName, closeViewerFile]);
+
+  const handleCopySelectedUrls = useCallback(() => {
+    const selectedFileNames = getSelectedFiles();
+    if (selectedFileNames.length === 0) return;
+
+    const urls = selectedFileNames
+      .map(
+        (fileName) =>
+          `${window.location.origin}/api/files/${encodeURIComponent(fileName)}`,
+      )
+      .join("\n");
+
+    try {
+      navigator.clipboard.writeText(urls);
+      toast.success(t("gallery.file_actions.copy_url"));
+    } catch {
+      toast.error(t("gallery.file_actions.copy_error"));
+    }
+  }, [getSelectedFiles, t]);
+
+  const handleToggleStarSelected = useCallback(async () => {
+    const selectedFilesData = getSelectedFilesData(uniqueFiles);
+    if (selectedFilesData.length === 0) return;
+
+    try {
+      const promises = selectedFilesData.map(async (file) => {
+        const formData = new FormData();
+        formData.append("isStarred", (!file.isStarred).toString());
+
+        return fetch(`/api/files/${encodeURIComponent(file.name)}/star`, {
+          method: "PUT",
+          body: formData,
+        });
+      });
+
+      await Promise.all(promises);
+
+      updateData((prev) =>
+        prev.map((f) => {
+          const sel = selectedFilesData.find((sf) => sf.name === f.name);
+          return sel ? { ...f, isStarred: !sel.isStarred } : f;
+        }),
+      );
+      setViewerFallbackFile((prev) => {
+        if (!prev) return prev;
+        const sel = selectedFilesData.find((file) => file.name === prev.name);
+        return sel ? { ...prev, isStarred: !sel.isStarred } : prev;
+      });
+
+      toast.success(t("gallery.file_actions.added_to_favorites"));
+    } catch {
+      toast.error(t("gallery.file_actions.error_occurred"));
+    }
+  }, [getSelectedFilesData, uniqueFiles, updateData, t]);
+
+  const handleToggleSecuritySelected = useCallback(async () => {
+    const selectedFilesData = getSelectedFilesData(uniqueFiles);
+    if (selectedFilesData.length === 0) return;
+
+    try {
+      const promises = selectedFilesData.map(async (file) => {
+        const formData = new FormData();
+        formData.append("isSecure", (!file.isSecure).toString());
+
+        return fetch(`/api/files?filename=${encodeURIComponent(file.name)}`, {
+          method: "PUT",
+          body: formData,
+        });
+      });
+
+      await Promise.all(promises);
+
+      updateData((prev) =>
+        prev.map((f) => {
+          const sel = selectedFilesData.find((sf) => sf.name === f.name);
+          return sel ? { ...f, isSecure: !sel.isSecure } : f;
+        }),
+      );
+      setViewerFallbackFile((prev) => {
+        if (!prev) return prev;
+        const sel = selectedFilesData.find((file) => file.name === prev.name);
+        return sel ? { ...prev, isSecure: !sel.isSecure } : prev;
+      });
+
+      toast.success(t("gallery.file_actions.now_private"));
+    } catch {
+      toast.error(t("gallery.file_actions.error_occurred"));
+    }
+  }, [getSelectedFilesData, uniqueFiles, updateData, t]);
+
+  const handleAddToAlbum = useCallback(() => {
+    const selected = getSelectedFiles();
+    if (selected.length === 0) return;
+    setFilesToAddToAlbum(selected);
+    setIsMoveMode(false);
+    setIsAddToAlbumDialogOpen(true);
+  }, [getSelectedFiles]);
+
+  const handleMoveToAlbum = useCallback(() => {
+    const selected = getSelectedFiles();
+    if (selected.length === 0) return;
+    setFilesToAddToAlbum(selected);
+    setIsMoveMode(true);
+    setIsAddToAlbumDialogOpen(true);
+  }, [getSelectedFiles]);
+
+  const handleAddToAlbumSuccess = useCallback(async () => {
+    if (isMoveMode) {
+      try {
+        await fetch(`/api/albums/${albumId}/files`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileNames: filesToAddToAlbum }),
+        });
+        updateData((prev) =>
+          prev.filter((f) => !filesToAddToAlbum.includes(f.name)),
+        );
+        if (viewerFileName && filesToAddToAlbum.includes(viewerFileName)) {
+          closeViewerFile();
+          setViewerFallbackFile(null);
+        }
+        toast.success(t("albums.files_moved", { count: filesToAddToAlbum.length }));
+      } catch {
+        toast.error(t("albums.errors.remove_file"));
+      }
+    }
+    clearSelection();
+    setIsSelectionMode(false);
+    setFilesToAddToAlbum([]);
+    setIsMoveMode(false);
+    setIsAddToAlbumDialogOpen(false);
+  }, [isMoveMode, albumId, filesToAddToAlbum, updateData, viewerFileName, closeViewerFile, clearSelection, t]);
+
+  const { shortcuts } = useKeyboardShortcuts({
+    onSelectAll: () => selectAll(uniqueFiles),
+    onClearSelection: clearSelection,
+    onDeleteSelected: handleDeleteSelected,
+    onCopySelected: handleCopySelectedUrls,
+    onToggleStarSelected: handleToggleStarSelected,
+    onToggleSecuritySelected: handleToggleSecuritySelected,
+    onAddToAlbum: handleAddToAlbum,
+    onShowHelp: () => setIsShortcutsHelpOpen(true),
+    enabled: isSelectionMode,
+    hasSelection,
+  });
+
   if (albumLoading || !initialData.loaded) {
     return <Loading fullHeight />;
   }
@@ -750,6 +1002,20 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
               onSelect={(file) => openViewerFile(file.name)}
               onToggleSecurity={handleToggleSecurity}
               onToggleStar={handleToggleStar}
+              onToggleSelection={toggleFile}
+              isSelected={isSelected}
+              isSelectionMode={isSelectionMode}
+              showSelectionCheckbox={isSelectionMode}
+              allSelectedFiles={getSelectedFilesData(uniqueFiles)}
+              selectedCount={selectedCount}
+              hasSelection={hasSelection}
+              onClearSelection={clearSelection}
+              onCopyUrls={handleCopySelectedUrls}
+              onDeleteSelected={handleDeleteSelected}
+              onToggleStarSelected={handleToggleStarSelected}
+              onToggleSecuritySelected={handleToggleSecuritySelected}
+              onStartSelectionMode={handleStartSelectionMode}
+              onAddToAlbum={handleAddToAlbum}
               newFileIds={[]}
             />
           ) : (
@@ -760,6 +1026,20 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
               onSelect={(file) => openViewerFile(file.name)}
               onToggleSecurity={handleToggleSecurity}
               onToggleStar={handleToggleStar}
+              onToggleSelection={toggleFile}
+              isSelected={isSelected}
+              isSelectionMode={isSelectionMode}
+              showSelectionCheckbox={isSelectionMode}
+              allSelectedFiles={getSelectedFilesData(uniqueFiles)}
+              selectedCount={selectedCount}
+              hasSelection={hasSelection}
+              onClearSelection={clearSelection}
+              onCopyUrls={handleCopySelectedUrls}
+              onDeleteSelected={handleDeleteSelected}
+              onToggleStarSelected={handleToggleStarSelected}
+              onToggleSecuritySelected={handleToggleSecuritySelected}
+              onStartSelectionMode={handleStartSelectionMode}
+              onAddToAlbum={handleAddToAlbum}
               detailed={viewMode === "details"}
               newFileIds={[]}
             />
@@ -794,6 +1074,43 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         hasNext={viewerFileIndex >= 0 && viewerFileIndex < uniqueFiles.length - 1}
         isLoading={isViewerLoading}
         loadingName={viewerFileName}
+      />
+
+      {/* Toolbar de sélection */}
+      {isSelectionMode && hasSelection && (
+        <SelectionToolbar
+          selectedFiles={getSelectedFilesData(uniqueFiles)}
+          selectedCount={selectedCount}
+          onClearSelection={clearSelection}
+          onCopyUrls={handleCopySelectedUrls}
+          onDeleteSelected={handleDeleteSelected}
+          onToggleStarSelected={handleToggleStarSelected}
+          onToggleSecuritySelected={handleToggleSecuritySelected}
+          onAddToAlbum={handleAddToAlbum}
+          onRemoveFromAlbum={handleBulkRemoveFromAlbum}
+          onMoveToAlbum={handleMoveToAlbum}
+          onShowHelp={() => setIsShortcutsHelpOpen(true)}
+        />
+      )}
+
+      {/* Dialog d'ajout/déplacement vers un album */}
+      <AddToAlbumDialog
+        open={isAddToAlbumDialogOpen}
+        onClose={() => {
+          setIsAddToAlbumDialogOpen(false);
+          setFilesToAddToAlbum([]);
+          setIsMoveMode(false);
+        }}
+        selectedFiles={filesToAddToAlbum}
+        excludeAlbumIds={[albumId]}
+        onSuccess={handleAddToAlbumSuccess}
+      />
+
+      {/* Dialog des raccourcis clavier */}
+      <KeyboardShortcutsDialog
+        open={isShortcutsHelpOpen}
+        onClose={() => setIsShortcutsHelpOpen(false)}
+        shortcuts={shortcuts}
       />
     </div>
   );

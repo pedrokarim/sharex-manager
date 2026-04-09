@@ -1,15 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { TimePicker } from "@/components/ui/time-picker";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useTheme } from "@/components/theme-provider";
 import { isDeepEqual } from "@/lib/utils";
 import type { UserThemeMode } from "@/types/theme-runtime";
-import { Clock3, Palette, Save, Sparkles } from "lucide-react";
+import { Clock3, Palette, Save } from "lucide-react";
 import { toast } from "sonner";
 
 type ThemeModeFormState = {
@@ -18,17 +24,11 @@ type ThemeModeFormState = {
   dayEndHour: number;
 };
 
-const modeOptions: Array<{
-  value: UserThemeMode;
+const personalModeOptions: Array<{
+  value: Exclude<UserThemeMode, "inherit">;
   label: string;
   description: string;
 }> = [
-  {
-    value: "inherit",
-    label: "Par défaut du site",
-    description:
-      "Suit le mode publié globalement, sans forcer votre propre priorité.",
-  },
   {
     value: "light",
     label: "Clair",
@@ -51,16 +51,18 @@ const modeOptions: Array<{
   },
 ];
 
+const globalModeLabelMap: Record<string, string> = {
+  light: "Clair",
+  dark: "Sombre",
+  system: "Système",
+};
+
 function buildFormState(
   modeOverride: UserThemeMode,
   dayStartHour: number,
   dayEndHour: number,
-) {
-  return {
-    modeOverride,
-    dayStartHour,
-    dayEndHour,
-  };
+): ThemeModeFormState {
+  return { modeOverride, dayStartHour, dayEndHour };
 }
 
 export function ThemeModePreferencesPanel({
@@ -70,6 +72,8 @@ export function ThemeModePreferencesPanel({
 }) {
   const router = useRouter();
   const { resolvedTheme, replaceResolvedTheme } = useTheme();
+  const lastNonInheritMode = useRef<Exclude<UserThemeMode, "inherit">>("system");
+
   const [formState, setFormState] = useState<ThemeModeFormState>(() =>
     buildFormState(
       resolvedTheme.userPreferences?.modeOverride ?? "inherit",
@@ -80,14 +84,24 @@ export function ThemeModePreferencesPanel({
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    const mode = resolvedTheme.userPreferences?.modeOverride ?? "inherit";
     setFormState(
       buildFormState(
-        resolvedTheme.userPreferences?.modeOverride ?? "inherit",
+        mode,
         resolvedTheme.userPreferences?.dayStartHour ?? 7,
         resolvedTheme.userPreferences?.dayEndHour ?? 19,
       ),
     );
+    if (mode !== "inherit") {
+      lastNonInheritMode.current = mode;
+    }
   }, [resolvedTheme]);
+
+  useEffect(() => {
+    if (formState.modeOverride !== "inherit") {
+      lastNonInheritMode.current = formState.modeOverride;
+    }
+  }, [formState.modeOverride]);
 
   const initialState = useMemo(
     () =>
@@ -99,11 +113,18 @@ export function ThemeModePreferencesPanel({
     [resolvedTheme],
   );
   const hasChanges = !isDeepEqual(formState, initialState);
+  const isPersonalMode = formState.modeOverride !== "inherit";
 
   const globalModeLabel =
-    modeOptions.find(
-      (option) => option.value === resolvedTheme.globalTheme.mode,
-    )?.label ?? resolvedTheme.globalTheme.mode;
+    globalModeLabelMap[resolvedTheme.globalTheme.mode] ??
+    resolvedTheme.globalTheme.mode;
+
+  const handleTogglePersonalMode = (enabled: boolean) => {
+    setFormState((current) => ({
+      ...current,
+      modeOverride: enabled ? lastNonInheritMode.current : "inherit",
+    }));
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -111,10 +132,11 @@ export function ThemeModePreferencesPanel({
     try {
       const response = await fetch("/api/settings/theme", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formState),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formState,
+          overrideEnabled: formState.modeOverride !== "inherit",
+        }),
       });
 
       const data = await response.json();
@@ -126,7 +148,11 @@ export function ThemeModePreferencesPanel({
       }
 
       replaceResolvedTheme(data.payload);
-      toast.success("La priorité de thème a été mise à jour.");
+      toast.success(
+        isPersonalMode
+          ? "Votre mode personnel a été enregistré."
+          : "Votre compte suit de nouveau le thème du site.",
+      );
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -138,136 +164,88 @@ export function ThemeModePreferencesPanel({
     }
   };
 
-  const handleFollowSite = async () => {
-    const nextState = buildFormState(
-      "inherit",
-      formState.dayStartHour,
-      formState.dayEndHour,
-    );
-
-    setFormState(nextState);
-    setIsSaving(true);
-
-    try {
-      const response = await fetch("/api/settings/theme", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(nextState),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Impossible de suivre le thème du site");
-      }
-
-      replaceResolvedTheme(data.payload, { animate: false });
-      toast.success("Votre compte suit de nouveau la priorité du site.");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Réinitialisation impossible",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return (
-    <div className="space-y-5 rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <Palette className="h-3.5 w-3.5" />
-            Priorité utilisateur
+    <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background px-4 py-2.5 sm:justify-start">
+            <Label htmlFor="personal-mode-toggle" className="text-sm font-medium whitespace-nowrap">
+              Mode personnel
+            </Label>
+            <Switch
+              id="personal-mode-toggle"
+              checked={isPersonalMode}
+              onCheckedChange={handleTogglePersonalMode}
+            />
           </div>
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold">Mode personnel</h3>
+
+          {isPersonalMode && (
+            <TooltipProvider delayDuration={300}>
+              <div className="flex flex-wrap gap-1.5">
+                {personalModeOptions.map((option) => (
+                  <Tooltip key={option.value}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormState((current) => ({
+                            ...current,
+                            modeOverride: option.value,
+                          }))
+                        }
+                        className={`rounded-xl border px-3 py-1.5 text-sm transition-colors ${
+                          formState.modeOverride === option.value
+                            ? "border-primary bg-primary/10 font-medium"
+                            : "border-border/60 bg-background hover:bg-muted/40"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{option.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            </TooltipProvider>
+          )}
+
+          {!isPersonalMode && (
             <p className="text-sm text-muted-foreground">
-              Le site est actuellement publié en mode{" "}
-              <strong>{globalModeLabel}</strong>. Choisissez ici si votre compte
-              suit cette base ou applique une priorité différente.
+              Suit le mode du site ({globalModeLabel})
             </p>
-          </div>
+          )}
         </div>
 
-        <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
-          <Badge
-            variant={
-              formState.modeOverride === "inherit" ? "secondary" : "default"
-            }
-          >
-            {formState.modeOverride === "inherit"
-              ? "Suit le site"
-              : "Priorité personnelle"}
-          </Badge>
+        <div className="flex items-center gap-2">
+          {showThemeEditorShortcut && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/settings/theme")}
+            >
+              Ouvrir l’atelier
+            </Button>
+          )}
           <Button
-            variant="outline"
-            onClick={handleFollowSite}
-            className="w-full text-sm sm:w-auto"
-          >
-            Suivre le site
-          </Button>
-          <Button
+            size="sm"
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
-            className="w-full text-sm sm:w-auto"
           >
-            <Save className="mr-2 h-4 w-4" />
-            {isSaving ? "Enregistrement..." : "Enregistrer"}
+            <Save className="mr-2 h-3.5 w-3.5" />
+            {isSaving ? "..." : "Enregistrer"}
           </Button>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-muted-foreground" />
-          <Label className="text-sm font-medium sm:text-base">
-            Priorité du mode
-          </Label>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          {modeOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() =>
-                setFormState((current) => ({
-                  ...current,
-                  modeOverride: option.value,
-                }))
-              }
-              className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
-                formState.modeOverride === option.value
-                  ? "border-primary bg-primary/10"
-                  : "border-border/60 bg-background hover:bg-muted/40"
-              }`}
-            >
-              <p className="text-sm font-medium">{option.label}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {option.description}
-              </p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {formState.modeOverride === "time-based" && (
-        <div className="space-y-4 border-t border-border/60 pt-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Clock3 className="h-4 w-4 text-muted-foreground" />
-              <Label className="text-sm font-medium">
-                Plage horaire personnelle
-              </Label>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Le mode clair s’applique dans cette fenêtre, puis votre interface
-              passe en dark.
-            </p>
+      {isPersonalMode && formState.modeOverride === "time-based" && (
+        <div className="mt-4 flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-end sm:gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock3 className="h-4 w-4 shrink-0" />
+            <span>Plage horaire :</span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:gap-3">
             <TimePicker
               label="Début"
               value={`${formState.dayStartHour.toString().padStart(2, "0")}:00`}
@@ -290,26 +268,6 @@ export function ThemeModePreferencesPanel({
               format="24h"
             />
           </div>
-        </div>
-      )}
-
-      {showThemeEditorShortcut && (
-        <div className="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <Label className="text-sm font-medium">Palette personnelle</Label>
-            <p className="text-sm text-muted-foreground">
-              La palette et les réglages avancés se pilotent depuis l’atelier
-              thème dédié, pour éviter de charger la page préférences
-              inutilement.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            className="w-full text-sm sm:w-auto"
-            onClick={() => router.push("/settings/theme")}
-          >
-            Ouvrir l’atelier thème
-          </Button>
         </div>
       )}
     </div>

@@ -1142,6 +1142,8 @@
       "description": "Commencez par créer votre premier album pour organiser vos fichiers"
     },
     "file_removed": "Fichier retiré de l'album",
+    "files_removed": "{count} fichier(s) retiré(s) de l'album",
+    "files_moved": "{count} fichier(s) déplacé(s) vers l'album",
     "deleted": "Album supprimé avec succès",
     "now_public": "Album rendu public avec succès",
     "now_private": "Album rendu privé avec succès",
@@ -1173,6 +1175,8 @@
     "select_all": "Tout sélectionner",
     "deselect_all": "Tout désélectionner",
     "add_to_album": "Ajouter à un album",
+    "remove_from_album": "Retirer de l'album",
+    "move_to_album": "Déplacer vers un album",
     "actions": {
       "toggle_favorites": "Basculer favoris",
       "toggle_security": "Basculer sécurité",

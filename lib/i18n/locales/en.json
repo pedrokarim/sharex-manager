@@ -1198,6 +1198,8 @@
       "description": "Start by creating your first album to organize your files"
     },
     "file_removed": "File removed from album",
+    "files_removed": "{count} file(s) removed from album",
+    "files_moved": "{count} file(s) moved to album",
     "deleted": "Album deleted successfully",
     "now_public": "Album is now public",
     "now_private": "Album is now private",
@@ -1229,6 +1231,8 @@
     "select_all": "Select all",
     "deselect_all": "Deselect all",
     "add_to_album": "Add to album",
+    "remove_from_album": "Remove from album",
+    "move_to_album": "Move to album",
     "actions": {
       "toggle_favorites": "Toggle favorites",
       "toggle_security": "Toggle security",
