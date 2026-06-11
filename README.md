@@ -58,6 +58,40 @@ bun dev
 3. Importez le fichier `.sxcu` dans ShareX
 4. Commencez à uploader !
 
+## Utilisation bureau (Windows & Linux)
+
+ShareX Manager fonctionne avec n'importe quel client compatible `.sxcu` :
+
+- 🪟 **Windows** → [ShareX](https://getsharex.com)
+- 🐧 **Linux** → [`fu` (flameshot-uploader)](https://github.com/pedrokarim/flameshot-uploader), qui lit **le même `.sxcu`**.
+
+Dans les deux cas, on récupère la config de la même façon : **Paramètres → Clés API → créer une clé → onglet « Configuration ShareX » → Copier**.
+
+### Windows (ShareX)
+
+1. Collez la config dans un fichier `sharex-manager.sxcu`.
+2. **Double-cliquez** le fichier → ShareX l'importe.
+3. Capturez (par défaut **Impr. écran**) → l'URL est copiée.
+
+### Linux (Flameshot + `fu`)
+
+```sh
+# 1. Installer fu
+curl -fsSL https://pedrokarim.github.io/flameshot-uploader/install.sh | sh
+
+# 2. Dépendances (jq est requis pour lire l'URL de réponse)
+sudo apt install flameshot xclip jq
+
+# 3. Enregistrer la config copiée dans un fichier, puis :
+fu add ~/sharex-manager.sxcu
+fu default sharex-manager
+```
+
+4. Associez un raccourci clavier à la commande **`fu gui`** (ex. la touche **Impr. écran**).
+5. Capturez → l'URL est copiée.
+
+> 📖 **Guides complets, pas-à-pas (avec captures)** : [Windows](docs/integration-windows.md) · [Linux](docs/integration-linux.md) — également disponibles sur le [wiki](https://github.com/pedrokarim/sharex-manager/wiki).
+
 ## Technologies utilisées
 
 - [Next.js 14](https://nextjs.org/) - Framework React avec App Router
