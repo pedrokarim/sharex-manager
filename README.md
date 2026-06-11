@@ -2,6 +2,8 @@
 
 Une application web pour gérer facilement vos uploads ShareX avec une interface moderne et sécurisée.
 
+📖 **[Site & documentation](https://pedrokarim.github.io/sharex-manager/)** · 📚 **[Wiki](https://github.com/pedrokarim/sharex-manager/wiki)** · 🚀 **[Démo](https://sxm.ascencia.re)**
+
 ## Screenshot
 
 ![Screenshot](./assets/brave_FlSkkG1Mow.jpg)
