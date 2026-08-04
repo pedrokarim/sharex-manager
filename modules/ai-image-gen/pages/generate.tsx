@@ -1,8 +1,58 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Download,
+  ImageDown,
+  Images,
+  KeyRound,
+  Maximize2,
+  Paperclip,
+  RotateCcw,
+  Settings2,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupTextarea,
+} from "@/components/ui/input-group";
+import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentMedia,
+  AttachmentTitle,
+} from "@/components/ui/attachment";
 import {
   Select,
   SelectContent,
@@ -11,35 +61,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Sparkles,
-  Download,
-  Loader2,
-  ImageIcon,
-  Settings,
-  RotateCcw,
-  Upload,
-  X,
-  Trash2,
-  Clock,
-  Wand2,
-  Palette,
-  Mountain,
-  User,
-  Zap,
-  Camera,
-} from "lucide-react";
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import type { ModuleConfig } from "@/types/modules";
-
-// ─── Types ──────────────────────────────────────────────────
+import { ModuleShell } from "../components/module-shell";
+import { ImageViewer, type Shot } from "../components/image-viewer";
+import { MODELS, aspectRatioOf, getModelSpec } from "../lib/models";
+import {
+  PRESETS,
+  callModule,
+  downloadImage,
+  imageUrl,
+  readFileAsBase64,
+  type HistoryItem,
+  type SecretStatus,
+} from "../lib/client";
 
 interface GeneratePageProps {
   moduleName: string;
@@ -47,647 +86,671 @@ interface GeneratePageProps {
   settings: Record<string, any>;
 }
 
-interface HistoryItem {
-  id: string;
-  prompt: string;
-  notes: string;
-  provider: string;
-  model: string;
-  size: string;
-  count: number;
-  imageFiles: string[];
-  createdAt: number;
+interface Reference {
+  b64: string;
+  mimeType: string;
+  dataUrl: string;
+  name: string;
+  size: number;
 }
 
-interface SessionImage {
-  b64?: string;
-  url?: string;
-  file?: string;
-}
-
-// ─── Constants ──────────────────────────────────────────────
-
-const PRESETS = [
-  { label: "Anime", icon: Sparkles, prompt: "anime style, detailed illustration, vibrant colors, high quality" },
-  { label: "Paysage", icon: Mountain, prompt: "landscape, scenic view, atmospheric lighting, detailed environment, 8k" },
-  { label: "Portrait", icon: User, prompt: "portrait, detailed face, studio lighting, professional photography" },
-  { label: "Cyberpunk", icon: Zap, prompt: "cyberpunk, neon lights, futuristic city, rain, dark atmosphere, cinematic" },
-  { label: "Fantasy", icon: Wand2, prompt: "fantasy art, magical, ethereal, detailed illustration, dramatic lighting" },
-  { label: "Réaliste", icon: Camera, prompt: "photorealistic, 8k, ultra high detail, natural lighting, sharp focus" },
-];
-
-const MODELS: Record<string, { label: string; provider: string; sizes: string[]; color: string; tags: string[] }> = {
-  "dall-e-3": {
-    label: "DALL-E 3",
-    provider: "openai",
-    sizes: ["1024x1024", "1024x1792", "1792x1024"],
-    color: "from-emerald-500 to-teal-600",
-    tags: ["Haute Qualité", "Créatif"],
-  },
-  "dall-e-2": {
-    label: "DALL-E 2",
-    provider: "openai",
-    sizes: ["256x256", "512x512", "1024x1024"],
-    color: "from-blue-500 to-cyan-600",
-    tags: ["Rapide", "Variations"],
-  },
-  "stable-diffusion-xl": {
-    label: "SDXL",
-    provider: "stability",
-    sizes: ["1024x1024", "768x1024", "1024x768"],
-    color: "from-violet-500 to-purple-600",
-    tags: ["Open Source", "Personnalisable"],
-  },
-};
-
-const SHOWCASE = [
-  { title: "Anime Portrait", gradient: "from-pink-500/20 to-purple-600/20", border: "border-pink-500/30" },
-  { title: "Paysage Fantasy", gradient: "from-emerald-500/20 to-cyan-600/20", border: "border-emerald-500/30" },
-  { title: "Cyberpunk City", gradient: "from-violet-500/20 to-fuchsia-600/20", border: "border-violet-500/30" },
-  { title: "Nature Réaliste", gradient: "from-amber-500/20 to-orange-600/20", border: "border-amber-500/30" },
-];
-
-// ─── Helper ──────────────────────────────────────────────────
-
-async function callModule(fn: string, ...args: any[]) {
-  const res = await fetch("/api/modules/call-function", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      moduleName: "ai-image-gen",
-      functionName: fn,
-      args,
-    }),
-  });
-  return res.json();
-}
-
-function imageUrl(file: string) {
-  return `/api/modules/ai-image-gen/data/images/${file}`;
-}
-
-function timeAgo(ts: number) {
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "À l'instant";
-  if (mins < 60) return `Il y a ${mins}min`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `Il y a ${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `Il y a ${days}j`;
-}
-
-// ─── Component ──────────────────────────────────────────────
+const COUNT_CHOICES = [1, 2, 4] as const;
 
 export default function GeneratePage({ settings }: GeneratePageProps) {
-  // Form state
+  // ─── Composition ────────────────────────────────────────────
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState(settings.default_model || "dall-e-3");
-  const [size, setSize] = useState(settings.default_size || "1024x1024");
-  const [count, setCount] = useState(1);
-  const [notes, setNotes] = useState(settings.notes_preprompt || "");
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
-  const refInputRef = useRef<HTMLInputElement>(null);
+  const [model, setModel] = useState<string>(
+    settings.default_model || "gpt-image-1"
+  );
+  const [size, setSize] = useState<string>(settings.default_size || "1024x1024");
+  const [quality, setQuality] = useState<string>(
+    settings.default_quality || "medium"
+  );
+  const [count, setCount] = useState<number>(settings.default_count || 1);
+  const [notes, setNotes] = useState<string>(settings.notes_preprompt || "");
+  const [reference, setReference] = useState<Reference | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Generation state
+  // ─── Exécution ──────────────────────────────────────────────
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sessionImages, setSessionImages] = useState<SessionImage[]>([]);
+  const [result, setResult] = useState<HistoryItem | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
-  // History state
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [selectedHistory, setSelectedHistory] = useState<HistoryItem | null>(null);
+  // ─── Contexte ───────────────────────────────────────────────
+  const [recent, setRecent] = useState<HistoryItem[]>([]);
+  const [keys, setKeys] = useState<Record<string, SecretStatus> | null>(null);
 
-  // Derived
-  const modelInfo = MODELS[model];
-  const provider = modelInfo?.provider || "openai";
-  const availableSizes = modelInfo?.sizes || ["1024x1024"];
+  const spec = getModelSpec(model) ?? MODELS[0];
+  const ratio = aspectRatioOf(size);
 
-  // Load history on mount
-  useEffect(() => {
-    setHistoryLoading(true);
-    callModule("getHistory", 50)
-      .then((res) => {
-        if (res.success && res.data) setHistory(res.data);
-      })
-      .catch(() => {})
-      .finally(() => setHistoryLoading(false));
+  const providerReady = keys
+    ? Boolean(keys[spec.provider]?.configured)
+    : true; // Tant que l'état des clés n'est pas connu, on n'alarme pas.
+
+  const refreshHistory = useCallback(() => {
+    callModule<HistoryItem[]>("getHistory", 12)
+      .then(setRecent)
+      .catch(() => setRecent([]));
   }, []);
 
-  // Reset size when model changes
   useEffect(() => {
-    const sizes = MODELS[model]?.sizes || [];
-    if (!sizes.includes(size)) {
-      setSize(sizes[0] || "1024x1024");
-    }
-  }, [model, size]);
+    refreshHistory();
+    callModule<Record<string, SecretStatus>>("getSecretsStatus")
+      .then(setKeys)
+      .catch(() => setKeys(null));
+  }, [refreshHistory]);
 
-  // ─── Handlers ─────────────────────────────────────────────
+  // Chaque modèle a ses propres tailles et paliers de qualité : garder une
+  // valeur devenue invalide provoquerait un rejet côté API.
+  useEffect(() => {
+    if (!spec.sizes.includes(size)) setSize(spec.sizes[0]);
+    if (spec.qualities && !spec.qualities.some((q) => q.value === quality)) {
+      setQuality(spec.qualities[0].value);
+    }
+  }, [spec, size, quality]);
+
+  // Une référence chargée puis un changement de modèle qui ne la gère pas :
+  // on la retire plutôt que de laisser une pièce jointe sans effet.
+  useEffect(() => {
+    if (reference && !spec.supportsReference) {
+      setReference(null);
+      toast.info(`${spec.label} ne gère pas l'image de référence, elle a été retirée.`);
+    }
+  }, [spec, reference]);
+
+  const shots: Shot[] = useMemo(
+    () => (result ? result.imageFiles.map((file) => ({ item: result, file })) : []),
+    [result]
+  );
+
+  // ─── Actions ────────────────────────────────────────────────
 
   const handleGenerate = useCallback(async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || loading) return;
     setLoading(true);
     setError(null);
-    setSelectedHistory(null);
 
     try {
-      const result = await callModule("generateImage", prompt, {
-        provider,
-        model,
-        size,
-        n: count,
-        notes: notes || undefined,
-        referenceImageB64: referenceImage || undefined,
-      });
-
-      if (!result.success) {
-        throw new Error(result.error || "Erreur lors de la génération");
-      }
-
-      const images: SessionImage[] = (result.data?.images || []).map(
-        (img: any, i: number) => ({
-          b64: img.b64,
-          url: img.url,
-          file: result.data?.historyId
-            ? `${result.data.historyId}-${i}.png`
-            : undefined,
-        })
+      const response = await callModule<{ historyId: string }>(
+        "generateImage",
+        prompt,
+        {
+          model,
+          size,
+          quality: spec.qualities ? quality : undefined,
+          n: count,
+          notes: notes || undefined,
+          referenceImageB64: reference?.b64,
+          referenceMimeType: reference?.mimeType,
+        }
       );
-      setSessionImages(images);
 
-      // Refresh history
-      const histRes = await callModule("getHistory", 50);
-      if (histRes.success && histRes.data) setHistory(histRes.data);
+      // On relit l'historique plutôt que de reconstruire l'objet côté client :
+      // le serveur est seul à connaître les copies en galerie et la durée.
+      const history = await callModule<HistoryItem[]>("getHistory", 12);
+      setRecent(history);
+      const fresh = history.find((h) => h.id === response.historyId);
+      if (fresh) setResult(fresh);
+      toast.success(
+        fresh && fresh.count > 1
+          ? `${fresh.count} images générées`
+          : "Image générée"
+      );
     } catch (err: any) {
-      setError(err.message || "Erreur inattendue");
+      setError(err?.message ?? "Erreur inattendue");
     } finally {
       setLoading(false);
     }
-  }, [prompt, provider, model, size, count, notes, referenceImage]);
+  }, [prompt, loading, model, size, quality, spec, count, notes, reference]);
 
-  const handleReset = useCallback(() => {
-    setPrompt("");
-    setError(null);
-    setSessionImages([]);
-    setSelectedHistory(null);
-    setReferenceImage(null);
-    setModel(settings.default_model || "dall-e-3");
-    setSize(settings.default_size || "1024x1024");
-    setCount(1);
-    setNotes(settings.notes_preprompt || "");
-  }, [settings]);
-
-  const handlePreset = useCallback((presetPrompt: string) => {
-    setPrompt((prev) =>
-      prev ? `${prev}, ${presetPrompt}` : presetPrompt
-    );
-  }, []);
-
-  const handleDownload = useCallback((src: string, index: number) => {
-    const link = document.createElement("a");
-    link.href = src;
-    link.download = `ai-gen-${Date.now()}-${index}.png`;
-    link.click();
-  }, []);
-
-  const handleRefUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+  const handleReferencePick = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = ""; // Permet de resélectionner le même fichier.
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const b64 = (reader.result as string).split(",")[1];
-        setReferenceImage(b64);
-      };
-      reader.readAsDataURL(file);
+
+      if (!file.type.startsWith("image/")) {
+        toast.error("Le fichier doit être une image");
+        return;
+      }
+      try {
+        const { b64, mimeType, dataUrl } = await readFileAsBase64(file);
+        setReference({ b64, mimeType, dataUrl, name: file.name, size: file.size });
+      } catch {
+        toast.error("Lecture de l'image impossible");
+      }
     },
     []
   );
 
-  const handleHistoryClick = useCallback((item: HistoryItem) => {
-    setSelectedHistory(item);
-    setSessionImages(
-      item.imageFiles.map((f) => ({ file: f }))
-    );
+  const handleReset = useCallback(() => {
+    setPrompt("");
+    setError(null);
+    setResult(null);
+    setReference(null);
+    setModel(settings.default_model || "gpt-image-1");
+    setCount(settings.default_count || 1);
+    setNotes(settings.notes_preprompt || "");
+  }, [settings]);
+
+  const applyPreset = useCallback((fragment: string) => {
+    setPrompt((prev) => {
+      if (prev.includes(fragment)) return prev;
+      return prev.trim() ? `${prev.trim()}, ${fragment}` : fragment;
+    });
+  }, []);
+
+  const reuse = useCallback((item: HistoryItem) => {
     setPrompt(item.prompt);
+    setModel(item.model);
+    setSize(item.size);
+    if (item.quality) setQuality(item.quality);
+    setResult(item);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const handleClearHistory = useCallback(async () => {
-    await callModule("clearHistory");
-    setHistory([]);
-    setSelectedHistory(null);
-  }, []);
+  const saveShotToGallery = useCallback(
+    async (item: HistoryItem, file: string) => {
+      try {
+        const res = await callModule<{ fileName?: string }>(
+          "saveToGallery",
+          item.id,
+          file
+        );
+        toast.success(`Ajoutée à la galerie : ${res?.fileName}`);
+        refreshHistory();
+      } catch (err: any) {
+        toast.error(err?.message ?? "Copie impossible");
+      }
+    },
+    [refreshHistory]
+  );
 
-  // ─── Render helpers ───────────────────────────────────────
-
-  const displayImages =
-    sessionImages.length > 0
-      ? sessionImages
-      : selectedHistory
-        ? selectedHistory.imageFiles.map((f) => ({ file: f }))
-        : [];
-
-  function getImageSrc(img: SessionImage) {
-    if (img.b64) return `data:image/png;base64,${img.b64}`;
-    if (img.file) return imageUrl(img.file);
-    return img.url || "";
-  }
-
-  // ─── JSX ──────────────────────────────────────────────────
+  // ─── Rendu ──────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Sparkles className="h-7 w-7 text-primary" />
-            AI Image Generation
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Générez des images à partir de descriptions textuelles
-          </p>
-        </div>
-        <Button variant="outline" size="sm" asChild>
-          <a href="/m/ai-image-gen/settings">
-            <Settings className="mr-2 h-4 w-4" />
-            Paramètres
-          </a>
+    <ModuleShell
+      current=""
+      title="Studio"
+      description="Décrivez une image, ajustez les réglages, générez."
+      actions={
+        <Button variant="outline" size="sm" asChild className="gap-2">
+          <Link href="/m/ai-image-gen/library">
+            <Images className="h-4 w-4" />
+            Bibliothèque
+          </Link>
         </Button>
-      </div>
+      }
+    >
+      {keys && !providerReady && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3">
+          <KeyRound className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
+          <p className="min-w-0 flex-1 text-sm">
+            Aucune clé{" "}
+            {spec.provider === "openai" ? "OpenAI" : "Stability"} enregistrée —
+            la génération échouera tant qu&apos;elle manque.
+          </p>
+          <Button size="sm" variant="outline" asChild className="gap-1.5">
+            <Link href="/m/ai-image-gen/settings">
+              Configurer
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </div>
+      )}
 
-      {/* Main 3-column layout */}
-      <div className="grid gap-4 lg:grid-cols-[220px_1fr_280px]">
-        {/* ─── LEFT: History ─────────────────────── */}
-        <Card className="hidden lg:flex flex-col max-h-[calc(100vh-180px)]">
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm flex items-center gap-1.5">
-              <Clock className="h-4 w-4" />
-              Historique
-            </CardTitle>
-            {history.length > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={handleClearHistory}
-                title="Effacer l'historique"
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent className="flex-1 overflow-hidden p-2">
-            <ScrollArea className="h-full">
-              {historyLoading ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              ) : history.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">
-                  Pas encore de génération
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {history.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => handleHistoryClick(item)}
-                      className={`w-full text-left rounded-lg border p-2 transition-colors hover:bg-accent ${
-                        selectedHistory?.id === item.id
-                          ? "border-primary bg-accent"
-                          : "border-transparent"
-                      }`}
-                    >
-                      {item.imageFiles[0] && (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
-                          src={imageUrl(item.imageFiles[0])}
-                          alt=""
-                          className="w-full aspect-square rounded-md object-cover mb-1.5"
-                        />
-                      )}
-                      <p className="text-xs line-clamp-2">{item.prompt}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {timeAgo(item.createdAt)}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* ─── CENTER: Prompt + Results ──────────── */}
-        <div className="space-y-4">
-          {/* Prompt */}
-          <Card>
-            <CardContent className="pt-4 space-y-3">
-              <Textarea
-                placeholder="Décrivez l'image que vous souhaitez générer..."
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        {/* ─── Colonne principale ─────────────────────────── */}
+        <div className="flex min-w-0 flex-col gap-5">
+          <div className="space-y-3">
+            <InputGroup>
+              <InputGroupTextarea
+                placeholder="Un phare isolé dans la brume au lever du jour, lumière rasante…"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                rows={3}
-                className="resize-none text-sm border-muted-foreground/20"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
                     handleGenerate();
                   }
                 }}
+                className="min-h-[112px] text-sm"
               />
-
-              {/* Presets */}
-              <div className="flex flex-wrap gap-1.5">
-                {PRESETS.map((p) => (
-                  <button
-                    key={p.label}
-                    onClick={() => handlePreset(p.prompt)}
-                    className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent hover:border-primary/50"
+              <InputGroupAddon align="block-end" className="justify-between">
+                <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+                  <KbdGroup>
+                    <Kbd>Ctrl</Kbd>
+                    <Kbd>↵</Kbd>
+                  </KbdGroup>
+                  pour générer
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleReset}
+                    disabled={loading}
+                    className="gap-1.5"
                   >
-                    <p.icon className="h-3 w-3" />
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleGenerate}
-                  disabled={loading || !prompt.trim()}
-                  className="flex-1"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Génération...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Générer{count > 1 ? ` (${count})` : ""}
-                    </>
-                  )}
-                </Button>
-                <Button variant="outline" onClick={handleReset}>
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Réinitialiser
-                </Button>
-              </div>
-
-              {error && (
-                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                  {error}
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Réinitialiser
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleGenerate}
+                    disabled={loading || !prompt.trim()}
+                    className="gap-1.5"
+                  >
+                    {loading ? (
+                      <Spinner className="h-3.5 w-3.5" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    {loading
+                      ? "Génération…"
+                      : `Générer${count > 1 ? ` ×${count}` : ""}`}
+                  </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </InputGroupAddon>
+            </InputGroup>
 
-          {/* Results or Showcase */}
-          {displayImages.length > 0 ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">
-                  Résultats
-                  {selectedHistory && (
-                    <span className="font-normal text-muted-foreground ml-2">
-                      — {timeAgo(selectedHistory.createdAt)}
-                    </span>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={`grid gap-3 ${displayImages.length === 1 ? "grid-cols-1 max-w-lg mx-auto" : "grid-cols-2"}`}>
-                  {displayImages.map((img, i) => (
-                    <div
-                      key={i}
-                      className="group relative overflow-hidden rounded-lg border bg-muted"
+            <div className="flex flex-wrap gap-1.5">
+              {PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => applyPreset(preset.fragment)}
+                  className="rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="text-sm font-medium text-destructive">
+                  La génération a échoué
+                </p>
+                {/* Le message vient tel quel de l'API : c'est lui qui indique
+                    s'il s'agit d'un quota, d'un refus de contenu ou d'une clé. */}
+                <p className="text-sm break-words text-destructive/90">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Résultats */}
+          {loading ? (
+            <div
+              className={cn(
+                "grid gap-3",
+                count > 1 ? "grid-cols-2" : "grid-cols-1"
+              )}
+            >
+              {Array.from({ length: count }).map((_, i) => (
+                // La place du résultat est réservée au bon ratio dès le départ :
+                // la page ne saute pas quand les images arrivent.
+                <Skeleton
+                  key={i}
+                  className="w-full rounded-xl"
+                  style={{ aspectRatio: ratio }}
+                />
+              ))}
+            </div>
+          ) : shots.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-medium">Résultat</h2>
+                <Badge variant="secondary" className="font-normal">
+                  {getModelSpec(result!.model)?.label ?? result!.model}
+                </Badge>
+                <Badge variant="outline" className="font-mono text-[11px]">
+                  {result!.size}
+                </Badge>
+                {result!.usedReference && (
+                  <Badge variant="outline">avec référence</Badge>
+                )}
+              </div>
+
+              <div
+                className={cn(
+                  "grid gap-3",
+                  shots.length > 1 ? "grid-cols-2" : "grid-cols-1"
+                )}
+              >
+                {shots.map((shot, i) => {
+                  const inGallery = Boolean(result!.savedToGallery?.[shot.file]);
+                  return (
+                    <figure
+                      key={shot.file}
+                      className="group relative overflow-hidden rounded-xl border bg-muted"
+                      style={{ aspectRatio: ratio }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={getImageSrc(img)}
-                        alt={prompt}
-                        className="aspect-square w-full object-cover"
+                        src={imageUrl(shot.file)}
+                        alt={result!.prompt}
+                        className="h-full w-full object-cover"
                       />
-                      <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100">
-                        <div className="flex w-full items-center justify-end p-2">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-white hover:text-white hover:bg-white/20"
+                      <figcaption className="pointer-events-none absolute inset-0 flex items-end justify-end bg-gradient-to-t from-black/70 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                        <div className="pointer-events-auto flex gap-1">
+                          <ShotAction
+                            label="Voir en grand"
+                            onClick={() => setViewerIndex(i)}
+                          >
+                            <Maximize2 className="h-4 w-4" />
+                          </ShotAction>
+                          <ShotAction
+                            label="Télécharger"
                             onClick={() =>
-                              handleDownload(getImageSrc(img), i)
+                              downloadImage(imageUrl(shot.file), shot.file)
                             }
                           >
                             <Download className="h-4 w-4" />
-                          </Button>
+                          </ShotAction>
+                          <ShotAction
+                            label={
+                              inGallery ? "Déjà en galerie" : "Ajouter à la galerie"
+                            }
+                            disabled={inGallery}
+                            onClick={() => saveShotToGallery(result!, shot.file)}
+                          >
+                            <ImageDown className="h-4 w-4" />
+                          </ShotAction>
                         </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                      </figcaption>
+                    </figure>
+                  );
+                })}
+              </div>
+            </div>
           ) : (
-            !loading && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Exemples de styles</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-3">
-                    {SHOWCASE.map((item) => (
-                      <div
-                        key={item.title}
-                        className={`relative aspect-square rounded-lg border ${item.border} bg-gradient-to-br ${item.gradient} flex flex-col items-center justify-center p-4 text-center`}
-                      >
-                        <ImageIcon className="h-8 w-8 mb-2 text-muted-foreground/60" />
-                        <p className="text-xs font-medium">{item.title}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          Tapez un prompt pour commencer
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          )}
-
-          {loading && (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16">
-                <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-                <p className="text-sm text-muted-foreground">
-                  Génération en cours... Cela peut prendre quelques secondes.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* ─── RIGHT: Options Panel ──────────────── */}
-        <div className="space-y-3">
-          {/* Reference Image */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Image de référence</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <input
-                ref={refInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleRefUpload}
-              />
-              {referenceImage ? (
-                <div className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`data:image/png;base64,${referenceImage}`}
-                    alt="Référence"
-                    className="w-full aspect-square rounded-md object-cover"
-                  />
-                  <Button
-                    size="icon"
-                    variant="destructive"
-                    className="absolute top-1 right-1 h-6 w-6"
-                    onClick={() => setReferenceImage(null)}
-                  >
-                    <X className="h-3 w-3" />
+            <Empty className="flex-none rounded-xl border border-dashed py-14">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Sparkles />
+                </EmptyMedia>
+                <EmptyTitle>Rien de généré pour l&apos;instant</EmptyTitle>
+                <EmptyDescription>
+                  Écrivez un prompt ci-dessus. Les réglages à droite décident du
+                  modèle, du format et du nombre d&apos;images.
+                </EmptyDescription>
+              </EmptyHeader>
+              {recent.length > 0 && (
+                <EmptyContent>
+                  <Button variant="outline" size="sm" asChild className="gap-2">
+                    <Link href="/m/ai-image-gen/library">
+                      <Images className="h-4 w-4" />
+                      Voir les {recent.length} dernières générations
+                    </Link>
                   </Button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => refInputRef.current?.click()}
-                  className="w-full aspect-video rounded-md border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-1.5 transition-colors hover:border-primary/50 hover:bg-accent/50"
-                >
-                  <Upload className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">
-                    Télécharger une image
-                  </span>
-                </button>
+                </EmptyContent>
               )}
-            </CardContent>
-          </Card>
+            </Empty>
+          )}
 
-          {/* Model Selection */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Modèle</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {Object.entries(MODELS).map(([key, m]) => (
-                <button
-                  key={key}
-                  onClick={() => setModel(key)}
-                  className={`w-full flex items-center gap-2.5 rounded-lg border p-2 transition-all ${
-                    model === key
-                      ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                      : "border-border hover:border-primary/30 hover:bg-accent/50"
-                  }`}
-                >
-                  <div
-                    className={`h-9 w-9 rounded-md bg-gradient-to-br ${m.color} flex items-center justify-center shrink-0`}
-                  >
-                    <Sparkles className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="text-left min-w-0">
-                    <p className="text-xs font-medium leading-none">
-                      {m.label}
-                    </p>
-                    <div className="flex gap-1 mt-1">
-                      {m.tags.map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="text-[9px] px-1 py-0 h-3.5"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Size */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Taille</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={size} onValueChange={setSize}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableSizes.map((s) => (
-                    <SelectItem key={s} value={s} className="text-xs">
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          {/* Count */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Nombre d&apos;images</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Button
-                  variant={count === 1 ? "default" : "outline"}
-                  size="sm"
-                  className="flex-1 h-8 text-xs"
-                  onClick={() => setCount(1)}
-                >
-                  x1
-                </Button>
-                <Button
-                  variant={count === 4 ? "default" : "outline"}
-                  size="sm"
-                  className="flex-1 h-8 text-xs"
-                  onClick={() => setCount(4)}
-                >
-                  x4
+          {/* Reprise rapide */}
+          {recent.length > 0 && (
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-medium">Générations récentes</h2>
+                <Button variant="link" size="sm" asChild className="h-auto p-0">
+                  <Link href="/m/ai-image-gen/library">Tout voir</Link>
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Notes */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-1.5">
-                <Palette className="h-3.5 w-3.5" />
-                Notes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="masterpiece, best quality, highly detailed..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-                className="resize-none text-xs border-muted-foreground/20"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1.5">
-                Ajoutées en pré-prompt à chaque génération
-              </p>
-            </CardContent>
-          </Card>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {recent.slice(0, 10).map((item) =>
+                  item.imageFiles[0] ? (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => reuse(item)}
+                      title={item.prompt}
+                      className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border transition-colors hover:border-primary"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imageUrl(item.imageFiles[0])}
+                        alt={item.prompt}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
+                  ) : null
+                )}
+              </div>
+            </section>
+          )}
         </div>
+
+        {/* ─── Réglages ───────────────────────────────────── */}
+        <aside className="min-w-0">
+          <div className="sticky top-4 rounded-xl border bg-card p-4">
+            <FieldGroup className="gap-5">
+              <Field>
+                <FieldLabel>Modèle</FieldLabel>
+                <div className="flex flex-col gap-2">
+                  {MODELS.map((m) => (
+                    <Item
+                      key={m.id}
+                      asChild
+                      variant={model === m.id ? "muted" : "outline"}
+                      size="sm"
+                      className={cn(
+                        "cursor-pointer",
+                        model === m.id && "border-primary ring-1 ring-primary/20"
+                      )}
+                    >
+                      <button type="button" onClick={() => setModel(m.id)} className="text-left">
+                        <ItemContent>
+                          <ItemTitle className="flex items-center gap-2">
+                            {m.label}
+                            {m.tags[0] === "Recommandé" && (
+                              <Badge
+                                variant="secondary"
+                                className="h-4 px-1.5 text-[10px] font-normal"
+                              >
+                                Recommandé
+                              </Badge>
+                            )}
+                          </ItemTitle>
+                          <ItemDescription className="line-clamp-2">
+                            {m.description}
+                          </ItemDescription>
+                        </ItemContent>
+                      </button>
+                    </Item>
+                  ))}
+                </div>
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="ai-size">Format</FieldLabel>
+                <Select value={size} onValueChange={setSize}>
+                  <SelectTrigger id="ai-size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {spec.sizes.map((s) => {
+                      const r = aspectRatioOf(s);
+                      const shape =
+                        r > 1.05 ? "paysage" : r < 0.95 ? "portrait" : "carré";
+                      return (
+                        <SelectItem key={s} value={s}>
+                          <span className="font-mono text-xs">{s}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {shape}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              {spec.qualities && (
+                <Field>
+                  <FieldLabel htmlFor="ai-quality">Qualité</FieldLabel>
+                  <Select value={quality} onValueChange={setQuality}>
+                    <SelectTrigger id="ai-quality">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {spec.qualities.map((q) => (
+                        <SelectItem key={q.value} value={q.value}>
+                          {q.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    Une qualité plus haute coûte davantage par image.
+                  </FieldDescription>
+                </Field>
+              )}
+
+              <Field>
+                <FieldLabel>Nombre d&apos;images</FieldLabel>
+                <ButtonGroup className="w-full">
+                  {COUNT_CHOICES.map((value) => (
+                    <Button
+                      key={value}
+                      type="button"
+                      variant={count === value ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCount(value)}
+                      className="flex-1"
+                    >
+                      ×{value}
+                    </Button>
+                  ))}
+                </ButtonGroup>
+                {count > spec.maxBatch && (
+                  // Le contournement est réel mais facturé : le dire évite la
+                  // surprise sur la note OpenAI.
+                  <FieldDescription>
+                    {spec.label} ne rend qu&apos;une image par appel : {count}{" "}
+                    appels seront facturés.
+                  </FieldDescription>
+                )}
+              </Field>
+
+              <Field>
+                <FieldLabel>Image de référence</FieldLabel>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleReferencePick}
+                />
+                {reference ? (
+                  <Attachment>
+                    <AttachmentMedia variant="image">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={reference.dataUrl} alt="" />
+                    </AttachmentMedia>
+                    <AttachmentContent>
+                      <AttachmentTitle>{reference.name}</AttachmentTitle>
+                      <AttachmentDescription>
+                        {(reference.size / 1024).toFixed(0)} Ko
+                      </AttachmentDescription>
+                    </AttachmentContent>
+                    <AttachmentActions>
+                      <AttachmentAction
+                        aria-label="Retirer l'image de référence"
+                        onClick={() => setReference(null)}
+                      >
+                        <X />
+                      </AttachmentAction>
+                    </AttachmentActions>
+                  </Attachment>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!spec.supportsReference}
+                    className="w-full justify-start gap-2 font-normal"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                    Choisir une image…
+                  </Button>
+                )}
+                <FieldDescription>
+                  {spec.supportsReference
+                    ? "L'image sert de point de départ ; le prompt décrit la transformation."
+                    : `${spec.label} génère uniquement à partir de texte.`}
+                </FieldDescription>
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="ai-notes">Notes de style</FieldLabel>
+                <Textarea
+                  id="ai-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder="masterpiece, best quality…"
+                  className="resize-none text-xs"
+                />
+                <FieldDescription>
+                  Ajoutées devant chaque prompt de cette session.
+                </FieldDescription>
+              </Field>
+
+              <Button variant="ghost" size="sm" asChild className="gap-2">
+                <Link href="/m/ai-image-gen/settings">
+                  <Settings2 className="h-4 w-4" />
+                  Réglages par défaut
+                </Link>
+              </Button>
+            </FieldGroup>
+          </div>
+        </aside>
       </div>
-    </div>
+
+      <ImageViewer
+        shots={shots}
+        index={viewerIndex}
+        onIndexChange={setViewerIndex}
+        onMutate={refreshHistory}
+      />
+    </ModuleShell>
+  );
+}
+
+/** Bouton d'action en survol d'une vignette, avec libellé accessible. */
+function ShotAction({
+  label,
+  children,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          size="icon"
+          variant="secondary"
+          aria-label={label}
+          disabled={disabled}
+          onClick={onClick}
+          className="h-8 w-8"
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }

@@ -50,6 +50,11 @@ data/users.test.json
 # et ne doivent jamais partir dans l'historique.
 data/*.db*
 
+# Données runtime des modules : images générées, historiques et surtout
+# `secrets.json` (clés API). `module.json` reste versionné, lui, car c'est le
+# manifeste du module — d'où la séparation des deux.
+modules/*/data/
+
 # uploads
 /uploads
 .idea

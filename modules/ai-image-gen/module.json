@@ -1,6 +1,6 @@
 {
   "name": "ai-image-gen",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Generez des images par intelligence artificielle",
   "author": "ShareX Manager",
   "enabled": true,
@@ -10,16 +10,16 @@
   "hasUI": false,
   "supportedFileTypes": [],
   "settings": {
-    "provider": "openai",
-    "openai_api_key": "",
-    "stability_api_key": "",
-    "default_model": "dall-e-3",
+    "default_model": "gpt-image-1",
     "default_size": "1024x1024",
-    "save_to_gallery": true,
+    "default_quality": "medium",
+    "default_count": 1,
+    "save_to_gallery": false,
     "notes_preprompt": ""
   },
   "pages": [
-    { "path": "", "title": "Generer", "component": "pages/generate.tsx" },
+    { "path": "", "title": "Studio", "component": "pages/generate.tsx" },
+    { "path": "library", "title": "Bibliotheque", "component": "pages/library.tsx" },
     { "path": "settings", "title": "Configuration", "component": "pages/settings.tsx" }
   ],
   "navItems": [

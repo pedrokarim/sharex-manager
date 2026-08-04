@@ -1,8 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Lock,
+  ShieldCheck,
+  Sliders,
+  XCircle,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+  FieldLegend,
+} from "@/components/ui/field";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import {
   Select,
   SelectContent,
@@ -10,28 +41,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Settings,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  ArrowLeft,
-  Eye,
-  EyeOff,
-  Key,
-  Sliders,
-} from "lucide-react";
 import type { ModuleConfig } from "@/types/modules";
+import { ModuleShell } from "../components/module-shell";
+import { MODELS, getModelSpec } from "../lib/models";
+import { callModule, type SecretStatus } from "../lib/client";
 
 interface SettingsPageProps {
   moduleName: string;
@@ -39,368 +52,431 @@ interface SettingsPageProps {
   settings: Record<string, any>;
 }
 
+type ProviderKey = "openai" | "stability";
+
+const PROVIDERS: {
+  id: ProviderKey;
+  label: string;
+  field: "openai_api_key" | "stability_api_key";
+  placeholder: string;
+  help: string;
+}[] = [
+  {
+    id: "openai",
+    label: "OpenAI",
+    field: "openai_api_key",
+    placeholder: "sk-proj-…",
+    help: "Requise pour GPT Image 1 et DALL-E 3.",
+  },
+  {
+    id: "stability",
+    label: "Stability AI",
+    field: "stability_api_key",
+    placeholder: "sk-…",
+    help: "Requise pour Stable Diffusion XL.",
+  },
+];
+
 export default function SettingsPage({
   moduleName,
   settings: initialSettings,
 }: SettingsPageProps) {
-  const [settings, setSettings] = useState(initialSettings);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    provider: string;
-    success: boolean;
-    message: string;
-  } | null>(null);
-  const [testing, setTesting] = useState<string | null>(null);
-  const [showOpenAI, setShowOpenAI] = useState(false);
-  const [showStability, setShowStability] = useState(false);
+  const [settings, setSettings] = useState<Record<string, any>>(initialSettings);
+  const [keys, setKeys] = useState<Record<string, SecretStatus> | null>(null);
 
-  // Refetch settings on mount
+  /** Saisie en cours, non encore enregistrée. Vide = la clé stockée est conservée. */
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const [testing, setTesting] = useState<string | null>(null);
+  const [tests, setTests] = useState<
+    Record<string, { success: boolean; message: string }>
+  >({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+
+  const loadKeys = useCallback(() => {
+    callModule<Record<string, SecretStatus>>("getSecretsStatus")
+      .then(setKeys)
+      .catch(() => setKeys(null));
+  }, []);
+
   useEffect(() => {
+    loadKeys();
     fetch(`/api/modules/${moduleName}/settings`)
       .then((r) => r.json())
-      .then((data) => {
-        if (data.settings) setSettings(data.settings);
-      })
+      .then((data) => data?.settings && setSettings(data.settings))
       .catch(() => {});
-  }, [moduleName]);
+  }, [moduleName, loadKeys]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    setSaved(false);
+  const defaultModel = getModelSpec(settings.default_model || "gpt-image-1");
+
+  // ─── Clés API ───────────────────────────────────────────────
+
+  const handleSaveKey = async (field: string, id: ProviderKey) => {
+    setSavingKey(id);
+    try {
+      await callModule("saveSecrets", { [field]: drafts[field] ?? "" });
+      setDrafts((prev) => ({ ...prev, [field]: "" }));
+      setTests((prev) => ({ ...prev, [id]: undefined as any }));
+      loadKeys();
+      toast.success(
+        drafts[field] ? "Clé enregistrée" : "Clé supprimée"
+      );
+    } catch (error: any) {
+      toast.error(error?.message ?? "Enregistrement impossible");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const handleTest = async (id: ProviderKey) => {
+    setTesting(id);
+    try {
+      const result = await callModule<{ success: boolean; message: string }>(
+        "testConnection",
+        id
+      );
+      setTests((prev) => ({ ...prev, [id]: result }));
+    } catch (error: any) {
+      setTests((prev) => ({
+        ...prev,
+        [id]: { success: false, message: error?.message ?? "Erreur" },
+      }));
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  // ─── Préférences ────────────────────────────────────────────
+
+  const updateSetting = (key: string, value: unknown) =>
+    setSettings((prev) => ({ ...prev, [key]: value }));
+
+  const handleSavePrefs = async () => {
+    setSavingPrefs(true);
     try {
       const res = await fetch(`/api/modules/${moduleName}/settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings }),
       });
-      if (res.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
-      }
-    } catch {
-      // ignore
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast.success("Préférences enregistrées");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Enregistrement impossible");
     } finally {
-      setSaving(false);
+      setSavingPrefs(false);
     }
-  };
-
-  const handleTestConnection = async (provider: "openai" | "stability") => {
-    // Save settings first so the server reads the latest key
-    await fetch(`/api/modules/${moduleName}/settings`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ settings }),
-    });
-
-    setTesting(provider);
-    setTestResult(null);
-    try {
-      const res = await fetch("/api/modules/call-function", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          moduleName: "ai-image-gen",
-          functionName: "testConnection",
-          args: [provider],
-        }),
-      });
-      const result = await res.json();
-      if (result.success && result.data) {
-        setTestResult({ provider, ...result.data });
-      } else {
-        setTestResult({
-          provider,
-          success: false,
-          message: result.error || "Erreur",
-        });
-      }
-    } catch {
-      setTestResult({
-        provider,
-        success: false,
-        message: "Erreur réseau",
-      });
-    } finally {
-      setTesting(null);
-    }
-  };
-
-  const updateSetting = (key: string, value: any) => {
-    setSettings((prev: any) => ({ ...prev, [key]: value }));
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <a href="/m/ai-image-gen">
-            <ArrowLeft className="h-4 w-4" />
-          </a>
-        </Button>
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Configuration
-          </h1>
-          <p className="text-muted-foreground">
-            Paramètres du module AI Image Generation
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* API Keys */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5" />
+    <ModuleShell
+      current="settings"
+      title="Configuration"
+      description="Clés d'accès aux API et valeurs par défaut du Studio."
+    >
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* ─── Clés API ─────────────────────────────────── */}
+        <section className="rounded-xl border bg-card p-5">
+          <FieldSet>
+            <FieldLegend className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4" />
               Clés API
-            </CardTitle>
-            <CardDescription>
-              Configurez vos clés API pour chaque provider
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* OpenAI */}
-            <div className="space-y-2.5">
-              <Label className="text-sm font-medium">Clé API OpenAI</Label>
-              <div className="relative">
-                <Input
-                  type={showOpenAI ? "text" : "password"}
-                  placeholder="sk-proj-..."
-                  value={settings.openai_api_key || ""}
-                  onChange={(e) =>
-                    updateSetting("openai_api_key", e.target.value)
-                  }
-                  className="pr-10 bg-muted/50 border-muted-foreground/20 font-mono text-xs"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowOpenAI(!showOpenAI)}
-                >
-                  {showOpenAI ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </Button>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleTestConnection("openai")}
-                  disabled={testing !== null || !settings.openai_api_key}
-                >
-                  {testing === "openai" && (
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  )}
-                  Tester la connexion
-                </Button>
-                {testResult?.provider === "openai" && (
-                  <span
-                    className={`inline-flex items-center gap-1 text-xs ${
-                      testResult.success
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-destructive"
-                    }`}
-                  >
-                    {testResult.success ? (
-                      <CheckCircle className="h-3 w-3" />
-                    ) : (
-                      <XCircle className="h-3 w-3" />
-                    )}
-                    {testResult.message}
-                  </span>
-                )}
-              </div>
-            </div>
+            </FieldLegend>
 
-            {/* Stability */}
-            <div className="space-y-2.5">
-              <Label className="text-sm font-medium">
-                Clé API Stability AI
-              </Label>
-              <div className="relative">
-                <Input
-                  type={showStability ? "text" : "password"}
-                  placeholder="sk-..."
-                  value={settings.stability_api_key || ""}
-                  onChange={(e) =>
-                    updateSetting("stability_api_key", e.target.value)
-                  }
-                  className="pr-10 bg-muted/50 border-muted-foreground/20 font-mono text-xs"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowStability(!showStability)}
-                >
-                  {showStability ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </Button>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleTestConnection("stability")}
-                  disabled={testing !== null || !settings.stability_api_key}
-                >
-                  {testing === "stability" && (
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  )}
-                  Tester la connexion
-                </Button>
-                {testResult?.provider === "stability" && (
-                  <span
-                    className={`inline-flex items-center gap-1 text-xs ${
-                      testResult.success
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-destructive"
-                    }`}
-                  >
-                    {testResult.success ? (
-                      <CheckCircle className="h-3 w-3" />
-                    ) : (
-                      <XCircle className="h-3 w-3" />
-                    )}
-                    {testResult.message}
-                  </span>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Defaults */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sliders className="h-5 w-5" />
-              Paramètres par défaut
-            </CardTitle>
-            <CardDescription>
-              Valeurs par défaut pour la génération
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">
-                Provider par défaut
-              </Label>
-              <Select
-                value={settings.provider || "openai"}
-                onValueChange={(val) => updateSetting("provider", val)}
-              >
-                <SelectTrigger className="bg-muted/50 border-muted-foreground/20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="stability">Stability AI</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">
-                Modèle par défaut
-              </Label>
-              <Select
-                value={settings.default_model || "dall-e-3"}
-                onValueChange={(val) => updateSetting("default_model", val)}
-              >
-                <SelectTrigger className="bg-muted/50 border-muted-foreground/20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dall-e-3">DALL-E 3</SelectItem>
-                  <SelectItem value="dall-e-2">DALL-E 2</SelectItem>
-                  <SelectItem value="stable-diffusion-xl">
-                    Stable Diffusion XL
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">
-                Taille par défaut
-              </Label>
-              <Select
-                value={settings.default_size || "1024x1024"}
-                onValueChange={(val) => updateSetting("default_size", val)}
-              >
-                <SelectTrigger className="bg-muted/50 border-muted-foreground/20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1024x1024">1024 x 1024</SelectItem>
-                  <SelectItem value="1024x1792">1024 x 1792</SelectItem>
-                  <SelectItem value="1792x1024">1792 x 1024</SelectItem>
-                  <SelectItem value="512x512">512 x 512</SelectItem>
-                  <SelectItem value="256x256">256 x 256</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Notes pré-prompt</Label>
-              <Textarea
-                placeholder="masterpiece, best quality, highly detailed..."
-                value={settings.notes_preprompt || ""}
-                onChange={(e) =>
-                  updateSetting("notes_preprompt", e.target.value)
-                }
-                rows={2}
-                className="resize-none text-xs bg-muted/50 border-muted-foreground/20"
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Ces notes sont ajoutées automatiquement avant chaque prompt
+            <div className="mb-4 flex items-start gap-2.5 rounded-lg bg-muted/60 px-3 py-2.5">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <p className="text-xs leading-5 text-muted-foreground">
+                Les clés sont écrites dans{" "}
+                <code className="rounded bg-background px-1 py-0.5 font-mono text-[11px]">
+                  modules/ai-image-gen/data/secrets.json
+                </code>
+                , en dehors du dépôt git. Les variables{" "}
+                <code className="rounded bg-background px-1 py-0.5 font-mono text-[11px]">
+                  OPENAI_API_KEY
+                </code>{" "}
+                et{" "}
+                <code className="rounded bg-background px-1 py-0.5 font-mono text-[11px]">
+                  STABILITY_API_KEY
+                </code>{" "}
+                priment si elles existent.
               </p>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-muted-foreground/20 p-3">
-              <Label
-                htmlFor="save-gallery"
-                className="text-sm font-medium cursor-pointer"
-              >
-                Sauvegarder dans la galerie
-              </Label>
-              <Switch
-                id="save-gallery"
-                checked={settings.save_to_gallery ?? true}
-                onCheckedChange={(val) =>
-                  updateSetting("save_to_gallery", val)
-                }
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <FieldGroup className="gap-6">
+              {PROVIDERS.map((provider) => {
+                const status = keys?.[provider.id];
+                const fromEnv = status?.fromEnv;
+                const draft = drafts[provider.field] ?? "";
+                const test = tests[provider.id];
 
-      {/* Save button */}
-      <div className="flex items-center gap-3">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Sauvegarder les paramètres
-        </Button>
-        {saved && (
-          <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
-            <CheckCircle className="h-4 w-4" />
-            Paramètres sauvegardés
-          </span>
-        )}
+                return (
+                  <Field key={provider.id}>
+                    <FieldLabel
+                      htmlFor={`key-${provider.id}`}
+                      className="flex items-center gap-2"
+                    >
+                      {provider.label}
+                      {status?.configured && (
+                        <Badge
+                          variant="secondary"
+                          className="h-5 gap-1 px-1.5 text-[10px] font-normal"
+                        >
+                          {fromEnv ? (
+                            <>
+                              <Lock className="h-2.5 w-2.5" />
+                              variable d&apos;environnement
+                            </>
+                          ) : (
+                            status.hint
+                          )}
+                        </Badge>
+                      )}
+                    </FieldLabel>
+
+                    {fromEnv ? (
+                      // Saisir une clé ici serait sans effet : l'environnement
+                      // l'emporte à la lecture. Mieux vaut le dire.
+                      <FieldDescription>
+                        Définie par l&apos;environnement du serveur. Retirez la
+                        variable pour pouvoir la gérer depuis cette page.
+                      </FieldDescription>
+                    ) : (
+                      <>
+                        <InputGroup>
+                          <InputGroupInput
+                            id={`key-${provider.id}`}
+                            type={revealed[provider.field] ? "text" : "password"}
+                            placeholder={
+                              status?.configured
+                                ? "Laisser vide pour conserver la clé actuelle"
+                                : provider.placeholder
+                            }
+                            value={draft}
+                            onChange={(e) =>
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [provider.field]: e.target.value,
+                              }))
+                            }
+                            className="font-mono text-xs"
+                          />
+                          <InputGroupAddon align="inline-end">
+                            <InputGroupButton
+                              aria-label={
+                                revealed[provider.field]
+                                  ? "Masquer la clé"
+                                  : "Afficher la clé"
+                              }
+                              onClick={() =>
+                                setRevealed((prev) => ({
+                                  ...prev,
+                                  [provider.field]: !prev[provider.field],
+                                }))
+                              }
+                            >
+                              {revealed[provider.field] ? <EyeOff /> : <Eye />}
+                            </InputGroupButton>
+                          </InputGroupAddon>
+                        </InputGroup>
+                        <FieldDescription>{provider.help}</FieldDescription>
+                      </>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!fromEnv && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            savingKey === provider.id ||
+                            (!draft && !status?.configured)
+                          }
+                          onClick={() =>
+                            handleSaveKey(provider.field, provider.id)
+                          }
+                        >
+                          {savingKey === provider.id && (
+                            <Spinner className="mr-1.5 h-3 w-3" />
+                          )}
+                          {draft
+                            ? "Enregistrer"
+                            : status?.configured
+                              ? "Supprimer la clé"
+                              : "Enregistrer"}
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={testing !== null || !status?.configured}
+                        onClick={() => handleTest(provider.id)}
+                      >
+                        {testing === provider.id && (
+                          <Spinner className="mr-1.5 h-3 w-3" />
+                        )}
+                        Tester
+                      </Button>
+                      {test && (
+                        <span
+                          className={
+                            test.success
+                              ? "inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"
+                              : "inline-flex items-center gap-1 text-xs text-destructive"
+                          }
+                        >
+                          {test.success ? (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          ) : (
+                            <XCircle className="h-3.5 w-3.5" />
+                          )}
+                          {test.message}
+                        </span>
+                      )}
+                    </div>
+                  </Field>
+                );
+              })}
+            </FieldGroup>
+          </FieldSet>
+        </section>
+
+        {/* ─── Valeurs par défaut ───────────────────────── */}
+        <section className="rounded-xl border bg-card p-5">
+          <FieldSet>
+            <FieldLegend className="flex items-center gap-2">
+              <Sliders className="h-4 w-4" />
+              Valeurs par défaut
+            </FieldLegend>
+
+            <FieldGroup className="gap-5">
+              <Field>
+                <FieldLabel htmlFor="default-model">Modèle</FieldLabel>
+                <Select
+                  value={settings.default_model || "gpt-image-1"}
+                  onValueChange={(v) => {
+                    updateSetting("default_model", v);
+                    // Les tailles diffèrent d'un modèle à l'autre : conserver
+                    // l'ancienne enregistrerait un défaut invalide.
+                    const spec = getModelSpec(v);
+                    if (spec && !spec.sizes.includes(settings.default_size)) {
+                      updateSetting("default_size", spec.sizes[0]);
+                    }
+                    if (
+                      spec?.qualities &&
+                      !spec.qualities.some(
+                        (q) => q.value === settings.default_quality
+                      )
+                    ) {
+                      updateSetting("default_quality", spec.qualities[0].value);
+                    }
+                  }}
+                >
+                  <SelectTrigger id="default-model">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MODELS.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {defaultModel && (
+                  <FieldDescription>{defaultModel.description}</FieldDescription>
+                )}
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="default-size">Format</FieldLabel>
+                <Select
+                  value={settings.default_size || "1024x1024"}
+                  onValueChange={(v) => updateSetting("default_size", v)}
+                >
+                  <SelectTrigger id="default-size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(defaultModel?.sizes ?? ["1024x1024"]).map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              {defaultModel?.qualities && (
+                <Field>
+                  <FieldLabel htmlFor="default-quality">Qualité</FieldLabel>
+                  <Select
+                    value={
+                      settings.default_quality || defaultModel.qualities[0].value
+                    }
+                    onValueChange={(v) => updateSetting("default_quality", v)}
+                  >
+                    <SelectTrigger id="default-quality">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {defaultModel.qualities.map((q) => (
+                        <SelectItem key={q.value} value={q.value}>
+                          {q.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
+
+              <Field>
+                <FieldLabel htmlFor="default-notes">Notes de style</FieldLabel>
+                <Textarea
+                  id="default-notes"
+                  rows={3}
+                  placeholder="masterpiece, best quality, highly detailed…"
+                  value={settings.notes_preprompt || ""}
+                  onChange={(e) =>
+                    updateSetting("notes_preprompt", e.target.value)
+                  }
+                  className="resize-none text-xs"
+                />
+                <FieldDescription>
+                  Placées devant chaque prompt. Le Studio les pré-remplit et
+                  permet de les ajuster au coup par coup.
+                </FieldDescription>
+              </Field>
+
+              <Separator />
+
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="save-gallery">
+                    Envoyer dans la galerie
+                  </FieldLabel>
+                  <FieldDescription>
+                    Chaque image générée est copiée dans les uploads de
+                    l&apos;application et devient visible dans la galerie.
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="save-gallery"
+                  checked={Boolean(settings.save_to_gallery)}
+                  onCheckedChange={(v) => updateSetting("save_to_gallery", v)}
+                />
+              </Field>
+            </FieldGroup>
+          </FieldSet>
+
+          <div className="mt-6 flex justify-end">
+            <Button onClick={handleSavePrefs} disabled={savingPrefs}>
+              {savingPrefs && <Spinner className="mr-2 h-4 w-4" />}
+              Enregistrer les préférences
+            </Button>
+          </div>
+        </section>
       </div>
-    </div>
+    </ModuleShell>
   );
 }

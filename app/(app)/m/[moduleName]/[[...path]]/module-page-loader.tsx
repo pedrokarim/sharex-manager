@@ -20,6 +20,10 @@ const MODULE_PAGES: Record<
       ssr: false,
       loading: LoadingSpinner,
     }),
+    library: dynamic(() => import("@/modules/ai-image-gen/pages/library"), {
+      ssr: false,
+      loading: LoadingSpinner,
+    }),
     settings: dynamic(() => import("@/modules/ai-image-gen/pages/settings"), {
       ssr: false,
       loading: LoadingSpinner,
