@@ -8,7 +8,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ArrowLeft, MessageCircle, Github, ExternalLink } from "lucide-react";
+import { ArrowLeft, MessageCircle, ExternalLink } from "lucide-react";
+import { Github } from "@/components/ui/icons";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 

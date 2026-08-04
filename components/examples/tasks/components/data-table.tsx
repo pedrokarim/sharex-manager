@@ -2,19 +2,21 @@
 
 import * as React from "react";
 import {
-  ColumnDef,
   ColumnFiltersState,
+  ColumnVisibilityState as VisibilityState,
   SortingState,
-  VisibilityState,
   flexRender,
+} from "@tanstack/react-table";
+import {
+  LegacyColumnDef as ColumnDef,
   getCoreRowModel,
   getFacetedRowModel,
   getFacetedUniqueValues,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
+  useLegacyTable as useReactTable,
+} from "@tanstack/react-table/legacy";
 
 import {
   Table,

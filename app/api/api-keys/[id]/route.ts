@@ -1,4 +1,5 @@
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { NextRequest } from "next/server";
@@ -12,7 +13,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
     if (!session?.user) {
       logDb.createLog({

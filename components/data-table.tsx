@@ -21,20 +21,22 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
-  ColumnDef,
   ColumnFiltersState,
-  Row,
+  ColumnVisibilityState as VisibilityState,
   SortingState,
-  VisibilityState,
   flexRender,
+} from "@tanstack/react-table"
+import {
+  LegacyColumnDef as ColumnDef,
+  LegacyRow as Row,
   getCoreRowModel,
   getFacetedRowModel,
   getFacetedUniqueValues,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  useReactTable,
-} from "@tanstack/react-table"
+  useLegacyTable as useReactTable,
+} from "@tanstack/react-table/legacy"
 import {
   CheckCircle2Icon,
   CheckCircleIcon,

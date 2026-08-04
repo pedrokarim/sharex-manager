@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { GalleryClient } from "../page.client";
@@ -19,7 +19,7 @@ export default async function StarredGalleryPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   const headersList = await headers();
   const resolvedSearchParams = await searchParams;
 

@@ -1,5 +1,5 @@
 import { DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu";
-import { Table } from "@tanstack/react-table";
+import { LegacyTable as Table } from "@tanstack/react-table/legacy";
 import { Settings2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

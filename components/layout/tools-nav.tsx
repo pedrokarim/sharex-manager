@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Image, LogIn, Wrench, Home } from "lucide-react";
+import Image from "next/image";
+import { LogIn, Wrench, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTranslation } from "@/lib/i18n";
 
@@ -16,7 +17,16 @@ export function ToolsNav() {
       <div className="px-4 flex h-14 items-center">
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2">
-            <Image className="h-6 w-6" />
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <Image
+                src="/images/logo-sxm-simple.png"
+                alt=""
+                width={16}
+                height={16}
+                className="h-4 w-4"
+                priority
+              />
+            </span>
             <span className="font-semibold">ShareX Manager</span>
           </Link>
           <span className="text-muted-foreground">•</span>

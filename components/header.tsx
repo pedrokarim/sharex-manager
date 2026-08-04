@@ -1,6 +1,6 @@
 "use client";
 
-import { signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from "@/lib/auth-client";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -18,11 +18,9 @@ export function Header() {
   const { t } = useTranslation();
 
   const handleSignOut = async () => {
-    await signOut({
-      redirect: true,
-      redirectTo: "/",
-    });
+    await signOut();
     toast.success(t("common.logout_success"));
+    window.location.href = "/";
   };
 
   return (

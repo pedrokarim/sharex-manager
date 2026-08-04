@@ -9,8 +9,12 @@ const { authMock, themeStore } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/auth", () => ({
-  auth: authMock,
+vi.mock("@/lib/auth", () => ({
+  auth: { api: { getSession: authMock } },
+}));
+
+vi.mock("next/headers", () => ({
+  headers: vi.fn(async () => new Headers()),
 }));
 
 vi.mock("@/lib/theme/theme-db", () => ({

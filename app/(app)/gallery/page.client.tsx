@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { redirect } from "next/navigation";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -190,7 +190,7 @@ export function GalleryClient({
   secureOnly = false,
   starredOnly = false,
 }: GalleryClientProps) {
-  const { data: session, status } = useSession();
+  const { data: session, isPending: isSessionPending } = useSession();
   const { t } = useTranslation();
   const [defaultViewMode, setDefaultViewMode] = useAtom(galleryViewModeAtom);
   const [showFileInfo] = useAtom(showFileInfoAtom);
@@ -592,10 +592,10 @@ export function GalleryClient({
   }, [handleRefresh]);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (!isSessionPending && !session) {
       redirect("/login");
     }
-  }, [status]);
+  }, [isSessionPending, session]);
 
   // Éviter les doublons dans les fichiers
   const uniqueFiles = useMemo(() => {

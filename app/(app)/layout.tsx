@@ -1,7 +1,8 @@
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import { SidebarHeader } from "@/components/sidebar/sibebar-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 export default async function RootLayout({
@@ -9,7 +10,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user) {
     redirect("/login");

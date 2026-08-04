@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { storeDeletionToken } from "@/lib/deletion-tokens";
 import { recordUpload } from "@/lib/history";
 import { getServerConfig } from "@/lib/server/config";
@@ -8,7 +9,7 @@ import { logDb } from "@/lib/utils/db";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = await auth.api.getSession({ headers: await headers() });
 
     if (!session) {
       logDb.createLog({

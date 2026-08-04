@@ -1,4 +1,4 @@
-import { Row } from "@tanstack/react-table";
+import { LegacyRow as Row } from "@tanstack/react-table/legacy";
 import { MoreHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

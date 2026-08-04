@@ -1,17 +1,19 @@
 "use client";
 
 import {
-  ColumnDef,
   ColumnFiltersState,
+  ColumnVisibilityState as VisibilityState,
   flexRender,
+  SortingState,
+} from "@tanstack/react-table";
+import {
+  LegacyColumnDef as ColumnDef,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  SortingState,
-  useReactTable,
-  VisibilityState,
-} from "@tanstack/react-table";
+  useLegacyTable as useReactTable,
+} from "@tanstack/react-table/legacy";
 import { MoreHorizontalIcon } from "lucide-react";
 import * as React from "react";
 

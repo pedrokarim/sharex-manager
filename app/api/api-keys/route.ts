@@ -1,4 +1,5 @@
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { NextRequest, NextResponse } from "next/server";
@@ -25,7 +26,7 @@ async function saveApiKeys(keys: ApiKey[]): Promise<void> {
 
 // GET /api/api-keys
 export async function GET() {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
     if (!session?.user) {
       logDb.createLog({
@@ -57,7 +58,7 @@ export async function GET() {
 
 // POST /api/api-keys
 export async function POST(request: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
     if (!session?.user) {
       logDb.createLog({

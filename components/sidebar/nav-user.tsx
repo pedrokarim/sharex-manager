@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
+import { useSession, signOut } from "@/lib/auth-client";
 import {
   BadgeCheck,
   Bell,
@@ -34,11 +34,9 @@ export function NavUser() {
   const { t } = useTranslation();
 
   const handleSignOut = async () => {
-    await signOut({
-      redirect: true,
-      redirectTo: "/",
-    });
+    await signOut();
     toast.success(t("common.logout_success"));
+    window.location.href = "/";
   };
 
   if (!session?.user) return null;

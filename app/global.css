@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Les classes `prose` étaient déjà utilisées (about, pages légales) sans que
+   le plugin soit chargé : elles n'avaient donc aucun effet. */
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

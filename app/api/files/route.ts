@@ -1,4 +1,5 @@
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { readdir, unlink } from "fs/promises";
 import { join } from "path";
 import { NextResponse } from "next/server";
@@ -14,7 +15,7 @@ const PAGE_SIZE = 12; // Nombre d'images par page
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
+    const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       return new Response("Non autorisé", { status: 401 });
     }
@@ -131,7 +132,7 @@ export async function GET(request: Request) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
+    const session = await auth.api.getSession({ headers: await headers() });
 
     if (!session?.user) {
       return Response.json({ error: "Non autorisé" }, { status: 401 });
@@ -180,7 +181,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const session = await auth();
+    const session = await auth.api.getSession({ headers: await headers() });
 
     if (!session?.user) {
       return Response.json({ error: "Non autorisé" }, { status: 401 });
@@ -233,7 +234,7 @@ export async function DELETE(req: NextRequest) {
 
 export async function PUT(request: Request) {
   try {
-    const session = await auth();
+    const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) {
       return new Response("Non autorisé", { status: 401 });
     }

@@ -34,7 +34,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import Image from "next/image";
 import { useTranslation } from "@/lib/i18n";
 import { resolveIcon } from "@/lib/utils/resolve-icon";

@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { NextRequest } from "next/server";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -23,7 +24,7 @@ const updateUserSchema = z.object({
 const usersPath = join(process.cwd(), "data/users.json");
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user?.role || session.user.role !== "admin") {
     logDb.createLog({
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user?.role || session.user.role !== "admin") {
     logDb.createLog({
@@ -203,7 +204,7 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user?.role || session.user.role !== "admin") {
     logDb.createLog({
@@ -293,7 +294,7 @@ export async function DELETE(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user?.role || session.user.role !== "admin") {
     return Response.json({ error: "Unauthorized" }, { status: 401 });

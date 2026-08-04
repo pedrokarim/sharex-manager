@@ -4,7 +4,8 @@ import { getAbsoluteUploadPath } from "@/lib/config";
 import { serveFile, getClientInfo } from "@/lib/file-handler";
 import { logDb } from "@/lib/utils/db";
 import { existsSync } from "fs";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { isFileSecure } from "@/lib/secure-files";
 
 const UPLOADS_DIR = getAbsoluteUploadPath();
@@ -40,7 +41,7 @@ export async function GET(
   // Si le fichier est sécurisé, vérifier l'authentification
   if (isSecure) {
     // Remarque : ça ne fonctionne pas avec le middleware auth
-    const session = await auth();
+    const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) {
       // Logger la tentative d'accès non autorisé
       logDb.createLog({

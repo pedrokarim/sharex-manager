@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import fs from "fs";
 import path from "path";
@@ -8,7 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import AdmZip from "adm-zip";
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
     if (!session) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });

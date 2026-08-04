@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { GalleryClient } from "./page.client";
 import { headers } from "next/headers";
@@ -14,7 +14,7 @@ export default async function GalleryPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   const headersList = await headers();
   const resolvedSearchParams = await searchParams;
 

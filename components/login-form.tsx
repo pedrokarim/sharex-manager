@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { siDiscord } from "simple-icons";
 
@@ -24,17 +24,21 @@ export function LoginForm({
     const formData = new FormData(e.currentTarget);
 
     try {
-      const res = await signIn("credentials", {
-        username: formData.get("username"),
-        password: formData.get("password"),
-        redirect: false,
-        callbackUrl: "/gallery",
+      const { error } = await signIn.username({
+        username: String(formData.get("username") ?? ""),
+        password: String(formData.get("password") ?? ""),
       });
 
-      if (res?.error) {
-        toast.error("Identifiants invalides");
-      } else if (res?.url) {
-        window.location.href = res.url;
+      if (error) {
+        // Ne pas tout réduire à « identifiants invalides » : une erreur de
+        // configuration (origine refusée, 500…) doit rester diagnosticable.
+        toast.error(
+          error.status === 401
+            ? "Identifiants invalides"
+            : (error.message ?? `Échec de la connexion (${error.status})`)
+        );
+      } else {
+        window.location.href = "/gallery";
       }
     } catch (error) {
       toast.error("Une erreur est survenue");
@@ -118,8 +122,9 @@ export function LoginForm({
         </Button>
       </div>
       <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-primary">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
+        En vous connectant, vous acceptez nos{" "}
+        <a href="/legal/terms">Conditions Générales d&apos;Utilisation</a> et
+        notre <a href="/legal/privacy">Politique de confidentialité</a>.
       </div>
     </form>
   );

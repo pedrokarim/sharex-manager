@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteHistoryEntry, getAllHistory } from "@/lib/history";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });

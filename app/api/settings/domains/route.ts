@@ -3,7 +3,8 @@ import { resolve } from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { Domain } from "@/lib/types/upload-config";
 import { logDb } from "@/lib/utils/db";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 
 const CONFIG_PATH = resolve(process.cwd(), "config", "uploads.json");
 
@@ -43,7 +44,7 @@ async function writeConfig(config: any) {
 }
 
 export async function GET() {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
     if (!session?.user) {
       logDb.createLog({
@@ -86,7 +87,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
     if (!session?.user || session.user.role !== "admin") {
       logDb.createLog({
@@ -167,7 +168,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
     if (!session?.user || session.user.role !== "admin") {
       logDb.createLog({
@@ -299,7 +300,7 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
     if (!session?.user || session.user.role !== "admin") {
       logDb.createLog({

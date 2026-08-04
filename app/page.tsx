@@ -13,7 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Footer } from "@/components/layout/footer";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useTranslation } from "@/lib/i18n";
 import { CatalogAccessButton } from "@/components/catalog/catalog-access-button";
 import { HeroSection } from "@/components/home/hero-section";

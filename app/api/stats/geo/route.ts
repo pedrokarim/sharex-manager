@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { getAllHistory } from "@/lib/history";
 import { batchResolveGeoIP, isPrivateIP } from "@/lib/geo-cache";
 import type { GeoStatsResponse, TopIPEntry, GeoMarker } from "@/lib/types/geo";
 
 export async function GET() {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });

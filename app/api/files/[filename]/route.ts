@@ -1,4 +1,5 @@
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { unlink } from "fs/promises";
 import { join } from "path";
 import { NextRequest } from "next/server";
@@ -19,7 +20,7 @@ export async function DELETE(
     const resolvedParams = await params;
 
     // Vérifier si c'est une suppression authentifiée ou par token
-    const session = await auth();
+    const session = await auth.api.getSession({ headers: await headers() });
     const token = request.nextUrl.searchParams.get("token");
 
     if (!session && !token) {
