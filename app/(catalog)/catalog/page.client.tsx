@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, FolderOpen, Images, Sparkles } from "lucide-react";
+import { ArrowRight, FolderOpen, Images } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
-import { HeroBackground } from "@/components/catalog/hero-background";
 import { Loading } from "@/components/ui/loading";
-import { AlbumStackCard } from "@/components/catalog/album-stack-card";
+import { CatalogMosaic } from "@/components/catalog/catalog-mosaic";
+import { CatalogAlbumCard } from "@/components/catalog/catalog-album-card";
 import type { Album } from "@/types/albums";
 
 interface CatalogData {
@@ -18,7 +19,15 @@ interface CatalogData {
     albumName?: string;
   }>;
   total: number;
+  imagesTotal?: number;
 }
+
+const formatDate = (iso?: string) =>
+  iso
+    ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(
+        new Date(iso),
+      )
+    : "—";
 
 export function CatalogLanding() {
   const [data, setData] = useState<CatalogData | null>(null);
@@ -27,13 +36,12 @@ export function CatalogLanding() {
   useEffect(() => {
     const fetchCatalog = async () => {
       try {
+        // 24 images suffisent à peupler la mosaïque : elle les recycle en
+        // boucle, inutile de tirer tout le catalogue pour un fond.
         const response = await fetch(
-          "/api/public/catalog?includeImages=true&randomImages=8&limit=6"
+          "/api/public/catalog?includeImages=true&randomImages=24&limit=6",
         );
-        if (response.ok) {
-          const result = await response.json();
-          setData(result);
-        }
+        if (response.ok) setData(await response.json());
       } catch (error) {
         console.error("Erreur lors du chargement du catalogue:", error);
       } finally {
@@ -44,132 +52,112 @@ export function CatalogLanding() {
     fetchCatalog();
   }, []);
 
-  if (loading) {
-    return <Loading fullScreen />;
-  }
+  if (loading) return <Loading fullScreen />;
+
+  const heroNames = (data?.heroImages ?? []).map((image) => image.name);
+  const imagesTotal = data?.imagesTotal ?? heroNames.length;
+  const lastAdded = data?.heroImages?.[0]?.addedAt;
 
   return (
     <div className="relative">
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        <HeroBackground images={(data?.heroImages || []).map((img) => img.name)} />
+      <section className="relative flex min-h-[82vh] items-end overflow-hidden">
+        {heroNames.length > 0 ? (
+          <CatalogMosaic images={heroNames} rate={1.5} fade={1600} />
+        ) : (
+          <div className="absolute inset-0 bg-muted" />
+        )}
 
-        <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="max-w-4xl mx-auto space-y-8">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 text-sm">
-              <Sparkles className="h-4 w-4" />
-              <span>Collection publique</span>
-            </div>
+        {/* Le héros est posé sur un voile sombre : son contenu reste clair dans
+            les deux thèmes, indépendamment des couleurs de l'application. */}
+        {/* pb-28 : le contenu doit passer au-dessus du fondu de raccord (h-24),
+            sinon les statistiques se délavent en thème clair. */}
+        <div className="container relative z-10 mx-auto px-4 pb-28 text-white sm:px-6 lg:px-8">
+          <h1 className="max-w-[14ch] text-4xl font-bold leading-[0.98] tracking-tighter text-balance sm:text-5xl lg:text-7xl">
+            {imagesTotal > 0
+              ? `${imagesTotal} images, partagées librement.`
+              : "Une collection en préparation."}
+          </h1>
 
-            {/* Title */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-tight tracking-tight">
-              Explorez notre
-              <br />
-              <span className="bg-gradient-to-r from-white via-white/80 to-white/60 bg-clip-text text-transparent">
-                collection
-              </span>
-            </h1>
+          <p className="mt-4 max-w-[50ch] text-base leading-relaxed text-white/75 sm:text-lg">
+            {data && data.total > 0
+              ? "Des albums mis à jour au fil des captures. Entrez par un album ou parcourez tout d'un bloc."
+              : "Aucun album public pour le moment. Revenez bientôt."}
+          </p>
 
-            {/* Subtitle */}
-            <p className="text-lg sm:text-xl text-white/70 max-w-2xl mx-auto leading-relaxed">
-              Découvrez une sélection d'albums et d'images partagés
-              publiquement. Parcourez, explorez et laissez-vous inspirer.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-              <Link href="/catalog/albums">
-                <Button
-                  size="lg"
-                  className="rounded-full px-8 gap-2 bg-white text-black hover:bg-white/90 shadow-xl shadow-white/20"
-                >
-                  <FolderOpen className="h-5 w-5" />
-                  Voir les albums
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Button
+              size="lg"
+              className="gap-2 bg-white text-black hover:bg-white/90"
+              asChild
+            >
               <Link href="/catalog/gallery">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="rounded-full px-8 gap-2 border-2 border-white/60 bg-black/20 backdrop-blur-md text-white hover:bg-black/30 hover:border-white/80 shadow-xl shadow-black/20"
-                >
-                  <Images className="h-5 w-5" />
-                  Explorer la galerie
-                </Button>
+                <Images className="h-4 w-4" />
+                Parcourir la galerie
               </Link>
-            </div>
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="gap-2 border-white/25 bg-black/30 text-white backdrop-blur hover:bg-black/45 hover:text-white"
+              asChild
+            >
+              <Link href="/catalog/albums">
+                <FolderOpen className="h-4 w-4" />
+                Voir les albums
+              </Link>
+            </Button>
+          </div>
 
-            {/* Stats */}
-            {data && data.total > 0 && (
-              <div className="pt-12 flex items-center justify-center gap-8 sm:gap-16">
-                <div className="text-center">
-                  <div className="text-3xl sm:text-4xl font-bold text-white">
-                    {data.total}
-                  </div>
-                  <div className="text-sm text-white/60 mt-1">
-                    Albums publics
-                  </div>
-                </div>
-                <div className="w-px h-12 bg-white/20" />
-                <div className="text-center">
-                  <div className="text-3xl sm:text-4xl font-bold text-white">
-                    {data.heroImages.length}+
-                  </div>
-                  <div className="text-sm text-white/60 mt-1">Images</div>
-                </div>
+          {data && data.total > 0 ? (
+            <dl className="mt-8 flex flex-wrap gap-8 border-t border-white/15 pt-5 font-mono text-[11px] uppercase tracking-wider text-white/60">
+              <div>
+                <dt>albums</dt>
+                <dd className="font-sans text-2xl font-semibold tracking-tight tabular-nums text-white">
+                  {data.total}
+                </dd>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
-          <div className="w-6 h-10 rounded-full border-2 border-white/30 flex justify-center pt-2">
-            <div className="w-1 h-3 rounded-full bg-white/60 animate-bounce" />
-          </div>
+              <div>
+                <dt>images</dt>
+                <dd className="font-sans text-2xl font-semibold tracking-tight tabular-nums text-white">
+                  {imagesTotal}
+                </dd>
+              </div>
+              <div>
+                <dt>dernier ajout</dt>
+                <dd className="font-sans text-2xl font-semibold tracking-tight text-white">
+                  {formatDate(lastAdded)}
+                </dd>
+              </div>
+            </dl>
+          ) : null}
         </div>
       </section>
 
-      {/* Featured Albums Section */}
-      {data && data.albums.length > 0 && (
-        <section className="py-20 sm:py-32 bg-background">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-end justify-between mb-12">
-              <div>
-                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
-                  Albums à découvrir
-                </h2>
-                <p className="text-muted-foreground mt-2 max-w-xl">
-                  Une sélection d'albums récemment partagés
-                </p>
-              </div>
-              <Link href="/catalog/albums">
-                <Button variant="ghost" className="gap-2 hidden sm:flex">
-                  Voir tout
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
+      {data && data.albums.length > 0 ? (
+        <section className="container mx-auto px-4 pt-16 sm:px-6 lg:px-8">
+          <div className="mb-6 flex items-baseline gap-3">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+              Sélection
+            </span>
+            <h2 className="text-2xl font-semibold tracking-tight">
+              Albums à découvrir
+            </h2>
+            <Link
+              href="/catalog/albums"
+              className="ml-auto inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Tout voir
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {data.albums.map((album) => (
-                <AlbumStackCard key={album.id} album={album} />
-              ))}
-            </div>
-
-            <div className="mt-8 text-center sm:hidden">
-              <Link href="/catalog/albums">
-                <Button variant="outline" className="gap-2">
-                  Voir tous les albums
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {data.albums.map((album) => (
+              <CatalogAlbumCard key={album.id} album={album} />
+            ))}
           </div>
         </section>
-      )}
+      ) : null}
     </div>
   );
 }

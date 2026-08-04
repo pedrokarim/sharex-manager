@@ -252,7 +252,9 @@ function ThemeAdminPageContent({
         </div>
       </section>
 
-      <Card className="overflow-hidden rounded-[2rem] border-border/70 shadow-sm">
+      {/* py-0 gap-0 : Card porte py-6 depuis shadcn v4 ; l'en-tête et l'éditeur
+          gèrent déjà leur propre espacement, la marge s'ajoutait en doublon. */}
+      <Card className="gap-0 overflow-hidden rounded-[2rem] border-border/70 py-0 shadow-sm">
         <CardHeader className="border-b border-border/60 bg-muted/20 px-6 py-5">
           <CardTitle className="flex items-center gap-2 text-xl">
             <Palette className="h-5 w-5" />

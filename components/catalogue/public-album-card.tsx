@@ -101,7 +101,7 @@ export function PublicAlbumCard({ album }: PublicAlbumCardProps) {
   };
 
   return (
-    <Link href={`/public/albums/${album.publicSlug}`}>
+    <Link href={`/catalog/albums/${album.publicSlug}`}>
       <Card className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden border-border/50">
         <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 relative overflow-hidden">
           {renderThumbnail()}

@@ -108,8 +108,10 @@ export function TopIpsChart({ topIps }: TopIpsChartProps) {
       </Card>
 
       {/* Table détaillée */}
-      <Card>
-        <CardHeader className="pb-2 px-4 pt-4 sm:px-5">
+      {/* py-0 : Card porte py-6 depuis shadcn v4, qui s'ajoutait au pt-4 de
+          l'en-tête et laissait une bande vide sous le tableau. */}
+      <Card className="gap-0 overflow-hidden py-0">
+        <CardHeader className="px-4 pb-2 pt-4 sm:px-5">
           <CardTitle className="text-sm sm:text-base font-semibold">
             {t("uploads.stats.network.top_ips_table")}
           </CardTitle>

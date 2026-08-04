@@ -1,4 +1,6 @@
-import { DragEvent } from "react";
+"use client";
+
+import { DragEvent, useState } from "react";
 import { FileInfo } from "@/types/files";
 import { Button } from "../ui/button";
 import {
@@ -38,6 +40,18 @@ export function ListItemCard({
   isNew,
 }: ListItemCardProps) {
   const locale = useDateLocale();
+
+  /**
+   * Vignette de 64 px : inutile de télécharger le fichier d'origine.
+   * On retombe dessus si la route de miniatures ne gère pas le format.
+   */
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+  const previewUrl =
+    isImage && !thumbFailed
+      ? `/api/thumbnails/${encodeURIComponent(file.name)}`
+      : file.url;
+
   const preventNativeImageDrag = (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
   };
@@ -55,11 +69,13 @@ export function ListItemCard({
         onDragStart={preventNativeImageDrag}
       >
         <Image
-          src={file.url}
+          src={previewUrl}
           alt={file.name}
           fill
           draggable={false}
+          loading="lazy"
           onDragStart={preventNativeImageDrag}
+          onError={() => setThumbFailed(true)}
           className="object-cover"
           sizes="64px"
         />
