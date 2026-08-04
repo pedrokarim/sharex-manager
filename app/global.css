@@ -228,3 +228,33 @@
 .animate-sxm-album-float {
   animation: sxm-album-float 6s ease-in-out infinite;
 }
+
+/* Mosaïque animée du catalogue.
+   Les deux couches d'une case se recouvrent pendant le fondu croisé : aucun
+   fond ne transparaît au changement d'image. */
+.sxm-mosaic {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 8), 1fr);
+  grid-auto-rows: 1fr;
+  gap: 3px;
+}
+.sxm-mosaic .sxm-cell {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--muted) 60%, var(--background));
+}
+.sxm-mosaic .sxm-cell > span {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity var(--fade, 1600ms) ease-in-out;
+  will-change: opacity;
+}
+.sxm-mosaic .sxm-cell > span.on { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sxm-mosaic .sxm-cell > span { transition: none; }
+}

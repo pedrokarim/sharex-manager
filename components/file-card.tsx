@@ -150,6 +150,22 @@ export function FileCard({
   };
 
   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+
+  /**
+   * La vignette de la grille passe par /api/thumbnails (300 px, mis en cache un
+   * an) et non par le fichier d'origine : une grille de captures en pleine
+   * résolution représente plusieurs dizaines de mégaoctets pour un rendu de
+   * quelques centaines de pixels de côté.
+   *
+   * En cas d'échec (format non géré par la route), on retombe sur le fichier
+   * d'origine plutôt que d'afficher une case vide.
+   */
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const previewUrl =
+    isImage && !thumbFailed
+      ? `/api/thumbnails/${encodeURIComponent(file.name)}`
+      : file.url;
+
   const preventNativeImageDrag = (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
   };
@@ -157,7 +173,10 @@ export function FileCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden transition-all duration-500",
+        // py-0 gap-0 : depuis shadcn v4, Card porte py-6 et gap-6 en dur.
+        // Sans ces annulations, une bande vide apparaît au-dessus de l'image
+        // même avec un CardHeader en p-0.
+        "gap-0 overflow-hidden py-0 transition-all duration-500",
         isNew && "animate-in fade-in-0 zoom-in-95",
       )}
     >
@@ -207,13 +226,15 @@ export function FileCard({
           {isImage ? (
             showThumbnails ? (
               <Image
-                src={file.url}
+                src={previewUrl}
                 alt={file.name}
                 fill
                 draggable={false}
                 onDragStart={preventNativeImageDrag}
+                onError={() => setThumbFailed(true)}
+                loading="lazy"
                 className="object-cover"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 16vw"
               />
             ) : (
               <div className="flex h-full items-center justify-center">

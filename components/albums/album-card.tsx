@@ -145,7 +145,7 @@ export function AlbumCard({
   const handleCopyPublicUrl = async () => {
     if (!album.publicSlug) return;
 
-    const publicUrl = `${window.location.origin}/public/albums/${album.publicSlug}`;
+    const publicUrl = `${window.location.origin}/catalog/albums/${album.publicSlug}`;
     try {
       await navigator.clipboard.writeText(publicUrl);
       setCopiedUrl(true);
@@ -292,10 +292,13 @@ export function AlbumCard({
   // Fonction pour rendre la miniature de l'album
   const renderThumbnail = () => {
     if (imageFiles.length === 0) {
-      // Aucune image : afficher l'icône de dossier
+      // Album vide : un aplat neutre et discret. Le dégradé précédent, basé sur
+      // --primary, produisait un gros carré gris qu'on pouvait prendre pour un
+      // chargement en cours ou une image cassée.
       return (
-        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-          <FolderOpen className="h-8 w-8 sm:h-12 sm:w-12 text-primary/50" />
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2 border-b bg-muted/40 text-muted-foreground">
+          <FolderOpen className="h-7 w-7 opacity-40" />
+          <span className="text-xs">Album vide</span>
         </div>
       );
     }
@@ -333,15 +336,9 @@ export function AlbumCard({
               </div>
             );
           } else {
-            // Case vide : afficher l'icône de dossier
-            return (
-              <div
-                key={index}
-                className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5"
-              >
-                <FolderOpen className="h-4 w-4 sm:h-6 sm:w-6 text-primary/50" />
-              </div>
-            );
+            // Case manquante dans la mosaïque : un simple aplat, sans icône.
+            // Répéter le dossier jusqu'à trois fois attirait l'œil sur le vide.
+            return <div key={index} className="h-full w-full bg-muted/40" />;
           }
         })}
       </div>
@@ -349,10 +346,14 @@ export function AlbumCard({
   };
 
   return (
-    <Card className="group hover:shadow-md transition-all duration-200 hover:scale-105">
+    // py-0 gap-0 : depuis shadcn v4, Card porte py-6 et gap-6 en dur, ce qui
+    // insérait une bande vide au-dessus de la couverture.
+    // hover:scale retiré : sur une grille, la carte agrandie chevauchait ses
+    // voisines. L'ombre suffit à signaler le survol.
+    <Card className="group gap-0 overflow-hidden py-0 transition-shadow duration-200 hover:shadow-md">
       <CardHeader className="p-0">
         <Link href={`/albums/${album.id}`}>
-          <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 rounded-t-lg relative overflow-hidden">
+          <div className="relative aspect-video overflow-hidden bg-muted">
             {renderThumbnail()}
 
             {/* Badge du nombre de fichiers */}

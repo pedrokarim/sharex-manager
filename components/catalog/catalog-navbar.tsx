@@ -28,8 +28,10 @@ export function CatalogNavbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // La page d'accueil du catalogue a un hero sombre, les autres pages non
-  const isHeroPage = pathname === "/catalog";
+  // Les pages à bandeau d'images (accueil et détail d'un album) posent un voile
+  // sombre sous la navigation : elle peut y rester transparente et en blanc.
+  const isHeroPage =
+    pathname === "/catalog" || /^\/catalog\/albums\/[^/]+$/.test(pathname);
   const useTransparentStyle = isHeroPage && !isScrolled;
 
   useEffect(() => {
@@ -65,7 +67,17 @@ export function CatalogNavbar() {
               alt="SXM"
               className="h-8 w-8"
             />
-            <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            {/* Le dégradé est basé sur --primary, sombre en thème clair : il
+                disparaîtrait sur le voile du bandeau. On garde le blanc plein
+                tant que la navigation est transparente. */}
+            <span
+              className={cn(
+                "truncate",
+                useTransparentStyle
+                  ? "text-white"
+                  : "bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent",
+              )}
+            >
               SXM Catalog
             </span>
           </Link>

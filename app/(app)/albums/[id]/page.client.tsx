@@ -23,14 +23,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { GridView } from "@/components/gallery/grid-view";
 import { ListView } from "@/components/gallery/list-view";
@@ -70,6 +66,16 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   const [albumLoading, setAlbumLoading] = useState(true);
   const [isTogglingPublic, setIsTogglingPublic] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+
+  /**
+   * L'origine n'est connue que côté navigateur. La lire pendant le rendu
+   * produisait un HTML serveur différent du client, donc une erreur
+   * d'hydratation : on l'installe après le montage.
+   */
+  const [origin, setOrigin] = useState("");
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
   const {
     fileName: viewerFileName,
     presentation: viewerPresentation,
@@ -463,7 +469,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   const handleCopyPublicUrl = async () => {
     if (!album?.publicSlug) return;
 
-    const publicUrl = `${window.location.origin}/public/albums/${album.publicSlug}`;
+    const publicUrl = `${window.location.origin}/catalog/albums/${album.publicSlug}`;
     try {
       await navigator.clipboard.writeText(publicUrl);
       setCopiedUrl(true);
@@ -823,7 +829,10 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
                 </Badge>
               )}
               <Badge variant="secondary" className="text-xs sm:text-sm w-fit">
-                {t("albums.files_count", { count: files.length })}
+                {/* fileCount et non files.length : la liste est paginée, le compteur
+                     affichait sinon le nombre de fichiers déjà chargés et
+                     augmentait au fil du défilement. */
+                  t("albums.files_count", { count: album.fileCount })}
               </Badge>
             </div>
             {album.description && (
@@ -891,7 +900,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
                   <DropdownMenuItem
                     onClick={() => {
                       window.open(
-                        `/public/albums/${album.publicSlug}`,
+                        `/catalog/albums/${album.publicSlug}`,
                         "_blank"
                       );
                     }}
@@ -916,65 +925,51 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         </div>
       </div>
 
-      {/* Section de configuration publique */}
+      {/* Lien public : une ligne au lieu d'une carte pleine largeur, qui
+          occupait un quart de l'écran pour afficher une URL. L'adresse est
+          désormais un vrai lien cliquable, et non un champ en lecture seule
+          qu'il fallait sélectionner à la main. */}
       {album.isPublic && album.publicSlug && (
-        <Card className="mb-6 sm:mb-8">
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-              <Globe className="h-4 w-4 sm:h-5 sm:w-5" />
-              {t("albums.public_album")}
-            </CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
-              {t("albums.public_album_description")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="public-url" className="text-xs sm:text-sm">
-                  {t("albums.public_url")}
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="public-url"
-                    readOnly
-                    value={
-                      typeof window !== "undefined"
-                        ? `${window.location.origin}/public/albums/${album.publicSlug}`
-                        : `/public/albums/${album.publicSlug}`
-                    }
-                    className="text-xs sm:text-sm font-mono"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleCopyPublicUrl}
-                    className="flex-shrink-0"
-                  >
-                    {copiedUrl ? (
-                      <Check className="h-3 w-3 sm:h-4 sm:w-4" />
-                    ) : (
-                      <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      window.open(
-                        `/public/albums/${album.publicSlug}`,
-                        "_blank"
-                      );
-                    }}
-                    className="flex-shrink-0"
-                  >
-                    <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="mb-6 flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 sm:mb-8">
+          <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <a
+            href={`/catalog/albums/${album.publicSlug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground transition-colors hover:text-foreground hover:underline sm:text-sm"
+          >
+            {origin}/catalog/albums/{album.publicSlug}
+          </a>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCopyPublicUrl}
+            className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+          >
+            {copiedUrl ? (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                Copié
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5" />
+                Copier
+              </>
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            aria-label="Ouvrir la page publique"
+            onClick={() =>
+              window.open(`/catalog/albums/${album.publicSlug}`, "_blank")
+            }
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       )}
 
       {/* Contenu de l'album */}

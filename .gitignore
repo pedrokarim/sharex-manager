@@ -45,8 +45,10 @@ public/thumbnails/*
 data/users.test.json
 
 # DB
-data/*.db
-data/*.db-*
+# `data/*.db*` couvre aussi les -wal/-shm de SQLite et les copies de sauvegarde
+# (`albums.db.bak-<horodatage>`) : ces fichiers contiennent des données utilisateur
+# et ne doivent jamais partir dans l'historique.
+data/*.db*
 
 # uploads
 /uploads

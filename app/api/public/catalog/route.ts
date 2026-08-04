@@ -59,6 +59,9 @@ export async function GET(request: NextRequest) {
 
     // Si on veut des images aléatoires pour le hero
     let heroImages: Array<{ name: string; addedAt: string; albumSlug: string; albumName: string }> = [];
+    // Nombre total d'images publiques : la page d'accueil l'affiche, or
+    // heroImages n'en contient qu'un échantillon.
+    let heroImagesTotal = 0;
     if (randomImages > 0) {
       const allImages: Array<{ name: string; addedAt: string; albumSlug: string; albumName: string }> = [];
 
@@ -84,6 +87,8 @@ export async function GET(request: NextRequest) {
           .values(),
       );
 
+      heroImagesTotal = deduped.length;
+
       // Mélanger et prendre le nombre demandé
       const shuffled = deduped.sort(() => Math.random() - 0.5);
       heroImages = shuffled.slice(0, randomImages);
@@ -104,6 +109,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       albums: enrichedAlbums,
       heroImages,
+      imagesTotal: heroImagesTotal,
       total: publicAlbums.length,
     });
   } catch (error) {
