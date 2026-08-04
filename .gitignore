@@ -54,6 +54,8 @@ data/*.db*
 # `secrets.json` (clés API). `module.json` reste versionné, lui, car c'est le
 # manifeste du module — d'où la séparation des deux.
 modules/*/data/
+# Même contenu, côté hôte, quand il est monté dans le conteneur.
+/module-data
 
 # uploads
 /uploads

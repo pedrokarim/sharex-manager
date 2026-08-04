@@ -23,6 +23,10 @@ services:
       - ./config:/app/config
       - ./uploads:/app/uploads:delegated
       - ./data:/app/data
+      # Données runtime des modules (images générées, historiques, secrets.json).
+      # `modules/` est cuit dans l'image : sans ce montage, tout serait perdu à
+      # chaque rebuild. Les clés API peuvent aussi passer par .env, qui prime.
+      - ./module-data/ai-image-gen:/app/modules/ai-image-gen/data
       - next-cache:/app/.next/cache
 
 volumes:
