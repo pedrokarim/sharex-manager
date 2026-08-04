@@ -1,10 +1,10 @@
 import { UnauthorizedError } from "@/types/errors";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { NextRequest } from "next/server";
 
 export async function getCurrentUserId(req?: NextRequest): Promise<string> {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user?.id) {
     throw new UnauthorizedError();
@@ -14,7 +14,7 @@ export async function getCurrentUserId(req?: NextRequest): Promise<string> {
 }
 
 export async function getCurrentUser(req?: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session) {
     throw new UnauthorizedError();

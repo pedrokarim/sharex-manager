@@ -8,7 +8,7 @@ export function Footer() {
         <div className="flex flex-col items-center justify-between gap-4 md:h-16 md:flex-row">
           <div className="text-center md:text-left">
             <p className="text-sm text-muted-foreground">
-              © 2025 Ascencia. Tous droits réservés.
+              © {new Date().getFullYear()} Ascencia — code sous licence GPL v3.
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -31,6 +31,18 @@ export function Footer() {
                 className="hover:text-primary transition-colors"
               >
                 Mentions légales
+              </Link>
+              <Link
+                href="/legal/terms"
+                className="hover:text-primary transition-colors"
+              >
+                CGU
+              </Link>
+              <Link
+                href="/legal/privacy"
+                className="hover:text-primary transition-colors"
+              >
+                Confidentialité
               </Link>
               <Link
                 href="https://ascencia.re"

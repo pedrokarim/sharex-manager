@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllHistory, searchHistory } from "@/lib/history";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });

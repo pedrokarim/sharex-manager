@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { logDb } from "@/lib/utils/db";
 import {
   validateApiKeyForColorExtraction,
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
     console.log("🔑 Clé API extraite:", apiKey ? "Présente" : "Absente");
 
     // Vérifier l'authentification : Session OU Clé API
-    const session = await auth();
+    const session = await auth.api.getSession({ headers: await headers() });
     const hasSession = !!session?.user;
 
     console.log(

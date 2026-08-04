@@ -1,4 +1,5 @@
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { themeDb } from "@/lib/theme/theme-db";
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminThemePage() {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user || session.user.role !== "admin") {
     redirect("/");

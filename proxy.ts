@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { isEdgeRuntime } from "@/lib/utils";
 import type { LogAction } from "@/lib/types/logs";
 
@@ -37,18 +37,14 @@ const setCorsHeaders = (response: NextResponse, req: NextRequest) => {
   return response;
 };
 
-// Configuration du matcher
+// Configuration du matcher.
+// Pas de clé `runtime` ici : contrairement à middleware.ts, proxy.ts s'exécute
+// toujours sur Node.js et Next refuse une config de segment dans ce fichier.
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-    "/api/:path*",
-    "/api/auth/callback/credentials",
-    "/api/auth/signout",
-  ],
-  runtime: "nodejs",
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)", "/api/:path*"],
 };
 
-// Fonction de journalisation sécurisée pour le middleware
+// Fonction de journalisation sécurisée pour le proxy
 const safeLog = async (options: {
   level: "info" | "warning" | "error";
   action: LogAction;
@@ -70,8 +66,8 @@ const safeLog = async (options: {
   );
 };
 
-// Configuration du middleware
-export async function middleware(req: NextRequest) {
+// Configuration du proxy
+export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const url = req.nextUrl.clone();
 
@@ -85,7 +81,9 @@ export async function middleware(req: NextRequest) {
 
   // Gestion des routes API
   const apiPublicRoutes = {
-    exact: ["/api/upload", "/api/logs"],
+    // /api/contact sert le formulaire de la page vitrine : il doit rester
+    // joignable sans session (il a sa propre limitation de débit).
+    exact: ["/api/upload", "/api/logs", "/api/contact"],
     startsWith: ["/api/auth"],
   };
 
@@ -99,7 +97,7 @@ export async function middleware(req: NextRequest) {
     }
 
     // Vérification de l'authentification avec Next Auth 5
-    const session = await auth();
+    const session = await auth.api.getSession({ headers: req.headers });
     if (!session) {
       await safeLog({
         level: "warning",
@@ -122,7 +120,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // Vérification de l'authentification avec Next Auth 5
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: req.headers });
   if (!session) {
     await safeLog({
       level: "warning",
@@ -133,20 +131,6 @@ export async function middleware(req: NextRequest) {
       metadata: { path },
     });
     return NextResponse.redirect(new URL("/login", req.nextUrl));
-  }
-
-  // Gérer les tentatives de connexion
-  if (path === "/api/auth/callback/credentials") {
-    const email = req.nextUrl.searchParams.get("email");
-    await safeLog({
-      level: "info",
-      action: "auth.login" as LogAction,
-      message: "Tentative de connexion",
-      userEmail: email || "inconnu",
-      ip: req.ip || req.headers.get("x-forwarded-for") || "unknown",
-      userAgent: req.headers.get("user-agent") || "unknown",
-      metadata: { email },
-    });
   }
 
   return setCorsHeaders(NextResponse.next(), req);

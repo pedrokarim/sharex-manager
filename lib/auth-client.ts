@@ -1,16 +1,14 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { createAuthClient } from "better-auth/react";
+import {
+  inferAdditionalFields,
+  usernameClient,
+} from "better-auth/client/plugins";
+import type { auth } from "@/lib/auth";
 
-// Simple auth client wrapper for NextAuth compatibility
-// This provides the methods that components expect from better-auth client
+export const authClient = createAuthClient({
+  plugins: [inferAdditionalFields<typeof auth>(), usernameClient()],
+});
 
-export const authClient = {
-  useSession: () => {
-    const { data: session, status } = useSession();
-    return {
-      data: session,
-      isPending: status === "loading",
-    };
-  },
-};
+export const { useSession, signIn, signOut, getSession } = authClient;

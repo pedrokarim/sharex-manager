@@ -14,10 +14,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft,
   MessageCircle,
-  Github,
   Send,
   ExternalLink,
 } from "lucide-react";
+import { Github } from "@/components/ui/icons";
 import { useTranslation } from "@/lib/i18n";
 import { useState } from "react";
 

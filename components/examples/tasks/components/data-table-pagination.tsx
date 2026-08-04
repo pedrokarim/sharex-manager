@@ -1,4 +1,4 @@
-import { Table } from "@tanstack/react-table";
+import { LegacyTable as Table } from "@tanstack/react-table/legacy";
 import {
   ChevronLeft,
   ChevronRight,

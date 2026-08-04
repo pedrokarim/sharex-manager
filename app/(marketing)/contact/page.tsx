@@ -2,8 +2,10 @@ import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Mail, MessageSquare, User, Github, Globe, Send } from "lucide-react";
+import { Mail, MessageSquare, User, Globe, Send } from "lucide-react";
+import { Github } from "@/components/ui/icons";
 import { Card } from "@/components/ui/card";
+import { ContactForm } from "./contact-form";
 
 export const metadata: Metadata = {
   title: "Contact | ShareX Manager",
@@ -21,80 +23,7 @@ export default function ContactPage() {
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2">
           <Card className="p-6">
-            <form className="space-y-6">
-              <div className="space-y-2">
-                <label
-                  htmlFor="name"
-                  className="text-sm font-medium flex items-center gap-2"
-                >
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  Nom
-                </label>
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  placeholder="Votre nom"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="text-sm font-medium flex items-center gap-2"
-                >
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  Email
-                </label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="votre@email.com"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="subject"
-                  className="text-sm font-medium flex items-center gap-2"
-                >
-                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                  Sujet
-                </label>
-                <Input
-                  id="subject"
-                  name="subject"
-                  type="text"
-                  placeholder="Sujet de votre message"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="message"
-                  className="text-sm font-medium flex items-center gap-2"
-                >
-                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                  Message
-                </label>
-                <Textarea
-                  id="message"
-                  name="message"
-                  placeholder="Votre message..."
-                  rows={6}
-                  required
-                />
-              </div>
-
-              <Button type="submit" className="w-full gap-2">
-                <Send className="h-4 w-4" />
-                Envoyer le message
-              </Button>
-            </form>
+            <ContactForm />
           </Card>
         </div>
 
@@ -138,11 +67,13 @@ export default function ContactPage() {
             </div>
           </Card>
 
-          <Card className="p-6 bg-primary text-primary-foreground">
-            <h2 className="text-xl font-semibold mb-2">Support prioritaire</h2>
-            <p className="text-sm opacity-90">
-              Besoin d&apos;une réponse rapide ? Nos clients bénéficient
-              d&apos;un support prioritaire 24/7.
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-2">Délai de réponse</h2>
+            <p className="text-sm text-muted-foreground">
+              ShareX Manager est un projet personnel, maintenu sur le temps
+              libre : les réponses arrivent dès que possible, sans garantie de
+              délai. Pour un bug ou une suggestion, une issue GitHub est souvent
+              le chemin le plus rapide.
             </p>
           </Card>
         </div>

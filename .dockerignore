@@ -18,11 +18,17 @@ tests
 # Fichiers de développement
 .git
 .gitignore
-# .env.local
+
+# Secrets : jamais dans le contexte de build.
+# Ces lignes étaient commentées, si bien que .env atterrissait dans l'image
+# (Next le recopie dans .next/standalone, que le Dockerfile embarque tel quel).
+# Les valeurs sont fournies à l'exécution par `env_file` du docker-compose.
+.env
+.env.local
 .env.development.local
 .env.test.local
 .env.production.local
-# .env
+.env.bak-*
 
 # Logs
 npm-debug.log*

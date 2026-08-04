@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import type { Session } from "next-auth";
+import { headers } from "next/headers";
 import localFont from "next/font/local";
 import Script from "next/script";
 import "./global.css";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { createThemeBootstrapScript } from "@/lib/theme/create-theme-bootstrap-script";
 import { getResolvedThemePayload } from "@/lib/theme/get-resolved-theme-payload";
 // import { ThemeWrapper } from "@/components/theme-wrapper"; // Disabled - themes now handled by Jotai
@@ -32,15 +32,9 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const sessionPromise = auth();
-  const themePromise = sessionPromise.then((session: Session | null) =>
-    getResolvedThemePayload(session?.user?.id ?? null),
-  );
+  const session = await auth.api.getSession({ headers: await headers() });
+  const initialTheme = await getResolvedThemePayload(session?.user?.id ?? null);
 
-  const [session, initialTheme] = await Promise.all([
-    sessionPromise,
-    themePromise,
-  ]);
   const themeBootstrapScript = createThemeBootstrapScript({
     initialTheme,
     isAuthenticated: !!session?.user,

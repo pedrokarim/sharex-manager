@@ -3,7 +3,8 @@ import { resolve } from "path";
 import type { NextRequest } from "next/server";
 import type { UploadConfig } from "@/lib/types/upload-config";
 import { logDb } from "@/lib/utils/db";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { defaultConfig } from "@/lib/defaultConfig";
 import { uploadConfigSchema } from "@/schemas/upload-config";
 
@@ -46,7 +47,7 @@ async function writeConfig(config: UploadConfig): Promise<void> {
 }
 
 export async function GET() {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
     if (!session?.user) {
       // Si l'utilisateur n'est pas authentifié, retourner la configuration par défaut
@@ -81,7 +82,7 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
     if (!session?.user || session.user.role !== "admin") {
       logDb.createLog({

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
     if (!session) {
       logDb.createLog({

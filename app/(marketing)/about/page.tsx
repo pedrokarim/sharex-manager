@@ -1,139 +1,139 @@
-import { Metadata } from "next";
+import type { Metadata } from "next";
 import {
-  Target,
-  Sparkles,
-  Users,
-  Shield,
-  Workflow,
   Globe,
-  Github,
+  Info,
+  Shield,
+  Sparkles,
+  Target,
+  Users,
+  Workflow,
 } from "lucide-react";
+
+import { Github } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { DocPage, type DocSection } from "../_components/doc-page";
 
 export const metadata: Metadata = {
   title: "À propos | ShareX Manager",
   description:
-    "Découvrez ShareX Manager, la solution ultime pour gérer vos uploads d'images et de fichiers.",
+    "ShareX Manager : pourquoi ce projet existe, ce qu'il fait, et qui le maintient.",
 };
 
-const sections = [
+const features = [
+  {
+    icon: Workflow,
+    title: "Gestion simplifiée",
+    description:
+      "Une interface pour retrouver, trier et organiser vos envois en galeries et albums.",
+  },
+  {
+    icon: Shield,
+    title: "Sécurité avancée",
+    description:
+      "Fichiers privés par défaut, partage explicite, et clés API révocables à tout moment.",
+  },
+  {
+    icon: Globe,
+    title: "Multi-domaines",
+    description:
+      "Servez vos fichiers depuis votre propre domaine, distinct de celui de l'application.",
+  },
+  {
+    icon: Sparkles,
+    title: "Compatible ShareX",
+    description:
+      "Se branche sur ShareX sous Windows, et sur flameshot ou fu sous Linux.",
+  },
+];
+
+const sections: DocSection[] = [
   {
     id: "mission",
-    title: "Notre Mission",
+    title: "Pourquoi ce projet",
     icon: Target,
+    content: (
+      <>
+        <p>
+          ShareX Manager est né d&apos;un besoin simple : ShareX envoie très bien
+          des fichiers, mais ne dit rien de ce qu&apos;ils deviennent ensuite. Les
+          captures s&apos;accumulent sur un serveur, sans galerie, sans
+          recherche, sans moyen de reprendre la main sur un lien partagé.
+        </p>
+        <p>
+          Ce projet comble cet angle mort : un point de chute pour vos envois,
+          qui les organise, les rend consultables et vous laisse décider de ce
+          qui est public. Le tout auto-hébergeable, pour que vos fichiers restent
+          sur votre infrastructure.
+        </p>
+      </>
+    ),
   },
   {
     id: "features",
-    title: "Fonctionnalités",
+    title: "Ce que fait l'application",
     icon: Sparkles,
+    raw: true,
+    content: (
+      <div className="grid gap-4 sm:grid-cols-2">
+        {features.map((feature) => (
+          <div key={feature.title} className="rounded-lg border bg-card p-5">
+            <feature.icon className="mb-3 h-5 w-5 text-primary" />
+            <h3 className="mb-1.5 font-semibold">{feature.title}</h3>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {feature.description}
+            </p>
+          </div>
+        ))}
+      </div>
+    ),
   },
   {
     id: "team",
-    title: "Notre Équipe",
+    title: "Qui est derrière",
     icon: Users,
+    content: (
+      <>
+        <p>
+          ShareX Manager est développé et maintenu par Ascencia, une structure
+          informelle animée par Ahmed Karim. C&apos;est un projet personnel, sans
+          société ni modèle commercial derrière : pas de publicité, pas de
+          revente de données, pas de version payante.
+        </p>
+        <p>
+          Le code est publié sous licence GNU GPL v3 : chacun peut l&apos;auditer,
+          l&apos;héberger pour son propre usage et y contribuer.
+        </p>
+        <div className="not-prose mt-6">
+          <Button variant="outline" className="gap-2" asChild>
+            <a
+              href="https://github.com/pedrokarim/sharex-manager"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Github className="h-4 w-4" />
+              Voir le projet sur GitHub
+            </a>
+          </Button>
+        </div>
+      </>
+    ),
   },
 ];
 
 export default function AboutPage() {
   return (
-    <div className="flex">
-      {/* Sidebar */}
-      <aside className="hidden lg:block sticky top-14 h-screen w-64 overflow-y-auto border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <ScrollArea className="py-6 pr-6 lg:py-8">
-          <div className="space-y-4">
-            <div className="px-4 py-2">
-              <h2 className="text-lg font-semibold">Sur cette page</h2>
-            </div>
-            <nav className="space-y-1 px-4">
-              {sections.map((section) => (
-                <a
-                  key={section.id}
-                  href={`#${section.id}`}
-                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                >
-                  <section.icon className="h-4 w-4" />
-                  {section.title}
-                </a>
-              ))}
-            </nav>
-          </div>
-        </ScrollArea>
-      </aside>
-
-      {/* Main content */}
-      <main className="flex-1 container py-8 px-4">
-        <div className="prose dark:prose-invert max-w-none">
-          <section id="mission" className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <Target className="h-8 w-8 text-primary" />
-              <h2 className="text-3xl font-bold mt-0">Notre Mission</h2>
-            </div>
-            <div className="bg-card rounded-lg p-6 border">
-              <p className="text-lg mb-4">
-                ShareX Manager est né de la volonté de simplifier la gestion et
-                le partage de fichiers pour les utilisateurs de ShareX. Notre
-                plateforme offre une solution complète et sécurisée pour
-                l&apos;hébergement et la gestion de vos fichiers.
-              </p>
-              <div className="flex gap-4">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  <span>Sécurité renforcée</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Globe className="h-5 w-5 text-primary" />
-                  <span>Support multi-domaines</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section id="features" className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <Sparkles className="h-8 w-8 text-primary" />
-              <h2 className="text-3xl font-bold mt-0">Fonctionnalités</h2>
-            </div>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-card rounded-lg p-6 border">
-                <Workflow className="h-6 w-6 text-primary mb-4" />
-                <h3 className="text-xl font-semibold mb-2">
-                  Gestion simplifiée
-                </h3>
-                <p>
-                  Interface intuitive pour gérer tous vos uploads facilement.
-                </p>
-              </div>
-              <div className="bg-card rounded-lg p-6 border">
-                <Shield className="h-6 w-6 text-primary mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Sécurité avancée</h3>
-                <p>
-                  Protection de vos fichiers avec des contrôles d&apos;accès
-                  stricts.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section id="team" className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <Users className="h-8 w-8 text-primary" />
-              <h2 className="text-3xl font-bold mt-0">Notre Équipe</h2>
-            </div>
-            <div className="bg-card rounded-lg p-6 border">
-              <p className="text-lg mb-6">
-                Nous sommes une équipe passionnée par l&apos;open source et
-                dédiée à fournir les meilleures solutions pour la gestion de
-                fichiers.
-              </p>
-              <Button variant="outline" className="gap-2">
-                <Github className="h-4 w-4" />
-                Voir le projet sur GitHub
-              </Button>
-            </div>
-          </section>
-        </div>
-      </main>
-    </div>
+    <DocPage
+      eyebrow="À propos"
+      title="ShareX Manager"
+      icon={Info}
+      intro={
+        <p>
+          Un gestionnaire de fichiers auto-hébergeable pour les captures envoyées
+          depuis ShareX et ses équivalents. Libre, sans publicité, et pensé pour
+          que vos fichiers restent chez vous.
+        </p>
+      }
+      sections={sections}
+    />
   );
 }

@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { defaultConfig } from "@/lib/defaultConfig";
 import type { UploadConfig } from "@/lib/types/upload-config";
 import { logDb } from "@/lib/utils/db";
@@ -46,7 +47,7 @@ async function saveConfig(config: UploadConfig): Promise<void> {
 }
 
 export async function GET() {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user) {
     logDb.createLog({
@@ -88,7 +89,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user) {
     logDb.createLog({

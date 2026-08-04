@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -43,7 +43,7 @@ import {
 
 export default function ApiKeysPage() {
   const { t } = useTranslation();
-  const { status } = useSession();
+  const { data: session, isPending: isSessionPending } = useSession();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -54,12 +54,12 @@ export default function ApiKeysPage() {
   const locale = useDateLocale();
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (!isSessionPending && !session) {
       redirect("/login");
     }
 
     fetchKeys();
-  }, [status]);
+  }, [isSessionPending, session]);
 
   const summary = useMemo(() => {
     const now = new Date();

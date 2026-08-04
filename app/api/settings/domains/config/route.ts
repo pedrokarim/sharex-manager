@@ -1,7 +1,8 @@
 import { readFile, writeFile } from "fs/promises";
 import { resolve } from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 
 const CONFIG_PATH = resolve(process.cwd(), "config", "uploads.json");
 
@@ -15,7 +16,7 @@ async function writeConfig(config: any) {
 }
 
 export async function GET() {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }

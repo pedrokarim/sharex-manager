@@ -1,244 +1,242 @@
-import { Metadata } from "next";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import type { Metadata } from "next";
+import Link from "next/link";
 import {
+  AlertCircle,
   Building2,
   Copyright,
-  Shield,
-  Cookie,
-  Scale,
-  Gavel,
+  Flag,
   Mail,
-  AlertCircle,
+  Scale,
+  ScrollText,
+  Server,
+  Shield,
+  UserCog,
 } from "lucide-react";
 
+import { DocPage, type DocSection } from "../_components/doc-page";
+import { LEGAL_INFO } from "./_components/legal-info";
+
 export const metadata: Metadata = {
-  title: "Mentions Légales | ShareX Manager",
+  title: "Mentions légales | ShareX Manager",
   description:
-    "Mentions légales et conditions d'utilisation de ShareX Manager.",
+    "Éditeur, directeur de publication, hébergeur et informations légales de ShareX Manager.",
 };
 
-const sections = [
+const documents = [
   {
-    id: "legal",
-    title: "Informations Légales",
-    icon: Building2,
+    href: "/legal/terms",
+    icon: ScrollText,
+    title: "Conditions Générales d'Utilisation",
+    description:
+      "Règles d'usage, comptes, clés API, contenus envoyés, responsabilités et résiliation.",
   },
   {
-    id: "intellectual-property",
-    title: "Propriété Intellectuelle",
-    icon: Copyright,
-  },
-  {
-    id: "data-protection",
-    title: "Protection des Données",
+    href: "/legal/privacy",
     icon: Shield,
-  },
-  {
-    id: "hosting",
-    title: "Hébergement",
-    icon: Building2,
-  },
-  {
-    id: "cookies",
-    title: "Cookies",
-    icon: Cookie,
-  },
-  {
-    id: "liability",
-    title: "Limitation de Responsabilité",
-    icon: AlertCircle,
-  },
-  {
-    id: "applicable-law",
-    title: "Droit Applicable",
-    icon: Gavel,
-  },
-  {
-    id: "contact",
-    title: "Contact",
-    icon: Mail,
+    title: "Politique de confidentialité",
+    description:
+      "Données traitées, finalités, durées de conservation et vos droits au titre du RGPD.",
   },
 ];
 
-export default function LegalPage() {
+const sections: DocSection[] = [
+  {
+    id: "editeur",
+    title: "1. Éditeur",
+    icon: Building2,
+    content: (
+      <>
+        <p>
+          {LEGAL_INFO.appName} est édité par {LEGAL_INFO.editor}.
+        </p>
+        <p>
+          Ascencia est une structure informelle, sans forme sociale
+          commerciale&nbsp;: le service est proposé à titre non lucratif, sans
+          publicité.
+        </p>
+        <ul className="not-prose list-none space-y-2 pl-0">
+          <li className="flex items-center gap-2">
+            <Mail className="h-4 w-4 shrink-0 text-primary" />
+            <a
+              href={`mailto:${LEGAL_INFO.contactEmail}`}
+              className="text-primary hover:underline"
+            >
+              {LEGAL_INFO.contactEmail}
+            </a>
+          </li>
+          <li className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 shrink-0 text-primary" />
+            <a
+              href={LEGAL_INFO.editorSite}
+              className="text-primary hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ascencia.re
+            </a>
+          </li>
+        </ul>
+      </>
+    ),
+  },
+  {
+    id: "directeur-publication",
+    title: "2. Directeur de la publication",
+    icon: UserCog,
+    content: (
+      <p>
+        Le directeur de la publication est {LEGAL_INFO.publicationDirector},
+        joignable à{" "}
+        <a href={`mailto:${LEGAL_INFO.contactEmail}`}>
+          {LEGAL_INFO.contactEmail}
+        </a>
+        .
+      </p>
+    ),
+  },
+  {
+    id: "hebergeur",
+    title: "3. Hébergeur",
+    icon: Server,
+    content: (
+      <>
+        <p>
+          L&apos;instance {LEGAL_INFO.domain} est hébergée par&nbsp;:
+        </p>
+        <p className="not-prose">
+          <strong>{LEGAL_INFO.host.name}</strong>
+          <br />
+          {LEGAL_INFO.host.address}
+          <br />
+          <a
+            href={LEGAL_INFO.host.site}
+            className="text-primary hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            contabo.com
+          </a>
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "propriete",
+    title: "4. Propriété intellectuelle",
+    icon: Copyright,
+    content: (
+      <>
+        <p>
+          Le code source de {LEGAL_INFO.appName} est publié sous licence{" "}
+          <a
+            href={LEGAL_INFO.licenseUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {LEGAL_INFO.license}
+          </a>
+          , et disponible sur{" "}
+          <a
+            href={LEGAL_INFO.repository}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub
+          </a>
+          . Chacun peut l&apos;utiliser, l&apos;étudier, le modifier et le
+          redistribuer dans les conditions de cette licence.
+        </p>
+        <p>
+          Le nom {LEGAL_INFO.appName}, le logo et les éléments graphiques
+          associés demeurent la propriété d&apos;Ascencia et ne sont pas couverts
+          par la licence du code.
+        </p>
+        <p>
+          Les fichiers envoyés par les utilisateurs restent leur propriété
+          pleine et entière.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "signalement",
+    title: "5. Signalement d'un contenu illicite",
+    icon: Flag,
+    content: (
+      <p>
+        Tout contenu manifestement illicite hébergé sur cette instance peut être
+        signalé à{" "}
+        <a href={`mailto:${LEGAL_INFO.contactEmail}`}>
+          {LEGAL_INFO.contactEmail}
+        </a>
+        . Merci d&apos;indiquer l&apos;URL concernée et le motif du signalement,
+        afin que la demande puisse être traitée dans les meilleurs délais.
+      </p>
+    ),
+  },
+  {
+    id: "responsabilite",
+    title: "6. Limitation de responsabilité",
+    icon: AlertCircle,
+    content: (
+      <p>
+        Le service est fourni «&nbsp;en l&apos;état&nbsp;», sans garantie de
+        disponibilité ni de conservation des données. L&apos;éditeur ne saurait
+        être tenu responsable des dommages indirects liés à son utilisation. Les
+        modalités complètes figurent dans les{" "}
+        <Link href="/legal/terms">CGU</Link>.
+      </p>
+    ),
+  },
+  {
+    id: "droit-applicable",
+    title: "7. Droit applicable",
+    icon: Scale,
+    content: (
+      <p>
+        Les présentes mentions sont soumises au droit français. À défaut de
+        résolution amiable, les tribunaux français sont seuls compétents.
+      </p>
+    ),
+  },
+];
+
+export default function LegalIndexPage() {
   return (
-    <div className="flex">
-      {/* Sidebar */}
-      <aside className="hidden lg:block sticky top-14 h-[100vh] w-64 overflow-y-auto border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <ScrollArea className="py-6 pr-6 lg:py-8">
-          <div className="space-y-4">
-            <div className="px-4 py-2">
-              <h2 className="text-lg font-semibold">Sur cette page</h2>
-            </div>
-            <nav className="space-y-1 px-4">
-              {sections.map((section) => (
-                <a
-                  key={section.id}
-                  href={`#${section.id}`}
-                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                >
-                  <section.icon className="h-4 w-4" />
-                  {section.title}
-                </a>
-              ))}
-            </nav>
+    <DocPage
+      eyebrow="Legal"
+      title="Mentions légales"
+      icon={Scale}
+      lastUpdated={LEGAL_INFO.lastUpdated}
+      intro={
+        <>
+          <p>
+            Qui édite {LEGAL_INFO.appName}, qui l&apos;héberge, et comment nous
+            joindre. Les règles d&apos;usage et le traitement des données font
+            l&apos;objet de documents dédiés.
+          </p>
+          <div className="not-prose mt-6 grid gap-4 sm:grid-cols-2">
+            {documents.map((doc) => (
+              <Link
+                key={doc.href}
+                href={doc.href}
+                className="group flex flex-col gap-2 rounded-lg border bg-card p-5 transition-colors hover:border-primary/50 hover:bg-accent/50"
+              >
+                <div className="flex items-center gap-2">
+                  <doc.icon className="h-5 w-5 shrink-0 text-primary" />
+                  <span className="font-semibold text-foreground group-hover:text-primary">
+                    {doc.title}
+                  </span>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {doc.description}
+                </span>
+              </Link>
+            ))}
           </div>
-        </ScrollArea>
-      </aside>
-
-      {/* Main content */}
-      <main className="flex-1 container py-8 px-4">
-        <div className="prose dark:prose-invert max-w-none">
-          <div className="flex items-center gap-3 mb-8">
-            <Scale className="h-8 w-8 text-primary" />
-            <h1 className="text-4xl font-bold mt-0">Mentions Légales</h1>
-          </div>
-
-          <section id="legal" className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <Building2 className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-bold mt-0">Informations Légales</h2>
-            </div>
-            <div className="bg-card rounded-lg p-6 border">
-              <p>
-                ShareX Manager est un projet développé et maintenu par Ascencia
-                (https://ascencia.re). Le site est édité par Ascencia. © 2025
-                Ascencia. Tous droits réservés.
-              </p>
-            </div>
-          </section>
-
-          <section id="intellectual-property" className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <Copyright className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-bold mt-0">
-                Propriété Intellectuelle
-              </h2>
-            </div>
-            <div className="bg-card rounded-lg p-6 border">
-              <p>
-                ShareX Manager est la propriété exclusive d&apos;Ascencia et est
-                distribué sous licence MIT. Le code source est disponible sur
-                GitHub. Tous les droits non expressément accordés par la licence
-                sont réservés à Ascencia.
-              </p>
-              <p className="mb-0">
-                Le nom ShareX Manager, le logo et les éléments graphiques
-                associés sont la propriété exclusive d&apos;Ascencia.
-              </p>
-            </div>
-          </section>
-
-          <section id="data-protection" className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <Shield className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-bold mt-0">
-                Protection des Données
-              </h2>
-            </div>
-            <div className="bg-card rounded-lg p-6 border">
-              <p>
-                Conformément au Règlement Général sur la Protection des Données
-                (RGPD), vous disposez d&apos;un droit d&apos;accès, de
-                rectification et de suppression de vos données personnelles.
-              </p>
-              <p className="mb-0">
-                Pour exercer ces droits ou pour toute question relative à la
-                protection de vos données, vous pouvez nous contacter via la
-                page Contact.
-              </p>
-            </div>
-          </section>
-
-          <section id="hosting" className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <Building2 className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-bold mt-0">Hébergement</h2>
-            </div>
-            <div className="bg-card rounded-lg p-6 border">
-              <p className="mb-0">
-                Ce site est hébergé par : [Nom de l&apos;hébergeur] [Adresse de
-                l&apos;hébergeur]
-              </p>
-            </div>
-          </section>
-
-          <section id="cookies" className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <Cookie className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-bold mt-0">Cookies</h2>
-            </div>
-            <div className="bg-card rounded-lg p-6 border">
-              <p className="mb-0">
-                Ce site utilise des cookies nécessaires à son bon
-                fonctionnement. En continuant à naviguer sur ce site, vous
-                acceptez leur utilisation.
-              </p>
-            </div>
-          </section>
-
-          <section id="liability" className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <AlertCircle className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-bold mt-0">
-                Limitation de Responsabilité
-              </h2>
-            </div>
-            <div className="bg-card rounded-lg p-6 border">
-              <p className="mb-0">
-                ShareX Manager ne pourra être tenu responsable des dommages
-                directs ou indirects résultant de l&apos;utilisation de ce site
-                ou des services proposés.
-              </p>
-            </div>
-          </section>
-
-          <section id="applicable-law" className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <Gavel className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-bold mt-0">Droit Applicable</h2>
-            </div>
-            <div className="bg-card rounded-lg p-6 border">
-              <p className="mb-0">
-                Les présentes mentions légales sont soumises au droit français.
-                En cas de litige, les tribunaux français seront seuls
-                compétents.
-              </p>
-            </div>
-          </section>
-
-          <section id="contact" className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <Mail className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-bold mt-0">Contact</h2>
-            </div>
-            <div className="bg-card rounded-lg p-6 border">
-              <p>
-                Pour toute question concernant ces mentions légales ou
-                l&apos;utilisation de ShareX Manager, vous pouvez contacter
-                Ascencia :
-              </p>
-              <ul className="list-none pl-0 space-y-2 mb-0">
-                <li className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-primary" />
-                  <span>Email : contact@ascencia.re</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-primary" />
-                  <a
-                    href="https://ascencia.re"
-                    className="text-primary hover:underline"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    ascencia.re
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </section>
-        </div>
-      </main>
-    </div>
+        </>
+      }
+      sections={sections}
+    />
   );
 }

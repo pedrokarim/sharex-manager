@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { AlbumViewClient } from "./page.client";
 
 interface AlbumPageProps {
@@ -9,7 +10,7 @@ interface AlbumPageProps {
 }
 
 export default async function AlbumPage({ params }: AlbumPageProps) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user) {
     redirect("/login");
