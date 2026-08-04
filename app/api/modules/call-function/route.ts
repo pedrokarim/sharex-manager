@@ -131,9 +131,21 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Erreur lors de l'appel de fonction:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de l'appel de fonction" },
-      { status: 500 }
-    );
+
+    // Le message vient de la fonction du module et porte l'information utile
+    // (« quota dépassé », « clé refusée »…). Le remplacer par un libellé
+    // générique laissait l'utilisateur sans piste.
+    const message =
+      error instanceof Error ? error.message : "Erreur lors de l'appel de fonction";
+
+    logDb.createLog({
+      level: "error",
+      action: "module.function" as LogAction,
+      message: `Échec de l'appel de fonction : ${message}`,
+      userId: session?.user?.id || undefined,
+      userEmail: session?.user?.email || undefined,
+    });
+
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

@@ -623,13 +623,17 @@ class ApiModuleManagerImpl implements ModuleManager {
         return null;
       }
 
+      // Les erreurs levées par la fonction du module remontent volontairement :
+      // les renvoyer en `null` faisait passer un échec (clé API manquante,
+      // quota dépassé, contenu refusé) pour un succès sans résultat, et
+      // l'appelant n'avait aucun moyen de distinguer les deux.
       return await moduleExports[functionName](...args);
     } catch (error) {
       console.error(
         `Error calling ${functionName} on module ${moduleName}:`,
         error
       );
-      return null;
+      throw error;
     }
   }
 
