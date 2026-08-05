@@ -3,6 +3,13 @@ services:
     build:
       context: .
       target: runner
+      # Indispensable, pas redondant avec le bloc `environment` : Next fige les
+      # NEXT_PUBLIC_* dans le bundle client pendant `bun run build`. Sans ces
+      # args, le navigateur reçoit les valeurs de repli du code.
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+        NEXT_PUBLIC_IMAGE_DOMAIN: ${NEXT_PUBLIC_IMAGE_DOMAIN:-img.ascencia.re}
+        NEXT_PUBLIC_APP_DOMAIN: ${NEXT_PUBLIC_APP_DOMAIN:-sxm.ascencia.re}
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     env_file:
