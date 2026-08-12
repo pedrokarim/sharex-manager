@@ -60,6 +60,15 @@ jobs:
           java-version: 17
           cache: gradle
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: >-
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+            ndk;27.1.12297006
+
       - name: Check Expo authentication
         shell: bash
         run: |
@@ -68,11 +77,6 @@ jobs:
             echo "Créez un token Expo puis ajoutez-le dans Settings > Secrets and variables > Actions."
             exit 1
           fi
-
-      - name: Install Android build requirements
-        shell: bash
-        run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006"
 
       - name: Install mobile dependencies
         working-directory: sharex-mobile
