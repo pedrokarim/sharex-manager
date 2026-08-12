@@ -16,6 +16,7 @@
 
 # production
 /build
+sharex-mobile/modules/*/android/build/
 
 # misc
 .DS_Store
@@ -63,7 +64,9 @@ modules/*/data/
 
 # claude code
 .claude/
-.agents/
+# Les instructions projet destinées aux agents sont partagées et versionnées.
+!.agents/
+!.agents/**
 skills-lock.json
 
 tweakcn

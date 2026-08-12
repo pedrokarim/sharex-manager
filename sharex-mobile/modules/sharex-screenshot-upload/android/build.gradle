@@ -1,0 +1,15 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 're.ascencia.screenshotupload'
+version = '1.0.0'
+
+android {
+  namespace "re.ascencia.screenshotupload"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}

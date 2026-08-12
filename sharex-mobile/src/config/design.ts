@@ -1,151 +1,135 @@
-// Configuration du design moderne
+import { Platform } from "react-native";
 
+/**
+ * Editorial design system inspired by the warm, playful Behance reference.
+ * The names from the previous theme are intentionally preserved so legacy
+ * screens and utilities inherit the redesign without carrying two palettes.
+ */
 export const COLORS = {
-  // Couleur principale - Indigo moderne
-  primary: "#6366F1",
-  primaryLight: "#A5B4FC",
-  primaryDark: "#4F46E5",
-  primaryBg: "#EEF2FF",
+  primary: "#4A1D78",
+  primaryLight: "#B891D6",
+  primaryDark: "#31104F",
+  primaryBg: "#F1E8F7",
 
-  // Couleur secondaire - Émeraude
-  secondary: "#10B981",
-  secondaryLight: "#6EE7B7",
-  secondaryDark: "#059669",
-  secondaryBg: "#ECFDF5",
+  secondary: "#F47F5B",
+  secondaryLight: "#FFB29A",
+  secondaryDark: "#D95F3C",
+  secondaryBg: "#FFE5DB",
 
-  // Couleurs d'accent
-  accent: "#F59E0B",
-  accentLight: "#FEF3C7",
-  accentDark: "#D97706",
+  accent: "#F6B85F",
+  accentLight: "#FFF0CC",
+  accentDark: "#D9912D",
 
-  // Couleurs d'état
-  success: "#10B981",
-  successLight: "#D1FAE5",
-  successDark: "#059669",
+  success: "#39866D",
+  successLight: "#DDF2E9",
+  successDark: "#24634F",
+  error: "#C95050",
+  errorLight: "#FBE4E1",
+  errorDark: "#A93C3C",
+  warning: "#D98A2B",
+  warningLight: "#FFF0D5",
+  warningDark: "#A96618",
+  info: "#5C8FC7",
+  infoLight: "#E3F0FB",
+  infoDark: "#3B6FAD",
 
-  error: "#EF4444",
-  errorLight: "#FEE2E2",
-  errorDark: "#DC2626",
-
-  warning: "#F59E0B",
-  warningLight: "#FEF3C7",
-  warningDark: "#D97706",
-
-  info: "#3B82F6",
-  infoLight: "#DBEAFE",
-  infoDark: "#2563EB",
-
-  // Couleurs neutres
   white: "#FFFFFF",
-  black: "#000000",
+  black: "#1F171C",
+  gray50: "#FFF9F6",
+  gray100: "#F8EEE9",
+  gray200: "#ECDCD4",
+  gray300: "#D9C7C0",
+  gray400: "#B6A6A3",
+  gray500: "#897A7D",
+  gray600: "#6D5F64",
+  gray700: "#51434A",
+  gray800: "#382D33",
+  gray900: "#251C21",
 
-  // Grises
-  gray50: "#F8FAFC",
-  gray100: "#F1F5F9",
-  gray200: "#E2E8F0",
-  gray300: "#CBD5E1",
-  gray400: "#94A3B8",
-  gray500: "#64748B",
-  gray600: "#475569",
-  gray700: "#334155",
-  gray800: "#1E293B",
-  gray900: "#0F172A",
-
-  // Couleurs de texte
-  textPrimary: "#0F172A",
-  textSecondary: "#475569",
-  textTertiary: "#64748B",
+  textPrimary: "#251C21",
+  textSecondary: "#6F6268",
+  textTertiary: "#94868A",
   textInverse: "#FFFFFF",
 
-  // Couleurs de fond
-  background: "#FFFFFF",
-  backgroundSecondary: "#F8FAFC",
-  backgroundTertiary: "#F1F5F9",
+  background: "#FFF7F2",
+  backgroundSecondary: "#FFF1EB",
+  backgroundTertiary: "#F4E6DF",
+  surface: "#FFFFFF",
+  coral: "#F47F5B",
+  peach: "#FFD3C2",
+  lavender: "#CDA9E8",
+  purpleCard: "#7650A3",
 
-  // Couleurs de bordure
-  border: "#E2E8F0",
-  borderLight: "#F1F5F9",
-  borderDark: "#CBD5E1",
+  border: "#EEDDD5",
+  borderLight: "#F5E9E3",
+  borderDark: "#D7C2B9",
+  shadow: "rgba(62, 27, 52, 0.12)",
+  shadowLight: "rgba(62, 27, 52, 0.06)",
+  shadowDark: "rgba(62, 27, 52, 0.18)",
 
-  // Couleurs d'ombre
-  shadow: "rgba(0, 0, 0, 0.1)",
-  shadowLight: "rgba(0, 0, 0, 0.05)",
-  shadowDark: "rgba(0, 0, 0, 0.15)",
-
-  // Couleurs de gradient
-  gradientStart: "#6366F1",
-  gradientEnd: "#3B82F6",
-  gradientSecondary: "#10B981",
-  gradientAccent: "#F59E0B",
+  gradientStart: "#F69069",
+  gradientEnd: "#F3B3BE",
+  gradientSecondary: "#7650A3",
+  gradientAccent: "#F6B85F",
 } as const;
 
 export const SPACING = {
   xs: 4,
-  sm: 6,
-  md: 8,
-  lg: 12,
-  xl: 16,
-  xxl: 20,
-  xxxl: 24,
-  huge: 32,
-} as const;
-
-export const BORDER_RADIUS = {
   sm: 8,
   md: 12,
   lg: 16,
   xl: 20,
   xxl: 24,
-  round: 50,
+  xxxl: 28,
+  huge: 36,
+} as const;
+
+export const BORDER_RADIUS = {
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 26,
+  xxl: 32,
+  round: 999,
 } as const;
 
 export const SHADOWS = {
   sm: {
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
     elevation: 2,
   },
   md: {
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 5,
   },
   lg: {
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.14,
+    shadowRadius: 28,
+    elevation: 9,
   },
 } as const;
 
 export const TYPOGRAPHY = {
-  // Tailles de police
+  family: Platform.select({ ios: "Avenir Next", android: "sans-serif", default: "System" }),
+  rounded: Platform.select({ ios: "Avenir Next", android: "sans-serif-medium", default: "System" }),
   fontSize: {
-    xs: 10,
-    sm: 12,
-    md: 14,
-    lg: 16,
-    xl: 18,
-    xxl: 20,
-    xxxl: 24,
-    huge: 28,
+    xs: 11,
+    sm: 13,
+    md: 15,
+    lg: 17,
+    xl: 20,
+    xxl: 24,
+    xxxl: 30,
+    huge: 38,
   },
-
-  // Poids de police
   fontWeight: {
     light: "300",
     normal: "400",
@@ -154,60 +138,29 @@ export const TYPOGRAPHY = {
     bold: "700",
     black: "900",
   },
-
-  // Hauteur de ligne
-  lineHeight: {
-    tight: 1.2,
-    normal: 1.4,
-    relaxed: 1.6,
-    loose: 1.8,
-  },
+  lineHeight: { tight: 1.15, normal: 1.4, relaxed: 1.6, loose: 1.8 },
 } as const;
 
 export const ANIMATIONS = {
-  // Durées d'animation
-  duration: {
-    fast: 200,
-    normal: 300,
-    slow: 500,
-  },
-
-  // Easing
-  easing: {
-    ease: "ease",
-    easeIn: "ease-in",
-    easeOut: "ease-out",
-    easeInOut: "ease-in-out",
-  },
+  duration: { fast: 180, normal: 280, slow: 480 },
+  easing: { ease: "ease", easeIn: "ease-in", easeOut: "ease-out", easeInOut: "ease-in-out" },
 } as const;
 
 export const LAYOUT = {
-  // Tailles d'écran
-  breakpoints: {
-    sm: 576,
-    md: 768,
-    lg: 992,
-    xl: 1200,
-  },
-
-  // Marges et paddings
-  containerPadding: 20,
-  sectionSpacing: 24,
-  cardPadding: 16,
-
-  // Hauteurs
-  headerHeight: 56,
-  tabBarHeight: 70,
-  buttonHeight: 40,
-  inputHeight: 40,
+  breakpoints: { sm: 576, md: 768, lg: 992, xl: 1200 },
+  containerPadding: 22,
+  sectionSpacing: 28,
+  cardPadding: 18,
+  headerHeight: 60,
+  tabBarHeight: 76,
+  buttonHeight: 52,
+  inputHeight: 54,
 } as const;
 
-// Couleurs spécifiques aux composants
 export const COMPONENT_COLORS = {
-  // Boutons
   buttonPrimary: COLORS.primary,
   buttonPrimaryHover: COLORS.primaryDark,
-  buttonSecondary: COLORS.secondary,
+  buttonSecondary: COLORS.coral,
   buttonSecondaryHover: COLORS.secondaryDark,
   buttonAccent: COLORS.accent,
   buttonAccentHover: COLORS.accentDark,
@@ -217,21 +170,15 @@ export const COMPONENT_COLORS = {
   buttonOutline: COLORS.white,
   buttonOutlineBorder: COLORS.border,
   buttonOutlineText: COLORS.textSecondary,
-
-  // Badges de statut
   statusSuccess: COLORS.success,
   statusSuccessBg: COLORS.successLight,
   statusError: COLORS.error,
   statusErrorBg: COLORS.errorLight,
   statusWarning: COLORS.warning,
   statusWarningBg: COLORS.warningLight,
-
-  // Cartes
-  cardBackground: COLORS.gray50,
+  cardBackground: COLORS.surface,
   cardBorder: COLORS.border,
   cardShadow: COLORS.shadow,
-
-  // Inputs
   inputBackground: COLORS.white,
   inputBorder: COLORS.border,
   inputBorderFocus: COLORS.primary,

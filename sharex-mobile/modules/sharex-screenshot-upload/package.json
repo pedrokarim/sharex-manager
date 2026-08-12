@@ -1,0 +1,10 @@
+{
+  "name": "sharex-screenshot-upload",
+  "version": "1.0.0",
+  "description": "Native Android foreground screenshot uploader for ShareX Manager",
+  "private": true,
+  "peerDependencies": {
+    "expo": "*",
+    "react-native": "*"
+  }
+}

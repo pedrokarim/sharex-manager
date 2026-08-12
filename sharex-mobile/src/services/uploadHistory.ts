@@ -6,12 +6,24 @@ import { UploadHistoryItem } from "../types";
 const HISTORY_KEY = "upload_history";
 
 export class UploadHistoryService {
+  private static listeners = new Set<() => void>();
+
+  static subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private static emitChange(): void {
+    this.listeners.forEach((listener) => listener());
+  }
+
   /**
    * Sauvegarde un nouvel upload dans l'historique
    */
   static async addUpload(uploadData: {
     filename: string;
     url: string;
+    thumbnailUrl?: string;
     size: number;
     type: string;
     localUri: string;
@@ -24,6 +36,7 @@ export class UploadHistoryService {
         id: Date.now().toString(),
         filename: uploadData.filename,
         url: uploadData.url,
+        thumbnailUrl: uploadData.thumbnailUrl,
         localUri: uploadData.localUri,
         uploadedAt: new Date().toISOString(),
         size: uploadData.size,
@@ -42,6 +55,7 @@ export class UploadHistoryService {
         HISTORY_KEY,
         JSON.stringify(limitedHistory)
       );
+      this.emitChange();
     } catch (error) {
       console.error("Erreur lors de la sauvegarde de l'historique:", error);
     }
@@ -74,6 +88,7 @@ export class UploadHistoryService {
         HISTORY_KEY,
         JSON.stringify(updatedHistory)
       );
+      this.emitChange();
     } catch (error) {
       console.error("Erreur lors de la suppression de l'historique:", error);
     }
@@ -85,6 +100,7 @@ export class UploadHistoryService {
   static async clearHistory(): Promise<void> {
     try {
       await SecureStore.deleteItemAsync(HISTORY_KEY);
+      this.emitChange();
     } catch (error) {
       console.error("Erreur lors de la suppression de l'historique:", error);
     }

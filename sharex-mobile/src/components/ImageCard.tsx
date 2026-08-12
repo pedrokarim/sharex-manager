@@ -1,10 +1,11 @@
 // Composant de carte d'image pour la vue grille
 
 import React from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { UploadHistoryItem } from "../types";
 import { ViewMode } from "./ViewSelector";
 import { Icon } from "./Icon";
+import { HistoryImage } from "./HistoryImage";
 import {
   COLORS,
   COMPONENT_COLORS,
@@ -54,8 +55,8 @@ export const ImageCard: React.FC<ImageCardProps> = ({
         onPress={() => onPress(item)}
       >
         <View style={styles.listImageContainer}>
-          <Image
-            source={{ uri: item.localUri }}
+          <HistoryImage
+            item={item}
             style={styles.listImage}
             resizeMode="cover"
           />
@@ -95,8 +96,8 @@ export const ImageCard: React.FC<ImageCardProps> = ({
         style={styles.miniContainer}
         onPress={() => onPress(item)}
       >
-        <Image
-          source={{ uri: item.localUri }}
+        <HistoryImage
+          item={item}
           style={styles.miniImage}
           resizeMode="cover"
         />
@@ -107,8 +108,8 @@ export const ImageCard: React.FC<ImageCardProps> = ({
   return (
     <TouchableOpacity style={styles.container} onPress={() => onPress(item)}>
       <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: item.localUri }}
+        <HistoryImage
+          item={item}
           style={styles.image}
           resizeMode="cover"
         />
@@ -145,22 +146,20 @@ export const ImageCard: React.FC<ImageCardProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    margin: 4,
+    margin: 0,
     backgroundColor: COMPONENT_COLORS.cardBackground,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    borderRadius: BORDER_RADIUS.lg,
+    overflow: "hidden",
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
   imageContainer: {
     position: "relative",
     aspectRatio: 1,
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     overflow: "hidden",
   },
   image: {
@@ -171,39 +170,42 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 8,
     right: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(74, 29, 120, 0.88)",
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: BORDER_RADIUS.round,
   },
   dateText: {
     color: "#ffffff",
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
+    fontFamily: TYPOGRAPHY.rounded,
   },
   infoContainer: {
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   filename: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#333333",
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    fontFamily: TYPOGRAPHY.rounded,
     marginBottom: 4,
     flex: 1,
     marginRight: 8,
   },
   sizeText: {
     fontSize: 12,
-    color: "#666666",
+    color: COLORS.textTertiary,
   },
   // Styles pour le mode liste
   listContainer: {
     flexDirection: "row",
     backgroundColor: COMPONENT_COLORS.cardBackground,
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     marginBottom: 8,
     padding: 12,
-    shadowColor: "#000",
+    shadowColor: COLORS.primaryDark,
     shadowOffset: {
       width: 0,
       height: 1,
@@ -230,25 +232,26 @@ const styles = StyleSheet.create({
   },
   listFilename: {
     fontSize: 16,
-    fontWeight: "500",
-    color: "#333333",
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    fontFamily: TYPOGRAPHY.rounded,
     marginBottom: 4,
     flex: 1,
     marginRight: 8,
   },
   listSizeText: {
     fontSize: 12,
-    color: "#666666",
+    color: COLORS.textSecondary,
     marginBottom: 2,
   },
   listDateText: {
     fontSize: 11,
-    color: "#999999",
+    color: COLORS.textTertiary,
   },
   // Styles pour le mode mini-grille
   miniContainer: {
     aspectRatio: 1,
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     overflow: "hidden",
     backgroundColor: "#f5f5f5",
   },

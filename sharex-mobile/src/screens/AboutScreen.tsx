@@ -1,452 +1,119 @@
-// Écran À propos de l'application
-
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  StatusBar,
-  TouchableOpacity,
-  Linking,
-  Dimensions,
-  Image,
-} from "react-native";
+import { Image, Linking, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NavigationProps } from "../types";
 import { Icon } from "../components/Icon";
-import { ModernCard } from "../components/ModernCard";
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from "../config/design";
 import { TEAM_INFO } from "../config/constants";
-
-const { width } = Dimensions.get("window");
+import { BORDER_RADIUS, COLORS, SHADOWS, TYPOGRAPHY } from "../config/design";
 
 export const AboutScreen: React.FC<NavigationProps> = ({ navigation }) => {
-  const openLink = async (url: string) => {
-    try {
-      await Linking.openURL(url);
-    } catch (error) {
-      console.error("Erreur lors de l'ouverture du lien:", error);
-    }
-  };
+  const open = (url: string) => Linking.openURL(url).catch(console.error);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Icon
-            name="arrow-back"
-            size={24}
-            color={COLORS.primary}
-            type="ionicons"
-          />
+        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.navigate("Main")}>
+          <Icon name="menu" size={22} color={COLORS.textPrimary} type="ionicons" />
         </TouchableOpacity>
-        <Text style={styles.title}>À propos</Text>
-        <View style={styles.placeholder} />
+        <Text style={styles.headerTitle}>L’application</Text>
+        <TouchableOpacity style={styles.headerButton} onPress={() => open(TEAM_INFO.CONTACT.GITHUB)}>
+          <Icon name="logo-github" size={21} color={COLORS.textPrimary} type="ionicons" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Logo et nom de l'app */}
-        <View style={styles.appInfo}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require("../../assets/logo-sxm-simple.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.profileCard}>
+          <View style={styles.leafOne}><Icon name="leaf-outline" size={76} color="rgba(74,29,120,.12)" type="ionicons" /></View>
+          <View style={styles.logoShell}>
+            <Image source={require("../../assets/logo-sxm-simple.png")} style={styles.logo} />
           </View>
           <Text style={styles.appName}>{TEAM_INFO.APP_INFO.NAME}</Text>
-          <Text style={styles.appVersion}>
-            Version {TEAM_INFO.APP_INFO.VERSION}
-          </Text>
-          <Text style={styles.appDescription}>
-            {TEAM_INFO.APP_INFO.DESCRIPTION}
-          </Text>
+          <Text style={styles.version}>VERSION {TEAM_INFO.APP_INFO.VERSION}</Text>
+          <Text style={styles.description}>{TEAM_INFO.APP_INFO.DESCRIPTION}</Text>
+          <View style={styles.badges}>
+            <View style={styles.badge}><Icon name="phone-portrait-outline" size={14} color={COLORS.primary} type="ionicons" /><Text style={styles.badgeText}>Mobile</Text></View>
+            <View style={styles.badge}><Icon name="shield-checkmark-outline" size={14} color={COLORS.primary} type="ionicons" /><Text style={styles.badgeText}>Sécurisé</Text></View>
+          </View>
         </View>
 
-        {/* Fonctionnalités principales */}
-        <ModernCard title="Fonctionnalités" variant="elevated">
-          <View style={styles.featuresList}>
-            <View style={styles.featureItem}>
-              <Icon
-                name="images"
-                size={20}
-                color={COLORS.primary}
-                type="ionicons"
-              />
-              <Text style={styles.featureText}>
-                Upload d'images depuis la galerie
-              </Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Icon
-                name="camera"
-                size={20}
-                color={COLORS.primary}
-                type="ionicons"
-              />
-              <Text style={styles.featureText}>
-                Prise de photos avec la caméra
-              </Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Icon
-                name="share"
-                size={20}
-                color={COLORS.primary}
-                type="ionicons"
-              />
-              <Text style={styles.featureText}>
-                Partage depuis d'autres applications
-              </Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Icon
-                name="cut"
-                size={20}
-                color={COLORS.primary}
-                type="ionicons"
-              />
-              <Text style={styles.featureText}>
-                Édition et recadrage d'images
-              </Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Icon
-                name="stats-chart"
-                size={20}
-                color={COLORS.primary}
-                type="ionicons"
-              />
-              <Text style={styles.featureText}>Statistiques détaillées</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Icon
-                name="grid"
-                size={20}
-                color={COLORS.primary}
-                type="ionicons"
-              />
-              <Text style={styles.featureText}>
-                Galerie avec vues grille et liste
-              </Text>
-            </View>
-          </View>
-        </ModernCard>
-
-        {/* Informations techniques */}
-        <ModernCard title="Informations techniques" variant="elevated">
-          <View style={styles.techInfo}>
-            <View style={styles.techRow}>
-              <Text style={styles.techLabel}>Plateforme:</Text>
-              <Text style={styles.techValue}>React Native + Expo</Text>
-            </View>
-            <View style={styles.techRow}>
-              <Text style={styles.techLabel}>Langage:</Text>
-              <Text style={styles.techValue}>TypeScript</Text>
-            </View>
-            <View style={styles.techRow}>
-              <Text style={styles.techLabel}>UI Framework:</Text>
-              <Text style={styles.techValue}>React Native + Tailwind CSS</Text>
-            </View>
-            <View style={styles.techRow}>
-              <Text style={styles.techLabel}>Navigation:</Text>
-              <Text style={styles.techValue}>React Navigation</Text>
-            </View>
-            <View style={styles.techRow}>
-              <Text style={styles.techLabel}>Stockage:</Text>
-              <Text style={styles.techValue}>Expo SecureStore</Text>
-            </View>
-          </View>
-        </ModernCard>
-
-        {/* Liens utiles */}
-        <ModernCard title="Liens utiles" variant="elevated">
-          <View style={styles.linksList}>
-            <TouchableOpacity
-              style={styles.linkItem}
-              onPress={() => openLink(TEAM_INFO.CONTACT.GITHUB)}
-            >
-              <Icon
-                name="logo-github"
-                size={20}
-                color={COLORS.primary}
-                type="ionicons"
-              />
-              <Text style={styles.linkText}>Code source sur GitHub</Text>
-              <Icon
-                name="chevron-forward"
-                size={16}
-                color={COLORS.textTertiary}
-                type="ionicons"
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.linkItem}
-              onPress={() => openLink(TEAM_INFO.CONTACT.WEBSITE)}
-            >
-              <Icon
-                name="globe"
-                size={20}
-                color={COLORS.primary}
-                type="ionicons"
-              />
-              <Text style={styles.linkText}>Site web Ascencia</Text>
-              <Icon
-                name="chevron-forward"
-                size={16}
-                color={COLORS.textTertiary}
-                type="ionicons"
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.linkItem}
-              onPress={() => openLink("https://docs.expo.dev/")}
-            >
-              <Icon
-                name="document-text"
-                size={20}
-                color={COLORS.primary}
-                type="ionicons"
-              />
-              <Text style={styles.linkText}>Documentation Expo</Text>
-              <Icon
-                name="chevron-forward"
-                size={16}
-                color={COLORS.textTertiary}
-                type="ionicons"
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.linkItem}
-              onPress={() => openLink("https://reactnative.dev/")}
-            >
-              <Icon
-                name="logo-react"
-                size={20}
-                color={COLORS.primary}
-                type="ionicons"
-              />
-              <Text style={styles.linkText}>Documentation React Native</Text>
-              <Icon
-                name="chevron-forward"
-                size={16}
-                color={COLORS.textTertiary}
-                type="ionicons"
-              />
-            </TouchableOpacity>
-          </View>
-        </ModernCard>
-
-        {/* Crédits */}
-        <ModernCard title="Crédits" variant="elevated">
-          <View style={styles.creditsList}>
-            <View style={styles.creditItem}>
-              <Text style={styles.creditLabel}>Développé par:</Text>
-              <Text style={styles.creditValue}>
-                {TEAM_INFO.DEVELOPER.NAME} ({TEAM_INFO.DEVELOPER.ALIAS})
-              </Text>
-            </View>
-            <View style={styles.creditItem}>
-              <Text style={styles.creditLabel}>Société:</Text>
-              <Text style={styles.creditValue}>{TEAM_INFO.COMPANY.NAME}</Text>
-            </View>
-            <View style={styles.creditItem}>
-              <Text style={styles.creditLabel}>Icônes:</Text>
-              <Text style={styles.creditValue}>Ionicons</Text>
-            </View>
-            <View style={styles.creditItem}>
-              <Text style={styles.creditLabel}>Framework:</Text>
-              <Text style={styles.creditValue}>Expo & React Native</Text>
-            </View>
-            <View style={styles.creditItem}>
-              <Text style={styles.creditLabel}>Licence:</Text>
-              <Text style={styles.creditValue}>MIT</Text>
-            </View>
-          </View>
-        </ModernCard>
-
-        {/* Copyright */}
-        <View style={styles.copyright}>
-          <Text style={styles.copyrightText}>
-            {TEAM_INFO.APP_INFO.COPYRIGHT}
-          </Text>
-          <Text style={styles.copyrightSubtext}>
-            Application développée avec ❤️ par {TEAM_INFO.DEVELOPER.NAME} (
-            {TEAM_INFO.DEVELOPER.ALIAS})
-          </Text>
+        <Text style={styles.sectionTitle}>Pensée pour aller vite</Text>
+        <View style={styles.featuresGrid}>
+          <Feature icon="images-outline" title="Galerie" text="Sélection instantanée" color={COLORS.secondaryBg} />
+          <Feature icon="camera-outline" title="Caméra" text="Capture et envoi" color={COLORS.primaryBg} />
+          <Feature icon="share-social-outline" title="Partage" text="Depuis toutes vos apps" color={COLORS.infoLight} />
+          <Feature icon="stats-chart-outline" title="Activité" text="Suivi de vos uploads" color={COLORS.accentLight} />
         </View>
+
+        <Text style={styles.sectionTitle}>À propos du projet</Text>
+        <View style={styles.infoCard}>
+          <InfoRow label="Développé par" value={`${TEAM_INFO.DEVELOPER.NAME} · ${TEAM_INFO.DEVELOPER.ALIAS}`} />
+          <InfoRow label="Équipe" value={TEAM_INFO.COMPANY.NAME} />
+          <InfoRow label="Technologie" value="Expo · React Native" />
+          <InfoRow label="Licence" value="GPL-3.0" last />
+        </View>
+
+        <View style={styles.linksCard}>
+          <LinkRow icon="globe-outline" title="Découvrir Ascencia" onPress={() => open(TEAM_INFO.CONTACT.WEBSITE)} />
+          <LinkRow icon="logo-github" title="Voir le code source" onPress={() => open(TEAM_INFO.CONTACT.GITHUB)} last />
+        </View>
+
+        <Text style={styles.copyright}>{TEAM_INFO.APP_INFO.COPYRIGHT}{"\n"}Une application Ascencia.</Text>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
+const Feature = ({ icon, title, text, color }: { icon: string; title: string; text: string; color: string }) => (
+  <View style={styles.feature}>
+    <View style={[styles.featureIcon, { backgroundColor: color }]}><Icon name={icon} size={24} color={COLORS.textPrimary} type="ionicons" /></View>
+    <Text style={styles.featureTitle}>{title}</Text>
+    <Text style={styles.featureText}>{text}</Text>
+  </View>
+);
+
+const InfoRow = ({ label, value, last = false }: { label: string; value: string; last?: boolean }) => (
+  <View style={[styles.infoRow, last && styles.infoRowLast]}><Text style={styles.infoLabel}>{label}</Text><Text style={styles.infoValue}>{value}</Text></View>
+);
+
+const LinkRow = ({ icon, title, onPress, last = false }: { icon: string; title: string; onPress: () => void; last?: boolean }) => (
+  <TouchableOpacity style={[styles.linkRow, last && styles.infoRowLast]} onPress={onPress}>
+    <View style={styles.linkIcon}><Icon name={icon} size={20} color={COLORS.primary} type="ionicons" /></View>
+    <Text style={styles.linkTitle}>{title}</Text>
+    <Icon name="arrow-forward" size={18} color={COLORS.coral} type="ionicons" />
+  </TouchableOpacity>
+);
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
-    backgroundColor: COLORS.background,
-  },
-  backButton: {
-    padding: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.primaryBg,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.textPrimary,
-  },
-  placeholder: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: SPACING.lg,
-  },
-  scrollContent: {
-    paddingBottom: 60, // Espace pour la bottom bar
-  },
-  appInfo: {
-    alignItems: "center",
-    paddingVertical: SPACING.xxxl,
-  },
-  logoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: COLORS.primaryBg,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: SPACING.lg,
-  },
-  logo: {
-    width: 80,
-    height: 80,
-  },
-  appName: {
-    fontSize: TYPOGRAPHY.fontSize.xxxl,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.sm,
-  },
-  appVersion: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
-  },
-  appDescription: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    color: COLORS.textSecondary,
-    textAlign: "center",
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.lg,
-  },
-  featuresList: {
-    gap: SPACING.md,
-  },
-  featureItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.md,
-  },
-  featureText: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.textPrimary,
-    flex: 1,
-  },
-  techInfo: {
-    gap: SPACING.sm,
-  },
-  techRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
-  },
-  techLabel: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.textSecondary,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-  },
-  techValue: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.textPrimary,
-  },
-  linksList: {
-    gap: SPACING.sm,
-  },
-  linkItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.backgroundSecondary,
-    gap: SPACING.md,
-  },
-  linkText: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.textPrimary,
-    flex: 1,
-  },
-  creditsList: {
-    gap: SPACING.sm,
-  },
-  creditItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
-  },
-  creditLabel: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.textSecondary,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-  },
-  creditValue: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.textPrimary,
-  },
-  copyright: {
-    alignItems: "center",
-    paddingVertical: SPACING.xxxl,
-    marginTop: SPACING.lg,
-  },
-  copyrightText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.textTertiary,
-    textAlign: "center",
-    marginBottom: SPACING.xs,
-  },
-  copyrightSubtext: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.textTertiary,
-    textAlign: "center",
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  header: { height: 62, paddingHorizontal: 22, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerButton: { width: 40, height: 40, borderRadius: 14, backgroundColor: COLORS.surface, alignItems: "center", justifyContent: "center" },
+  headerTitle: { color: COLORS.textPrimary, fontSize: 17, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  content: { paddingHorizontal: 22, paddingTop: 16, paddingBottom: 135 },
+  profileCard: { padding: 24, alignItems: "center", overflow: "hidden", borderRadius: 30, backgroundColor: COLORS.secondaryBg, ...SHADOWS.sm },
+  leafOne: { position: "absolute", right: -12, top: -3, transform: [{ rotate: "-25deg" }] },
+  logoShell: { width: 88, height: 88, borderRadius: 30, backgroundColor: COLORS.surface, alignItems: "center", justifyContent: "center", ...SHADOWS.md },
+  logo: { width: 58, height: 58, resizeMode: "contain" },
+  appName: { color: COLORS.textPrimary, fontSize: 26, fontWeight: "800", fontFamily: TYPOGRAPHY.rounded, marginTop: 17 },
+  version: { color: COLORS.coral, fontSize: 10, letterSpacing: 1.4, fontWeight: "800", marginTop: 5 },
+  description: { maxWidth: 300, color: COLORS.textSecondary, textAlign: "center", fontSize: 13, lineHeight: 19, marginTop: 11 },
+  badges: { flexDirection: "row", gap: 8, marginTop: 15 },
+  badge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: BORDER_RADIUS.round, backgroundColor: COLORS.surface },
+  badgeText: { color: COLORS.primary, fontSize: 10, fontWeight: "700" },
+  sectionTitle: { marginTop: 30, marginBottom: 13, color: COLORS.textPrimary, fontSize: 20, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  featuresGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  feature: { width: "48.5%", padding: 14, borderRadius: BORDER_RADIUS.xl, backgroundColor: COLORS.surface },
+  featureIcon: { width: 46, height: 46, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  featureTitle: { color: COLORS.textPrimary, fontSize: 14, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded, marginTop: 12 },
+  featureText: { color: COLORS.textTertiary, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  infoCard: { paddingHorizontal: 16, borderRadius: BORDER_RADIUS.xl, backgroundColor: COLORS.surface },
+  infoRow: { minHeight: 54, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
+  infoRowLast: { borderBottomWidth: 0 },
+  infoLabel: { color: COLORS.textSecondary, fontSize: 12 },
+  infoValue: { maxWidth: "60%", color: COLORS.textPrimary, fontSize: 12, fontWeight: "700", textAlign: "right" },
+  linksCard: { marginTop: 18, paddingHorizontal: 14, borderRadius: BORDER_RADIUS.xl, backgroundColor: COLORS.surface },
+  linkRow: { minHeight: 64, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
+  linkIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: COLORS.primaryBg, alignItems: "center", justifyContent: "center" },
+  linkTitle: { flex: 1, color: COLORS.textPrimary, fontSize: 13, fontWeight: "700", marginLeft: 11 },
+  copyright: { color: COLORS.textTertiary, fontSize: 11, lineHeight: 18, textAlign: "center", marginTop: 25 },
 });

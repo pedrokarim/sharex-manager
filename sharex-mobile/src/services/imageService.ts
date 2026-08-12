@@ -73,7 +73,7 @@ export class ImageService {
       return {
         uri: asset.uri,
         name: asset.fileName || `image_${Date.now()}.jpg`,
-        type: asset.type || "image",
+        type: asset.mimeType || "image/jpeg",
         size: asset.fileSize || 0,
         width: asset.width,
         height: asset.height,
@@ -107,7 +107,7 @@ export class ImageService {
       return {
         uri: asset.uri,
         name: asset.fileName || `photo_${Date.now()}.jpg`,
-        type: asset.type || "image",
+        type: asset.mimeType || "image/jpeg",
         size: asset.fileSize || 0,
         width: asset.width,
         height: asset.height,
@@ -134,10 +134,10 @@ export class ImageService {
         return [];
       }
 
-      return result.assets.map((asset) => ({
+      return result.assets.map((asset, index) => ({
         uri: asset.uri,
-        name: asset.fileName || `image_${Date.now()}.jpg`,
-        type: asset.type || "image",
+        name: asset.fileName || `image_${Date.now()}_${index + 1}.jpg`,
+        type: asset.mimeType || "image/jpeg",
         size: asset.fileSize || 0,
         width: asset.width,
         height: asset.height,

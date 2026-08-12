@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["re.ascencia.screenshotupload.ScreenshotUploadModule"]
+  }
+}

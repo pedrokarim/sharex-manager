@@ -43,14 +43,15 @@ export const ShareTestScreen: React.FC<NavigationProps> = ({ navigation }) => {
             addTestResult("Simulation d'un Share Intent");
             // Simuler la navigation vers l'écran d'upload
             navigation.navigate("Upload", {
-              image: {
+              images: [{
                 uri: "https://picsum.photos/800/600",
                 name: "test_shared_image.jpg",
                 type: "image/jpeg",
                 size: 245760, // ~240 KB - taille plus réaliste
                 width: 800,
                 height: 600,
-              },
+              }],
+              source: "test",
             });
           },
         },
@@ -113,7 +114,7 @@ export const ShareTestScreen: React.FC<NavigationProps> = ({ navigation }) => {
           <View style={styles.stepContainer}>
             <Text style={styles.stepNumber}>4</Text>
             <Text style={styles.stepText}>
-              Choisissez "ShareX Manager" dans la liste
+              Choisissez "ShareX Manager" dans la liste, avec une ou plusieurs images
             </Text>
           </View>
 

@@ -1,7 +1,7 @@
 // Composant d'icône moderne réutilisable
 
 import React from "react";
-import { Text, StyleSheet, ViewStyle, TextStyle } from "react-native";
+import { StyleProp, Text, ViewStyle, TextStyle } from "react-native";
 import { COLORS, SPACING, BORDER_RADIUS } from "../config/design";
 
 interface ModernIconProps {
@@ -9,7 +9,7 @@ interface ModernIconProps {
   size?: "sm" | "md" | "lg" | "xl";
   color?: string;
   backgroundColor?: string;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   textStyle?: TextStyle;
 }
 

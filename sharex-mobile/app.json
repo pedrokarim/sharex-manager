@@ -4,31 +4,25 @@
     "slug": "sharex-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icon-v2.png",
+    "backgroundColor": "#FFF7F2",
+    "primaryColor": "#4A1D78",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#6366F1"
-    },
     "ios": {
+      "bundleIdentifier": "re.ascencia.sharexmanager",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Cette application a besoin d'accéder à l'appareil photo pour prendre des photos à uploader.",
-        "NSPhotoLibraryUsageDescription": "Cette application a besoin d'accéder à la galerie pour sélectionner des images à uploader.",
-        "CFBundleURLTypes": [
-          {
-            "CFBundleURLName": "sharex-manager",
-            "CFBundleURLSchemes": ["sharex-manager"]
-          }
-        ]
+        "NSPhotoLibraryUsageDescription": "Cette application a besoin d'accéder à la galerie pour sélectionner des images à uploader."
       }
     },
     "android": {
+      "icon": "./assets/app-icon-v2.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/adaptive-icon-v2.png",
+        "monochromeImage": "./assets/monochrome-icon-v2.png",
+        "backgroundColor": "#FFF1EB"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -45,23 +39,7 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
       ],
-      "package": "re.ascencia.sharexmanager",
-      "intentFilters": [
-        {
-          "action": "android.intent.action.SEND",
-          "category": ["android.intent.category.DEFAULT"],
-          "data": {
-            "mimeType": "image/*"
-          }
-        },
-        {
-          "action": "android.intent.action.SEND_MULTIPLE",
-          "category": ["android.intent.category.DEFAULT"],
-          "data": {
-            "mimeType": "image/*"
-          }
-        }
-      ]
+      "package": "re.ascencia.sharexmanager"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -86,6 +64,33 @@
           "photosPermission": "L'application a besoin d'accéder à vos photos pour les uploader vers ShareX Manager.",
           "savePhotosPermission": "L'application a besoin de sauvegarder des photos dans votre galerie.",
           "isAccessMediaLocationEnabled": true
+        }
+      ],
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsImageWithMaxCount": 20,
+            "NSExtensionActivationSupportsFileWithMaxCount": 20
+          },
+          "iosShareExtensionName": "ShareX Manager Upload",
+          "androidIntentFilters": [
+            "*/*"
+          ],
+          "androidMultiIntentFilters": [
+            "*/*"
+          ]
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFF7F2",
+          "image": "./assets/splash-icon-v2.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
         }
       ]
     ],

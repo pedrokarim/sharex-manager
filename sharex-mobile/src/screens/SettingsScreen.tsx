@@ -1,480 +1,308 @@
-// Écran des paramètres de l'application
-
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-  Switch,
-  StatusBar,
-} from "react-native";
+import React, { useEffect, useState } from "react";
+import { Alert, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as MediaLibrary from "expo-media-library";
+import * as Notifications from "expo-notifications";
+import * as ScreenCapture from "expo-screen-capture";
 import { NavigationProps, AppSettings } from "../types";
 import { StorageService } from "../services/storage";
 import { ShareXApiService } from "../services/api";
 import { Icon } from "../components/Icon";
-import { ModernButton } from "../components/ModernButton";
-import { ModernCard } from "../components/ModernCard";
 import { QRCodeScannerScreen } from "./QRCodeScannerScreen";
-import {
-  COLORS,
-  COMPONENT_COLORS,
-  SPACING,
-  BORDER_RADIUS,
-  TYPOGRAPHY,
-} from "../config/design";
+import { BORDER_RADIUS, COLORS, SHADOWS, TYPOGRAPHY } from "../config/design";
 
-const SettingsScreenComponent: React.FC<NavigationProps> = ({ navigation }) => {
-  const [settings, setSettings] = useState<AppSettings>({
-    serverUrl: "",
-    apiKey: "",
-    autoUpload: false,
-    notifications: true,
-    theme: "auto",
-    allowImageEditing: true, // Activé par défaut
-  });
-  const [isLoading, setIsLoading] = useState(true);
+const defaults: AppSettings = {
+  serverUrl: "",
+  apiKey: "",
+  autoUpload: false,
+  autoUploadScreenshots: false,
+  notifications: true,
+  theme: "auto",
+  allowImageEditing: true,
+};
+
+export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
+  const [settings, setSettings] = useState<AppSettings>(defaults);
   const [isSaving, setIsSaving] = useState(false);
-  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
+  const load = async () => setSettings((await StorageService.getSettings()) || defaults);
 
-  // Recharger les paramètres quand on revient sur l'écran
   useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", () => {
-      loadSettings();
-    });
-
+    load().catch(console.error);
+    const unsubscribe = navigation.addListener("focus", () => load().catch(console.error));
     return unsubscribe;
   }, [navigation]);
 
-  const loadSettings = async () => {
-    try {
-      const savedSettings = await StorageService.getSettings();
-      if (savedSettings) {
-        setSettings(savedSettings);
-      }
-    } catch (error) {
-      console.error("Erreur lors du chargement des paramètres:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSave = async () => {
+  const save = async () => {
     if (!settings.serverUrl.trim() || !settings.apiKey.trim()) {
-      Alert.alert("Erreur", "Veuillez remplir tous les champs obligatoires.");
+      Alert.alert("Configuration incomplète", "Renseignez l’URL du serveur et la clé API.");
       return;
     }
-
     setIsSaving(true);
     try {
       await StorageService.saveSettings(settings);
-      Alert.alert("Succès", "Paramètres sauvegardés avec succès.");
-      navigation.goBack();
-    } catch (error) {
-      console.error("Erreur lors de la sauvegarde:", error);
-      Alert.alert("Erreur", "Impossible de sauvegarder les paramètres.");
+      Alert.alert("Tout est enregistré", "ShareX Manager est prêt à envoyer vos images.");
+    } catch {
+      Alert.alert("Erreur", "Les paramètres n’ont pas pu être enregistrés.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleTestConnection = async () => {
+  const testConnection = async () => {
     if (!settings.serverUrl.trim()) {
-      Alert.alert("Erreur", "Veuillez remplir l'URL du serveur.");
+      Alert.alert("URL manquante", "Indiquez l’adresse de votre serveur.");
+      return;
+    }
+    setIsTesting(true);
+    try {
+      const connected = await ShareXApiService.testServerUrl(settings.serverUrl);
+      Alert.alert(connected ? "Serveur accessible" : "Connexion impossible", connected ? "L’adresse répond correctement." : "Vérifiez l’adresse et votre connexion réseau.");
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const clearData = () => Alert.alert(
+    "Effacer les données ?",
+    "La configuration et les préférences locales seront supprimées.",
+    [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Effacer",
+        style: "destructive",
+        onPress: async () => {
+          await StorageService.clearAll();
+          setSettings(defaults);
+        },
+      },
+    ],
+  );
+
+  const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => setSettings((current) => ({ ...current, [key]: value }));
+
+  const updateScreenshotUpload = async (enabled: boolean) => {
+    if (!settings.serverUrl.trim() || !settings.apiKey.trim()) {
+      Alert.alert(
+        "Configuration requise",
+        "Enregistrez d’abord l’URL du serveur et la clé API."
+      );
       return;
     }
 
-    setIsTestingConnection(true);
-    try {
-      // Tester seulement si l'URL est accessible
-      const isConnected = await ShareXApiService.testServerUrl(
-        settings.serverUrl
-      );
+    if (!enabled) {
+      const next = { ...settings, autoUploadScreenshots: false };
+      setSettings(next);
+      await StorageService.saveSettings(next);
+      return;
+    }
 
-      if (isConnected) {
-        Alert.alert("Succès", "Serveur accessible ! L'URL est correcte.");
-      } else {
+    const [mediaPermission, capturePermission] = await Promise.all([
+      MediaLibrary.requestPermissionsAsync(false, ["photo"]),
+      ScreenCapture.requestPermissionsAsync(),
+    ]);
+    if (
+      mediaPermission.status !== "granted" ||
+      mediaPermission.accessPrivileges === "limited" ||
+      capturePermission.status !== "granted"
+    ) {
+      Alert.alert(
+        "Accès complet requis",
+        "Autorisez l’accès à toutes les photos pour que ShareX Manager puisse retrouver automatiquement chaque nouvelle capture d’écran."
+      );
+      const next = { ...settings, autoUploadScreenshots: false };
+      setSettings(next);
+      await StorageService.saveSettings(next);
+      return;
+    }
+
+    let notificationsEnabled = settings.notifications;
+    if (notificationsEnabled) {
+      const notificationPermission = await Notifications.requestPermissionsAsync();
+      if (notificationPermission.status !== "granted") {
+        notificationsEnabled = false;
         Alert.alert(
-          "Erreur",
-          "Impossible d'accéder au serveur. Vérifiez l'URL."
+          "Notifications refusées",
+          "L’envoi automatique fonctionnera quand même : son état restera visible directement dans l’application."
         );
       }
-    } catch (error) {
-      console.error("Erreur lors du test de connexion:", error);
-      Alert.alert("Erreur", "Erreur lors du test de connexion.");
-    } finally {
-      setIsTestingConnection(false);
+    }
+
+    const next = {
+      ...settings,
+      autoUploadScreenshots: true,
+      notifications: notificationsEnabled,
+    };
+    setSettings(next);
+    await StorageService.saveSettings(next);
+    Alert.alert(
+      "Captures automatiques activées",
+      "La notification permanente maintient la surveillance en arrière-plan. Faites une capture maintenant : son envoi sera confirmé automatiquement."
+    );
+  };
+
+  const updateNotifications = async (enabled: boolean) => {
+    let granted = enabled;
+    if (enabled) {
+      const permission = await Notifications.requestPermissionsAsync();
+      granted = permission.status === "granted";
+      if (!granted) {
+        Alert.alert(
+          "Notifications non autorisées",
+          "Activez-les dans les réglages Android. Le suivi intégré des envois restera disponible."
+        );
+      }
+    }
+    const next = { ...settings, notifications: granted };
+    setSettings(next);
+    if (next.serverUrl.trim() && next.apiKey.trim()) {
+      await StorageService.saveSettings(next);
     }
   };
 
-  const handleClearData = () => {
-    Alert.alert(
-      "Supprimer les données",
-      "Êtes-vous sûr de vouloir supprimer toutes les données de l'application ?",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await StorageService.clearAll();
-              setSettings({
-                serverUrl: "",
-                apiKey: "",
-                autoUpload: false,
-                notifications: true,
-                theme: "auto",
-                allowImageEditing: true, // Activé par défaut
-              });
-              Alert.alert("Succès", "Données supprimées avec succès.");
-            } catch (error) {
-              console.error("Erreur lors de la suppression:", error);
-              Alert.alert("Erreur", "Impossible de supprimer les données.");
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  if (isLoading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Chargement...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={COLORS.backgroundSecondary}
-      />
-
-      {/* Header */}
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Icon
-            name="arrow-back"
-            size={24}
-            color={COLORS.primary}
-            type="ionicons"
-          />
+        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.navigate("Main")}>
+          <Icon name="menu" size={22} color={COLORS.textPrimary} type="ionicons" />
         </TouchableOpacity>
-        <Text style={styles.title}>Paramètres</Text>
-        <View style={styles.placeholder} />
+        <Text style={styles.headerTitle}>Paramètres</Text>
+        <TouchableOpacity style={styles.avatarButton} onPress={() => navigation.navigate("About")}>
+          <Icon name="person" size={19} color={COLORS.primary} type="ionicons" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Configuration du serveur - AVEC ModernCard CORRIGÉE */}
-        <ModernCard title="Configuration du serveur" variant="elevated">
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>URL du serveur *</Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <Text style={styles.kicker}>VOTRE ESPACE</Text>
+        <Text style={styles.title}>Connectez votre serveur.</Text>
+        <Text style={styles.subtitle}>Une fois configuré, chaque image part exactement là où vous le souhaitez.</Text>
+
+        <View style={styles.serverCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIcon}><Icon name="server-outline" size={22} color={COLORS.white} type="ionicons" /></View>
+            <View style={styles.cardTitleCopy}>
+              <Text style={styles.cardTitle}>Serveur ShareX</Text>
+              <Text style={styles.cardSubtitle}>Connexion sécurisée par clé API</Text>
+            </View>
+            <TouchableOpacity style={styles.qrButton} onPress={() => setShowQRScanner(true)}>
+              <Icon name="qr-code-outline" size={22} color={COLORS.primary} type="ionicons" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.inputLabel}>URL du serveur</Text>
+          <View style={styles.inputShell}>
+            <Icon name="globe-outline" size={18} color={COLORS.coral} type="ionicons" />
             <TextInput
-              style={styles.textInput}
+              style={styles.input}
               value={settings.serverUrl}
-              onChangeText={(text) => {
-                setSettings((prev) => ({ ...prev, serverUrl: text }));
-              }}
+              onChangeText={(value) => update("serverUrl", value)}
               placeholder="https://votre-serveur.com"
+              placeholderTextColor={COLORS.textTertiary}
               keyboardType="url"
               autoCapitalize="none"
               autoCorrect={false}
             />
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Clé API *</Text>
+          <Text style={styles.inputLabel}>Clé API</Text>
+          <View style={styles.inputShell}>
+            <Icon name="key-outline" size={18} color={COLORS.coral} type="ionicons" />
             <TextInput
-              style={styles.textInput}
+              style={styles.input}
               value={settings.apiKey}
-              onChangeText={(text) => {
-                setSettings((prev) => ({ ...prev, apiKey: text }));
-              }}
-              placeholder="Votre clé API"
+              onChangeText={(value) => update("apiKey", value)}
+              placeholder="••••••••••••••••"
+              placeholderTextColor={COLORS.textTertiary}
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
             />
           </View>
 
-          <ModernButton
-            title={
-              isTestingConnection
-                ? "Test en cours..."
-                : "Tester l'URL du serveur"
-            }
-            onPress={handleTestConnection}
-            variant="secondary"
-            size="md"
-            disabled={isTestingConnection}
-            loading={isTestingConnection}
-            icon="wifi"
-            iconType="ionicons"
-          />
-        </ModernCard>
+          <TouchableOpacity style={styles.testButton} onPress={testConnection} disabled={isTesting}>
+            <Icon name={isTesting ? "hourglass-outline" : "wifi-outline"} size={18} color={COLORS.primary} type="ionicons" />
+            <Text style={styles.testText}>{isTesting ? "Test en cours…" : "Tester la connexion"}</Text>
+          </TouchableOpacity>
+        </View>
 
-        {/* Options de l'application */}
-        <ModernCard title="Options de l'application" variant="elevated">
-          <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>Upload automatique</Text>
-            <Switch
-              value={settings.autoUpload}
-              onValueChange={(value) =>
-                setSettings({ ...settings, autoUpload: value })
-              }
-            />
-          </View>
+        <Text style={styles.sectionTitle}>Préférences</Text>
+        <View style={styles.optionsCard}>
+          <SettingRow icon="flash-outline" title="Upload automatique" description="Envoyer directement après sélection" color={COLORS.accentLight} value={settings.autoUpload} onChange={(value) => update("autoUpload", value)} />
+          <SettingRow icon="phone-portrait-outline" title="Captures automatiques" description="Arrière-plan · notification permanente" color={COLORS.accentLight} value={settings.autoUploadScreenshots} onChange={(value) => { updateScreenshotUpload(value).catch(console.error); }} />
+          <SettingRow icon="notifications-outline" title="Notifications" description="Confirmer chaque envoi" color={COLORS.secondaryBg} value={settings.notifications} onChange={(value) => { updateNotifications(value).catch(console.error); }} />
+          <SettingRow icon="color-wand-outline" title="Édition d’image" description="Recadrer avant l’envoi" color={COLORS.primaryBg} value={settings.allowImageEditing} onChange={(value) => update("allowImageEditing", value)} last />
+        </View>
 
-          <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>Notifications</Text>
-            <Switch
-              value={settings.notifications}
-              onValueChange={(value) =>
-                setSettings({ ...settings, notifications: value })
-              }
-            />
-          </View>
+        <TouchableOpacity style={styles.saveButton} onPress={save} disabled={isSaving}>
+          <Text style={styles.saveText}>{isSaving ? "Enregistrement…" : "Enregistrer les paramètres"}</Text>
+          <View style={styles.saveIcon}><Icon name="checkmark" size={20} color={COLORS.primary} type="ionicons" /></View>
+        </TouchableOpacity>
 
-          <View style={styles.switchContainer}>
-            <View style={styles.switchLabelContainer}>
-              <Text style={styles.switchLabel}>
-                Permettre l'édition d'images
-              </Text>
-              <Text style={styles.switchDescription}>
-                Affiche les options de crop/modification lors de la sélection
-                d'images
-              </Text>
-            </View>
-            <Switch
-              value={settings.allowImageEditing}
-              onValueChange={(value) =>
-                setSettings({ ...settings, allowImageEditing: value })
-              }
-            />
-          </View>
-        </ModernCard>
-
-        {/* Actions */}
-        <View style={styles.actionsContainer}>
-          <ModernButton
-            title={isSaving ? "Sauvegarde..." : "Sauvegarder"}
-            onPress={handleSave}
-            variant="primary"
-            size="lg"
-            disabled={isSaving}
-            loading={isSaving}
-            icon="save"
-            iconType="ionicons"
-          />
-
-          <ModernButton
-            title="Scanner QR Code"
-            onPress={() => setShowQRScanner(true)}
-            variant="secondary"
-            size="lg"
-            icon="qr-code"
-            iconType="ionicons"
-          />
-
-          {__DEV__ && (
-            <ModernButton
-              title="Tests & Debug"
-              onPress={() => navigation.navigate("Test")}
-              variant="secondary"
-              size="lg"
-              icon="bug"
-              iconType="ionicons"
-            />
-          )}
-
-          <ModernButton
-            title="Supprimer les données"
-            onPress={handleClearData}
-            variant="danger"
-            size="lg"
-            icon="trash"
-            iconType="ionicons"
-          />
-
-          <ModernButton
-            title="À propos de l'application"
-            onPress={() => navigation.navigate("About")}
-            variant="ghost"
-            size="lg"
-            icon="information-circle"
-            iconType="ionicons"
-          />
+        <View style={styles.secondaryActions}>
+          {__DEV__ && <ActionRow icon="bug-outline" label="Tests et débogage" onPress={() => navigation.navigate("Test")} />}
+          <ActionRow icon="information-circle-outline" label="À propos de l’application" onPress={() => navigation.navigate("About")} />
+          <ActionRow icon="trash-outline" label="Effacer les données locales" danger onPress={clearData} />
         </View>
       </ScrollView>
 
-      {/* QR Code Scanner Modal */}
-      <QRCodeScannerScreen
-        visible={showQRScanner}
-        onClose={() => {
-          setShowQRScanner(false);
-          // Recharger les paramètres après la fermeture du scanner
-          loadSettings();
-        }}
-      />
+      <QRCodeScannerScreen visible={showQRScanner} onClose={() => { setShowQRScanner(false); load().catch(console.error); }} />
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  content: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    fontSize: 18,
-    color: "#666666",
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 20,
-    paddingBottom: 50, // Espace pour la bottom bar
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
-    backgroundColor: COLORS.backgroundSecondary,
-  },
-  backButton: {
-    padding: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.primaryBg,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.textPrimary,
-  },
-  placeholder: {
-    width: 40,
-  },
-  section: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#333333",
-    marginBottom: 16,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 16,
-    color: "#333333",
-    marginBottom: 8,
-    fontWeight: "500",
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: "#ffffff",
-  },
-  testButton: {
-    backgroundColor: "#34C759",
-    borderRadius: 8,
-    padding: 12,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  testButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  switchContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-    paddingVertical: 8,
-  },
-  switchLabelContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
-  switchLabel: {
-    fontSize: 16,
-    color: "#333333",
-    fontWeight: "500",
-  },
-  switchDescription: {
-    fontSize: 12,
-    color: "#666666",
-    marginTop: 2,
-    lineHeight: 16,
-  },
-  actionsContainer: {
-    marginTop: 20,
-  },
-  saveButton: {
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-    padding: 16,
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  saveButtonText: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  clearButton: {
-    backgroundColor: "#FF3B30",
-    borderRadius: 8,
-    padding: 16,
-    alignItems: "center",
-  },
-  clearButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-});
+const SettingRow = ({ icon, title, description, color, value, onChange, last = false }: { icon: string; title: string; description: string; color: string; value: boolean; onChange: (value: boolean) => void; last?: boolean }) => (
+  <View style={[styles.settingRow, last && styles.settingRowLast]}>
+    <View style={[styles.settingIcon, { backgroundColor: color }]}><Icon name={icon} size={20} color={COLORS.textPrimary} type="ionicons" /></View>
+    <View style={styles.settingCopy}><Text style={styles.settingTitle}>{title}</Text><Text style={styles.settingDescription}>{description}</Text></View>
+    <Switch value={value} onValueChange={onChange} trackColor={{ false: COLORS.gray300, true: COLORS.primaryLight }} thumbColor={value ? COLORS.primary : COLORS.white} />
+  </View>
+);
 
-export const SettingsScreen = SettingsScreenComponent;
+const ActionRow = ({ icon, label, onPress, danger = false }: { icon: string; label: string; onPress: () => void; danger?: boolean }) => (
+  <TouchableOpacity style={styles.actionRow} onPress={onPress}>
+    <Icon name={icon} size={19} color={danger ? COLORS.error : COLORS.textSecondary} type="ionicons" />
+    <Text style={[styles.actionLabel, danger && { color: COLORS.error }]}>{label}</Text>
+    <Icon name="chevron-forward" size={17} color={COLORS.textTertiary} type="ionicons" />
+  </TouchableOpacity>
+);
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.background },
+  header: { height: 62, paddingHorizontal: 22, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerButton: { width: 40, height: 40, borderRadius: 14, backgroundColor: COLORS.surface, alignItems: "center", justifyContent: "center" },
+  avatarButton: { width: 40, height: 40, borderRadius: 14, backgroundColor: COLORS.primaryBg, alignItems: "center", justifyContent: "center" },
+  headerTitle: { color: COLORS.textPrimary, fontSize: 17, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  content: { paddingHorizontal: 22, paddingTop: 16, paddingBottom: 135 },
+  kicker: { color: COLORS.coral, fontSize: 12, letterSpacing: 1.5, fontWeight: "800", fontFamily: TYPOGRAPHY.rounded },
+  title: { marginTop: 8, color: COLORS.textPrimary, fontSize: 31, lineHeight: 37, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  subtitle: { color: COLORS.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 8, marginBottom: 22 },
+  serverCard: { padding: 18, borderRadius: BORDER_RADIUS.xl, backgroundColor: COLORS.surface, ...SHADOWS.sm },
+  cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
+  cardIcon: { width: 48, height: 48, borderRadius: 17, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center" },
+  cardTitleCopy: { flex: 1, marginHorizontal: 11 },
+  cardTitle: { color: COLORS.textPrimary, fontSize: 16, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  cardSubtitle: { color: COLORS.textTertiary, fontSize: 11, marginTop: 3 },
+  qrButton: { width: 42, height: 42, borderRadius: 14, backgroundColor: COLORS.primaryBg, alignItems: "center", justifyContent: "center" },
+  inputLabel: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "600", marginBottom: 7, marginLeft: 2 },
+  inputShell: { height: 52, marginBottom: 14, paddingHorizontal: 14, borderRadius: 17, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: COLORS.background },
+  input: { flex: 1, color: COLORS.textPrimary, fontSize: 14, paddingVertical: 0 },
+  testButton: { height: 48, borderRadius: 17, backgroundColor: COLORS.primaryBg, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 3 },
+  testText: { color: COLORS.primary, fontSize: 13, fontWeight: "700" },
+  sectionTitle: { marginTop: 30, marginBottom: 13, color: COLORS.textPrimary, fontSize: 20, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  optionsCard: { paddingHorizontal: 16, borderRadius: BORDER_RADIUS.xl, backgroundColor: COLORS.surface },
+  settingRow: { minHeight: 78, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
+  settingRowLast: { borderBottomWidth: 0 },
+  settingIcon: { width: 42, height: 42, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  settingCopy: { flex: 1, marginLeft: 11 },
+  settingTitle: { color: COLORS.textPrimary, fontSize: 14, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  settingDescription: { color: COLORS.textTertiary, fontSize: 11, marginTop: 3 },
+  saveButton: { marginTop: 22, height: 60, paddingLeft: 21, paddingRight: 7, borderRadius: 21, backgroundColor: COLORS.primary, flexDirection: "row", alignItems: "center", justifyContent: "space-between", ...SHADOWS.md },
+  saveText: { color: COLORS.white, fontSize: 15, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  saveIcon: { width: 46, height: 46, borderRadius: 17, backgroundColor: COLORS.white, alignItems: "center", justifyContent: "center" },
+  secondaryActions: { marginTop: 20, borderRadius: BORDER_RADIUS.xl, paddingHorizontal: 16, backgroundColor: COLORS.surface },
+  actionRow: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: 11, borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
+  actionLabel: { flex: 1, color: COLORS.textSecondary, fontSize: 13, fontWeight: "600" },
+});

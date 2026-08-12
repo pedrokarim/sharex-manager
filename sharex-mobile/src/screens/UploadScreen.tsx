@@ -1,427 +1,415 @@
-// Écran d'upload d'images
-
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
+  ActivityIndicator,
   Alert,
   Image,
   ScrollView,
   StatusBar,
-  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { NavigationProps, ImageInfo, UploadResponse } from "../types";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Circle } from "react-native-svg";
+import {
+  ImageInfo,
+  NavigationProps,
+  ServerConfig,
+  UploadResponse,
+} from "../types";
 import { StorageService } from "../services/storage";
 import { getApiService } from "../services/api";
 import { ImageService } from "../services/imageService";
 import { UploadHistoryService } from "../services/uploadHistory";
 import { ClipboardService } from "../services/clipboard";
 import { Icon } from "../components/Icon";
-import { ModernButton } from "../components/ModernButton";
-import { ModernCard } from "../components/ModernCard";
-import { COLORS, COMPONENT_COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from "../config/design";
+import {
+  BORDER_RADIUS,
+  COLORS,
+  SHADOWS,
+  TYPOGRAPHY,
+} from "../config/design";
 
-export const UploadScreen: React.FC<NavigationProps> = ({
-  navigation,
-  route,
-}) => {
-  const { image } = route.params as { image: ImageInfo };
+type UploadParams = {
+  image?: ImageInfo;
+  images?: ImageInfo[];
+  autoStart?: boolean;
+  source?: "picker" | "camera" | "share" | "test";
+};
+
+const isImage = (file: ImageInfo) => file.type.startsWith("image/");
+
+export const UploadScreen: React.FC<NavigationProps> = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
+  const params = (route.params ?? {}) as UploadParams;
+  const [files, setFiles] = useState<ImageInfo[]>(() =>
+    params.images?.length ? params.images : params.image ? [params.image] : []
+  );
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<UploadResponse | null>(null);
-  const [serverConfig, setServerConfig] = useState<any>(null);
+  const [results, setResults] = useState<Record<number, UploadResponse>>({});
+  const [currentUpload, setCurrentUpload] = useState(0);
+  const [activeUploadIndex, setActiveUploadIndex] = useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<Record<number, number>>({});
+  const [serverConfig, setServerConfig] = useState<ServerConfig | null>(null);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [autoStarted, setAutoStarted] = useState(false);
 
   useEffect(() => {
-    loadServerConfig();
+    StorageService.getServerConfig()
+      .then(setServerConfig)
+      .catch(console.error)
+      .finally(() => setConfigLoaded(true));
   }, []);
 
-  const loadServerConfig = async () => {
-    try {
-      const config = await StorageService.getServerConfig();
-      setServerConfig(config);
-    } catch (error) {
-      console.error("Erreur lors du chargement de la configuration:", error);
-      Alert.alert(
-        "Erreur",
-        "Impossible de charger la configuration du serveur."
-      );
-    }
+  const totalSize = useMemo(
+    () => files.reduce((total, file) => total + (file.size || 0), 0),
+    [files]
+  );
+  const resultValues = Object.values(results);
+  const successCount = resultValues.filter((result) => result.success).length;
+  const failedCount = resultValues.filter((result) => !result.success).length;
+  const allSucceeded = files.length > 0 && successCount === files.length;
+
+  const formatFileSize = (bytes: number) => {
+    if (!bytes) return "Taille inconnue";
+    const units = ["o", "Ko", "Mo", "Go"];
+    const rank = Math.min(
+      Math.floor(Math.log(bytes) / Math.log(1024)),
+      units.length - 1
+    );
+    return `${(bytes / 1024 ** rank).toFixed(rank ? 1 : 0)} ${units[rank]}`;
   };
 
-  const handleUpload = async () => {
+  const upload = async () => {
     if (!serverConfig) {
-      Alert.alert("Erreur", "Configuration du serveur manquante.");
+      Alert.alert(
+        "Serveur non configuré",
+        "Ajoutez l’URL du serveur et votre clé API dans les paramètres.",
+        [
+          { text: "Annuler", style: "cancel" },
+          {
+            text: "Configurer",
+            onPress: () =>
+              navigation.navigate("MainTabs", { screen: "Settings" }),
+          },
+        ]
+      );
       return;
     }
 
     setIsUploading(true);
-    setUploadResult(null);
+    const api = getApiService(serverConfig);
 
     try {
-      const apiService = getApiService(serverConfig);
-      const result = await apiService.uploadImage(image.uri, image.name);
+      for (let index = 0; index < files.length; index += 1) {
+        if (results[index]?.success) continue;
 
-      setUploadResult(result);
+        const file = files[index];
+        setCurrentUpload(index + 1);
+        setActiveUploadIndex(index);
+        setUploadProgress((current) => ({ ...current, [index]: 0 }));
 
-      if (result.success) {
-        // Sauvegarder dans l'historique
-        await UploadHistoryService.addUpload({
-          filename: result.filename || image.name,
-          url: result.url || "",
-          size: image.size,
-          type: image.type,
-          localUri: image.uri,
-          width: image.width,
-          height: image.height,
-        });
+        let result: UploadResponse;
+        try {
+          result = await api.uploadFile(file.uri, file.name, file.type, (progress) => {
+            setUploadProgress((current) => ({ ...current, [index]: progress }));
+          });
+        } catch {
+          result = {
+            success: false,
+            error: "Le serveur n’a pas pu recevoir ce fichier.",
+          };
+        }
 
-        Alert.alert(
-          "Upload réussi !",
-          `Image uploadée avec succès.\nURL: ${result.url}`,
-          [
-            {
-              text: "Copier l'URL",
-              onPress: () => {
-                if (result.url) {
-                  ClipboardService.copyUrl(result.url);
-                }
-              },
-            },
-            {
-              text: "OK",
-              onPress: () => navigation.goBack(),
-            },
-          ]
-        );
-      } else {
-        Alert.alert("Erreur d'upload", result.error || "Erreur inconnue");
+        setResults((current) => ({ ...current, [index]: result }));
+
+        if (result.success) {
+          await UploadHistoryService.addUpload({
+            filename: result.filename || file.name,
+            url: result.url || "",
+            thumbnailUrl: result.thumbnailUrl,
+            size: file.size,
+            type: file.type,
+            localUri: file.uri,
+            width: file.width,
+            height: file.height,
+          });
+        }
       }
-    } catch (error) {
-      console.error("Erreur lors de l'upload:", error);
-      Alert.alert("Erreur", "Impossible d'uploader l'image.");
     } finally {
       setIsUploading(false);
+      setCurrentUpload(0);
+      setActiveUploadIndex(null);
     }
   };
 
-  const handleRetry = () => {
-    setUploadResult(null);
-    handleUpload();
-  };
+  useEffect(() => {
+    if (
+      configLoaded &&
+      params.autoStart &&
+      files.length > 0 &&
+      !autoStarted
+    ) {
+      setAutoStarted(true);
+      upload().catch(console.error);
+    }
+  }, [configLoaded, params.autoStart, autoStarted, files.length]);
 
-  const handleCancel = () => {
-    navigation.goBack();
-  };
-
-  const handleCropImage = async () => {
-    try {
-      // Vérifier si l'édition d'images est autorisée
-      const settings = await StorageService.getSettings();
-      const allowEditing = settings?.allowImageEditing ?? true;
-
-      if (!allowEditing) {
-        Alert.alert(
-          "Édition désactivée",
-          "L'édition d'images est désactivée dans les paramètres. Activez-la pour pouvoir modifier les images."
-        );
-        return;
-      }
-
-      // Proposer à l'utilisateur de choisir une nouvelle image avec crop
-      Alert.alert(
-        "Modifier l'image",
-        "Voulez-vous sélectionner une nouvelle image à modifier ?",
-        [
-          {
-            text: "Sélectionner depuis la galerie",
-            onPress: async () => {
-              const croppedImage = await ImageService.pickImageFromGallery(
-                true
-              );
-              if (croppedImage) {
-                // Naviguer vers un nouvel écran d'upload avec l'image modifiée
-                navigation.replace("Upload", { image: croppedImage });
-              }
-            },
-          },
-          {
-            text: "Prendre une nouvelle photo",
-            onPress: async () => {
-              const croppedImage = await ImageService.takePhoto(true);
-              if (croppedImage) {
-                // Naviguer vers un nouvel écran d'upload avec l'image modifiée
-                navigation.replace("Upload", { image: croppedImage });
-              }
-            },
-          },
-          { text: "Annuler", style: "cancel" },
-        ]
-      );
-    } catch (error) {
-      console.error("Erreur lors du crop de l'image:", error);
-      Alert.alert("Erreur", "Impossible de modifier l'image.");
+  const addFiles = async () => {
+    const selected = await ImageService.pickMultipleImages();
+    if (selected.length) {
+      setFiles((current) => [...current, ...selected]);
     }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  const removeFile = (index: number) => {
+    if (isUploading || resultValues.length) return;
+    setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
   };
+
+  const copyAndClose = async () => {
+    const urls = resultValues
+      .filter((result) => result.success && result.url)
+      .map((result) => result.url as string);
+    if (urls.length) await ClipboardService.copyUrl(urls.join("\n"));
+    navigation.navigate("MainTabs");
+  };
+
+  if (!files.length) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.emptyState}>
+          <Icon name="documents-outline" size={42} color={COLORS.primary} type="ionicons" />
+          <Text style={styles.emptyTitle}>Aucun fichier reçu</Text>
+          <Text style={styles.emptyText}>Revenez en arrière et sélectionnez au moins un fichier.</Text>
+          <TouchableOpacity style={styles.emptyButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.emptyButtonText}>Retour</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const buttonLabel = isUploading
+    ? `Envoi ${currentUpload}/${files.length}…`
+    : allSucceeded
+      ? successCount > 1
+        ? `Copier les ${successCount} liens et terminer`
+        : "Copier le lien et terminer"
+      : failedCount
+        ? `Réessayer ${failedCount} fichier${failedCount > 1 ? "s" : ""}`
+        : `Envoyer ${files.length} fichier${files.length > 1 ? "s" : ""}`;
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleCancel}>
-            <Icon
-              name="arrow-back"
-              size={24}
-              color={COLORS.primary}
-              type="ionicons"
-            />
-          </TouchableOpacity>
-          <Text style={styles.title}>Upload d'image</Text>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
+          <Icon name="arrow-back" size={21} color={COLORS.textPrimary} type="ionicons" />
+        </TouchableOpacity>
+        <View style={styles.headerCopy}>
+          <Text style={styles.headerTitle}>Nouvel upload</Text>
+          <Text style={styles.headerSubtitle}>
+            {params.source === "share" ? "Reçu depuis le partage" : `${files.length} sélectionné${files.length > 1 ? "s" : ""}`}
+          </Text>
         </View>
+        <TouchableOpacity style={styles.headerButton} onPress={addFiles} disabled={isUploading}>
+          <Icon name="add" size={23} color={COLORS.textPrimary} type="ionicons" />
+        </TouchableOpacity>
+      </View>
 
-        {/* Prévisualisation de l'image */}
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: image.uri }} style={styles.image} />
-        </View>
-
-        {/* Informations sur l'image */}
-        <ModernCard title="Informations de l'image" variant="elevated">
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Nom:</Text>
-            <Text style={styles.infoValue}>{image.name}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Type:</Text>
-            <Text style={styles.infoValue}>{image.type}</Text>
-          </View>
-
-          {image.size > 0 && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Taille:</Text>
-              <Text style={styles.infoValue}>{formatFileSize(image.size)}</Text>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: 110 + Math.max(insets.bottom, 20) }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.previewCard}>
+          {isImage(files[0]) ? (
+            <Image source={{ uri: files[0].uri }} style={styles.preview} resizeMode="cover" />
+          ) : (
+            <View style={styles.filePreview}>
+              <Icon name="document-text-outline" size={58} color={COLORS.primary} type="ionicons" />
+              <Text style={styles.filePreviewName} numberOfLines={2}>{files[0].name}</Text>
             </View>
           )}
-
-          {image.width && image.height && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Dimensions:</Text>
-              <Text style={styles.infoValue}>
-                {image.width} × {image.height}
-              </Text>
-            </View>
-          )}
-        </ModernCard>
-
-        {/* Résultat de l'upload */}
-        {uploadResult && (
-          <View
-            style={[
-              styles.resultContainer,
-              { backgroundColor: uploadResult.success ? "#E8F5E8" : "#FFEBEE" },
-            ]}
-          >
-            <Text
-              style={[
-                styles.resultTitle,
-                {
-                  color: uploadResult.success
-                    ? COMPONENT_COLORS.statusSuccess
-                    : COMPONENT_COLORS.statusError,
-                },
-              ]}
-            >
-              <Icon
-                name={
-                  uploadResult.success ? "checkmark-circle" : "close-circle"
-                }
-                size={16}
-                color={
-                  uploadResult.success
-                    ? COMPONENT_COLORS.statusSuccess
-                    : COMPONENT_COLORS.statusError
-                }
-                type="ionicons"
-              />
-              <Text style={{ marginLeft: 8 }}>
-                {uploadResult.success ? "Upload réussi" : "Upload échoué"}
-              </Text>
+          <View style={styles.previewTag}>
+            <Icon name="checkmark" size={14} color={COLORS.white} type="ionicons" />
+            <Text style={styles.previewTagText}>
+              {files.length > 1 ? `${files.length} fichiers prêts` : "Prêt à envoyer"}
             </Text>
+          </View>
+        </View>
 
-            {uploadResult.success && uploadResult.url && (
-              <View style={styles.urlContainer}>
-                <Text style={styles.urlLabel}>URL:</Text>
-                <Text style={styles.urlValue}>{uploadResult.url}</Text>
+        <View style={styles.fileList}>
+          {files.map((file, index) => {
+            const result = results[index];
+            return (
+              <View style={styles.fileRow} key={`${file.uri}-${index}`}>
+                <View style={styles.fileThumbnail}>
+                  {isImage(file) ? (
+                    <Image source={{ uri: file.uri }} style={styles.thumbnailImage} />
+                  ) : (
+                    <Icon name="document-outline" size={21} color={COLORS.primary} type="ionicons" />
+                  )}
+                </View>
+                <View style={styles.fileCopy}>
+                  <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
+                  <Text style={styles.fileMeta}>
+                    {formatFileSize(file.size)} · {file.type.split("/").pop()?.toUpperCase() || "FICHIER"}
+                  </Text>
+                </View>
+                {isUploading && !result?.success ? (
+                  <UploadProgressCircle
+                    progress={activeUploadIndex === index ? uploadProgress[index] || 0 : 0}
+                    active={activeUploadIndex === index}
+                  />
+                ) : result ? (
+                  <View style={[styles.statusIcon, { backgroundColor: result.success ? COLORS.successLight : COLORS.errorLight }]}>
+                    <Icon
+                      name={result.success ? "checkmark" : "close"}
+                      size={17}
+                      color={result.success ? COLORS.success : COLORS.error}
+                      type="ionicons"
+                    />
+                  </View>
+                ) : (
+                  <TouchableOpacity style={styles.removeButton} onPress={() => removeFile(index)} disabled={isUploading}>
+                    <Icon name="close" size={17} color={COLORS.textTertiary} type="ionicons" />
+                  </TouchableOpacity>
+                )}
               </View>
-            )}
+            );
+          })}
+        </View>
 
-            {uploadResult.error && (
-              <Text style={styles.errorText}>{uploadResult.error}</Text>
-            )}
+        <View style={styles.detailsCard}>
+          <Text style={styles.sectionTitle}>Détails de l’envoi</Text>
+          <Detail icon="documents-outline" label="Fichiers" value={`${files.length}`} />
+          <Detail icon="archive-outline" label="Taille totale" value={formatFileSize(totalSize)} />
+          <Detail icon="server-outline" label="Destination" value={serverConfig?.url || "Serveur non configuré"} last />
+        </View>
+
+        {resultValues.length > 0 && !isUploading && (
+          <View style={[styles.resultCard, allSucceeded ? styles.resultSuccess : styles.resultError]}>
+            <View style={[styles.resultIcon, { backgroundColor: allSucceeded ? COLORS.success : COLORS.error }]}>
+              <Icon name={allSucceeded ? "checkmark" : "alert"} size={20} color={COLORS.white} type="ionicons" />
+            </View>
+            <View style={styles.resultCopy}>
+              <Text style={styles.resultTitle}>
+                {allSucceeded ? "Envoi terminé !" : "Envoi partiellement terminé"}
+              </Text>
+              <Text style={styles.resultText}>
+                {successCount} réussi{successCount > 1 ? "s" : ""}{failedCount ? ` · ${failedCount} échoué${failedCount > 1 ? "s" : ""}` : ""}
+              </Text>
+            </View>
           </View>
         )}
-
-        {/* Actions */}
-        <View style={styles.actionsContainer}>
-          {!uploadResult && (
-            <>
-              <ModernButton
-                title={isUploading ? "Upload en cours..." : "Uploader l'image"}
-                onPress={handleUpload}
-                variant="primary"
-                size="lg"
-                disabled={isUploading}
-                loading={isUploading}
-                icon="cloud-upload"
-                iconType="ionicons"
-              />
-
-              <ModernButton
-                title="Crop/Modifier"
-                onPress={handleCropImage}
-                variant="accent"
-                size="lg"
-                disabled={isUploading}
-                icon="cut"
-                iconType="ionicons"
-              />
-            </>
-          )}
-
-          {uploadResult && !uploadResult.success && (
-            <ModernButton
-              title="Réessayer"
-              onPress={handleRetry}
-              variant="accent"
-              size="lg"
-              icon="refresh"
-              iconType="ionicons"
-            />
-          )}
-
-          <ModernButton
-            title="Annuler"
-            onPress={handleCancel}
-            variant="ghost"
-            size="lg"
-          />
-        </View>
       </ScrollView>
+
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom + 10, 20) }]}>
+        <TouchableOpacity
+          style={[styles.primaryButton, isUploading && styles.primaryButtonDisabled]}
+          onPress={allSucceeded ? copyAndClose : upload}
+          disabled={isUploading}
+        >
+          <Text style={styles.primaryText}>{buttonLabel}</Text>
+          <View style={styles.buttonIcon}>
+            {isUploading ? (
+              <ActivityIndicator color={COLORS.primary} size="small" />
+            ) : (
+              <Icon name={allSucceeded ? "copy-outline" : "arrow-up"} size={19} color={COLORS.primary} type="ionicons" />
+            )}
+          </View>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
 
+const Detail = ({ icon, label, value, last = false }: { icon: string; label: string; value: string; last?: boolean }) => (
+  <View style={[styles.detailRow, last && styles.detailRowLast]}>
+    <View style={styles.detailLeft}>
+      <Icon name={icon} size={18} color={COLORS.coral} type="ionicons" />
+      <Text style={styles.detailLabel}>{label}</Text>
+    </View>
+    <Text style={styles.detailValue} numberOfLines={1}>{value}</Text>
+  </View>
+);
+
+const UploadProgressCircle = ({ progress, active }: { progress: number; active: boolean }) => {
+  const radius = 12;
+  const circumference = 2 * Math.PI * radius;
+  const displayedProgress = Math.max(0.03, Math.min(progress, 1));
+
+  return (
+    <View style={[styles.progressIcon, active && styles.progressIconActive]}>
+      <Svg width={32} height={32} viewBox="0 0 32 32">
+        <Circle cx="16" cy="16" r={radius} fill="none" stroke={COLORS.border} strokeWidth="3" />
+        <Circle
+          cx="16"
+          cy="16"
+          r={radius}
+          fill="none"
+          stroke={COLORS.primary}
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray={`${circumference} ${circumference}`}
+          strokeDashoffset={circumference * (1 - displayedProgress)}
+          rotation="-90"
+          origin="16, 16"
+        />
+      </Svg>
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 20,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  backButton: {
-    marginRight: 16,
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: COLORS.primaryBg,
-    borderRadius: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-  },
-  imageContainer: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  image: {
-    width: 200,
-    height: 200,
-    borderRadius: 12,
-    resizeMode: "cover",
-  },
-  infoContainer: {
-    backgroundColor: "#f8f9fa",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-  },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333333",
-    marginBottom: 12,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: "#666666",
-    fontWeight: "500",
-  },
-  infoValue: {
-    fontSize: 14,
-    color: "#333333",
-    flex: 1,
-    textAlign: "right",
-  },
-  resultContainer: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-  },
-  resultTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  urlContainer: {
-    marginTop: 8,
-  },
-  urlLabel: {
-    fontSize: 14,
-    color: "#666666",
-    marginBottom: 4,
-  },
-  urlValue: {
-    fontSize: 12,
-    color: "#333333",
-    fontFamily: "monospace",
-    backgroundColor: "#ffffff",
-    padding: 8,
-    borderRadius: 4,
-  },
-  errorText: {
-    fontSize: 14,
-    color: "#C62828",
-    marginTop: 8,
-  },
-  actionsContainer: {
-    marginTop: 20,
-  },
-  // Style uniforme pour tous les boutons
+  container: { flex: 1, backgroundColor: COLORS.background },
+  header: { minHeight: 66, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20 },
+  headerButton: { width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: COLORS.surface },
+  headerCopy: { flex: 1, alignItems: "center", paddingHorizontal: 10 },
+  headerTitle: { fontSize: 18, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded, color: COLORS.textPrimary },
+  headerSubtitle: { color: COLORS.textTertiary, fontSize: 11, marginTop: 2 },
+  content: { paddingHorizontal: 22, paddingTop: 8, paddingBottom: 120 },
+  previewCard: { height: 260, overflow: "hidden", borderRadius: BORDER_RADIUS.xl, backgroundColor: COLORS.primaryBg, ...SHADOWS.md },
+  preview: { width: "100%", height: "100%" },
+  filePreview: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 36 },
+  filePreviewName: { color: COLORS.textPrimary, fontFamily: TYPOGRAPHY.rounded, fontSize: 16, fontWeight: "700", textAlign: "center", marginTop: 14 },
+  previewTag: { position: "absolute", top: 14, left: 14, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: COLORS.primary, paddingHorizontal: 11, paddingVertical: 7, borderRadius: BORDER_RADIUS.round },
+  previewTagText: { color: COLORS.white, fontSize: 11, fontWeight: "700" },
+  fileList: { marginVertical: 16, backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.xl, paddingHorizontal: 14 },
+  fileRow: { minHeight: 68, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
+  fileThumbnail: { width: 44, height: 44, borderRadius: 14, overflow: "hidden", backgroundColor: COLORS.secondaryBg, alignItems: "center", justifyContent: "center" },
+  thumbnailImage: { width: "100%", height: "100%" },
+  fileCopy: { flex: 1, marginHorizontal: 11 },
+  fileName: { color: COLORS.textPrimary, fontSize: 14, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  fileMeta: { color: COLORS.textTertiary, fontSize: 11, marginTop: 3 },
+  removeButton: { width: 32, height: 32, borderRadius: 12, backgroundColor: COLORS.background, alignItems: "center", justifyContent: "center" },
+  statusIcon: { width: 32, height: 32, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  progressIcon: { width: 32, height: 32, borderRadius: 12, alignItems: "center", justifyContent: "center", opacity: 0.5 },
+  progressIconActive: { backgroundColor: COLORS.primaryBg, opacity: 1 },
+  detailsCard: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.xl, padding: 18 },
+  sectionTitle: { fontSize: 17, fontWeight: "700", color: COLORS.textPrimary, fontFamily: TYPOGRAPHY.rounded, marginBottom: 8 },
+  detailRow: { minHeight: 54, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
+  detailRowLast: { borderBottomWidth: 0 },
+  detailLeft: { flexDirection: "row", alignItems: "center", gap: 9 },
+  detailLabel: { color: COLORS.textSecondary, fontSize: 13 },
+  detailValue: { maxWidth: "54%", color: COLORS.textPrimary, fontSize: 13, fontWeight: "600", textAlign: "right" },
+  resultCard: { flexDirection: "row", alignItems: "center", marginTop: 16, padding: 15, borderRadius: BORDER_RADIUS.lg },
+  resultSuccess: { backgroundColor: COLORS.successLight },
+  resultError: { backgroundColor: COLORS.errorLight },
+  resultIcon: { width: 38, height: 38, borderRadius: 14, alignItems: "center", justifyContent: "center", marginRight: 12 },
+  resultCopy: { flex: 1 },
+  resultTitle: { color: COLORS.textPrimary, fontSize: 14, fontWeight: "700" },
+  resultText: { color: COLORS.textSecondary, fontSize: 12, marginTop: 3 },
+  footer: { position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: 22, paddingTop: 12, paddingBottom: 14, backgroundColor: COLORS.background },
+  primaryButton: { minHeight: 60, borderRadius: 22, paddingLeft: 22, paddingRight: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: COLORS.primary, ...SHADOWS.md },
+  primaryButtonDisabled: { opacity: 0.82 },
+  primaryText: { flex: 1, color: COLORS.white, fontSize: 15, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded, paddingRight: 10 },
+  buttonIcon: { width: 46, height: 46, borderRadius: 17, backgroundColor: COLORS.white, alignItems: "center", justifyContent: "center" },
+  emptyState: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 40 },
+  emptyTitle: { color: COLORS.textPrimary, fontFamily: TYPOGRAPHY.rounded, fontSize: 22, fontWeight: "700", marginTop: 18 },
+  emptyText: { color: COLORS.textSecondary, textAlign: "center", lineHeight: 21, marginTop: 8 },
+  emptyButton: { marginTop: 22, backgroundColor: COLORS.primary, borderRadius: 18, paddingHorizontal: 24, paddingVertical: 14 },
+  emptyButtonText: { color: COLORS.white, fontWeight: "700" },
 });

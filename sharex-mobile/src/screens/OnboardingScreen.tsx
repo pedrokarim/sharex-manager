@@ -1,327 +1,141 @@
-// Écran d'onboarding moderne
-
-import React, { useState, useRef } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Dimensions,
-  ScrollView,
-  Image,
-  StatusBar,
-} from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import React, { useRef, useState } from "react";
+import { Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "../components/Icon";
-
-const { width, height } = Dimensions.get("window");
+import { BORDER_RADIUS, COLORS, SHADOWS, TYPOGRAPHY } from "../config/design";
 
 interface OnboardingScreenProps {
   onComplete: () => void;
   navigation: any;
 }
 
-interface OnboardingSlide {
-  id: number;
-  title: string;
-  subtitle: string;
-  description: string;
-  icon: string;
-  color: string;
-  backgroundColor: string;
-}
-
-const slides: OnboardingSlide[] = [
+const slides = [
   {
-    id: 1,
-    title: "Bienvenue sur",
-    subtitle: "ShareX Manager",
-    description:
-      "L'application mobile pour uploader et gérer vos images facilement",
-    icon: "phone-portrait",
-    color: "#007AFF",
-    backgroundColor: "#F0F8FF",
+    kicker: "BIENVENUE",
+    title: "Vos images vous suivent partout.",
+    description: "Envoyez une capture, une photo ou un visuel vers votre serveur ShareX Manager en quelques secondes.",
+    icon: "cloud-upload-outline",
+    image: require("../../assets/editorial-onboarding.png"),
   },
   {
-    id: 2,
-    title: "Upload rapide",
-    subtitle: "En un clic",
-    description:
-      "Prenez une photo ou sélectionnez depuis votre galerie et uploadez instantanément",
-    icon: "flash",
-    color: "#34C759",
-    backgroundColor: "#F0FFF4",
+    kicker: "UN SEUL GESTE",
+    title: "Partagez depuis toutes vos apps.",
+    description: "Choisissez ShareX Manager dans le menu de partage : votre image est prête à être envoyée.",
+    icon: "share-social-outline",
+    image: require("../../assets/editorial-onboarding-share.png"),
   },
   {
-    id: 3,
-    title: "Partage facile",
-    subtitle: "Avec Share Intent",
-    description:
-      "Partagez des images depuis n'importe quelle app directement vers ShareX Manager",
-    icon: "link",
-    color: "#FF9500",
-    backgroundColor: "#FFF8F0",
-  },
-  {
-    id: 4,
-    title: "Galerie organisée",
-    subtitle: "Tout en un endroit",
-    description:
-      "Consultez votre historique d'uploads, copiez les liens et gérez vos images",
-    icon: "images",
-    color: "#AF52DE",
-    backgroundColor: "#F8F0FF",
+    kicker: "TOUT EST PRÊT",
+    title: "Retrouvez, copiez, partagez.",
+    description: "Gardez vos derniers uploads à portée de main et récupérez leurs liens publics instantanément.",
+    icon: "images-outline",
+    image: require("../../assets/editorial-onboarding-gallery.png"),
   },
 ];
 
-export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
-  onComplete,
-  navigation,
-}) => {
+export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete, navigation }) => {
+  const { width } = useWindowDimensions();
   const [currentSlide, setCurrentSlide] = useState(0);
-  const scrollViewRef = useRef<ScrollView>(null);
-  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
 
-  const handleNext = () => {
-    if (currentSlide < slides.length - 1) {
-      const nextSlide = currentSlide + 1;
-      setCurrentSlide(nextSlide);
-      scrollViewRef.current?.scrollTo({
-        x: nextSlide * width,
-        animated: true,
-      });
-    } else {
-      // Sauvegarder l'état d'onboarding
-      onComplete();
-      // Naviguer directement vers MainTabs
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "MainTabs" }],
-      });
+  const finish = async () => {
+    await onComplete();
+    navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
+  };
+
+  const next = () => {
+    if (currentSlide === slides.length - 1) {
+      finish();
+      return;
     }
+    const nextIndex = currentSlide + 1;
+    setCurrentSlide(nextIndex);
+    scrollRef.current?.scrollTo({ x: nextIndex * width, animated: true });
   };
-
-  const handleSkip = () => {
-    // Sauvegarder l'état d'onboarding
-    onComplete();
-    // Naviguer directement vers MainTabs
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "MainTabs" }],
-    });
-  };
-
-  const handleScroll = (event: any) => {
-    const slideIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-    setCurrentSlide(slideIndex);
-  };
-
-  const renderSlide = (slide: OnboardingSlide, index: number) => (
-    <View
-      key={slide.id}
-      style={[
-        styles.slide,
-        {
-          backgroundColor: slide.backgroundColor,
-        },
-      ]}
-    >
-      <View style={styles.slideContent}>
-        {/* Icône principale */}
-        <View style={[styles.iconContainer, { backgroundColor: slide.color }]}>
-          <Icon name={slide.icon} size={48} color="#ffffff" type="ionicons" />
-        </View>
-
-        {/* Titre et sous-titre */}
-        <View style={styles.textContainer}>
-          <Text style={styles.title}>{slide.title}</Text>
-          <Text style={[styles.subtitle, { color: slide.color }]}>
-            {slide.subtitle}
-          </Text>
-          <Text style={styles.description}>{slide.description}</Text>
-        </View>
-
-        {/* Boutons d'action */}
-        <View style={styles.buttonContainer}>
-          {index === slides.length - 1 ? (
-            <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: slide.color }]}
-              onPress={handleNext}
-            >
-              <Text style={styles.primaryButtonText}>Commencer</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.buttonRow}>
-              <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-                <Text style={styles.skipButtonText}>Passer</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.nextButton, { backgroundColor: slide.color }]}
-                onPress={handleNext}
-              >
-                <Text style={styles.nextButtonText}>Suivant</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </View>
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <View style={styles.topBar}>
+        <View style={styles.brand}>
+          <View style={styles.brandIcon}>
+            <Image source={require("../../assets/logo-sxm-simple.png")} style={styles.brandLogo} resizeMode="contain" />
+          </View>
+          <Text style={styles.brandText}>ShareX Manager</Text>
+        </View>
+        <TouchableOpacity onPress={finish} style={styles.skipButton}>
+          <Text style={styles.skipText}>Passer</Text>
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
-        ref={scrollViewRef}
+        ref={scrollRef}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
         scrollEventThrottle={16}
-        style={styles.scrollView}
+        onMomentumScrollEnd={(event) => setCurrentSlide(Math.round(event.nativeEvent.contentOffset.x / width))}
       >
-        {slides.map((slide, index) => renderSlide(slide, index))}
+        {slides.map((slide, index) => (
+          <View key={slide.kicker} style={[styles.slide, { width }]}>
+            <View style={[styles.artCard, index === 1 && styles.artCardPurple, index === 2 && styles.artCardPeach]}>
+              <Image source={slide.image} style={styles.illustration} resizeMode="contain" />
+              <View style={styles.floatingBadge}>
+                <Image source={require("../../assets/logo-sxm-simple.png")} style={styles.floatingLogo} resizeMode="contain" />
+              </View>
+              <View style={styles.featureBadge}><Icon name={slide.icon} size={19} color={COLORS.coral} type="ionicons" /></View>
+              <View style={styles.decorDotOne} />
+              <View style={styles.decorDotTwo} />
+            </View>
+            <Text style={styles.kicker}>{slide.kicker}</Text>
+            <Text style={styles.title}>{slide.title}</Text>
+            <Text style={styles.description}>{slide.description}</Text>
+          </View>
+        ))}
       </ScrollView>
 
-      {/* Indicateurs de pagination */}
-      <View style={styles.paginationContainer}>
-        {slides.map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.paginationDot,
-              {
-                backgroundColor: index === currentSlide ? "#007AFF" : "#E0E0E0",
-                width: index === currentSlide ? 24 : 8,
-              },
-            ]}
-          />
-        ))}
+      <View style={styles.footer}>
+        <View style={styles.pagination}>
+          {slides.map((_, index) => <View key={index} style={[styles.dot, index === currentSlide && styles.dotActive]} />)}
+        </View>
+        <TouchableOpacity style={styles.nextButton} onPress={next} activeOpacity={0.85}>
+          <Text style={styles.nextText}>{currentSlide === slides.length - 1 ? "Commencer" : "Continuer"}</Text>
+          <View style={styles.arrowCircle}>
+            <Icon name="arrow-forward" size={18} color={COLORS.primary} type="ionicons" />
+          </View>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  slide: {
-    width,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  slideContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 40,
-  },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 40,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  textContainer: {
-    alignItems: "center",
-    marginBottom: 60,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "300",
-    color: "#333333",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 32,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  description: {
-    fontSize: 16,
-    color: "#666666",
-    textAlign: "center",
-    lineHeight: 24,
-    maxWidth: 280,
-  },
-  buttonContainer: {
-    width: "100%",
-    paddingHorizontal: 20,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  primaryButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    borderRadius: 25,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  skipButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  skipButtonText: {
-    color: "#999999",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  nextButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 20,
-    alignItems: "center",
-  },
-  nextButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  paginationContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 20,
-  },
-  paginationDot: {
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  topBar: { height: 62, paddingHorizontal: 22, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  brand: { flexDirection: "row", alignItems: "center", gap: 9 },
+  brandIcon: { width: 38, height: 38, borderRadius: 13, backgroundColor: COLORS.surface, alignItems: "center", justifyContent: "center", ...SHADOWS.sm },
+  brandLogo: { width: 29, height: 29 },
+  brandText: { color: COLORS.textPrimary, fontSize: 15, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  skipButton: { paddingHorizontal: 13, paddingVertical: 8, backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.round },
+  skipText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "600" },
+  slide: { paddingHorizontal: 22, paddingTop: 10 },
+  artCard: { height: "53%", minHeight: 330, maxHeight: 470, borderRadius: 34, overflow: "hidden", backgroundColor: "#FFE2D6", alignItems: "center", justifyContent: "center", ...SHADOWS.sm },
+  artCardPurple: { backgroundColor: "#E9DDF3" },
+  artCardPeach: { backgroundColor: "#FFD9C8" },
+  illustration: { width: "88%", height: "93%" },
+  floatingBadge: { position: "absolute", top: 18, right: 18, width: 52, height: 52, borderRadius: 18, backgroundColor: COLORS.surface, alignItems: "center", justifyContent: "center", ...SHADOWS.sm },
+  floatingLogo: { width: 38, height: 38 },
+  featureBadge: { position: "absolute", top: 24, left: 22, width: 40, height: 40, borderRadius: 14, backgroundColor: COLORS.surface, alignItems: "center", justifyContent: "center", ...SHADOWS.sm },
+  decorDotOne: { position: "absolute", left: 18, top: 28, width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.coral },
+  decorDotTwo: { position: "absolute", left: 34, top: 47, width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.primaryLight },
+  kicker: { marginTop: 24, color: COLORS.coral, fontSize: 12, letterSpacing: 1.6, fontWeight: "800", fontFamily: TYPOGRAPHY.rounded },
+  title: { marginTop: 8, maxWidth: 360, color: COLORS.textPrimary, fontSize: 30, lineHeight: 36, letterSpacing: -0.5, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  description: { marginTop: 10, maxWidth: 360, color: COLORS.textSecondary, fontSize: 15, lineHeight: 22 },
+  footer: { paddingHorizontal: 22, paddingTop: 8, paddingBottom: 12 },
+  pagination: { flexDirection: "row", gap: 6, marginBottom: 16 },
+  dot: { width: 8, height: 5, borderRadius: 3, backgroundColor: COLORS.gray300 },
+  dotActive: { width: 28, backgroundColor: COLORS.coral },
+  nextButton: { height: 58, paddingLeft: 21, paddingRight: 7, borderRadius: 21, backgroundColor: COLORS.primary, flexDirection: "row", alignItems: "center", justifyContent: "space-between", ...SHADOWS.md },
+  nextText: { color: COLORS.white, fontSize: 16, fontWeight: "700", fontFamily: TYPOGRAPHY.rounded },
+  arrowCircle: { width: 44, height: 44, borderRadius: 16, backgroundColor: COLORS.white, alignItems: "center", justifyContent: "center" },
 });

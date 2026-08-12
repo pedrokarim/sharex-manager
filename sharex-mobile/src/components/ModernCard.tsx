@@ -39,9 +39,9 @@ export const ModernCard: React.FC<ModernCardProps> = memo(
   }) => {
     const cardStyle = useMemo((): ViewStyle => {
       const baseStyle: ViewStyle = {
-        borderRadius: BORDER_RADIUS.lg,
+        borderRadius: BORDER_RADIUS.xl,
         backgroundColor: COMPONENT_COLORS.cardBackground,
-        marginBottom: SPACING.lg,
+        marginBottom: SPACING.xl,
         ...SHADOWS.sm,
       };
 
@@ -116,6 +116,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.textPrimary,
+    fontFamily: TYPOGRAPHY.rounded,
     marginBottom: SPACING.xs,
   },
   subtitle: {

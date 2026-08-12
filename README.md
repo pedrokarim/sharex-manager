@@ -104,6 +104,18 @@ fu default sharex-manager
 - [Bun](https://bun.sh/) - Runtime JavaScript
 - [Sharp](https://sharp.pixelplumbing.com/) - Traitement d'images
 
+## Versions et releases
+
+Le serveur et l'application mobile possèdent des versions indépendantes :
+
+- serveur : tags `server-vX.Y.Z` ;
+- mobile : tags `mobile-vX.Y.Z`.
+
+Les versions suivent SemVer et chaque composant possède son propre changelog.
+Consultez la [politique de versioning](docs/versioning.md), le
+[changelog serveur](CHANGELOG.md) et le
+[changelog mobile](sharex-mobile/CHANGELOG.md) avant de préparer une release.
+
 ## Structure du projet
 
 ```
