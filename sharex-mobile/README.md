@@ -168,23 +168,71 @@ src/
 
 ## 🚀 Déploiement
 
-### Build de production
+La version visible doit rester synchronisée entre `app.json`, `package.json` et
+`package-lock.json`. Les règles complètes, les tags `mobile-vX.Y.Z` et la
+checklist sont décrits dans la
+[politique de versioning](../docs/versioning.md) et le
+[changelog mobile](CHANGELOG.md).
 
-1. **Android** :
-   ```bash
-   expo build:android
-   ```
+### Builds Android
 
-2. **iOS** :
-   ```bash
-   expo build:ios
-   ```
+APK de preview :
+
+```bash
+npx eas-cli build --platform android --profile preview
+```
+
+APK de production installable :
+
+```bash
+npx eas-cli build --platform android --profile production-apk
+```
+
+Build identique exécuté localement, sans file d'attente EAS :
+
+```bash
+npx eas-cli build --platform android --profile production-apk --local \
+  --output dist/sharex-manager.apk
+```
+
+Le profil `production` produit l'artefact destiné au store, généralement un
+AAB :
+
+```bash
+npx eas-cli build --platform android --profile production
+```
+
+### Test et release avec GitHub Actions
+
+Après avoir ajouté le secret Actions `EXPO_TOKEN` au dépôt :
+
+```bash
+gh secret set EXPO_TOKEN
+```
+
+1. ouvrez **Actions → Mobile APK → Run workflow** ;
+2. le workflow construit un APK de test sans créer de tag ni de release ;
+3. téléchargez directement l'APK dans la section **Artifacts** du run.
+
+Une pull request interne vers `main` qui modifie l'application lance également
+ce build de test. Les pull requests issues de forks n'accèdent pas au secret
+Expo et ne lancent pas ce job signé.
+
+Une vraie release est déclenchée uniquement par un tag conforme, par exemple
+`mobile-v1.1.0`. La version et la section datée correspondante du
+[`CHANGELOG.md`](CHANGELOG.md) doivent être préparées avant de pousser le tag.
+
+### Build iOS
+
+```bash
+npx eas-cli build --platform ios --profile production
+```
 
 ### Publication sur les stores
 
 1. **Google Play Store** :
    - Créez un compte développeur
-   - Uploadez l'APK/AAB
+   - Uploadez l'AAB de production
    - Remplissez les informations de l'application
 
 2. **App Store** :

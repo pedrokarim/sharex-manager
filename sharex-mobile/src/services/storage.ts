@@ -7,11 +7,15 @@ const STORAGE_KEYS = {
   SERVER_URL: "server_url",
   API_KEY: "api_key",
   AUTO_UPLOAD: "auto_upload",
+  AUTO_UPLOAD_SCREENSHOTS: "auto_upload_screenshots",
   NOTIFICATIONS: "notifications",
   THEME: "theme",
   ALLOW_IMAGE_EDITING: "allow_image_editing",
   ONBOARDING_COMPLETED: "onboarding_completed",
 } as const;
+
+type SettingsListener = (settings: AppSettings | null) => void;
+const settingsListeners = new Set<SettingsListener>();
 
 export class StorageService {
   /**
@@ -78,6 +82,10 @@ export class StorageService {
           settings.autoUpload.toString()
         ),
         SecureStore.setItemAsync(
+          STORAGE_KEYS.AUTO_UPLOAD_SCREENSHOTS,
+          settings.autoUploadScreenshots.toString()
+        ),
+        SecureStore.setItemAsync(
           STORAGE_KEYS.NOTIFICATIONS,
           settings.notifications.toString()
         ),
@@ -87,6 +95,7 @@ export class StorageService {
           settings.allowImageEditing.toString()
         ),
       ]);
+      settingsListeners.forEach((listener) => listener(settings));
     } catch (error) {
       console.error("Erreur lors de la sauvegarde des paramètres:", error);
       throw error;
@@ -102,6 +111,7 @@ export class StorageService {
         serverUrl,
         apiKey,
         autoUpload,
+        autoUploadScreenshots,
         notifications,
         theme,
         allowImageEditing,
@@ -109,6 +119,7 @@ export class StorageService {
         SecureStore.getItemAsync(STORAGE_KEYS.SERVER_URL),
         SecureStore.getItemAsync(STORAGE_KEYS.API_KEY),
         SecureStore.getItemAsync(STORAGE_KEYS.AUTO_UPLOAD),
+        SecureStore.getItemAsync(STORAGE_KEYS.AUTO_UPLOAD_SCREENSHOTS),
         SecureStore.getItemAsync(STORAGE_KEYS.NOTIFICATIONS),
         SecureStore.getItemAsync(STORAGE_KEYS.THEME),
         SecureStore.getItemAsync(STORAGE_KEYS.ALLOW_IMAGE_EDITING),
@@ -122,7 +133,11 @@ export class StorageService {
         serverUrl,
         apiKey,
         autoUpload: autoUpload === "true",
-        notifications: notifications === "true",
+        autoUploadScreenshots: autoUploadScreenshots === "true",
+        // Les installations créées avant l'ajout de cette préférence n'ont
+        // encore aucune valeur. Dans ce cas, conserver le défaut historique
+        // (notifications activées) au lieu de les désactiver silencieusement.
+        notifications: notifications !== "false",
         theme: (theme as "light" | "dark" | "auto") || "auto",
         allowImageEditing: allowImageEditing === "true",
       };
@@ -199,11 +214,13 @@ export class StorageService {
         SecureStore.deleteItemAsync(STORAGE_KEYS.SERVER_URL),
         SecureStore.deleteItemAsync(STORAGE_KEYS.API_KEY),
         SecureStore.deleteItemAsync(STORAGE_KEYS.AUTO_UPLOAD),
+        SecureStore.deleteItemAsync(STORAGE_KEYS.AUTO_UPLOAD_SCREENSHOTS),
         SecureStore.deleteItemAsync(STORAGE_KEYS.NOTIFICATIONS),
         SecureStore.deleteItemAsync(STORAGE_KEYS.THEME),
         SecureStore.deleteItemAsync(STORAGE_KEYS.ALLOW_IMAGE_EDITING),
         SecureStore.deleteItemAsync(STORAGE_KEYS.ONBOARDING_COMPLETED),
       ]);
+      settingsListeners.forEach((listener) => listener(null));
     } catch (error) {
       console.error("Erreur lors de la suppression des données:", error);
       throw error;
@@ -227,5 +244,10 @@ export class StorageService {
       );
       return false;
     }
+  }
+
+  static subscribeToSettings(listener: SettingsListener): () => void {
+    settingsListeners.add(listener);
+    return () => settingsListeners.delete(listener);
   }
 }

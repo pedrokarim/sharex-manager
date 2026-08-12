@@ -1,0 +1,185 @@
+name: Mobile APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/mobile-release.yml"
+      - "scripts/release/mobile-release.mjs"
+      - "sharex-mobile/**"
+  push:
+    tags:
+      - "mobile-v*.*.*"
+
+concurrency:
+  group: mobile-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-android:
+    name: Build Android APK
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      artifact_name: ${{ steps.metadata.outputs.artifact_name }}
+      checksum_name: ${{ steps.metadata.outputs.checksum_name }}
+      prerelease: ${{ steps.metadata.outputs.prerelease }}
+      release_title: ${{ steps.metadata.outputs.release_title }}
+      version: ${{ steps.metadata.outputs.version }}
+
+    env:
+      CI: "1"
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx6g
+      NODE_OPTIONS: --max-old-space-size=6144
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sharex-mobile/package-lock.json
+          package-manager-cache: true
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Check Expo authentication
+        shell: bash
+        run: |
+          if [[ -z "$EXPO_TOKEN" ]]; then
+            echo "Le secret GitHub EXPO_TOKEN est absent."
+            echo "Créez un token Expo puis ajoutez-le dans Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Install Android build requirements
+        shell: bash
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006"
+
+      - name: Install mobile dependencies
+        working-directory: sharex-mobile
+        run: npm ci
+
+      - name: Validate TypeScript and Expo project
+        working-directory: sharex-mobile
+        run: |
+          npx tsc --noEmit
+          npx expo-doctor
+
+      - name: Validate mobile release metadata
+        id: metadata
+        shell: bash
+        run: |
+          arguments=(
+            --github-output "$GITHUB_OUTPUT"
+            --notes-output dist/RELEASE_NOTES.md
+          )
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            arguments+=(--tag "$GITHUB_REF_NAME")
+          fi
+          node scripts/release/mobile-release.mjs "${arguments[@]}"
+
+      - name: Build signed APK locally
+        working-directory: sharex-mobile
+        shell: bash
+        run: |
+          mkdir -p dist
+          npx --yes eas-cli@21.8.0 build \
+            --platform android \
+            --profile "${{ steps.metadata.outputs.profile }}" \
+            --local \
+            --non-interactive \
+            --output "dist/${{ steps.metadata.outputs.artifact_name }}"
+
+      - name: Verify APK signature and checksum
+        working-directory: sharex-mobile
+        shell: bash
+        run: |
+          apk_path="dist/${{ steps.metadata.outputs.artifact_name }}"
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" verify --verbose "$apk_path"
+          (
+            cd dist
+            sha256sum "${{ steps.metadata.outputs.artifact_name }}" \
+              > "${{ steps.metadata.outputs.checksum_name }}"
+          )
+
+      - name: Upload APK test artifact
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          path: sharex-mobile/dist/${{ steps.metadata.outputs.artifact_name }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test checksum artifact
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          path: sharex-mobile/dist/${{ steps.metadata.outputs.checksum_name }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload release assets
+        if: github.ref_type == 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: mobile-release-assets-${{ steps.metadata.outputs.version }}
+          path: |
+            sharex-mobile/dist/${{ steps.metadata.outputs.artifact_name }}
+            sharex-mobile/dist/${{ steps.metadata.outputs.checksum_name }}
+            dist/RELEASE_NOTES.md
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-release:
+    name: Publish GitHub Release
+    if: github.ref_type == 'tag'
+    needs: build-android
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download verified release assets
+        uses: actions/download-artifact@v8
+        with:
+          name: mobile-release-assets-${{ needs.build-android.outputs.version }}
+          path: release-assets
+
+      - name: Publish immutable GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_arguments=(
+            "$GITHUB_REF_NAME"
+            "release-assets/${{ needs.build-android.outputs.artifact_name }}"
+            "release-assets/${{ needs.build-android.outputs.checksum_name }}"
+            --verify-tag
+            --title "${{ needs.build-android.outputs.release_title }}"
+            --notes-file release-assets/RELEASE_NOTES.md
+          )
+          if [[ "${{ needs.build-android.outputs.prerelease }}" == "true" ]]; then
+            release_arguments+=(--prerelease)
+          fi
+          gh release create "${release_arguments[@]}"

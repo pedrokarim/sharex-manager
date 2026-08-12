@@ -1,7 +1,7 @@
 // Composant d'icône moderne avec @expo/vector-icons
 
 import React from "react";
-import { ViewStyle, TextStyle } from "react-native";
+import { StyleProp, TextStyle, View, ViewStyle } from "react-native";
 import {
   Ionicons,
   MaterialIcons,
@@ -15,7 +15,7 @@ interface IconProps {
   size?: number;
   color?: string;
   backgroundColor?: string;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   textStyle?: TextStyle;
   type?: "ionicons" | "material" | "antdesign" | "feather";
 }
@@ -108,4 +108,3 @@ export const IconButton: React.FC<IconButtonProps> = ({
     />
   );
 };
-

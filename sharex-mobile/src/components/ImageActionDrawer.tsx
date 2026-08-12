@@ -7,7 +7,7 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import {
   BottomSheetModal,
   BottomSheetBackdrop,
@@ -22,6 +22,7 @@ import {
   TYPOGRAPHY,
 } from "../config/design";
 import { UploadHistoryItem } from "../types";
+import { HistoryImage } from "./HistoryImage";
 
 interface ImageActionDrawerProps {
   onCopyLink?: (item: UploadHistoryItem) => void;
@@ -43,26 +44,21 @@ export const ImageActionDrawer = forwardRef<
     React.useState<UploadHistoryItem | null>(null);
 
   // Points d'ancrage du drawer (en pourcentage de la hauteur d'écran)
-  const snapPoints = useMemo(() => ["60%"], []);
+  const snapPoints = useMemo(() => ["55%"], []);
 
   // Exposer les méthodes via ref
   useImperativeHandle(ref, () => ({
     present: (item: UploadHistoryItem) => {
-      console.log("ImageActionDrawer present called with item:", item);
-      console.log("bottomSheetRef.current:", bottomSheetRef.current);
       setCurrentItem(item);
       bottomSheetRef.current?.present();
-      console.log("present() called on BottomSheetModal");
     },
     dismiss: () => {
-      console.log("ImageActionDrawer dismiss called");
       bottomSheetRef.current?.dismiss();
     },
   }));
 
   // Callback pour gérer les changements d'index
   const handleSheetChanges = useCallback((index: number) => {
-    console.log("BottomSheet index changed to:", index);
     if (index === -1) {
       setCurrentItem(null);
     }
@@ -70,7 +66,6 @@ export const ImageActionDrawer = forwardRef<
 
   // Callback pour gérer la fermeture du modal
   const handleDismiss = useCallback(() => {
-    console.log("BottomSheet dismissed");
     bottomSheetRef.current?.dismiss();
     setCurrentItem(null);
   }, []);
@@ -124,11 +119,13 @@ export const ImageActionDrawer = forwardRef<
         {/* Header with image */}
         <View style={styles.header}>
           <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: currentItem?.localUri }}
-              style={styles.image}
-              resizeMode="cover"
-            />
+            {currentItem && (
+              <HistoryImage
+                item={currentItem}
+                style={styles.image}
+                resizeMode="cover"
+              />
+            )}
           </View>
           <View style={styles.imageInfo}>
             <Text style={styles.filename} numberOfLines={2}>
@@ -266,8 +263,8 @@ const formatDate = (dateString: string): string => {
 const styles = StyleSheet.create({
   background: {
     backgroundColor: COMPONENT_COLORS.cardBackground,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: BORDER_RADIUS.xxl,
+    borderTopRightRadius: BORDER_RADIUS.xxl,
   },
   handleIndicator: {
     backgroundColor: COLORS.borderLight,
@@ -288,7 +285,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: 80,
     height: 80,
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     overflow: "hidden",
     marginRight: SPACING.md,
   },
@@ -304,6 +301,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.textPrimary,
+    fontFamily: TYPOGRAPHY.rounded,
     marginBottom: 4,
   },
   fileSize: {
@@ -316,7 +314,12 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
   },
   closeButton: {
-    padding: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.background,
     marginLeft: SPACING.sm,
   },
   actions: {
@@ -327,14 +330,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
     marginBottom: SPACING.sm,
+    backgroundColor: COLORS.background,
   },
   actionIconContainer: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.primary + "20",
+    borderRadius: 16,
+    backgroundColor: COLORS.primaryBg,
     alignItems: "center",
     justifyContent: "center",
     marginRight: SPACING.md,
@@ -346,6 +350,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
     color: COLORS.textPrimary,
+    fontFamily: TYPOGRAPHY.rounded,
     marginBottom: 2,
   },
   actionDescription: {

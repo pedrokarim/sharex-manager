@@ -49,8 +49,9 @@ export const ModernButton: React.FC<ModernButtonProps> = ({
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      borderRadius: BORDER_RADIUS.lg,
+      borderRadius: BORDER_RADIUS.xl,
       marginBottom: SPACING.md,
+      minHeight: 48,
     };
 
     // Variantes de couleur
@@ -68,9 +69,8 @@ export const ModernButton: React.FC<ModernButtonProps> = ({
         baseStyle.backgroundColor = COMPONENT_COLORS.buttonDanger;
         break;
       case "ghost":
-        baseStyle.backgroundColor = "transparent";
-        baseStyle.borderWidth = 1;
-        baseStyle.borderColor = COLORS.border;
+        baseStyle.backgroundColor = COLORS.surface;
+        baseStyle.borderWidth = 0;
         break;
     }
 
@@ -101,6 +101,7 @@ export const ModernButton: React.FC<ModernButtonProps> = ({
   const getTextStyle = (): TextStyle => {
     const baseStyle: TextStyle = {
       fontWeight: TYPOGRAPHY.fontWeight.medium,
+      fontFamily: TYPOGRAPHY.rounded,
       textAlign: "center",
       color: COLORS.textInverse,
     };
@@ -108,13 +109,13 @@ export const ModernButton: React.FC<ModernButtonProps> = ({
     // Tailles de texte
     switch (size) {
       case "sm":
-        baseStyle.fontSize = TYPOGRAPHY.fontSize.xs;
-        break;
-      case "md":
         baseStyle.fontSize = TYPOGRAPHY.fontSize.sm;
         break;
-      case "lg":
+      case "md":
         baseStyle.fontSize = TYPOGRAPHY.fontSize.md;
+        break;
+      case "lg":
+        baseStyle.fontSize = TYPOGRAPHY.fontSize.lg;
         break;
     }
 

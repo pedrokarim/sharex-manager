@@ -71,6 +71,7 @@ export const QRCodeScannerScreen: React.FC<QRCodeScannerScreenProps> = ({
         apiKey: config.apiKey,
         allowImageEditing: true,
         autoUpload: false,
+        autoUploadScreenshots: false,
         notifications: true,
         theme: "auto",
       };
@@ -166,7 +167,7 @@ export const QRCodeScannerScreen: React.FC<QRCodeScannerScreenProps> = ({
             <Icon
               name="arrow-left"
               size={24}
-              color={COLORS.background}
+              color={COLORS.primary}
               type="feather"
             />
           </TouchableOpacity>
@@ -257,6 +258,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.textPrimary,
+    fontFamily: TYPOGRAPHY.rounded,
   },
   placeholder: {
     width: 40,
@@ -286,10 +288,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 30,
     height: 30,
-    borderColor: COLORS.primary,
-    borderWidth: 3,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
+    borderColor: COLORS.coral,
+    borderWidth: 4,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
     borderRightWidth: 0,
     borderBottomWidth: 0,
   },
@@ -320,14 +322,14 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.background,
     textAlign: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(49, 16, 79, 0.82)",
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
-    borderRadius: 20,
+    borderRadius: 18,
   },
   bottomContainer: {
     padding: SPACING.lg,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    backgroundColor: COLORS.primaryDark,
   },
   actionButton: {
     marginBottom: SPACING.sm,

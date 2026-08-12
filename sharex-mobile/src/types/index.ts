@@ -17,6 +17,7 @@ export interface ApiKey {
 export interface UploadResponse {
   success: boolean;
   url?: string;
+  thumbnailUrl?: string;
   filename?: string;
   error?: string;
 }
@@ -40,7 +41,8 @@ export interface UploadHistoryItem {
   id: string;
   filename: string;
   url: string; // URL du serveur pour le partage
-  localUri: string; // URI locale pour l'affichage
+  thumbnailUrl?: string; // Miniature distante générée par le serveur
+  localUri: string; // URI locale temporaire, utilisée uniquement en repli
   uploadedAt: string;
   size: number;
   type: string;
@@ -52,6 +54,7 @@ export interface AppSettings {
   serverUrl: string;
   apiKey: string;
   autoUpload: boolean;
+  autoUploadScreenshots: boolean;
   notifications: boolean;
   theme: "light" | "dark" | "auto";
   allowImageEditing: boolean;

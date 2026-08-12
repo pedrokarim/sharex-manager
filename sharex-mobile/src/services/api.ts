@@ -43,56 +43,77 @@ export class ShareXApiService {
    */
   async uploadImage(
     imageUri: string,
-    filename: string
+    filename: string,
+    mimeType: string = "image/jpeg"
   ): Promise<UploadResponse> {
-    try {
-      // Créer un AbortController pour gérer le timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+    return this.uploadFile(imageUri, filename, mimeType);
+  }
 
-      // Créer un FormData avec l'image
+  /** Upload une image ou un fichier reçu depuis le menu de partage. */
+  async uploadFile(
+    fileUri: string,
+    filename: string,
+    mimeType: string = "application/octet-stream",
+    onProgress?: (progress: number) => void
+  ): Promise<UploadResponse> {
+    return new Promise((resolve) => {
       const formData = new FormData();
-
-      // Pour React Native, on doit créer un objet avec les propriétés requises
       formData.append("file", {
-        uri: imageUri,
+        uri: fileUri,
         name: filename,
-        type: "image/jpeg", // Type par défaut, peut être ajusté selon le fichier
+        type: mimeType,
       } as any);
 
-      const response = await fetch(`${this.baseUrl}/api/upload`, {
-        method: "POST",
-        headers: {
-          "x-api-key": this.apiKey,
-          "Content-Type": "multipart/form-data",
-        },
-        body: formData,
-        signal: controller.signal,
-      });
+      const request = new XMLHttpRequest();
+      request.open("POST", `${this.baseUrl}/api/upload`);
+      request.setRequestHeader("x-api-key", this.apiKey);
+      request.timeout = API_TIMEOUT;
 
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return {
-          success: false,
-          error: errorData.error || `Erreur HTTP: ${response.status}`,
-        };
-      }
-
-      const data = await response.json();
-      return {
-        success: true,
-        url: data.url,
-        filename: data.filename,
+      request.upload.onprogress = (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          onProgress?.(Math.min(event.loaded / event.total, 0.99));
+        }
       };
-    } catch (error) {
-      console.error("Erreur lors de l'upload:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Erreur inconnue",
+
+      request.onload = () => {
+        let data: any = {};
+        try {
+          data = JSON.parse(request.responseText || "{}");
+        } catch {
+          data = {};
+        }
+
+        if (request.status < 200 || request.status >= 300) {
+          resolve({
+            success: false,
+            error: data.error || `Erreur HTTP: ${request.status}`,
+          });
+          return;
+        }
+
+        onProgress?.(1);
+        resolve({
+          success: true,
+          url: data.url,
+          thumbnailUrl: data.thumbnail_url || undefined,
+          filename:
+            data.filename ||
+            (typeof data.url === "string"
+              ? data.url.split("/").pop()?.split("?")[0]
+              : undefined),
+        });
       };
-    }
+
+      const resolveNetworkError = (message: string) =>
+        resolve({ success: false, error: message });
+
+      request.onerror = () =>
+        resolveNetworkError("Le serveur n’a pas pu recevoir ce fichier.");
+      request.ontimeout = () =>
+        resolveNetworkError("L’envoi a dépassé le délai autorisé.");
+      request.onabort = () => resolveNetworkError("L’envoi a été annulé.");
+      request.send(formData);
+    });
   }
 
   /**
@@ -137,6 +158,9 @@ export const getApiService = (config?: ServerConfig): ShareXApiService => {
     throw new Error(
       "Service API non initialisé. Fournissez une configuration."
     );
+  }
+  if (config) {
+    apiServiceInstance.updateConfig(config);
   }
   return apiServiceInstance;
 };

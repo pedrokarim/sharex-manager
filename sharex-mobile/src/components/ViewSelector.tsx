@@ -30,14 +30,6 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
           }
           type="ionicons"
         />
-        <Text
-          style={[
-            styles.buttonText,
-            currentView === "grid" && styles.activeButtonText,
-          ]}
-        >
-          Grille
-        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -52,14 +44,6 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
           }
           type="ionicons"
         />
-        <Text
-          style={[
-            styles.buttonText,
-            currentView === "list" && styles.activeButtonText,
-          ]}
-        >
-          Liste
-        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -79,14 +63,6 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
           }
           type="ionicons"
         />
-        <Text
-          style={[
-            styles.buttonText,
-            currentView === "mini-grid" && styles.activeButtonText,
-          ]}
-        >
-          Mini
-        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -95,22 +71,22 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    backgroundColor: COLORS.backgroundSecondary,
-    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.round,
     padding: 4,
     flex: 0,
-    maxWidth: 250,
+    maxWidth: 156,
     gap: 4,
   },
   button: {
     flex: 1,
     paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: BORDER_RADIUS.round,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
-    minHeight: 40,
+    minHeight: 38,
   },
   activeButton: {
     backgroundColor: COLORS.primary,

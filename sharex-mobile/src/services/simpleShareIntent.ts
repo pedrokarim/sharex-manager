@@ -1,7 +1,5 @@
 // Service simplifié pour les Share Intents
 
-import * as Sharing from "expo-sharing";
-import * as FileSystem from "expo-file-system";
 import { ImageInfo } from "../types";
 
 export class SimpleShareIntentService {
@@ -61,10 +59,10 @@ export class SimpleShareIntentService {
   static getTestInstructions(): string[] {
     return [
       "1. Ouvrez votre galerie d'images",
-      "2. Sélectionnez une image",
+      "2. Sélectionnez une ou plusieurs images",
       "3. Appuyez sur le bouton 'Partager'",
       "4. Choisissez 'ShareX Manager' dans la liste",
-      "5. L'image devrait s'ouvrir directement dans l'app !",
+      "5. Les fichiers doivent s'ouvrir ensemble dans l'écran d'envoi",
     ];
   }
 

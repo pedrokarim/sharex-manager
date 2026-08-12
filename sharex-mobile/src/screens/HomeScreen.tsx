@@ -72,9 +72,17 @@ export const HomeScreen: React.FC<NavigationProps> = ({ navigation }) => {
       const settings = await StorageService.getSettings();
       const allowEditing = settings?.allowImageEditing || false;
 
-      const image = await ImageService.pickImageFromGallery(allowEditing);
-      if (image) {
-        navigation.navigate("Upload", { image });
+      const images = allowEditing
+        ? await ImageService.pickImageFromGallery(true).then((image) =>
+            image ? [image] : []
+          )
+        : await ImageService.pickMultipleImages();
+      if (images.length) {
+        navigation.navigate("Upload", {
+          images,
+          autoStart: settings?.autoUpload === true,
+          source: "picker",
+        });
       }
     } catch (error) {
       console.error("Erreur lors de la sélection d'image:", error);
@@ -96,7 +104,12 @@ export const HomeScreen: React.FC<NavigationProps> = ({ navigation }) => {
       // Prendre la photo directement, l'utilisateur pourra choisir de modifier dans l'écran d'upload
       const image = await ImageService.takePhoto(false);
       if (image) {
-        navigation.navigate("Upload", { image });
+        const settings = await StorageService.getSettings();
+        navigation.navigate("Upload", {
+          images: [image],
+          autoStart: settings?.autoUpload === true,
+          source: "camera",
+        });
       }
     } catch (error) {
       console.error("Erreur lors de la prise de photo:", error);
