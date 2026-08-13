@@ -177,11 +177,11 @@ jobs:
         run: |
           release_arguments=(
             "$GITHUB_REF_NAME"
-            "release-assets/${{ needs.build-android.outputs.artifact_name }}"
-            "release-assets/${{ needs.build-android.outputs.checksum_name }}"
+            "release-assets/sharex-mobile/dist/${{ needs.build-android.outputs.artifact_name }}"
+            "release-assets/sharex-mobile/dist/${{ needs.build-android.outputs.checksum_name }}"
             --verify-tag
             --title "${{ needs.build-android.outputs.release_title }}"
-            --notes-file release-assets/RELEASE_NOTES.md
+            --notes-file release-assets/dist/RELEASE_NOTES.md
           )
           if [[ "${{ needs.build-android.outputs.prerelease }}" == "true" ]]; then
             release_arguments+=(--prerelease)
