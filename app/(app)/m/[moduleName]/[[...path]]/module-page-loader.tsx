@@ -24,6 +24,14 @@ const MODULE_PAGES: Record<
       ssr: false,
       loading: LoadingSpinner,
     }),
+    collections: dynamic(
+      () => import("@/modules/ai-image-gen/pages/collections"),
+      { ssr: false, loading: LoadingSpinner }
+    ),
+    pipelines: dynamic(() => import("@/modules/ai-image-gen/pages/pipelines"), {
+      ssr: false,
+      loading: LoadingSpinner,
+    }),
     settings: dynamic(() => import("@/modules/ai-image-gen/pages/settings"), {
       ssr: false,
       loading: LoadingSpinner,

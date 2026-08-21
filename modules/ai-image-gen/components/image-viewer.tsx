@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
-import { getModelSpec } from "../lib/models";
 import {
   callModule,
   downloadImage,
@@ -83,7 +82,6 @@ export function ImageViewer({
   if (!shot) return null;
 
   const { item, file } = shot;
-  const spec = getModelSpec(item.model);
   const alreadyInGallery = Boolean(item.savedToGallery?.[file]);
 
   const handleCopyPrompt = async () => {
@@ -104,7 +102,7 @@ export function ImageViewer({
     setBusy(true);
     try {
       const result = await callModule<{ fileName?: string }>(
-        "saveToGallery",
+        "sendToGallery",
         item.id,
         file
       );
@@ -240,7 +238,7 @@ export function ImageViewer({
               <div className="col-span-2">
                 <dt className="text-xs text-muted-foreground">Modèle</dt>
                 <dd className="mt-0.5 font-medium">
-                  {spec?.label ?? item.model}
+                  {item.modelLabel ?? item.model}
                 </dd>
               </div>
               <div>

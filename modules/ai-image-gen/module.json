@@ -1,7 +1,7 @@
 {
   "name": "ai-image-gen",
   "version": "2.0.0",
-  "description": "Generez des images par intelligence artificielle",
+  "description": "Studio de generation d'images : agents CLI connectes ou cles API",
   "author": "ShareX Manager",
   "enabled": true,
   "entry": "index.process.ts",
@@ -10,17 +10,21 @@
   "hasUI": false,
   "supportedFileTypes": [],
   "settings": {
-    "default_model": "gpt-image-1",
+    "default_model": "codex/gpt-image-2",
     "default_size": "1024x1024",
     "default_quality": "medium",
     "default_count": 1,
     "save_to_gallery": false,
-    "notes_preprompt": ""
+    "notes_preprompt": "",
+    "default_negative_prompt": "",
+    "max_parallel_jobs": 2
   },
   "pages": [
     { "path": "", "title": "Studio", "component": "pages/generate.tsx" },
     { "path": "library", "title": "Bibliotheque", "component": "pages/library.tsx" },
-    { "path": "settings", "title": "Configuration", "component": "pages/settings.tsx" }
+    { "path": "collections", "title": "Series", "component": "pages/collections.tsx" },
+    { "path": "pipelines", "title": "Pipelines", "component": "pages/pipelines.tsx" },
+    { "path": "settings", "title": "Moteurs", "component": "pages/settings.tsx" }
   ],
   "navItems": [
     { "title": "AI Image Gen", "icon": "Sparkles" }
