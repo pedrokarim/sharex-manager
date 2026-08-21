@@ -23,6 +23,7 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   repères visuels à chaque scène.
 - Module AI Image Gen : consignes négatives, variantes et agrandissement local
   depuis la carte d'une génération.
+- Module AI Image Gen : icône dédiée, produite par le module lui-même.
 
 ### Changed
 
@@ -32,12 +33,21 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 - Module AI Image Gen : le studio dépose un travail au lieu d'attendre la
   réponse HTTP, ce qu'une génération par agent (une minute ou plus) ne permettait
   pas de tenir.
+- Page « Gestion des modules » : catégorie ramenée à côté du nom au lieu de
+  chevaucher l'interrupteur, quatrième colonne sur très large écran, et raccourci
+  « Ouvrir » sur les modules qui exposent des pages.
 
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+- Page « Gestion des modules » : les actions des cartes se plaçaient à une
+  hauteur différente dans chaque carte d'une même rangée, avec un vide sous
+  elles. Le pied de carte est désormais ancré en bas.
+- Carte d'installation d'un module : couleurs codées en dur qui ignoraient le
+  thème sombre, et sélecteur d'onglets à un seul onglet.
 
 ### Security
 

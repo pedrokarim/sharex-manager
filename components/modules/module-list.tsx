@@ -139,9 +139,9 @@ export const ModuleList = () => {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-6">
       {Array.isArray(modules) && modules.length > 0 && (
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs
             value={filter}
             onValueChange={(v) => setFilter(v as typeof filter)}
@@ -184,7 +184,7 @@ export const ModuleList = () => {
 
       {Array.isArray(modules) && modules.length > 0 ? (
         filteredModules.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {filteredModules.map((module) => (
               <ModuleCard
                 key={module.name}
@@ -238,7 +238,7 @@ export const ModuleList = () => {
         </Empty>
       )}
 
-      <div id="module-upload" className="mt-6 sm:mt-8">
+      <div id="module-upload" className="border-t pt-6">
         <ModuleUpload onUploadSuccess={fetchModules} />
       </div>
     </div>

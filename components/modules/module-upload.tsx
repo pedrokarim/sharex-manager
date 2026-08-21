@@ -12,10 +12,10 @@ import {
 } from "@/components/ui/card";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
-import { Upload, X, Image as ImageIcon } from "lucide-react";
+import { FileArchive, Upload, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 interface ModuleUploadProps {
   onUploadSuccess: () => void;
@@ -25,7 +25,6 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [iconUrl, setIconUrl] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
-  const [iconTab, setIconTab] = useState<string>("url");
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -95,15 +94,16 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
           Téléchargez un fichier ZIP contenant un module compatible
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         {!file ? (
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
+            className={cn(
+              "cursor-pointer rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
               isDragActive
                 ? "border-primary bg-primary/5"
-                : "border-gray-300 hover:border-primary"
-            }`}
+                : "border-border hover:border-primary/60 hover:bg-muted/40"
+            )}
           >
             <input {...getInputProps()} />
             <Upload className="mx-auto h-10 w-10 text-muted-foreground" />
@@ -117,88 +117,69 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
             </p>
           </div>
         ) : (
-          <div className="flex items-center justify-between p-3 border rounded-md">
-            <div className="flex items-center space-x-3">
-              <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
-                <Upload className="h-5 w-5 text-primary" />
+          <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <FileArchive className="h-5 w-5 text-primary" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate dark:text-gray-100">
-                  {file.name}
-                </p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{file.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {(file.size / 1024).toFixed(2)} KB
+                  {(file.size / 1024).toFixed(0)} Ko
                 </p>
               </div>
             </div>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Retirer le fichier"
               onClick={handleRemoveFile}
-              className="text-gray-400 hover:text-gray-500"
+              className="h-8 w-8 shrink-0"
             >
-              <X className="h-5 w-5" />
-            </button>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         )}
 
         {file && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <ImageIcon className="h-5 w-5 text-muted-foreground" />
-              <h3 className="text-sm font-medium">
-                Icône du module (optionnel)
-              </h3>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1 space-y-2">
+              <Label htmlFor="icon-url">Icône du module (facultatif)</Label>
+              <Input
+                id="icon-url"
+                placeholder="https://exemple.com/icone.png"
+                value={iconUrl}
+                onChange={(e) => setIconUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                URL d&apos;une image carrée. Sans elle, le module reçoit une
+                icône générique.
+              </p>
             </div>
 
-            <Tabs
-              defaultValue="url"
-              onValueChange={setIconTab}
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-1">
-                <TabsTrigger value="url">URL de l'image</TabsTrigger>
-              </TabsList>
-              <TabsContent value="url" className="mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="icon-url">URL de l'icône</Label>
-                  <Input
-                    id="icon-url"
-                    placeholder="https://exemple.com/icone.png"
-                    value={iconUrl}
-                    onChange={(e) => setIconUrl(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Entrez l'URL d'une image pour l'utiliser comme icône du
-                    module
-                  </p>
-                </div>
-              </TabsContent>
-            </Tabs>
-
             {iconUrl && (
-              <div className="mt-4 flex justify-center">
-                <div className="h-16 w-16 rounded-md overflow-hidden border">
-                  <img
-                    src={iconUrl}
-                    alt="Aperçu de l'icône"
-                    className="h-full w-full object-cover"
-                    onError={() => {
-                      toast.error("Impossible de charger l'image");
-                    }}
-                  />
-                </div>
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={iconUrl}
+                  alt="Aperçu de l'icône"
+                  className="h-full w-full object-cover"
+                  onError={() => toast.error("Impossible de charger l'image")}
+                />
               </div>
             )}
           </div>
         )}
+
       </CardContent>
-      <CardFooter>
+      <CardFooter className="justify-end">
         <Button
           onClick={handleUpload}
           disabled={!file || isUploading}
-          className="w-full"
+          className="w-full sm:w-auto"
         >
-          {isUploading ? "Installation en cours..." : "Installer le module"}
+          {isUploading ? "Installation en cours…" : "Installer le module"}
         </Button>
       </CardFooter>
     </Card>
