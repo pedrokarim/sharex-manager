@@ -17,7 +17,11 @@ export default async function RootLayout({
   }
 
   return (
+    // h-svh + overflow-hidden : la fenêtre ne défile pas. Sans ça, dès que le
+    // contenu dépasse, c'est le document entier qui scrolle et l'encart perd sa
+    // forme — coins arrondis et marges sortent de l'écran.
     <SidebarProvider
+      className="h-svh overflow-hidden"
       style={
         {
           "--sidebar-width": "calc(var(--spacing) * 72)",
@@ -26,9 +30,14 @@ export default async function RootLayout({
       }
     >
       <AppSidebar variant="inset" />
-      <SidebarInset>
+      {/* L'encart garde sa hauteur et rogne ce qui dépasse : c'est lui qui
+          définit la boîte, l'en-tête y reste fixe. */}
+      <SidebarInset className="min-h-0 overflow-hidden">
         <SidebarHeader />
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">{children}</div>
+        {/* Le défilement a lieu ici, à l'intérieur de la boîte. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pt-0">
+          {children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

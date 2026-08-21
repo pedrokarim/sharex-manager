@@ -10,6 +10,9 @@
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://pedrokarim.github.io/sharex-manager/img/home.png" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖼️</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg: #0c0a14;
@@ -21,12 +24,14 @@
       --accent-2: #7c5cff;
       --accent-3: #c4b5fd;
       --radius: 14px;
+      --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: var(--font-sans);
       background: radial-gradient(1100px 540px at 50% -8%, #241b3d 0%, var(--bg) 58%);
       color: var(--fg);
       line-height: 1.65;
@@ -35,7 +40,8 @@
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     .wrap { max-width: 1040px; margin: 0 auto; padding: 0 22px; }
-    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    code, pre, kbd { font-family: var(--font-mono); }
+    h1, h2, h3 { letter-spacing: -0.03em; }
 
     /* nav */
     nav {

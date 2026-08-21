@@ -24,7 +24,8 @@
     "reset": "Reset",
     "preview": "Preview",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "open": "Open"
   },
   "navigation": {
     "home": "Home",
@@ -532,89 +533,7 @@
       "api_doc_optional": "Optional"
     }
   },
-  "home": {
-    "title": "ShareX Manager",
-    "subtitle": "Manage your screenshots and images with ease",
-    "new": {
-      "features_eyebrow": "Why ShareX Manager",
-      "features_title": "Everything to manage your uploads",
-      "features_subtitle": "A modern, fast and customizable interface, built for your workflow.",
-      "code_eyebrow": "Tailwind-style",
-      "code_window_title": "Configuration example",
-      "code_tab_sharex": "ShareX",
-      "code_tab_curl": "cURL",
-      "code_copy_sharex": "Copy ShareX config",
-      "code_copy_curl": "Copy cURL command",
-      "showcase_eyebrow": "Preview",
-      "showcase_aria_label": "UI preview",
-      "showcase_title": "A glimpse of the experience",
-      "showcase_subtitle": "Screens and UI states — clean in light and dark.",
-      "tools_all_title": "All tools",
-      "tools_all_description": "Explore all tools and bonus features.",
-      "coming_soon_title": "More tools",
-      "coming_soon_description": "New features are coming soon to boost your workflow.",
-      "coming_soon_badge": "Coming soon",
-      "available_badge": "Available",
-      "cta_title": "Ready to centralize your uploads?",
-      "cta_subtitle": "Gallery, security, organization and tools — with a theme that fits you.",
-      "stats_uploads": "Uploads",
-      "stats_storage": "Storage",
-      "stats_modules": "Modules"
-    },
-    "cta": {
-      "gallery": "View my gallery",
-      "configure": "Configure ShareX"
-    },
-    "features": {
-      "upload": {
-        "title": "Fast upload",
-        "description": "Upload your images instantly via ShareX",
-        "fast": "One-click upload",
-        "history": "Complete history"
-      },
-      "security": {
-        "title": "Security",
-        "description": "Your images are protected and private",
-        "private": "Private access",
-        "api_keys": "Secure API keys"
-      },
-      "management": {
-        "title": "Management",
-        "description": "Organize and manage your images easily",
-        "customization": "Customization",
-        "stats": "Detailed statistics"
-      },
-      "tools": {
-        "title": "Tools",
-        "description": "Additional features for your images",
-        "minecraft": "Minecraft skin generator",
-        "more": "And much more coming"
-      }
-    },
-    "tools_section": {
-      "title": "Additional tools",
-      "subtitle": "Discover our bonus features",
-      "cta": "View all tools"
-    },
-    "configuration": {
-      "title": "ShareX Configuration",
-      "badge": "Easy",
-      "intro": "Configure ShareX to use your personal instance:",
-      "steps": {
-        "step1": "Download and install ShareX",
-        "step2": "Open ShareX settings",
-        "step3": "Add a new destination with these parameters:",
-        "step4": "Test your configuration by taking a screenshot"
-      },
-      "config_items": {
-        "request_url": "Request URL",
-        "method": "Method",
-        "file_form": "File field name"
-      },
-      "download_config": "Download config",
-      "get_api_key": "Get API key"
-    }
-  },
+
   "loading": {
     "messages": {
       "preparing_gallery": "Preparing your gallery...",
@@ -666,6 +585,68 @@
   "home": {
     "title": "ShareX Manager",
     "subtitle": "A modern and powerful interface to manage your screenshots and files uploaded via ShareX",
+    "landing": {
+      "hero": {
+        "title": "Your screenshots,",
+        "title_accent": "on your server.",
+        "subtitle": "The landing place for everything you capture: upload with a shortcut, get a public link instantly, plus albums, statistics and API keys. On your server, not someone else's.",
+        "compatibility": "ShareX · Flameshot · Android · Permanent links · No ads",
+        "screenshot_alt": "The ShareX Manager gallery, images grouped by month",
+        "cta_primary": "Explore the catalog",
+        "cta_secondary": "Sign in",
+        "stat_images": "images hosted",
+        "stat_storage": "stored",
+        "stat_albums": "public albums"
+      },
+      "flow": {
+        "kicker": "The flow",
+        "title": "From keyboard shortcut to public link",
+        "description": "ShareX on Windows, Flameshot on Linux, native sharing from the Android app: everything lands in the same place, indexed right away.",
+        "bullets": [
+          "Link copied to the clipboard as soon as the upload finishes",
+          "Thumbnails, search and filtering by date",
+          "Private albums, or published in one click"
+        ],
+        "image_alt": "The API keys management screen"
+      },
+      "catalog": {
+        "kicker": "The catalog",
+        "title": "A storefront, separate from your private space",
+        "description": "The public catalog has its own navigation, albums and pages. You decide exactly what goes out.",
+        "bullets": [
+          "Albums published one by one",
+          "Direct links and Discord embeds",
+          "Customisable theme and branding"
+        ],
+        "image_alt": "The public catalog home page",
+        "cta": "Browse the catalog"
+      },
+      "wall": {
+        "kicker": "The wall",
+        "title": "{count} images and counting",
+        "cta": "Browse every image"
+      },
+      "setup": {
+        "kicker": "Getting started",
+        "title": "Up and running in three steps",
+        "subtitle": "No sign-up, no third-party service. One Docker image, one configuration file, and your Print Screen key becomes a shareable link.",
+        "window_title": "sharex-manager.sxcu",
+        "steps": [
+          {
+            "title": "Deploy",
+            "description": "One docker compose up -d and the instance is live, SQLite database included."
+          },
+          {
+            "title": "Create a key",
+            "description": "One API key per machine, revocable, with its own permissions."
+          },
+          {
+            "title": "Import the config",
+            "description": "ShareX, Flameshot or the Android app point at your domain."
+          }
+        ]
+      }
+    },
     "new": {
       "features_eyebrow": "Why ShareX Manager",
       "features_title": "Everything to manage your uploads",
@@ -714,7 +695,18 @@
         "description": "Intuitive interface with advanced features to organize and analyze your uploads.",
         "customization": "Complete customization",
         "stats": "Detailed statistics"
+      },
+      "tools": {
+        "title": "Tools",
+        "description": "Additional features for your images",
+        "minecraft": "Minecraft skin generator",
+        "more": "And much more coming"
       }
+    },
+    "tools_section": {
+      "title": "Additional tools",
+      "subtitle": "Discover our bonus features",
+      "cta": "View all tools"
     },
     "configuration": {
       "title": "ShareX Configuration",
@@ -785,23 +777,37 @@
   "admin": {
     "title": "Administration",
     "description": "Manage administration settings for your ShareX Manager application",
+    "soon": "Soon",
     "sections": {
       "users": {
         "title": "User Management",
         "badge": "Users",
-        "description": "Manage users and their permissions"
+        "description": "Manage accounts, their roles and their permissions."
       },
       "logs": {
         "title": "System Logs",
-        "description": "View logs and system activity"
+        "badge": "Observability",
+        "description": "Browse logs and system activity."
+      },
+      "theme": {
+        "title": "Global Theme",
+        "badge": "Design system",
+        "description": "Publish the site visual baseline and prepare upcoming branding extensions."
       },
       "system": {
         "title": "System Configuration",
-        "description": "Manage system settings and upload configuration"
+        "badge": "Infrastructure",
+        "description": "Manage system settings and upload configuration."
+      },
+      "modules": {
+        "title": "Module Management",
+        "badge": "Extensions",
+        "description": "Manage installed modules and their dependencies."
       },
       "security": {
-        "title": "Security (Coming soon)",
-        "description": "Configure advanced security settings"
+        "title": "Security",
+        "badge": "Protection",
+        "description": "Configure advanced security settings."
       }
     },
     "security": {

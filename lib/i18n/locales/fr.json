@@ -25,7 +25,8 @@
     "preview": "Aperçu",
     "yes": "Oui",
     "no": "Non",
-    "apply": "Appliquer"
+    "apply": "Appliquer",
+    "open": "Ouvrir"
   },
   "navigation": {
     "home": "Accueil",
@@ -551,6 +552,68 @@
   "home": {
     "title": "ShareX Manager",
     "subtitle": "Gérez vos captures d'écran et images avec facilité",
+    "landing": {
+      "hero": {
+        "title": "Vos captures,",
+        "title_accent": "chez vous.",
+        "subtitle": "Le point de chute de tout ce que vous capturez : upload en un raccourci, lien public immédiat, albums, statistiques et clés d'API. Sur votre serveur, pas celui d'un autre.",
+        "compatibility": "ShareX · Flameshot · Android · Liens permanents · Sans publicité",
+        "screenshot_alt": "La galerie de ShareX Manager, images classées par mois",
+        "cta_primary": "Explorer le catalogue",
+        "cta_secondary": "Se connecter",
+        "stat_images": "images hébergées",
+        "stat_storage": "stockés",
+        "stat_albums": "albums publics"
+      },
+      "flow": {
+        "kicker": "Le flux",
+        "title": "Du raccourci clavier au lien public",
+        "description": "ShareX sur Windows, Flameshot sur Linux, l'app Android en partage natif : tout arrive au même endroit, immédiatement indexé.",
+        "bullets": [
+          "Lien copié dans le presse-papiers dès la fin de l'upload",
+          "Miniatures, recherche et filtres par date",
+          "Albums privés ou publiés en un clic"
+        ],
+        "image_alt": "L'écran de gestion des clés d'API"
+      },
+      "catalog": {
+        "kicker": "Le catalogue",
+        "title": "Une vitrine, séparée de votre espace privé",
+        "description": "Le catalogue public a sa propre navigation, ses albums et ses pages. Vous choisissez exactement ce qui sort.",
+        "bullets": [
+          "Albums publiables individuellement",
+          "Liens directs et intégrations Discord",
+          "Thème et branding personnalisables"
+        ],
+        "image_alt": "La page d'accueil du catalogue public",
+        "cta": "Voir le catalogue"
+      },
+      "wall": {
+        "kicker": "Le mur",
+        "title": "{count} images et ça continue",
+        "cta": "Parcourir toutes les images"
+      },
+      "setup": {
+        "kicker": "Mise en route",
+        "title": "Opérationnel en trois étapes",
+        "subtitle": "Aucune inscription, aucun service tiers. Une image Docker, un fichier de configuration, et votre touche Impr. écran devient un lien partageable.",
+        "window_title": "sharex-manager.sxcu",
+        "steps": [
+          {
+            "title": "Déployez",
+            "description": "Un docker compose up -d et l'instance tourne, base SQLite incluse."
+          },
+          {
+            "title": "Générez une clé",
+            "description": "Une clé d'API par machine, révocable, avec ses propres permissions."
+          },
+          {
+            "title": "Importez la configuration",
+            "description": "ShareX, Flameshot ou l'app Android pointent vers votre domaine."
+          }
+        ]
+      }
+    },
     "new": {
       "features_eyebrow": "Pourquoi ShareX Manager",
       "features_title": "Tout pour gérer vos uploads",
@@ -729,23 +792,37 @@
   "admin": {
     "title": "Administration",
     "description": "Gérez les paramètres d'administration de votre application ShareX Manager",
+    "soon": "Bientôt",
     "sections": {
       "users": {
         "title": "Gestion des utilisateurs",
         "badge": "Utilisateurs",
-        "description": "Gérez les utilisateurs et leurs permissions"
+        "description": "Gérez les comptes, leurs rôles et leurs permissions."
       },
       "logs": {
         "title": "Logs système",
-        "description": "Consultez les logs et l'activité du système"
+        "badge": "Observabilité",
+        "description": "Consultez les logs et l'activité du système."
+      },
+      "theme": {
+        "title": "Thème global",
+        "badge": "Design system",
+        "description": "Publiez la base visuelle du site et préparez les futures extensions de branding."
       },
       "system": {
         "title": "Configuration système",
-        "description": "Gérez les paramètres système et la configuration des uploads"
+        "badge": "Infrastructure",
+        "description": "Gérez les paramètres système et la configuration des uploads."
+      },
+      "modules": {
+        "title": "Gestion des modules",
+        "badge": "Extensions",
+        "description": "Gérez les modules installés et leurs dépendances."
       },
       "security": {
-        "title": "Sécurité (Bientôt disponible)",
-        "description": "Configurez les paramètres de sécurité avancés"
+        "title": "Sécurité",
+        "badge": "Protection",
+        "description": "Configurez les paramètres de sécurité avancés."
       }
     },
     "security": {

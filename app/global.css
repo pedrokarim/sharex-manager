@@ -10,9 +10,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans, var(--font-geist-sans));
+  --font-sans: var(--font-sans, var(--font-plus-jakarta));
   --font-serif: var(--font-serif);
-  --font-mono: var(--font-mono, var(--font-geist-mono));
+  --font-mono: var(--font-mono, var(--font-jetbrains-mono));
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -69,6 +69,16 @@
 :root {
   --radius: 0.625rem;
   --spacing: 0.25rem;
+  /* Échelle de crénage dérivée du réglage global du thème. Sans ces
+     déclarations, `--tracking-*` reste indéfini et les utilitaires
+     `tracking-tight` / `tracking-wide` n'ont aucun effet. */
+  --letter-spacing: 0em;
+  --tracking-tighter: calc(var(--letter-spacing) - 0.05em);
+  --tracking-tight: calc(var(--letter-spacing) - 0.025em);
+  --tracking-normal: var(--letter-spacing);
+  --tracking-wide: calc(var(--letter-spacing) + 0.025em);
+  --tracking-wider: calc(var(--letter-spacing) + 0.05em);
+  --tracking-widest: calc(var(--letter-spacing) + 0.1em);
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -143,6 +153,43 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Barres de défilement au thème : le pouce est dérivé de `--foreground`,
+     il suit donc automatiquement le clair, le sombre et les thèmes publiés
+     depuis l'éditeur. Le rail reste transparent pour ne pas dessiner une
+     colonne grise le long des encarts arrondis. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent)
+      transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    /* La bordure transparente combinée à `content-box` détache le pouce du
+       bord : sans elle il colle au contenu. */
+    background-color: color-mix(in oklab, var(--foreground) 22%, transparent);
+    background-clip: content-box;
+    border: 3px solid transparent;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklab, var(--foreground) 38%, transparent);
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background-color: color-mix(in oklab, var(--foreground) 50%, transparent);
   }
 }
 

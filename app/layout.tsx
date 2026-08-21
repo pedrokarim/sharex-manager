@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import localFont from "next/font/local";
+import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import Script from "next/script";
 import "./global.css";
 import { Providers } from "@/components/providers";
@@ -8,18 +8,21 @@ import { Toaster } from "@/components/ui/sonner";
 import { auth } from "@/lib/auth";
 import { createThemeBootstrapScript } from "@/lib/theme/create-theme-bootstrap-script";
 import { getResolvedThemePayload } from "@/lib/theme/get-resolved-theme-payload";
+import { getThemeFontStylesheets } from "@/lib/theme/theme-font-families";
 // import { ThemeWrapper } from "@/components/theme-wrapper"; // Disabled - themes now handled by Jotai
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
+// Polices auto-hébergées par next/font : aucune requête vers Google au runtime,
+// et aucun décalage de mise en page au premier rendu.
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-plus-jakarta",
+  display: "swap",
 });
 
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -40,10 +43,20 @@ export default async function RootLayout({
     isAuthenticated: !!session?.user,
   });
 
+  // Un thème enregistré depuis l'éditeur référence des familles Google par leur
+  // nom (« Plus Jakarta Sans, sans-serif ») : sans cette feuille de style, le
+  // navigateur retombe sur la police système.
+  const themeFontStylesheets = getThemeFontStylesheets(initialTheme.styles);
+
   return (
     <html lang="fr" suppressHydrationWarning>
+      <head>
+        {themeFontStylesheets.map((href) => (
+          <link key={href} rel="stylesheet" href={href} />
+        ))}
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${plusJakartaSans.variable} ${jetBrainsMono.variable} antialiased`}
       >
         <Script
           id="theme-bootstrap"
