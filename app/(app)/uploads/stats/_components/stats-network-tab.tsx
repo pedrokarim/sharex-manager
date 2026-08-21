@@ -64,7 +64,7 @@ export function StatsNetworkTab() {
   if (!data) return null;
 
   return (
-    <div className="grid gap-4 sm:gap-6">
+    <div className="grid gap-4">
       {data.rateLimited && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />

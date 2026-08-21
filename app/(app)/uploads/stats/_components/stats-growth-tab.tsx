@@ -19,6 +19,12 @@ import {
 import { useTranslation } from "@/lib/i18n";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import { StatsData, formatFileSize } from "./types";
+import {
+  STAT_CARD,
+  STAT_CARD_CONTENT,
+  STAT_CARD_HEADER,
+} from "./card-spacing";
+import { cn } from "@/lib/utils";
 
 const chartConfig = {
   newFiles: { label: "Nouveaux fichiers", color: "var(--chart-1)" },
@@ -34,14 +40,14 @@ export function StatsGrowthTab({ stats }: StatsGrowthTabProps) {
   const locale = useDateLocale();
 
   return (
-    <div className="grid gap-4 sm:gap-6">
-      <Card className="col-span-full">
-        <CardHeader className="pb-2 px-4 pt-4 sm:px-5">
+    <div className="grid gap-4">
+      <Card className={cn("col-span-full", STAT_CARD)}>
+        <CardHeader className={STAT_CARD_HEADER}>
           <CardTitle className="text-sm sm:text-base font-semibold">
             {t("uploads.stats.charts.monthly_growth")}
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-3 sm:p-4 pt-2">
+        <CardContent className={STAT_CARD_CONTENT}>
           <ChartContainer
             config={chartConfig}
             className="h-[200px] sm:h-[240px] w-full"
