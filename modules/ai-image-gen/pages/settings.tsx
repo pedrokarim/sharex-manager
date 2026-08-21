@@ -517,7 +517,10 @@ function CliEngineCard({
           />
         </label>
 
-        {!engine.imageCapable && installed && (
+        {/* La ligne reste visible une fois activée : elle se règle sur le choix
+            de l'utilisateur, pas sur la capacité effective, sinon l'activer la
+            ferait disparaître et il n'y aurait plus moyen de revenir dessus. */}
+        {!engine.nativeImageCapable && installed && (
           <label className="flex items-start justify-between gap-3 text-xs">
             <span>
               Cet outil sait générer des images
@@ -527,6 +530,7 @@ function CliEngineCard({
               </span>
             </span>
             <Switch
+              checked={engine.assumeImageCapable}
               disabled={busy}
               onCheckedChange={(checked) =>
                 save({ assumeImageCapable: checked })

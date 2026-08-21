@@ -184,8 +184,14 @@ export interface CliEngineStatus extends CliProbe {
   label: string;
   installHint: string;
   docsUrl?: string;
-  /** Le module sait-il faire générer des images à ce CLI ? */
+  /** Le module sait-il faire générer des images à ce CLI, réglage compris ? */
   imageCapable: boolean;
+  /** Capacité annoncée par le module, avant réglage de l'utilisateur. */
+  nativeImageCapable: boolean;
+  /** L'utilisateur a-t-il forcé la capacité ? Distinct de `imageCapable`, qui
+   *  fusionne les deux : sans cette distinction, l'interface ne pourrait plus
+   *  proposer de désactiver ce qu'elle vient d'activer. */
+  assumeImageCapable: boolean;
   /** Le moteur est-il retenu pour le studio ? */
   enabled: boolean;
   /** Chemin imposé par l'utilisateur, s'il y en a un. */
@@ -211,7 +217,8 @@ export async function probeCliEngines(
     specs.map(async (spec) => {
       const settings = config.cli[spec.id] ?? {};
       const custom = config.customEngines.some((entry) => entry.id === spec.id);
-      const imageCapable = spec.imageCapable || Boolean(settings.assumeImageCapable);
+      const assumeImageCapable = Boolean(settings.assumeImageCapable);
+      const imageCapable = spec.imageCapable || assumeImageCapable;
       const base: CliEngineStatus = {
         ...EMPTY_PROBE,
         id: spec.id,
@@ -219,6 +226,8 @@ export async function probeCliEngines(
         installHint: spec.installHint,
         docsUrl: spec.docsUrl,
         imageCapable,
+        nativeImageCapable: spec.imageCapable,
+        assumeImageCapable,
         enabled: settings.enabled !== false,
         configuredPath: settings.binaryPath,
         custom,

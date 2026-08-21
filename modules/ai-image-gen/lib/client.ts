@@ -38,6 +38,8 @@ export interface CliEngineStatus {
   installHint: string;
   docsUrl?: string;
   imageCapable: boolean;
+  nativeImageCapable: boolean;
+  assumeImageCapable: boolean;
   enabled: boolean;
   custom: boolean;
   configuredPath?: string;
