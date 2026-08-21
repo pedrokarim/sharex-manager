@@ -5,7 +5,20 @@
    le plugin soit chargé : elles n'avaient donc aucun effet. */
 @plugin "@tailwindcss/typography";
 
-@custom-variant dark (&:is(.dark *));
+/* Le mode sombre s'applique dans deux cas :
+   - `.dark` sur <html>, posé par le serveur ou au changement de thème ;
+   - préférence « système » (`.theme-system`) et navigateur en sombre, résolu
+     par le navigateur au parsing, donc sans JavaScript et sans flash. */
+@custom-variant dark {
+  &:is(.dark *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:is(.theme-system *) {
+      @slot;
+    }
+  }
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -67,6 +80,7 @@
 }
 
 :root {
+  color-scheme: light;
   --radius: 0.625rem;
   --spacing: 0.25rem;
   /* Échelle de crénage dérivée du réglage global du thème. Sans ces
@@ -113,6 +127,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --spacing: 0.25rem;
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
@@ -145,6 +160,12 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.552 0.016 285.938);
+}
+
+@media (prefers-color-scheme: dark) {
+  .theme-system {
+    color-scheme: dark;
+  }
 }
 
 @layer base {

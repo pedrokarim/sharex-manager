@@ -3,6 +3,7 @@ import {
   DEFAULT_DAY_END_HOUR,
   DEFAULT_DAY_START_HOUR,
 } from "@/lib/theme/constants";
+import { resolveThemeRuntimeState } from "@/lib/theme/runtime-theme";
 import type { ResolvedThemePayload } from "@/types/theme-runtime";
 
 function escapeJsonForInlineScript(value: string) {
@@ -14,90 +15,97 @@ function escapeJsonForInlineScript(value: string) {
     .replace(/\u2029/g, "\\u2029");
 }
 
+/**
+ * Script de correction du thème, exécuté dans le `<head>` avant la première
+ * peinture.
+ *
+ * Il ne pose plus le thème : la classe de `<html>` et les variables CSS sont
+ * rendues par le serveur, et le cas « système » est résolu par le navigateur en
+ * CSS pur. Ce script ne sert qu'aux deux situations que le serveur ne peut pas
+ * connaître :
+ *
+ * 1. un visiteur anonyme dont la préférence est stockée dans `localStorage` ;
+ * 2. le mode horaire, dont l'heure de référence est celle du visiteur et non
+ *    celle du serveur.
+ *
+ * Dans tous les autres cas — c'est-à-dire la majorité — il ne fait rien.
+ */
 export function createThemeBootstrapScript(options: {
   initialTheme: ResolvedThemePayload;
   isAuthenticated: boolean;
 }) {
+  const state = resolveThemeRuntimeState(options.initialTheme, {
+    isAuthenticated: options.isAuthenticated,
+    anonymousPreference: null,
+    prefersDark: false,
+  });
+
   const data = escapeJsonForInlineScript(
     JSON.stringify({
-      initialTheme: options.initialTheme,
       isAuthenticated: options.isAuthenticated,
-      anonymousPreferenceStorageKey: ANONYMOUS_THEME_PREFERENCE_STORAGE_KEY,
-      defaultDayStartHour: DEFAULT_DAY_START_HOUR,
-      defaultDayEndHour: DEFAULT_DAY_END_HOUR,
+      modePreference: state.modePreference,
+      themePreference: state.themePreference,
+      storageKey: ANONYMOUS_THEME_PREFERENCE_STORAGE_KEY,
+      dayStartHour: state.timeWindow.dayStartHour ?? DEFAULT_DAY_START_HOUR,
+      dayEndHour: state.timeWindow.dayEndHour ?? DEFAULT_DAY_END_HOUR,
     }),
   );
 
   return `
 (() => {
-  const data = ${data};
-  const payload = data.initialTheme;
-  const root = document.documentElement;
+  try {
+    const data = ${data};
+    const root = document.documentElement;
 
-  const parseAnonymousPreference = (value) => {
-    if (value === "light" || value === "dark" || value === "system") {
-      return value;
-    }
-    return null;
-  };
+    let preference = data.modePreference;
 
-  const resolveMode = (modePreference, prefersDark, now, dayStartHour, dayEndHour) => {
-    if (modePreference === "light" || modePreference === "dark") {
-      return modePreference;
-    }
-
-    if (modePreference === "system") {
-      return prefersDark ? "dark" : "light";
-    }
-
-    const currentHour = now.getHours();
-    const isDayTime = currentHour >= dayStartHour && currentHour < dayEndHour;
-    return isDayTime ? "light" : "dark";
-  };
-
-  const rawAnonymousPreference = !data.isAuthenticated
-    ? window.localStorage.getItem(data.anonymousPreferenceStorageKey)
-    : null;
-  const anonymousPreference = parseAnonymousPreference(rawAnonymousPreference);
-  const themePreference = data.isAuthenticated
-    ? (payload.userPreferences && payload.userPreferences.modeOverride) || "inherit"
-    : anonymousPreference || payload.globalTheme.mode;
-  const modePreference =
-    themePreference === "inherit" ? payload.globalTheme.mode : themePreference;
-  const dayStartHour =
-    (payload.userPreferences && payload.userPreferences.dayStartHour) ??
-    data.defaultDayStartHour;
-  const dayEndHour =
-    (payload.userPreferences && payload.userPreferences.dayEndHour) ??
-    data.defaultDayEndHour;
-  const prefersDark =
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const activeMode = resolveMode(
-    modePreference,
-    prefersDark,
-    new Date(),
-    dayStartHour,
-    dayEndHour
-  );
-  const activeStyles = payload.styles[activeMode];
-
-  if (activeMode === "dark") {
-    root.classList.add("dark");
-  } else {
-    root.classList.remove("dark");
-  }
-
-  if (activeStyles) {
-    for (const [key, value] of Object.entries(activeStyles)) {
-      if (typeof value === "string" && value.trim() !== "") {
-        root.style.setProperty("--" + key, value);
+    if (!data.isAuthenticated) {
+      let stored = null;
+      try {
+        stored = window.localStorage.getItem(data.storageKey);
+      } catch (error) {
+        // Stockage indisponible (navigation privée, cookies bloqués) : on garde
+        // ce que le serveur a rendu.
+      }
+      if (stored === "light" || stored === "dark" || stored === "system") {
+        preference = stored;
       }
     }
-  }
 
-  root.dataset.themePreference = themePreference;
-  root.dataset.themeMode = activeMode;
+    let target;
+    if (preference === "system") {
+      target = "theme-system";
+    } else if (preference === "time-based") {
+      const hour = new Date().getHours();
+      const isDay = hour >= data.dayStartHour && hour < data.dayEndHour;
+      target = isDay ? "" : "dark";
+    } else {
+      target = preference === "dark" ? "dark" : "";
+    }
+
+    // Ne touche au DOM que si le serveur s'est trompé : sans ça, on force un
+    // recalcul de style à chaque chargement pour rien.
+    if (root.classList.contains("dark") !== (target === "dark")) {
+      root.classList.toggle("dark", target === "dark");
+    }
+    if (root.classList.contains("theme-system") !== (target === "theme-system")) {
+      root.classList.toggle("theme-system", target === "theme-system");
+    }
+
+    root.dataset.themePreference = data.isAuthenticated
+      ? data.themePreference
+      : preference;
+
+    const prefersDark =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.themeMode =
+      target === "dark" || (target === "theme-system" && prefersDark)
+        ? "dark"
+        : "light";
+  } catch (error) {
+    // Un thème mal appliqué ne doit jamais empêcher la page de s'afficher.
+  }
 })();
   `.trim();
 }
