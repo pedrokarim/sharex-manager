@@ -12,7 +12,6 @@ import {
   buildThemeStylesheet,
   resolveThemeHtmlClass,
 } from "@/lib/theme/theme-stylesheet";
-// import { ThemeWrapper } from "@/components/theme-wrapper"; // Disabled - themes now handled by Jotai
 
 // Polices auto-hébergées par next/font : aucune requête vers Google au runtime,
 // et aucun décalage de mise en page au premier rendu.
@@ -87,7 +86,6 @@ export default async function RootLayout({
           Skip to main content
         </a>
         <Providers initialTheme={initialTheme} session={session}>
-          {/* ThemeWrapper disabled - themes now handled by ThemeProvider in components/theme-provider.tsx */}
           <div className="relative min-h-screen">
             <main id="main-content">{children}</main>
             <Toaster />
