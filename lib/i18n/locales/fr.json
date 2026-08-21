@@ -398,7 +398,10 @@
         "processing": "Traitement en cours...",
         "select_module": "Sélectionner un module",
         "apply_module": "Appliquer le module",
-        "cancel_processing": "Annuler le traitement"
+        "cancel_processing": "Annuler le traitement",
+        "empty_category": "Aucun module dans cette catégorie.",
+        "collapse": "Masquer les modules",
+        "expand": "Modules disponibles"
       }
     },
     "upload_zone": {

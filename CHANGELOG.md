@@ -27,6 +27,12 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Visionneuse de fichiers : les modules quittent le panneau flottant du coin
+  haut-droit pour un bandeau révélé depuis le bas de la zone image, au-dessus
+  de la barre d'outils. Un bouton rond en bas à gauche l'ouvre, une rangée de
+  filtres resserrée le trie par catégorie, Échap le referme sans fermer la
+  visionneuse. Les deux rangées défilent horizontalement, le système de modules
+  n'ayant ni nombre ni catégories connus à l'avance.
 - Module AI Image Gen : le catalogue de modèles est construit côté serveur à
   partir de ce qui est réellement installé et connecté. Un modèle indisponible
   est affiché avec la raison au lieu d'échouer à l'exécution.

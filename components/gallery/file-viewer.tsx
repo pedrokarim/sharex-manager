@@ -298,7 +298,12 @@ function FileViewerBody({
                   </Button>
                 ) : null}
 
-                <div className="absolute right-4 top-4 z-10 flex justify-end">
+                {/* Ancré au bas de la zone image, juste au-dessus de la barre
+                    d'outils : les modules agissent sur l'image, ils se placent
+                    donc contre elle plutôt que de flotter dans un coin. Le
+                    conteneur ne capte pas le pointeur, seuls ses contrôles le
+                    font, sinon il masquerait l'image sur toute sa largeur. */}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-start">
                   <ModuleActions
                     file={file}
                     onProcessComplete={handleProcessComplete}

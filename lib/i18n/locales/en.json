@@ -378,6 +378,9 @@
         "other": "Others",
         "create_new_version": "Create a new version",
         "modify_existing": "Modify existing version",
+        "empty_category": "No module in this category.",
+        "collapse": "Hide modules",
+        "expand": "Available modules",
         "categories": {
           "edition": "Edition",
           "brand": "Brand",
