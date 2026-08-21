@@ -94,7 +94,7 @@ export function HomePageClient({ showcase, apiBaseUrl }: HomePageClientProps) {
             src: "/images/home/app-gallery.jpg",
             alt: t("home.landing.hero.screenshot_alt"),
             width: 1600,
-            height: 798,
+            height: 901,
           }}
         />
 
@@ -104,10 +104,10 @@ export function HomePageClient({ showcase, apiBaseUrl }: HomePageClientProps) {
           description={t("home.landing.flow.description")}
           bullets={asList("home.landing.flow.bullets")}
           image={{
-            src: "/images/home/app-api-keys.jpg",
+            src: "/images/home/app-history.jpg",
             alt: t("home.landing.flow.image_alt"),
             width: 1600,
-            height: 801,
+            height: 901,
           }}
         />
 

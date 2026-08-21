@@ -607,7 +607,7 @@
           "Thumbnails, search and filtering by date",
           "Private albums, or published in one click"
         ],
-        "image_alt": "The API keys management screen"
+        "image_alt": "The upload history, showing date, size and method for every file"
       },
       "catalog": {
         "kicker": "The catalog",

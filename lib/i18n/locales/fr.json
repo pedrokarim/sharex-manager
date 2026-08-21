@@ -574,7 +574,7 @@
           "Miniatures, recherche et filtres par date",
           "Albums privés ou publiés en un clic"
         ],
-        "image_alt": "L'écran de gestion des clés d'API"
+        "image_alt": "L'historique des uploads, avec la date, la taille et la méthode de chaque fichier"
       },
       "catalog": {
         "kicker": "Le catalogue",

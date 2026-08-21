@@ -17,6 +17,7 @@ import { Search, FolderOpen, Plus, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
 import { CreateAlbumDialog } from "./create-album-dialog";
+import { chunk, FILES_BATCH_LIMIT, readApiError } from "@/lib/utils/chunk";
 import type { Album } from "@/types/albums";
 
 interface AddToAlbumDialogProps {
@@ -41,6 +42,9 @@ export function AddToAlbumDialog({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAlbums, setSelectedAlbums] = useState<Set<number>>(new Set());
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  );
 
   const fetchAlbums = async () => {
     try {
@@ -72,51 +76,95 @@ export function AddToAlbumDialog({
       album.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
 
+  /**
+   * Ajoute la sélection à un album, par lots.
+   *
+   * La route plafonne à `FILES_BATCH_LIMIT` fichiers par requête : envoyer une
+   * grande sélection d'un bloc renvoyait une 400 et n'ajoutait rien du tout.
+   * Les lots partent en séquence pour ne pas saturer la base sur une grosse
+   * sélection, et on renvoie ce qui a réellement été ajouté.
+   */
+  const addFilesToAlbum = async (albumId: number) => {
+    let added = 0;
+
+    for (const batch of chunk(selectedFiles, FILES_BATCH_LIMIT)) {
+      const response = await fetch(`/api/albums/${albumId}/files`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ fileNames: batch }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(response, "Erreur lors de l'ajout des fichiers"),
+        );
+      }
+
+      const result = await response.json();
+      added += result.addedFiles?.length ?? 0;
+    }
+
+    return added;
+  };
+
   const handleAddToAlbums = async () => {
     if (selectedAlbums.size === 0) return;
 
-    try {
-      setAdding(true);
-      const promises = Array.from(selectedAlbums).map(async (albumId) => {
-        const response = await fetch(`/api/albums/${albumId}/files`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ fileNames: selectedFiles }),
-        });
+    setAdding(true);
+    setProgress({ done: 0, total: selectedAlbums.size });
 
-        if (!response.ok) {
-          throw new Error(`Erreur pour l'album ${albumId}`);
-        }
+    const failures: string[] = [];
+    let succeeded = 0;
+    let done = 0;
 
-        return response.json();
-      });
+    // Séquentiel plutôt qu'en parallèle : l'échec sur un album ne doit pas
+    // masquer le succès des autres, et la progression reste lisible.
+    for (const albumId of selectedAlbums) {
+      const albumName =
+        albums.find((album) => album.id === albumId)?.name ?? `#${albumId}`;
 
-      await Promise.all(promises);
+      try {
+        await addFilesToAlbum(albumId);
+        succeeded += 1;
+      } catch (error) {
+        console.error(`Erreur pour l'album ${albumName}:`, error);
+        failures.push(albumName);
+      } finally {
+        done += 1;
+        setProgress({ done, total: selectedAlbums.size });
+      }
+    }
 
+    setAdding(false);
+    setProgress(null);
+
+    const fileCount = selectedFiles.length;
+
+    if (failures.length === 0) {
       const albumNames = albums
         .filter((album) => selectedAlbums.has(album.id))
         .map((album) => album.name)
         .join(", ");
 
-      if (selectedAlbums.size === 1) {
-        toast.success(
-          `${selectedFiles.length} fichier(s) ajouté(s) à l'album "${albumNames}"`,
-        );
-      } else {
-        toast.success(
-          `${selectedFiles.length} fichier(s) ajouté(s) à ${selectedAlbums.size} albums`,
-        );
-      }
+      toast.success(
+        selectedAlbums.size === 1
+          ? `${fileCount} fichier(s) ajouté(s) à l'album "${albumNames}"`
+          : `${fileCount} fichier(s) ajouté(s) à ${selectedAlbums.size} albums`,
+      );
+    } else if (succeeded === 0) {
+      toast.error(`Échec de l'ajout : ${failures.join(", ")}`);
+    } else {
+      // État partiel : le dire, plutôt que de laisser croire à un succès total.
+      toast.warning(
+        `${fileCount} fichier(s) ajouté(s) à ${succeeded} album(s). Échec : ${failures.join(", ")}`,
+      );
+    }
 
+    if (succeeded > 0) {
       onSuccess?.();
       handleClose();
-    } catch (error) {
-      console.error("Erreur:", error);
-      toast.error("Erreur lors de l'ajout des fichiers aux albums");
-    } finally {
-      setAdding(false);
     }
   };
 
@@ -293,9 +341,11 @@ export function AddToAlbumDialog({
                   {adding && (
                     <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
                   )}
-                  {selectedAlbums.size === 1
-                    ? "Ajouter à l'album"
-                    : `Ajouter à ${selectedAlbums.size} albums`}
+                  {progress
+                    ? `Ajout… ${progress.done}/${progress.total}`
+                    : selectedAlbums.size === 1
+                      ? "Ajouter à l'album"
+                      : `Ajouter à ${selectedAlbums.size} albums`}
                 </Button>
               </div>
             </div>
