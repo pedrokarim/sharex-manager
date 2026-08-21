@@ -94,7 +94,7 @@ export function HomePageClient({ showcase, apiBaseUrl }: HomePageClientProps) {
             src: "/images/home/app-gallery.jpg",
             alt: t("home.landing.hero.screenshot_alt"),
             width: 1600,
-            height: 901,
+            height: 900,
           }}
         />
 
@@ -107,7 +107,7 @@ export function HomePageClient({ showcase, apiBaseUrl }: HomePageClientProps) {
             src: "/images/home/app-history.jpg",
             alt: t("home.landing.flow.image_alt"),
             width: 1600,
-            height: 901,
+            height: 900,
           }}
         />
 
@@ -125,8 +125,8 @@ export function HomePageClient({ showcase, apiBaseUrl }: HomePageClientProps) {
           image={{
             src: "/images/home/catalog.jpg",
             alt: t("home.landing.catalog.image_alt"),
-            width: 1440,
-            height: 1277,
+            width: 1600,
+            height: 900,
           }}
         />
 

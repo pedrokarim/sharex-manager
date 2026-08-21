@@ -4,7 +4,12 @@ import {
   CodeBlock,
   CodeBlockCopyButton,
 } from "@/components/ai-elements/code-block";
+import {
+  HOME_CONTAINER,
+  HOME_SECTION_PADDING,
+} from "@/components/home/container";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 export interface SetupStep {
   title: string;
@@ -64,7 +69,7 @@ export function SetupSection({
 
   return (
     <section className="border-t border-border/60">
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
+      <div className={cn(HOME_CONTAINER, HOME_SECTION_PADDING)}>
         <div className="max-w-2xl">
           <p className="text-xs font-bold tracking-[0.14em] text-primary uppercase">
             {kicker}

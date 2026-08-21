@@ -2,6 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 
+import {
+  HOME_CONTAINER,
+  HOME_SECTION_PADDING,
+} from "@/components/home/container";
 import { cn } from "@/lib/utils";
 
 interface FeatureSplitProps {
@@ -36,7 +40,13 @@ export function FeatureSplit({
 }: FeatureSplitProps) {
   return (
     <section className={cn("overflow-hidden border-t border-border/60", className)}>
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-20 lg:py-28">
+      <div
+        className={cn(
+          HOME_CONTAINER,
+          HOME_SECTION_PADDING,
+          "grid items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-20",
+        )}
+      >
         <div className={cn("min-w-0", reversed && "lg:order-2")}>
           <p className="text-xs font-bold tracking-[0.14em] text-primary uppercase">
             {kicker}
@@ -68,19 +78,14 @@ export function FeatureSplit({
           ) : null}
         </div>
 
-        <div
-          className={cn(
-            "min-w-0",
-            reversed ? "lg:order-1 lg:-ml-20" : "lg:-mr-20",
-          )}
-        >
+        <div className={cn("min-w-0", reversed && "lg:order-1")}>
           <Image
             src={image.src}
             alt={image.alt}
             width={image.width}
             height={image.height}
             sizes="(min-width: 1024px) 56vw, 100vw"
-            className="w-full rounded-2xl shadow-2xl shadow-black/15 dark:shadow-black/50"
+            className="w-full rounded-2xl shadow-2xl shadow-black/15 ring-1 ring-black/10 dark:shadow-black/50 dark:ring-white/10"
           />
         </div>
       </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
+import { HOME_CONTAINER } from "@/components/home/container";
 import { cn } from "@/lib/utils";
 
 interface ImageWallProps {
@@ -27,8 +28,8 @@ export function ImageWall({ images, kicker, title, cta }: ImageWallProps) {
   const tiles = images.slice(0, rows * 6);
 
   return (
-    <section className="relative border-t border-border/60 pb-16 lg:pb-24">
-      <div className="mx-auto max-w-3xl px-4 pt-16 pb-9 text-center sm:px-6 lg:pt-24">
+    <section className="relative border-t border-border/60 pb-20 lg:pb-28">
+      <div className={cn(HOME_CONTAINER, "max-w-3xl pt-20 pb-9 text-center lg:pt-28")}>
         <p className="text-xs font-bold tracking-[0.14em] text-primary uppercase">
           {kicker}
         </p>
@@ -40,7 +41,7 @@ export function ImageWall({ images, kicker, title, cta }: ImageWallProps) {
       <div className="relative">
         <div
           aria-hidden
-          className="grid grid-cols-3 gap-2 px-4 sm:px-6 lg:grid-cols-6"
+          className={cn(HOME_CONTAINER, "grid grid-cols-3 gap-2 lg:grid-cols-6")}
         >
           {tiles.map((name) => (
             // eslint-disable-next-line @next/next/no-img-element -- vignettes
@@ -63,7 +64,7 @@ export function ImageWall({ images, kicker, title, cta }: ImageWallProps) {
           aria-hidden
           className={cn(
             "pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-background to-transparent",
-            rows > 1 ? "h-40" : "h-20",
+            rows > 1 ? "h-24" : "h-16",
           )}
         />
       </div>

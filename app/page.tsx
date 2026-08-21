@@ -12,10 +12,24 @@ export const revalidate = 300;
 const IMAGE_PATTERN = /\.(jpe?g|png|gif|webp)$/i;
 
 /**
- * Nombre de vignettes du mur, en bas de page. 12 est divisible par 3, 4 et 6 —
- * les trois largeurs de grille — donc aucune dernière ligne incomplète.
+ * Nombre de vignettes du mur, en bas de page. La grille passe de 3 à 6
+ * colonnes : 12 se pose sans dernière ligne incomplète aux deux largeurs.
  */
 const WALL_SAMPLE = 12;
+
+/**
+ * Échantillon réparti sur toute la liste plutôt que sa tête.
+ *
+ * Les fichiers ajoutés en une fois partagent le même horodatage : prendre les
+ * douze premiers donne un tri arbitraire où les doublons se suivent. Un pas
+ * régulier balaie l'ensemble du catalogue et montre autre chose à chaque fois
+ * que le contenu bouge.
+ */
+function pickSpread<T>(items: T[], count: number): T[] {
+  if (items.length <= count) return items;
+  const step = items.length / count;
+  return Array.from({ length: count }, (_, i) => items[Math.floor(i * step)]);
+}
 
 function readPublicShowcase(): HomeShowcase {
   try {
@@ -47,7 +61,7 @@ function readPublicShowcase(): HomeShowcase {
     }
 
     return {
-      wallImages: names.slice(0, WALL_SAMPLE),
+      wallImages: pickSpread(names, WALL_SAMPLE),
       imagesTotal: names.length,
       albumsTotal: publicAlbums.length,
       bytesTotal: bytes,

@@ -4,6 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
+import {
+  HOME_CONTAINER,
+  HOME_SECTION_PADDING,
+} from "@/components/home/container";
+import { cn } from "@/lib/utils";
+
 export interface HeroStat {
   value: string;
   label: string;
@@ -47,7 +53,13 @@ export function HeroProduct({
         className="pointer-events-none absolute -top-1/3 -left-1/4 h-[620px] w-[70%] rounded-full bg-primary/15 blur-3xl"
       />
 
-      <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16 lg:py-28">
+      <div
+        className={cn(
+          HOME_CONTAINER,
+          HOME_SECTION_PADDING,
+          "relative grid items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16",
+        )}
+      >
         <div className="min-w-0">
           <h1 className="text-4xl leading-[1.02] font-bold tracking-tighter text-balance sm:text-5xl lg:text-6xl">
             {title}
@@ -103,7 +115,7 @@ export function HeroProduct({
         {/* Capture posée librement : ni bordure ni fausse barre de navigateur.
             Elle déborde vers le bord de page et penche légèrement, pour se lire
             comme un objet dans la page plutôt que comme une vignette encadrée. */}
-        <div className="min-w-0 [perspective:1800px] lg:-mr-32 xl:-mr-44">
+        <div className="min-w-0 [perspective:1800px]">
           <Image
             src={screenshot.src}
             alt={screenshot.alt}
@@ -111,7 +123,7 @@ export function HeroProduct({
             height={screenshot.height}
             sizes="(min-width: 1024px) 62vw, 100vw"
             priority
-            className="w-full rounded-2xl shadow-2xl shadow-black/20 lg:origin-left lg:[transform:rotateX(2deg)_rotateY(-9deg)] dark:shadow-black/60"
+            className="w-full rounded-2xl shadow-2xl shadow-black/20 ring-1 ring-black/10 lg:origin-left lg:[transform:rotateX(2deg)_rotateY(-9deg)] dark:shadow-black/60 dark:ring-white/10"
           />
         </div>
       </div>
