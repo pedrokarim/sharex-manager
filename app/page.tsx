@@ -4,6 +4,15 @@ import { join } from "path";
 import { getAbsoluteUploadPath } from "@/lib/config";
 import { albumsDb } from "@/lib/utils/albums-db";
 import { HomePageClient, type HomeShowcase } from "./page.client";
+import { publicPageMetadata } from "@/lib/seo";
+
+export const metadata = publicPageMetadata({
+  title: "ShareX Manager — vos captures, chez vous",
+  description:
+    "Gestionnaire d'images auto-hébergé pour ShareX, Flameshot et mobile : upload en un raccourci, lien public immédiat, albums, statistiques et clés d'API.",
+  path: "/",
+});
+
 
 // Le mur et les chiffres reflètent le catalogue public réel : ils doivent
 // suivre les publications, sans rejouer la requête à chaque visite.

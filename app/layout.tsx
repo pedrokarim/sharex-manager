@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { createThemeBootstrapScript } from "@/lib/theme/create-theme-bootstrap-script";
 import { getResolvedThemePayload } from "@/lib/theme/get-resolved-theme-payload";
 import { getThemeFontStylesheets } from "@/lib/theme/theme-font-families";
+import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo";
 import {
   buildThemeStylesheet,
   resolveThemeHtmlClass,
@@ -27,9 +28,35 @@ const jetBrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+const SITE_DESCRIPTION =
+  "Gestionnaire d'images auto-hébergé pour ShareX, Flameshot et mobile : upload en un raccourci, galerie, albums publics, clés d'API et statistiques.";
+
 export const metadata: Metadata = {
-  title: "ShareX Manager",
-  description: "Gérez vos uploads ShareX facilement et en toute sécurité",
+  // Sans `metadataBase`, toute image Open Graph déclarée en chemin relatif ne
+  // se résout pas et les aperçus partagés restent vides.
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_NAME,
+    template: `%s — ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "fr_FR",
+    url: SITE_URL,
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE],
+  },
 };
 
 export default async function RootLayout({

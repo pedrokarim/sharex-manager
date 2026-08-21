@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { AlbumViewClient } from "./page.client";
+import { privatePageMetadata } from "@/lib/seo";
+
+export const metadata = privatePageMetadata({ title: "Album" });
+
 
 interface AlbumPageProps {
   params: Promise<{

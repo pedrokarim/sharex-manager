@@ -1,6 +1,10 @@
 import UsersPageClient from "./page.client";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { privatePageMetadata } from "@/lib/seo";
+
+export const metadata = privatePageMetadata({ title: "Gestion des utilisateurs" });
+
 
 export default async function UsersPage() {
   const headersList = headers();

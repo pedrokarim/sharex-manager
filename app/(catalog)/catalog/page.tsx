@@ -1,10 +1,13 @@
 import { CatalogLanding } from "./page.client";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata = {
-  title: "Catalog - Découvrez les albums publics",
+export const metadata = publicPageMetadata({
+  title: "Catalogue public",
   description:
-    "Explorez une collection d'albums et d'images partagés publiquement",
-};
+    "Parcourez les albums et les images partagés publiquement sur ShareX Manager.",
+  path: "/catalog",
+});
+
 
 export default function CatalogPage() {
   return <CatalogLanding />;

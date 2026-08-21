@@ -1,10 +1,9 @@
 import { Metadata } from "next";
 import { UpgradePageClient } from "./page.client";
+import { privatePageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Upgrade Pro - ShareX Manager",
-  description: "Découvrez les avantages de la version Pro de ShareX Manager",
-};
+export const metadata = privatePageMetadata({ title: "Passer à l'offre supérieure" });
+
 
 export default function UpgradePage() {
   return <UpgradePageClient />;

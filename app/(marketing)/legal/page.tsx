@@ -15,12 +15,15 @@ import {
 
 import { DocPage, type DocSection } from "../_components/doc-page";
 import { LEGAL_INFO } from "./_components/legal-info";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Mentions légales | ShareX Manager",
+export const metadata = publicPageMetadata({
+  title: "Mentions légales",
   description:
-    "Éditeur, directeur de publication, hébergeur et informations légales de ShareX Manager.",
-};
+    "Éditeur, hébergement et informations légales du service.",
+  path: "/legal",
+});
+
 
 const documents = [
   {

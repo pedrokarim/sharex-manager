@@ -4,6 +4,20 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+
+/**
+ * Tout l'espace applicatif est derrière authentification : aucune de ces pages
+ * n'a de raison d'apparaître dans un moteur de recherche. Déclaré ici plutôt
+ * que page par page — les enfants en héritent.
+ */
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false },
+  },
+};
 
 export default async function RootLayout({
   children,

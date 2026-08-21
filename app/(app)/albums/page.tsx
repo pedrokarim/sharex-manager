@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { AlbumsClient } from "./page.client";
+import { privatePageMetadata } from "@/lib/seo";
+
+export const metadata = privatePageMetadata({ title: "Albums" });
+
 
 export default async function AlbumsPage() {
   const session = await auth.api.getSession({ headers: await headers() });

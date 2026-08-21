@@ -16,12 +16,15 @@ import {
 
 import { DocPage, type DocSection } from "../../_components/doc-page";
 import { LEGAL_INFO } from "../_components/legal-info";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Politique de confidentialité | ShareX Manager",
+export const metadata = publicPageMetadata({
+  title: "Politique de confidentialité",
   description:
-    "Quelles données ShareX Manager traite, pourquoi, combien de temps, et quels sont vos droits (RGPD).",
-};
+    "Quelles données sont collectées, pourquoi, et comment elles sont traitées.",
+  path: "/legal/privacy",
+});
+
 
 const sections: DocSection[] = [
   {
