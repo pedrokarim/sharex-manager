@@ -1,176 +1,112 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Gamepad2, Palette, Wrench, Zap } from "lucide-react";
-import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
+import { ArrowLeft, Boxes, Wrench } from "lucide-react";
 
-interface Tool {
-  id: string;
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  status: "available" | "coming-soon" | "beta";
-  href: string;
-  category: string;
-}
+import { ServiceCard } from "@/components/tools/service-card";
+import { useTranslation } from "@/lib/i18n";
 
-const getTools = (t: any): Tool[] => [
+/**
+ * Services annexes présentés sur la page.
+ *
+ * Les couleurs sont écrites en toutes lettres : Tailwind scanne les sources,
+ * une classe assemblée dynamiquement ne serait pas générée.
+ */
+const SERVICES = [
   {
-    id: "minecraft-skin",
-    title: t("tools.minecraft_skin.title"),
-    description: t("tools.minecraft_skin.description"),
-    icon: Gamepad2,
-    status: "available",
-    href: "http://mcinfo.ascencia.re/",
-    category: "Gaming",
+    key: "just_tools",
+    name: "Just Tools",
+    href: "https://just-tools.ascencia.re",
+    domain: "just-tools.ascencia.re",
+    logo: "/images/tools/just-tools-logo.png",
+    preview: "/images/tools/just-tools.jpg",
+    accent: {
+      glow: "bg-indigo-500/30",
+      border: "hover:border-indigo-500/50",
+      button: "bg-indigo-600 shadow-indigo-600/30 hover:bg-indigo-600/90",
+    },
   },
   {
-    id: "color-palette",
-    title: "Color Palette Generator",
-    description: "Générateur de palettes de couleurs à partir d'images",
-    icon: Palette,
-    status: "coming-soon",
-    href: "/tools/color-palette",
-    category: "Design",
+    key: "mcinfo",
+    name: "MCInfo",
+    href: "https://mcinfo.ascencia.re",
+    domain: "mcinfo.ascencia.re",
+    logo: "/images/tools/mcinfo-logo.png",
+    preview: "/images/tools/mcinfo.jpg",
+    accent: {
+      glow: "bg-amber-500/30",
+      border: "hover:border-amber-500/50",
+      button: "bg-amber-600 shadow-amber-600/30 hover:bg-amber-600/90",
+    },
   },
-  {
-    id: "image-converter",
-    title: "Image Converter",
-    description: "Convertisseur d'images avec support de nombreux formats",
-    icon: Wrench,
-    status: "coming-soon",
-    href: "/tools/image-converter",
-    category: "Media",
-  },
-  {
-    id: "qr-generator",
-    title: "QR Code Generator",
-    description: "Générateur de codes QR personnalisables",
-    icon: Zap,
-    status: "coming-soon",
-    href: "/tools/qr-generator",
-    category: "Utility",
-  },
-];
-
-const categories = ["All", "Gaming", "Design", "Media", "Utility"];
+] as const;
 
 export function ToolsPageClient() {
   const { t } = useTranslation();
-  const [selectedCategory, setSelectedCategory] = useState("All");
 
-  const tools = getTools(t);
-  const filteredTools =
-    selectedCategory === "All"
-      ? tools
-      : tools.filter((tool) => tool.category === selectedCategory);
-
-  const getStatusBadge = (status: Tool["status"]) => {
-    switch (status) {
-      case "available":
-        return (
-          <Badge variant="default" className="bg-green-100 text-green-800">
-            Disponible
-          </Badge>
-        );
-      case "beta":
-        return (
-          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-            Beta
-          </Badge>
-        );
-      case "coming-soon":
-        return (
-          <Badge variant="outline" className="bg-gray-100 text-gray-600">
-            Bientôt
-          </Badge>
-        );
-    }
+  const asList = (key: string): string[] => {
+    const value = t(key);
+    return Array.isArray(value) ? value : [];
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">
-          {t("tools.title")}
-        </h1>
-        <p className="text-muted-foreground">{t("tools.description")}</p>
-      </div>
+    <div className="relative min-h-screen overflow-hidden">
+      {/* Halo de fond, sous le titre. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
+      />
 
-      {/* Category Filter */}
-      <div className="flex flex-wrap gap-2">
-        {categories.map((category) => (
-          <Button
-            key={category}
-            variant={selectedCategory === category ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedCategory(category)}
-          >
-            {category}
-          </Button>
-        ))}
-      </div>
+      <div className="relative mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+        <Link
+          href="/"
+          className="group mb-10 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5" />
+          {t("tools.hub.back")}
+        </Link>
 
-      {/* Tools Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredTools.map((tool) => {
-          const Icon = tool.icon;
-          return (
-            <Card key={tool.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Icon className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">{tool.title}</CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {tool.category}
-                      </p>
-                    </div>
-                  </div>
-                  {getStatusBadge(tool.status)}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="mb-4">
-                  {tool.description}
-                </CardDescription>
-                <Button
-                  asChild
-                  className="w-full"
-                  disabled={tool.status === "coming-soon"}
-                >
-                  <Link href={tool.href}>
-                    {tool.status === "coming-soon"
-                      ? "Bientôt disponible"
-                      : "Utiliser l'outil"}
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {filteredTools.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">
-            Aucun outil trouvé dans cette catégorie.
+        <header className="max-w-2xl">
+          <p className="flex items-center gap-2 text-xs font-bold tracking-[0.14em] text-primary uppercase">
+            <Wrench className="size-3.5" />
+            {t("tools.hub.kicker")}
           </p>
+          <h1 className="mt-4 text-3xl font-bold tracking-tighter text-balance sm:text-4xl lg:text-5xl">
+            {t("tools.hub.title")}
+          </h1>
+          <p className="mt-5 text-pretty text-muted-foreground sm:text-lg">
+            {t("tools.hub.subtitle")}
+          </p>
+        </header>
+
+        <div className="mt-12 grid gap-6 lg:mt-16 lg:grid-cols-2 lg:gap-8">
+          {SERVICES.map((service) => (
+            <ServiceCard
+              key={service.key}
+              name={service.name}
+              tagline={t(`tools.hub.services.${service.key}.tagline`)}
+              description={t(`tools.hub.services.${service.key}.description`)}
+              highlights={asList(`tools.hub.services.${service.key}.highlights`)}
+              href={service.href}
+              domain={service.domain}
+              logo={{
+                src: service.logo,
+                alt: `Logo ${service.name}`,
+              }}
+              preview={{
+                src: service.preview,
+                alt: t(`tools.hub.services.${service.key}.preview_alt`),
+              }}
+              accent={service.accent}
+            />
+          ))}
         </div>
-      )}
+
+        <footer className="mt-14 flex items-start gap-3 rounded-2xl border border-border/70 bg-muted/40 p-5 text-sm text-muted-foreground">
+          <Boxes className="mt-0.5 size-4 shrink-0 text-primary" />
+          <p className="text-pretty">{t("tools.hub.note")}</p>
+        </footer>
+      </div>
     </div>
   );
 }

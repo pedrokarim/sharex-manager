@@ -5,6 +5,7 @@ import { FeatureSplit } from "@/components/home/feature-split";
 import { HeroProduct } from "@/components/home/hero-product";
 import { ImageWall } from "@/components/home/image-wall";
 import { SetupSection, type SetupStep } from "@/components/home/setup-section";
+import { ToolsTeaser } from "@/components/home/tools-teaser";
 import { Footer } from "@/components/layout/footer";
 import { useSession } from "@/lib/auth-client";
 import { useTranslation } from "@/lib/i18n";
@@ -128,6 +129,27 @@ export function HomePageClient({ showcase, apiBaseUrl }: HomePageClientProps) {
             width: 1600,
             height: 900,
           }}
+        />
+
+        <ToolsTeaser
+          kicker={t("home.landing.tools.kicker")}
+          title={t("home.landing.tools.title")}
+          description={t("home.landing.tools.description")}
+          cta={{ label: t("home.landing.tools.cta"), href: "/tools" }}
+          services={[
+            {
+              name: "Just Tools",
+              tagline: t("tools.hub.services.just_tools.tagline"),
+              logo: "/images/tools/just-tools-logo.png",
+              glow: "bg-indigo-500/25",
+            },
+            {
+              name: "MCInfo",
+              tagline: t("tools.hub.services.mcinfo.tagline"),
+              logo: "/images/tools/mcinfo-logo.png",
+              glow: "bg-amber-500/25",
+            },
+          ]}
         />
 
         <SetupSection

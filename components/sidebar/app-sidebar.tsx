@@ -20,7 +20,6 @@ import {
   Sliders,
   Key,
   Share2,
-  TestTube,
   Wrench,
   AudioWaveform,
   Palette,
@@ -201,11 +200,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             url: "/modules",
             icon: FileImage,
           },
-          {
-            title: "Test Couleurs",
-            url: "/test-colors",
-            icon: TestTube,
-          },
         ],
       },
     ],
@@ -235,32 +229,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             title: t("sidebar.admin.security"),
             url: "/admin/security",
           },
-          {
-            title: "Outils Minecraft",
-            url: "/admin/tools",
-          },
         ],
       },
     ],
     navOther: [
       {
+        // Passerelle vers les services annexes : pas de sous-menu, la page
+        // elle-même présente Just Tools et MCInfo.
         title: "Outils",
         url: "/tools",
         icon: MoreHorizontal,
-        items: [
-          {
-            title: "Color Palette",
-            url: "/tools/color-palette",
-          },
-          {
-            title: "Image Converter",
-            url: "/tools/image-converter",
-          },
-          {
-            title: "QR Generator",
-            url: "/tools/qr-generator",
-          },
-        ],
       },
     ],
     navSecondary: [
