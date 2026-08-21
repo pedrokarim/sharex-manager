@@ -44,6 +44,21 @@
   },
   "settings": {
     "title": "Settings",
+    "groups": {
+      "personalisation": {
+        "title": "Personalisation",
+        "description": "The settings that shape the look, the pace and the comfort of everyday use."
+      },
+      "publication": {
+        "title": "Publishing",
+        "description": "Everything about the delivery pipeline, access keys and public addresses."
+      },
+      "monitoring": {
+        "title": "Monitoring",
+        "description": "The views that show activity, trends and history."
+      }
+    },
+    "preferences_badge": "Interface",
     "description": "Manage all settings for your ShareX Manager application",
     "preferences": "User Preferences",
     "preferences_description": "Customize your display and feature preferences",

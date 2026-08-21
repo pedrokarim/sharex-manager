@@ -46,6 +46,21 @@
   "settings": {
     "title": "Paramètres",
     "description": "Gérez tous les paramètres de votre application ShareX Manager",
+    "groups": {
+      "personalisation": {
+        "title": "Personnalisation",
+        "description": "Les réglages qui définissent l'apparence, le rythme et le confort de navigation."
+      },
+      "publication": {
+        "title": "Publication",
+        "description": "Tout ce qui touche au pipeline de diffusion, aux accès et aux adresses publiques."
+      },
+      "monitoring": {
+        "title": "Pilotage",
+        "description": "Les vues qui permettent de comprendre l'activité, les tendances et l'historique."
+      }
+    },
+    "preferences_badge": "Interface",
     "preferences": "Préférences utilisateur",
     "preferences_description": "Personnalisez vos préférences d'affichage et de fonctionnalités",
     "appearance": "Apparence",
