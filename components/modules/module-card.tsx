@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowUpRight, ChevronDown, Download, Package, Trash2 } from "lucide-react";
+import { ArrowUpRight, Download, Package, Trash2 } from "lucide-react";
 import { ModuleConfig } from "@/types/modules";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,10 +22,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 interface ModuleCardProps {
@@ -46,7 +46,6 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isInstallingDeps, setIsInstallingDeps] = useState(false);
-  const [isNpmDepsOpen, setIsNpmDepsOpen] = useState(false);
 
   const npmDependencies = module.npmDependencies ?? {};
   const npmCount = Object.keys(npmDependencies).length;
@@ -176,7 +175,7 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
       </div>
 
       {/* ─── Corps ────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col gap-3 px-5">
+      <div className="flex flex-1 flex-col gap-3 px-5 pb-5">
         {/* Hauteur réservée pour deux lignes : sans elle, une description
             courte remonterait tout ce qui suit et désalignerait la rangée. */}
         <p className="line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">
@@ -202,47 +201,56 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
         </div>
 
         {npmCount > 0 && (
-          <Collapsible open={isNpmDepsOpen} onOpenChange={setIsNpmDepsOpen}>
-            <CollapsibleTrigger asChild>
+          <Popover>
+            <PopoverTrigger asChild>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="-ml-2 h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                className="h-7 w-fit gap-1.5 px-2 text-xs font-normal text-muted-foreground"
               >
+                <Package className="h-3.5 w-3.5" />
                 {npmCount} dépendance{npmCount > 1 ? "s" : ""} NPM
-                <ChevronDown
-                  className={cn(
-                    "h-3.5 w-3.5 transition-transform",
-                    isNpmDepsOpen && "rotate-180"
-                  )}
-                />
               </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-1 space-y-1 rounded-lg border bg-muted/40 p-2.5 text-xs">
+            </PopoverTrigger>
+            {/* Un popover plutôt qu'un dépliant : déplier changeait la hauteur
+                de la carte, donc celle de toute la rangée. Et une liste de
+                vingt dépendances défile ici sans rien déformer. */}
+            <PopoverContent align="start" className="w-80 p-0">
+              <div className="border-b px-3 py-2.5">
+                <p className="text-sm font-medium">Dépendances NPM</p>
+                <p className="text-xs text-muted-foreground">
+                  Requises par le module {module.name}.
+                </p>
+              </div>
+
+              <div className="max-h-56 overflow-y-auto p-1.5">
                 {Object.entries(npmDependencies).map(([name, version]) => (
-                  <div key={name} className="flex justify-between gap-3">
+                  <div
+                    key={name}
+                    className="flex items-baseline justify-between gap-3 rounded px-1.5 py-1 text-xs hover:bg-muted/60"
+                  >
                     <span className="truncate font-mono">{name}</span>
-                    <span className="shrink-0 text-muted-foreground">
+                    <span className="shrink-0 font-mono text-muted-foreground">
                       {version}
                     </span>
                   </div>
                 ))}
-                <div className="flex justify-end pt-1.5">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleInstallNpmDeps}
-                    disabled={isInstallingDeps}
-                    className="h-7 gap-1.5 text-xs"
-                  >
-                    <Download className="h-3 w-3" />
-                    {isInstallingDeps ? "Installation…" : "Installer"}
-                  </Button>
-                </div>
               </div>
-            </CollapsibleContent>
-          </Collapsible>
+
+              <div className="border-t p-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleInstallNpmDeps}
+                  disabled={isInstallingDeps}
+                  className="h-8 w-full gap-1.5 text-xs"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {isInstallingDeps ? "Installation…" : "Installer les dépendances"}
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         )}
       </div>
 
