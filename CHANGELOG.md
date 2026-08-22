@@ -89,6 +89,11 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Build Docker : Bun 1.3.14 segfaute en fermant ses workers, après que
+  `next build` a terminé son travail. Le build échouait en sortie 132 alors que
+  `.next/standalone` et `.next/static` étaient complets. L'étape ne tolère ce
+  code de sortie que si les deux répertoires existent, une vraie erreur de
+  compilation continue donc d'arrêter le build.
 - Polices : Plus Jakarta Sans et JetBrains Mono n'étaient appliquées nulle
   part, malgré leur déclaration dans le layout racine. Leurs variables étaient
   posées sur `<body>` alors que les jetons du thème sont déclarés sur `:root`,

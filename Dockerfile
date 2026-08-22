@@ -95,7 +95,24 @@ RUN test -n "$NEXT_PUBLIC_API_URL" -a -n "$NEXT_PUBLIC_IMAGE_DOMAIN" -a -n "$NEX
     || { echo "ERREUR: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_IMAGE_DOMAIN et NEXT_PUBLIC_APP_DOMAIN doivent être fournis via --build-arg (le compose les lit depuis .env)."; exit 1; }
 
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN bun run build
+
+# Bun 1.3.14 segfaute par intermittence en fermant ses workers, APRÈS que
+# `next build` a terminé son travail : le tableau des routes est déjà affiché,
+# `.next/standalone` et `.next/static` sont complets, mais le processus sort en
+# 132 et Docker déclare l'étape en échec. Bun le reconnaît dans sa propre
+# trace : « oh no: Bun has crashed. This indicates a bug in Bun, not your code ».
+#
+# On n'ignore pas l'échec pour autant : on ne le tolère que si les deux
+# répertoires attendus sont là. Une vraie erreur de compilation ne les produit
+# pas, et fait donc toujours échouer le build.
+RUN set +e; bun run build; status=$?; set -e; \
+    if [ ! -d .next/standalone ] || [ ! -d .next/static ]; then \
+      echo "ERREUR: le build n'a produit ni .next/standalone ni .next/static (sortie ${status})."; \
+      exit 1; \
+    fi; \
+    if [ "$status" -ne 0 ]; then \
+      echo "AVERTISSEMENT: bun est sorti en ${status} après un build complet (crash connu à la fermeture). Artefacts vérifiés, on continue."; \
+    fi
 
 # Garde-fou : si une URL de repli s'est glissée dans le bundle client, c'est que
 # l'inlining n'a pas pris. Mieux vaut casser le build que livrer ça.
