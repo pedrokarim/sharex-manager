@@ -17,6 +17,7 @@ import type { ThemeStyles } from "@/types/theme";
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
+import { normalizeLegacyFontTokens } from "@/lib/theme/normalize-font-tokens";
 
 const GLOBAL_THEME_ROW_ID = 1;
 
@@ -126,10 +127,10 @@ class ThemeDatabase {
     light_styles: string;
     dark_styles: string;
   }): ThemeStyles {
-    return {
+    return normalizeLegacyFontTokens({
       light: JSON.parse(row.light_styles),
       dark: JSON.parse(row.dark_styles),
-    };
+    });
   }
 
   private static mapGlobalTheme(row: any): GlobalThemeConfig {
@@ -152,10 +153,10 @@ class ThemeDatabase {
       darkColorOverrides: JSON.parse(row.dark_color_overrides || "{}"),
       stylesOverride:
         row.light_theme_styles && row.dark_theme_styles
-          ? {
+          ? normalizeLegacyFontTokens({
               light: JSON.parse(row.light_theme_styles),
               dark: JSON.parse(row.dark_theme_styles),
-            }
+            })
           : null,
       dayStartHour: row.day_start_hour,
       dayEndHour: row.day_end_hour,

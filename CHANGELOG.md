@@ -79,6 +79,15 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Polices : Plus Jakarta Sans et JetBrains Mono n'étaient appliquées nulle
+  part, malgré leur déclaration dans le layout racine. Leurs variables étaient
+  posées sur `<body>` alors que les jetons du thème sont déclarés sur `:root`,
+  où un `var()` vers une variable invisible rend toute la déclaration invalide.
+  L'application retombait donc silencieusement sur la police système. Les
+  variables sont remontées sur `<html>`.
+- Thèmes : les styles enregistrés avant le changement de police pointaient
+  encore vers `--font-geist-sans` et `--font-geist-mono`, qui n'existent plus.
+  Ces variables sont désormais remplacées à la lecture, sans migration de base.
 - Galerie : démarrer une sélection ramenait la vue en haut de la liste. La
   carte changeait de composant d'enveloppe selon le mode, ce qui démontait la
   grille entière (bouton qui venait d'être cliqué compris), et le navigateur

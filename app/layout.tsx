@@ -84,7 +84,16 @@ export default async function RootLayout({
   const themeStylesheet = buildThemeStylesheet(initialTheme.styles);
 
   return (
-    <html lang="fr" className={themeClass} suppressHydrationWarning>
+    // Les variables de police vivent sur <html>, pas sur <body> : les jetons du
+    // thème sont déclarés sur `:root`, et un `var(--font-plus-jakarta)` écrit là
+    // ne résout que si la variable y est visible. Posées plus bas, elles
+    // rendaient la déclaration invalide et toute l'application retombait sur la
+    // police système.
+    <html
+      lang="fr"
+      className={`${plusJakartaSans.variable} ${jetBrainsMono.variable} ${themeClass}`}
+      suppressHydrationWarning
+    >
       <head>
         {/* Avant toute autre feuille : le style du thème doit être connu du
             navigateur au moment où il calcule le premier rendu. */}
@@ -103,9 +112,7 @@ export default async function RootLayout({
           <link key={href} rel="stylesheet" href={href} />
         ))}
       </head>
-      <body
-        className={`${plusJakartaSans.variable} ${jetBrainsMono.variable} antialiased`}
-      >
+      <body className="antialiased">
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:z-[9999] focus:bg-background focus:px-4 focus:py-2 focus:text-foreground"
