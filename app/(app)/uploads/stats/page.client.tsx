@@ -286,7 +286,7 @@ export function StatsPageClient() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs value={tab} onValueChange={setTab} className="gap-4">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview" className="gap-1.5">
             <LayoutDashboard className="h-3.5 w-3.5 hidden sm:block" />

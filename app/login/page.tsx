@@ -1,6 +1,10 @@
 import Image from "next/image";
 
 import { LoginForm } from "@/components/login-form";
+import { privatePageMetadata } from "@/lib/seo";
+
+export const metadata = privatePageMetadata({ title: "Connexion" });
+
 
 export default function LoginPage() {
   return (

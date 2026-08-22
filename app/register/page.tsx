@@ -1,6 +1,10 @@
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { privatePageMetadata } from "@/lib/seo";
+
+export const metadata = privatePageMetadata({ title: "Créer un compte" });
+
 
 export default function RegisterPage() {
   return (

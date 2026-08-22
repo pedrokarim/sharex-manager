@@ -17,12 +17,15 @@ import {
 
 import { DocPage, type DocSection } from "../../_components/doc-page";
 import { LEGAL_INFO } from "../_components/legal-info";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Conditions Générales d'Utilisation | ShareX Manager",
+export const metadata = publicPageMetadata({
+  title: "Conditions générales d'utilisation",
   description:
-    "Règles d'usage de ShareX Manager : comptes, uploads, clés API, responsabilités et résiliation.",
-};
+    "Les règles d'usage du service et les engagements de chacun.",
+  path: "/legal/terms",
+});
+
 
 const sections: DocSection[] = [
   {

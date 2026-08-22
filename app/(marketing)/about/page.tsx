@@ -12,12 +12,15 @@ import {
 import { Github } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { DocPage, type DocSection } from "../_components/doc-page";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "À propos | ShareX Manager",
+export const metadata = publicPageMetadata({
+  title: "À propos",
   description:
-    "ShareX Manager : pourquoi ce projet existe, ce qu'il fait, et qui le maintient.",
-};
+    "Ce qu'est ShareX Manager, pourquoi il existe et ce qu'il fait de vos images.",
+  path: "/about",
+});
+
 
 const features = [
   {

@@ -51,11 +51,11 @@ export const defaultThemeState = {
       spacing: "0.25rem",
       "letter-spacing": "0em",
       "font-sans":
-        "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
+        "var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif",
       "font-serif":
         "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
       "font-mono":
-        "var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace",
+        "var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace",
       "shadow-color": "hsl(0 0% 0%)",
       "shadow-opacity": "0.18",
       "shadow-blur": "2px",
@@ -100,11 +100,11 @@ export const defaultThemeState = {
       spacing: "0.25rem",
       "letter-spacing": "0em",
       "font-sans":
-        "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
+        "var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif",
       "font-serif":
         "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
       "font-mono":
-        "var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace",
+        "var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace",
       "shadow-color": "hsl(0 0% 0%)",
       "shadow-opacity": "0.18",
       "shadow-blur": "2px",

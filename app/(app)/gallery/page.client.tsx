@@ -27,6 +27,11 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { SelectionToolbar } from "@/components/gallery/selection-toolbar";
 import { AddToAlbumDialog } from "@/components/albums/add-to-album-dialog";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
+import {
+  chunk,
+  FILE_ALBUMS_BATCH_LIMIT,
+  readApiError,
+} from "@/lib/utils/chunk";
 import { useQueryState } from "nuqs";
 import { ViewSelector } from "@/components/view-selector";
 import { GridView } from "@/components/gallery/grid-view";
@@ -296,15 +301,28 @@ export function GalleryClient({
 
         if (uncachedFiles.length === 0) return;
 
-        const response = await fetch("/api/files/albums/batch", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ fileNames: uncachedFiles }),
-        });
+        // La route plafonne à FILE_ALBUMS_BATCH_LIMIT fichiers : au-delà elle
+        // répond 400 et aucune pastille d'album ne se met à jour. Cas concret :
+        // le rafraîchissement qui suit un ajout sur une grosse sélection.
+        for (const batch of chunk(uncachedFiles, FILE_ALBUMS_BATCH_LIMIT)) {
+          const response = await fetch("/api/files/albums/batch", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ fileNames: batch }),
+          });
 
-        if (response.ok) {
+          if (!response.ok) {
+            // Un échec ici n'est pas bloquant, mais il ne doit plus passer
+            // inaperçu : sans ça les pastilles restaient vides sans un mot.
+            console.error(
+              "Chargement des albums échoué:",
+              await readApiError(response, `HTTP ${response.status}`),
+            );
+            continue;
+          }
+
           const data = await response.json();
           setFileAlbumsCache((prev) => ({
             ...prev,

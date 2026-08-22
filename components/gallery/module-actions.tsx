@@ -12,6 +12,8 @@ import {
   ChevronLeft,
   ChevronRight,
   PanelRight,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -84,6 +86,25 @@ export function ModuleActions({
 
   // Récupérer l'extension du fichier
   const fileExtension = file.name.split(".").pop()?.toLowerCase() || "";
+
+  /**
+   * Échap referme le bandeau avant de fermer la visionneuse. Sans cette étape,
+   * la seule touche d'échappement disponible ferait perdre le fichier en cours
+   * de consultation alors que l'utilisateur voulait juste ranger les modules.
+   */
+  useEffect(() => {
+    if (variant !== "overlay" || !isExpanded) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setIsExpanded(false);
+    };
+
+    // En phase de capture, pour passer avant le gestionnaire de la visionneuse.
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [variant, isExpanded]);
 
   // Fonction pour gérer le résultat du module UI
   const handleModuleUIComplete = useCallback(
@@ -321,17 +342,22 @@ export function ModuleActions({
 
   // Si aucun module n'est disponible ou en cours de chargement, ne rien afficher
   if (isLoading) {
+    // En surimpression, le chargement prend la place du déclencheur plutôt que
+    // d'afficher une pastille de texte au milieu de l'image.
+    if (variant === "overlay") {
+      return (
+        <div className="pointer-events-none p-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-background/80 shadow-lg backdrop-blur">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div
-        className={cn(
-          "flex items-center justify-center",
-          variant === "overlay"
-            ? "p-3 bg-black/20 dark:bg-white/10 backdrop-blur-md border border-black/20 dark:border-white/20 rounded-xl shadow-2xl"
-            : "p-1"
-        )}
-      >
-        <Loader2 className="h-4 w-4 animate-spin mr-2 text-white/90 dark:text-black/90" />
-        <span className="text-xs text-white/80 dark:text-black/80">
+      <div className="flex items-center justify-center p-1">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">
           {t("gallery.file_viewer.modules.loading")}
         </span>
       </div>
@@ -403,93 +429,91 @@ export function ModuleActions({
   if (variant === "overlay") {
     return (
       <>
-        <motion.div
-          className={cn(
-            "flex items-center bg-black/20 dark:bg-white/10 backdrop-blur-md border border-black/20 dark:border-white/20 rounded-xl shadow-2xl overflow-hidden",
-            !isExpanded && "my-4"
-          )}
-          initial={{ width: "auto" }}
-          animate={{ width: isExpanded ? "auto" : "auto" }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-        >
-          {/* Bouton de toggle à gauche */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-12 w-12 flex-shrink-0 bg-transparent focus:bg-transparent dark:focus:bg-transparent hover:bg-black/30 dark:hover:bg-white/20 active:bg-transparent dark:active:bg-transparent"
-            )}
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            <motion.div
-              animate={{ rotate: isExpanded ? 180 : 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              {isExpanded ? (
-                <ChevronLeft className="h-5 w-5 text-white/90 dark:text-black/90" />
-              ) : (
-                <ChevronRight className="h-5 w-5 text-white/90 dark:text-black/90" />
-              )}
-            </motion.div>
-          </Button>
+        {/*
+          Bandeau révélé depuis le bas de la zone image, au-dessus de la barre
+          d'outils. Il remplace un panneau flottant qui n'était ancré à rien et
+          inventait sa propre palette. Ici, jetons de thème uniquement.
 
-          {/* Contenu expandable */}
-          <AnimatePresence>
-            {isExpanded && (
-              <motion.div
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: "auto", opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="flex flex-col gap-3 p-3 min-w-[300px] border-l-[1px] border-black/20 dark:border-white/20"
-              >
-                {categories.length > 1 && (
-                  <Tabs
-                    value={activeCategory}
-                    onValueChange={setActiveCategory}
-                    className="w-full"
-                  >
-                    <TabsList className="flex w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 justify-end">
-                      {categories.map((category) => (
-                        <TabsTrigger
+          Le système de modules accepte n'importe quoi : ni le nombre de modules
+          ni la liste des catégories ne sont connus à l'avance. Les deux rangées
+          défilent donc horizontalement plutôt que de passer à la ligne, sinon le
+          bandeau grandirait jusqu'à manger l'image.
+        */}
+        <AnimatePresence initial={false}>
+          {isExpanded ? (
+            <motion.div
+              key="bandeau"
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="pointer-events-auto w-full border-t border-border/60 bg-background/90 backdrop-blur"
+            >
+              <div className="flex items-center gap-2 px-4 pt-2">
+                {categories.length > 1 ? (
+                  <div className="-mx-1 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1 pb-0.5">
+                    {categories.map((category) => {
+                      const count =
+                        category === "all"
+                          ? modules.length
+                          : modules.filter(
+                              (m) => (m.category || "other") === category
+                            ).length;
+                      return (
+                        <button
                           key={category}
-                          value={category}
-                          className="text-xs h-7 px-3 whitespace-nowrap flex-shrink-0 data-[state=active]:bg-black/20 dark:data-[state=active]:bg-white/20 data-[state=active]:text-white dark:data-[state=active]:text-black data-[state=active]:shadow-sm"
+                          type="button"
+                          onClick={() => setActiveCategory(category)}
+                          className={cn(
+                            "flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors",
+                            activeCategory === category
+                              ? "bg-secondary text-secondary-foreground"
+                              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                          )}
                         >
                           {category === "all"
                             ? t("gallery.file_viewer.modules.all")
                             : category === "other"
-                            ? t("gallery.file_viewer.modules.other")
-                            : category === "Édition"
-                            ? t(
-                                "gallery.file_viewer.modules.categories.edition"
-                              )
-                            : category === "Marque"
-                            ? t("gallery.file_viewer.modules.categories.brand")
-                            : category === "Effets"
-                            ? t(
-                                "gallery.file_viewer.modules.categories.effects"
-                              )
-                            : category === "Filtres"
-                            ? t(
-                                "gallery.file_viewer.modules.categories.filters"
-                              )
-                            : category}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                  </Tabs>
+                              ? t("gallery.file_viewer.modules.other")
+                              : category}
+                          <span className="text-[10px] tabular-nums opacity-60">
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="flex-1 truncate text-xs text-muted-foreground">
+                    {t("gallery.file_viewer.modules.title")}
+                  </p>
                 )}
 
-                <div className="flex flex-wrap gap-2 justify-end">
-                  {filteredModules.map((module) => (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t("gallery.file_viewer.modules.collapse")}
+                  onClick={() => setIsExpanded(false)}
+                  className="h-7 w-7 shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto px-4 pb-3 pt-2">
+                {filteredModules.length === 0 ? (
+                  <p className="py-2 text-xs text-muted-foreground">
+                    {t("gallery.file_viewer.modules.empty_category")}
+                  </p>
+                ) : (
+                  filteredModules.map((module) => (
                     <TooltipProvider key={module.name}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 border border-black/20 dark:border-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center justify-center"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 shrink-0 gap-2 px-2.5 font-normal"
                             onClick={() =>
                               module.hasUI
                                 ? openModuleUI(module.name)
@@ -497,32 +521,68 @@ export function ModuleActions({
                             }
                             disabled={processingModule === module.name}
                           >
-                            {processingModule === module.name ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-white dark:text-black" />
-                            ) : (
-                              <div className="text-white/90 dark:text-black/90 flex items-center justify-center">
-                                {renderModuleIcon(module)}
-                              </div>
-                            )}
+                            <span className="flex h-4 w-4 items-center justify-center">
+                              {processingModule === module.name ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                renderModuleIcon(module)
+                              )}
+                            </span>
+                            <span className="max-w-40 truncate text-xs">
+                              {module.name}
+                            </span>
+                            {/* Distingue d'un coup d'oeil ce qui s'applique
+                                immédiatement de ce qui ouvre une interface. */}
+                            {module.hasUI ? (
+                              <SlidersHorizontal className="h-3 w-3 text-muted-foreground" />
+                            ) : null}
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent
-                          side="bottom"
-                          className="max-w-[200px] bg-white/95 dark:bg-black/95 backdrop-blur-md border border-white/20 dark:border-white/10 text-black dark:text-white"
-                        >
+                        <TooltipContent side="top" className="max-w-56">
                           <p className="font-medium">{module.name}</p>
-                          <p className="text-xs text-muted-foreground line-clamp-2">
+                          <p className="text-xs text-muted-foreground">
                             {module.description}
                           </p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="declencheur"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.15 }}
+              className="pointer-events-auto p-4"
+            >
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => setIsExpanded(true)}
+                      aria-label={t("gallery.file_viewer.modules.expand")}
+                      className="relative h-11 w-11 rounded-full border border-border/60 bg-background/80 shadow-lg backdrop-blur hover:bg-background"
+                    >
+                      <Wand2 className="h-5 w-5" />
+                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium tabular-nums text-primary-foreground">
+                        {modules.length}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {t("gallery.file_viewer.modules.expand")}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Dialog pour l'interface utilisateur du module */}
         <Dialog

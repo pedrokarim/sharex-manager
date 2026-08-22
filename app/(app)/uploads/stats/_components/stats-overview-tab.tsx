@@ -30,6 +30,11 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import { StatsData, formatFileSize } from "./types";
+import {
+  STAT_CARD,
+  STAT_CARD_CONTENT,
+  STAT_CARD_HEADER,
+} from "./card-spacing";
 
 const chartConfig = {
   api: { label: "Via API", color: "var(--chart-1)" },
@@ -47,11 +52,11 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
   const [activeView, setActiveView] = useState<"api" | "web" | null>(null);
 
   return (
-    <div className="grid gap-4 sm:gap-6">
+    <div className="grid gap-4">
       {/* Cartes de statistiques générales */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-        <Card className="@container">
-          <CardHeader className="pb-2 px-4 pt-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+        <Card className={cn("@container", STAT_CARD)}>
+          <CardHeader className={STAT_CARD_HEADER}>
             <div className="flex items-center gap-2">
               <Upload className="h-3.5 w-3.5 text-muted-foreground" />
               <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -59,7 +64,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0">
+          <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
               {stats.totalUploads.toLocaleString()}
             </div>
@@ -69,8 +74,8 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
           </CardContent>
         </Card>
 
-        <Card className="@container">
-          <CardHeader className="pb-2 px-4 pt-4">
+        <Card className={cn("@container", STAT_CARD)}>
+          <CardHeader className={STAT_CARD_HEADER}>
             <div className="flex items-center gap-2">
               <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
               <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -78,7 +83,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0">
+          <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
               {formatFileSize(stats.totalSize)}
             </div>
@@ -88,8 +93,8 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
           </CardContent>
         </Card>
 
-        <Card className="@container">
-          <CardHeader className="pb-2 px-4 pt-4">
+        <Card className={cn("@container", STAT_CARD)}>
+          <CardHeader className={STAT_CARD_HEADER}>
             <div className="flex items-center gap-2">
               <Code className="h-3.5 w-3.5 text-muted-foreground" />
               <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -97,7 +102,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0">
+          <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
               {stats.uploadsByMethod.api.toLocaleString()}
             </div>
@@ -107,8 +112,8 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
           </CardContent>
         </Card>
 
-        <Card className="@container">
-          <CardHeader className="pb-2 px-4 pt-4">
+        <Card className={cn("@container", STAT_CARD)}>
+          <CardHeader className={STAT_CARD_HEADER}>
             <div className="flex items-center gap-2">
               <Globe className="h-3.5 w-3.5 text-muted-foreground" />
               <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -116,7 +121,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0">
+          <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
               {stats.uploadsByMethod.web.toLocaleString()}
             </div>
@@ -126,8 +131,8 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
           </CardContent>
         </Card>
 
-        <Card className="@container">
-          <CardHeader className="pb-2 px-4 pt-4">
+        <Card className={cn("@container", STAT_CARD)}>
+          <CardHeader className={STAT_CARD_HEADER}>
             <div className="flex items-center gap-2">
               <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
               <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -135,7 +140,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0">
+          <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
               {format(new Date(stats.oldestFile.date), "dd/MM/yy", { locale })}
             </div>
@@ -148,8 +153,8 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
           </CardContent>
         </Card>
 
-        <Card className="@container">
-          <CardHeader className="pb-2 px-4 pt-4">
+        <Card className={cn("@container", STAT_CARD)}>
+          <CardHeader className={STAT_CARD_HEADER}>
             <div className="flex items-center gap-2">
               <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
               <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -157,7 +162,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0">
+          <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
               {format(new Date(stats.newestFile.date), "dd/MM/yy", { locale })}
             </div>
@@ -172,7 +177,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
       </div>
 
       {/* Graphique des uploads par jour */}
-      <Card className="col-span-full">
+      <Card className={cn("col-span-full", STAT_CARD)}>
         <CardHeader className="flex flex-col items-stretch space-y-0 border-b p-0 sm:flex-row">
           <div className="flex flex-1 flex-col justify-center gap-1 px-4 py-3 sm:px-5 sm:py-4">
             <CardTitle className="text-sm sm:text-base font-semibold">
@@ -212,7 +217,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
             ))}
           </div>
         </CardHeader>
-        <CardContent className="p-3 sm:p-4">
+        <CardContent className={STAT_CARD_CONTENT}>
           <ChartContainer
             config={chartConfig}
             className="h-[200px] sm:h-[240px] lg:h-[320px] w-full"
@@ -278,13 +283,13 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
       </Card>
 
       {/* Graphique de la taille moyenne des fichiers par jour */}
-      <Card className="col-span-full">
-        <CardHeader className="pb-2 px-4 pt-4 sm:px-5">
+      <Card className={cn("col-span-full", STAT_CARD)}>
+        <CardHeader className={STAT_CARD_HEADER}>
           <CardTitle className="text-sm sm:text-base font-semibold">
             {t("uploads.stats.cards.average_size")}
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-3 sm:p-4 pt-2">
+        <CardContent className={STAT_CARD_CONTENT}>
           <ChartContainer
             config={chartConfig}
             className="h-[180px] sm:h-[220px] w-full"

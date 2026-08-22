@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import { BrandingPageClient } from "@/components/branding/branding-page.client";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Branding • ShareX Manager",
-  description: "Identité visuelle, couleurs et composants de ShareX Manager.",
-};
+export const metadata = publicPageMetadata({
+  title: "Identité visuelle",
+  description:
+    "Logos, couleurs et règles d'usage de la marque ShareX Manager.",
+  path: "/branding",
+});
+
 
 const Page = () => {
   return <BrandingPageClient />;

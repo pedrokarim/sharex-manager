@@ -1,10 +1,9 @@
 import { Metadata } from "next";
 import { FeedbackPageClient } from "./page.client";
+import { privatePageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Feedback - ShareX Manager",
-  description: "Partagez vos idées et aidez-nous à améliorer ShareX Manager",
-};
+export const metadata = privatePageMetadata({ title: "Votre avis" });
+
 
 export default function FeedbackPage() {
   return <FeedbackPageClient />;

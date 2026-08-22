@@ -25,7 +25,8 @@
     "preview": "Aperçu",
     "yes": "Oui",
     "no": "Non",
-    "apply": "Appliquer"
+    "apply": "Appliquer",
+    "open": "Ouvrir"
   },
   "navigation": {
     "home": "Accueil",
@@ -45,6 +46,21 @@
   "settings": {
     "title": "Paramètres",
     "description": "Gérez tous les paramètres de votre application ShareX Manager",
+    "groups": {
+      "personalisation": {
+        "title": "Personnalisation",
+        "description": "Les réglages qui définissent l'apparence, le rythme et le confort de navigation."
+      },
+      "publication": {
+        "title": "Publication",
+        "description": "Tout ce qui touche au pipeline de diffusion, aux accès et aux adresses publiques."
+      },
+      "monitoring": {
+        "title": "Pilotage",
+        "description": "Les vues qui permettent de comprendre l'activité, les tendances et l'historique."
+      }
+    },
+    "preferences_badge": "Interface",
     "preferences": "Préférences utilisateur",
     "preferences_description": "Personnalisez vos préférences d'affichage et de fonctionnalités",
     "appearance": "Apparence",
@@ -382,7 +398,10 @@
         "processing": "Traitement en cours...",
         "select_module": "Sélectionner un module",
         "apply_module": "Appliquer le module",
-        "cancel_processing": "Annuler le traitement"
+        "cancel_processing": "Annuler le traitement",
+        "empty_category": "Aucun module dans cette catégorie.",
+        "collapse": "Masquer les modules",
+        "expand": "Modules disponibles"
       }
     },
     "upload_zone": {
@@ -496,139 +515,126 @@
   "tools": {
     "title": "Outils",
     "description": "Fonctionnalités supplémentaires pour améliorer votre expérience",
-    "minecraft_skin": {
-      "title": "Minecraft Skin Renderer",
-      "description": "Générateur d'images de skins Minecraft en 2D et 3D avec support des capes",
-      "configuration": "Configuration",
-      "configuration_description": "Configurez les paramètres de rendu pour votre skin Minecraft",
-      "results": "Résultats",
-      "results_description": "Images générées à partir de votre configuration",
-      "uuid_placeholder": "Entrez l'UUID du joueur (sans tirets)",
-      "uuid_help": "Vous pouvez trouver l'UUID sur",
-      "model": "Modèle",
-      "model_slim": "Slim (Alex)",
-      "model_classic": "Classic (Steve)",
-      "flip": "Retourner",
-      "flip_yes": "Oui",
-      "flip_no": "Non",
-      "width": "Largeur",
-      "height": "Hauteur",
-      "theta": "Theta (3D)",
-      "phi": "Phi (3D)",
-      "time": "Temps (3D)",
-      "generate_all": "Générer tout",
-      "generating": "Génération...",
-      "head": "Tête",
-      "body": "Modèle 3D",
-      "skin": "Skin 2D",
-      "cape": "Cape",
-      "no_image": "Aucune image générée",
-      "generated_successfully": "Généré avec succès",
-      "use_tool": "Utiliser l'outil",
-      "coming_soon": "Bientôt disponible",
-      "generate": "Générer",
-      "download": "Télécharger",
-      "refresh": "Actualiser",
-      "featured_skins": "Skins en vedette",
-      "featured_trending": "Trending",
-      "featured_empty": "Aucun skin en vedette disponible",
-      "recent_skins": "Skins récemment recherchés",
-      "recent_empty": "Aucune recherche récente. Recherchez un joueur pour commencer !",
-      "api_doc": "Documentation API",
-      "api_doc_title": "Minecraft Skin API",
-      "api_doc_description": "API REST pour rechercher des joueurs Minecraft, générer des rendus de skins et télécharger des textures.",
-      "api_doc_back": "Retour au viewer",
-      "api_doc_base_url": "URL de base",
-      "api_doc_endpoints": "Endpoints",
-      "api_doc_params": "Paramètres",
-      "api_doc_response": "Réponse",
-      "api_doc_example_curl": "Exemple cURL",
-      "api_doc_example_response": "Exemple de réponse",
-      "api_doc_required": "Requis",
-      "api_doc_optional": "Optionnel"
+    "hub": {
+      "back": "Retour à l'accueil",
+      "kicker": "Services annexes",
+      "title": "Les outils vivent à côté, et ils sont bien mieux là-bas.",
+      "subtitle": "ShareX Manager s'occupe de vos images. Tout le reste (conversion, formatage, palettes, données Minecraft) est hébergé sur deux services dédiés, gratuits et ouverts.",
+      "note": "Ces deux services sont hébergés séparément de ShareX Manager. Ils s'ouvrent dans un nouvel onglet et ne demandent aucun compte.",
+      "services": {
+        "just_tools": {
+          "tagline": "12 outils de développement, gratuits et open source",
+          "description": "La boîte à outils du quotidien : encoder, formater, valider, générer, convertir. Tout tourne dans le navigateur, rien n'est envoyé sur un serveur.",
+          "preview_alt": "La page d'accueil de Just Tools",
+          "highlights": [
+            "Base64",
+            "Formateur de code",
+            "Validateur JSON",
+            "Générateur de palette",
+            "Extracteur de couleurs",
+            "Mots de passe",
+            "Éditeur Markdown",
+            "Halftone",
+            "Synthèse vocale"
+          ]
+        },
+        "mcinfo": {
+          "tagline": "Serveurs, joueurs et skins Minecraft",
+          "description": "Interrogez n'importe quel serveur Java ou Bedrock en direct, retrouvez un profil joueur et affichez son skin en 2D comme en 3D.",
+          "preview_alt": "La page d'accueil de MCInfo",
+          "highlights": [
+            "Statut de serveur en direct",
+            "MOTD rendu",
+            "Profils joueurs",
+            "Historique de pseudos",
+            "Rendu de skins 2D",
+            "Visionneuse 3D",
+            "API publique"
+          ]
+        }
+      }
     }
   },
   "home": {
     "title": "ShareX Manager",
     "subtitle": "Gérez vos captures d'écran et images avec facilité",
+    "landing": {
+      "hero": {
+        "title": "Vos captures,",
+        "title_accent": "chez vous.",
+        "subtitle": "Le point de chute de tout ce que vous capturez : upload en un raccourci, lien public immédiat, albums, statistiques et clés d'API. Sur votre serveur, pas celui d'un autre.",
+        "compatibility": "ShareX · Flameshot · Android · Liens permanents · Sans publicité",
+        "screenshot_alt": "La galerie de ShareX Manager, images classées par mois",
+        "cta_primary": "Explorer le catalogue",
+        "cta_secondary": "Se connecter",
+        "stat_images": "images hébergées",
+        "stat_storage": "stockés",
+        "stat_albums": "albums publics"
+      },
+      "flow": {
+        "kicker": "Le flux",
+        "title": "Du raccourci clavier au lien public",
+        "description": "ShareX sur Windows, Flameshot sur Linux, l'app Android en partage natif : tout arrive au même endroit, immédiatement indexé.",
+        "bullets": [
+          "Lien copié dans le presse-papiers dès la fin de l'upload",
+          "Miniatures, recherche et filtres par date",
+          "Albums privés ou publiés en un clic"
+        ],
+        "image_alt": "L'historique des uploads, avec la date, la taille et la méthode de chaque fichier"
+      },
+      "catalog": {
+        "kicker": "Le catalogue",
+        "title": "Une vitrine, séparée de votre espace privé",
+        "description": "Le catalogue public a sa propre navigation, ses albums et ses pages. Vous choisissez exactement ce qui sort.",
+        "bullets": [
+          "Albums publiables individuellement",
+          "Liens directs et intégrations Discord",
+          "Thème et branding personnalisables"
+        ],
+        "image_alt": "La page d'accueil du catalogue public",
+        "cta": "Voir le catalogue"
+      },
+      "wall": {
+        "kicker": "Le mur",
+        "title": "{count} images et ça continue",
+        "cta": "Parcourir toutes les images"
+      },
+      "tools": {
+        "kicker": "L'écosystème",
+        "title": "Et deux services de plus, juste à côté",
+        "description": "ShareX Manager ne fait qu'une chose. Pour encoder, formater, générer une palette ou interroger un serveur Minecraft, deux services dédiés prennent le relais, sans compte et sans installation.",
+        "cta": "Découvrir les outils"
+      },
+      "setup": {
+        "kicker": "Mise en route",
+        "title": "Opérationnel en trois étapes",
+        "subtitle": "Aucune inscription, aucun service tiers. Une image Docker, un fichier de configuration, et votre touche Impr. écran devient un lien partageable.",
+        "window_title": "sharex-manager.sxcu",
+        "steps": [
+          {
+            "title": "Déployez",
+            "description": "Un docker compose up -d et l'instance tourne, base SQLite incluse."
+          },
+          {
+            "title": "Générez une clé",
+            "description": "Une clé d'API par machine, révocable, avec ses propres permissions."
+          },
+          {
+            "title": "Importez la configuration",
+            "description": "ShareX, Flameshot ou l'app Android pointent vers votre domaine."
+          }
+        ]
+      }
+    },
     "new": {
-      "features_eyebrow": "Pourquoi ShareX Manager",
-      "features_title": "Tout pour gérer vos uploads",
-      "features_subtitle": "Une interface moderne, rapide et configurable, pensée pour votre workflow.",
-      "code_eyebrow": "Style ShareXManager",
-      "code_window_title": "Exemple de configuration",
       "code_tab_sharex": "ShareX",
       "code_tab_curl": "cURL",
       "code_copy_sharex": "Copier la config ShareX",
-      "code_copy_curl": "Copier la commande cURL",
-      "showcase_eyebrow": "Aperçu",
-      "showcase_aria_label": "Aperçu de l’interface",
-      "showcase_title": "Un aperçu de l’expérience",
-      "showcase_subtitle": "Des écrans et états UI, pour un rendu propre en clair comme en sombre.",
-      "tools_all_title": "Tous les outils",
-      "tools_all_description": "Explorez l’ensemble des outils et fonctionnalités bonus.",
-      "coming_soon_title": "Plus d’outils",
-      "coming_soon_description": "De nouvelles fonctionnalités arrivent bientôt pour booster votre workflow.",
-      "coming_soon_badge": "Bientôt",
-      "available_badge": "Disponible",
-      "cta_title": "Prêt à centraliser vos uploads ?",
-      "cta_subtitle": "Galerie, sécurité, organisation et outils — avec un thème qui vous ressemble.",
-      "stats_uploads": "Uploads",
-      "stats_storage": "Stockage",
-      "stats_modules": "Modules"
+      "code_copy_curl": "Copier la commande cURL"
     },
     "cta": {
       "gallery": "Voir ma galerie",
       "configure": "Configurer ShareX"
-    },
-    "features": {
-      "upload": {
-        "title": "Upload rapide",
-        "description": "Téléchargez vos images instantanément via ShareX",
-        "fast": "Upload en un clic",
-        "history": "Historique complet"
-      },
-      "security": {
-        "title": "Sécurité",
-        "description": "Vos images sont protégées et privées",
-        "private": "Accès privé",
-        "api_keys": "Clés API sécurisées"
-      },
-      "management": {
-        "title": "Gestion",
-        "description": "Organisez et gérez vos images facilement",
-        "customization": "Personnalisation",
-        "stats": "Statistiques détaillées"
-      },
-      "tools": {
-        "title": "Outils",
-        "description": "Fonctionnalités supplémentaires pour vos images",
-        "minecraft": "Générateur de skins Minecraft",
-        "more": "Et bien plus à venir"
-      }
-    },
-    "tools_section": {
-      "title": "Outils supplémentaires",
-      "subtitle": "Découvrez nos fonctionnalités bonus",
-      "cta": "Voir tous les outils"
-    },
-    "configuration": {
-      "title": "Configuration ShareX",
-      "badge": "Facile",
-      "intro": "Configurez ShareX pour utiliser votre instance personnelle :",
-      "steps": {
-        "step1": "Téléchargez et installez ShareX",
-        "step2": "Ouvrez les paramètres de ShareX",
-        "step3": "Ajoutez une nouvelle destination avec ces paramètres :",
-        "step4": "Testez votre configuration en prenant une capture"
-      },
-      "config_items": {
-        "request_url": "URL de requête",
-        "method": "Méthode",
-        "file_form": "Nom du champ fichier"
-      },
-      "download_config": "Télécharger la config",
-      "get_api_key": "Obtenir une clé API"
     }
   },
   "branding": {
@@ -729,23 +735,37 @@
   "admin": {
     "title": "Administration",
     "description": "Gérez les paramètres d'administration de votre application ShareX Manager",
+    "soon": "Bientôt",
     "sections": {
       "users": {
         "title": "Gestion des utilisateurs",
         "badge": "Utilisateurs",
-        "description": "Gérez les utilisateurs et leurs permissions"
+        "description": "Gérez les comptes, leurs rôles et leurs permissions."
       },
       "logs": {
         "title": "Logs système",
-        "description": "Consultez les logs et l'activité du système"
+        "badge": "Observabilité",
+        "description": "Consultez les logs et l'activité du système."
+      },
+      "theme": {
+        "title": "Thème global",
+        "badge": "Design system",
+        "description": "Publiez la base visuelle du site et préparez les futures extensions de branding."
       },
       "system": {
         "title": "Configuration système",
-        "description": "Gérez les paramètres système et la configuration des uploads"
+        "badge": "Infrastructure",
+        "description": "Gérez les paramètres système et la configuration des uploads."
+      },
+      "modules": {
+        "title": "Gestion des modules",
+        "badge": "Extensions",
+        "description": "Gérez les modules installés et leurs dépendances."
       },
       "security": {
-        "title": "Sécurité (Bientôt disponible)",
-        "description": "Configurez les paramètres de sécurité avancés"
+        "title": "Sécurité",
+        "badge": "Protection",
+        "description": "Configurez les paramètres de sécurité avancés."
       }
     },
     "security": {

@@ -6,11 +6,15 @@ import { Mail, MessageSquare, User, Globe, Send } from "lucide-react";
 import { Github } from "@/components/ui/icons";
 import { Card } from "@/components/ui/card";
 import { ContactForm } from "./contact-form";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Contact | ShareX Manager",
-  description: "Contactez-nous pour toute question concernant ShareX Manager.",
-};
+export const metadata = publicPageMetadata({
+  title: "Contact",
+  description:
+    "Une question, un signalement ou une demande : écrivez-nous.",
+  path: "/contact",
+});
+
 
 export default function ContactPage() {
   return (

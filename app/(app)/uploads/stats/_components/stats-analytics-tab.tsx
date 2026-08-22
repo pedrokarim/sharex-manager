@@ -20,6 +20,12 @@ import {
 } from "@/components/ui/chart";
 import { useTranslation } from "@/lib/i18n";
 import { StatsData } from "./types";
+import {
+  STAT_CARD,
+  STAT_CARD_CONTENT,
+  STAT_CARD_HEADER,
+} from "./card-spacing";
+import { cn } from "@/lib/utils";
 
 const chartConfig = {
   count: { label: "Nombre", color: "var(--chart-1)" },
@@ -57,17 +63,17 @@ export function StatsAnalyticsTab({ stats }: StatsAnalyticsTabProps) {
   })();
 
   return (
-    <div className="grid gap-4 sm:gap-6">
+    <div className="grid gap-4">
       {/* Graphiques côte à côte */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         {/* Types de fichiers */}
-        <Card>
-          <CardHeader className="pb-2 px-4 pt-4 sm:px-5">
+        <Card className={STAT_CARD}>
+          <CardHeader className={STAT_CARD_HEADER}>
             <CardTitle className="text-sm sm:text-base font-semibold">
               {t("uploads.stats.charts.uploads_by_type")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
+          <CardContent className={STAT_CARD_CONTENT}>
             <ChartContainer
               config={chartConfig}
               className="h-[200px] sm:h-[240px] w-full"
@@ -133,13 +139,13 @@ export function StatsAnalyticsTab({ stats }: StatsAnalyticsTabProps) {
         </Card>
 
         {/* Uploads par heure */}
-        <Card>
-          <CardHeader className="pb-2 px-4 pt-4 sm:px-5">
+        <Card className={STAT_CARD}>
+          <CardHeader className={STAT_CARD_HEADER}>
             <CardTitle className="text-sm sm:text-base font-semibold">
               {t("uploads.stats.charts.uploads_by_hour")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
+          <CardContent className={STAT_CARD_CONTENT}>
             <ChartContainer
               config={chartConfig}
               className="h-[200px] sm:h-[240px] w-full"
@@ -181,13 +187,13 @@ export function StatsAnalyticsTab({ stats }: StatsAnalyticsTabProps) {
       </div>
 
       {/* Uploads par jour de la semaine */}
-      <Card className="col-span-full">
-        <CardHeader className="pb-2 px-4 pt-4 sm:px-5">
+      <Card className={cn("col-span-full", STAT_CARD)}>
+        <CardHeader className={STAT_CARD_HEADER}>
           <CardTitle className="text-sm sm:text-base font-semibold">
             {t("uploads.stats.charts.uploads_by_weekday")}
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-3 sm:p-4 pt-2">
+        <CardContent className={STAT_CARD_CONTENT}>
           <ChartContainer
             config={chartConfig}
             className="h-[160px] sm:h-[200px] w-full"
@@ -229,13 +235,13 @@ export function StatsAnalyticsTab({ stats }: StatsAnalyticsTabProps) {
       </Card>
 
       {/* Distribution des tailles de fichiers */}
-      <Card className="col-span-full">
-        <CardHeader className="pb-2 px-4 pt-4 sm:px-5">
+      <Card className={cn("col-span-full", STAT_CARD)}>
+        <CardHeader className={STAT_CARD_HEADER}>
           <CardTitle className="text-sm sm:text-base font-semibold">
             {t("uploads.stats.charts.size_distribution")}
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-3 sm:p-4 pt-2">
+        <CardContent className={STAT_CARD_CONTENT}>
           <ChartContainer
             config={chartConfig}
             className="h-[180px] sm:h-[220px] w-full"

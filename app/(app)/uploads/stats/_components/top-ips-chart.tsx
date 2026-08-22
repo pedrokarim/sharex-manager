@@ -17,6 +17,11 @@ import {
 import { useTranslation } from "@/lib/i18n";
 import { formatFileSize } from "./types";
 import type { TopIPEntry } from "@/lib/types/geo";
+import {
+  STAT_CARD,
+  STAT_CARD_CONTENT,
+  STAT_CARD_HEADER,
+} from "./card-spacing";
 
 const chartConfig = {
   count: { label: "Uploads", color: "var(--chart-1)" },
@@ -59,15 +64,15 @@ export function TopIpsChart({ topIps }: TopIpsChartProps) {
   }));
 
   return (
-    <div className="grid gap-4 sm:gap-6">
+    <div className="grid gap-4">
       {/* Bar chart horizontal */}
-      <Card>
-        <CardHeader className="pb-2 px-4 pt-4 sm:px-5">
+      <Card className={STAT_CARD}>
+        <CardHeader className={STAT_CARD_HEADER}>
           <CardTitle className="text-sm sm:text-base font-semibold">
             {t("uploads.stats.network.top_ips_chart")}
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-3 sm:p-4 pt-0">
+        <CardContent className={STAT_CARD_CONTENT}>
           <ChartContainer
             config={chartConfig}
             className="h-[280px] sm:h-[340px] w-full"
@@ -111,7 +116,7 @@ export function TopIpsChart({ topIps }: TopIpsChartProps) {
       {/* py-0 : Card porte py-6 depuis shadcn v4, qui s'ajoutait au pt-4 de
           l'en-tête et laissait une bande vide sous le tableau. */}
       <Card className="gap-0 overflow-hidden py-0">
-        <CardHeader className="px-4 pb-2 pt-4 sm:px-5">
+        <CardHeader className={STAT_CARD_HEADER}>
           <CardTitle className="text-sm sm:text-base font-semibold">
             {t("uploads.stats.network.top_ips_table")}
           </CardTitle>

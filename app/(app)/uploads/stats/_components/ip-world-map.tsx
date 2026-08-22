@@ -11,6 +11,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslation } from "@/lib/i18n";
 import type { GeoMarker } from "@/lib/types/geo";
+import {
+  STAT_CARD,
+  STAT_CARD_CONTENT,
+  STAT_CARD_HEADER,
+} from "./card-spacing";
+import { cn } from "@/lib/utils";
 
 const GEO_URL =
   "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -36,13 +42,13 @@ function IPWorldMapInner({ markers }: IPWorldMapProps) {
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-2 px-4 pt-4 sm:px-5">
+    <Card className={STAT_CARD}>
+      <CardHeader className={STAT_CARD_HEADER}>
         <CardTitle className="text-sm sm:text-base font-semibold">
           {t("uploads.stats.network.world_map")}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-3 sm:p-4 pt-0 relative">
+      <CardContent className={cn(STAT_CARD_CONTENT, "relative")}>
         <div className="w-full aspect-[2/1] rounded-lg overflow-hidden border bg-muted/20">
           <ComposableMap
             projectionConfig={{

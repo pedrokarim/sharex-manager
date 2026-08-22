@@ -107,10 +107,20 @@ export function ThemeProvider({
 
   useEffect(() => {
     const root = document.documentElement;
-    applyRuntimeThemeToElement(root, resolvedTheme.styles, runtimeState.activeMode);
+    applyRuntimeThemeToElement(
+      root,
+      resolvedTheme.styles,
+      runtimeState.activeMode,
+      runtimeState.modePreference,
+    );
     root.dataset.themePreference = runtimeState.themePreference;
     root.dataset.themeMode = runtimeState.activeMode;
-  }, [resolvedTheme.styles, runtimeState.activeMode, runtimeState.themePreference]);
+  }, [
+    resolvedTheme.styles,
+    runtimeState.activeMode,
+    runtimeState.modePreference,
+    runtimeState.themePreference,
+  ]);
 
   const runWithTransition = (coords: Coords | undefined, updater: () => void) => {
     const root = document.documentElement;

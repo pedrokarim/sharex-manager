@@ -1,13 +1,12 @@
 "use client";
 
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { toast } from "sonner";
+import { ArrowUpRight, Download, Package, Trash2 } from "lucide-react";
 import { ModuleConfig } from "@/types/modules";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -22,15 +21,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
-import { toast } from "sonner";
-import Image from "next/image";
-import { Package, Download, Trash2 } from "lucide-react";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 interface ModuleCardProps {
@@ -39,25 +34,33 @@ interface ModuleCardProps {
   onDelete: (moduleName: string) => Promise<void>;
 }
 
+/**
+ * Carte d'un module dans le registre.
+ *
+ * La carte est une colonne à trois zones de hauteur fixe ou extensible :
+ * en-tête, corps, pied. Le pied est poussé en bas par `mt-auto`, sinon il
+ * remontait coller au contenu et les actions se retrouvaient à une hauteur
+ * différente dans chaque carte d'une même rangée, avec un vide sous elles.
+ */
 export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isInstallingDeps, setIsInstallingDeps] = useState(false);
-  const [isNpmDepsOpen, setIsNpmDepsOpen] = useState(false);
+
+  const npmDependencies = module.npmDependencies ?? {};
+  const npmCount = Object.keys(npmDependencies).length;
+  const fileTypes = module.supportedFileTypes ?? [];
+  const hasPages = Boolean(module.pages?.length);
 
   const handleToggle = async () => {
     try {
       setIsLoading(true);
       await onToggle(module.name);
       toast.success(
-        `Module ${module.name} ${
-          module.enabled ? "désactivé" : "activé"
-        } avec succès`
+        `Module ${module.name} ${module.enabled ? "désactivé" : "activé"}`
       );
     } catch (error) {
-      toast.error(
-        `Erreur lors de l'activation/désactivation du module ${module.name}`
-      );
+      toast.error(`Impossible de changer l'état du module ${module.name}`);
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -68,51 +71,36 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
     try {
       setIsLoading(true);
       await onDelete(module.name);
-      toast.success(`Module ${module.name} supprimé avec succès`);
+      toast.success(`Module ${module.name} supprimé`);
     } catch (error) {
-      toast.error(`Erreur lors de la suppression du module ${module.name}`);
+      toast.error(`Impossible de supprimer le module ${module.name}`);
       console.error(error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleImageError = () => {
-    setImageError(true);
-  };
-
-  // Installer les dépendances NPM
   const handleInstallNpmDeps = async () => {
     try {
       setIsInstallingDeps(true);
-
       const response = await fetch("/api/modules/install-dependencies", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ moduleName: module.name }),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(
-          data.error || "Erreur lors de l'installation des dépendances NPM"
-        );
+        throw new Error(data.error || "Installation des dépendances impossible");
       }
 
-      toast.success(
-        `Dépendances NPM installées avec succès pour le module ${module.name}`
-      );
+      toast.success(`Dépendances installées pour ${module.name}`);
     } catch (error) {
-      console.error(
-        "Erreur lors de l'installation des dépendances NPM:",
-        error
-      );
+      console.error("Erreur lors de l'installation des dépendances :", error);
       toast.error(
         error instanceof Error
           ? error.message
-          : "Erreur lors de l'installation des dépendances NPM"
+          : "Installation des dépendances impossible"
       );
     } finally {
       setIsInstallingDeps(false);
@@ -122,139 +110,185 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
   return (
     <Card
       className={cn(
-        "group w-full transition-all duration-200 hover:shadow-md relative",
-        !module.enabled && "opacity-60"
+        "group flex h-full flex-col gap-0 overflow-hidden py-0 transition-colors",
+        "hover:border-primary/40",
+        // Un module en veille reste lisible : on le signale par une teinte de
+        // fond et le point d'état, pas en effaçant la carte entière.
+        !module.enabled && "bg-muted/30"
       )}
     >
-      {module.category && (
-        <div className="absolute top-3 right-3 z-10">
-          <Badge variant="outline" className="text-xs">
-            {module.category}
-          </Badge>
-        </div>
-      )}
+      {/* ─── En-tête ──────────────────────────────────── */}
+      <div className="flex items-start gap-3 p-5">
+        <span
+          className={cn(
+            "relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted ring-1 ring-border/60",
+            !module.enabled && "grayscale"
+          )}
+        >
+          {module.icon && !imageError ? (
+            <Image
+              src={module.icon}
+              alt=""
+              width={48}
+              height={48}
+              className="h-full w-full object-cover"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <Package className="h-5 w-5 text-muted-foreground" />
+          )}
+        </span>
 
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-md overflow-hidden flex items-center justify-center bg-muted">
-              {module.icon && !imageError ? (
-                <Image
-                  src={module.icon}
-                  alt={`Icône du module ${module.name}`}
-                  width={48}
-                  height={48}
-                  className="object-cover"
-                  onError={handleImageError}
-                />
-              ) : (
-                <Package className="h-6 w-6 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              aria-hidden
+              className={cn(
+                "h-2 w-2 shrink-0 rounded-full",
+                module.enabled ? "bg-emerald-500" : "bg-muted-foreground/40"
               )}
-            </div>
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <span
-                  className={cn(
-                    "inline-block h-2 w-2 rounded-full",
-                    module.enabled ? "bg-green-500" : "bg-gray-400"
-                  )}
-                />
-                {module.name}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground truncate">
-                v{module.version} · {module.author}
-              </p>
-            </div>
+            />
+            <h3 className="truncate font-semibold" title={module.name}>
+              {module.name}
+            </h3>
+            {module.category && (
+              <Badge
+                variant="outline"
+                className="h-5 shrink-0 px-1.5 text-[10px] font-normal"
+              >
+                {module.category}
+              </Badge>
+            )}
           </div>
-          <Switch
-            checked={module.enabled}
-            onCheckedChange={handleToggle}
-            disabled={isLoading}
-            aria-label={`Activer/désactiver le module ${module.name}`}
-          />
+          <p className="mt-1 truncate text-xs text-muted-foreground">
+            v{module.version} · {module.author}
+          </p>
         </div>
-      </CardHeader>
 
-      <CardContent>
-        <p className="text-sm text-muted-foreground line-clamp-2">
+        <Switch
+          checked={module.enabled}
+          onCheckedChange={handleToggle}
+          disabled={isLoading}
+          aria-label={`Activer ou désactiver le module ${module.name}`}
+          className="mt-0.5 shrink-0"
+        />
+      </div>
+
+      {/* ─── Corps ────────────────────────────────────── */}
+      <div className="flex flex-1 flex-col gap-3 px-5 pb-5">
+        {/* Hauteur réservée pour deux lignes : sans elle, une description
+            courte remonterait tout ce qui suit et désalignerait la rangée. */}
+        <p className="line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">
           {module.description}
         </p>
 
-        {module.supportedFileTypes && module.supportedFileTypes.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {module.supportedFileTypes.map((type) => (
-              <Badge key={type} variant="secondary" className="text-xs font-mono">
-                .{type}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {fileTypes.length > 0 ? (
+            fileTypes.map((type) => (
+              <Badge
+                key={type}
+                variant="secondary"
+                className="h-5 px-1.5 font-mono text-[10px] font-normal"
+              >
+                {type === "*" ? "tous" : `.${type}`}
               </Badge>
-            ))}
-          </div>
+            ))
+          ) : (
+            <span className="text-[11px] text-muted-foreground/70">
+              Sans traitement d&apos;upload
+            </span>
+          )}
+        </div>
+
+        {npmCount > 0 && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 w-fit gap-1.5 px-2 text-xs font-normal text-muted-foreground"
+              >
+                <Package className="h-3.5 w-3.5" />
+                {npmCount} dépendance{npmCount > 1 ? "s" : ""} NPM
+              </Button>
+            </PopoverTrigger>
+            {/* Un popover plutôt qu'un dépliant : déplier changeait la hauteur
+                de la carte, donc celle de toute la rangée. Et une liste de
+                vingt dépendances défile ici sans rien déformer. */}
+            <PopoverContent align="start" className="w-80 p-0">
+              <div className="border-b px-3 py-2.5">
+                <p className="text-sm font-medium">Dépendances NPM</p>
+                <p className="text-xs text-muted-foreground">
+                  Requises par le module {module.name}.
+                </p>
+              </div>
+
+              <div className="max-h-56 overflow-y-auto p-1.5">
+                {Object.entries(npmDependencies).map(([name, version]) => (
+                  <div
+                    key={name}
+                    className="flex items-baseline justify-between gap-3 rounded px-1.5 py-1 text-xs hover:bg-muted/60"
+                  >
+                    <span className="truncate font-mono">{name}</span>
+                    <span className="shrink-0 font-mono text-muted-foreground">
+                      {version}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t p-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleInstallNpmDeps}
+                  disabled={isInstallingDeps}
+                  className="h-8 w-full gap-1.5 text-xs"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {isInstallingDeps ? "Installation…" : "Installer les dépendances"}
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
+
+      {/* ─── Pied ─────────────────────────────────────── */}
+      <div className="mt-auto flex items-center justify-between gap-2 border-t px-3 py-2.5">
+        {hasPages && module.enabled ? (
+          <Button variant="ghost" size="sm" asChild className="h-8 gap-1.5 px-2">
+            <Link href={`/m/${module.name}`}>
+              Ouvrir
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        ) : (
+          <span className="px-2 text-xs text-muted-foreground">
+            {module.enabled ? "Actif" : "En veille"}
+          </span>
         )}
 
-        {module.npmDependencies &&
-          Object.keys(module.npmDependencies).length > 0 && (
-            <Collapsible
-              open={isNpmDepsOpen}
-              onOpenChange={setIsNpmDepsOpen}
-              className="mt-4"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
-                  Dépendances NPM:{" "}
-                  {Object.keys(module.npmDependencies).length}
-                </p>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    {isNpmDepsOpen ? "Masquer" : "Afficher"}
-                  </Button>
-                </CollapsibleTrigger>
-              </div>
-              <CollapsibleContent className="mt-2">
-                <div className="text-xs text-muted-foreground space-y-1 border rounded-md p-2">
-                  {Object.entries(module.npmDependencies).map(
-                    ([name, version]) => (
-                      <div key={name} className="flex justify-between">
-                        <span>{name}</span>
-                        <span>{version}</span>
-                      </div>
-                    )
-                  )}
-                  <div className="pt-2 flex justify-end">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleInstallNpmDeps}
-                      disabled={isInstallingDeps}
-                      className="flex items-center gap-1"
-                    >
-                      <Download className="h-3 w-3" />
-                      {isInstallingDeps ? "Installation..." : "Installer"}
-                    </Button>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-      </CardContent>
-
-      <CardFooter className="flex justify-end">
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
               disabled={isLoading}
-              className="text-muted-foreground hover:text-destructive"
+              className="h-8 gap-1.5 px-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
             >
-              <Trash2 className="h-4 w-4 mr-1.5" />
+              <Trash2 className="h-3.5 w-3.5" />
               Supprimer
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
+              <AlertDialogTitle>
+                Supprimer le module {module.name} ?
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                Cette action supprimera définitivement le module {module.name}{" "}
-                et ne peut pas être annulée.
+                Le dossier du module et ses données seront retirés de
+                l&apos;instance. Cette action est définitive.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -265,7 +299,7 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </CardFooter>
+      </div>
     </Card>
   );
 };

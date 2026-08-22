@@ -51,12 +51,12 @@ import { cn } from "@/lib/utils";
 import type { ModuleConfig } from "@/types/modules";
 import { ModuleShell } from "../components/module-shell";
 import { ImageViewer, type Shot } from "../components/image-viewer";
-import { getModelSpec } from "../lib/models";
 import {
   callModule,
   formatBytes,
   imageUrl,
   timeAgo,
+  type Collection,
   type HistoryItem,
   type ModuleStats,
 } from "../lib/client";
@@ -75,16 +75,20 @@ export default function LibraryPage({}: LibraryPageProps) {
   const [query, setQuery] = useState("");
   const [modelFilter, setModelFilter] = useState("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [collectionFilter, setCollectionFilter] = useState("all");
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [history, moduleStats] = await Promise.all([
+      const [history, moduleStats, cols] = await Promise.all([
         callModule<HistoryItem[]>("getHistory", 200),
         callModule<ModuleStats>("getStats"),
+        callModule<Collection[]>("listCollections"),
       ]);
       setItems(history);
       setStats(moduleStats);
+      setCollections(cols);
     } catch {
       toast.error("Chargement de la bibliothèque impossible");
     } finally {
@@ -101,6 +105,12 @@ export default function LibraryPage({}: LibraryPageProps) {
     return items.filter((item) => {
       if (favoritesOnly && !item.favorite) return false;
       if (modelFilter !== "all" && item.model !== modelFilter) return false;
+      if (
+        collectionFilter !== "all" &&
+        (item.collectionId ?? "none") !== collectionFilter
+      ) {
+        return false;
+      }
       if (!needle) return true;
       // Les notes font partie de ce qui a produit l'image : les inclure évite
       // qu'une recherche sur « aquarelle » rate les générations où le mot est
@@ -110,7 +120,14 @@ export default function LibraryPage({}: LibraryPageProps) {
         item.notes.toLowerCase().includes(needle)
       );
     });
-  }, [items, query, modelFilter, favoritesOnly]);
+  }, [items, query, modelFilter, favoritesOnly, collectionFilter]);
+
+  /** Les libellés de modèles viennent des statistiques : le catalogue courant
+      ne connaît plus forcément un moteur retiré depuis. */
+  const modelLabels = useMemo(
+    () => new Map((stats?.byModel ?? []).map((entry) => [entry.model, entry.label])),
+    [stats]
+  );
 
   /** La grille montre des images, pas des générations : on aplatit les lots. */
   const shots: Shot[] = useMemo(
@@ -275,7 +292,24 @@ export default function LibraryPage({}: LibraryPageProps) {
                 <SelectItem value="all">Tous les modèles</SelectItem>
                 {availableModels.map((m) => (
                   <SelectItem key={m} value={m}>
-                    {getModelSpec(m)?.label ?? m}
+                    {modelLabels.get(m) ?? m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {collections.length > 0 && (
+            <Select value={collectionFilter} onValueChange={setCollectionFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les séries</SelectItem>
+                <SelectItem value="none">Hors série</SelectItem>
+                {collections.map((collection) => (
+                  <SelectItem key={collection.id} value={collection.id}>
+                    {collection.name}
                   </SelectItem>
                 ))}
               </SelectContent>

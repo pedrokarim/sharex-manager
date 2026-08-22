@@ -10,6 +10,7 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
         NEXT_PUBLIC_IMAGE_DOMAIN: ${NEXT_PUBLIC_IMAGE_DOMAIN:-img.ascencia.re}
         NEXT_PUBLIC_APP_DOMAIN: ${NEXT_PUBLIC_APP_DOMAIN:-sxm.ascencia.re}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://sxm.ascencia.re}
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     env_file:
@@ -22,6 +23,10 @@ services:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3000}
       - NEXT_PUBLIC_IMAGE_DOMAIN=${NEXT_PUBLIC_IMAGE_DOMAIN:-img.ascencia.re}
       - NEXT_PUBLIC_APP_DOMAIN=${NEXT_PUBLIC_APP_DOMAIN:-ascencia.re}
+      # URL publique utilisée par les metadata et les images Open Graph. Comme
+      # tout NEXT_PUBLIC_*, elle est figée dans le bundle au moment du build,
+      # d'où sa présence aussi dans `args`.
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-https://sxm.ascencia.re}
       - TZ=Europe/Paris
     restart: unless-stopped
     user: "${UID:-1000}:${GID:-1000}"

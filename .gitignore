@@ -70,3 +70,6 @@ modules/*/data/
 skills-lock.json
 
 tweakcn
+
+# Explorations design locales (non versionnées)
+/.design/

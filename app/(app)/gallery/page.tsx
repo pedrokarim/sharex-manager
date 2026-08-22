@@ -2,6 +2,10 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { GalleryClient } from "./page.client";
 import { headers } from "next/headers";
+import { privatePageMetadata } from "@/lib/seo";
+
+export const metadata = privatePageMetadata({ title: "Galerie" });
+
 
 interface SearchParams {
   q?: string;
