@@ -39,6 +39,11 @@ services:
       # `modules/` est cuit dans l'image : sans ce montage, tout serait perdu à
       # chaque rebuild. Les clés API peuvent aussi passer par .env, qui prime.
       - ./module-data/ai-image-gen:/app/modules/ai-image-gen/data
+      # Session Codex du module ai-image-gen. Sans ce montage, il faudrait se
+      # reconnecter après chaque redéploiement : le jeton vit dans ce dossier.
+      # Connexion initiale, une seule fois, sans navigateur sur le serveur :
+      #   docker compose exec sharex-manager codex login --device-auth
+      - ./codex-home:/app/codex-home
       - next-cache:/app/.next/cache
 
 volumes:

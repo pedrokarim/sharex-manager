@@ -6,8 +6,49 @@
 # contient une image plus ancienne produirait donc un build cassé, sans que rien
 # n'indique la cause. Toute montée de version se fait ici, sciemment.
 ARG BUN_VERSION=1.3.14
+
+# Version de Codex ÉPINGLÉE, pour la même raison que Bun : une image
+# reconstruite dans six mois doit livrer le binaire qu'on a validé, pas le
+# dernier en date. Toute montée de version se fait ici, sciemment.
+ARG CODEX_VERSION=0.149.0
+
 FROM oven/bun:${BUN_VERSION} AS base
 WORKDIR /app
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Codex CLI, pour le module ai-image-gen
+#
+# Le module sait générer des images en pilotant un agent en ligne de commande
+# déjà authentifié, ce qui consomme un abonnement au lieu d'une clé facturée à
+# l'image. Encore faut-il que le binaire existe dans le conteneur.
+#
+# On prend l'archive « package » et non le binaire nu : elle embarque `rg` et
+# surtout `bwrap`, le bac à sable que Codex utilise sous Linux. Sans lui,
+# l'exécution en `--sandbox read-only` échoue.
+#
+# Ce que l'archive ne contient pas, en revanche, c'est la compétence de
+# génération d'images : Codex la sème dans $CODEX_HOME au premier lancement.
+# Un volume vide suffit donc, rien à préinstaller.
+# ─────────────────────────────────────────────────────────────────────────────
+FROM base AS codex
+ARG CODEX_VERSION
+ARG TARGETARCH
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+RUN set -eu; \
+    case "${TARGETARCH:-amd64}" in \
+      amd64) target="x86_64-unknown-linux-musl" ;; \
+      arm64) target="aarch64-unknown-linux-musl" ;; \
+      *) echo "ERREUR: architecture non gérée pour Codex: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    mkdir -p /opt/codex; \
+    curl -fsSL "https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/codex-package-${target}.tar.gz" \
+      | tar -xz -C /opt/codex; \
+    chmod +x /opt/codex/bin/* /opt/codex/codex-path/* /opt/codex/codex-resources/bwrap
+# Échec au build plutôt qu'une image qui démarre sans moteur : une archive
+# tronquée ou une architecture inattendue se voit ici, pas en production.
+RUN /opt/codex/bin/codex --version
 
 # Dépendances applicatives
 FROM base AS deps
@@ -68,12 +109,26 @@ RUN mkdir -p /app/.next/static \
     /app/uploads \
     /app/uploads/thumbnails \
     /app/data \
-    /app/config && \
+    /app/config \
+    /app/codex-home && \
     chmod 755 /app/uploads \
     /app/uploads/thumbnails \
     /app/data \
-    /app/config && \
-    chown -R 1000:1000 /app/uploads /app/data /app/config
+    /app/config \
+    /app/codex-home && \
+    chown -R 1000:1000 /app/uploads /app/data /app/config /app/codex-home
+
+# Codex, plus son `rg` et son `bwrap`. Le PATH plutôt qu'un lien symbolique :
+# le binaire déduit l'emplacement de ses ressources du sien, un lien depuis
+# /usr/local/bin lui ferait chercher `codex-resources` au mauvais endroit.
+COPY --from=codex /opt/codex /opt/codex
+ENV PATH="/opt/codex/bin:${PATH}"
+
+# Emplacement explicite, indépendant de l'utilisateur qui fait tourner le
+# conteneur : le compose impose un UID arbitraire, et $HOME peut alors pointer
+# ailleurs, voire nulle part. C'est ici que vivent les jetons de session Codex,
+# d'où le volume.
+ENV CODEX_HOME=/app/codex-home
 
 # La sortie standalone embarque server.js, proxy.ts et le sous-ensemble de
 # node_modules réellement utilisé.
@@ -86,7 +141,7 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 
-VOLUME ["/app/uploads", "/app/config", "/app/data"]
+VOLUME ["/app/uploads", "/app/config", "/app/data", "/app/codex-home"]
 
 RUN mkdir -p .next/cache && chown -R 1000:1000 .next
 

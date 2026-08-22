@@ -40,6 +40,13 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 - Module AI Image Gen : consignes négatives, variantes et agrandissement local
   depuis la carte d'une génération.
 - Module AI Image Gen : icône dédiée, produite par le module lui-même.
+- Déploiement : l'image Docker embarque le CLI Codex, version épinglée, avec
+  son bac à sable `bwrap`. La session vit dans le volume `./codex-home`, la
+  connexion se fait une fois avec `docker compose exec sharex-manager codex
+  login --device-auth`, sans navigateur sur le serveur.
+- Module AI Image Gen : mode d'isolation réglable pour les agents CLI qui en
+  proposent un, le mécanisme du noyau n'étant pas toujours disponible en
+  conteneur.
 
 ### Changed
 
@@ -62,6 +69,9 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 - Module AI Image Gen : le studio dépose un travail au lieu d'attendre la
   réponse HTTP, ce qu'une génération par agent (une minute ou plus) ne permettait
   pas de tenir.
+- Module AI Image Gen : la détection des agents est mise en cache une minute.
+  Elle lançait deux processus par CLI installé à chaque ouverture du studio, ce
+  qui se voit sur une machine modeste. Le bouton de la page Moteurs la forçe.
 - Page « Gestion des modules » : catégorie ramenée à côté du nom au lieu de
   chevaucher l'interrupteur, quatrième colonne sur très large écran, et raccourci
   « Ouvrir » sur les modules qui exposent des pages.

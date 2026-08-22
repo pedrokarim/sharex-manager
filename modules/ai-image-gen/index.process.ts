@@ -97,7 +97,7 @@ export async function getCatalogue(): Promise<CatalogPayload> {
 
 /** Relance la détection des CLI, sans passer par le catalogue complet. */
 export async function detectCliEngines(): Promise<CliEngineStatus[]> {
-  return probeCliEngines(buildEngineConfig());
+  return probeCliEngines(buildEngineConfig(), { force: true });
 }
 
 export async function getSecretsStatus() {
@@ -124,6 +124,7 @@ export async function saveCliSettings(
     binaryPath?: string;
     assumeImageCapable?: boolean;
     timeoutSeconds?: number;
+    sandbox?: string;
   }
 ): Promise<{ success: boolean }> {
   const secrets = readSecrets();
