@@ -135,6 +135,14 @@ RUN mkdir -p /app/.next/static \
     /app/codex-home && \
     chown -R 1000:1000 /app/uploads /app/data /app/config /app/codex-home
 
+# L'image de base ne contient aucun certificat racine : Bun n'en a pas besoin,
+# il embarque les siens. Codex, lui, valide TLS avec ceux du système, et sans
+# eux toute connexion sortante de l'agent échoue sur un laconique « error
+# sending request » — y compris la connexion au compte.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 # Codex, plus son `rg` et son `bwrap`. Le PATH plutôt qu'un lien symbolique :
 # le binaire déduit l'emplacement de ses ressources du sien, un lien depuis
 # /usr/local/bin lui ferait chercher `codex-resources` au mauvais endroit.

@@ -89,6 +89,9 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Image Docker : ajout des certificats racine. L'image de base n'en contenait
+  aucun, Bun embarquant les siens ; le CLI Codex, qui valide TLS avec ceux du
+  système, échouait sur « error sending request » dès la connexion au compte.
 - Build Docker : Bun 1.3.14 segfaute en fermant ses workers, après que
   `next build` a terminé son travail. Le build échouait en sortie 132 alors que
   `.next/standalone` et `.next/static` étaient complets. L'étape ne tolère ce
