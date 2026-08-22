@@ -13,6 +13,9 @@ export const SITE_URL = (
 
 export const SITE_NAME = "ShareX Manager";
 
+/** Le catalogue public a sa propre marque, affichée dans sa barre de navigation. */
+export const CATALOG_NAME = "SXM Catalog";
+
 /** Image Open Graph par défaut, servie par `app/og/route.tsx`. */
 export const DEFAULT_OG_IMAGE = {
   url: `${SITE_URL}/og`,

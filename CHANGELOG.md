@@ -20,7 +20,8 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 - `app/robots.ts` et `app/sitemap.ts`, ce dernier listant les pages publiques et
   un lien par album public.
 - Images Open Graph : une image par défaut générée, et une image dédiée par
-  album public composée de ses quatre premières images.
+  album public composée de ses quatre premières images. Chacune porte le logo
+  de sa surface, celui de la plateforme ou celui du catalogue.
 - Titre dynamique sur la fiche d'un album public et sur les pages de module.
 - Module AI Image Gen : génération d'images par un agent en ligne de commande
   déjà authentifié sur le serveur (Codex CLI validé, Gemini CLI et Claude Code

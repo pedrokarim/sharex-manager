@@ -5,7 +5,8 @@ import sharp from "sharp";
 
 import { getAbsoluteUploadPath } from "@/lib/config";
 import { albumFallbackDescription, getPublicAlbumSummary } from "@/lib/seo-album";
-import { SITE_NAME } from "@/lib/seo";
+import { LOGO_CATALOG, loadPublicImage } from "@/lib/og-assets";
+import { CATALOG_NAME } from "@/lib/seo";
 
 export const alt = "Album public sur ShareX Manager";
 export const size = { width: 1200, height: 630 };
@@ -50,6 +51,8 @@ export default async function AlbumOpengraphImage({
 }) {
   const { slug } = await params;
   const album = getPublicAlbumSummary(slug);
+  // Le catalogue a son propre logo, distinct de celui de la plateforme.
+  const logo = await loadPublicImage(LOGO_CATALOG, { size: 96 });
 
   const covers = album
     ? (await Promise.all(album.covers.map(loadCover))).filter(
@@ -170,20 +173,19 @@ export default async function AlbumOpengraphImage({
             }}
           >
             <div style={{ display: "flex", alignItems: "center" }}>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: "#6d5cf5",
-                  fontSize: 22,
-                }}
-              >
-                🖼️
-              </div>
+              {logo ? (
+                <img src={logo} width={44} height={44} style={{ width: 44, height: 44 }} />
+              ) : (
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    display: "flex",
+                    backgroundColor: "#6d5cf5",
+                  }}
+                />
+              )}
               <div
                 style={{
                   marginLeft: 16,
@@ -192,7 +194,7 @@ export default async function AlbumOpengraphImage({
                   color: "rgba(255,255,255,0.85)",
                 }}
               >
-                {SITE_NAME}
+                {CATALOG_NAME}
               </div>
             </div>
 
