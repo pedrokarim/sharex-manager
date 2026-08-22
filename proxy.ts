@@ -6,49 +6,8 @@ import type { LogAction } from "@/lib/types/logs";
 
 const imageDomain = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
 
-/**
- * Surface publique, accessible sans session.
- *
- * L'ancienne liste contenait `"/"` et était testée avec `startsWith` : tout
- * chemin commençant par une barre oblique, donc *tous*, était considéré public.
- * Le proxy retournait immédiatement à chaque requête et ses deux contrôles —
- * 401 sur l'API, redirection vers la connexion sur les pages — n'étaient jamais
- * atteints.
- */
-const PUBLIC_EXACT = new Set([
-  "/",
-  "/login",
-  "/register",
-  "/forgot-password",
-  "/about",
-  "/contact",
-  "/branding",
-  "/support",
-  "/feedback",
-  "/about-app",
-  "/og",
-  "/robots.txt",
-  "/sitemap.xml",
-  "/favicon.ico",
-  "/manifest.webmanifest",
-]);
-
-/** Préfixes publics : le chemin exact et tout ce qu'il contient. */
-const PUBLIC_PREFIXES = [
-  "/img-handler",
-  "/catalog",
-  "/tools",
-  "/legal",
-  "/api/public",
-  "/_next",
-];
-
-function isPublicPath(path: string) {
-  if (PUBLIC_EXACT.has(path)) return true;
-  return PUBLIC_PREFIXES.some(
-    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
-  );
-}
+// Liste des routes publiques
+const publicRoutes = ["/img-handler", "/", "/login"];
 
 // Configuration CORS — restreint aux domaines autorisés
 const ALLOWED_ORIGINS = [
@@ -115,13 +74,8 @@ export async function proxy(req: NextRequest) {
   // get real domain
   const realDomain = req.headers.get("host") || url.host || url.hostname;
 
-  // Les requêtes de pré-vérification CORS ne portent jamais de session : les
-  // bloquer casserait toute requête inter-domaines avant même son envoi.
-  if (req.method === "OPTIONS") {
-    return setCorsHeaders(NextResponse.next(), req);
-  }
-
-  if (isPublicPath(path)) {
+  // Vérifier si la route est publique
+  if (publicRoutes.some((route) => path.startsWith(route))) {
     return setCorsHeaders(NextResponse.next(), req);
   }
 
