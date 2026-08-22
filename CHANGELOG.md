@@ -7,6 +7,21 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Page d'accueil refondue : héros avec capture de l'application, sections
+  alternées texte/capture, mise en route en trois étapes avec le fichier
+  `.sxcu`, mur d'images et renvoi vers les services annexes. Les chiffres et
+  les vignettes viennent du catalogue public réel, lus côté serveur.
+- Page « Outils » transformée en passerelle vers Just Tools et MCInfo, avec la
+  capture, le logo et le contenu de chaque service. Une section de l'accueil y
+  renvoie.
+- Référencement : `metadataBase`, gabarit de titre, description, lien
+  canonique, Open Graph et carte Twitter sur toutes les pages publiques. Les
+  pages privées passent en `noindex` via le layout de leur groupe.
+- `app/robots.ts` et `app/sitemap.ts`, ce dernier listant les pages publiques et
+  un lien par album public.
+- Images Open Graph : une image par défaut générée, et une image dédiée par
+  album public composée de ses quatre premières images.
+- Titre dynamique sur la fiche d'un album public et sur les pages de module.
 - Module AI Image Gen : génération d'images par un agent en ligne de commande
   déjà authentifié sur le serveur (Codex CLI validé, Gemini CLI et Claude Code
   détectés), sans clef API. La page Moteurs liste les agents installés avec leur
@@ -27,6 +42,13 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Typographie : Geist remplacé par Plus Jakarta Sans et JetBrains Mono,
+  servies par `next/font` donc auto-hébergées. Site vitrine aligné.
+- Cartes de navigation des écrans « Administration » et « Réglages » unifiées
+  dans un composant commun, avec leurs libellés déplacés dans les traductions.
+- Ajout de fichiers à un album : la sélection part par lots de cinquante,
+  album par album, avec la progression affichée et un état partiel signalé
+  comme tel.
 - Visionneuse de fichiers : les modules quittent le panneau flottant du coin
   haut-droit pour un bandeau révélé depuis le bas de la zone image, au-dessus
   de la barre d'outils. Un bouton rond en bas à gauche l'ouvre, une rangée de
@@ -47,8 +69,41 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Removed
 
+- Rendu de skins Minecraft : page, route de test, scripts NameMC et commande
+  de rendu. Le service MCInfo assure cette fonction.
+- Page « Test Couleurs ».
+- `ThemeWrapper`, désactivé de longue date et en doublon avec le
+  `ThemeProvider`, ainsi que son crochet et la dépendance `next-themes` devenue
+  inutilisée.
+
 ### Fixed
 
+- Flash au chargement : la page s'affichait en clair avant de basculer en
+  sombre. Le thème est désormais décidé au rendu serveur (classe sur `<html>`,
+  variables dans le `<head>`), et le mode « système » est résolu en CSS par le
+  navigateur, sans JavaScript. Effet de bord corrigé : un thème « système »
+  suit maintenant un changement de mode du système d'exploitation en direct.
+- Contrôle d'accès du proxy : sa liste blanche contenait `"/"` testé avec
+  `startsWith`, donc toute route passait pour publique et les deux contrôles
+  n'étaient jamais atteints. `/account`, `/dashboard` et `/upgrade`
+  s'affichaient sans session.
+- Ajout à un album au-delà de cinquante fichiers : la requête était rejetée
+  et aucun fichier n'était ajouté, pour un message d'erreur générique.
+- Défilement de l'application : au-delà d'un écran de contenu, c'était la
+  fenêtre qui défilait et l'encart perdait ses marges et ses coins arrondis.
+- Espacements des cartes de statistiques : neuf recettes de padding écrites
+  à la main s'ajoutaient au `py-6` de la carte shadcn v4 au lieu de le
+  remplacer, soit quarante pixels de vide en haut et en bas de chaque carte.
+- Sections de l'accueil décentrées : trois largeurs de conteneur différentes
+  et des marges négatives qui décalaient le bloc visible.
+- Cartes de l'écran d'administration : le dégradé posé dans le `CardHeader`
+  laissait deux bandes vides, le `py-6` de la carte le maintenant à l'intérieur.
+- Échelle de crénage : `--tracking-*` n'était défini nulle part, les
+  utilitaires `tracking-tight` n'avaient donc aucun effet.
+- Polices d'un thème publié : la feuille Google n'était chargée que dans
+  l'éditeur, l'application retombait sur la police système.
+- Traductions : la clé racine `home` était présente deux fois dans
+  `en.json`, tout le premier bloc était mort.
 - Page « Gestion des modules » : les actions des cartes se plaçaient à une
   hauteur différente dans chaque carte d'une même rangée, avec un vide sous
   elles. Le pied de carte est désormais ancré en bas.
