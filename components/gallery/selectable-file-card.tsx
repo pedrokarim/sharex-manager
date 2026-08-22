@@ -3,8 +3,12 @@
 import { MouseEvent } from "react";
 import { Check } from "lucide-react";
 import { FileCard } from "@/components/file-card";
-import { FileContextMenu } from "@/components/gallery/file-context-menu";
-import { MultiSelectContextMenu } from "@/components/gallery/multi-select-context-menu";
+import { FileContextMenuContent } from "@/components/gallery/file-context-menu";
+import { MultiSelectContextMenuContent } from "@/components/gallery/multi-select-context-menu";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { AlbumIndicator } from "@/components/gallery/album-indicator";
 import { cn } from "@/lib/utils";
 import type { FileInfo } from "@/types/files";
@@ -161,48 +165,59 @@ export function SelectableFileCard({
     </div>
   );
 
-  // Choisir le bon context menu en fonction du mode
-  if (isSelectionMode && selectedCount > 0) {
-    return (
-      <MultiSelectContextMenu
-        selectedFiles={allSelectedFiles}
-        selectedCount={selectedCount}
-        onCopyUrls={onCopyUrls}
-        onToggleStarSelected={onToggleStarSelected}
-        onToggleSecuritySelected={onToggleSecuritySelected}
-        onDeleteSelected={onDeleteSelected}
-        onAddToAlbum={
-          hasSelection
-            ? onAddToAlbum
-            : () => onAddSingleFileToAlbum?.(file.name)
-        }
-        onCreateAlbum={(fileName) => onCreateAlbum?.(fileName)}
-        onClearSelection={onClearSelection}
-        albums={albums}
-        onAddToSpecificAlbum={onAddToSpecificAlbum}
-        enabled={true}
-      >
-        {cardContent}
-      </MultiSelectContextMenu>
-    );
-  }
+  // Le menu dépend du mode, mais la racine, elle, ne doit jamais changer :
+  // remplacer le composant d'enveloppe démonterait la carte entière — donc la
+  // grille entière — au moment où la sélection démarre. Le bouton qui vient
+  // d'être cliqué disparaîtrait alors du DOM, et le navigateur replacerait le
+  // défilement en haut de la liste.
+  const menu = isSelectionMode
+    ? selectedCount > 0
+      ? "multiple"
+      : "aucun"
+    : "fichier";
 
   return (
-    <FileContextMenu
-      file={file}
-      onCopy={onCopy}
-      onToggleStar={onToggleStar}
-      onToggleSecurity={onToggleSecurity}
-      onDelete={onDelete}
-      onAddToAlbum={onAddToAlbum}
-      onCreateAlbum={onCreateAlbum}
-      onAddSingleFileToAlbum={onAddSingleFileToAlbum}
-      albums={albums}
-      onAddToSpecificAlbum={onAddToSpecificAlbum}
-      isSelectionMode={isSelectionMode}
-      disabled={isSelectionMode}
-    >
-      {cardContent}
-    </FileContextMenu>
+    <ContextMenu>
+      {/* Désactivé plutôt que retiré : le clic droit rend la main au menu natif,
+          comme avant, sans démonter la carte. */}
+      <ContextMenuTrigger asChild disabled={menu === "aucun"}>
+        {cardContent}
+      </ContextMenuTrigger>
+
+      {menu === "multiple" && (
+        <MultiSelectContextMenuContent
+          selectedFiles={allSelectedFiles}
+          selectedCount={selectedCount}
+          onCopyUrls={onCopyUrls}
+          onToggleStarSelected={onToggleStarSelected}
+          onToggleSecuritySelected={onToggleSecuritySelected}
+          onDeleteSelected={onDeleteSelected}
+          onAddToAlbum={
+            hasSelection
+              ? onAddToAlbum
+              : () => onAddSingleFileToAlbum?.(file.name)
+          }
+          onCreateAlbum={(fileName) => onCreateAlbum?.(fileName)}
+          onClearSelection={onClearSelection}
+          albums={albums}
+          onAddToSpecificAlbum={onAddToSpecificAlbum}
+        />
+      )}
+
+      {menu === "fichier" && (
+        <FileContextMenuContent
+          file={file}
+          onCopy={onCopy}
+          onToggleStar={onToggleStar}
+          onToggleSecurity={onToggleSecurity}
+          onDelete={onDelete}
+          onAddToAlbum={onAddToAlbum}
+          onCreateAlbum={onCreateAlbum}
+          onAddSingleFileToAlbum={onAddSingleFileToAlbum}
+          albums={albums}
+          onAddToSpecificAlbum={onAddToSpecificAlbum}
+        />
+      )}
+    </ContextMenu>
   );
 }
