@@ -125,6 +125,26 @@ const codexEngine: CliEngineSpec = {
   imageCapable: true,
   versionArgs: ["--version"],
   authArgs: ["login", "status"],
+  sandboxModes: [
+    {
+      value: "read-only",
+      label: "Lecture seule",
+      description:
+        "L'agent ne peut rien écrire. Suffisant ici, puisque ses rendus sont récupérés dans son propre dossier d'archive.",
+    },
+    {
+      value: "workspace-write",
+      label: "Écriture dans l'espace de travail",
+      description:
+        "L'agent peut écrire dans le dossier jetable de la génération, et nulle part ailleurs.",
+    },
+    {
+      value: "off",
+      label: "Sans bac à sable",
+      description:
+        "Dernier recours en conteneur, quand le noyau ou le profil seccomp de l'hôte empêche le bac à sable de démarrer. L'isolation ne repose alors plus que sur le conteneur lui-même.",
+    },
+  ],
   parseAuth: (out) => {
     const text = out.trim();
     const match = text.match(/Logged in using (.+)/i);
@@ -143,14 +163,17 @@ const codexEngine: CliEngineSpec = {
         "N'exécute aucune commande shell et n'écris, ne copie ni ne déplace aucun fichier : les rendus de image_gen sont récupérés directement. Une fois toutes les images générées, réponds uniquement OK.",
     });
 
+    // Le mode d'isolation est un réglage et non une constante : sous Linux,
+    // Codex s'appuie sur bubblewrap, qui a besoin des espaces de noms
+    // utilisateur. Un hôte qui les refuse ferait échouer toutes les
+    // générations sans que rien ne puisse être fait depuis l'interface.
+    const sandbox =
+      typeof input.options.sandbox === "string" ? input.options.sandbox : "read-only";
+
     const args = [
       "exec",
       "--json",
       "--skip-git-repo-check",
-      // Lecture seule : l'agent n'a besoin d'aucun droit d'écriture puisqu'on
-      // récupère ses rendus dans son propre dossier d'archive.
-      "--sandbox",
-      "read-only",
       // Sans cette option, les serveurs MCP configurés par l'utilisateur sont
       // démarrés à chaque génération : plusieurs secondes perdues et des
       // erreurs d'authentification sans rapport dans le journal.
@@ -158,6 +181,12 @@ const codexEngine: CliEngineSpec = {
       "--cd",
       input.workspace,
     ];
+
+    if (sandbox === "off") {
+      args.push("--dangerously-bypass-approvals-and-sandbox");
+    } else {
+      args.push("--sandbox", sandbox);
+    }
 
     for (const file of input.referenceFiles) {
       args.push("--image", file);

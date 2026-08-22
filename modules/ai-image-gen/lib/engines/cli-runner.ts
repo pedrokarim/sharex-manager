@@ -63,6 +63,12 @@ export interface CliEngineSpec {
   /** Commande facultative rendant compte du compte connecté. */
   authArgs?: string[];
   parseAuth?: (out: string) => { authenticated: boolean; account: string | null };
+  /**
+   * Modes de bac a sable proposes, quand le CLI en a un. En conteneur, le
+   * mecanisme d'isolation peut etre indisponible selon le noyau et le profil
+   * seccomp de l'hote : il faut pouvoir le relacher sans toucher au code.
+   */
+  sandboxModes?: { value: string; label: string; description: string }[];
   models: EngineModelSpec[];
   /** Construit la ligne de commande d'une génération. */
   plan(input: CliPlanInput): CliPlan;

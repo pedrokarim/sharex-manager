@@ -43,6 +43,8 @@ export interface CliEngineStatus {
   enabled: boolean;
   custom: boolean;
   configuredPath?: string;
+  sandboxModes: { value: string; label: string; description: string }[];
+  sandbox: string | null;
   binaryPath: string | null;
   version: string | null;
   account: string | null;

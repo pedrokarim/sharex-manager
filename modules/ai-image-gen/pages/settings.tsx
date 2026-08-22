@@ -507,6 +507,36 @@ function CliEngineCard({
         </FieldDescription>
       </Field>
 
+      {engine.sandboxModes.length > 0 && installed && (
+        <Field>
+          <FieldLabel htmlFor={`sandbox-${engine.id}`} className="text-xs">
+            Isolation de l&apos;agent
+          </FieldLabel>
+          <Select
+            value={engine.sandbox ?? engine.sandboxModes[0].value}
+            onValueChange={(value) => save({ sandbox: value })}
+          >
+            <SelectTrigger id={`sandbox-${engine.id}`} className="h-8 w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {engine.sandboxModes.map((mode) => (
+                <SelectItem key={mode.value} value={mode.value}>
+                  {mode.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldDescription className="text-[11px]">
+            {
+              engine.sandboxModes.find(
+                (mode) => mode.value === (engine.sandbox ?? engine.sandboxModes[0].value)
+              )?.description
+            }
+          </FieldDescription>
+        </Field>
+      )}
+
       <div className="flex flex-col gap-2 border-t pt-3">
         <label className="flex items-center justify-between gap-3 text-xs">
           <span>Proposer dans le studio</span>

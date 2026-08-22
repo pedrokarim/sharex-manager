@@ -51,6 +51,8 @@ export interface CliEngineSettings {
   assumeImageCapable?: boolean;
   /** Délai maximal d'une exécution, en secondes. */
   timeoutSeconds?: number;
+  /** Mode d'isolation, pour les CLI qui en proposent un. */
+  sandbox?: string;
 }
 
 export interface EngineConfig {
@@ -197,7 +199,32 @@ export interface CliEngineStatus extends CliProbe {
   /** Chemin imposé par l'utilisateur, s'il y en a un. */
   configuredPath?: string;
   custom: boolean;
+  /** Modes d'isolation proposés par ce CLI, vide s'il n'en a pas. */
+  sandboxModes: { value: string; label: string; description: string }[];
+  /** Mode retenu, ou null quand la notion ne s'applique pas. */
+  sandbox: string | null;
   models: EngineModelSpec[];
+}
+
+/**
+ * Résultat de la dernière détection.
+ *
+ * Chaque sonde lance deux processus par CLI installé, et le studio demande le
+ * catalogue à chaque ouverture. Sur une machine modeste, relancer tout cela à
+ * chaque chargement se voit. Le cache est volontairement court : une
+ * connexion faite dans un terminal doit se refléter sans qu'on ait à redémarrer
+ * le serveur, et le bouton de la page Moteurs le contourne de toute façon.
+ */
+const PROBE_CACHE_MS = 60_000;
+
+let probeCache: { key: string; at: number; result: CliEngineStatus[] } | null = null;
+
+/** Ce qui, en changeant, doit invalider la détection. */
+function probeKey(config: EngineConfig): string {
+  return JSON.stringify({
+    cli: config.cli,
+    customs: config.customEngines.map((entry) => [entry.id, entry.binary]),
+  });
 }
 
 /**
@@ -206,8 +233,25 @@ export interface CliEngineStatus extends CliProbe {
  * plutôt que disparaître comme s'il n'était pas installé.
  */
 export async function probeCliEngines(
-  config: EngineConfig
+  config: EngineConfig,
+  options: { force?: boolean } = {}
 ): Promise<CliEngineStatus[]> {
+  const key = probeKey(config);
+  if (
+    !options.force &&
+    probeCache &&
+    probeCache.key === key &&
+    Date.now() - probeCache.at < PROBE_CACHE_MS
+  ) {
+    return probeCache.result;
+  }
+
+  const result = await runProbes(config);
+  probeCache = { key, at: Date.now(), result };
+  return result;
+}
+
+async function runProbes(config: EngineConfig): Promise<CliEngineStatus[]> {
   const specs = [
     ...BUILT_IN_CLI_ENGINES,
     ...config.customEngines.map(buildCustomEngine),
@@ -231,6 +275,10 @@ export async function probeCliEngines(
         enabled: settings.enabled !== false,
         configuredPath: settings.binaryPath,
         custom,
+        sandboxModes: spec.sandboxModes ?? [],
+        sandbox: spec.sandboxModes?.length
+          ? (settings.sandbox ?? spec.sandboxModes[0].value)
+          : null,
         models: spec.models,
       };
 
