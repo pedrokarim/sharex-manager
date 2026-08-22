@@ -79,6 +79,14 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Galerie : démarrer une sélection ramenait la vue en haut de la liste. La
+  carte changeait de composant d'enveloppe selon le mode, ce qui démontait la
+  grille entière (bouton qui venait d'être cliqué compris), et le navigateur
+  replaçait alors le défilement. La racine du menu contextuel est désormais
+  unique et stable : seul son contenu change. Le défilement, le focus et les
+  images restent en place, en vue grille comme en vue liste.
+- Galerie : en vue liste et en vue détails, le rond de sélection ne faisait
+  rien. La vue ne recevait pas le gestionnaire qui démarre la sélection.
 - Flash au chargement : la page s'affichait en clair avant de basculer en
   sombre. Le thème est désormais décidé au rendu serveur (classe sur `<html>`,
   variables dans le `<head>`), et le mode « système » est résolu en CSS par le

@@ -1461,6 +1461,7 @@ export function GalleryClient({
                       onDeleteSelected={handleDeleteSelected}
                       onToggleStarSelected={handleToggleStarSelected}
                       onToggleSecuritySelected={handleToggleSecuritySelected}
+                      onStartSelectionMode={handleStartSelectionMode}
                       detailed={viewMode === "details"}
                       newFileIds={newFileIds}
                     />
