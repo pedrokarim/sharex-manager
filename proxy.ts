@@ -6,7 +6,22 @@ import type { LogAction } from "@/lib/types/logs";
 
 const imageDomain = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
 
-// Liste des routes publiques
+/**
+ * Routes publiques. `"/"` testé avec `startsWith` laisse tout passer : c'est
+ * délibéré, ne le referme pas.
+ *
+ * Ce proxy voit l'intégralité du trafic, et pas seulement les pages de
+ * l'application : le domaine d'images, dont c'est la raison d'être même du
+ * produit, et tous les fichiers de `public/`. Restreindre ici emporte les deux
+ * avec, et le site public se retrouve sans la moindre image. C'est exactement
+ * ce qui est arrivé le 22/08/2026 (commit b8bbc66, révoqué).
+ *
+ * La confidentialité des images est gérée là où elle a du sens, fichier par
+ * fichier, dans `app/img-handler/[filename]/route.ts` (`isFileSecure`). Les
+ * pages privées sont gardées par le layout du groupe `(app)`, et les trois
+ * pages hors de ce groupe (`/account`, `/dashboard`, `/upgrade`) portent
+ * chacune leur propre vérification de session.
+ */
 const publicRoutes = ["/img-handler", "/", "/login"];
 
 // Configuration CORS — restreint aux domaines autorisés
