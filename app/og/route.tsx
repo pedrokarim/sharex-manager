@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 
+import { LOGO_SITE, loadPublicImage } from "@/lib/og-assets";
 import { SITE_NAME } from "@/lib/seo";
 
 const size = { width: 1200, height: 630 };
@@ -16,7 +17,9 @@ const size = { width: 1200, height: 630 };
  * raccourci `background`, et tout conteneur à plusieurs enfants doit déclarer
  * son `display: flex`.
  */
-export function GET() {
+export async function GET() {
+  const logo = await loadPublicImage(LOGO_SITE, { size: 128 });
+
   return new ImageResponse(
     (
       <div
@@ -35,20 +38,19 @@ export function GET() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center" }}>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 18,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "#6d5cf5",
-              fontSize: 34,
-            }}
-          >
-            🖼️
-          </div>
+          {logo ? (
+            <img src={logo} width={64} height={64} style={{ width: 64, height: 64 }} />
+          ) : (
+            <div
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 18,
+                display: "flex",
+                backgroundColor: "#6d5cf5",
+              }}
+            />
+          )}
           <div
             style={{
               marginLeft: 22,
