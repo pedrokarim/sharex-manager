@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
-// Removed Dialog imports - using simple backdrop instead
 import { Button } from "@/components/ui/button";
 import {
   Download,
@@ -39,6 +38,29 @@ interface PublicImageViewerProps {
   onIndexChange: (index: number) => void;
 }
 
+/** Vue de l'image : le zoom et le déplacement, exprimés en pixels écran. */
+interface View {
+  scale: number;
+  x: number;
+  y: number;
+}
+
+const MIN_SCALE = 1;
+const MAX_SCALE = 8;
+/** Zoom appliqué au double-clic, puis retour à 1 au double-clic suivant. */
+const DOUBLE_CLICK_SCALE = 2.5;
+const IDENTITY: View = { scale: 1, x: 0, y: 0 };
+
+/** La bande de vignettes a besoin d'aperçus, pas des fichiers d'origine. */
+const thumbnailUrl = (name: string) =>
+  `/api/thumbnails/${encodeURIComponent(name)}`;
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+const distance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+  Math.hypot(a.x - b.x, a.y - b.y);
+
 export function PublicImageViewer({
   items,
   index,
@@ -46,143 +68,275 @@ export function PublicImageViewer({
   onIndexChange,
 }: PublicImageViewerProps) {
   const { t } = useTranslation();
-  const [scale, setScale] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [view, setView] = useState<View>(IDENTITY);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const imageRef = useRef<HTMLDivElement>(null);
 
-  const currentItem = index !== null ? items[index] : null;
-  const hasPrevious = index !== null && index > 0;
-  const hasNext = index !== null && index < items.length - 1;
+  const stageRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  /** Pointeurs actifs sur la scène : 1 = déplacement, 2 = pincement. */
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const pinchRef = useRef<{ distance: number; scale: number } | null>(null);
 
-  // Reset zoom and pan when changing image
+  const isOpen = index !== null;
+
+  /**
+   * Bornes réelles du déplacement : on les calcule sur la taille rendue de
+   * l'image, pas sur des constantes. Sans ça, une image haute reste hors
+   * d'atteinte pendant qu'une petite s'échappe du cadre.
+   */
+  const clampPan = useCallback((x: number, y: number, scale: number) => {
+    const stage = stageRef.current;
+    const image = imageRef.current;
+    if (!stage || !image) return { x, y };
+
+    const maxX = Math.max(0, (image.offsetWidth * scale - stage.clientWidth) / 2);
+    const maxY = Math.max(
+      0,
+      (image.offsetHeight * scale - stage.clientHeight) / 2,
+    );
+
+    return { x: clamp(x, -maxX, maxX), y: clamp(y, -maxY, maxY) };
+  }, []);
+
+  /**
+   * Zoom ancré : le point visé (curseur, milieu des doigts, centre par défaut)
+   * reste sous le pointeur au lieu que l'image parte vers son centre.
+   */
+  const zoomTo = useCallback(
+    (target: number, clientX?: number, clientY?: number) => {
+      setView((previous) => {
+        const scale = clamp(target, MIN_SCALE, MAX_SCALE);
+        if (scale === previous.scale) return previous;
+        if (scale === MIN_SCALE) return IDENTITY;
+
+        const stage = stageRef.current;
+        if (!stage) return { ...previous, scale };
+
+        const rect = stage.getBoundingClientRect();
+        const anchorX =
+          clientX === undefined ? 0 : clientX - (rect.left + rect.width / 2);
+        const anchorY =
+          clientY === undefined ? 0 : clientY - (rect.top + rect.height / 2);
+        const ratio = scale / previous.scale;
+
+        return {
+          scale,
+          ...clampPan(
+            anchorX - ratio * (anchorX - previous.x),
+            anchorY - ratio * (anchorY - previous.y),
+            scale,
+          ),
+        };
+      });
+    },
+    [clampPan],
+  );
+
+  // Chaque image s'ouvre à sa taille d'origine, sans hériter du zoom précédent.
   useEffect(() => {
-    setScale(1);
-    setPan({ x: 0, y: 0 });
+    setView(IDENTITY);
+    pointersRef.current.clear();
+    dragRef.current = null;
+    pinchRef.current = null;
+    setIsDragging(false);
   }, [index]);
 
-  // Keyboard navigation
+  // La page derrière ne doit pas défiler pendant qu'on regarde une image.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isOpen]);
+
+  /**
+   * React pose ses écouteurs `wheel` en passif : `preventDefault` y est ignoré
+   * et la molette zoomait *et* faisait défiler la page. D'où l'écouteur natif.
+   */
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || !isOpen) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
+      const factor = Math.exp(-event.deltaY * unit * 0.0015);
+      setView((previous) => {
+        const scale = clamp(previous.scale * factor, MIN_SCALE, MAX_SCALE);
+        if (scale === previous.scale) return previous;
+        if (scale === MIN_SCALE) return IDENTITY;
+
+        const rect = stage.getBoundingClientRect();
+        const anchorX = event.clientX - (rect.left + rect.width / 2);
+        const anchorY = event.clientY - (rect.top + rect.height / 2);
+        const ratio = scale / previous.scale;
+
+        return {
+          scale,
+          ...clampPan(
+            anchorX - ratio * (anchorX - previous.x),
+            anchorY - ratio * (anchorY - previous.y),
+            scale,
+          ),
+        };
+      });
+    };
+
+    stage.addEventListener("wheel", handleWheel, { passive: false });
+    return () => stage.removeEventListener("wheel", handleWheel);
+  }, [isOpen, clampPan]);
+
+  // Un redimensionnement peut laisser l'image hors cadre : on la recadre.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleResize = () => {
+      setView((previous) => ({
+        ...previous,
+        ...clampPan(previous.x, previous.y, previous.scale),
+      }));
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isOpen, clampPan]);
+
   useEffect(() => {
     if (index === null) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
         onClose();
-      } else if (e.key === "ArrowRight" && hasNext) {
+      } else if (event.key === "ArrowRight" && index < items.length - 1) {
         onIndexChange(index + 1);
-      } else if (e.key === "ArrowLeft" && hasPrevious) {
+      } else if (event.key === "ArrowLeft" && index > 0) {
         onIndexChange(index - 1);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [index, hasPrevious, hasNext, onClose, onIndexChange]);
+  }, [index, items.length, onClose, onIndexChange]);
 
-  // Wheel zoom
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setScale(prev => Math.max(0.5, Math.min(4, prev + delta)));
-  }, []);
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      // Les flèches de navigation vivent dans la scène : capturer le pointeur
+      // ici leur volerait leur `click`, qui serait réémis sur la scène.
+      if ((event.target as HTMLElement).closest("button, a")) return;
 
-  const handleZoomIn = () => {
-    setScale(prev => Math.min(4, prev + 0.5));
-  };
+      const pointers = pointersRef.current;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
-  const handleZoomOut = () => {
-    setScale(prev => Math.max(0.5, prev - 0.5));
-  };
+      if (pointers.size === 2) {
+        const [a, b] = Array.from(pointers.values());
+        pinchRef.current = { distance: distance(a, b), scale: view.scale };
+        dragRef.current = null;
+        setIsDragging(false);
+        event.currentTarget.setPointerCapture(event.pointerId);
+        return;
+      }
 
-  const handleZoomReset = () => {
-    setScale(1);
-    setPan({ x: 0, y: 0 });
-  };
+      if (pointers.size === 1 && view.scale > 1) {
+        dragRef.current = {
+          x: event.clientX - view.x,
+          y: event.clientY - view.y,
+        };
+        setIsDragging(true);
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+    },
+    [view.scale, view.x, view.y],
+  );
 
-  // Drag/pan functionality
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (scale <= 1) return; // Only allow panning when zoomed
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const pointers = pointersRef.current;
+      if (!pointers.has(event.pointerId)) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
-    e.preventDefault();
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - pan.x,
-      y: e.clientY - pan.y,
-    });
-  }, [scale, pan]);
+      const pinch = pinchRef.current;
+      if (pinch && pointers.size === 2) {
+        const [a, b] = Array.from(pointers.values());
+        const spread = distance(a, b);
+        if (pinch.distance > 0) {
+          zoomTo(
+            (pinch.scale * spread) / pinch.distance,
+            (a.x + b.x) / 2,
+            (a.y + b.y) / 2,
+          );
+        }
+        return;
+      }
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging) return;
+      const drag = dragRef.current;
+      if (!drag) return;
 
-    const newPan = {
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
-    };
+      setView((previous) => ({
+        ...previous,
+        ...clampPan(
+          event.clientX - drag.x,
+          event.clientY - drag.y,
+          previous.scale,
+        ),
+      }));
+    },
+    [clampPan, zoomTo],
+  );
 
-    // Limit pan bounds to prevent image from going too far off screen
-    const maxPanX = (scale - 1) * 200; // Adjust based on your needs
-    const maxPanY = (scale - 1) * 150;
+  const handlePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const pointers = pointersRef.current;
+      pointers.delete(event.pointerId);
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
 
-    setPan({
-      x: Math.max(-maxPanX, Math.min(maxPanX, newPan.x)),
-      y: Math.max(-maxPanY, Math.min(maxPanY, newPan.y)),
-    });
-  }, [isDragging, dragStart, scale]);
+      if (pointers.size < 2) pinchRef.current = null;
+      if (pointers.size === 0) {
+        dragRef.current = null;
+        setIsDragging(false);
+      }
+    },
+    [],
+  );
 
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
+  const handleDoubleClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      // Deux clics rapides sur « suivant » ne doivent pas zoomer au passage.
+      if ((event.target as HTMLElement).closest("button, a")) return;
 
-  // Touch events for mobile
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (scale <= 1 || e.touches.length !== 1) return;
+      zoomTo(
+        view.scale > 1 ? MIN_SCALE : DOUBLE_CLICK_SCALE,
+        event.clientX,
+        event.clientY,
+      );
+    },
+    [view.scale, zoomTo],
+  );
 
-    e.preventDefault();
-    const touch = e.touches[0];
-    setIsDragging(true);
-    setDragStart({
-      x: touch.clientX - pan.x,
-      y: touch.clientY - pan.y,
-    });
-  }, [scale, pan]);
+  if (index === null) return null;
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDragging || e.touches.length !== 1) return;
-
-    e.preventDefault();
-    const touch = e.touches[0];
-    const newPan = {
-      x: touch.clientX - dragStart.x,
-      y: touch.clientY - dragStart.y,
-    };
-
-    const maxPanX = (scale - 1) * 200;
-    const maxPanY = (scale - 1) * 150;
-
-    setPan({
-      x: Math.max(-maxPanX, Math.min(maxPanX, newPan.x)),
-      y: Math.max(-maxPanY, Math.min(maxPanY, newPan.y)),
-    });
-  }, [isDragging, dragStart, scale]);
-
-  const handleTouchEnd = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  const handleDownload = () => {
-    if (currentItem) {
-      const link = document.createElement('a');
-      link.href = currentItem.url;
-      link.download = currentItem.name;
-      link.click();
-    }
-  };
-
+  const currentItem = items[index];
   if (!currentItem) return null;
 
+  const hasPrevious = index > 0;
+  const hasNext = index < items.length - 1;
+
+  const handleDownload = () => {
+    const link = document.createElement("a");
+    link.href = currentItem.url;
+    link.download = currentItem.name;
+    link.click();
+  };
+
   const formattedDate = currentItem.addedAt
-    ? format(parseISO(currentItem.addedAt), "dd MMMM yyyy à HH:mm", { locale: fr })
+    ? format(parseISO(currentItem.addedAt), "dd MMMM yyyy à HH:mm", {
+        locale: fr,
+      })
     : null;
 
   return (
@@ -240,8 +394,8 @@ export function PublicImageViewer({
               size="icon"
               aria-label="Zoom out"
               className="h-8 w-8 text-white hover:bg-white/10"
-              onClick={handleZoomOut}
-              disabled={scale <= 0.5}
+              onClick={() => zoomTo(view.scale - 0.5)}
+              disabled={view.scale <= MIN_SCALE}
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -250,8 +404,8 @@ export function PublicImageViewer({
               size="icon"
               aria-label="Reset zoom"
               className="h-8 w-8 text-white hover:bg-white/10"
-              onClick={handleZoomReset}
-              disabled={scale === 1}
+              onClick={() => setView(IDENTITY)}
+              disabled={view.scale === 1 && view.x === 0 && view.y === 0}
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
@@ -260,8 +414,8 @@ export function PublicImageViewer({
               size="icon"
               aria-label="Zoom in"
               className="h-8 w-8 text-white hover:bg-white/10"
-              onClick={handleZoomIn}
-              disabled={scale >= 4}
+              onClick={() => zoomTo(view.scale + 0.5)}
+              disabled={view.scale >= MAX_SCALE}
             >
               <ZoomIn className="h-4 w-4" />
             </Button>
@@ -302,116 +456,123 @@ export function PublicImageViewer({
 
       {/* Main image area */}
       <div
-        className="relative flex-1 overflow-hidden w-full"
+        ref={stageRef}
+        className="relative flex-1 overflow-hidden w-full touch-none"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onDoubleClick={handleDoubleClick}
+        style={{
+          cursor: view.scale > 1 ? (isDragging ? "grabbing" : "grab") : "default",
+        }}
+      >
+        {/*
+          Le cadre transformé occupe toute la scène : son centre est celui de la
+          scène, ce dont dépend l'ancrage du zoom. L'image, elle, garde sa taille
+          naturelle au maximum — pas d'agrandissement forcé, pas de débordement.
+        */}
+        <div
+          className="absolute inset-0 flex items-center justify-center p-4"
+          style={{
+            transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+            transformOrigin: "center center",
+            // Pas de transition pendant le geste : sinon l'image traîne
+            // derrière le curseur et le déplacement paraît cassé.
+            transition:
+              isDragging || pinchRef.current
+                ? "none"
+                : "transform 150ms ease-out",
+            willChange: "transform",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- taille rendue
+              nécessaire au calcul des bornes ; l'optimisation d'image est
+              désactivée globalement (next.config). */}
+          <img
+            ref={imageRef}
+            src={currentItem.url}
+            alt={currentItem.name}
+            className="max-w-full max-h-full object-contain select-none"
+            draggable={false}
+          />
+        </div>
+
+        {/* Navigation buttons */}
+        {hasPrevious && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Previous image"
+            className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/20 hover:bg-black/40 text-white h-12 w-12 focus-visible:ring-2 focus-visible:ring-white"
+            onClick={() => onIndexChange(index - 1)}
+          >
+            <ChevronLeft className="h-8 w-8" />
+          </Button>
+        )}
+        {hasNext && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Next image"
+            className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/20 hover:bg-black/40 text-white h-12 w-12 focus-visible:ring-2 focus-visible:ring-white"
+            onClick={() => onIndexChange(index + 1)}
+          >
+            <ChevronRight className="h-8 w-8" />
+          </Button>
+        )}
+      </div>
+
+      {/* Thumbnail strip - centered on active image */}
+      <div
+        className="flex-none bg-black/40 border-t border-white/10 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="relative h-16 flex items-center justify-center">
           <div
-            className="relative flex-1 flex items-center justify-center p-4"
-            onWheel={handleWheel}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
+            className="absolute flex items-center gap-2 transition-transform duration-300 ease-out"
             style={{
-              cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+              // Each thumbnail is 48px + 8px gap = 56px
+              // To center: start at 50%, then move left by (index * 56px + 24px for half thumbnail)
+              left: "50%",
+              transform: `translateX(calc(-${index} * 56px - 24px))`,
             }}
           >
-            <div
-              ref={imageRef}
-              className="relative transition-transform duration-200 ease-out"
-              style={{
-                transform: `scale(${scale}) translate(${pan.x}px, ${pan.y}px)`,
-                transformOrigin: 'center center',
-              }}
-            >
-              <Image
-                src={currentItem.url}
-                alt={currentItem.name}
-                width={1200}
-                height={800}
-                className="max-w-full max-h-full object-contain select-none"
-                draggable={false}
-                priority
-              />
-            </div>
-          </div>
-
-          {/* Navigation buttons */}
-          {hasPrevious && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Previous image"
-              className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/20 hover:bg-black/40 text-white h-12 w-12 focus-visible:ring-2 focus-visible:ring-white"
-              onClick={() => onIndexChange(index - 1)}
-            >
-              <ChevronLeft className="h-8 w-8" />
-            </Button>
-          )}
-          {hasNext && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Next image"
-              className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/20 hover:bg-black/40 text-white h-12 w-12 focus-visible:ring-2 focus-visible:ring-white"
-              onClick={() => onIndexChange(index + 1)}
-            >
-              <ChevronRight className="h-8 w-8" />
-            </Button>
-          )}
-        </div>
-
-        {/* Thumbnail strip - centered on active image */}
-        <div
-          className="flex-none bg-black/40 border-t border-white/10 overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="relative h-16 flex items-center justify-center">
-            <div
-              className="absolute flex items-center gap-2 transition-transform duration-300 ease-out"
-              style={{
-                // Each thumbnail is 48px + 8px gap = 56px
-                // To center: start at 50%, then move left by (index * 56px + 24px for half thumbnail)
-                left: '50%',
-                transform: `translateX(calc(-${index} * 56px - 24px))`,
-              }}
-            >
-              {items.map((item, i) => (
-                <button
-                  key={item.name}
-                  onClick={() => onIndexChange(i)}
-                  className={cn(
-                    "flex-none w-12 h-12 rounded-md overflow-hidden border-2 transition-all duration-200",
-                    i === index
-                      ? "border-white shadow-lg scale-110"
-                      : "border-white/20 hover:border-white/60 opacity-60 hover:opacity-100"
-                  )}
-                >
-                  <Image
-                    src={item.url}
-                    alt={item.name}
-                    width={48}
-                    height={48}
-                    className="w-full h-full object-cover"
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer hints */}
-        <div
-          className="flex-none p-2 text-center"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="text-white/60 text-sm bg-black/20 px-3 py-1 rounded-full inline-block">
-            Utilisez les flèches ← → pour naviguer • Échap pour fermer • Molette pour zoomer • Drag pour déplacer quand zoomé
+            {items.map((item, i) => (
+              <button
+                key={item.name}
+                onClick={() => onIndexChange(i)}
+                className={cn(
+                  "flex-none w-12 h-12 rounded-md overflow-hidden border-2 transition-all duration-200",
+                  i === index
+                    ? "border-white shadow-lg scale-110"
+                    : "border-white/20 hover:border-white/60 opacity-60 hover:opacity-100",
+                )}
+              >
+                <Image
+                  src={thumbnailUrl(item.name)}
+                  alt={item.name}
+                  width={48}
+                  height={48}
+                  className="w-full h-full object-cover"
+                />
+              </button>
+            ))}
           </div>
         </div>
       </div>
+
+      {/* Footer hints */}
+      <div
+        className="flex-none p-2 text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-white/60 text-sm bg-black/20 px-3 py-1 rounded-full inline-block">
+          Utilisez les flèches ← → pour naviguer • Échap pour fermer • Molette ou
+          double-clic pour zoomer • Glissez pour déplacer quand zoomé
+        </div>
+      </div>
+    </div>
   );
 }
