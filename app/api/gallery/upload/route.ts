@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { getTrustedClientIp } from "@/lib/request-ip";
 import { auth } from "@/lib/auth";
 import { storeDeletionToken } from "@/lib/deletion-tokens";
 import { recordUpload } from "@/lib/history";
@@ -209,8 +210,7 @@ export async function POST(request: NextRequest) {
       fileUrl: uploadResult.fileUrl!,
       thumbnailUrl: uploadResult.thumbnailUrl,
       deletionToken: uploadResult.deletionToken,
-      ipAddress:
-        request.ip || request.headers.get("x-forwarded-for") || "unknown",
+      ipAddress: getTrustedClientIp(request.headers),
       userId: session?.user?.id,
     });
 

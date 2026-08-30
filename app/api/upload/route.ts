@@ -7,6 +7,7 @@ import { recordUpload } from "@/lib/history";
 import { getServerConfig } from "@/lib/server/config";
 import { handleFileUpload } from "@/lib/upload";
 import { revalidatePath } from "next/cache";
+import { getTrustedClientIp } from "@/lib/request-ip";
 import { getAbsoluteUploadPath } from "@/lib/config";
 import fs from "fs/promises";
 import { logDb } from "@/lib/utils/db";
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
         action: "api.request",
         message: "Tentative d'upload sans clé API",
         metadata: {
-          ip: request.ip || request.headers.get("x-forwarded-for") || "unknown",
+          ip: getTrustedClientIp(request.headers),
         },
       });
       return new Response(JSON.stringify({ error: "Clé API manquante" }), {
@@ -156,7 +157,7 @@ export async function POST(request: NextRequest) {
         action: "api.request",
         message: "Tentative d'upload sans fichier",
         metadata: {
-          ip: request.ip || request.headers.get("x-forwarded-for") || "unknown",
+          ip: getTrustedClientIp(request.headers),
           apiKey: apiKey.substring(0, 8) + "...",
         },
       });
@@ -344,8 +345,7 @@ export async function POST(request: NextRequest) {
       fileUrl: uploadResult.fileUrl!,
       thumbnailUrl: uploadResult.thumbnailUrl,
       deletionToken: uploadResult.deletionToken,
-      ipAddress:
-        request.ip || request.headers.get("x-forwarded-for") || "unknown",
+      ipAddress: getTrustedClientIp(request.headers),
       userId: validKey.id,
       userName: validKey.name,
     });
@@ -462,7 +462,7 @@ export async function POST(request: NextRequest) {
       message: "Erreur système lors de l'upload via API",
       metadata: {
         error: error instanceof Error ? error.message : "Unknown error",
-        ip: request.ip || request.headers.get("x-forwarded-for") || "unknown",
+        ip: getTrustedClientIp(request.headers),
       },
     });
     return new Response(

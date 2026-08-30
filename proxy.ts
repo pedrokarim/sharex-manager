@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { isEdgeRuntime } from "@/lib/utils";
 import type { LogAction } from "@/lib/types/logs";
+import { getTrustedClientIp } from "@/lib/request-ip";
 
 const imageDomain = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
 
@@ -118,7 +119,7 @@ export async function proxy(req: NextRequest) {
         level: "warning",
         action: "auth.unauthorized" as LogAction,
         message: "Tentative d'accès non autorisé à l'API",
-        ip: req.ip || req.headers.get("x-forwarded-for") || "unknown",
+        ip: getTrustedClientIp(req.headers),
         userAgent: req.headers.get("user-agent") || "unknown",
         metadata: { path },
       });
@@ -141,7 +142,7 @@ export async function proxy(req: NextRequest) {
       level: "warning",
       action: "auth.unauthorized" as LogAction,
       message: "Tentative d'accès non autorisé",
-      ip: req.ip || req.headers.get("x-forwarded-for") || "unknown",
+      ip: getTrustedClientIp(req.headers),
       userAgent: req.headers.get("user-agent") || "unknown",
       metadata: { path },
     });

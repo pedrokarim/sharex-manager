@@ -86,6 +86,10 @@ const nextConfig = {
                 key: 'Permissions-Policy',
                 value: 'camera=(), microphone=(), geolocation=()',
             },
+            {
+                key: 'Content-Security-Policy',
+                value: "object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+            },
         ];
 
         return [

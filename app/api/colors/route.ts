@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { getTrustedClientIp } from "@/lib/request-ip";
 import { auth } from "@/lib/auth";
 import { logDb } from "@/lib/utils/db";
 import {
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
         message: "Tentative d'extraction de couleur sans image",
         userId: hasSession ? session.user.id : undefined,
         metadata: {
-          ip: request.ip || request.headers.get("x-forwarded-for") || "unknown",
+          ip: getTrustedClientIp(request.headers),
         },
       });
       return new Response(JSON.stringify({ error: "Aucune image fournie" }), {
@@ -182,7 +183,7 @@ export async function POST(request: NextRequest) {
         action: "api.request",
         message: "Tentative d'accès à l'API couleurs sans authentification",
         metadata: {
-          ip: request.ip || request.headers.get("x-forwarded-for") || "unknown",
+          ip: getTrustedClientIp(request.headers),
         },
       });
       return new Response(JSON.stringify({ error: "Non autorisé" }), {
@@ -233,7 +234,7 @@ export async function POST(request: NextRequest) {
       message: "Erreur lors de l'extraction de couleur dominante",
       metadata: {
         error: error instanceof Error ? error.message : "Unknown error",
-        ip: request.ip || request.headers.get("x-forwarded-for") || "unknown",
+        ip: getTrustedClientIp(request.headers),
       },
     });
     return new Response(

@@ -1,5 +1,6 @@
 # Dépendances
 node_modules
+**/node_modules
 .pnp
 .pnp.js
 .yarn/install-state.gz
@@ -9,6 +10,7 @@ node_modules
 out
 build
 dist
+/sharex-mobile
 
 # Fichiers de test
 coverage
@@ -29,6 +31,8 @@ tests
 .env.test.local
 .env.production.local
 .env.bak-*
+/codex-home
+/.backups
 
 # Logs
 npm-debug.log*
@@ -47,6 +51,9 @@ yarn-error.log*
 uploads/*
 uploads/thumbnails/*
 data/*
+config/uploads.json
+modules/*/data
+/module-data
 
 # Divers
 README.md
@@ -58,4 +65,4 @@ LICENSE
 
 # Typescript
 *.tsbuildinfo
-next-env.d.ts 
+next-env.d.ts

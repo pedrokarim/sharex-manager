@@ -30,6 +30,7 @@ yarn-error.log*
 # local env files
 .env
 .env*.local
+.env.bak-*
 
 # vercel
 .vercel
@@ -57,6 +58,8 @@ data/*.db*
 modules/*/data/
 # Même contenu, côté hôte, quand il est monté dans le conteneur.
 /module-data
+/codex-home
+/.backups
 
 # uploads
 /uploads

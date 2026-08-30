@@ -12,7 +12,9 @@ services:
         NEXT_PUBLIC_APP_DOMAIN: ${NEXT_PUBLIC_APP_DOMAIN:-sxm.ascencia.re}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://sxm.ascencia.re}
     ports:
-      - "${PORT:-3000}:${PORT:-3000}"
+      # Nginx est le seul point d'entrée. Ne jamais republier l'application sur
+      # toutes les interfaces : cela contournerait Cloudflare et ses contrôles.
+      - "127.0.0.1:${PORT:-3000}:${PORT:-3000}"
     env_file:
       - .env
     environment:

@@ -6,6 +6,7 @@ import { sendMail } from "@/lib/email/send";
 import { isMailConfigured } from "@/lib/email/transporter";
 import ContactMessage from "@/lib/email/templates/contact-message";
 import ContactAcknowledgement from "@/lib/email/templates/contact-acknowledgement";
+import { getTrustedClientIp } from "@/lib/request-ip";
 
 /** 10 Ko : très au-delà d'un message légitime, bien en deçà d'un abus. */
 const MAX_BODY_BYTES = 10_240;
@@ -38,10 +39,7 @@ export async function POST(request: NextRequest) {
     return json({ error: "Requête trop volumineuse." }, 413);
   }
 
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
+  const ip = getTrustedClientIp(request.headers);
 
   const { allowed, retryAfterMs } = checkRateLimit(`contact:${ip}`);
   if (!allowed) {

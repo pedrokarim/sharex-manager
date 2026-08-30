@@ -2,6 +2,7 @@ import { createReadStream } from "fs";
 import { stat } from "fs/promises";
 import { Duplex } from "stream";
 import type { NextRequest } from "next/server";
+import { getTrustedClientIp } from "@/lib/request-ip";
 
 export interface ClientInfo {
 	ip: string;
@@ -13,11 +14,7 @@ export interface ClientInfo {
 }
 
 export function getClientInfo(request: NextRequest): ClientInfo {
-	const ip =
-		request.ip ||
-		request.headers.get("x-forwarded-for") ||
-		request.headers.get("x-real-ip") ||
-		"IP inconnue";
+	const ip = getTrustedClientIp(request.headers);
 
 	const userAgent = request.headers.get("user-agent") || "User-Agent inconnu";
 	const referer = request.headers.get("referer") || "Referer inconnu";

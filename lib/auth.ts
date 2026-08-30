@@ -32,6 +32,13 @@ export const auth = betterAuth({
   secret: process.env.AUTH_SECRET,
   baseURL: process.env.AUTH_URL,
   trustedOrigins,
+  advanced: {
+    ipAddress: {
+      // Le port applicatif est limité au loopback et Nginx écrase cet en-tête
+      // avec l'adresse cliente restaurée depuis Cloudflare.
+      ipAddressHeaders: ["x-real-ip"],
+    },
+  },
   emailAndPassword: {
     enabled: true,
     // Les comptes historiques (data/users.json) portent un hash bcrypt : on garde
