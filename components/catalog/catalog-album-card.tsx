@@ -14,7 +14,7 @@ const thumb = (name: string) => `/api/thumbnails/${encodeURIComponent(name)}`;
  * Carte d'album du catalogue : une grande couverture flanquée de deux
  * vignettes, qui donne un aperçu du contenu plutôt qu'une seule image.
  *
- * Les albums vides sont affichés comme tels — auparavant ils produisaient une
+ * Les albums vides sont affichés comme tels – auparavant ils produisaient une
  * pile de cadres sans image, qu'on pouvait prendre pour un chargement en cours.
  */
 export function CatalogAlbumCard({ album }: CatalogAlbumCardProps) {

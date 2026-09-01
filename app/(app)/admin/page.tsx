@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Administration | ShareX Manager",
+  title: "Administration",
   description:
     "Gérez les paramètres d'administration de votre application ShareX Manager",
 };

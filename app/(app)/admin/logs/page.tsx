@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 
 export const metadata = {
-  title: "Logs - Administration",
+  title: "Logs d'administration",
   description: "Gestion des logs système",
 };
 

@@ -1,4 +1,4 @@
-# Guide agent — serveur
+# Guide agent – serveur
 
 Le serveur correspond à l'application Next.js située à la racine du dépôt et à
 ses modules locaux.

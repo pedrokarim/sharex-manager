@@ -3,7 +3,7 @@
  *
  * Un agent n'est pas une API : il ne « renvoie » pas d'image, il en écrit sur
  * le disque au fil de son raisonnement. Le contrat commun se réduit donc à
- * trois questions — quels arguments lancer, comment lire son avancement, et où
+ * trois questions – quels arguments lancer, comment lire son avancement, et où
  * regarder ensuite. Chaque moteur répond à ces trois questions dans
  * `cli-engines.ts`, tout le reste est mutualisé ici.
  */
@@ -128,8 +128,8 @@ export interface CliRunOutcome {
  * Lance l'agent, suit sa sortie ligne à ligne, puis ramasse les images.
  *
  * Le filtrage par date de modification est indispensable : les moteurs qui
- * archivent leurs rendus dans un dossier partagé — Codex range tout sous
- * `~/.codex/generated_images` — exposeraient sinon les images des exécutions
+ * archivent leurs rendus dans un dossier partagé – Codex range tout sous
+ * `~/.codex/generated_images` – exposeraient sinon les images des exécutions
  * précédentes.
  */
 export async function runCliEngine(
@@ -277,7 +277,7 @@ export async function runCliEngine(
 
 /**
  * Deux chemins pour le même rendu : on ne garde que le premier trouvé. La
- * taille en octets suffit à les rapprocher — il s'agit de copies exactes, pas
+ * taille en octets suffit à les rapprocher – il s'agit de copies exactes, pas
  * de rendus voisins.
  */
 function dedupeBySize(files: string[]): string[] {

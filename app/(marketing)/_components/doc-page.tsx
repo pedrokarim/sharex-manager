@@ -129,7 +129,7 @@ export function DocPage({
 
         {lastUpdated ? (
           <p className="mt-12 max-w-3xl border-t pt-6 text-sm text-muted-foreground">
-            Dernière mise à jour : {lastUpdated}
+            Dernière mise à jour : {lastUpdated}
           </p>
         ) : null}
       </article>

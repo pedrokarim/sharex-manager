@@ -9,7 +9,7 @@ import type { Metadata } from "next";
 /**
  * Tout l'espace applicatif est derrière authentification : aucune de ces pages
  * n'a de raison d'apparaître dans un moteur de recherche. Déclaré ici plutôt
- * que page par page — les enfants en héritent.
+ * que page par page – les enfants en héritent.
  */
 export const metadata: Metadata = {
   robots: {
@@ -33,7 +33,7 @@ export default async function RootLayout({
   return (
     // h-svh + overflow-hidden : la fenêtre ne défile pas. Sans ça, dès que le
     // contenu dépasse, c'est le document entier qui scrolle et l'encart perd sa
-    // forme — coins arrondis et marges sortent de l'écran.
+    // forme – coins arrondis et marges sortent de l'écran.
     <SidebarProvider
       className="h-svh overflow-hidden"
       style={

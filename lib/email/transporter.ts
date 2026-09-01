@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 
 /**
- * SMTP LWS — cf. NODEMAILER_SETUP_GUIDE.md.
+ * SMTP LWS – cf. NODEMAILER_SETUP_GUIDE.md.
  *
  * Deux pièges documentés :
  *  - le host doit être le serveur LWS direct (mail52.lwspanel.com) et non
@@ -23,7 +23,7 @@ export function getTransporter(): nodemailer.Transporter {
 
   if (!user || !pass) {
     console.warn(
-      "[email] SMTP_USER / SMTP_PASS non définis — aucun mail ne partira."
+      "[email] SMTP_USER / SMTP_PASS non définis – aucun mail ne partira."
     );
   }
 

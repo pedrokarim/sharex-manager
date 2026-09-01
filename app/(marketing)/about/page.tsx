@@ -57,13 +57,13 @@ const sections: DocSection[] = [
     content: (
       <>
         <p>
-          ShareX Manager est né d&apos;un besoin simple : ShareX envoie très bien
+          ShareX Manager est né d&apos;un besoin simple : ShareX envoie très bien
           des fichiers, mais ne dit rien de ce qu&apos;ils deviennent ensuite. Les
           captures s&apos;accumulent sur un serveur, sans galerie, sans
           recherche, sans moyen de reprendre la main sur un lien partagé.
         </p>
         <p>
-          Ce projet comble cet angle mort : un point de chute pour vos envois,
+          Ce projet comble cet angle mort : un point de chute pour vos envois,
           qui les organise, les rend consultables et vous laisse décider de ce
           qui est public. Le tout auto-hébergeable, pour que vos fichiers restent
           sur votre infrastructure.
@@ -99,11 +99,11 @@ const sections: DocSection[] = [
         <p>
           ShareX Manager est développé et maintenu par Ascencia, une structure
           informelle animée par Ahmed Karim. C&apos;est un projet personnel, sans
-          société ni modèle commercial derrière : pas de publicité, pas de
+          société ni modèle commercial derrière : pas de publicité, pas de
           revente de données, pas de version payante.
         </p>
         <p>
-          Le code est publié sous licence GNU GPL v3 : chacun peut l&apos;auditer,
+          Le code est publié sous licence GNU GPL v3 : chacun peut l&apos;auditer,
           l&apos;héberger pour son propre usage et y contribuer.
         </p>
         <div className="not-prose mt-6">

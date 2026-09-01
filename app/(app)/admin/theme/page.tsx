@@ -6,7 +6,7 @@ import { themeDb } from "@/lib/theme/theme-db";
 import ThemeAdminPageClient from "./page.client";
 
 export const metadata: Metadata = {
-  title: "Thème global | Administration",
+  title: "Thème global",
   description: "Pilotez le thème global du site et préparez les futures extensions de branding.",
 };
 

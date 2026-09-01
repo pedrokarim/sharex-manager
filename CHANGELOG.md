@@ -1,4 +1,4 @@
-# Changelog — serveur ShareX Manager
+# Changelog – serveur ShareX Manager
 
 Les changements notables du serveur web et de son API sont documentés ici. La
 politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).

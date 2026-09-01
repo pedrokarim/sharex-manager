@@ -53,7 +53,7 @@ export async function seedLegacyUsers(log: (msg: string) => void = () => {}) {
   const ctx = await auth.$context;
   const existing = await ctx.adapter.count({ model: "user" });
   if (existing > 0) {
-    log(`${existing} compte(s) déjà en base — import ignoré`);
+    log(`${existing} compte(s) déjà en base – import ignoré`);
     return { imported: 0 };
   }
 

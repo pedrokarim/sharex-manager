@@ -3,7 +3,7 @@ import { ModuleList } from "@/components/modules/module-list";
 import { Metadata } from "next";
 
 export const metadata = {
-  title: "Gestion des modules - ShareX Manager",
+  title: "Administration des modules",
   description: "Gérez les modules installés dans ShareX Manager",
 };
 

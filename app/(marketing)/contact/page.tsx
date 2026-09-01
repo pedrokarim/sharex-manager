@@ -11,7 +11,7 @@ import { publicPageMetadata } from "@/lib/seo";
 export const metadata = publicPageMetadata({
   title: "Contact",
   description:
-    "Une question, un signalement ou une demande : écrivez-nous.",
+    "Une question, un signalement ou une demande : écrivez-nous.",
   path: "/contact",
 });
 
@@ -75,7 +75,7 @@ export default function ContactPage() {
             <h2 className="text-xl font-semibold mb-2">Délai de réponse</h2>
             <p className="text-sm text-muted-foreground">
               ShareX Manager est un projet personnel, maintenu sur le temps
-              libre : les réponses arrivent dès que possible, sans garantie de
+              libre : les réponses arrivent dès que possible, sans garantie de
               délai. Pour un bug ou une suggestion, une issue GitHub est souvent
               le chemin le plus rapide.
             </p>

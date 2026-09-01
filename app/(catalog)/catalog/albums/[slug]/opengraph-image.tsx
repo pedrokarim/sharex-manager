@@ -24,7 +24,7 @@ const BANNER_HEIGHT = 340;
  * un titre blanc devient illisible sur les premières.
  *
  * Les vignettes sont lues sur le disque et encodées en base64 plutôt que
- * référencées par URL — `next/og` devrait sinon appeler l'application par le
+ * référencées par URL – `next/og` devrait sinon appeler l'application par le
  * réseau pour se servir elle-même, ce qui échoue dès que le domaine public
  * diffère de celui du serveur.
  */

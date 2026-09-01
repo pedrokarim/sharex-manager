@@ -7,7 +7,7 @@ import { albumsDb } from "@/lib/utils/albums-db";
  * Le `robots.txt` annonçait déjà un sitemap à cette adresse, mais rien ne le
  * servait : les robots tombaient sur un 404.
  *
- * Les albums publics y figurent un par un — ce sont les seules pages de contenu
+ * Les albums publics y figurent un par un – ce sont les seules pages de contenu
  * du site, et celles qui changent.
  */
 export const revalidate = 3600;

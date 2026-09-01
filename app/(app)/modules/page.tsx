@@ -3,7 +3,7 @@ import { Puzzle } from "lucide-react";
 import { ModuleList } from "@/components/modules/module-list";
 
 export const metadata: Metadata = {
-  title: "Gestion des modules | ShareX Manager",
+  title: "Gestion des modules",
   description: "Gérez les modules de votre application ShareX Manager",
 };
 

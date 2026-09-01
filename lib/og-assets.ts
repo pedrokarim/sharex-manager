@@ -6,7 +6,7 @@ import sharp from "sharp";
  * Charge un fichier de `public/` et le renvoie en URL de données.
  *
  * `next/og` ne sait pas lire un chemin local : il faudrait lui donner une URL
- * absolue, donc faire appeler l'application par elle-même à travers le réseau —
+ * absolue, donc faire appeler l'application par elle-même à travers le réseau –
  * ce qui échoue dès que le domaine public diffère de celui du serveur. Lire le
  * fichier sur le disque évite complètement cet aller-retour.
  */
