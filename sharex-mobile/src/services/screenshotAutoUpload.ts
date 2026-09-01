@@ -263,7 +263,7 @@ class ScreenshotAutoUploadService {
       console.warn("Notification d’envoi impossible:", error);
     }
     if (Platform.OS === "android") {
-      ToastAndroid.show(`${title} — ${body}`, isError ? ToastAndroid.LONG : ToastAndroid.SHORT);
+      ToastAndroid.show(`${title} – ${body}`, isError ? ToastAndroid.LONG : ToastAndroid.SHORT);
     }
   }
 }
