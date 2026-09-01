@@ -8,7 +8,7 @@ export function Footer() {
         <div className="flex flex-col items-center justify-between gap-4 md:h-16 md:flex-row">
           <div className="text-center md:text-left">
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Ascencia — code sous licence GPL v3.
+              © {new Date().getFullYear()} Ascencia – code sous licence GPL v3.
             </p>
           </div>
           <div className="flex items-center gap-4">

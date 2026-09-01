@@ -48,7 +48,7 @@ const modeOptions: Array<{
   {
     value: "system",
     label: "Système",
-    description: "Laisse l’app suivre la préférence du device.",
+    description: "Suit la préférence de l’appareil.",
   },
 ];
 

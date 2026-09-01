@@ -18,7 +18,7 @@ const contactSchema = z.object({
   message: z.string().trim().min(10, "Message trop court").max(5000),
   /**
    * Champ leurre : invisible pour un humain, souvent rempli par les robots.
-   * Volontairement permissif ici — le rejet se fait plus bas, en simulant un
+   * Volontairement permissif ici – le rejet se fait plus bas, en simulant un
    * succès, pour ne pas signaler au robot que le champ est piégé.
    */
   website: z.string().optional(),

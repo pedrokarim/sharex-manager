@@ -471,7 +471,7 @@ export function PublicImageViewer({
         {/*
           Le cadre transformé occupe toute la scène : son centre est celui de la
           scène, ce dont dépend l'ancrage du zoom. L'image, elle, garde sa taille
-          naturelle au maximum — pas d'agrandissement forcé, pas de débordement.
+          naturelle au maximum – pas d'agrandissement forcé, pas de débordement.
         */}
         <div
           className="absolute inset-0 flex items-center justify-center p-4"

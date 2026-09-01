@@ -13,7 +13,7 @@ const size = { width: 1200, height: 630 };
  * qu'une page enfant définit son propre bloc `openGraph`. Une route se
  * référence explicitement, depuis n'importe où.
  *
- * `next/og` ne comprend qu'un sous-ensemble de CSS — pas de `gap`, pas de
+ * `next/og` ne comprend qu'un sous-ensemble de CSS – pas de `gap`, pas de
  * raccourci `background`, et tout conteneur à plusieurs enfants doit déclarer
  * son `display: flex`.
  */

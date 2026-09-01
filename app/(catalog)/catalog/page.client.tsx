@@ -27,7 +27,7 @@ const formatDate = (iso?: string) =>
     ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(
         new Date(iso),
       )
-    : "—";
+    : "–";
 
 export function CatalogLanding() {
   const [data, setData] = useState<CatalogData | null>(null);

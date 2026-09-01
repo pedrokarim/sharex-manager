@@ -92,7 +92,7 @@ fu default sharex-manager
 4. Associez un raccourci clavier à la commande **`fu gui`** (ex. la touche **Impr. écran**).
 5. Capturez → l'URL est copiée.
 
-> 📖 **Guides complets, pas-à-pas (avec captures)** : [Windows](docs/integration-windows.md) · [Linux](docs/integration-linux.md) — également disponibles sur le [wiki](https://github.com/pedrokarim/sharex-manager/wiki).
+> 📖 **Guides complets, pas-à-pas (avec captures)** : [Windows](docs/integration-windows.md) · [Linux](docs/integration-linux.md) – également disponibles sur le [wiki](https://github.com/pedrokarim/sharex-manager/wiki).
 
 ## Technologies utilisées
 

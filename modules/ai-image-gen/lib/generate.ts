@@ -3,7 +3,7 @@
  *
  * Cette couche ne connaît ni HTTP ni file d'attente. Elle compose le prompt
  * final, choisit le moteur, écrit les rendus sur le disque et tient
- * l'historique à jour — c'est tout ce que les travaux et les pipelines ont
+ * l'historique à jour – c'est tout ce que les travaux et les pipelines ont
  * besoin de savoir faire.
  */
 
@@ -53,7 +53,7 @@ export function buildEngineConfig(): EngineConfig {
  * Assemble le texte réellement envoyé au modèle.
  *
  * Trois sources se superposent : les notes de style globales, celles de la
- * collection, puis la demande. L'ordre compte — les consignes générales
+ * collection, puis la demande. L'ordre compte – les consignes générales
  * d'abord, le sujet ensuite, comme le recommandent les modèles image.
  */
 export function composePrompt(request: JobRequest): {

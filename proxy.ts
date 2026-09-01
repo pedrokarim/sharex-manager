@@ -25,7 +25,7 @@ const imageDomain = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
  */
 const publicRoutes = ["/img-handler", "/", "/login"];
 
-// Configuration CORS — restreint aux domaines autorisés
+// Configuration CORS – restreint aux domaines autorisés
 const ALLOWED_ORIGINS = [
   "https://sxm.ascencia.re",
   "https://ascencia.re",

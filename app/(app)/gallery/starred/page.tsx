@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { GalleryClient } from "../page.client";
 
 export const metadata: Metadata = {
-  title: "Fichiers Favoris - ShareX Manager",
+  title: "Fichiers favoris",
   description: "Gérez vos fichiers favoris",
 };
 

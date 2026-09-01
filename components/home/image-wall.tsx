@@ -15,13 +15,13 @@ interface ImageWallProps {
 /**
  * Mur d'images en fondu : la dernière preuve avant la partie technique.
  *
- * Volontairement décoratif — les vignettes ne sont pas cliquables une à une,
+ * Volontairement décoratif – les vignettes ne sont pas cliquables une à une,
  * c'est le bloc entier qui mène au catalogue.
  */
 export function ImageWall({ images, kicker, title, cta }: ImageWallProps) {
   // La grille passe de 3 à 6 colonnes : seuls les multiples de 6 se posent sans
   // dernière ligne incomplète, aux deux largeurs. En dessous d'une ligne pleine,
-  // le mur ressemble à un bug d'affichage — on ne le montre pas.
+  // le mur ressemble à un bug d'affichage – on ne le montre pas.
   const rows = Math.min(Math.floor(images.length / 6), 2);
   if (rows === 0) return null;
 

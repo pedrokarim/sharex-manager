@@ -7,9 +7,9 @@ import { HomePageClient, type HomeShowcase } from "./page.client";
 import { publicPageMetadata } from "@/lib/seo";
 
 export const metadata = publicPageMetadata({
-  title: "ShareX Manager — vos captures, chez vous",
+  title: "Vos captures, chez vous",
   description:
-    "Gestionnaire d'images auto-hébergé pour ShareX, Flameshot et mobile : upload en un raccourci, lien public immédiat, albums, statistiques et clés d'API.",
+    "Gestionnaire d'images auto-hébergé pour ShareX, Flameshot et mobile : upload en un raccourci, lien public immédiat, albums, statistiques et clés d'API.",
   path: "/",
 });
 

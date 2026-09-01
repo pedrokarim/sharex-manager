@@ -1,4 +1,4 @@
-# Guide agent — application mobile
+# Guide agent – application mobile
 
 L'application Expo/React Native se trouve dans `sharex-mobile/`. Elle contient
 du code natif local ; Expo Go ne suffit donc pas pour valider toutes ses

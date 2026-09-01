@@ -308,7 +308,7 @@ export function CatalogGalleryPage() {
           {!loadingMore && images.length > 0 && !hasMore ? (
             <p className="py-10 text-center font-mono text-xs text-muted-foreground">
               {typeof total === "number"
-                ? `${images.length} / ${total} — fin de la galerie`
+                ? `${images.length} / ${total} – fin de la galerie`
                 : "Fin de la galerie"}
             </p>
           ) : null}

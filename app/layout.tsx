@@ -29,7 +29,7 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 const SITE_DESCRIPTION =
-  "Gestionnaire d'images auto-hébergé pour ShareX, Flameshot et mobile : upload en un raccourci, galerie, albums publics, clés d'API et statistiques.";
+  "Gestionnaire d'images auto-hébergé pour ShareX, Flameshot et mobile : upload en un raccourci, galerie, albums publics, clés d'API et statistiques.";
 
 export const metadata: Metadata = {
   // Sans `metadataBase`, toute image Open Graph déclarée en chemin relatif ne
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: SITE_NAME,
-    template: `%s — ${SITE_NAME}`,
+    template: `%s – ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
@@ -79,7 +79,7 @@ export default async function RootLayout({
 
   // Le thème est décidé ici, pas après l'hydratation : la classe part dans le
   // HTML et les variables dans une feuille de style du <head>. C'est ce qui
-  // supprime le flash — le navigateur peint directement les bonnes couleurs.
+  // supprime le flash – le navigateur peint directement les bonnes couleurs.
   const themeClass = resolveThemeHtmlClass(initialTheme, !!session?.user);
   const themeStylesheet = buildThemeStylesheet(initialTheme.styles);
 

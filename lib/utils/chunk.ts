@@ -3,7 +3,7 @@
  *
  * Les routes en lot plafonnent le nombre d'éléments par requête (Zod `.max()`).
  * Côté client, envoyer une sélection entière dans un seul appel échoue dès que
- * ce plafond est dépassé — et échoue en bloc, sans rien traiter.
+ * ce plafond est dépassé – et échoue en bloc, sans rien traiter.
  */
 export function chunk<T>(items: T[], size: number): T[][] {
   if (size < 1) throw new Error("chunk: la taille doit être supérieure à 0");

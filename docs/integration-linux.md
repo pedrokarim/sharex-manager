@@ -122,7 +122,7 @@ Reviens à la liste des catégories et ouvre **Raccourcis personnalisés**…
 
 ![Définir le raccourci personnalisé](https://img.ascencia.re/Sv3oyLAPXNW0.png)
 
-Valide — c'est prêt ! 🎉
+Valide – c'est prêt ! 🎉
 
 ---
 

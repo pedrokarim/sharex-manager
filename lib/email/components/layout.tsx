@@ -17,7 +17,7 @@ const APP_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://sxm.ascencia.re";
  * Palette du thème clair par défaut de l'application, convertie d'oklch en
  * hexadécimal : les clients mail ne savent pas interpréter oklch, ni les
  * variables CSS. Les emails ne suivent volontairement pas le thème de
- * l'utilisateur — ils gardent la direction artistique par défaut du site.
+ * l'utilisateur – ils gardent la direction artistique par défaut du site.
  */
 export const emailColors = {
   background: "#ffffff",

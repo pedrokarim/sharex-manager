@@ -10,7 +10,7 @@ const FONT_KEYS = ["font-sans", "font-serif", "font-mono"] as const;
  * un `var()` sans repli vers une variable inexistante n'est pas ignoré par le
  * navigateur : il rend la déclaration entière invalide. `--font-sans` devient
  * donc vide, `font-family` avec lui, et toute l'application retombe sur la
- * police système — silencieusement.
+ * police système – silencieusement.
  */
 const LEGACY_FONT_VARIABLES: Record<string, string> = {
   "--font-geist-sans": "--font-plus-jakarta",

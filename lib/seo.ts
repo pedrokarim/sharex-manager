@@ -5,7 +5,7 @@ import type { Metadata } from "next";
  *
  * `NEXT_PUBLIC_API_URL` ne convient pas : elle vaut `http://localhost:3000` en
  * développement, et une image Open Graph doit être une URL absolue et publique
- * — sinon les aperçus partagés pointent sur la machine de l'auteur.
+ * – sinon les aperçus partagés pointent sur la machine de l'auteur.
  */
 export const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL || "https://sxm.ascencia.re"

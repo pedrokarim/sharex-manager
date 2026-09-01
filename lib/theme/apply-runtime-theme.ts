@@ -18,7 +18,7 @@ type ModePreference = "light" | "dark" | "system" | "time-based";
  *
  * Les variables ne sont plus posées en style inline sur `<html>` : elles
  * réécrivent la feuille rendue par le serveur. La différence compte pour la
- * préférence « système », dont le mode sombre passe par une media query — un
+ * préférence « système », dont le mode sombre passe par une media query – un
  * style inline l'emporterait sur elle et figerait le thème au mode détecté au
  * chargement, sans plus jamais suivre le système.
  */

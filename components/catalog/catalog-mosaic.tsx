@@ -23,7 +23,7 @@ const thumb = (name: string) => `/api/thumbnails/${encodeURIComponent(name)}`;
  *
  * Chaque case porte deux couches superposées. Pour changer d'image, on peint la
  * couche cachée puis on croise les opacités : les deux se recouvrant pendant la
- * transition, aucun fond ne transparaît — c'est ce qui distingue un vrai fondu
+ * transition, aucun fond ne transparaît – c'est ce qui distingue un vrai fondu
  * d'un simple remplacement de source.
  *
  * Le DOM est piloté à la main plutôt que par l'état React : une bascule par

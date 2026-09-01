@@ -9,11 +9,11 @@
  *
  * Deux stratégies de récolte coexistent :
  *
- * - `dossier de session` — le CLI archive ses rendus à un emplacement connu,
+ * - `dossier de session` – le CLI archive ses rendus à un emplacement connu,
  *   qu'on retrouve grâce à l'identifiant de session lu dans ses évènements.
  *   C'est le cas de Codex, et c'est le chemin le plus fiable : l'agent n'a
  *   besoin d'aucun droit d'écriture sur l'espace de travail.
- * - `espace de travail` — on lui demande d'écrire dans un dossier jetable, et
+ * - `espace de travail` – on lui demande d'écrire dans un dossier jetable, et
  *   on regarde ce qui y est apparu. Moins précis, mais applicable à n'importe
  *   quel outil, y compris ceux qu'on ne connaît pas encore.
  */
@@ -51,7 +51,7 @@ function briefing(input: CliPlanInput, options: {
         const role = roles[index]?.role === "edit-target"
           ? "image à retoucher, conserve tout ce que la demande ne fait pas varier"
           : "référence de style, de composition ou de sujet";
-        return `  ${index + 1}. ${path.basename(file)} — ${role}.`;
+        return `  ${index + 1}. ${path.basename(file)} – ${role}.`;
       })
     );
   }

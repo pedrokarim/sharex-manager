@@ -4,8 +4,8 @@ import { Metadata } from "next";
 import DomainsPage from "./page.client";
 
 export const metadata: Metadata = {
-  title: "Domains | ShareX Manager",
-  description: "Manage domains for your ShareX uploads",
+  title: "Domaines",
+  description: "Gérez les domaines utilisés par vos uploads ShareX",
 };
 
 async function getDomainsConfig() {

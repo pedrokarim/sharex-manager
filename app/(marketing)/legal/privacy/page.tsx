@@ -61,29 +61,29 @@ const sections: DocSection[] = [
         </p>
         <ul>
           <li>
-            <strong>Compte</strong> — identifiant, adresse email, rôle, et le
+            <strong>Compte</strong> – identifiant, adresse email, rôle, et le
             mot de passe sous forme de condensat bcrypt (jamais en clair).
           </li>
           <li>
-            <strong>Sessions</strong> — un jeton de session, sa date
+            <strong>Sessions</strong> – un jeton de session, sa date
             d&apos;expiration, ainsi que l&apos;adresse IP et le user-agent
             associés à la connexion.
           </li>
           <li>
-            <strong>Fichiers envoyés</strong> — le fichier lui-même et ses
+            <strong>Fichiers envoyés</strong> – le fichier lui-même et ses
             métadonnées (nom, taille, type, date, album, statut public ou privé).
           </li>
           <li>
-            <strong>Clés API</strong> — nom, clé, date de création et
+            <strong>Clés API</strong> – nom, clé, date de création et
             d&apos;expiration, permissions, et compte créateur.
           </li>
           <li>
-            <strong>Journaux techniques</strong> — horodatage, action, niveau,
+            <strong>Journaux techniques</strong> – horodatage, action, niveau,
             message, identifiant et email du compte concerné, adresse IP et
             user-agent.
           </li>
           <li>
-            <strong>Préférences d&apos;affichage</strong> — thème, couleurs
+            <strong>Préférences d&apos;affichage</strong> – thème, couleurs
             personnalisées et plage horaire du mode automatique.
           </li>
         </ul>
@@ -104,17 +104,17 @@ const sections: DocSection[] = [
         <ul>
           <li>
             <strong>Fournir le service</strong> (compte, envoi, galerie, albums,
-            partage) — exécution du contrat que constituent les{" "}
+            partage) – exécution du contrat que constituent les{" "}
             <Link href="/legal/terms">CGU</Link>.
           </li>
           <li>
             <strong>Sécuriser le service</strong> (journaux, limitation de débit,
-            détection d&apos;accès non autorisés) — intérêt légitime de
+            détection d&apos;accès non autorisés) – intérêt légitime de
             l&apos;éditeur à protéger l&apos;instance et ses utilisateurs.
           </li>
           <li>
             <strong>Statistiques d&apos;usage</strong> (volumétrie, répartition
-            géographique approximative des accès) — intérêt légitime à
+            géographique approximative des accès) – intérêt légitime à
             comprendre la charge et l&apos;usage de l&apos;instance.
           </li>
         </ul>
@@ -159,7 +159,7 @@ const sections: DocSection[] = [
         </p>
         <ul>
           <li>
-            <strong>Cookie de session</strong> — maintient votre connexion. Il
+            <strong>Cookie de session</strong> – maintient votre connexion. Il
             est <code>httpOnly</code>, donc inaccessible au JavaScript de la
             page, et expire automatiquement.
           </li>
@@ -167,7 +167,7 @@ const sections: DocSection[] = [
             <strong>
               <code>sidebar_state</code>
             </strong>{" "}
-            — mémorise si le menu latéral est ouvert ou replié. Pur confort
+            – mémorise si le menu latéral est ouvert ou replié. Pur confort
             d&apos;affichage, aucune donnée personnelle.
           </li>
         </ul>
@@ -186,11 +186,11 @@ const sections: DocSection[] = [
         </p>
         <ul>
           <li>
-            <strong>{LEGAL_INFO.host.name}</strong> — hébergeur de
+            <strong>{LEGAL_INFO.host.name}</strong> – hébergeur de
             l&apos;infrastructure ({LEGAL_INFO.host.address}).
           </li>
           <li>
-            <strong>ip-api.com</strong> — géolocalisation des adresses IP,
+            <strong>ip-api.com</strong> – géolocalisation des adresses IP,
             dans les conditions décrites plus haut.
           </li>
         </ul>
@@ -208,19 +208,19 @@ const sections: DocSection[] = [
     content: (
       <ul>
         <li>
-          <strong>Compte</strong> — conservé tant que le compte existe, supprimé
+          <strong>Compte</strong> – conservé tant que le compte existe, supprimé
           sur demande.
         </li>
         <li>
-          <strong>Sessions</strong> — supprimées à l&apos;expiration, à la
+          <strong>Sessions</strong> – supprimées à l&apos;expiration, à la
           déconnexion ou lors d&apos;un changement de mot de passe.
         </li>
         <li>
-          <strong>Fichiers</strong> — conservés jusqu&apos;à leur suppression par
+          <strong>Fichiers</strong> – conservés jusqu&apos;à leur suppression par
           leur propriétaire ou à la suppression du compte.
         </li>
         <li>
-          <strong>Journaux techniques</strong> — conservés pour les besoins de
+          <strong>Journaux techniques</strong> – conservés pour les besoins de
           sécurité et de diagnostic, puis purgés. Ils peuvent subsister après la
           suppression d&apos;un compte, l&apos;identifiant n&apos;étant alors
           plus rattaché à aucune donnée de profil.
@@ -323,7 +323,7 @@ export default function PrivacyPage() {
           {LEGAL_INFO.appName} héberge vos fichiers&nbsp;: la moindre des choses
           est de dire précisément ce qui est conservé et pourquoi. Cette page
           décrit les traitements réellement effectués par l&apos;instance{" "}
-          {LEGAL_INFO.domain} — ni plus, ni moins.
+          {LEGAL_INFO.domain} – ni plus, ni moins.
         </p>
       }
       sections={sections}

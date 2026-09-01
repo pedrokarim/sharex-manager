@@ -1,4 +1,4 @@
-# Changelog — ShareX Manager Mobile
+# Changelog – ShareX Manager Mobile
 
 Les changements notables de l'application Android/iOS sont documentés ici. La
 politique complète se trouve dans

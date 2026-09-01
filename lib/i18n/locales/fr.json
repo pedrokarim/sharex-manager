@@ -10,7 +10,7 @@
     "delete": "Supprimer",
     "edit": "Modifier",
     "search": "Rechercher",
-    "loading": "Chargement...",
+    "loading": "Chargement…",
     "error": "Erreur",
     "success": "Succès",
     "confirm": "Confirmer",
@@ -167,7 +167,7 @@
     "api_keys": {
       "new_key": "Nouvelle clé",
       "create_key": "Créer une clé",
-      "loading": "Chargement des clés API...",
+      "loading": "Chargement des clés API…",
       "never": "Jamais",
       "table": {
         "name": "Nom",
@@ -306,7 +306,7 @@
       "description": "Sélectionnez un fichier à uploader sur le serveur.",
       "file_label": "Fichier",
       "private_file": "Fichier privé",
-      "uploading": "Upload en cours...",
+      "uploading": "Upload en cours…",
       "upload_button": "Uploader"
     },
     "file_actions": {
@@ -335,7 +335,7 @@
     },
     "file_viewer": {
       "details": "Détails",
-      "accessibility": "Image ajoutée le {date}. Taille du fichier : {size} Ko. {navigation}",
+      "accessibility": "Image ajoutée le {date}. Taille du fichier : {size} Ko. {navigation}",
       "previous_button": "Utilisez le bouton précédent pour voir l'image précédente.",
       "next_button": "Utilisez le bouton suivant pour voir l'image suivante.",
       "presentation": {
@@ -367,7 +367,7 @@
       "view_logs": "Voir les logs",
       "modules": {
         "title": "Modules disponibles",
-        "loading": "Chargement des modules...",
+        "loading": "Chargement des modules…",
         "no_modules": "Aucun module disponible pour ce type de fichier",
         "apply_error": "Erreur lors de l'application du module",
         "apply_success": "Module {module} appliqué avec succès",
@@ -392,10 +392,10 @@
           "effects_alt": "Effets spéciaux",
           "filters_alt": "Filtres d'image"
         },
-        "install_dependencies": "Installation des dépendances...",
+        "install_dependencies": "Installation des dépendances…",
         "install_success": "Dépendances installées avec succès",
         "install_error": "Erreur lors de l'installation des dépendances",
-        "processing": "Traitement en cours...",
+        "processing": "Traitement en cours…",
         "select_module": "Sélectionner un module",
         "apply_module": "Appliquer le module",
         "cancel_processing": "Annuler le traitement",
@@ -412,7 +412,7 @@
       "files_to_upload": "Fichiers à uploader ({valid}/{total})",
       "clear_all": "Tout supprimer",
       "upload": "Uploader",
-      "uploading": "Upload en cours...",
+      "uploading": "Upload en cours…",
       "no_valid_files": "Aucun fichier valide à uploader",
       "upload_complete": "Upload terminé avec succès",
       "upload_error": "Erreur lors de l'upload",
@@ -440,7 +440,7 @@
       }
     },
     "notifications": {
-      "new_file": "Nouveau fichier : {filename}"
+      "new_file": "Nouveau fichier : {filename}"
     },
     "date_filter": {
       "start_date": "Date de début",
@@ -456,7 +456,7 @@
       "delete_success": "Le fichier a été supprimé avec succès",
       "delete_error": "Une erreur est survenue lors de la suppression du fichier",
       "delete_confirmation": {
-        "title": "Êtes-vous sûr ?",
+        "title": "Êtes-vous sûr ?",
         "description": "Cette action est irréversible. Le fichier sera définitivement supprimé.",
         "cancel": "Annuler",
         "confirm": "Continuer"
@@ -467,7 +467,7 @@
     "app_name": "ShareX Manager",
     "app_description": "Gestionnaire d'images",
     "search": "Rechercher",
-    "search_placeholder": "Rechercher...",
+    "search_placeholder": "Rechercher…",
     "toggle": "Basculer",
     "main": {
       "gallery": "Galerie",
@@ -562,7 +562,7 @@
       "hero": {
         "title": "Vos captures,",
         "title_accent": "chez vous.",
-        "subtitle": "Le point de chute de tout ce que vous capturez : upload en un raccourci, lien public immédiat, albums, statistiques et clés d'API. Sur votre serveur, pas celui d'un autre.",
+        "subtitle": "Le point de chute de tout ce que vous capturez : upload en un raccourci, lien public immédiat, albums, statistiques et clés d'API. Sur votre serveur, pas celui d'un autre.",
         "compatibility": "ShareX · Flameshot · Android · Liens permanents · Sans publicité",
         "screenshot_alt": "La galerie de ShareX Manager, images classées par mois",
         "cta_primary": "Explorer le catalogue",
@@ -574,7 +574,7 @@
       "flow": {
         "kicker": "Le flux",
         "title": "Du raccourci clavier au lien public",
-        "description": "ShareX sur Windows, Flameshot sur Linux, l'app Android en partage natif : tout arrive au même endroit, immédiatement indexé.",
+        "description": "ShareX sur Windows, Flameshot sur Linux, l'app Android en partage natif : tout arrive au même endroit, immédiatement indexé.",
         "bullets": [
           "Lien copié dans le presse-papiers dès la fin de l'upload",
           "Miniatures, recherche et filtres par date",
@@ -642,7 +642,7 @@
     "hero": {
       "title": "Identité visuelle ShareX Manager"
     },
-    "subtitle": "Logos, palette et composants — compatibles avec vos thèmes personnalisés.",
+    "subtitle": "Logos, palette et composants – compatibles avec vos thèmes personnalisés.",
     "logo": {
       "title": "Logo",
       "description": "Nos logos officiels pour différents usages.",
@@ -680,43 +680,43 @@
   },
   "loading": {
     "messages": {
-      "preparing_gallery": "Préparation de votre galerie...",
-      "loading_images": "Chargement des images...",
-      "optimizing_display": "Optimisation de l'affichage...",
-      "retrieving_data": "Récupération des données...",
-      "configuring_interface": "Configuration de l'interface...",
-      "ai_neurons": "Réveil des neurones artificiels...",
-      "consulting_claude": "Consultation de Claude pour des conseils...",
-      "asking_gpt": "Demande à GPT-4 de faire plus vite...",
-      "negotiating_dalle": "Négociation avec DALL-E pour les miniatures...",
-      "training_models": "Formation accélérée des modèles...",
-      "meditating": "Méditation profonde avec Stable Diffusion...",
-      "calculating_meaning": "Calcul du sens de la vie numérique...",
-      "downloading_consciousness": "Téléchargement de la conscience artificielle...",
-      "aligning_transformers": "Alignement des transformers...",
-      "calibrating_attention": "Calibration des attention heads...",
-      "feeding_pixels": "Nourrissage des pixels affamés...",
-      "massaging_tensors": "Massage des tenseurs stressés...",
-      "deploying_hamsters": "Déploiement des hamsters quantiques...",
-      "fixing_bugs": "Réparation des bugs qui n'existent pas...",
-      "reading_manual": "Lecture du manuel d'utilisation (enfin presque)...",
-      "counting_pixels": "Comptage des pixels jusqu'à l'infini...",
-      "talking_backend": "Tentative de discussion avec le backend...",
-      "motivating_bytes": "Motivation des octets paresseux...",
-      "resolving_conflicts": "Résolution des conflits entre les composants...",
-      "negotiating_cache": "Négociation avec le cache récalcitrant...",
-      "optimizing_prompts": "Optimisation des prompts vectoriels...",
-      "calculating_embeddings": "Calcul des embeddings multidimensionnels...",
-      "training_llms": "Entraînement des LLMs de poche...",
-      "deploying_agents": "Déploiement des agents autonomes...",
-      "configuring_consciousness": "Configuration du flux de conscience numérique...",
-      "activating_synapses": "Activation des synapses artificielles...",
-      "updating_knowledge": "Mise à jour de la base de connaissances...",
-      "syncing_multiverse": "Synchronisation des multivers parallèles...",
-      "calibrating_sensors": "Calibration des capteurs émotionnels...",
-      "initializing_creativity": "Initialisation du module de créativité..."
+      "preparing_gallery": "Préparation de votre galerie…",
+      "loading_images": "Chargement des images…",
+      "optimizing_display": "Optimisation de l'affichage…",
+      "retrieving_data": "Récupération des données…",
+      "configuring_interface": "Configuration de l'interface…",
+      "ai_neurons": "Réveil des neurones artificiels…",
+      "consulting_claude": "Consultation de Claude pour des conseils…",
+      "asking_gpt": "Demande à GPT-4 de faire plus vite…",
+      "negotiating_dalle": "Négociation avec DALL-E pour les miniatures…",
+      "training_models": "Formation accélérée des modèles…",
+      "meditating": "Méditation profonde avec Stable Diffusion…",
+      "calculating_meaning": "Calcul du sens de la vie numérique…",
+      "downloading_consciousness": "Téléchargement de la conscience artificielle…",
+      "aligning_transformers": "Alignement des transformers…",
+      "calibrating_attention": "Calibration des attention heads…",
+      "feeding_pixels": "Nourrissage des pixels affamés…",
+      "massaging_tensors": "Massage des tenseurs stressés…",
+      "deploying_hamsters": "Déploiement des hamsters quantiques…",
+      "fixing_bugs": "Réparation des bugs qui n'existent pas…",
+      "reading_manual": "Lecture du manuel d'utilisation (enfin presque)…",
+      "counting_pixels": "Comptage des pixels jusqu'à l'infini…",
+      "talking_backend": "Tentative de discussion avec le backend…",
+      "motivating_bytes": "Motivation des octets paresseux…",
+      "resolving_conflicts": "Résolution des conflits entre les composants…",
+      "negotiating_cache": "Négociation avec le cache récalcitrant…",
+      "optimizing_prompts": "Optimisation des prompts vectoriels…",
+      "calculating_embeddings": "Calcul des embeddings multidimensionnels…",
+      "training_llms": "Entraînement des LLMs de poche…",
+      "deploying_agents": "Déploiement des agents autonomes…",
+      "configuring_consciousness": "Configuration du flux de conscience numérique…",
+      "activating_synapses": "Activation des synapses artificielles…",
+      "updating_knowledge": "Mise à jour de la base de connaissances…",
+      "syncing_multiverse": "Synchronisation des multivers parallèles…",
+      "calibrating_sensors": "Calibration des capteurs émotionnels…",
+      "initializing_creativity": "Initialisation du module de créativité…"
     },
-    "wait_message": "Veuillez patienter un instant pendant que nos IAs s'activent..."
+    "wait_message": "Veuillez patienter un instant pendant que nos IAs s'activent…"
   },
   "errors": {
     "not_found": "Page non trouvée",
@@ -774,8 +774,8 @@
       "coming_soon": {
         "title": "Fonctionnalité à venir",
         "subtitle": "Cette section est en cours de développement",
-        "description": "La configuration avancée de la sécurité sera bientôt disponible. Cette section permettra de :",
-        "check_back": "Revenez bientôt pour découvrir ces nouvelles fonctionnalités !"
+        "description": "La configuration avancée de la sécurité sera bientôt disponible. Cette section permettra de :",
+        "check_back": "Revenez bientôt pour découvrir ces nouvelles fonctionnalités !"
       },
       "features": {
         "password_policies": "Configurer les politiques de mots de passe",
@@ -798,7 +798,7 @@
       "advanced_config": {
         "title": "Configuration système",
         "subtitle": "Paramètres système avancés (Bientôt disponible)",
-        "description": "Cette section permettra de configurer les paramètres système avancés :",
+        "description": "Cette section permettra de configurer les paramètres système avancés :",
         "coming_soon": "Ces fonctionnalités seront disponibles dans une prochaine mise à jour."
       },
       "features": {
@@ -817,7 +817,7 @@
         "admins": "Administrateurs",
         "users": "Utilisateurs"
       },
-      "search_placeholder": "Rechercher un utilisateur...",
+      "search_placeholder": "Rechercher un utilisateur…",
       "filter_by_role": "Filtrer par rôle",
       "roles": {
         "all": "Tous les rôles",
@@ -836,7 +836,7 @@
         "delete": "Supprimer"
       },
       "delete_dialog": {
-        "title": "Êtes-vous sûr de vouloir supprimer cet utilisateur ?",
+        "title": "Êtes-vous sûr de vouloir supprimer cet utilisateur ?",
         "description": "Cette action est irréversible. L'utilisateur ne pourra plus se connecter."
       },
       "no_users_found": "Aucun utilisateur trouvé",
@@ -861,7 +861,7 @@
       "apply_filters": "Appliquer les filtres",
       "reset_filters": "Réinitialiser",
       "no_logs": "Aucun log disponible",
-      "loading": "Chargement des logs...",
+      "loading": "Chargement des logs…",
       "error": "Erreur lors du chargement des logs",
       "refresh": "Actualiser",
       "timestamp": "Horodatage",
@@ -947,7 +947,7 @@
       "filters": {
         "title": "Filtres",
         "search": "Rechercher",
-        "search_placeholder": "Rechercher un fichier...",
+        "search_placeholder": "Rechercher un fichier…",
         "upload_method": "Méthode d'upload",
         "all_methods": "Toutes les méthodes",
         "start_date": "Date de début",
@@ -957,7 +957,7 @@
       "list": {
         "title": "Résultats",
         "no_results": "Aucun fichier dans l'historique",
-        "loading": "Chargement des résultats...",
+        "loading": "Chargement des résultats…",
         "error": "Erreur lors du chargement de l'historique",
         "anonymous": "Anonyme",
         "open_menu": "Ouvrir le menu",
@@ -1231,7 +1231,7 @@
   },
   "modules": {
     "common": {
-      "loading": "Chargement de l'interface...",
+      "loading": "Chargement de l'interface…",
       "error": "Erreur lors du chargement",
       "success": "Opération réussie",
       "apply": "Appliquer",
@@ -1242,11 +1242,11 @@
   },
   "support": {
     "title": "Support & Aide",
-    "description": "Besoin d'aide avec ShareX Manager ? Nous sommes là pour vous accompagner ! Choisissez le canal de support qui vous convient le mieux.",
+    "description": "Besoin d'aide avec ShareX Manager ? Nous sommes là pour vous accompagner ! Choisissez le canal de support qui vous convient le mieux.",
     "discord": {
       "title": "Discord Community",
       "description": "Rejoignez notre communauté Discord pour obtenir de l'aide en temps réel, partager vos expériences et discuter avec d'autres utilisateurs.",
-      "benefits": "Avantages :",
+      "benefits": "Avantages :",
       "benefits_list": [
         "Support en temps réel",
         "Communauté active",
@@ -1258,7 +1258,7 @@
     "github": {
       "title": "GitHub Repository",
       "description": "Consultez le code source, signalez des bugs, proposez des améliorations ou contribuez au développement de ShareX Manager.",
-      "available": "Disponible :",
+      "available": "Disponible :",
       "available_list": [
         "Code source complet",
         "Issue tracker pour les bugs",
@@ -1272,15 +1272,15 @@
       "description": "Quelques réponses rapides aux questions les plus courantes.",
       "questions": [
         {
-          "question": "Comment installer ShareX Manager ?",
+          "question": "Comment installer ShareX Manager ?",
           "answer": "Consultez la documentation sur GitHub ou demandez de l'aide sur Discord."
         },
         {
-          "question": "Comment configurer les modules ?",
+          "question": "Comment configurer les modules ?",
           "answer": "Allez dans la section \"Modules\" de l'interface d'administration."
         },
         {
-          "question": "Comment signaler un bug ?",
+          "question": "Comment signaler un bug ?",
           "answer": "Ouvrez une issue sur GitHub avec une description détaillée du problème."
         }
       ]
@@ -1306,7 +1306,7 @@
     "description": "Découvrez les avantages de la version Pro de ShareX Manager",
     "coming_soon": {
       "title": "Bientôt disponible",
-      "description": "Cette fonctionnalité sera bientôt disponible. Restez à l'écoute !"
+      "description": "Cette fonctionnalité sera bientôt disponible. Restez à l'écoute !"
     },
     "features": {
       "title": "Fonctionnalités Pro",
@@ -1332,12 +1332,12 @@
     },
     "channels": {
       "title": "Autres canaux",
-      "description": "Vous pouvez aussi nous contacter via :",
+      "description": "Vous pouvez aussi nous contacter via :",
       "discord": "Discord Community",
       "github": "GitHub Issues"
     },
     "thank_you": {
-      "title": "Merci pour votre feedback !",
+      "title": "Merci pour votre feedback !",
       "description": "Votre message a été envoyé avec succès. Nous l'examinerons et vous répondrons si nécessaire."
     }
   }

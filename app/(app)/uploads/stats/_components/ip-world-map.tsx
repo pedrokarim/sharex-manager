@@ -86,7 +86,7 @@ function IPWorldMapInner({ markers }: IPWorldMapProps) {
                     ).closest("svg")?.getBoundingClientRect();
                     if (rect) {
                       setTooltip({
-                        content: `${marker.city}, ${marker.country} — ${marker.count} uploads`,
+                        content: `${marker.city}, ${marker.country} – ${marker.count} uploads`,
                         x: e.clientX - rect.left,
                         y: e.clientY - rect.top - 10,
                       });

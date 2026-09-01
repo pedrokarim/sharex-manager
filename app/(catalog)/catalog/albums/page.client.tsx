@@ -114,7 +114,7 @@ export function CatalogAlbumsPage() {
             Raccourci
           </span>
           <h2 className="text-xl font-semibold tracking-tight">
-            Vous cherchez une image précise ?
+            Vous cherchez une image précise ?
           </h2>
           <Link
             href="/catalog/gallery"

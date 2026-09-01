@@ -26,7 +26,7 @@ export default function ContactMessage({
 }: ContactMessageProps) {
   return (
     <EmailLayout
-      preview={`Nouveau message de ${name} — ${subject}`}
+      preview={`Nouveau message de ${name} – ${subject}`}
       footerNote="Message reçu via le formulaire de contact du site. Répondre à cet email écrit directement à l'expéditeur."
     >
       <Heading

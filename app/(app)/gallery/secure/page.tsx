@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { GalleryClient } from "../page.client";
 
 export const metadata: Metadata = {
-  title: "Fichiers Sécurisés - ShareX Manager",
+  title: "Fichiers sécurisés",
   description: "Gérez vos fichiers privés",
 };
 

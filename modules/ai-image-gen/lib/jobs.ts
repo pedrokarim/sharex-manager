@@ -273,7 +273,7 @@ async function executePipeline(
     const label = step.label || describeStep(step);
     job.pipelineStep = { index, total: pipeline.steps.length, label };
     job.progress = { current: index, total: pipeline.steps.length, label };
-    log(job, "info", `Étape ${index + 1}/${pipeline.steps.length} — ${label}`);
+    log(job, "info", `Étape ${index + 1}/${pipeline.steps.length} – ${label}`);
 
     previous = await executeStep(job, step, previous, index, controller);
     // Les étapes locales (agrandissement, publication) enrichissent la

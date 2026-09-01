@@ -75,7 +75,7 @@ export function buildThemeStylesheet(styles: ThemeStyles): string {
  * Pour un utilisateur connecté, la préférence est connue : la décision est
  * prise ici, définitivement. Pour « système », on délègue au CSS. Le mode
  * horaire est calculé avec l'heure du serveur et corrigé ensuite côté client
- * si le fuseau diffère — c'est le seul cas qui peut encore bouger après coup.
+ * si le fuseau diffère – c'est le seul cas qui peut encore bouger après coup.
  */
 export function resolveThemeHtmlClass(
   payload: ResolvedThemePayload,

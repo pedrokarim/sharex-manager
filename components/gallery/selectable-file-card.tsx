@@ -166,8 +166,8 @@ export function SelectableFileCard({
   );
 
   // Le menu dépend du mode, mais la racine, elle, ne doit jamais changer :
-  // remplacer le composant d'enveloppe démonterait la carte entière — donc la
-  // grille entière — au moment où la sélection démarre. Le bouton qui vient
+  // remplacer le composant d'enveloppe démonterait la carte entière – donc la
+  // grille entière – au moment où la sélection démarre. Le bouton qui vient
   // d'être cliqué disparaîtrait alors du DOM, et le navigateur replacerait le
   // défilement en haut de la liste.
   const menu = isSelectionMode

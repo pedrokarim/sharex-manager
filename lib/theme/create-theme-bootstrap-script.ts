@@ -28,7 +28,7 @@ function escapeJsonForInlineScript(value: string) {
  * 2. le mode horaire, dont l'heure de référence est celle du visiteur et non
  *    celle du serveur.
  *
- * Dans tous les autres cas — c'est-à-dire la majorité — il ne fait rien.
+ * Dans tous les autres cas – c'est-à-dire la majorité – il ne fait rien.
  */
 export function createThemeBootstrapScript(options: {
   initialTheme: ResolvedThemePayload;
