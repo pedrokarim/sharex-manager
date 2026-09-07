@@ -51,6 +51,8 @@ data/users.test.json
 # (`albums.db.bak-<horodatage>`) : ces fichiers contiennent des données utilisateur
 # et ne doivent jamais partir dans l'historique.
 data/*.db*
+# Sauvegardes opérationnelles créées avant une modification de la base en prod.
+/data/backups/
 
 # Données runtime des modules : images générées, historiques et surtout
 # `secrets.json` (clés API). `module.json` reste versionné, lui, car c'est le
