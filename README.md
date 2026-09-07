@@ -30,28 +30,23 @@ git clone https://github.com/AliasPedroKarim/sharex-manager.git
 cd sharex-manager
 ```
 
-2. Installez les dépendances :
+2. Installez les dépendances et lancez l'assistant :
 ```bash
 bun install
+bun run setup
 ```
 
-3. Créez un fichier `.env.local` avec les variables d'environnement :
-```bash
-# Auth
-AUTH_SECRET=votre_secret_auth
-NEXTAUTH_URL=http://localhost:3000
+L'assistant crée les dossiers nécessaires, génère les secrets et propose deux
+modes : authentification intégrée par défaut, ou Ascencia ID via OIDC. Consultez
+[le guide d'authentification](docs/authentication.md) pour le mode automatisé et
+la politique d'accès Ascencia ID.
 
-# Application
-NEXT_PUBLIC_API_URL=http://localhost:3000
-
-```
-
-4. Lancez le serveur de développement :
+3. Lancez le serveur de développement :
 ```bash
 bun dev
 ```
 
-5. Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur
+4. Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur
 
 ## Configuration de ShareX
 

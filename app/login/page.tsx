@@ -1,12 +1,19 @@
 import Image from "next/image";
+import { connection } from "next/server";
 
 import { LoginForm } from "@/components/login-form";
+import { resolveAuthConfig } from "@/lib/auth-config";
 import { privatePageMetadata } from "@/lib/seo";
 
 export const metadata = privatePageMetadata({ title: "Connexion" });
 
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  // Le fournisseur est une configuration runtime. Cette page ne doit pas le
+  // figer au moment où l'image Docker est construite.
+  await connection();
+  const authConfig = resolveAuthConfig();
+
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       {/* Section formulaire avec background mobile */}
@@ -40,7 +47,7 @@ export default function LoginPage() {
         </div>
         <div className="relative z-10 flex flex-1 items-center justify-center">
           <div className="w-full max-w-xs">
-            <LoginForm />
+            <LoginForm authProvider={authConfig.provider} />
           </div>
         </div>
       </div>
