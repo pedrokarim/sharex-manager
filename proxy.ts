@@ -19,9 +19,9 @@ const imageDomain = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
  *
  * La confidentialité des images est gérée là où elle a du sens, fichier par
  * fichier, dans `app/img-handler/[filename]/route.ts` (`isFileSecure`). Les
- * pages privées sont gardées par le layout du groupe `(app)`, et les trois
- * pages hors de ce groupe (`/account`, `/dashboard`, `/upgrade`) portent
- * chacune leur propre vérification de session.
+ * pages privées sont gardées par le layout du groupe `(app)`, et les deux
+ * pages hors de ce groupe (`/dashboard`, `/upgrade`) portent chacune leur
+ * propre vérification de session.
  */
 const publicRoutes = ["/img-handler", "/", "/login"];
 

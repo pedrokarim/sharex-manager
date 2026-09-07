@@ -34,6 +34,7 @@ export function BreadcrumbNav() {
       admin: t("sidebar.admin.administration"),
       users: t("sidebar.admin.users"),
       preferences: t("sidebar.secondary.preferences"),
+      account: t("account.my_account"),
     };
 
     // Gestion des cas spéciaux comme [id]

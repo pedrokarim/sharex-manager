@@ -37,7 +37,56 @@
   "account": {
     "upgrade_pro": "Upgrade to Pro",
     "my_account": "My Account",
-    "api_keys": "API Keys"
+    "api_keys": "API Keys",
+    "eyebrow": "Your personal space",
+    "signing_out": "Signing out…",
+    "role": {
+      "admin": "Administrator",
+      "user": "User"
+    },
+    "provider": {
+      "builtin": "ShareX Manager account",
+      "ascencia": "Ascencia ID"
+    },
+    "status": {
+      "active": "Active session",
+      "secure": "Secure"
+    },
+    "identity": {
+      "title": "Identity",
+      "description": "The information associated with your account.",
+      "email": "Email address",
+      "role": "Access level",
+      "member_since": "Member since"
+    },
+    "security": {
+      "title": "Access and security",
+      "description": "The status of your connection to this instance.",
+      "session_description": "Your connection is currently valid",
+      "provider": "Identity provider",
+      "expires_at": "Session expiry",
+      "ascencia_notice": "Your identity and permissions are managed through Ascencia ID. Make any changes from your Ascencia account.",
+      "builtin_notice": "Your identity is managed directly by this ShareX Manager instance."
+    },
+    "quick_actions": {
+      "title": "Shortcuts",
+      "description": "Jump straight to the settings you use most.",
+      "preferences": {
+        "badge": "Interface",
+        "title": "Preferences",
+        "description": "Adjust the language, appearance, and behaviour of your space."
+      },
+      "api_keys": {
+        "badge": "Publishing",
+        "title": "API keys",
+        "description": "Manage the credentials used by ShareX and your upload tools."
+      },
+      "users": {
+        "badge": "Administration",
+        "title": "Users",
+        "description": "Review accounts and manage their access levels."
+      }
+    }
   },
   "breadcrumb": {
     "edit_key": "Edit Key"

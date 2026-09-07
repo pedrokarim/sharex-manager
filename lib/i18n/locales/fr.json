@@ -38,7 +38,56 @@
   "account": {
     "upgrade_pro": "Passer à Pro",
     "my_account": "Mon compte",
-    "api_keys": "Clés API"
+    "api_keys": "Clés API",
+    "eyebrow": "Votre espace personnel",
+    "signing_out": "Déconnexion…",
+    "role": {
+      "admin": "Administrateur",
+      "user": "Utilisateur"
+    },
+    "provider": {
+      "builtin": "Compte ShareX Manager",
+      "ascencia": "Ascencia ID"
+    },
+    "status": {
+      "active": "Session active",
+      "secure": "Sécurisée"
+    },
+    "identity": {
+      "title": "Identité",
+      "description": "Les informations associées à votre compte.",
+      "email": "Adresse e-mail",
+      "role": "Niveau d’accès",
+      "member_since": "Membre depuis"
+    },
+    "security": {
+      "title": "Accès et sécurité",
+      "description": "L’état de votre connexion à cette instance.",
+      "session_description": "Votre connexion est actuellement valide",
+      "provider": "Fournisseur d’identité",
+      "expires_at": "Expiration de la session",
+      "ascencia_notice": "Votre identité et vos droits sont pilotés par Ascencia ID. Toute modification doit être effectuée depuis votre compte Ascencia.",
+      "builtin_notice": "Votre identité est gérée directement par cette instance de ShareX Manager."
+    },
+    "quick_actions": {
+      "title": "Raccourcis",
+      "description": "Retrouvez les réglages les plus utiles sans chercher dans les menus.",
+      "preferences": {
+        "badge": "Interface",
+        "title": "Préférences",
+        "description": "Ajustez la langue, l’apparence et le comportement de votre espace."
+      },
+      "api_keys": {
+        "badge": "Publication",
+        "title": "Clés API",
+        "description": "Gérez les accès utilisés par ShareX et vos outils d’upload."
+      },
+      "users": {
+        "badge": "Administration",
+        "title": "Utilisateurs",
+        "description": "Consultez les comptes et gérez leurs niveaux d’accès."
+      }
+    }
   },
   "breadcrumb": {
     "edit_key": "Modifier clé"

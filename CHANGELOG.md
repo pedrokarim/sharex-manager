@@ -56,6 +56,9 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Page « Mon compte » entièrement refondue et intégrée au shell de
+  l’application : profil réel, rôle, fournisseur d’identité, état de session
+  et raccourcis utiles remplacent les cartes vides « bientôt ».
 - Typographie : Geist remplacé par Plus Jakarta Sans et JetBrains Mono,
   servies par `next/font` donc auto-hébergées. Site vitrine aligné.
 - Cartes de navigation des écrans « Administration » et « Réglages » unifiées
