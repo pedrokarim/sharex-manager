@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // Les SDK Ascencia ID sont publiés en TypeScript source. Toute la chaîne
+    // doit être transpilée, y compris les dépendances indirectes.
+    transpilePackages: [
+        '@ascencia/id-rbac',
+        '@ascencia/id-core',
+        '@ascencia/id-server',
+    ],
     // Ignore typescript errors and linter errors
     typescript: {
         ignoreBuildErrors: true,

@@ -157,6 +157,16 @@ async function main() {
 
   let selectedCommand = globalArgs.command;
 
+  // Accepte aussi la forme naturelle `bun run cli -- setup`, en plus de
+  // l'ancien `-c setup`.
+  if (
+    !selectedCommand &&
+    commandArgs[0] &&
+    availableCommands.includes(commandArgs[0])
+  ) {
+    selectedCommand = commandArgs.shift();
+  }
+
   if (!selectedCommand && interactive) {
     const commandChoices = await Promise.all(
       availableCommands.map(async (cmd) => {

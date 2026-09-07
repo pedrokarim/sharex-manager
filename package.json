@@ -12,10 +12,12 @@
     "test:coverage": "bun --bun vitest run --coverage",
     "test:watch": "bun --bun vitest watch",
     "cli": "bun cli/index.ts",
+    "setup": "bun cli/index.ts setup",
     "clean": "bun cli/index.ts --no-interactive -c clean",
     "deploy:cron": "bun cli/index.ts --no-interactive -c deploy-cron"
   },
   "dependencies": {
+    "@ascencia/id-server": "0.1.0-rc.1",
     "@ai-sdk/react": "^4.0.54",
     "@base-ui-components/react": "^1.0.0-rc.0",
     "@dnd-kit/core": "^6.3.1",

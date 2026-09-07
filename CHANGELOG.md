@@ -7,6 +7,12 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Assistant d'installation `bun run setup` : choix entre l'authentification
+  intégrée (par défaut) et Ascencia ID, génération de l'environnement avec
+  sauvegarde, création du premier administrateur intégré et mode non interactif
+  pour les déploiements automatisés.
+- Connexion Ascencia ID via OIDC avec PKCE, validation des jetons signés et
+  traduction configurable des rôles Ascencia en administrateur ShareX Manager.
 - Page d'accueil refondue : héros avec capture de l'application, sections
   alternées texte/capture, mise en route en trois étapes avec le fichier
   `.sxcu`, mur d'images et renvoi vers les services annexes. Les chiffres et
