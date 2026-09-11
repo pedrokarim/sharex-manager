@@ -154,6 +154,8 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   elles. Le pied de carte est désormais ancré en bas.
 - Carte d'installation d'un module : couleurs codées en dur qui ignoraient le
   thème sombre, et sélecteur d'onglets à un seul onglet.
+- Accueil du catalogue : la section « Albums à découvrir » n'avait aucune marge
+  basse, ses cartes touchaient le pied de page.
 
 ### Security
 

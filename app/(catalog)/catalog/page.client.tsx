@@ -134,7 +134,7 @@ export function CatalogLanding() {
       </section>
 
       {data && data.albums.length > 0 ? (
-        <section className="container mx-auto px-4 pt-16 sm:px-6 lg:px-8">
+        <section className="container mx-auto px-4 pb-20 pt-16 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-baseline gap-3">
             <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               Sélection
