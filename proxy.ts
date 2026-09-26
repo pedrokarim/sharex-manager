@@ -56,8 +56,17 @@ const setCorsHeaders = (response: NextResponse, req: NextRequest) => {
 // Configuration du matcher.
 // Pas de clé `runtime` ici : contrairement à middleware.ts, proxy.ts s'exécute
 // toujours sur Node.js et Next refuse une config de segment dans ce fichier.
+//
+// Les routes d'envoi de fichiers sont exclues : Next copie en mémoire le corps
+// de toute requête qui traverse le proxy et le tronque à 10 Mo
+// (`proxyClientMaxBodySize`), si bien qu'un export de Clip Studio ou une
+// capture ShareX un peu lourde arrivait coupé (« Envoi illisible »). Ces
+// routes vérifient elles-mêmes la session ou le jeton, et sont de même
+// origine : le proxy ne leur apportait rien.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)", "/api/:path*"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api/upload$|api/modules/[^/]+/upload$).*)",
+  ],
 };
 
 // Fonction de journalisation sécurisée pour le proxy
