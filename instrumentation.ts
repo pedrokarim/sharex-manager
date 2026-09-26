@@ -25,4 +25,13 @@ export async function register() {
     // et l'erreur doit rester visible dans les journaux du conteneur.
     console.error("[auth-migrate] échec de la migration au démarrage :", error);
   }
+
+  // Les modules se chargent sinon à la première requête. Les charger dès le
+  // démarrage lance leurs préparatifs (téléchargement des voix de Clip
+  // Studio…) sans attendre une visite. Sans bloquer : le serveur répond déjà.
+  setTimeout(() => {
+    import("@/lib/modules/module-manager.api")
+      .then(({ apiModuleManager }) => apiModuleManager.ensureInitialized())
+      .catch((error) => console.error("[modules] échec du chargement au démarrage :", error));
+  }, 2000);
 }

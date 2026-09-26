@@ -38,8 +38,13 @@ export interface ResourceState {
   error?: string;
 }
 
-const states = new Map<string, ResourceState>();
-const inflight = new Map<string, Promise<string>>();
+// Partagé par processus : le démarrage (instrumentation) et les routes
+// peuvent charger chacun leur copie de ce fichier, sans télécharger deux fois.
+const registry = ((globalThis as any).__clipStudioResources ??= {
+  states: new Map<string, ResourceState>(),
+  inflight: new Map<string, Promise<string>>(),
+}) as { states: Map<string, ResourceState>; inflight: Map<string, Promise<string>> };
+const { states, inflight } = registry;
 
 export function resourcePath(spec: ResourceSpec) {
   return path.join(RESOURCES_DIR, spec.target);
