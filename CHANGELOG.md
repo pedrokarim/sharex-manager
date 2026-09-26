@@ -7,6 +7,41 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- AI Image Gen : studio repensé. Les rendus forment une mosaïque justifiée,
+  groupée par jour, qui remplit toute la largeur ; une génération en cours y
+  occupe déjà sa place, et un échec s'y affiche avec son message et son
+  journal. Le formulaire latéral et la colonne « File d'attente » cèdent la
+  place à un compositeur flottant au pied de la page (moteur, format, qualité,
+  nombre, styles, réglages avancés en pastilles) et à un panneau « Activité ».
+- AI Image Gen : image de départ depuis les uploads ShareX (recherche par nom,
+  filtre par date ou par période), depuis les rendus du studio, depuis
+  l'ordinateur ou depuis un lien, importé par le serveur avec refus des
+  adresses internes. Une image se joint aussi par glisser-déposer n'importe
+  où sur la page ou par collage (Ctrl + V).
+- AI Image Gen : trois vues du fil au choix, retenues d'une visite à l'autre :
+  mosaïque, liste (prompt complet et détails à côté des images) et
+  conversation (prompt en bulle, réponse du studio avec les images, dans
+  l'ordre chronologique). L'en-tête du studio reste en haut sur grand écran.
+- AI Image Gen : menus contextuels dans le fil (clic droit sur une image, une
+  légende, une ligne ou une bulle du chat), identiques au bouton « … ».
+  « Reprendre » remet texte, réglages et images de départ dans le
+  compositeur pour modifier puis relancer ; s'y ajoutent « Reprendre le texte
+  seul », « Relancer à l'identique », retouche, inspiration, variantes,
+  agrandissement, copie de l'image, série, galerie et suppression. Les images
+  de départ sont désormais archivées avec chaque génération.
+- AI Image Gen : le compositeur se vide après « Générer » (texte et images),
+  réglable dans Moteurs › Préférences.
+- Galerie : section « Modules » dans le menu contextuel, pour un fichier ou
+  une sélection. Elle propose les actions des modules activés compatibles
+  avec les fichiers : ouvrir une page du module (« Retoucher dans le studio »,
+  « S'en inspirer dans le studio »), appliquer un traitement à toute la
+  sélection ou ouvrir ses réglages. Les mêmes actions rejoignent la barre des
+  modules de la visionneuse. Les modules les déclarent dans `fileActions`.
+- AI Image Gen : changer d'onglet ne remplace plus toute la page par un
+  spinner (pages préchargées, indicateur limité à l'onglet cliqué) ; le fil et
+  le brouillon du compositeur sont conservés entre deux visites. Les tuiles, le
+  plateau d'images et la file d'activité s'animent à l'arrivée, au départ et
+  au réordonnancement, dans le respect du réglage « réduire les animations ».
 - Assistant d'installation `bun run setup` : choix entre l'authentification
   intégrée (par défaut) et Ascencia ID, génération de l'environnement avec
   sauvegarde, création du premier administrateur intégré et mode non interactif

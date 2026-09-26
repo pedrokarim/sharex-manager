@@ -24,6 +24,7 @@ import {
 import { useTranslation } from "@/lib/i18n";
 import type { FileInfo } from "@/types/files";
 import { getGalleryImageUrl } from "@/lib/utils/url";
+import { ModulesContextSection } from "@/components/gallery/modules-context-section";
 
 interface FileContextMenuContentProps {
   file: FileInfo;
@@ -203,6 +204,9 @@ export function FileContextMenuContent({
           Informations
         </ContextMenuItem>
       )}
+
+      {/* Ce que les modules activés savent faire de ce fichier */}
+      <ModulesContextSection files={[file]} />
 
       <ContextMenuSeparator />
 

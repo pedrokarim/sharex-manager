@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { ModuleSettingsHost } from "@/components/gallery/module-settings-host";
 
 /**
  * Tout l'espace applicatif est derrière authentification : aucune de ces pages
@@ -53,6 +54,8 @@ export default async function RootLayout({
           {children}
         </div>
       </SidebarInset>
+      {/* Réglages des modules ouverts depuis un menu contextuel. */}
+      <ModuleSettingsHost />
     </SidebarProvider>
   );
 }

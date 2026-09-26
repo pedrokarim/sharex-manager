@@ -20,6 +20,17 @@ const ModuleNavItemSchema = z.object({
   url: z.string().optional(),
 });
 
+const ModuleFileActionSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.string().optional(),
+  icon: z.string().optional(),
+  fileTypes: z.array(z.string()).default(["*"]),
+  maxFiles: z.number().int().positive().optional(),
+  page: z.string().optional(),
+  params: z.record(z.string(), z.string()).optional(),
+});
+
 const ModuleConfigSchema = z.object({
   name: z.string(),
   version: z.string(),
@@ -37,6 +48,7 @@ const ModuleConfigSchema = z.object({
   capabilities: z.unknown().optional(),
   pages: z.array(ModulePageConfigSchema).optional(),
   navItems: z.array(ModuleNavItemSchema).optional(),
+  fileActions: z.array(ModuleFileActionSchema).optional(),
 });
 
 const PROCESS_TIMEOUT_MS = 30_000;

@@ -45,6 +45,14 @@ import {
   Maximize2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { ArrowUpRight } from "lucide-react";
+import {
+  linkActionHref,
+  moduleIcon,
+  useModuleFileActions,
+  type ModuleLinkAction,
+} from "@/lib/modules/file-actions";
 
 interface ModuleActionsProps {
   file: FileInfo;
@@ -83,6 +91,13 @@ export function ModuleActions({
     useState<React.ComponentType<ModuleUIProps> | null>(null);
   const [moduleError, setModuleError] = useState<Error | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const router = useRouter();
+  // Actions « ouvrir dans un module » (ex. retoucher dans le studio), à côté
+  // des traitements qui s'appliquent sur place.
+  const { data: fileActions } = useModuleFileActions([file.name]);
+  const links = fileActions?.links ?? [];
+  const openLink = (link: ModuleLinkAction) =>
+    router.push(linkActionHref(link, [file.name]));
 
   // Récupérer l'extension du fichier
   const fileExtension = file.name.split(".").pop()?.toLowerCase() || "";
@@ -364,7 +379,7 @@ export function ModuleActions({
     );
   }
 
-  if (!modules || modules.length === 0) {
+  if ((!modules || modules.length === 0) && links.length === 0) {
     return null;
   }
 
@@ -501,7 +516,35 @@ export function ModuleActions({
               </div>
 
               <div className="flex items-center gap-2 overflow-x-auto px-4 pb-3 pt-2">
-                {filteredModules.length === 0 ? (
+                {activeCategory === "all" &&
+                  links.map((link) => {
+                    const Icon = moduleIcon(link.icon);
+                    return (
+                      <TooltipProvider key={`${link.module}:${link.id}`}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-9 shrink-0 gap-2 border-primary/30 px-2.5 font-normal"
+                              onClick={() => openLink(link)}
+                            >
+                              <Icon className="h-4 w-4 text-primary" />
+                              <span className="max-w-48 truncate text-xs">{link.label}</span>
+                              <ArrowUpRight className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-56">
+                            <p className="font-medium">{link.moduleTitle}</p>
+                            {link.description && (
+                              <p className="text-xs text-muted-foreground">{link.description}</p>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    );
+                  })}
+                {filteredModules.length === 0 && links.length === 0 ? (
                   <p className="py-2 text-xs text-muted-foreground">
                     {t("gallery.file_viewer.modules.empty_category")}
                   </p>
@@ -571,7 +614,7 @@ export function ModuleActions({
                     >
                       <Wand2 className="h-5 w-5" />
                       <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium tabular-nums text-primary-foreground">
-                        {modules.length}
+                        {modules.length + links.length}
                       </span>
                     </Button>
                   </TooltipTrigger>
@@ -675,6 +718,35 @@ export function ModuleActions({
                   : category}
               </Button>
             ))}
+          </div>
+        )}
+
+        {links.length > 0 && (
+          <div className="grid grid-cols-1 gap-2">
+            {links.map((link) => {
+              const Icon = moduleIcon(link.icon);
+              return (
+                <Button
+                  key={`${link.module}:${link.id}`}
+                  variant="outline"
+                  size="sm"
+                  className="h-auto w-full justify-start px-3 py-2"
+                  onClick={() => openLink(link)}
+                >
+                  <div className="flex w-full items-center gap-2">
+                    <Icon className="h-4 w-4 shrink-0 text-primary" />
+                    <div className="overflow-hidden text-left">
+                      <p className="text-xs font-medium">{link.label}</p>
+                      <p className="w-full truncate text-[10px] text-muted-foreground">
+                        {link.moduleTitle}
+                        {link.description ? ` · ${link.description}` : ""}
+                      </p>
+                    </div>
+                    <ArrowUpRight className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  </div>
+                </Button>
+              );
+            })}
           </div>
         )}
 

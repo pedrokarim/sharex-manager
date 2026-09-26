@@ -74,6 +74,44 @@ Le fichier `module.json` définit les métadonnées et la configuration du modul
 - `hasUI` : Indique si le module a une interface utilisateur
 - `npmDependencies` : Dépendances npm requises
 - `settings` : Paramètres par défaut du module
+- `fileActions` : actions proposées sur les fichiers de la galerie (voir
+  ci-dessous)
+
+### Actions sur les fichiers (`fileActions`)
+
+Un module qui possède ses propres pages peut proposer d'y ouvrir des fichiers
+de la galerie. Ses actions apparaissent dans la section « Modules » du menu
+contextuel (fichier seul ou sélection) et dans la barre des modules de la
+visionneuse, **uniquement si le module est activé** et si l'action accepte le
+type de chaque fichier sélectionné.
+
+```json
+"fileActions": [
+  {
+    "id": "edit",
+    "label": "Retoucher dans le studio",
+    "description": "Garde la composition, ne change que ce que vous décrivez",
+    "icon": "PenLine",
+    "fileTypes": ["png", "jpg", "jpeg", "webp"],
+    "maxFiles": 1,
+    "page": "",
+    "params": { "role": "edit-target" }
+  }
+]
+```
+
+- `fileTypes` : extensions acceptées, ou `["*"]` ;
+- `maxFiles` : nombre maximal de fichiers ; absent, la sélection est libre ;
+- `page` : page du module à ouvrir (`""` pour la racine) ;
+- `params` : paramètres ajoutés à l'adresse.
+
+La page reçoit les fichiers dans l'adresse :
+`/m/<module>/<page>?files=a.png,b.png&role=edit-target`. Elle les lit via
+`/api/files/<nom>`, puis retire ces paramètres de l'adresse.
+
+Les modules de traitement (`supportedFileTypes`) apparaissent aussi dans ce
+menu : sans interface, ils s'appliquent à toute la sélection ; avec interface,
+ils ouvrent leur fenêtre de réglages pour une image.
 
 ## Architecture des fichiers principaux
 

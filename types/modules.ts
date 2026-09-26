@@ -10,6 +10,22 @@ export interface ModuleNavItem {
   url?: string;        // auto-genere en /m/<moduleName> si omis
 }
 
+/**
+ * Action qu'un module propose sur des fichiers de la galerie (menu contextuel,
+ * visionneuse). Elle ouvre une page du module en lui passant les fichiers :
+ * `/m/<module>/<page>?files=a.png,b.png&<params>`.
+ */
+export interface ModuleFileAction {
+  id: string;
+  label: string;
+  description?: string;
+  icon?: string;        // nom d'icone Lucide: "Sparkles", "PenLine"
+  fileTypes: string[];  // extensions sans point, ou "*"
+  maxFiles?: number;    // absent = sélection illimitée
+  page?: string;        // segment de page du module, "" = racine
+  params?: Record<string, string>;
+}
+
 export interface ModuleConfig {
   name: string;
   version: string;
@@ -27,6 +43,7 @@ export interface ModuleConfig {
   capabilities?: string[];
   pages?: ModulePageConfig[];
   navItems?: ModuleNavItem[];
+  fileActions?: ModuleFileAction[];
 }
 
 export interface LoadedModule {

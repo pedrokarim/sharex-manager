@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/context-menu";
 import { useTranslation } from "@/lib/i18n";
 import type { FileInfo } from "@/types/files";
+import { ModulesContextSection } from "@/components/gallery/modules-context-section";
 
 interface MultiSelectContextMenuContentProps {
   selectedFiles: FileInfo[];
@@ -173,6 +174,9 @@ export function MultiSelectContextMenuContent({
           <ContextMenuShortcut>Ctrl+Shift+A</ContextMenuShortcut>
         </ContextMenuItem>
       )}
+
+      {/* Ce que les modules activés savent faire de la sélection */}
+      {selectedFiles.length > 0 && <ModulesContextSection files={selectedFiles} />}
 
       <ContextMenuSeparator />
 
