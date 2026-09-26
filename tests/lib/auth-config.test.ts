@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isAscenciaCallback,
   resolveAuthConfig,
   resolveAuthProvider,
 } from "@/lib/auth-config";
@@ -36,5 +37,31 @@ describe("auth configuration", () => {
     expect(() =>
       resolveAuthConfig({ SHAREX_AUTH_PROVIDER: "ascencia" })
     ).toThrow("ASCENCIA_ISSUER");
+  });
+
+  it("recognizes the Ascencia callback from the better-auth route template", () => {
+    expect(
+      isAscenciaCallback({
+        path: "/oauth2/callback/:providerId",
+        params: { providerId: "ascencia" },
+      })
+    ).toBe(true);
+    expect(isAscenciaCallback({ path: "/oauth2/callback/ascencia" })).toBe(
+      true
+    );
+  });
+
+  it("rejects other callbacks and client endpoints", () => {
+    expect(
+      isAscenciaCallback({
+        path: "/oauth2/callback/:providerId",
+        params: { providerId: "other" },
+      })
+    ).toBe(false);
+    expect(isAscenciaCallback({ path: "/oauth2/callback/:providerId" })).toBe(
+      false
+    );
+    expect(isAscenciaCallback({ path: "/update-user" })).toBe(false);
+    expect(isAscenciaCallback(null)).toBe(false);
   });
 });

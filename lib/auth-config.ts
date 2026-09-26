@@ -1,5 +1,9 @@
 export const AUTH_PROVIDERS = ["builtin", "ascencia"] as const;
 
+export const ASCENCIA_PROVIDER_ID = "ascencia";
+
+const OAUTH_CALLBACK_ROUTE = "/oauth2/callback/:providerId";
+
 export type AuthProvider = (typeof AUTH_PROVIDERS)[number];
 
 export interface BuiltinAuthConfig {
@@ -71,4 +75,24 @@ function requiredValue(env: Environment, name: string): string {
     );
   }
   return value;
+}
+
+/**
+ * Indique si un hook de base de données s'exécute pendant le callback OIDC
+ * d'Ascencia ID. better-auth expose le modèle de route (`:providerId`) dans
+ * `path`, pas l'URL réelle : le fournisseur se lit donc dans `params`.
+ */
+export function isAscenciaCallback(
+  context:
+    | { path?: string; params?: Record<string, string | undefined> | null }
+    | null
+    | undefined
+): boolean {
+  if (!context) return false;
+
+  return (
+    context.path === `/oauth2/callback/${ASCENCIA_PROVIDER_ID}` ||
+    (context.path === OAUTH_CALLBACK_ROUTE &&
+      context.params?.providerId === ASCENCIA_PROVIDER_ID)
+  );
 }

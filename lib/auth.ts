@@ -12,6 +12,8 @@ import {
 import { createVerifier } from "@ascencia/id-server";
 
 import {
+  ASCENCIA_PROVIDER_ID,
+  isAscenciaCallback,
   resolveAuthConfig,
   type AscenciaAuthConfig,
 } from "@/lib/auth-config";
@@ -21,8 +23,6 @@ mkdirSync(dataDir, { recursive: true });
 
 const database = new Database(join(dataDir, "auth.db"));
 const authConfig = resolveAuthConfig();
-
-const ASCENCIA_PROVIDER_ID = "ascencia";
 
 /**
  * better-auth rejette toute requête dont l'`Origin` ne correspond pas au
@@ -85,7 +85,7 @@ export const auth = betterAuth({
             data: {
               ...user,
               role:
-                isAscenciaCallback(context.path) && user.role === "admin"
+                isAscenciaCallback(context) && user.role === "admin"
                   ? "admin"
                   : "user",
             },
@@ -100,7 +100,7 @@ export const auth = betterAuth({
             data: {
               ...user,
               role:
-                isAscenciaCallback(context.path) && user.role === "admin"
+                isAscenciaCallback(context) && user.role === "admin"
                   ? "admin"
                   : "user",
             },
@@ -123,10 +123,6 @@ export const auth = betterAuth({
 });
 
 export type Session = typeof auth.$Infer.Session;
-
-function isAscenciaCallback(path: string | undefined): boolean {
-  return path === `/oauth2/callback/${ASCENCIA_PROVIDER_ID}`;
-}
 
 function createAscenciaProvider(
   config: AscenciaAuthConfig

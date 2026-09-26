@@ -98,6 +98,9 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Ascencia ID : les rôles administrateur (`ASCENCIA_ADMIN_ROLES`) sont
+  désormais appliqués. better-auth expose le modèle de route du callback OIDC,
+  si bien que chaque compte Ascencia était ramené au rôle `user`.
 - Image Docker : ajout des certificats racine. L'image de base n'en contenait
   aucun, Bun embarquant les siens ; le CLI Codex, qui valide TLS avec ceux du
   système, échouait sur « error sending request » dès la connexion au compte.
