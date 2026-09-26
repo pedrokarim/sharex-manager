@@ -17,6 +17,7 @@ import type {
   ShapeItem,
   TextItem,
   TextStyle,
+  TimedWord,
   VideoItem,
   VisualItem,
 } from "./types";
@@ -88,7 +89,8 @@ function drawItem(
       drawMedia(ctx, item, frame, w, h, resolve);
       break;
     case "text":
-      drawText(ctx, item, w, H, anim.reveal);
+      if (item.karaoke) drawKaraoke(ctx, item, frame, project.fps, w, H);
+      else drawText(ctx, item, w, H, anim.reveal);
       break;
     case "shape":
       drawShape(ctx, item, frame, w, h);
@@ -253,6 +255,110 @@ function drawText(
     ctx.fillText(text, anchorX, y);
     ctx.restore();
   }
+}
+
+// ─── Sous-titres animés ──────────────────────────────────────────
+
+/**
+ * Groupes de mots affichés ensemble : au plus `size` mots, et une coupure
+ * après une ponctuation forte pour suivre les phrases.
+ */
+export function wordGroups(words: TimedWord[], size: number): number[][] {
+  const groups: number[][] = [];
+  let current: number[] = [];
+  words.forEach((word, index) => {
+    current.push(index);
+    if (current.length >= Math.max(1, size) || /[.!?…:;,]$/.test(word.text)) {
+      groups.push(current);
+      current = [];
+    }
+  });
+  if (current.length) groups.push(current);
+  return groups;
+}
+
+function drawKaraoke(ctx: Ctx, item: TextItem, frame: number, fps: number, w: number, canvasHeight: number) {
+  const karaoke = item.karaoke!;
+  const words = karaoke.words;
+  if (words.length === 0) return;
+  const nowMs = ((frame - item.start + karaoke.offset) / fps) * 1000;
+
+  // Mot en cours : le dernier commencé. Entre deux groupes, le groupe suivant
+  // n'apparaît qu'à son premier mot ; après la fin, plus rien.
+  let active = -1;
+  for (let index = 0; index < words.length; index++) {
+    if (words[index].startMs <= nowMs) active = index;
+    else break;
+  }
+  if (active === -1) return;
+  if (nowMs > words[words.length - 1].endMs + 250) return;
+  const group = wordGroups(words, karaoke.groupSize).find((entry) => entry.includes(active))!;
+
+  const style = item.style;
+  const fontPx = style.size * canvasHeight;
+  ctx.font = fontString(style, canvasHeight);
+  if ("letterSpacing" in ctx) {
+    (ctx as CanvasRenderingContext2D).letterSpacing = `${style.letterSpacing * fontPx}px`;
+  }
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+
+  const texts = group.map((index) => (style.uppercase ? words[index].text.toUpperCase() : words[index].text));
+  const space = ctx.measureText(" ").width;
+  const widths = texts.map((text) => ctx.measureText(text).width);
+
+  // Lignes : les mots du groupe qui tiennent dans la largeur de l'élément.
+  const lines: number[][] = [];
+  let line: number[] = [];
+  let lineWidth = 0;
+  texts.forEach((_, index) => {
+    const extra = (line.length ? space : 0) + widths[index];
+    if (line.length && lineWidth + extra > w) {
+      lines.push(line);
+      line = [];
+      lineWidth = 0;
+    }
+    lineWidth += (line.length ? space : 0) + widths[index];
+    line.push(index);
+  });
+  if (line.length) lines.push(line);
+
+  const lineHeight = fontPx * style.lineHeight;
+  const firstY = -(lines.length * lineHeight) / 2 + lineHeight / 2;
+
+  lines.forEach((entries, lineIndex) => {
+    const total = entries.reduce((sum, index, position) => sum + widths[index] + (position ? space : 0), 0);
+    let x = style.align === "left" ? -w / 2 : style.align === "right" ? w / 2 - total : -total / 2;
+    const y = firstY + lineIndex * lineHeight;
+    for (const index of entries) {
+      const wordIndex = group[index];
+      const current = wordIndex === active;
+      // Le mot prononcé grossit brièvement à son arrivée.
+      const age = nowMs - words[wordIndex].startMs;
+      const pop = current ? 1 + 0.12 * Math.max(0, 1 - age / 180) : 1;
+      ctx.save();
+      ctx.translate(x + widths[index] / 2, y);
+      ctx.scale(pop, pop);
+      if (style.stroke && style.stroke.width > 0) {
+        ctx.save();
+        ctx.lineJoin = "round";
+        ctx.miterLimit = 2;
+        ctx.strokeStyle = style.stroke.color;
+        ctx.lineWidth = style.stroke.width * fontPx * 2;
+        ctx.strokeText(texts[index], -widths[index] / 2, 0);
+        ctx.restore();
+      }
+      if (style.shadow) {
+        ctx.shadowColor = style.shadow.color;
+        ctx.shadowBlur = style.shadow.blur * fontPx;
+        ctx.shadowOffsetY = style.shadow.offsetY * fontPx;
+      }
+      ctx.fillStyle = current ? karaoke.highlight : style.color;
+      ctx.fillText(texts[index], -widths[index] / 2, 0);
+      ctx.restore();
+      x += widths[index] + space;
+    }
+  });
 }
 
 // ─── Formes ──────────────────────────────────────────────────────

@@ -35,9 +35,11 @@ interface InspectorProps {
   /** `key` regroupe les réglages successifs d'un même champ en une étape d'annulation. */
   onPatch: (patch: Partial<ClipItem>, key: string) => void;
   onClose: () => void;
+  /** Ajoute les sous-titres animés d'une voix. */
+  onCaption?: (itemId: string) => void;
 }
 
-export function Inspector({ project, item, onPatch, onClose }: InspectorProps) {
+export function Inspector({ project, item, onPatch, onClose, onCaption }: InspectorProps) {
   const fps = project.fps;
   const title =
     item.type === "text" ? "Texte" : item.type === "image" ? "Image" : item.type === "video" ? "Vidéo" : item.type === "shape" ? "Forme" : "Son";
@@ -56,6 +58,19 @@ export function Inspector({ project, item, onPatch, onClose }: InspectorProps) {
         {item.type === "video" && <VideoFields item={item} onPatch={onPatch} />}
         {item.type === "shape" && <ShapeFields item={item} onPatch={onPatch} />}
         {item.type === "audio" && <AudioFields item={item} fps={fps} onPatch={onPatch} />}
+        {item.type === "audio" &&
+        item.source.words?.length &&
+        !project.tracks.some((track) => track.items.some((other) => other.type === "text" && other.karaoke?.voiceId === item.id)) ? (
+          <Section title="Sous-titres">
+            <p className="text-xs text-muted-foreground">
+              Le texte de cette voix peut s&apos;afficher mot à mot, calé sur la lecture.
+            </p>
+            <Button variant="outline" size="sm" className="w-full" onClick={() => onCaption?.(item.id)}>
+              Ajouter les sous-titres animés
+            </Button>
+          </Section>
+        ) : null}
+        {item.type === "text" && item.karaoke && <KaraokeFields item={item} onPatch={onPatch} />}
 
         <Section title="Temps">
           <Slider
@@ -388,6 +403,20 @@ function ShapeFields({ item, onPatch }: { item: ShapeItem; onPatch: InspectorPro
           />
         </Row>
       )}
+    </Section>
+  );
+}
+
+function KaraokeFields({ item, onPatch }: { item: TextItem; onPatch: InspectorProps["onPatch"] }) {
+  const karaoke = item.karaoke!;
+  const set = (patch: Partial<typeof karaoke>, key: string) => onPatch({ karaoke: { ...karaoke, ...patch } } as Partial<ClipItem>, key);
+  return (
+    <Section title="Sous-titres animés">
+      <ColorField label="Mot prononcé" value={karaoke.highlight} onChange={(highlight) => set({ highlight }, "karaoke-color")} />
+      <Slider label="Mots à la fois" min={1} max={8} step={1} value={karaoke.groupSize} onChange={(groupSize) => set({ groupSize }, "karaoke-group")} />
+      <p className="text-[11px] leading-4 text-muted-foreground">
+        Le texte suit la voix : pour le corriger, modifiez la voix et régénérez-la.
+      </p>
     </Section>
   );
 }

@@ -34,6 +34,8 @@ import {
   changeAspect,
   createAudioItem,
   createMusicItems,
+  captionAllVoices,
+  captionForVoice,
   createImageItem,
   createShapeItem,
   createTextItem,
@@ -173,13 +175,17 @@ function Editor({ initial }: { initial: ClipProject }) {
 
   /** Voix off : à la tête de lecture, sur une piste Voix libre ou nouvelle. */
   const addVoice = useCallback(
-    (source: MediaSource) => {
+    (source: MediaSource, captions: boolean) => {
       const current = projectRef.current;
       // Une voix se lit presque à plein volume et sans fondu, contrairement à
       // une musique ; la marge évite la saturation quand les deux se mêlent.
       const item = { ...createAudioItem(source, playerRef.current?.frame ?? 0, current.fps), volume: 0.9, fadeIn: 0, fadeOut: 0 };
       const voiceTrack = current.tracks.find((track) => track.kind === "audio" && track.name.startsWith("Voix"));
-      commit((project) => addItem(project, item, voiceTrack?.id, "Voix"));
+      commit((project) => {
+        const next = addItem(project, item, voiceTrack?.id, "Voix");
+        const caption = captions ? captionForVoice(next, item) : null;
+        return caption ? addItem(next, caption, undefined, "Sous-titres") : next;
+      });
       setSelectedId(item.id);
     },
     [commit]
@@ -383,7 +389,15 @@ function Editor({ initial }: { initial: ClipProject }) {
                 {panel === "text" && <TextPanel onAddText={addText} onAddShape={addShape} />}
                 {panel === "music" && <MusicPanel onAdd={addMusic} />}
                 {panel === "voice" && (
-                  <VoicePanel selectedText={selected?.type === "text" ? selected.text : undefined} onAdd={addVoice} />
+                  <VoicePanel
+                    selectedText={selected?.type === "text" && !selected.karaoke ? selected.text : undefined}
+                    onAdd={addVoice}
+                    onCaptionAll={() => {
+                      const { project: next, count } = captionAllVoices(projectRef.current);
+                      if (count) commit(() => next);
+                      return count;
+                    }}
+                  />
                 )}
               </div>
             </motion.aside>
@@ -416,6 +430,14 @@ function Editor({ initial }: { initial: ClipProject }) {
                   project={project}
                   item={selected}
                   onClose={() => setSelectedId(null)}
+                  onCaption={(itemId) => {
+                    const found = findItem(projectRef.current, itemId);
+                    if (found?.item.type !== "audio") return;
+                    const caption = captionForVoice(projectRef.current, found.item);
+                    if (!caption) return;
+                    commit((current) => addItem(current, caption, undefined, "Sous-titres"));
+                    setSelectedId(caption.id);
+                  }}
                   onPatch={(patch, key) =>
                     commit((current) => updateItem(current, selected.id, patch), `inspect-${selected.id}-${key}`)
                   }

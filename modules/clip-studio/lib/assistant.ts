@@ -374,7 +374,7 @@ function narrationLines(template: TemplateId, data: QuizData | TopData | Slidesh
 async function speakLine(text: string, voice: string): Promise<VoiceClip | undefined> {
   if (!text) return undefined;
   try {
-    const { asset, durationMs } = await synthesize({ text, voice });
+    const { asset, durationMs, words } = await synthesize({ text, voice });
     if (!durationMs) return undefined;
     return {
       durationMs,
@@ -385,6 +385,7 @@ async function speakLine(text: string, voice: string): Promise<VoiceClip | undef
         kind: "audio",
         durationMs,
         credit: asset.credit,
+        words,
       },
     };
   } catch {

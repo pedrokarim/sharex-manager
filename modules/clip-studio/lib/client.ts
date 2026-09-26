@@ -66,6 +66,7 @@ export function assetToSource(asset: ClipAsset): MediaSource {
     height: asset.height,
     durationMs: asset.durationMs,
     credit: asset.credit,
+    words: asset.words,
   };
 }
 

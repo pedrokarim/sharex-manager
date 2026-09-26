@@ -9,8 +9,9 @@
 import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
-import type { ClipAsset } from "../engine/types";
+import type { ClipAsset, TimedWord } from "../engine/types";
 import { ensureResource, resourcePath, resourceState, type ResourceSpec, type ResourceState } from "./resources";
+import { alignWords } from "./align";
 import { ASSETS_DIR, ensureDirs, readAssets, writeAssets } from "./store";
 
 const PIPER_RELEASE = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2";
@@ -156,6 +157,8 @@ export function wavDurationMs(file: string): number {
 export interface SpeechResult {
   asset: ClipAsset;
   durationMs: number;
+  /** Instants de chaque mot, pour les sous-titres animés. */
+  words: TimedWord[];
 }
 
 /**
@@ -212,6 +215,12 @@ async function runSynthesis(input: { text: string; voice?: string; speed?: numbe
   });
 
   const durationMs = wavDurationMs(output);
+  let words: TimedWord[] = [];
+  try {
+    words = alignWords(output, text);
+  } catch {
+    // Sans alignement, la voix reste utilisable ; seuls les sous-titres manquent.
+  }
   const asset: ClipAsset = {
     file,
     kind: "audio",
@@ -219,8 +228,9 @@ async function runSynthesis(input: { text: string; voice?: string; speed?: numbe
     size: fs.statSync(output).size,
     durationMs,
     credit: `Voix ${voice.label} : ${voice.credit}, ${voice.license}`,
+    words,
     createdAt: Date.now(),
   };
   writeAssets([asset, ...readAssets()]);
-  return { asset, durationMs };
+  return { asset, durationMs, words };
 }

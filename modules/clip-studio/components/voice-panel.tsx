@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Mic, TextCursorInput } from "lucide-react";
+import { Captions, Loader2, Mic, TextCursorInput } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { ClipAsset, MediaSource } from "../engine/types";
 import { assetToSource, callModule } from "../lib/client";
@@ -22,30 +23,35 @@ const SPEEDS = [
 export function VoicePanel({
   selectedText,
   onAdd,
+  onCaptionAll,
 }: {
   /** Texte de l'élément sélectionné, proposé à la lecture. */
   selectedText?: string;
-  onAdd: (source: MediaSource) => void;
+  onAdd: (source: MediaSource, captions: boolean) => void;
+  /** Sous-titre les voix déjà posées ; renvoie le nombre de voix traitées. */
+  onCaptionAll: () => number;
 }) {
   const { info, prepare } = useVoices();
   const [text, setText] = useState("");
   const [voice, setVoice] = useState("siwis");
   const [speed, setSpeed] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [captions, setCaptions] = useState(true);
 
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("clip-studio:voice") ?? "null");
       if (saved?.voice) setVoice(saved.voice);
       if (saved?.speed) setSpeed(saved.speed);
+      if (typeof saved?.captions === "boolean") setCaptions(saved.captions);
     } catch {
       // Préférence absente ou illisible : on garde les valeurs par défaut.
     }
   }, []);
 
-  const remember = (next: { voice?: string; speed?: number }) => {
+  const remember = (next: { voice?: string; speed?: number; captions?: boolean }) => {
     try {
-      localStorage.setItem("clip-studio:voice", JSON.stringify({ voice, speed, ...next }));
+      localStorage.setItem("clip-studio:voice", JSON.stringify({ voice, speed, captions, ...next }));
     } catch {
       // Stockage indisponible : la préférence ne sera simplement pas retenue.
     }
@@ -60,7 +66,7 @@ export function VoicePanel({
     setBusy(true);
     try {
       const result = await callModule<{ asset: ClipAsset; durationMs: number }>("speak", { text: content, voice, speed });
-      onAdd(assetToSource(result.asset));
+      onAdd(assetToSource(result.asset), captions);
       toast.success(`Voix ajoutée, ${(result.durationMs / 1000).toFixed(1)} s`);
     } catch (error: any) {
       toast.error(error?.message ?? "La synthèse vocale a échoué");
@@ -137,6 +143,20 @@ export function VoicePanel({
         </div>
       </section>
 
+      <label className="flex items-center justify-between gap-3 text-sm">
+        <span>
+          Sous-titres animés
+          <span className="block text-[11px] text-muted-foreground">Le texte s&apos;affiche mot à mot, calé sur la voix.</span>
+        </span>
+        <Switch
+          checked={captions}
+          onCheckedChange={(checked) => {
+            setCaptions(checked);
+            remember({ captions: checked });
+          }}
+        />
+      </label>
+
       <Button onClick={generate} disabled={busy || !text.trim()} className="gap-2">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
         {busy ? "Enregistrement…" : "Générer à la tête de lecture"}
@@ -146,6 +166,20 @@ export function VoicePanel({
           Le moteur de synthèse sera téléchargé à la première génération (environ 25 Mo).
         </p>
       )}
+
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-2"
+        onClick={() => {
+          const count = onCaptionAll();
+          if (count) toast.success(`${count} voix sous-titrée(s)`);
+          else toast.info("Toutes les voix du projet sont déjà sous-titrées");
+        }}
+      >
+        <Captions className="h-4 w-4" />
+        Sous-titrer les voix du projet
+      </Button>
 
       <div className="mt-auto">
         <VoiceCredit voice={selected} />

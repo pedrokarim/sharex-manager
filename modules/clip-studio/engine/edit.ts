@@ -16,6 +16,7 @@ import {
   type ShapeItem,
   type TextItem,
   type TextStyle,
+  type TimedWord,
   type Track,
   type VideoItem,
   type VisualItem,
@@ -187,6 +188,65 @@ export function createMusicItems(source: MediaSource, start: number, end: number
     });
   }
   return items;
+}
+
+/** Style des sous-titres animés : gros, contrastés, lisibles sur tout fond. */
+export const CAPTION_STYLE: TextStyle = {
+  font: "Montserrat",
+  weight: 800,
+  size: 0.05,
+  color: "#ffffff",
+  align: "center",
+  lineHeight: 1.15,
+  uppercase: true,
+  letterSpacing: 0,
+  stroke: { color: "#000000", width: 0.09 },
+  shadow: { color: "rgba(0,0,0,0.55)", blur: 0.25, offsetY: 0.06 },
+  background: null,
+};
+
+/** Sous-titres animés calés sur une voix posée à l'image `start`. */
+export function createCaptionItem(words: TimedWord[], start: number, fps: number, vertical: boolean): TextItem {
+  const last = words[words.length - 1];
+  return {
+    id: uid("x-"),
+    type: "text",
+    start,
+    duration: Math.max(1, msToFrames(last ? last.endMs + 300 : 1000, fps)),
+    text: words.map((word) => word.text).join(" "),
+    style: structuredClone(CAPTION_STYLE),
+    karaoke: { words, offset: 0, highlight: "#facc15", groupSize: vertical ? 3 : 5 },
+    transform: { x: 0.5, y: vertical ? 0.74 : 0.84, width: vertical ? 0.86 : 0.8, height: 0.16, rotation: 0, opacity: 1 },
+    animIn: { kind: "none", frames: 6 },
+    animOut: { kind: "none", frames: 6 },
+  };
+}
+
+/** Sous-titres d'un élément audio de voix, calés sur sa place et son rognage. */
+export function captionForVoice(project: ClipProject, voice: AudioItem): TextItem | null {
+  const words = voice.source.words;
+  if (!words?.length) return null;
+  const caption = createCaptionItem(words, voice.start, project.fps, project.height > project.width);
+  caption.duration = voice.duration;
+  caption.karaoke = { ...caption.karaoke!, offset: voice.trimStart, voiceId: voice.id };
+  return caption;
+}
+
+/** Sous-titre toutes les voix du projet qui ne le sont pas encore. */
+export function captionAllVoices(project: ClipProject): { project: ClipProject; count: number } {
+  const captioned = new Set(
+    project.tracks.flatMap((track) => track.items).flatMap((item) => (item.type === "text" && item.karaoke?.voiceId ? [item.karaoke.voiceId] : []))
+  );
+  let next = project;
+  let count = 0;
+  for (const item of project.tracks.flatMap((track) => track.items)) {
+    if (item.type !== "audio" || captioned.has(item.id)) continue;
+    const caption = captionForVoice(project, item);
+    if (!caption) continue;
+    next = addItem(next, caption, undefined, "Sous-titres");
+    count++;
+  }
+  return { project: next, count };
 }
 
 export function createTextItem(
@@ -411,6 +471,9 @@ export function trimItem(
       start,
       duration: end - start,
       ...("trimStart" in current ? { trimStart: current.trimStart + delta } : {}),
+      ...(current.type === "text" && current.karaoke
+        ? { karaoke: { ...current.karaoke, offset: current.karaoke.offset + delta } }
+        : {}),
     }) as ClipItem);
   }
 
@@ -435,6 +498,9 @@ export function splitItem(project: ClipProject, itemId: string, frame: number): 
     start: cut,
     duration: item.start + item.duration - cut,
     ...("trimStart" in item ? { trimStart: item.trimStart + (cut - item.start) } : {}),
+    ...(item.type === "text" && item.karaoke
+      ? { karaoke: { ...structuredClone(item.karaoke), offset: item.karaoke.offset + (cut - item.start) } }
+      : {}),
   } as ClipItem;
   if ("animOut" in left) (left as VisualItem).animOut = { kind: "none", frames: 10 };
   if ("animIn" in right) (right as VisualItem).animIn = { kind: "none", frames: 10 };

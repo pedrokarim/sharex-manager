@@ -56,6 +56,8 @@ export interface MediaSource {
   durationMs?: number;
   /** Mention d'auteur et de licence, à reprendre à la publication. */
   credit?: string;
+  /** Voix de synthèse : instants de chaque mot, pour les sous-titres. */
+  words?: TimedWord[];
 }
 
 /** Position et taille relatives au canevas ; x et y désignent le centre. */
@@ -144,10 +146,34 @@ export interface TextStyle {
   background: { color: string; padding: number; radius: number } | null;
 }
 
+/** Un mot prononcé et ses instants, en millisecondes depuis le début de la voix. */
+export interface TimedWord {
+  text: string;
+  startMs: number;
+  endMs: number;
+}
+
+/**
+ * Sous-titres animés : le texte suit une voix mot à mot. On montre un groupe
+ * de quelques mots à la fois et le mot prononcé ressort.
+ */
+export interface Karaoke {
+  words: TimedWord[];
+  /** Décalage dans la voix, en images : avance quand on rogne le début ou qu'on scinde. */
+  offset: number;
+  /** Couleur du mot prononcé. */
+  highlight: string;
+  /** Nombre maximal de mots affichés ensemble. */
+  groupSize: number;
+  /** Élément audio sous-titré, pour ne pas le sous-titrer deux fois. */
+  voiceId?: string;
+}
+
 export interface TextItem extends VisualBase {
   type: "text";
   text: string;
   style: TextStyle;
+  karaoke?: Karaoke;
 }
 
 export interface ShapeItem extends VisualBase {
@@ -202,5 +228,7 @@ export interface ClipAsset {
   durationMs?: number;
   /** Mention d'auteur et de licence (voix de synthèse…). */
   credit?: string;
+  /** Voix de synthèse : instants de chaque mot, pour les sous-titres. */
+  words?: TimedWord[];
   createdAt: number;
 }
