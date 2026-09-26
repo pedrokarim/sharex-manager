@@ -364,6 +364,27 @@ export default function SettingsPage({
 
               <Field orientation="horizontal">
                 <FieldContent>
+                  <FieldLabel htmlFor="clear-after-submit">
+                    Vider le compositeur après « Générer »
+                  </FieldLabel>
+                  <FieldDescription>
+                    Le texte et les images jointes sont retirés dès que la
+                    génération part, pour laisser place à la suivante. Les
+                    réglages (moteur, format, série…) restent en place.
+                    « Reprendre » sur une génération les remet à tout moment.
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="clear-after-submit"
+                  checked={settings.clear_after_submit !== false}
+                  onCheckedChange={(value) =>
+                    updateSetting("clear_after_submit", value)
+                  }
+                />
+              </Field>
+
+              <Field orientation="horizontal">
+                <FieldContent>
                   <FieldLabel htmlFor="save-gallery">
                     Envoyer dans la galerie
                   </FieldLabel>

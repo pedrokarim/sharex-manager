@@ -17,7 +17,8 @@
     "save_to_gallery": false,
     "notes_preprompt": "",
     "default_negative_prompt": "",
-    "max_parallel_jobs": 2
+    "max_parallel_jobs": 2,
+    "clear_after_submit": true
   },
   "pages": [
     { "path": "", "title": "Studio", "component": "pages/generate.tsx" },
@@ -28,5 +29,27 @@
   ],
   "navItems": [
     { "title": "AI Image Gen", "icon": "Sparkles" }
+  ],
+  "fileActions": [
+    {
+      "id": "edit",
+      "label": "Retoucher dans le studio",
+      "description": "Garde la composition, ne change que ce que vous décrivez",
+      "icon": "PenLine",
+      "fileTypes": ["png", "jpg", "jpeg", "webp"],
+      "maxFiles": 1,
+      "page": "",
+      "params": { "role": "edit-target" }
+    },
+    {
+      "id": "inspire",
+      "label": "S'en inspirer dans le studio",
+      "description": "Sert de référence de style ou de sujet pour une nouvelle image",
+      "icon": "Sparkles",
+      "fileTypes": ["png", "jpg", "jpeg", "webp", "gif"],
+      "maxFiles": 4,
+      "page": "",
+      "params": { "role": "reference" }
+    }
   ]
 }

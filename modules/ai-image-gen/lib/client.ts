@@ -91,6 +91,8 @@ export interface HistoryItem {
   parentId?: string;
   pipelineId?: string;
   seed?: number;
+  /** Images de départ archivées, rendues par « Reprendre ». */
+  sourceImages?: { file: string; role?: "reference" | "edit-target" }[];
 }
 
 export type JobStatus = "queued" | "running" | "done" | "error" | "canceled";
@@ -221,10 +223,19 @@ export function isJobActive(job: Job): boolean {
  * la file est vide : une génération dure une minute, il serait absurde de
  * garder un aller-retour par seconde pendant que rien ne se passe.
  */
+/**
+ * Dernier état connu du studio, conservé entre deux visites de la page : au
+ * retour, le fil s'affiche aussitôt et se met à jour en arrière-plan, au lieu
+ * de repasser par un squelette.
+ */
+let studioSnapshot: { jobs: Job[]; history: HistoryItem[] } | null = null;
+
 export function useStudioState(historyLimit = 60) {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [ready, setReady] = useState(false);
+  const [jobs, setJobs] = useState<Job[]>(() => studioSnapshot?.jobs ?? []);
+  const [history, setHistory] = useState<HistoryItem[]>(
+    () => studioSnapshot?.history ?? []
+  );
+  const [ready, setReady] = useState(() => studioSnapshot !== null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stopped = useRef(false);
 
@@ -234,6 +245,7 @@ export function useStudioState(historyLimit = 60) {
         "getStudioState",
         historyLimit
       );
+      studioSnapshot = state;
       if (stopped.current) return state;
       setJobs(state.jobs);
       setHistory(state.history);
@@ -366,16 +378,112 @@ export function readFileAsBase64(
 export async function fileToReference(
   file: string
 ): Promise<{ b64: string; mimeType: string }> {
-  const response = await fetch(imageUrl(file));
+  const { b64, mimeType } = await sameOriginImageToBase64(imageUrl(file));
+  return { b64, mimeType };
+}
+
+/**
+ * Lit une image servie par ShareX Manager lui-même (upload, rendu du studio).
+ * La requête reste sur la même origine : la session suit, et aucun CORS ne
+ * s'en mêle.
+ */
+export async function sameOriginImageToBase64(
+  url: string
+): Promise<{ b64: string; mimeType: string; dataUrl: string }> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Image inaccessible (HTTP ${response.status})`);
+  }
   const blob = await response.blob();
-  const dataUrl: string = await new Promise((resolve, reject) => {
+  if (!blob.type.startsWith("image/")) {
+    throw new Error("Ce fichier n'est pas une image");
+  }
+  return blobToBase64(blob);
+}
+
+export function blobToBase64(
+  blob: Blob
+): Promise<{ b64: string; mimeType: string; dataUrl: string }> {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Lecture impossible"));
-    reader.onload = () => resolve(reader.result as string);
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      resolve({
+        b64: dataUrl.split(",")[1] ?? "",
+        mimeType: blob.type || "image/png",
+        dataUrl,
+      });
+    };
     reader.readAsDataURL(blob);
   });
+}
+
+/**
+ * Récupère une image hébergée ailleurs. Le navigateur ne peut pas la lire
+ * lui-même (CORS) : c'est le serveur du module qui la télécharge.
+ */
+export async function remoteImageToBase64(
+  url: string
+): Promise<{ b64: string; mimeType: string; dataUrl: string; name: string }> {
+  const result = await callModule<{ b64: string; mimeType: string; name: string }>(
+    "importImageFromUrl",
+    url
+  );
   return {
-    b64: dataUrl.split(",")[1] ?? "",
-    mimeType: blob.type || "image/png",
+    ...result,
+    dataUrl: `data:${result.mimeType};base64,${result.b64}`,
   };
+}
+
+// ─── Regroupement par jour ───────────────────────────────────────
+
+/** Clé stable d'un jour local, pour regrouper le fil du studio. */
+export function dayKey(ts: number): string {
+  const date = new Date(ts);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+/** « Aujourd'hui », « Hier », puis la date en toutes lettres. */
+export function dayLabel(ts: number): string {
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (dayKey(ts) === dayKey(today.getTime())) return "Aujourd'hui";
+  if (dayKey(ts) === dayKey(yesterday.getTime())) return "Hier";
+  return new Date(ts).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year:
+      new Date(ts).getFullYear() === today.getFullYear() ? undefined : "numeric",
+  });
+}
+
+/** « 1:1 », « 3:2 », « 16:9 »… à partir d'une taille « 1536x1024 ». */
+export function ratioLabel(size: string): string {
+  const [width, height] = size.split("x").map(Number);
+  if (!width || !height) return size;
+  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+  const divisor = gcd(width, height);
+  const simple = `${width / divisor}:${height / divisor}`;
+  // Certains formats (1792x1024) ne se simplifient pas joliment : on arrondit
+  // alors au ratio usuel le plus proche.
+  if (width / divisor <= 21 && height / divisor <= 21) return simple;
+  const ratio = width / height;
+  const known: [number, string][] = [
+    [1, "1:1"],
+    [4 / 3, "4:3"],
+    [3 / 4, "3:4"],
+    [3 / 2, "3:2"],
+    [2 / 3, "2:3"],
+    [16 / 9, "16:9"],
+    [9 / 16, "9:16"],
+    [7 / 4, "7:4"],
+    [4 / 7, "4:7"],
+    [21 / 9, "21:9"],
+  ];
+  return known.reduce((best, entry) =>
+    Math.abs(entry[0] - ratio) < Math.abs(best[0] - ratio) ? entry : best
+  )[1];
 }

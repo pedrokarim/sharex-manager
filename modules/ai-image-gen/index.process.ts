@@ -18,6 +18,7 @@ import {
   type ModelAvailability,
 } from "./lib/engines/registry";
 import { buildEngineConfig, saveToGallery, upscaleImage } from "./lib/generate";
+import { fetchRemoteImage } from "./lib/remote-image";
 import {
   cancelJob,
   clearFinishedJobs,
@@ -37,6 +38,7 @@ import {
   readHistory,
   readPipelines,
   readSecrets,
+  historyItemFiles,
   removeImageFiles,
   resolveApiKeys,
   setInjectedSettings,
@@ -206,6 +208,16 @@ export async function getStudioState(historyLimit = 40) {
   };
 }
 
+// ─── Images de départ ────────────────────────────────────────────
+
+/** Télécharge une image d'un autre site pour la joindre comme image de départ. */
+export async function importImageFromUrl(url: string) {
+  if (typeof url !== "string" || !url.trim()) {
+    throw new Error("Lien manquant");
+  }
+  return fetchRemoteImage(url);
+}
+
 // ─── Historique ──────────────────────────────────────────────────
 
 export async function getHistory(limit = 200): Promise<HistoryItem[]> {
@@ -255,7 +267,7 @@ export async function getStats() {
 
 export async function clearHistory(): Promise<{ success: boolean }> {
   const items = readHistory();
-  for (const item of items) removeImageFiles(item.imageFiles);
+  for (const item of items) removeImageFiles(historyItemFiles(item));
   writeHistory([]);
   return { success: true };
 }
@@ -263,7 +275,7 @@ export async function clearHistory(): Promise<{ success: boolean }> {
 export async function deleteHistoryItem(id: string): Promise<{ success: boolean }> {
   const items = readHistory();
   const item = items.find((entry) => entry.id === id);
-  if (item) removeImageFiles(item.imageFiles);
+  if (item) removeImageFiles(historyItemFiles(item));
   writeHistory(items.filter((entry) => entry.id !== id));
   return { success: true };
 }
@@ -281,6 +293,8 @@ export async function deleteImage(
   item.imageFiles = item.imageFiles.filter((entry) => entry !== file);
   if (item.savedToGallery) delete item.savedToGallery[file];
 
+  // Lot vidé : la génération disparaît, avec ses images de départ archivées.
+  if (item.imageFiles.length === 0) removeImageFiles(historyItemFiles(item));
   writeHistory(
     item.imageFiles.length > 0 ? items : items.filter((entry) => entry.id !== id)
   );

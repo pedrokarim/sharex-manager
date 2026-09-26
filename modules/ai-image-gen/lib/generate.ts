@@ -28,6 +28,7 @@ import {
   readCollections,
   readHistory,
   readSecrets,
+  historyItemFiles,
   removeImageFiles,
   resolveApiKeys,
   writeHistory,
@@ -133,10 +134,8 @@ export async function runGeneration(
       : model.qualities?.[0]?.value;
   const count = Math.max(1, Math.min(request.n ?? 1, 10));
 
-  const references = [
-    ...(request.references ?? []).map(loadReference),
-    ...collectionReferences(request.collectionId),
-  ];
+  const provided = (request.references ?? []).map(loadReference);
+  const references = [...provided, ...collectionReferences(request.collectionId)];
 
   // Une référence fournie à un modèle qui n'en gère pas serait ignorée en
   // silence : autant le dire plutôt que de facturer une génération à côté.
@@ -190,6 +189,22 @@ export async function runGeneration(
     imageFiles.push(fileName);
   }
 
+  // Les images de départ fournies sont archivées avec la génération : le
+  // dossier `refs` est vidé à la fin du travail, et « Reprendre » doit pouvoir
+  // les remettre dans le compositeur.
+  const sourceImages = provided.map((source, index) => {
+    const extension = source.mimeType.includes("jpeg")
+      ? "jpg"
+      : source.mimeType.includes("webp")
+        ? "webp"
+        : source.mimeType.includes("gif")
+          ? "gif"
+          : "png";
+    const file = `${historyId}-src-${index}.${extension}`;
+    fs.writeFileSync(path.join(IMAGES_DIR, file), Buffer.from(source.b64, "base64"));
+    return { file, role: source.role };
+  });
+
   const item: HistoryItem = {
     id: historyId,
     prompt: request.prompt,
@@ -211,13 +226,14 @@ export async function runGeneration(
     parentId: request.parentId,
     pipelineId: request.pipelineId,
     seed: request.seed,
+    sourceImages: sourceImages.length ? sourceImages : undefined,
   };
 
   const history = readHistory();
   history.unshift(item);
   if (history.length > HISTORY_LIMIT) {
     for (const old of history.splice(HISTORY_LIMIT)) {
-      removeImageFiles(old.imageFiles);
+      removeImageFiles(historyItemFiles(old));
     }
   }
   writeHistory(history);

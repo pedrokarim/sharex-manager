@@ -198,6 +198,17 @@ export interface HistoryItem {
   pipelineId?: string;
   seed?: number;
   jobId?: string;
+  /**
+   * Images de départ fournies pour cette génération, archivées dans
+   * `data/images` : « Reprendre » les remet dans le compositeur. Les repères
+   * d'une série n'y figurent pas, ils reviennent avec `collectionId`.
+   */
+  sourceImages?: { file: string; role?: "reference" | "edit-target" }[];
+}
+
+/** Tous les fichiers d'une génération : rendus et images de départ archivées. */
+export function historyItemFiles(item: HistoryItem): string[] {
+  return [...item.imageFiles, ...(item.sourceImages ?? []).map((source) => source.file)];
 }
 
 export function readHistory(): HistoryItem[] {

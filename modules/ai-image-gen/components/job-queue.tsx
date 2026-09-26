@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -70,10 +71,23 @@ export function JobQueue({ jobs, onMutate }: JobQueueProps) {
         </p>
       )}
 
-      <div className="flex flex-col gap-2">
-        {[...active, ...finished].map((job) => (
-          <JobRow key={job.id} job={job} onMutate={onMutate} />
-        ))}
+      {/* Un travail qui démarre, se termine ou disparaît glisse à sa place :
+          on suit l'évolution de la file sans la voir sauter. */}
+      <div className="relative flex flex-col gap-2">
+        <AnimatePresence initial={false} mode="popLayout">
+          {[...active, ...finished].map((job) => (
+            <motion.div
+              key={job.id}
+              layout
+              initial={{ opacity: 0, y: -8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 24, transition: { duration: 0.18 } }}
+              transition={{ type: "spring", stiffness: 420, damping: 34 }}
+            >
+              <JobRow job={job} onMutate={onMutate} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </section>
   );

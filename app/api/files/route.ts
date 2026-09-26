@@ -12,6 +12,7 @@ import { logger } from "@/lib/utils/logger";
 
 const UPLOADS_DIR = getAbsoluteUploadPath();
 const PAGE_SIZE = 12; // Nombre d'images par page
+const MAX_PAGE_SIZE = 60;
 
 export async function GET(request: Request) {
   try {
@@ -29,6 +30,11 @@ export async function GET(request: Request) {
     const order = searchParams.get("order") || "desc"; // asc | desc
     const startDate = searchParams.get("start");
     const endDate = searchParams.get("end");
+    // Les sélecteurs à grille dense demandent plus de 12 vignettes à la fois.
+    const pageSize = Math.min(
+      Math.max(Number.parseInt(searchParams.get("limit") || "", 10) || PAGE_SIZE, 1),
+      MAX_PAGE_SIZE
+    );
 
     // Force la revalidation du dossier public/uploads
     revalidatePath("/uploads");
@@ -105,8 +111,8 @@ export async function GET(request: Request) {
     });
 
     // Pagination
-    const start = (page - 1) * PAGE_SIZE;
-    const end = start + PAGE_SIZE;
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
     const paginatedFiles = validFiles.slice(start, end);
     const hasMore = end < validFiles.length;
 
