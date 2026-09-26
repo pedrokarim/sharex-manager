@@ -1,0 +1,32 @@
+{
+  "name": "clip-studio",
+  "version": "0.1.0",
+  "description": "Éditeur de clips : timeline multipiste, images, vidéos, textes animés, sons et export MP4",
+  "author": "ShareX Manager",
+  "enabled": true,
+  "entry": "index.process.ts",
+  "category": "Vidéo",
+  "hasUI": false,
+  "supportedFileTypes": [],
+  "settings": {},
+  "uploads": { "maxMb": 95, "kinds": ["image", "video", "audio"] },
+  "pages": [
+    { "path": "", "title": "Projets", "component": "pages/projects.tsx" },
+    { "path": "edit", "title": "Éditeur", "component": "pages/editor.tsx" }
+  ],
+  "navItems": [
+    { "title": "Clip Studio", "icon": "Clapperboard" }
+  ],
+  "fileActions": [
+    {
+      "id": "create",
+      "label": "Créer un clip avec la sélection",
+      "description": "Monte les images sélectionnées en clip, prêt à retoucher",
+      "icon": "Clapperboard",
+      "fileTypes": ["png", "jpg", "jpeg", "webp"],
+      "maxFiles": 60,
+      "page": "",
+      "params": { "action": "create" }
+    }
+  ]
+}

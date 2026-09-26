@@ -13,6 +13,71 @@ MP4 aux formats 16:9, 9:16, 1:1 ou 4:5.
 - **Module le plus ambitieux** : il est découpé pour livrer de la valeur dès
   la première étape (diaporama automatique), bien avant la timeline complète.
 
+## 0. Mise à jour : décisions prises à la réalisation
+
+L’étape 1 (éditeur) est réalisée dans `modules/clip-studio/`. Plusieurs
+choix de ce dossier ont été revus en la construisant ; ils priment sur les
+sections suivantes quand elles divergent.
+
+### Rendu dans le navigateur, pas sur le serveur
+
+L’aperçu **et** l’export se font dans le navigateur, par une seule fonction
+de dessin (`engine/render.ts`, `drawFrame`) sur un canevas 2D :
+
+- **aperçu** : `engine/preview.ts`, horloge de l'`AudioContext`, son mixé par
+  la Web Audio API, vidéos muettes recalées sur cette horloge ;
+- **export** : `engine/export.ts`, chaque image est dessinée puis encodée en
+  H.264 par WebCodecs via **Mediabunny** (MPL-2.0) ; les vidéos sources sont
+  décodées à l’instant exact demandé (`CanvasSink.canvasesAtTimestamps`), le
+  son est mixé hors temps réel par un `OfflineAudioContext` ;
+- le serveur ne reçoit que le MP4 final, par la route d’upload des modules.
+
+Conséquences : aucune charge de rendu sur `ascencia-prod`, et ce que l’on
+voit dans l’éditeur est exactement ce qui sort dans le fichier. Le graphe
+`ffmpeg` décrit plus bas (paragraphe 5.2) n’est plus nécessaire pour
+l’export ; il reste une piste pour un futur rendu serveur (génération
+automatique hors navigateur).
+
+### Pourquoi pas Remotion, ni le code d’OpenVideo
+
+Les deux références étudiées (Remotion, et l’éditeur de DesignCombo devenu
+OpenVideo) sont sous licence double : gratuites pour un particulier ou une
+structure de trois personnes au plus, payantes au-delà, avec une licence
+dédiée aux outils « prompt vers vidéo ». ShareX Manager est publié sous
+GPL v3 : en faire une dépendance créerait une incompatibilité de licence et
+imposerait une contrainte à chaque personne qui auto-héberge le projet.
+Mediabunny, sous MPL-2.0, est compatible ; le moteur est écrit dans le
+projet.
+
+### Modèle de projet
+
+Tout est en images à la cadence du projet (30 i/s), positions relatives au
+canevas (`engine/types.ts`). Pistes visuelles superposées (la première est
+dessinée au-dessus) et pistes audio ; éléments image, vidéo, texte, forme
+(dont une barre de compte à rebours) et son. Les opérations d’édition sont
+des fonctions pures (`engine/edit.ts`), ce qui rend l’annulation triviale.
+
+### Plateforme
+
+Ajoutés pour ce module et réutilisables par tous :
+
+- route `POST /api/modules/<nom>/upload` (déclarée par `uploads` dans
+  `module.json`, type contrôlé par signature, écriture en flux) ;
+- route de données en flux avec `Range` (`lib/modules/media-response.ts`),
+  limitée aux types média : elle ne sert plus les fichiers JSON internes
+  d’un module (dont `secrets.json` et ses clés API) et valide le nom du
+  module.
+
+### Feuille de route révisée
+
+| Étape | Contenu | État |
+| --- | --- | --- |
+| 1 | Éditeur : projets, timeline multipiste (déplacer, rogner, scinder, aimanter), aperçu, images, vidéos, sons, textes animés et styles, formes, compte à rebours, export MP4, diaporama depuis la galerie | Réalisée |
+| 2 | Modèles de projet (Quiz, Top 5, Diaporama, Avant / Après) et habillages de titres, remplis à partir de données structurées | À faire |
+| 3 | Assistant IA : « fais-moi un short quiz sur les animaux ». Script structuré écrit par Codex CLI (seul accès IA de la production), images générées par AI Image Gen, projet monté à partir d’un modèle | À faire |
+| 4 | Voix de synthèse : Piper en local (gratuit, voix françaises, dans l’image Docker), puis moteurs par clé API (OpenAI, Google, ElevenLabs) ; sous-titres mot à mot | À faire |
+| 5 | Galerie vidéo (socle, partie vidéo) pour envoyer les clips dans la galerie ; `client_max_body_size` Nginx relevé pour les routes d’upload | À faire |
+
 ## 1. Pourquoi ce module
 
 Les rendus d’AI Image Gen, les captures d’un projet ou les enregistrements

@@ -44,6 +44,8 @@ export interface ModuleConfig {
   pages?: ModulePageConfig[];
   navItems?: ModuleNavItem[];
   fileActions?: ModuleFileAction[];
+  /** Autorise l'envoi direct de médias dans `data/assets/` du module. */
+  uploads?: { maxMb?: number; kinds?: ("image" | "video" | "audio")[] };
 }
 
 export interface LoadedModule {

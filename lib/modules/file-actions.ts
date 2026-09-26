@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  Clapperboard,
   Crop,
   Droplets,
   Maximize2,
@@ -199,6 +200,7 @@ export function openModuleSettings(request: ModuleSettingsRequest) {
 // ─── Icônes ──────────────────────────────────────────────────────
 
 const ICONS: Record<string, LucideIcon> = {
+  Clapperboard,
   Crop,
   Droplets,
   Maximize2,

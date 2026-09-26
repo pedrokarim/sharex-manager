@@ -41,6 +41,8 @@ services:
       # `modules/` est cuit dans l'image : sans ce montage, tout serait perdu à
       # chaque rebuild. Les clés API peuvent aussi passer par .env, qui prime.
       - ./module-data/ai-image-gen:/app/modules/ai-image-gen/data
+      # Projets, médias importés et clips exportés de Clip Studio.
+      - ./module-data/clip-studio:/app/modules/clip-studio/data
       # Session Codex du module ai-image-gen. Sans ce montage, il faudrait se
       # reconnecter après chaque redéploiement : le jeton vit dans ce dossier.
       # Connexion initiale, une seule fois, sans navigateur sur le serveur :

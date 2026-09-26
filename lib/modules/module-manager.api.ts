@@ -49,6 +49,12 @@ const ModuleConfigSchema = z.object({
   pages: z.array(ModulePageConfigSchema).optional(),
   navItems: z.array(ModuleNavItemSchema).optional(),
   fileActions: z.array(ModuleFileActionSchema).optional(),
+  uploads: z
+    .object({
+      maxMb: z.number().positive().optional(),
+      kinds: z.array(z.enum(["image", "video", "audio"])).optional(),
+    })
+    .optional(),
 });
 
 const PROCESS_TIMEOUT_MS = 30_000;
