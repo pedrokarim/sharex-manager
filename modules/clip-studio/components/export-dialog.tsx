@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, CheckCircle2, Download, Film } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Copy, Download, Film } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,6 +25,48 @@ type Stage =
   | { kind: "uploading"; ratio: number }
   | { kind: "done"; result: ClipExport }
   | { kind: "error"; message: string };
+
+/** Mentions à reprendre dans la description de la vidéo publiée, sans doublon. */
+function projectCredits(project: ClipProject): string[] {
+  const credits = new Set<string>();
+  for (const track of project.tracks) {
+    for (const item of track.items) {
+      if ("source" in item && item.source.credit) credits.add(item.source.credit);
+    }
+  }
+  return [...credits];
+}
+
+function CreditsBox({ credits }: { credits: string[] }) {
+  if (credits.length === 0) return null;
+  const text = ["Crédits :", ...credits].join("\n");
+  return (
+    <div className="mt-3 space-y-1.5 rounded-lg border p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium">Crédits à mentionner en publiant</p>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 px-2 text-xs"
+          onClick={() =>
+            void navigator.clipboard.writeText(text).then(
+              () => toast.success("Crédits copiés"),
+              () => toast.error("Copie impossible")
+            )
+          }
+        >
+          <Copy className="h-3.5 w-3.5" />
+          Copier
+        </Button>
+      </div>
+      <ul className="space-y-0.5 text-[11px] leading-4 text-muted-foreground">
+        {credits.map((credit) => (
+          <li key={credit}>{credit}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 const PHASE_LABELS: Record<ExportProgress["phase"], string> = {
   prepare: "Préparation des médias",
@@ -50,6 +93,7 @@ export function ExportDialog({
 
   const busy = stage.kind === "rendering" || stage.kind === "uploading";
   const duration = projectDuration(project);
+  const credits = projectCredits(project);
 
   const start = async () => {
     const unsupported = await canExportInBrowser();
@@ -112,6 +156,7 @@ export function ExportDialog({
                 </p>
               </div>
             )}
+            {stage.kind === "ready" && <CreditsBox credits={credits} />}
 
             {(stage.kind === "rendering" || stage.kind === "uploading") && (
               <div className="space-y-3">
@@ -147,6 +192,7 @@ export function ExportDialog({
                   autoPlay
                   className="max-h-[50vh] w-full rounded-lg bg-black"
                 />
+                <CreditsBox credits={credits} />
               </div>
             )}
 

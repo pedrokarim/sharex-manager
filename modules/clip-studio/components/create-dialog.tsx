@@ -40,6 +40,7 @@ import { ASPECTS, type AspectPreset, type Motion } from "../engine/types";
 import { callModule, probeMedia } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
 import { useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
+import { MOOD_LABELS } from "./music-panel";
 
 type Mode = "blank" | "template" | "assistant";
 
@@ -87,6 +88,7 @@ export function CreateDialog({
   const [withImages, setWithImages] = useState(true);
   const [withVoice, setWithVoice] = useState(true);
   const [voice, setVoice] = useState("siwis");
+  const [music, setMusic] = useState<string>("auto");
   const { info: voices, prepare: prepareVoice } = useVoices();
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<AssistantJob | null>(null);
@@ -158,6 +160,7 @@ export function CreateDialog({
         count,
         images: withImages,
         voice: withVoice ? voice : undefined,
+        music: music === "none" ? undefined : music,
       });
       setJob(started);
       onAssistantStarted();
@@ -265,6 +268,24 @@ export function CreateDialog({
                           </motion.div>
                         )}
                       </AnimatePresence>
+                    </div>
+                    <div className="space-y-2">
+                      <span className="text-sm">Musique de fond</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[["none", "Aucune"], ["auto", "Choisie par l'IA"], ...Object.entries(MOOD_LABELS)].map(([key, label]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setMusic(key)}
+                            className={cn(
+                              "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                              music === key ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </>
                 )}

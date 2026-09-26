@@ -54,6 +54,8 @@ export interface MediaSource {
   width?: number;
   height?: number;
   durationMs?: number;
+  /** Mention d'auteur et de licence, à reprendre à la publication. */
+  credit?: string;
 }
 
 /** Position et taille relatives au canevas ; x et y désignent le centre. */
@@ -198,5 +200,7 @@ export interface ClipAsset {
   width?: number;
   height?: number;
   durationMs?: number;
+  /** Mention d'auteur et de licence (voix de synthèse…). */
+  credit?: string;
   createdAt: number;
 }

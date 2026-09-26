@@ -27,6 +27,16 @@ import {
 } from "./lib/store";
 import { prefetchTts, prepareVoice as downloadVoice, synthesize, voiceStatuses } from "./lib/tts";
 import {
+  addMusic,
+  downloadTrack,
+  listMusic,
+  prefetchMusic,
+  removeMusic,
+  searchMusic as searchOpenverse,
+  type MusicCandidate,
+  type MusicEntry,
+} from "./lib/music";
+import {
   cancelAssistantJob,
   getAssistantJob as readAssistantJob,
   listAssistantJobs as readAssistantJobs,
@@ -266,6 +276,33 @@ export async function speak(input: { text: string; voice?: string; speed?: numbe
   return synthesize(input);
 }
 
+// ─── Banque de musique ───────────────────────────────────────────
+
+/** Morceaux de la banque, avec l'état de leur téléchargement. */
+export async function getMusic(): Promise<MusicEntry[]> {
+  return listMusic();
+}
+
+/** Relance le téléchargement d'un morceau (après un échec). */
+export async function prepareMusic(id: string): Promise<{ success: boolean }> {
+  void downloadTrack(String(id)).catch(() => undefined);
+  return { success: true };
+}
+
+/** Recherche de morceaux libres (CC0, CC BY) dans Openverse. */
+export async function searchMusic(input: { query: string; page?: number }): Promise<MusicCandidate[]> {
+  return searchOpenverse(input);
+}
+
+export async function addMusicToLibrary(input: { id: string; mood?: string }): Promise<MusicEntry> {
+  return addMusic(input);
+}
+
+export async function removeMusicFromLibrary(id: string): Promise<{ success: boolean }> {
+  removeMusic(String(id));
+  return { success: true };
+}
+
 // ─── Cycle de vie ────────────────────────────────────────────────
 
 const moduleHooks: ModuleHooks = {
@@ -277,6 +314,8 @@ export function initModule() {
   // Moteur et voix par défaut téléchargés en arrière-plan au démarrage, une
   // seule fois : ils restent ensuite dans le volume de données du module.
   prefetchTts();
+  // Banque de musique : les morceaux manquants arrivent un par un.
+  prefetchMusic();
   return moduleHooks;
 }
 

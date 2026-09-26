@@ -22,7 +22,10 @@ import {
   type VoiceClip,
 } from "../engine/templates";
 import type { AspectPreset, MediaSource } from "../engine/types";
+import { addItem, createMusicItems } from "../engine/edit";
+import { projectDuration } from "../engine/timeline";
 import { askCodex, extractJson } from "./codex";
+import { MOODS, pickTrack } from "./music";
 import { synthesize, VOICES } from "./tts";
 import { DATA_DIR, ensureDirs, writeProject } from "./store";
 
@@ -34,6 +37,8 @@ export interface AssistantRequest {
   images: boolean;
   /** Voix de narration ; absente, le clip reste muet. */
   voice?: string;
+  /** Musique de fond : une ambiance, ou « auto » pour laisser le script choisir. */
+  music?: string;
 }
 
 type StepId = "script" | "images" | "narration" | "montage";
@@ -109,6 +114,7 @@ export function startAssistant(request: AssistantRequest): AssistantJob {
     count: Math.min(10, Math.max(2, Math.round(Number(request.count) || 5))),
     images: Boolean(request.images),
     voice: VOICES.some((voice) => voice.id === request.voice) ? request.voice : undefined,
+    music: request.music === "auto" || (MOODS as readonly string[]).includes(String(request.music)) ? request.music : undefined,
   };
   if (clean.brief.length < 3) throw new Error("Décrivez le short à créer.");
 
@@ -179,7 +185,18 @@ async function run(job: AssistantJob, signal: AbortSignal) {
 
     // 4. Montage
     step("montage", "running");
-    const project = buildFromTemplate(job.request.template, script.title, job.request.aspect, data);
+    let project = buildFromTemplate(job.request.template, script.title, job.request.aspect, data);
+    if (job.request.music) {
+      const mood = job.request.music === "auto" ? script.mood : job.request.music;
+      const end = projectDuration(project);
+      const track = pickTrack(mood, (end / project.fps) * 1000);
+      if (track?.url) {
+        // Sous une voix off, la musique se fait discrète.
+        const volume = job.request.voice ? 0.14 : 0.4;
+        const source: MediaSource = { url: track.url, ref: `module:clip-studio/resources/music/${track.id}.mp3`, name: `${track.title} – ${track.artist}`, kind: "audio", durationMs: track.durationMs, credit: track.credit };
+        for (const item of createMusicItems(source, 0, end, project.fps, volume)) project = addItem(project, item, undefined, "Musique");
+      }
+    }
     writeProject(project);
     job.projectId = project.id;
     job.status = "done";
@@ -201,6 +218,7 @@ interface RawScript {
   title?: string;
   subtitle?: string;
   outro?: string;
+  mood?: string;
   questions?: { question?: string; choices?: string[]; answer?: number; explanation?: string; imagePrompt?: string }[];
   entries?: { title?: string; detail?: string; imagePrompt?: string }[];
   slides?: { caption?: string; imagePrompt?: string }[];
@@ -215,6 +233,9 @@ function scriptPrompt(request: AssistantRequest): string {
     `Demande de l'utilisateur : ${request.brief}`,
     "Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour ni bloc de code.",
     "N'utilise aucun outil, n'exécute aucune commande et n'écris aucun fichier.",
+    ...(request.music === "auto"
+      ? [`Ajoute au JSON une clé "mood" : l'ambiance musicale la plus adaptée, parmi ${MOODS.join(", ")}.`]
+      : []),
   ];
   if (request.template === "quiz") {
     return [
@@ -246,10 +267,11 @@ function scriptPrompt(request: AssistantRequest): string {
 
 const cut = (value: unknown, max: number) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
-type CleanScript = (QuizData | TopData | SlideshowData) & { title: string; prompts: string[] };
+type CleanScript = (QuizData | TopData | SlideshowData) & { title: string; prompts: string[]; mood?: string };
 
 function sanitize(request: AssistantRequest, raw: RawScript): CleanScript {
   const title = cut(raw.title, 60) || "Mon short";
+  const mood = (MOODS as readonly string[]).includes(String(raw.mood)) ? String(raw.mood) : undefined;
   if (request.template === "quiz") {
     const questions = (raw.questions ?? [])
       .map((question) => {
@@ -268,6 +290,7 @@ function sanitize(request: AssistantRequest, raw: RawScript): CleanScript {
     if (questions.length === 0) throw new Error("Le script reçu ne contient aucune question exploitable.");
     return {
       title,
+      mood,
       subtitle: cut(raw.subtitle, 80) || undefined,
       outro: cut(raw.outro, 60) || undefined,
       questions,
@@ -280,13 +303,13 @@ function sanitize(request: AssistantRequest, raw: RawScript): CleanScript {
       .filter((entry) => entry.title)
       .slice(0, request.count);
     if (entries.length === 0) throw new Error("Le script reçu ne contient aucun élément exploitable.");
-    return { title, outro: cut(raw.outro, 60) || undefined, entries, prompts: entries.map((entry) => entry.imagePrompt) };
+    return { title, mood, outro: cut(raw.outro, 60) || undefined, entries, prompts: entries.map((entry) => entry.imagePrompt) };
   }
   const slides = (raw.slides ?? [])
     .map((slide) => ({ caption: cut(slide.caption, 110) || undefined, imagePrompt: cut(slide.imagePrompt, 500) }))
     .slice(0, request.count);
   if (slides.length === 0) throw new Error("Le script reçu ne contient aucune diapositive.");
-  return { title, outro: cut(raw.outro, 60) || undefined, slides, prompts: slides.map((slide) => slide.imagePrompt) };
+  return { title, mood, outro: cut(raw.outro, 60) || undefined, slides, prompts: slides.map((slide) => slide.imagePrompt) };
 }
 
 function segmentPrompts(_template: TemplateId, script: CleanScript): string[] {
@@ -361,6 +384,7 @@ async function speakLine(text: string, voice: string): Promise<VoiceClip | undef
         name: asset.originalName,
         kind: "audio",
         durationMs,
+        credit: asset.credit,
       },
     };
   } catch {

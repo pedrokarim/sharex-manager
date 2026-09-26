@@ -12,6 +12,7 @@ import {
   FolderOpen,
   Loader2,
   Mic,
+  Music,
   Redo2,
   Type,
   Undo2,
@@ -32,6 +33,7 @@ import {
   addItem,
   changeAspect,
   createAudioItem,
+  createMusicItems,
   createImageItem,
   createShapeItem,
   createTextItem,
@@ -49,7 +51,7 @@ import {
   updateTrack,
 } from "../engine/edit";
 import { MediaLibrary, PreviewPlayer } from "../engine/preview";
-import { projectDuration } from "../engine/timeline";
+import { msToFrames, projectDuration } from "../engine/timeline";
 import {
   ASPECTS,
   type AspectPreset,
@@ -66,6 +68,7 @@ import { MediaPanel } from "../components/media-panel";
 import { PreviewStage } from "../components/preview-stage";
 import { TextPanel } from "../components/text-panel";
 import { VoicePanel } from "../components/voice-panel";
+import { MusicPanel } from "../components/music-panel";
 import { Timeline } from "../components/timeline";
 import { useProjectHistory, type SaveState } from "../components/use-project-history";
 
@@ -108,7 +111,7 @@ export default function EditorPage() {
   );
 }
 
-type Panel = "media" | "text" | "voice";
+type Panel = "media" | "text" | "voice" | "music";
 
 function Editor({ initial }: { initial: ClipProject }) {
   const { project, commit, undo, redo, canUndo, canRedo, saveState } = useProjectHistory(initial);
@@ -172,11 +175,30 @@ function Editor({ initial }: { initial: ClipProject }) {
   const addVoice = useCallback(
     (source: MediaSource) => {
       const current = projectRef.current;
-      // Une voix se lit à plein volume et sans fondu, contrairement à une musique.
-      const item = { ...createAudioItem(source, playerRef.current?.frame ?? 0, current.fps), volume: 1, fadeIn: 0, fadeOut: 0 };
+      // Une voix se lit presque à plein volume et sans fondu, contrairement à
+      // une musique ; la marge évite la saturation quand les deux se mêlent.
+      const item = { ...createAudioItem(source, playerRef.current?.frame ?? 0, current.fps), volume: 0.9, fadeIn: 0, fadeOut: 0 };
       const voiceTrack = current.tracks.find((track) => track.kind === "audio" && track.name.startsWith("Voix"));
       commit((project) => addItem(project, item, voiceTrack?.id, "Voix"));
       setSelectedId(item.id);
+    },
+    [commit]
+  );
+
+  /**
+   * Musique de fond : de la tête de lecture à la fin du clip, bouclée si
+   * besoin, sur une piste Musique. En fin de clip, le morceau entier.
+   */
+  const addMusic = useCallback(
+    (source: MediaSource) => {
+      const current = projectRef.current;
+      const fps = current.fps;
+      const start = playerRef.current?.frame ?? 0;
+      const end = projectDuration(current);
+      const until = end - start >= 2 * fps ? end : start + msToFrames(source.durationMs ?? 30_000, fps);
+      const items = createMusicItems(source, start, until, fps);
+      commit((project) => items.reduce((next, item) => addItem(next, item, undefined, "Musique"), project));
+      setSelectedId(items[0]?.id ?? null);
     },
     [commit]
   );
@@ -341,6 +363,9 @@ function Editor({ initial }: { initial: ClipProject }) {
           <RailButton label="Voix" active={panel === "voice"} onClick={() => setPanel(panel === "voice" ? null : "voice")}>
             <Mic className="h-5 w-5" />
           </RailButton>
+          <RailButton label="Musique" active={panel === "music"} onClick={() => setPanel(panel === "music" ? null : "music")}>
+            <Music className="h-5 w-5" />
+          </RailButton>
         </nav>
 
         <AnimatePresence initial={false}>
@@ -356,6 +381,7 @@ function Editor({ initial }: { initial: ClipProject }) {
               <div className="h-full w-[300px]">
                 {panel === "media" && <MediaPanel onAdd={(source) => addSource(source)} />}
                 {panel === "text" && <TextPanel onAddText={addText} onAddShape={addShape} />}
+                {panel === "music" && <MusicPanel onAdd={addMusic} />}
                 {panel === "voice" && (
                   <VoicePanel selectedText={selected?.type === "text" ? selected.text : undefined} onAdd={addVoice} />
                 )}

@@ -77,6 +77,7 @@ Ajoutés pour ce module et réutilisables par tous :
 | 3 | Assistant IA : « fais-moi un short quiz sur les animaux ». Script écrit par Codex CLI (`lib/codex.ts`), illustrations demandées à la file d’AI Image Gen, projet monté par un modèle (`lib/assistant.ts`) | Réalisée |
 | 4 | Voix de synthèse : Piper en local (gratuit, quatre voix françaises sous licence libre), téléchargé au premier démarrage dans les données du module et non dans l’image Docker (`lib/resources.ts`, `lib/tts.ts`) ; panneau Voix dans l’éditeur ; narration par l’assistant, chaque segment s’allongeant à la durée de sa lecture. Restent : moteurs par clé API (OpenAI, Google, ElevenLabs) et sous-titres mot à mot | Réalisée en partie |
 | 5 | Galerie vidéo (socle, partie vidéo) pour envoyer les clips dans la galerie. Nginx est fait : 100 Mo sur `/api/modules/*/upload` (sans mise en tampon), 20 Mo explicites ailleurs, dans le seul fichier du site | À faire en partie |
+| 6 | Banque de musique libre de droits : sélection de base versionnée (`music/library.json`, morceaux Jamendo sous CC0 ou CC BY via Openverse), téléchargée au démarrage dans les données du module ; recherche et ajout depuis l’éditeur (onglet Découvrir) ; musique de fond choisie par l’assistant selon l’ambiance ; crédits rappelés à l’export | Réalisée |
 
 ## 1. Pourquoi ce module
 

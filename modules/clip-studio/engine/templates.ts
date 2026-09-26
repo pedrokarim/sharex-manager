@@ -86,14 +86,14 @@ const LAYERS = ["Textes", "Surlignage", "Cadres", "Voile", "Principale"] as cons
 type Layer = (typeof LAYERS)[number];
 
 class Builder {
-  private tracks = new Map<Layer | "Voix" | "Audio", Track>();
+  private tracks = new Map<Layer | "Voix" | "Musique", Track>();
 
   constructor(readonly project: ClipProject) {
     for (const layer of LAYERS) {
       this.tracks.set(layer, { id: uid("t-"), kind: "visual", name: layer, items: [] });
     }
     this.tracks.set("Voix", { id: uid("t-"), kind: "audio", name: "Voix", items: [] });
-    this.tracks.set("Audio", { id: uid("t-"), kind: "audio", name: "Audio", items: [] });
+    this.tracks.set("Musique", { id: uid("t-"), kind: "audio", name: "Musique", items: [] });
   }
 
   get fps() {
@@ -119,13 +119,14 @@ class Builder {
       duration: Math.max(1, this.seconds(voice.durationMs / 1000)),
       source: voice.source,
       trimStart: 0,
-      volume: 1,
+      // Un peu de marge : voix et musique additionnées ne saturent pas.
+      volume: 0.9,
       fadeIn: 0,
       fadeOut: 0,
     });
   }
 
-  add(layer: Layer | "Voix" | "Audio", item: ClipItem) {
+  add(layer: Layer | "Voix" | "Musique", item: ClipItem) {
     this.tracks.get(layer)!.items.push(item);
     return item;
   }
@@ -155,7 +156,7 @@ class Builder {
         }
         lane.items.push(item);
       }
-      if (lanes.length === 0 && (name === "Principale" || name === "Audio")) {
+      if (lanes.length === 0 && (name === "Principale" || name === "Musique")) {
         lanes.push({ ...layer, items: [] });
       }
       tracks.push(...lanes);

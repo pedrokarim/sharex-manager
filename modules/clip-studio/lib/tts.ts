@@ -218,6 +218,7 @@ async function runSynthesis(input: { text: string; voice?: string; speed?: numbe
     originalName: `Voix ${voice.label} : ${text.slice(0, 60)}`,
     size: fs.statSync(output).size,
     durationMs,
+    credit: `Voix ${voice.label} : ${voice.credit}, ${voice.license}`,
     createdAt: Date.now(),
   };
   writeAssets([asset, ...readAssets()]);

@@ -164,6 +164,31 @@ export function createAudioItem(source: MediaSource, start: number, fps: number)
   };
 }
 
+/**
+ * Musique de fond de `start` à `end`, bouclée si le morceau est plus court,
+ * avec une entrée et une sortie en fondu.
+ */
+export function createMusicItems(source: MediaSource, start: number, end: number, fps: number, volume = 0.35): AudioItem[] {
+  const length = Math.max(fps, source.durationMs ? msToFrames(source.durationMs, fps) : end - start);
+  const items: AudioItem[] = [];
+  for (let at = start; at < end; at += length) {
+    const duration = Math.min(length, end - at);
+    if (duration < 1) break;
+    items.push({
+      id: uid("a-"),
+      type: "audio",
+      start: at,
+      duration,
+      source,
+      trimStart: 0,
+      volume,
+      fadeIn: at === start ? Math.round(fps * 0.5) : 0,
+      fadeOut: at + duration >= end ? Math.min(duration, Math.round(fps * 1.5)) : 0,
+    });
+  }
+  return items;
+}
+
 export function createTextItem(
   presetId: string,
   start: number,
