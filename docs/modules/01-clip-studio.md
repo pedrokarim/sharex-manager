@@ -73,8 +73,8 @@ Ajoutés pour ce module et réutilisables par tous :
 | Étape | Contenu | État |
 | --- | --- | --- |
 | 1 | Éditeur : projets, timeline multipiste (déplacer, rogner, scinder, aimanter), aperçu, images, vidéos, sons, textes animés et styles, formes, compte à rebours, export MP4, diaporama depuis la galerie | Réalisée |
-| 2 | Modèles de projet (Quiz, Top 5, Diaporama, Avant / Après) et habillages de titres, remplis à partir de données structurées | À faire |
-| 3 | Assistant IA : « fais-moi un short quiz sur les animaux ». Script structuré écrit par Codex CLI (seul accès IA de la production), images générées par AI Image Gen, projet monté à partir d’un modèle | À faire |
+| 2 | Modèles de projet (Quiz, Top, Diaporama), remplis à partir de données structurées (`engine/templates.ts`) ; Avant / Après reste à faire | Réalisée |
+| 3 | Assistant IA : « fais-moi un short quiz sur les animaux ». Script écrit par Codex CLI (`lib/codex.ts`), illustrations demandées à la file d’AI Image Gen, projet monté par un modèle (`lib/assistant.ts`) | Réalisée |
 | 4 | Voix de synthèse : Piper en local (gratuit, voix françaises, dans l’image Docker), puis moteurs par clé API (OpenAI, Google, ElevenLabs) ; sous-titres mot à mot | À faire |
 | 5 | Galerie vidéo (socle, partie vidéo) pour envoyer les clips dans la galerie ; `client_max_body_size` Nginx relevé pour les routes d’upload | À faire |
 

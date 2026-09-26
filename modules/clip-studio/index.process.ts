@@ -25,6 +25,14 @@ import {
   writeExports,
   writeProject,
 } from "./lib/store";
+import {
+  cancelAssistantJob,
+  getAssistantJob as readAssistantJob,
+  listAssistantJobs as readAssistantJobs,
+  startAssistant as launchAssistant,
+  type AssistantJob,
+  type AssistantRequest,
+} from "./lib/assistant";
 
 export interface ProjectSummary {
   id: string;
@@ -214,6 +222,28 @@ export async function deleteExport(id: string): Promise<{ success: boolean }> {
   const entry = exports.find((item) => item.id === id);
   if (entry) fs.rmSync(path.join(EXPORTS_DIR, entry.file), { force: true });
   writeExports(exports.filter((item) => item.id !== id));
+  return { success: true };
+}
+
+// ─── Assistant IA ────────────────────────────────────────────────
+
+/** Lance la création d'un short par l'assistant ; le suivi se fait par `getAssistantJob`. */
+export async function startAssistant(request: AssistantRequest): Promise<AssistantJob> {
+  return launchAssistant(request);
+}
+
+export async function getAssistantJob(id: string): Promise<AssistantJob | null> {
+  assertId(id, "Identifiant de travail");
+  return readAssistantJob(id);
+}
+
+export async function listAssistantJobs(): Promise<AssistantJob[]> {
+  return readAssistantJobs();
+}
+
+export async function cancelAssistant(id: string): Promise<{ success: boolean }> {
+  assertId(id, "Identifiant de travail");
+  cancelAssistantJob(id);
   return { success: true };
 }
 

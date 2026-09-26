@@ -15,9 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -26,25 +24,17 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
-import { appendSequence, createImageItem, createProject } from "../engine/edit";
 import { formatTimecode } from "../engine/timeline";
-import { ASPECTS, type AspectPreset, type ClipExport, type Motion } from "../engine/types";
-import { callModule, exportUrl, probeMedia, type ProjectSummary } from "../lib/client";
+import type { ClipExport } from "../engine/types";
+import { callModule, exportUrl, type ProjectSummary } from "../lib/client";
+import type { AssistantJob } from "../lib/assistant";
+import { AssistantProgress, CreateDialog } from "../components/create-dialog";
 
 /** Données gardées entre deux visites : le retour à la liste est instantané. */
 let snapshot: { projects: ProjectSummary[]; exports: ClipExport[] } | null = null;
@@ -55,6 +45,8 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(snapshot?.projects ?? null);
   const [exports, setExports] = useState<ClipExport[]>(snapshot?.exports ?? []);
   const [creating, setCreating] = useState<{ files: string[] } | null>(null);
+  const [assistantJobs, setAssistantJobs] = useState<AssistantJob[]>([]);
+
 
   const refresh = useCallback(async () => {
     const [nextProjects, nextExports] = await Promise.all([
@@ -69,6 +61,33 @@ export default function ProjectsPage() {
   useEffect(() => {
     void refresh().catch(() => setProjects([]));
   }, [refresh]);
+
+  const refreshJobs = useCallback(async () => {
+    const jobs = await callModule<AssistantJob[]>("listAssistantJobs").catch(() => []);
+    // On montre les créations en cours et les échecs récents (moins d'une heure).
+    setAssistantJobs(
+      jobs.filter((job) => job.status === "running" || (job.status === "error" && Date.now() - job.createdAt < 3_600_000))
+    );
+    return jobs;
+  }, []);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    let stopped = false;
+    const tick = async () => {
+      const jobs = await refreshJobs();
+      if (stopped) return;
+      const running = jobs.some((job) => job.status === "running");
+      // Une création vient de se terminer : son projet apparaît dans la liste.
+      if (!running) void refresh().catch(() => undefined);
+      timer = setTimeout(tick, running ? 2000 : 15000);
+    };
+    void tick();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [refreshJobs, refresh]);
 
   // Arrivée depuis la galerie : « Créer un clip avec la sélection ».
   useEffect(() => {
@@ -97,6 +116,33 @@ export default function ProjectsPage() {
             Nouveau clip
           </Button>
         </header>
+
+        <AnimatePresence initial={false}>
+          {assistantJobs.length > 0 && (
+            <motion.section
+              key="assistant"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex flex-col gap-3 overflow-hidden"
+            >
+              <h2 className="text-sm font-semibold">En cours de création</h2>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {assistantJobs.map((job) => (
+                  <motion.div key={job.id} layout className="rounded-xl border p-4">
+                    <AssistantProgress
+                      job={job}
+                      onCancel={async () => {
+                        await callModule("cancelAssistant", job.id);
+                        void refreshJobs();
+                      }}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
 
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold">Projets</h2>
@@ -158,6 +204,7 @@ export default function ProjectsPage() {
         request={creating}
         onClose={() => setCreating(null)}
         onCreated={(id) => router.push(`/m/clip-studio/edit?id=${id}`)}
+        onAssistantStarted={() => void refreshJobs()}
       />
     </MotionConfig>
   );
@@ -306,117 +353,5 @@ function ExportCard({ entry, onChanged }: { entry: ClipExport; onChanged: () => 
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  );
-}
-
-// ─── Création ────────────────────────────────────────────────────
-
-const MOTIONS: Motion[] = ["zoom-in", "pan-right", "zoom-out", "pan-left"];
-
-function CreateDialog({
-  request,
-  onClose,
-  onCreated,
-}: {
-  request: { files: string[] } | null;
-  onClose: () => void;
-  onCreated: (id: string) => void;
-}) {
-  const [name, setName] = useState("");
-  const [aspect, setAspect] = useState<AspectPreset>("9:16");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (request) {
-      setName(request.files.length ? `Diaporama du ${new Date().toLocaleDateString("fr-FR")}` : "Nouveau clip");
-      setBusy(false);
-    }
-  }, [request]);
-
-  const create = async () => {
-    if (!request) return;
-    setBusy(true);
-    try {
-      let project = createProject(name.trim() || "Nouveau clip", aspect);
-      if (request.files.length) {
-        // Diaporama : 3 s par image, mouvements de caméra alternés, fondus.
-        const sources = await Promise.all(
-          request.files.map(async (file) => {
-            const url = `/api/files/${encodeURIComponent(file)}`;
-            const probe = await probeMedia(url, "image");
-            return { url, ref: `upload:${file}`, name: file, kind: "image" as const, ...probe };
-          })
-        );
-        let start = 0;
-        const items = sources.map((source, index) => {
-          const item = createImageItem(source, start, project.fps);
-          item.motion = MOTIONS[index % MOTIONS.length];
-          start += item.duration;
-          return item;
-        });
-        project = appendSequence(project, items);
-      }
-      await callModule("saveProject", project);
-      onCreated(project.id);
-    } catch (error: any) {
-      toast.error(error?.message ?? "Création impossible");
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Dialog open={request !== null} onOpenChange={(open) => !open && !busy && onClose()}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Nouveau clip</DialogTitle>
-          <DialogDescription>
-            {request?.files.length
-              ? `${request.files.length} image(s) montée(s) en diaporama, prêt(es) à retoucher.`
-              : "Choisissez un format ; il reste modifiable dans l'éditeur."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nom du clip" autoFocus />
-          <div className="grid grid-cols-4 gap-2">
-            {(Object.keys(ASPECTS) as AspectPreset[]).map((key) => {
-              const { width, height, label } = ASPECTS[key];
-              const selected = aspect === key;
-              const scale = 56 / Math.max(width, height);
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setAspect(key)}
-                  className={cn(
-                    "flex flex-col items-center gap-2 rounded-xl border px-2 pt-4 pb-3 transition-colors",
-                    selected ? "border-primary bg-primary/10" : "hover:bg-muted"
-                  )}
-                >
-                  <span className="flex h-14 items-center justify-center">
-                    <span
-                      className={cn("rounded-[3px] border-2", selected ? "border-primary" : "border-muted-foreground/60")}
-                      style={{ width: width * scale, height: height * scale }}
-                    />
-                  </span>
-                  <span className="text-sm font-medium">{key}</span>
-                  <span className="text-[11px] text-muted-foreground">{label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>
-            Annuler
-          </Button>
-          <Button onClick={create} disabled={busy} className="gap-2">
-            {busy ? <Spinner className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            Créer
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
