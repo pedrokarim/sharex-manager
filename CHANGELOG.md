@@ -133,6 +133,9 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Galerie : une nouvelle version produite par un module, ou une image
+  envoyée depuis le studio AI Image Gen, apparaît tout de suite dans les
+  galeries ouvertes. Seuls les uploads ShareX étaient annoncés jusqu'ici.
 - Ascencia ID : les rôles administrateur (`ASCENCIA_ADMIN_ROLES`) sont
   désormais appliqués. better-auth expose le modèle de route du callback OIDC,
   si bien que chaque compte Ascencia était ramené au rôle `user`.

@@ -10,6 +10,7 @@
 import fs from "fs";
 import path from "path";
 import { getAbsoluteUploadPath } from "../../../lib/config";
+import { announceNewUpload } from "../../../lib/gallery-events";
 import {
   generateWithEngine,
   findModel,
@@ -278,6 +279,7 @@ export async function saveToGallery(
 
   item.savedToGallery = { ...(item.savedToGallery ?? {}), [file]: fileName };
   writeHistory(items);
+  await announceNewUpload(fileName);
 
   return { success: true, fileName };
 }

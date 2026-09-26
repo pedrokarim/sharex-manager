@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { announceNewUpload } from "@/lib/gallery-events";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import fs from "fs";
@@ -140,6 +141,12 @@ export async function POST(request: NextRequest) {
     // Écrire le fichier traité
     const newFilePath = path.join(uploadPath, newFileName);
     fs.writeFileSync(newFilePath, processedBuffer);
+
+    // Une nouvelle version doit apparaître tout de suite dans les galeries
+    // ouvertes, comme un upload ShareX.
+    if (createNewVersion) {
+      await announceNewUpload(newFileName);
+    }
 
     // Journaliser l'action
     logDb.createLog({
