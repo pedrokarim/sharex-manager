@@ -39,6 +39,7 @@ import {
 import { ASPECTS, type AspectPreset, type Motion } from "../engine/types";
 import { callModule, probeMedia } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
+import { useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
 
 type Mode = "blank" | "template" | "assistant";
 
@@ -84,6 +85,9 @@ export function CreateDialog({
   const [brief, setBrief] = useState("");
   const [count, setCount] = useState(5);
   const [withImages, setWithImages] = useState(true);
+  const [withVoice, setWithVoice] = useState(true);
+  const [voice, setVoice] = useState("siwis");
+  const { info: voices, prepare: prepareVoice } = useVoices();
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<AssistantJob | null>(null);
 
@@ -153,6 +157,7 @@ export function CreateDialog({
         aspect,
         count,
         images: withImages,
+        voice: withVoice ? voice : undefined,
       });
       setJob(started);
       onAssistantStarted();
@@ -241,6 +246,25 @@ export function CreateDialog({
                         </span>
                         <Switch checked={withImages} onCheckedChange={setWithImages} />
                       </label>
+                    </div>
+                    <div className="space-y-3 rounded-lg border p-3">
+                      <label className="flex items-start justify-between gap-3">
+                        <span className="text-sm">
+                          Voix off
+                          <span className="block text-xs text-muted-foreground">
+                            Chaque segment est lu à voix haute ; sa durée s&apos;adapte à la lecture.
+                          </span>
+                        </span>
+                        <Switch checked={withVoice} onCheckedChange={setWithVoice} />
+                      </label>
+                      <AnimatePresence initial={false}>
+                        {withVoice && (
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="space-y-2 overflow-hidden">
+                            <VoicePicker value={voice} onChange={setVoice} voices={voices} onPrepare={prepareVoice} />
+                            <VoiceCredit voice={voices?.voices.find((entry) => entry.id === voice)} />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </>
                 )}

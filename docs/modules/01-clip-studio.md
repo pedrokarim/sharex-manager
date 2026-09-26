@@ -75,8 +75,8 @@ Ajoutés pour ce module et réutilisables par tous :
 | 1 | Éditeur : projets, timeline multipiste (déplacer, rogner, scinder, aimanter), aperçu, images, vidéos, sons, textes animés et styles, formes, compte à rebours, export MP4, diaporama depuis la galerie | Réalisée |
 | 2 | Modèles de projet (Quiz, Top, Diaporama), remplis à partir de données structurées (`engine/templates.ts`) ; Avant / Après reste à faire | Réalisée |
 | 3 | Assistant IA : « fais-moi un short quiz sur les animaux ». Script écrit par Codex CLI (`lib/codex.ts`), illustrations demandées à la file d’AI Image Gen, projet monté par un modèle (`lib/assistant.ts`) | Réalisée |
-| 4 | Voix de synthèse : Piper en local (gratuit, voix françaises, dans l’image Docker), puis moteurs par clé API (OpenAI, Google, ElevenLabs) ; sous-titres mot à mot | À faire |
-| 5 | Galerie vidéo (socle, partie vidéo) pour envoyer les clips dans la galerie ; `client_max_body_size` Nginx relevé pour les routes d’upload | À faire |
+| 4 | Voix de synthèse : Piper en local (gratuit, quatre voix françaises sous licence libre), téléchargé au premier démarrage dans les données du module et non dans l’image Docker (`lib/resources.ts`, `lib/tts.ts`) ; panneau Voix dans l’éditeur ; narration par l’assistant, chaque segment s’allongeant à la durée de sa lecture. Restent : moteurs par clé API (OpenAI, Google, ElevenLabs) et sous-titres mot à mot | Réalisée en partie |
+| 5 | Galerie vidéo (socle, partie vidéo) pour envoyer les clips dans la galerie. Nginx est fait : 100 Mo sur `/api/modules/*/upload` (sans mise en tampon), 20 Mo explicites ailleurs, dans le seul fichier du site | À faire en partie |
 
 ## 1. Pourquoi ce module
 

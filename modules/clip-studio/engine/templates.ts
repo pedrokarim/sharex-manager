@@ -26,6 +26,12 @@ import type {
 
 export type TemplateId = "quiz" | "top" | "slideshow";
 
+/** Narration d'un segment : un son déjà synthétisé et sa durée. */
+export interface VoiceClip {
+  source: MediaSource;
+  durationMs: number;
+}
+
 export interface QuizQuestion {
   question: string;
   choices: string[];
@@ -33,6 +39,7 @@ export interface QuizQuestion {
   answer: number;
   explanation?: string;
   image?: MediaSource;
+  voice?: { question?: VoiceClip; reveal?: VoiceClip };
 }
 
 export interface QuizData {
@@ -40,12 +47,14 @@ export interface QuizData {
   subtitle?: string;
   questions: QuizQuestion[];
   outro?: string;
+  voice?: { intro?: VoiceClip; outro?: VoiceClip };
 }
 
 export interface TopEntry {
   title: string;
   detail?: string;
   image?: MediaSource;
+  voice?: VoiceClip;
 }
 
 export interface TopData {
@@ -53,12 +62,14 @@ export interface TopData {
   /** Du premier affiché au dernier : le numéro 1 arrive en dernier. */
   entries: TopEntry[];
   outro?: string;
+  voice?: { intro?: VoiceClip; outro?: VoiceClip };
 }
 
 export interface SlideshowData {
   title?: string;
-  slides: { caption?: string; image?: MediaSource }[];
+  slides: { caption?: string; image?: MediaSource; voice?: VoiceClip }[];
   outro?: string;
+  voice?: { intro?: VoiceClip; outro?: VoiceClip };
 }
 
 /** Couleurs d'accent, une par segment : chaque question a sa teinte. */
@@ -75,12 +86,13 @@ const LAYERS = ["Textes", "Surlignage", "Cadres", "Voile", "Principale"] as cons
 type Layer = (typeof LAYERS)[number];
 
 class Builder {
-  private tracks = new Map<Layer | "Audio", Track>();
+  private tracks = new Map<Layer | "Voix" | "Audio", Track>();
 
   constructor(readonly project: ClipProject) {
     for (const layer of LAYERS) {
       this.tracks.set(layer, { id: uid("t-"), kind: "visual", name: layer, items: [] });
     }
+    this.tracks.set("Voix", { id: uid("t-"), kind: "audio", name: "Voix", items: [] });
     this.tracks.set("Audio", { id: uid("t-"), kind: "audio", name: "Audio", items: [] });
   }
 
@@ -92,7 +104,28 @@ class Builder {
     return Math.round(value * this.fps);
   }
 
-  add(layer: Layer | "Audio", item: ClipItem) {
+  /** Durée d'un segment : au moins `base`, et assez pour la narration plus une marge. */
+  fit(base: number, voice: VoiceClip | undefined, margin: number) {
+    return Math.max(this.seconds(base), voice ? this.seconds(voice.durationMs / 1000 + margin) : 0);
+  }
+
+  /** Pose la narration d'un segment sur la piste Voix. */
+  narrate(voice: VoiceClip | undefined, start: number) {
+    if (!voice) return;
+    this.add("Voix", {
+      id: uid("a-"),
+      type: "audio",
+      start,
+      duration: Math.max(1, this.seconds(voice.durationMs / 1000)),
+      source: voice.source,
+      trimStart: 0,
+      volume: 1,
+      fadeIn: 0,
+      fadeOut: 0,
+    });
+  }
+
+  add(layer: Layer | "Voix" | "Audio", item: ClipItem) {
     this.tracks.get(layer)!.items.push(item);
     return item;
   }
@@ -255,8 +288,9 @@ export function buildQuiz(
   let cursor = 0;
 
   // Intro
-  const intro = b.seconds(timing.intro);
+  const intro = b.fit(timing.intro, data.voice?.intro, 0.5);
   background(b, cursor, intro, data.questions[0]?.image, ACCENTS[0], 0);
+  b.narrate(data.voice?.intro, cursor + 4);
   b.add("Textes", text(b, data.title, cursor, intro, { preset: "impact", y: vertical ? 0.42 : 0.4, height: 0.24, style: { size: vertical ? 0.07 : 0.1 } }));
   b.add("Textes", text(b, data.subtitle ?? "Réponds avant la fin du compte à rebours !", cursor + 6, intro - 6, {
     preset: "caption",
@@ -268,10 +302,13 @@ export function buildQuiz(
 
   data.questions.forEach((question, index) => {
     const accent = ACCENTS[index % ACCENTS.length];
-    const think = b.seconds(timing.think);
-    const reveal = b.seconds(timing.reveal);
+    // Avec une narration, on laisse le temps de l'écouter puis de réfléchir.
+    const think = b.fit(timing.think, question.voice?.question, 3);
+    const reveal = b.fit(timing.reveal, question.voice?.reveal, 0.5);
     const total = think + reveal;
     background(b, cursor, total, question.image, accent, index + 1);
+    b.narrate(question.voice?.question, cursor + 4);
+    b.narrate(question.voice?.reveal, cursor + think + 2);
 
     // Numéro de la question
     b.add("Textes", text(b, `Question ${index + 1}/${data.questions.length}`, cursor, total, {
@@ -314,13 +351,16 @@ export function buildQuiz(
       }
     });
 
-    // Compte à rebours
+    // Compte à rebours : avec une narration, il part quand la question a été lue.
+    const countdownDelay = question.voice?.question
+      ? Math.min(think - b.seconds(2), 4 + b.seconds(question.voice.question.durationMs / 1000))
+      : 10;
     const bar: ShapeItem = {
       id: uid("s-"),
       type: "shape",
       shape: "progress",
-      start: cursor + 10,
-      duration: think - 10,
+      start: cursor + countdownDelay,
+      duration: think - countdownDelay,
       fill: accent,
       radius: 0.5,
       progress: { track: "rgba(255,255,255,0.25)", reverse: true },
@@ -344,8 +384,9 @@ export function buildQuiz(
   });
 
   // Conclusion
-  const outro = b.seconds(timing.outro);
+  const outro = b.fit(timing.outro, data.voice?.outro, 0.8);
   background(b, cursor, outro, undefined, ACCENTS[data.questions.length % ACCENTS.length], 0);
+  b.narrate(data.voice?.outro, cursor + 4);
   b.add("Textes", text(b, data.outro ?? "Combien de bonnes réponses ?", cursor, outro, { preset: "impact", y: 0.44, height: 0.24, style: { size: vertical ? 0.06 : 0.09 } }));
   b.add("Textes", text(b, "Dis-le en commentaire", cursor + 8, outro - 8, { preset: "caption", y: 0.58, style: { size: vertical ? 0.032 : 0.045 }, animIn: "slide-up" }));
 
@@ -359,8 +400,9 @@ export function buildTop(name: string, aspect: AspectPreset, data: TopData): Cli
   const vertical = aspect === "9:16" || aspect === "4:5";
   let cursor = 0;
 
-  const intro = b.seconds(2.5);
+  const intro = b.fit(2.5, data.voice?.intro, 0.5);
   background(b, cursor, intro, data.entries[0]?.image, ACCENTS[0], 0);
+  b.narrate(data.voice?.intro, cursor + 4);
   b.add("Textes", text(b, data.title, cursor, intro, { preset: "impact", y: 0.45, height: 0.26, style: { size: vertical ? 0.07 : 0.1 } }));
   cursor += intro;
 
@@ -368,8 +410,9 @@ export function buildTop(name: string, aspect: AspectPreset, data: TopData): Cli
   data.entries.forEach((entry, index) => {
     const rank = count - index;
     const accent = ACCENTS[index % ACCENTS.length];
-    const duration = b.seconds(rank === 1 ? 4.5 : 3.5);
+    const duration = b.fit(rank === 1 ? 4.5 : 3.5, entry.voice, 0.6);
     background(b, cursor, duration, entry.image, accent, index + 1);
+    b.narrate(entry.voice, cursor + 4);
     b.add("Textes", text(b, `#${rank}`, cursor, duration, {
       preset: "impact",
       y: vertical ? 0.2 : 0.22,
@@ -385,8 +428,9 @@ export function buildTop(name: string, aspect: AspectPreset, data: TopData): Cli
   });
 
   if (data.outro) {
-    const outro = b.seconds(2.5);
+    const outro = b.fit(2.5, data.voice?.outro, 0.8);
     background(b, cursor, outro, undefined, ACCENTS[count % ACCENTS.length], 0);
+    b.narrate(data.voice?.outro, cursor + 4);
     b.add("Textes", text(b, data.outro, cursor, outro, { preset: "impact", y: 0.46, height: 0.24, style: { size: vertical ? 0.06 : 0.09 } }));
   }
   return b.build();
@@ -399,22 +443,25 @@ export function buildSlideshow(name: string, aspect: AspectPreset, data: Slidesh
   const vertical = aspect === "9:16" || aspect === "4:5";
   let cursor = 0;
   if (data.title) {
-    const intro = b.seconds(2.5);
+    const intro = b.fit(2.5, data.voice?.intro, 0.5);
     background(b, cursor, intro, data.slides[0]?.image, ACCENTS[0], 0);
+    b.narrate(data.voice?.intro, cursor + 4);
     b.add("Textes", text(b, data.title, cursor, intro, { preset: "impact", y: 0.46, height: 0.26, style: { size: vertical ? 0.065 : 0.09 } }));
     cursor += intro;
   }
   data.slides.forEach((slide, index) => {
-    const duration = b.seconds(3.5);
+    const duration = b.fit(3.5, slide.voice, 0.6);
     background(b, cursor, duration, slide.image, ACCENTS[index % ACCENTS.length], index + 1);
+    b.narrate(slide.voice, cursor + 4);
     if (slide.caption) {
       b.add("Textes", text(b, slide.caption, cursor + 6, duration - 6, { preset: "caption", y: vertical ? 0.8 : 0.84, height: 0.16, style: { size: vertical ? 0.038 : 0.05 }, animIn: "slide-up" }));
     }
     cursor += duration;
   });
   if (data.outro) {
-    const outro = b.seconds(2.5);
+    const outro = b.fit(2.5, data.voice?.outro, 0.8);
     background(b, cursor, outro, undefined, ACCENTS[data.slides.length % ACCENTS.length], 0);
+    b.narrate(data.voice?.outro, cursor + 4);
     b.add("Textes", text(b, data.outro, cursor, outro, { preset: "impact", y: 0.46, height: 0.24, style: { size: vertical ? 0.06 : 0.09 } }));
   }
   return b.build();

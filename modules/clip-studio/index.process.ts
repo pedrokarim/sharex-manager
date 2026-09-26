@@ -25,6 +25,7 @@ import {
   writeExports,
   writeProject,
 } from "./lib/store";
+import { prefetchTts, prepareVoice as downloadVoice, synthesize, voiceStatuses } from "./lib/tts";
 import {
   cancelAssistantJob,
   getAssistantJob as readAssistantJob,
@@ -247,6 +248,24 @@ export async function cancelAssistant(id: string): Promise<{ success: boolean }>
   return { success: true };
 }
 
+// ─── Voix de synthèse ────────────────────────────────────────────
+
+/** Voix disponibles, avec l'état de leur téléchargement. */
+export async function getVoices() {
+  return voiceStatuses();
+}
+
+/** Télécharge une voix sans attendre la première synthèse. */
+export async function prepareVoice(id: string): Promise<{ success: boolean }> {
+  void downloadVoice(String(id)).catch(() => undefined);
+  return { success: true };
+}
+
+/** Lit un texte et range le son parmi les médias du module. */
+export async function speak(input: { text: string; voice?: string; speed?: number }) {
+  return synthesize(input);
+}
+
 // ─── Cycle de vie ────────────────────────────────────────────────
 
 const moduleHooks: ModuleHooks = {
@@ -255,6 +274,9 @@ const moduleHooks: ModuleHooks = {
 
 export function initModule() {
   ensureDirs();
+  // Moteur et voix par défaut téléchargés en arrière-plan au démarrage, une
+  // seule fois : ils restent ensuite dans le volume de données du module.
+  prefetchTts();
   return moduleHooks;
 }
 

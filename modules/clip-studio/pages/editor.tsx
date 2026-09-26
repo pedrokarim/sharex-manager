@@ -11,6 +11,7 @@ import {
   Film,
   FolderOpen,
   Loader2,
+  Mic,
   Redo2,
   Type,
   Undo2,
@@ -64,6 +65,7 @@ import { Inspector } from "../components/inspector";
 import { MediaPanel } from "../components/media-panel";
 import { PreviewStage } from "../components/preview-stage";
 import { TextPanel } from "../components/text-panel";
+import { VoicePanel } from "../components/voice-panel";
 import { Timeline } from "../components/timeline";
 import { useProjectHistory, type SaveState } from "../components/use-project-history";
 
@@ -106,7 +108,7 @@ export default function EditorPage() {
   );
 }
 
-type Panel = "media" | "text";
+type Panel = "media" | "text" | "voice";
 
 function Editor({ initial }: { initial: ClipProject }) {
   const { project, commit, undo, redo, canUndo, canRedo, saveState } = useProjectHistory(initial);
@@ -161,6 +163,19 @@ function Editor({ initial }: { initial: ClipProject }) {
       else if (source.kind === "video") item = createVideoItem(source, at?.frame ?? mainTrackEnd(current), fps);
       else item = createAudioItem(source, at?.frame ?? playerRef.current?.frame ?? 0, fps);
       commit((project) => addItem(project, item, at?.trackId ?? (source.kind === "audio" ? undefined : mainTrackId(project))));
+      setSelectedId(item.id);
+    },
+    [commit]
+  );
+
+  /** Voix off : à la tête de lecture, sur une piste Voix libre ou nouvelle. */
+  const addVoice = useCallback(
+    (source: MediaSource) => {
+      const current = projectRef.current;
+      // Une voix se lit à plein volume et sans fondu, contrairement à une musique.
+      const item = { ...createAudioItem(source, playerRef.current?.frame ?? 0, current.fps), volume: 1, fadeIn: 0, fadeOut: 0 };
+      const voiceTrack = current.tracks.find((track) => track.kind === "audio" && track.name.startsWith("Voix"));
+      commit((project) => addItem(project, item, voiceTrack?.id, "Voix"));
       setSelectedId(item.id);
     },
     [commit]
@@ -323,6 +338,9 @@ function Editor({ initial }: { initial: ClipProject }) {
           <RailButton label="Texte" active={panel === "text"} onClick={() => setPanel(panel === "text" ? null : "text")}>
             <Type className="h-5 w-5" />
           </RailButton>
+          <RailButton label="Voix" active={panel === "voice"} onClick={() => setPanel(panel === "voice" ? null : "voice")}>
+            <Mic className="h-5 w-5" />
+          </RailButton>
         </nav>
 
         <AnimatePresence initial={false}>
@@ -338,6 +356,9 @@ function Editor({ initial }: { initial: ClipProject }) {
               <div className="h-full w-[300px]">
                 {panel === "media" && <MediaPanel onAdd={(source) => addSource(source)} />}
                 {panel === "text" && <TextPanel onAddText={addText} onAddShape={addShape} />}
+                {panel === "voice" && (
+                  <VoicePanel selectedText={selected?.type === "text" ? selected.text : undefined} onAdd={addVoice} />
+                )}
               </div>
             </motion.aside>
           )}

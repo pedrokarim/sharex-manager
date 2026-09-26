@@ -241,9 +241,16 @@ function mapTrack(project: ClipProject, trackId: string, map: (track: Track) => 
  * où il ne chevauche rien. Faute de place, une piste est créée : pour un
  * visuel, au-dessus des autres (il sera visible) ; pour un son, en bas.
  */
-export function addItem(project: ClipProject, item: ClipItem, preferredTrackId?: string): ClipProject {
+/**
+ * Place un élément sur la première piste libre, en commençant par
+ * `preferredTrackId`. Avec `trackName`, seules les pistes de ce nom sont
+ * candidates et une piste de ce nom est créée s'il n'y a pas de place.
+ */
+export function addItem(project: ClipProject, item: ClipItem, preferredTrackId?: string, trackName?: string): ClipProject {
   const kind = item.type === "audio" ? "audio" : "visual";
-  const candidates = project.tracks.filter((track) => track.kind === kind && !track.locked);
+  const candidates = project.tracks.filter(
+    (track) => track.kind === kind && !track.locked && (!trackName || track.name.startsWith(trackName))
+  );
   const preferred = candidates.find((track) => track.id === preferredTrackId);
   const ordered = preferred ? [preferred, ...candidates.filter((track) => track !== preferred)] : candidates;
   const target = ordered.find((track) => !overlaps(track.items, item.start, item.duration));
@@ -258,7 +265,7 @@ export function addItem(project: ClipProject, item: ClipItem, preferredTrackId?:
   const track: Track = {
     id: uid("t-"),
     kind,
-    name: kind === "audio" ? "Audio" : "Calque",
+    name: trackName ?? (kind === "audio" ? "Audio" : "Calque"),
     items: [item],
   };
   const tracks =

@@ -5,7 +5,9 @@
  * 1. script : Codex CLI écrit le contenu, en JSON, selon le modèle choisi ;
  * 2. illustrations : une image par segment, demandée à la file d'AI Image Gen
  *    (elles apparaissent aussi dans son fil) ;
- * 3. montage : le modèle transforme le tout en projet, prêt à retoucher.
+ * 3. narration : chaque segment est lu par une voix de synthèse (Piper) ;
+ * 4. montage : le modèle transforme le tout en projet, prêt à retoucher, en
+ *    allongeant chaque segment pour laisser le temps à la voix.
  */
 
 import fs from "fs";
@@ -17,9 +19,11 @@ import {
   type SlideshowData,
   type TemplateId,
   type TopData,
+  type VoiceClip,
 } from "../engine/templates";
 import type { AspectPreset, MediaSource } from "../engine/types";
 import { askCodex, extractJson } from "./codex";
+import { synthesize, VOICES } from "./tts";
 import { DATA_DIR, ensureDirs, writeProject } from "./store";
 
 export interface AssistantRequest {
@@ -28,9 +32,11 @@ export interface AssistantRequest {
   aspect: AspectPreset;
   count: number;
   images: boolean;
+  /** Voix de narration ; absente, le clip reste muet. */
+  voice?: string;
 }
 
-type StepId = "script" | "images" | "montage";
+type StepId = "script" | "images" | "narration" | "montage";
 type StepState = "pending" | "running" | "done" | "error" | "skipped";
 
 export interface AssistantJob {
@@ -102,6 +108,7 @@ export function startAssistant(request: AssistantRequest): AssistantJob {
     aspect: (["9:16", "16:9", "1:1", "4:5"] as const).includes(request.aspect) ? request.aspect : "9:16",
     count: Math.min(10, Math.max(2, Math.round(Number(request.count) || 5))),
     images: Boolean(request.images),
+    voice: VOICES.some((voice) => voice.id === request.voice) ? request.voice : undefined,
   };
   if (clean.brief.length < 3) throw new Error("Décrivez le short à créer.");
 
@@ -112,6 +119,7 @@ export function startAssistant(request: AssistantRequest): AssistantJob {
     steps: [
       { id: "script", label: "Écriture du script", state: "pending" },
       { id: "images", label: "Création des illustrations", state: clean.images ? "pending" : "skipped" },
+      { id: "narration", label: "Enregistrement de la voix", state: clean.voice ? "pending" : "skipped" },
       { id: "montage", label: "Montage du clip", state: "pending" },
     ],
     images: { total: 0, done: 0, failed: 0 },
@@ -151,9 +159,27 @@ async function run(job: AssistantJob, signal: AbortSignal) {
       step("images", job.images.done > 0 ? "done" : "error", `${job.images.done} sur ${job.images.total}`);
     }
 
-    // 3. Montage
+    // 3. Narration
+    let data = attachImages(job.request.template, script, images);
+    if (job.request.voice) {
+      const lines = narrationLines(job.request.template, data);
+      let done = 0;
+      step("narration", "running", `0 sur ${lines.length}`);
+      const clips: (VoiceClip | undefined)[] = [];
+      for (const line of lines) {
+        if (signal.aborted) throw new DOMException("Annulé", "AbortError");
+        clips.push(await speakLine(line, job.request.voice));
+        done++;
+        step("narration", "running", `${done} sur ${lines.length}`);
+      }
+      const recorded = clips.filter(Boolean).length;
+      data = attachVoices(job.request.template, data, clips);
+      step("narration", recorded > 0 ? "done" : "error", `${recorded} sur ${lines.length}`);
+    }
+
+    // 4. Montage
     step("montage", "running");
-    const project = buildFromTemplate(job.request.template, script.title, job.request.aspect, attachImages(job.request.template, script, images));
+    const project = buildFromTemplate(job.request.template, script.title, job.request.aspect, data);
     writeProject(project);
     job.projectId = project.id;
     job.status = "done";
@@ -278,6 +304,90 @@ function attachImages(template: TemplateId, script: CleanScript, images: (MediaS
   }
   const data = script as SlideshowData & CleanScript;
   return { ...data, slides: data.slides.map((slide, index) => ({ ...slide, image: images[index] })) };
+}
+
+// ─── Narration ───────────────────────────────────────────────────
+
+/**
+ * Textes lus, dans un ordre fixe que `attachVoices` relit :
+ * - quiz : intro, puis question et réponse pour chaque question, puis outro ;
+ * - classement : intro, un texte par élément, outro ;
+ * - diaporama : intro, une légende par diapositive, outro.
+ * Une chaîne vide garde sa place mais ne sera pas lue.
+ */
+function narrationLines(template: TemplateId, data: QuizData | TopData | SlideshowData): string[] {
+  const sentence = (value: string | undefined) => {
+    const text = (value ?? "").trim();
+    return text && !/[.!?…]$/.test(text) ? `${text}.` : text;
+  };
+  if (template === "quiz") {
+    const quiz = data as QuizData;
+    const letters = ["A", "B", "C", "D"];
+    return [
+      [sentence(quiz.title), sentence(quiz.subtitle)].filter(Boolean).join(" "),
+      ...quiz.questions.flatMap((question, index) => [
+        `Question ${index + 1}. ${sentence(question.question)} ${question.choices
+          .map((choice, choiceIndex) => `${letters[choiceIndex]}, ${sentence(choice)}`)
+          .join(" ")}`,
+        `Réponse ${letters[question.answer]} : ${sentence(question.choices[question.answer])} ${sentence(question.explanation)}`.trim(),
+      ]),
+      sentence(quiz.outro),
+    ];
+  }
+  if (template === "top") {
+    const top = data as TopData;
+    const count = top.entries.length;
+    return [
+      sentence(top.title),
+      ...top.entries.map((entry, index) => `Numéro ${count - index}. ${sentence(entry.title)} ${sentence(entry.detail)}`.trim()),
+      sentence(top.outro),
+    ];
+  }
+  const slideshow = data as SlideshowData;
+  return [sentence(slideshow.title), ...slideshow.slides.map((slide) => sentence(slide.caption)), sentence(slideshow.outro)];
+}
+
+/** Une ligne ratée ne bloque pas le clip : le segment reste simplement muet. */
+async function speakLine(text: string, voice: string): Promise<VoiceClip | undefined> {
+  if (!text) return undefined;
+  try {
+    const { asset, durationMs } = await synthesize({ text, voice });
+    if (!durationMs) return undefined;
+    return {
+      durationMs,
+      source: {
+        url: `/api/modules/clip-studio/data/assets/${asset.file}`,
+        ref: `module:clip-studio/assets/${asset.file}`,
+        name: asset.originalName,
+        kind: "audio",
+        durationMs,
+      },
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function attachVoices<T extends QuizData | TopData | SlideshowData>(template: TemplateId, data: T, clips: (VoiceClip | undefined)[]): T {
+  const last = clips.length - 1;
+  const voice = { intro: clips[0], outro: clips[last] };
+  if (template === "quiz") {
+    const quiz = data as QuizData;
+    return {
+      ...quiz,
+      voice,
+      questions: quiz.questions.map((question, index) => ({
+        ...question,
+        voice: { question: clips[1 + index * 2], reveal: clips[2 + index * 2] },
+      })),
+    } as T;
+  }
+  if (template === "top") {
+    const top = data as TopData;
+    return { ...top, voice, entries: top.entries.map((entry, index) => ({ ...entry, voice: clips[1 + index] })) } as T;
+  }
+  const slideshow = data as SlideshowData;
+  return { ...slideshow, voice, slides: slideshow.slides.map((slide, index) => ({ ...slide, voice: clips[1 + index] })) } as T;
 }
 
 // ─── Illustrations via AI Image Gen ──────────────────────────────
