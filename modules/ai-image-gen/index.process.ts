@@ -92,7 +92,22 @@ function describeApiEngines() {
   });
 }
 
+/**
+ * Catalogue pour le studio, ouvert à tout compte : sans le chemin des
+ * exécutables, le compte connecté aux CLI (souvent une adresse e-mail) ni la
+ * fin des clés, qui ne servent qu'à la page des réglages.
+ */
 export async function getCatalogue(): Promise<CatalogPayload> {
+  const full = await getEngineDetails();
+  return {
+    ...full,
+    cli: full.cli.map((engine) => ({ ...engine, binaryPath: null, configuredPath: undefined, account: null })),
+    apiEngines: full.apiEngines.map((engine) => ({ ...engine, hint: "" })),
+  };
+}
+
+/** Catalogue complet, pour la page des réglages (réservé aux admins). */
+export async function getEngineDetails(): Promise<CatalogPayload> {
   const config = buildEngineConfig();
   const { models, cli } = await getCatalog(config);
   return { models, cli, apiEngines: describeApiEngines() };

@@ -185,7 +185,8 @@ export function wavDurationMs(file: string): number {
   while (offset + 8 <= buffer.length) {
     const id = buffer.toString("latin1", offset, offset + 4);
     const size = buffer.readUInt32LE(offset + 4);
-    if (id === "fmt ") byteRate = buffer.readUInt32LE(offset + 16);
+    // En-tête tronqué ou incohérent : pas de lecture hors du fichier.
+    if (id === "fmt " && offset + 20 <= buffer.length) byteRate = buffer.readUInt32LE(offset + 16);
     if (id === "data" && byteRate) return Math.round((size / byteRate) * 1000);
     offset += 8 + size + (size % 2);
   }

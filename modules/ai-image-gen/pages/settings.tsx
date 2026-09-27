@@ -80,7 +80,7 @@ export default function SettingsPage({
   const [savingPrefs, setSavingPrefs] = useState(false);
 
   const load = useCallback(async () => {
-    const next = await callModule<Catalogue>("getCatalogue");
+    const next = await callModule<Catalogue>("getEngineDetails");
     setCatalogue(next);
     return next;
   }, []);

@@ -33,13 +33,15 @@ function readPcm(file: string): Pcm | null {
     const id = buffer.toString("latin1", offset, offset + 4);
     const size = buffer.readUInt32LE(offset + 4);
     if (id === "fmt ") {
+      if (offset + 24 > buffer.length) return null;
       channels = buffer.readUInt16LE(offset + 10);
       sampleRate = buffer.readUInt32LE(offset + 12);
       bits = buffer.readUInt16LE(offset + 22);
     }
     if (id === "data") {
-      if (bits !== 16 || !sampleRate) return null;
-      const end = Math.min(buffer.length, offset + 8 + size);
+      if (bits !== 16 || !sampleRate || channels < 1 || channels > 8) return null;
+      // Longueur paire : un Int16Array ne se construit pas sur un octet isolé.
+      const end = offset + 8 + Math.floor((Math.min(buffer.length, offset + 8 + size) - offset - 8) / 2) * 2;
       const view = new Int16Array(buffer.buffer.slice(buffer.byteOffset + offset + 8, buffer.byteOffset + end));
       if (channels === 1) return { samples: view, sampleRate };
       const mono = new Int16Array(Math.floor(view.length / channels));
