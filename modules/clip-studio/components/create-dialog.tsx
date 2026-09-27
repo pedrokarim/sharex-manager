@@ -9,6 +9,7 @@ import {
   LayoutTemplate,
   ListOrdered,
   Loader2,
+  PenLine,
   Plus,
   Sparkles,
   SquareSplitHorizontal,
@@ -32,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { appendSequence, createImageItem, createProject } from "../engine/edit";
 import {
   SAMPLE_BEFORE_AFTER,
+  SAMPLE_FREE,
   SAMPLE_QUIZ,
   SAMPLE_SLIDESHOW,
   SAMPLE_TOP,
@@ -54,6 +56,7 @@ const MODES: { id: Mode; label: string; icon: typeof Plus }[] = [
 ];
 
 const TEMPLATES: { id: TemplateId; label: string; description: string; icon: typeof Plus }[] = [
+  { id: "free", label: "Libre", description: "Aucune forme imposée : des séquences, titre et texte", icon: PenLine },
   { id: "quiz", label: "Quiz", description: "Questions, choix, compte à rebours, réponse révélée", icon: ListOrdered },
   { id: "top", label: "Top", description: "Un classement révélé du dernier au premier", icon: Trophy },
   { id: "slideshow", label: "Diaporama", description: "Des images légendées qui racontent une histoire", icon: Images },
@@ -61,19 +64,30 @@ const TEMPLATES: { id: TemplateId; label: string; description: string; icon: typ
 ];
 
 /** L'assistant illustre lui-même ses clips : l'Avant / Après demande des images fournies. */
-const ASSISTANT_TEMPLATE_IDS: TemplateId[] = ["quiz", "top", "slideshow"];
+const ASSISTANT_TEMPLATE_IDS: TemplateId[] = ["free", "quiz", "top", "slideshow"];
 
 const SAMPLES = {
+  free: SAMPLE_FREE,
   quiz: SAMPLE_QUIZ,
   top: SAMPLE_TOP,
   slideshow: SAMPLE_SLIDESHOW,
   "before-after": SAMPLE_BEFORE_AFTER,
 } as const;
 
+/** Nom de ce que compte le curseur de l'assistant, selon le modèle. */
+const COUNT_LABELS: Partial<Record<TemplateId, string>> = {
+  free: "Séquences",
+  quiz: "Questions",
+  top: "Éléments",
+  slideshow: "Diapositives",
+};
+
 /** Montage d'une sélection de la galerie. */
 type Recipe = "slideshow" | "before-after";
 
 const IDEAS = [
+  "L’histoire de la tour Eiffel en quelques étapes",
+  "Trois astuces pour mieux dormir",
   "Un quiz sur les animaux de la savane",
   "Top 5 des planètes les plus étranges",
   "Un quiz de culture générale sur la France",
@@ -99,7 +113,7 @@ export function CreateDialog({
   const [mode, setMode] = useState<Mode>("assistant");
   const [name, setName] = useState("");
   const [aspect, setAspect] = useState<AspectPreset>("9:16");
-  const [template, setTemplate] = useState<TemplateId>("quiz");
+  const [template, setTemplate] = useState<TemplateId>("free");
   const [recipe, setRecipe] = useState<Recipe>("slideshow");
   const [brief, setBrief] = useState("");
   const [count, setCount] = useState(5);
@@ -220,7 +234,7 @@ export function CreateDialog({
                       type="button"
                       onClick={() => {
                         setMode(entry.id);
-                        if (entry.id === "assistant" && !ASSISTANT_TEMPLATE_IDS.includes(template)) setTemplate("quiz");
+                        if (entry.id === "assistant" && !ASSISTANT_TEMPLATE_IDS.includes(template)) setTemplate("free");
                       }}
                       className={cn("relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors", active ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
                     >
@@ -241,7 +255,7 @@ export function CreateDialog({
                       <Textarea
                         value={brief}
                         onChange={(event) => setBrief(event.target.value)}
-                        placeholder="Décrivez votre short : « un quiz sur les animaux de la savane, ton fun »"
+                        placeholder="Décrivez votre short : « l’histoire du chocolat, ton fun » ou « un quiz sur la savane »"
                         rows={3}
                         autoFocus
                         className="resize-none text-[15px]"
@@ -258,7 +272,7 @@ export function CreateDialog({
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="space-y-1.5">
                         <span className="flex items-center justify-between text-sm">
-                          <span>{template === "quiz" ? "Questions" : template === "top" ? "Éléments" : "Diapositives"}</span>
+                          <span>{COUNT_LABELS[template] ?? "Séquences"}</span>
                           <span className="font-mono text-xs tabular-nums">{count}</span>
                         </span>
                         <input type="range" min={2} max={10} value={count} onChange={(event) => setCount(Number(event.target.value))} className="w-full accent-primary" />
@@ -396,7 +410,7 @@ function RecipePicker({ value, onChange, count }: { value: Recipe; onChange: (va
       description:
         count < 2
           ? "Sélectionnez au moins deux images"
-          : `${pairs} paire${pairs > 1 ? "s" : ""}, dans l'ordre de la sélection${count % 2 ? " ; la dernière image, seule, est écartée" : ""}`,
+          : `${pairs} paire${pairs > 1 ? "s" : ""}, dans l'ordre de la sélection${count % 2 ? " ; la dernière image, seule, est écartée" : ""}`,
       icon: SquareSplitHorizontal,
     },
   ];
@@ -434,7 +448,7 @@ function TemplatePicker({
 }) {
   const templates = only ? TEMPLATES.filter((entry) => only.includes(entry.id)) : TEMPLATES;
   return (
-    <div className={cn("grid gap-2", templates.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "sm:grid-cols-3")}>
+    <div className={cn("grid gap-2", templates.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3")}>
       {templates.map((entry) => {
         const Icon = entry.icon;
         const selected = entry.id === value;

@@ -1,5 +1,6 @@
 /**
- * Assistant IA : « fais-moi un short quiz sur les animaux ».
+ * Assistant IA : « fais-moi un short sur les animaux », en forme libre ou
+ * selon un modèle (quiz, classement, diaporama).
  *
  * Trois étapes, suivies par l'interface :
  * 1. script : Codex CLI écrit le contenu, en JSON, selon le modèle choisi ;
@@ -15,6 +16,7 @@ import path from "path";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import {
   buildFromTemplate,
+  type FreeData,
   type QuizData,
   type SlideshowData,
   type TemplateId,
@@ -32,7 +34,7 @@ import { DATA_DIR, ensureDirs, writeProject } from "./store";
 /** L'assistant écrit et illustre lui-même : l'Avant / Après, fait d'images fournies, n'en fait pas partie. */
 export type AssistantTemplate = Exclude<TemplateId, "before-after">;
 
-const ASSISTANT_TEMPLATES: readonly TemplateId[] = ["quiz", "top", "slideshow"];
+const ASSISTANT_TEMPLATES: readonly TemplateId[] = ["free", "quiz", "top", "slideshow"];
 
 export interface AssistantRequest {
   brief: string;
@@ -123,7 +125,7 @@ export function startAssistant(request: AssistantRequest): AssistantJob {
   }
   const clean: AssistantRequest = {
     brief: String(request.brief ?? "").trim().slice(0, 600),
-    template: ASSISTANT_TEMPLATES.includes(request.template) ? request.template : "quiz",
+    template: ASSISTANT_TEMPLATES.includes(request.template) ? request.template : "free",
     aspect: (["9:16", "16:9", "1:1", "4:5"] as const).includes(request.aspect) ? request.aspect : "9:16",
     count: Math.min(10, Math.max(2, Math.round(Number(request.count) || 5))),
     images: Boolean(request.images),
@@ -236,6 +238,7 @@ interface RawScript {
   questions?: { question?: string; choices?: string[]; answer?: number; explanation?: string; imagePrompt?: string }[];
   entries?: { title?: string; detail?: string; imagePrompt?: string }[];
   slides?: { caption?: string; imagePrompt?: string }[];
+  scenes?: { heading?: string; text?: string; imagePrompt?: string }[];
 }
 
 const IMAGE_GUIDE =
@@ -261,6 +264,16 @@ function scriptPrompt(request: AssistantRequest): string {
       IMAGE_GUIDE + ", qui ne révèle pas la réponse.",
     ].join("\n");
   }
+  if (request.template === "free") {
+    return [
+      ...common,
+      `Format libre en ${request.count} séquences : choisis toi-même la forme qui sert le mieux la demande (histoire, explication, conseils, recette, anecdote, comparaison, tutoriel…), sans en faire un quiz ni un classement sauf si la demande le réclame.`,
+      'Schéma : {"title": string, "subtitle": string, "scenes": [{"heading": string, "text": string, "imagePrompt": string}], "outro": string}',
+      "Contraintes : title de 45 caractères au plus ; subtitle facultatif de 70 caractères au plus ; heading facultatif de 32 caractères au plus ; text de 110 caractères au plus, écrit pour être lu à voix haute ; chaque séquence porte au moins un heading ou un text ; outro facultatif de 40 caractères au plus.",
+      "Les séquences s'enchaînent : la première accroche, la dernière conclut.",
+      IMAGE_GUIDE + ".",
+    ].join("\n");
+  }
   if (request.template === "top") {
     return [
       ...common,
@@ -281,7 +294,7 @@ function scriptPrompt(request: AssistantRequest): string {
 
 const cut = (value: unknown, max: number) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
-type CleanScript = (QuizData | TopData | SlideshowData) & { title: string; prompts: string[]; mood?: string };
+type CleanScript = (FreeData | QuizData | TopData | SlideshowData) & { title: string; prompts: string[]; mood?: string };
 
 function sanitize(request: AssistantRequest, raw: RawScript): CleanScript {
   const title = cut(raw.title, 60) || "Mon short";
@@ -311,6 +324,25 @@ function sanitize(request: AssistantRequest, raw: RawScript): CleanScript {
       prompts: questions.map((question) => question.imagePrompt),
     };
   }
+  if (request.template === "free") {
+    const scenes = (raw.scenes ?? [])
+      .map((scene) => ({
+        heading: cut(scene.heading, 50) || undefined,
+        text: cut(scene.text, 160) || undefined,
+        imagePrompt: cut(scene.imagePrompt, 500),
+      }))
+      .filter((scene) => scene.heading || scene.text)
+      .slice(0, request.count);
+    if (scenes.length === 0) throw new Error("Le script reçu ne contient aucune séquence exploitable.");
+    return {
+      title,
+      mood,
+      subtitle: cut(raw.subtitle, 90) || undefined,
+      outro: cut(raw.outro, 60) || undefined,
+      scenes,
+      prompts: scenes.map((scene) => scene.imagePrompt),
+    };
+  }
   if (request.template === "top") {
     const entries = (raw.entries ?? [])
       .map((entry) => ({ title: cut(entry.title, 50), detail: cut(entry.detail, 80) || undefined, imagePrompt: cut(entry.imagePrompt, 500) }))
@@ -331,6 +363,10 @@ function segmentPrompts(_template: TemplateId, script: CleanScript): string[] {
 }
 
 function attachImages(template: TemplateId, script: CleanScript, images: (MediaSource | undefined)[]) {
+  if (template === "free") {
+    const data = script as FreeData & CleanScript;
+    return { ...data, scenes: data.scenes.map((scene, index) => ({ ...scene, image: images[index] })) };
+  }
   if (template === "quiz") {
     const data = script as QuizData & CleanScript;
     return { ...data, questions: data.questions.map((question, index) => ({ ...question, image: images[index] })) };
@@ -349,10 +385,11 @@ function attachImages(template: TemplateId, script: CleanScript, images: (MediaS
  * Textes lus, dans un ordre fixe que `attachVoices` relit :
  * - quiz : intro, puis question et réponse pour chaque question, puis outro ;
  * - classement : intro, un texte par élément, outro ;
- * - diaporama : intro, une légende par diapositive, outro.
+ * - diaporama : intro, une légende par diapositive, outro ;
+ * - libre : intro, titre et texte de chaque séquence, outro.
  * Une chaîne vide garde sa place mais ne sera pas lue.
  */
-function narrationLines(template: TemplateId, data: QuizData | TopData | SlideshowData): string[] {
+function narrationLines(template: TemplateId, data: FreeData | QuizData | TopData | SlideshowData): string[] {
   const sentence = (value: string | undefined) => {
     const text = (value ?? "").trim();
     return text && !/[.!?…]$/.test(text) ? `${text}.` : text;
@@ -369,6 +406,14 @@ function narrationLines(template: TemplateId, data: QuizData | TopData | Slidesh
         `Réponse ${letters[question.answer]} : ${sentence(question.choices[question.answer])} ${sentence(question.explanation)}`.trim(),
       ]),
       sentence(quiz.outro),
+    ];
+  }
+  if (template === "free") {
+    const free = data as FreeData;
+    return [
+      [sentence(free.title), sentence(free.subtitle)].filter(Boolean).join(" "),
+      ...free.scenes.map((scene) => [sentence(scene.heading), sentence(scene.text)].filter(Boolean).join(" ")),
+      sentence(free.outro),
     ];
   }
   if (template === "top") {
@@ -407,9 +452,13 @@ async function speakLine(text: string, voice: string): Promise<VoiceClip | undef
   }
 }
 
-function attachVoices<T extends QuizData | TopData | SlideshowData>(template: TemplateId, data: T, clips: (VoiceClip | undefined)[]): T {
+function attachVoices<T extends FreeData | QuizData | TopData | SlideshowData>(template: TemplateId, data: T, clips: (VoiceClip | undefined)[]): T {
   const last = clips.length - 1;
   const voice = { intro: clips[0], outro: clips[last] };
+  if (template === "free") {
+    const free = data as FreeData;
+    return { ...free, voice, scenes: free.scenes.map((scene, index) => ({ ...scene, voice: clips[1 + index] })) } as T;
+  }
   if (template === "quiz") {
     const quiz = data as QuizData;
     return {

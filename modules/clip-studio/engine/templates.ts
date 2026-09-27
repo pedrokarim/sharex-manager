@@ -24,7 +24,7 @@ import type {
   Track,
 } from "./types";
 
-export type TemplateId = "quiz" | "top" | "slideshow" | "before-after";
+export type TemplateId = "free" | "quiz" | "top" | "slideshow" | "before-after";
 
 /** Narration d'un segment : un son déjà synthétisé et sa durée. */
 export interface VoiceClip {
@@ -68,6 +68,23 @@ export interface TopData {
 export interface SlideshowData {
   title?: string;
   slides: { caption?: string; image?: MediaSource; voice?: VoiceClip }[];
+  outro?: string;
+  voice?: { intro?: VoiceClip; outro?: VoiceClip };
+}
+
+/** Une séquence du modèle libre : un titre, un texte, ou les deux. */
+export interface FreeScene {
+  heading?: string;
+  text?: string;
+  image?: MediaSource;
+  voice?: VoiceClip;
+}
+
+/** Modèle libre : aucune forme imposée, une suite de séquences. */
+export interface FreeData {
+  title?: string;
+  subtitle?: string;
+  scenes: FreeScene[];
   outro?: string;
   voice?: { intro?: VoiceClip; outro?: VoiceClip };
 }
@@ -480,6 +497,63 @@ export function buildSlideshow(name: string, aspect: AspectPreset, data: Slidesh
   return b.build();
 }
 
+// ─── Libre ───────────────────────────────────────────────────────
+
+/**
+ * Suite de séquences sans forme imposée : chacune porte son image, un titre
+ * en haut et un texte plus bas, et dure le temps de sa narration.
+ */
+export function buildFree(name: string, aspect: AspectPreset, data: FreeData): ClipProject {
+  const b = new Builder(createProject(name, aspect));
+  const vertical = aspect === "9:16" || aspect === "4:5";
+  let cursor = 0;
+
+  if (data.title) {
+    const intro = b.fit(2.5, data.voice?.intro, 0.5);
+    background(b, cursor, intro, data.scenes[0]?.image, ACCENTS[0], 0);
+    b.narrate(data.voice?.intro, cursor + 4);
+    b.add("Textes", text(b, data.title, cursor, intro, { preset: "impact", y: vertical ? 0.44 : 0.42, height: 0.26, style: { size: vertical ? 0.065 : 0.09 } }));
+    if (data.subtitle) {
+      b.add("Textes", text(b, data.subtitle, cursor + 6, intro - 6, { preset: "caption", y: vertical ? 0.58 : 0.62, style: { size: vertical ? 0.032 : 0.045 }, animIn: "slide-up" }));
+    }
+    cursor += intro;
+  }
+
+  data.scenes.forEach((scene, index) => {
+    const accent = ACCENTS[index % ACCENTS.length];
+    const duration = b.fit(scene.text ? 4 : 3, scene.voice, 0.6);
+    background(b, cursor, duration, scene.image, accent, index + 1);
+    b.narrate(scene.voice, cursor + 4);
+    if (scene.heading) {
+      b.add("Textes", text(b, scene.heading, cursor, duration, {
+        preset: "impact",
+        y: scene.text ? (vertical ? 0.2 : 0.22) : 0.46,
+        height: 0.18,
+        style: { size: vertical ? 0.055 : 0.08 },
+        animIn: "slide-down",
+      }));
+    }
+    if (scene.text) {
+      b.add("Textes", text(b, scene.text, cursor + 6, duration - 6, {
+        preset: "caption",
+        y: scene.heading ? (vertical ? 0.74 : 0.76) : 0.5,
+        height: vertical ? 0.24 : 0.2,
+        style: { size: vertical ? 0.038 : 0.05 },
+        animIn: "slide-up",
+      }));
+    }
+    cursor += duration;
+  });
+
+  if (data.outro) {
+    const outro = b.fit(2.5, data.voice?.outro, 0.8);
+    background(b, cursor, outro, undefined, ACCENTS[data.scenes.length % ACCENTS.length], 0);
+    b.narrate(data.voice?.outro, cursor + 4);
+    b.add("Textes", text(b, data.outro, cursor, outro, { preset: "impact", y: 0.46, height: 0.24, style: { size: vertical ? 0.06 : 0.09 } }));
+  }
+  return b.build();
+}
+
 // ─── Avant / Après ───────────────────────────────────────────────
 
 export interface BeforeAfterTiming {
@@ -612,18 +686,29 @@ export const SAMPLE_SLIDESHOW: SlideshowData = {
   outro: "À bientôt",
 };
 
+export const SAMPLE_FREE: FreeData = {
+  title: "Trois astuces pour mieux dormir",
+  scenes: [
+    { heading: "Une heure fixe", text: "Se coucher et se lever à la même heure, même le week-end." },
+    { heading: "Moins d’écrans", text: "Poser le téléphone trente minutes avant de dormir." },
+    { heading: "Une chambre fraîche", text: "Entre 16 et 19 degrés, le corps s’endort plus vite." },
+  ],
+  outro: "Laquelle vas-tu essayer ?",
+};
+
 export const SAMPLE_BEFORE_AFTER: BeforeAfterData = {
   title: "Avant / Après",
   pairs: [{ caption: "Première transformation" }, { caption: "Deuxième transformation" }],
-  outro: "Laquelle préfères-tu ?",
+  outro: "Laquelle préfères-tu ?",
 };
 
 export function buildFromTemplate(
   template: TemplateId,
   name: string,
   aspect: AspectPreset,
-  data: QuizData | TopData | SlideshowData | BeforeAfterData
+  data: FreeData | QuizData | TopData | SlideshowData | BeforeAfterData
 ): ClipProject {
+  if (template === "free") return buildFree(name, aspect, data as FreeData);
   if (template === "quiz") return buildQuiz(name, aspect, data as QuizData);
   if (template === "top") return buildTop(name, aspect, data as TopData);
   if (template === "before-after") return buildBeforeAfter(name, aspect, data as BeforeAfterData);
