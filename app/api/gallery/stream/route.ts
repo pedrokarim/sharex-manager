@@ -1,7 +1,13 @@
 import { NextRequest } from 'next/server';
 import { gallerySSEManager } from '@/lib/sse';
+import { requireAccess } from '@/lib/api-guard';
 
 export async function GET(request: NextRequest) {
+  // Le flux annonce chaque nouveau fichier, sécurisés compris : il était
+  // ouvert à tout visiteur, le proxy laissant tout passer.
+  const guard = await requireAccess("user");
+  if (!guard.ok) return guard.response;
+
   console.log('[Gallery SSE] Nouvelle connexion SSE reçue');
 
   // Créer un ReadableStream pour SSE
