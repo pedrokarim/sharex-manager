@@ -63,6 +63,8 @@ export async function GET(
         clientInfo,
         fallbackPath: FILE_NOT_FOUND_PATH,
         enableLogging: false,
+        // Jamais en cache : la capture peut redevenir publique.
+        cacheControl: "no-store",
       });
     }
   }

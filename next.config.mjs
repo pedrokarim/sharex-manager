@@ -116,10 +116,8 @@ const nextConfig = {
                         key: 'Access-Control-Allow-Headers',
                         value: 'Content-Type',
                     },
-                    {
-                        key: 'Cache-Control',
-                        value: 'public, max-age=31536000, immutable',
-                    },
+                    // Pas de Cache-Control ici : la route le fixe selon que
+                    // la capture est publique ou privée (lib/file-handler.ts).
                     ...securityHeaders,
                 ],
             },

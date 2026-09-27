@@ -3,6 +3,7 @@ import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { isAdmin } from "@/lib/api-guard";
 import { defaultConfig } from "@/lib/defaultConfig";
 import type { UploadConfig } from "@/lib/types/upload-config";
 import { logDb } from "@/lib/utils/db";
@@ -91,7 +92,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });
 
-  if (!session?.user) {
+  // Mêmes droits que PUT /api/settings/config, utilisé par l'interface.
+  if (!session?.user || !isAdmin(session)) {
     logDb.createLog({
       level: "warning",
       action: "admin.action",

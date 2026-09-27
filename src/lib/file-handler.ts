@@ -39,6 +39,13 @@ const mimeTypes: { [key: string]: string } = {
 	txt: "text/plain",
 };
 
+/**
+ * Cache d'une capture publique. Une heure, et non un an : quand une capture
+ * devient privée, les caches partagés (Cloudflare) et les navigateurs
+ * doivent cesser de la servir rapidement.
+ */
+export const PUBLIC_IMAGE_CACHE = "public, max-age=3600";
+
 interface ServeFileOptions {
 	filePath: string;
 	filename: string;
@@ -54,7 +61,7 @@ export async function serveFile({
 	clientInfo,
 	fallbackPath,
 	enableLogging = false,
-	cacheControl = "public, max-age=31536000",
+	cacheControl = PUBLIC_IMAGE_CACHE,
 }: ServeFileOptions): Promise<Response> {
 	let fileStream;
 

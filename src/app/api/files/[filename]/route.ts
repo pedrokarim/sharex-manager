@@ -8,7 +8,14 @@ import {
   deleteDeletionToken,
 } from "@/lib/deletion-tokens";
 import { getAbsoluteUploadPath } from "@/lib/config";
-import { serveFile } from "@/lib/file-handler";
+import { PUBLIC_IMAGE_CACHE, serveFile } from "@/lib/file-handler";
+import { isFileSecure } from "@/lib/secure-files";
+import { basename } from "path";
+
+/** Nom de fichier seul : le paramètre est décodé, « %2F.. » y devient un chemin. */
+function safeName(value: string): string | null {
+  return value && value === basename(value) && !value.includes("\\") && !value.startsWith(".") ? value : null;
+}
 
 const UPLOADS_DIR = getAbsoluteUploadPath();
 
@@ -35,7 +42,9 @@ export async function DELETE(
       }
     }
 
-    const filePath = join(UPLOADS_DIR, resolvedParams.filename);
+    const name = safeName(resolvedParams.filename);
+    if (!name) return new Response("Fichier introuvable", { status: 404 });
+    const filePath = join(UPLOADS_DIR, name);
     await unlink(filePath);
 
     // Si le fichier a été supprimé avec succès, supprimer aussi le token
@@ -56,13 +65,22 @@ export async function GET(
 ) {
   const resolvedParams = await params;
 
-  // Sécurisation : on ne prend que le nom du fichier, sans chemin
-	const filename = resolvedParams.filename.replace(/[/\\]/g, "");
-	const filePath = join(UPLOADS_DIR, filename);
+  const filename = safeName(resolvedParams.filename);
+  if (!filename) return new Response("Fichier introuvable", { status: 404 });
+  const filePath = join(UPLOADS_DIR, filename);
 
-	return serveFile({
-		filePath,
-		filename,
-		enableLogging: false,
-	});
+  // Les captures sont publiques par défaut ; celles marquées privées ne se
+  // servent qu'à une session, comme sur le domaine d'images.
+  const secure = await isFileSecure(filename);
+  if (secure) {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) return new Response("Fichier introuvable", { status: 404 });
+  }
+
+  return serveFile({
+    filePath,
+    filename,
+    enableLogging: false,
+    cacheControl: secure ? "private, no-store" : PUBLIC_IMAGE_CACHE,
+  });
 }

@@ -5,6 +5,7 @@ import { createReadStream } from "fs";
 import { stat } from "fs/promises";
 import { basename } from "path";
 import { getAbsoluteUploadPath } from "@/lib/config";
+import { PUBLIC_IMAGE_CACHE } from "@/lib/file-handler";
 import { auth } from "@/lib/auth";
 import { isFileSecure } from "@/lib/secure-files";
 
@@ -61,7 +62,7 @@ export async function GET(
       headers: {
         "Content-Type": "image/jpeg",
         // Jamais en cache partagé pour un fichier sécurisé.
-        "Cache-Control": secure ? "private, no-store" : "public, max-age=31536000",
+        "Cache-Control": secure ? "private, no-store" : PUBLIC_IMAGE_CACHE,
       },
     });
   } catch (error) {

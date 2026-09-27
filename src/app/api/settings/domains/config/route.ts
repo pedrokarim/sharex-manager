@@ -3,6 +3,7 @@ import { resolve } from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { requireAccess } from "@/lib/api-guard";
 
 const CONFIG_PATH = resolve(process.cwd(), "config", "uploads.json");
 
@@ -37,6 +38,10 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  // Ces réglages construisent les liens renvoyés à ShareX : réservés aux
+  // admins. La route n'avait aucun contrôle et le proxy laisse tout passer.
+  const guard = await requireAccess("admin");
+  if (!guard.ok) return guard.response;
   try {
     const updates = await request.json();
     const config = await readConfig();
