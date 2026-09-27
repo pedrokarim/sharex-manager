@@ -1,6 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join, relative } from "path";
+import { fileURLToPath } from "url";
 
 /**
  * Le proxy laisse tout passer (voir proxy.ts) : chaque route se protège
@@ -34,7 +35,7 @@ function routeFiles(dir: string): string[] {
 }
 
 describe("contrôle d'accès des routes", () => {
-  const root = join(import.meta.dir, "..", "..");
+  const root = fileURLToPath(new URL("../..", import.meta.url));
   const files = routeFiles(join(root, "app")).map((file) => relative(root, file).split("\\").join("/"));
 
   test("chaque route a un contrôle d'accès ou est déclarée publique", () => {

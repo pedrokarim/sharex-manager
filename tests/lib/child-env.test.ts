@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "vitest";
 import { childEnv } from "@/lib/child-env";
 import { assertSandboxSetting, resolveSandbox } from "@/modules/ai-image-gen/lib/engines/sandbox";
 
