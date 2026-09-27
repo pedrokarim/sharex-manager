@@ -9,6 +9,7 @@ import {
   Copy,
   Download,
   Film,
+  ImageUp,
   MoreHorizontal,
   Plus,
   Trash2,
@@ -32,7 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatTimecode } from "../engine/timeline";
 import type { ClipExport } from "../engine/types";
-import { callModule, exportUrl, type ProjectSummary } from "../lib/client";
+import { callModule, exportUrl, sendExportToGallery, type ProjectSummary } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
 import { AssistantProgress, CreateDialog } from "../components/create-dialog";
 
@@ -340,6 +341,29 @@ function ExportCard({ entry, onChanged }: { entry: ClipExport; onChanged: () => 
         <ContextMenuItem asChild>
           <Link href={`/m/clip-studio/edit?id=${entry.projectId}`}>Ouvrir le projet</Link>
         </ContextMenuItem>
+        {entry.galleryFile ? (
+          <ContextMenuItem asChild>
+            <Link href="/gallery">
+              <ImageUp className="mr-2 h-4 w-4" />
+              Voir dans la galerie
+            </Link>
+          </ContextMenuItem>
+        ) : (
+          <ContextMenuItem
+            onClick={async () => {
+              try {
+                await sendExportToGallery(entry.id);
+                toast.success("Clip ajouté à la galerie");
+                onChanged();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Envoi impossible");
+              }
+            }}
+          >
+            <ImageUp className="mr-2 h-4 w-4" />
+            Envoyer dans la galerie
+          </ContextMenuItem>
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem
           variant="destructive"

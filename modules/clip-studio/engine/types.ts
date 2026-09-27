@@ -216,6 +216,8 @@ export interface ClipExport {
   durationMs: number;
   sizeBytes: number;
   createdAt: number;
+  /** Nom du fichier dans la galerie, une fois le clip envoyé. */
+  galleryFile?: string;
 }
 
 export interface ClipAsset {

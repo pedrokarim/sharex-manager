@@ -14,6 +14,7 @@ import { useTranslation } from "@/lib/i18n";
 import { UploadConfig } from "@/schemas/upload-config";
 import { UPLOAD_CONFIG_LIMITS } from "@/schemas/upload-config";
 import { UseFormReturn } from "react-hook-form";
+import { DEFAULT_MAX_VIDEO_MB } from "@/lib/media-kind";
 
 interface GeneralTabProps {
   form: UseFormReturn<UploadConfig>;
@@ -86,6 +87,23 @@ export function GeneralTab({ form }: GeneralTabProps) {
               </FormItem>
             )}
           />
+          <FormField
+            control={form.control}
+            name="allowedTypes.videos"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 p-4">
+                <FormLabel className="text-sm">
+                  {t("uploads.config.general.allowed_types.videos")}
+                </FormLabel>
+                <FormControl>
+                  <Switch
+                    checked={field.value ?? false}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
         </div>
       </section>
 
@@ -117,6 +135,29 @@ export function GeneralTab({ form }: GeneralTabProps) {
                     step={UPLOAD_CONFIG_LIMITS.maxFileSizeMb.step}
                     unit="MB"
                     ariaLabel={t("uploads.config.general.limits.max_file_size")}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="limits.maxVideoSize"
+            render={({ field }) => (
+              <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <FormLabel className="text-sm">
+                  {t("uploads.config.general.limits.max_video_size")}
+                </FormLabel>
+                <FormControl>
+                  <BoundedNumberControl
+                    value={field.value ?? DEFAULT_MAX_VIDEO_MB}
+                    onChange={field.onChange}
+                    min={UPLOAD_CONFIG_LIMITS.maxFileSizeMb.min}
+                    max={UPLOAD_CONFIG_LIMITS.maxFileSizeMb.max}
+                    step={UPLOAD_CONFIG_LIMITS.maxFileSizeMb.step}
+                    unit="MB"
+                    ariaLabel={t("uploads.config.general.limits.max_video_size")}
                   />
                 </FormControl>
               </FormItem>

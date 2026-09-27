@@ -2,6 +2,8 @@
 
 import { DragEvent, useState } from "react";
 import Image from "next/image";
+import { VideoThumbnail } from "@/components/gallery/video-thumbnail";
+import { isVideoFile } from "@/lib/media-kind";
 import { formatDistanceToNow } from "date-fns";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import {
@@ -150,6 +152,7 @@ export function FileCard({
   };
 
   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+  const isVideo = isVideoFile(file.name);
 
   /**
    * La vignette de la grille passe par /api/thumbnails (300 px, mis en cache un
@@ -241,6 +244,8 @@ export function FileCard({
                 <span className="text-2xl font-bold">IMG</span>
               </div>
             )
+          ) : isVideo && showThumbnails ? (
+            <VideoThumbnail name={file.name} durationMs={file.durationMs} />
           ) : (
             <div className="flex h-full items-center justify-center">
               <span className="text-2xl font-bold">

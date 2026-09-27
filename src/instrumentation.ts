@@ -30,6 +30,10 @@ export async function register() {
   // démarrage lance leurs préparatifs (téléchargement des voix de Clip
   // Studio…) sans attendre une visite. Sans bloquer : le serveur répond déjà.
   setTimeout(() => {
+    // ffmpeg sert aux couvertures des vidéos de la galerie.
+    import("@/lib/media/ffmpeg")
+      .then(({ prefetchFfmpeg }) => prefetchFfmpeg())
+      .catch((error) => console.error("[ffmpeg] échec du préchargement :", error));
     import("@/lib/modules/module-manager.api")
       .then(({ apiModuleManager }) => apiModuleManager.ensureInitialized())
       .catch((error) => console.error("[modules] échec du chargement au démarrage :", error));

@@ -4,6 +4,8 @@ import { getAbsoluteUploadPath } from "@/lib/config";
 import { getSecureFiles } from "@/lib/secure-files";
 import { getStarredFiles } from "@/lib/starred-files";
 import type { FileInfo } from "@/types/files";
+import { isVideoFile } from "@/lib/media-kind";
+import { videoMeta } from "@/lib/media/video";
 
 const UPLOADS_DIR = getAbsoluteUploadPath();
 
@@ -44,6 +46,7 @@ export async function getFileMetadata(
       createdAt: stats.mtime.toISOString(),
       isSecure: flags.secureFiles.has(safeFilename),
       isStarred: flags.starredFiles.has(safeFilename),
+      ...(isVideoFile(safeFilename) ? videoMeta(safeFilename) : undefined),
     };
   } catch (error) {
     if (

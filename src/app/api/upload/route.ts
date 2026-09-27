@@ -16,6 +16,7 @@ import { stat } from "fs/promises";
 import { join } from "path";
 import { getSecureFiles } from "@/lib/secure-files";
 import { getStarredFiles } from "@/lib/starred-files";
+import { isVideoFile, maxVideoMb } from "@/lib/media-kind";
 
 const API_KEYS_FILE = path.join(process.cwd(), "data/api-keys.json");
 
@@ -170,9 +171,15 @@ export async function POST(request: NextRequest) {
       );
     }
     const declared = Number(request.headers.get("content-length"));
-    const limits = (await getServerConfig()).limits;
+    const serverConfig = await getServerConfig();
+    const limits = serverConfig.limits;
+    // Le nom du fichier n'est connu qu'après lecture du corps : la limite
+    // vidéo ne compte ici que si les vidéos sont acceptées.
+    const maxMb = serverConfig.allowedTypes.videos
+      ? Math.max(limits.maxFileSize, maxVideoMb(limits))
+      : limits.maxFileSize;
     // Marge pour l'enveloppe multipart autour du fichier.
-    const maxBody = limits.maxFileSize * 1024 * 1024 + 1024 * 1024;
+    const maxBody = maxMb * 1024 * 1024 + 1024 * 1024;
     if (!Number.isFinite(declared) || declared <= 0) {
       return new Response(JSON.stringify({ error: "Taille de l'envoi non annoncée" }), {
         status: 411,
@@ -181,7 +188,7 @@ export async function POST(request: NextRequest) {
     }
     if (declared > maxBody) {
       return new Response(
-        JSON.stringify({ error: `La taille du fichier dépasse la limite de ${limits.maxFileSize}MB` }),
+        JSON.stringify({ error: `La taille du fichier dépasse la limite de ${maxMb}MB` }),
         { status: 413, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -222,6 +229,7 @@ export async function POST(request: NextRequest) {
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
     const isDocument = /\.(pdf|doc|docx|txt)$/i.test(file.name);
     const isArchive = /\.(zip|rar)$/i.test(file.name);
+    const isVideo = isVideoFile(file.name);
 
     if (isImage && !config.allowedTypes.images) {
       logDb.createLog({
@@ -280,7 +288,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!isImage && !isDocument && !isArchive) {
+    if (isVideo && !config.allowedTypes.videos) {
+      return new Response(
+        JSON.stringify({ error: "L'upload de vidéos n'est pas autorisé" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!isImage && !isDocument && !isArchive && !isVideo) {
       logDb.createLog({
         level: "warning",
         action: "api.request",
@@ -322,24 +337,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vérifier la taille maximale
-    if (file.size > config.limits.maxFileSize * 1024 * 1024) {
+    // Vérifier la taille maximale (les vidéos ont leur propre limite)
+    const maxFileMb = isVideo ? maxVideoMb(config.limits) : config.limits.maxFileSize;
+    if (file.size > maxFileMb * 1024 * 1024) {
       logDb.createLog({
         level: "warning",
         action: "api.request",
-        message: `Tentative d'upload d'un fichier trop grand (> ${config.limits.maxFileSize}MB)`,
+        message: `Tentative d'upload d'un fichier trop grand (> ${maxFileMb}MB)`,
         userId: validKey.id,
         metadata: {
           keyName: validKey.name,
           filename: file.name,
           fileSize: file.size,
           mimeType: file.type,
-          maxSize: config.limits.maxFileSize * 1024 * 1024,
+          maxSize: maxFileMb * 1024 * 1024,
         },
       });
       return new Response(
         JSON.stringify({
-          error: `La taille du fichier dépasse la limite de ${config.limits.maxFileSize}MB`,
+          error: `La taille du fichier dépasse la limite de ${maxFileMb}MB`,
         }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );

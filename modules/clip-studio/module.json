@@ -22,6 +22,7 @@
     "listExports": "user",
     "registerExport": "user",
     "deleteExport": "user",
+    "sendExportToGallery": "user",
     "startAssistant": "user",
     "getAssistantJob": "user",
     "listAssistantJobs": "user",

@@ -17,9 +17,13 @@ export interface UploadConfig {
     images: boolean;
     documents: boolean;
     archives: boolean;
+    /** Absent des anciennes configurations : les vidéos restent alors refusées. */
+    videos?: boolean;
   };
   limits: {
     maxFileSize: number;
+    /** Limite propre aux vidéos, en Mo (95 par défaut : Cloudflare refuse un envoi de plus de 100 Mo). */
+    maxVideoSize?: number;
     minFileSize: number;
     maxFilesPerUpload: number;
     maxFilesPerType: {

@@ -8,7 +8,11 @@
 
 import fs from "fs";
 import path from "path";
+import { randomBytes } from "crypto";
 import { ModuleHooks } from "@/types/modules";
+import { getAbsoluteUploadPath } from "@/lib/config";
+import { announceNewUpload } from "@/lib/gallery-events";
+import { prepareVideo } from "@/lib/media/video";
 import type { ClipAsset, ClipExport, ClipProject } from "./engine/types";
 import {
   ASSETS_DIR,
@@ -293,6 +297,35 @@ export async function deleteExport(id: string): Promise<{ success: boolean }> {
   if (entry) fs.rmSync(path.join(EXPORTS_DIR, entry.file), { force: true });
   writeExports(exports.filter((item) => item.id !== id));
   return { success: true };
+}
+
+/**
+ * Copie un clip exporté dans la galerie, comme une capture ShareX : public
+ * par défaut, avec sa couverture et sa durée. Un second envoi ne duplique
+ * pas le fichier tant que la copie existe.
+ */
+export async function sendExportToGallery(id: string): Promise<{ fileName: string }> {
+  assertId(id, "Identifiant d'export");
+  const exports = readExports();
+  const entry = exports.find((item) => item.id === id);
+  if (!entry) throw new Error("Export introuvable");
+  const source = path.join(EXPORTS_DIR, entry.file);
+  if (!fs.existsSync(source)) throw new Error("Fichier exporté introuvable");
+
+  const uploads = getAbsoluteUploadPath();
+  if (entry.galleryFile && fs.existsSync(path.join(uploads, entry.galleryFile))) {
+    return { fileName: entry.galleryFile };
+  }
+
+  const fileName = `${randomBytes(9).toString("base64url")}.mp4`;
+  fs.mkdirSync(uploads, { recursive: true });
+  fs.copyFileSync(source, path.join(uploads, fileName));
+  await prepareVideo(fileName);
+
+  entry.galleryFile = fileName;
+  writeExports(exports);
+  await announceNewUpload(fileName);
+  return { fileName };
 }
 
 // ─── Assistant IA ────────────────────────────────────────────────

@@ -5,9 +5,11 @@ export const defaultConfig: UploadConfig = {
 		images: true,
 		documents: false,
 		archives: false,
+		videos: false,
 	},
 	limits: {
 		maxFileSize: 10,
+		maxVideoSize: 95,
 		minFileSize: 1,
 		maxFilesPerUpload: 50,
 		maxFilesPerType: {

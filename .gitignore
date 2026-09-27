@@ -53,6 +53,8 @@ data/users.test.json
 data/*.db*
 # Sauvegardes opérationnelles créées avant une modification de la base en prod.
 /data/backups/
+# Binaires téléchargés au démarrage (ffmpeg pour les vidéos de la galerie).
+/data/tools/
 
 # Données runtime des modules : images générées, historiques et surtout
 # `secrets.json` (clés API). `module.json` reste versionné, lui, car c'est le

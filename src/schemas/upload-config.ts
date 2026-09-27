@@ -17,12 +17,19 @@ const uploadConfigBaseSchema = z
         images: z.boolean().optional().nullable(),
         documents: z.boolean().optional().nullable(),
         archives: z.boolean().optional().nullable(),
+        videos: z.boolean().optional().nullable(),
       })
       .optional()
       .nullable(),
     limits: z
       .object({
         maxFileSize: z
+          .number()
+          .min(UPLOAD_CONFIG_LIMITS.maxFileSizeMb.min)
+          .max(UPLOAD_CONFIG_LIMITS.maxFileSizeMb.max)
+          .optional()
+          .nullable(),
+        maxVideoSize: z
           .number()
           .min(UPLOAD_CONFIG_LIMITS.maxFileSizeMb.min)
           .max(UPLOAD_CONFIG_LIMITS.maxFileSizeMb.max)

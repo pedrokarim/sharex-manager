@@ -1,7 +1,9 @@
 import { join } from "path";
 import type { NextRequest } from "next/server";
 import { getAbsoluteUploadPath } from "@/lib/config";
-import { serveFile, getClientInfo } from "@/lib/file-handler";
+import { serveFile, getClientInfo, PUBLIC_IMAGE_CACHE } from "@/lib/file-handler";
+import { isVideoFile } from "@/lib/media-kind";
+import { serveMediaFile } from "@/lib/modules/media-response";
 import { logDb } from "@/lib/utils/db";
 import { existsSync } from "fs";
 import { headers } from "next/headers";
@@ -86,6 +88,14 @@ export async function GET(
       referer: request.headers.get("referer") || undefined,
     },
   });
+
+  // Une vidéo se lit par morceaux (Range) : le lecteur peut se déplacer
+  // sans tout télécharger.
+  if (fileExists && isVideoFile(filename)) {
+    return serveMediaFile(request, filePath, {
+      cacheControl: isSecure ? "private, no-store" : PUBLIC_IMAGE_CACHE,
+    });
+  }
 
   return serveFile({
     filePath,

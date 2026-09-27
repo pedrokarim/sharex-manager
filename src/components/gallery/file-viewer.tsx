@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
+import { isVideoFile } from "@/lib/media-kind";
 import { format, parseISO } from "date-fns";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import { cn } from "@/lib/utils";
@@ -260,18 +261,31 @@ function FileViewerBody({
                 )}
               >
                 <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-                  <Image
-                    src={file.url}
-                    alt={file.name}
-                    fill
-                    className="object-contain file-viewer-image"
-                    sizes={
-                      presentation === "fullscreen"
-                        ? "100vw"
-                        : "(max-width: 768px) 100vw, 80vw"
-                    }
-                    priority
-                  />
+                  {isVideoFile(file.name) ? (
+                    <video
+                      key={file.name}
+                      src={file.url}
+                      controls
+                      autoPlay
+                      playsInline
+                      preload="metadata"
+                      poster={`/api/thumbnails/${encodeURIComponent(file.name)}`}
+                      className="max-h-full max-w-full bg-black"
+                    />
+                  ) : (
+                    <Image
+                      src={file.url}
+                      alt={file.name}
+                      fill
+                      className="object-contain file-viewer-image"
+                      sizes={
+                        presentation === "fullscreen"
+                          ? "100vw"
+                          : "(max-width: 768px) 100vw, 80vw"
+                      }
+                      priority
+                    />
+                  )}
                 </div>
 
                 {hasPrevious ? (
@@ -302,14 +316,18 @@ function FileViewerBody({
                     d'outils : les modules agissent sur l'image, ils se placent
                     donc contre elle plutôt que de flotter dans un coin. Le
                     conteneur ne capte pas le pointeur, seuls ses contrôles le
-                    font, sinon il masquerait l'image sur toute sa largeur. */}
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-start">
-                  <ModuleActions
-                    file={file}
-                    onProcessComplete={handleProcessComplete}
-                    variant="overlay"
-                  />
-                </div>
+                    font, sinon il masquerait l'image sur toute sa largeur.
+                    Absent sur une vidéo : il recouvrirait les commandes du
+                    lecteur, et les modules d'image n'y ont rien à faire. */}
+                {!isVideoFile(file.name) && (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-start">
+                    <ModuleActions
+                      file={file}
+                      onProcessComplete={handleProcessComplete}
+                      variant="overlay"
+                    />
+                  </div>
+                )}
               </div>
 
               {showDetails ? (

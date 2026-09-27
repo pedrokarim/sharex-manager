@@ -8,6 +8,8 @@ import { getAbsoluteUploadPath } from "@/lib/config";
 import { PUBLIC_IMAGE_CACHE } from "@/lib/file-handler";
 import { auth } from "@/lib/auth";
 import { isFileSecure } from "@/lib/secure-files";
+import { isVideoFile } from "@/lib/media-kind";
+import { prepareVideo, videoCoverPath } from "@/lib/media/video";
 
 const UPLOADS_DIR = getAbsoluteUploadPath();
 const THUMBNAIL_SIZE = 300;
@@ -39,13 +41,21 @@ export async function GET(
       return new Response("Fichier non trouvé", { status: 404 });
     }
 
-    // Vérifier si c'est une image
-    if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(filename)) {
+    // Une vidéo a pour miniature sa couverture, extraite à l'envoi.
+    let sourcePath = filePath;
+    if (isVideoFile(filename)) {
+      // Vidéo arrivée avant ffmpeg : la couverture se fait à la première demande.
+      sourcePath = videoCoverPath(filename);
+      if (!(await stat(sourcePath).catch(() => null))) await prepareVideo(filename);
+      if (!(await stat(sourcePath).catch(() => null))) {
+        return new Response("Couverture indisponible", { status: 404 });
+      }
+    } else if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(filename)) {
       return new Response("Ce fichier n'est pas une image", { status: 400 });
     }
 
     // Créer un stream de l'image d'origine
-    const imageStream = createReadStream(filePath);
+    const imageStream = createReadStream(sourcePath);
 
     // Générer la miniature
     const transform = sharp()

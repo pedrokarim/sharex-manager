@@ -225,6 +225,11 @@ export async function fetchStudioImages(): Promise<BrowsableMedia[]> {
 
 // ─── Exports ─────────────────────────────────────────────────────
 
+/** Copie un clip exporté dans la galerie (sans doublon s'il y est déjà). */
+export function sendExportToGallery(id: string): Promise<{ fileName: string }> {
+  return callModule<{ fileName: string }>("sendExportToGallery", id);
+}
+
 export async function saveExport(
   project: ClipProject,
   blob: Blob,

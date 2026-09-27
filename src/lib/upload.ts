@@ -8,6 +8,8 @@ import { toZonedTime } from "date-fns-tz";
 import { getFileUrl } from "@/lib/utils/url";
 import { getAbsoluteUploadPath } from "@/lib/config";
 import { processImage } from "@/lib/modules/image-processor";
+import { isVideoFile, sniffVideo } from "@/lib/media-kind";
+import { prepareVideo } from "@/lib/media/video";
 
 export interface UploadResult {
   success: boolean;
@@ -222,6 +224,12 @@ export async function handleFileUpload(
 
     let buffer = Buffer.from(await file.arrayBuffer());
 
+    // Une vidéo doit en être une : l'extension seule ne prouve rien, et le
+    // fichier sera servi avec un type vidéo.
+    if (isVideoFile(file.name) && !sniffVideo(buffer.subarray(0, 16))) {
+      return { success: false, error: "Ce fichier n'est pas une vidéo MP4, MOV ou WebM" };
+    }
+
     // Appliquer les modules de traitement d'image si c'est une image
     if (/\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)) {
       try {
@@ -264,6 +272,9 @@ export async function handleFileUpload(
 
       thumbnailUrl = `/${config.storage.thumbnailsPath}/${thumbnailFileName}`;
     }
+
+    // Couverture et durée pour la galerie
+    if (isVideoFile(fileName)) await prepareVideo(fileName);
 
     // Générer un token de suppression
     const deletionToken = await generateDeletionToken();

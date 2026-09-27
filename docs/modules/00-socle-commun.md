@@ -298,6 +298,17 @@ premier module et à consigner ici.
 
 ### 3.3 Vidéo dans les uploads et la galerie
 
+> **État (27/09/2026).** Réalisé : type `videos` (désactivé par défaut) et
+> limite `limits.maxVideoSize` (95 Mo), contrôle par signature, couverture
+> et métadonnées, lecture avec `Range`, vignettes, visionneuse et envoi des
+> clips de Clip Studio dans la galerie. Écarts avec ce qui suit : `ffmpeg`
+> n’est pas dans l’image Docker, il est téléchargé au démarrage dans
+> `data/tools/` depuis une version épinglée de ffmpeg-static, vérifiée par
+> SHA-256 (`src/lib/media/ffmpeg.ts`) ; durée et dimensions sont lues dans
+> la sortie de `ffmpeg -i`, sans `ffprobe` ; le `.mkv` n’est pas accepté ;
+> pas encore d’aperçu animé au survol ; le catalogue public reste réservé
+> aux images.
+
 **Types et limites.**
 
 - Nouvelle catégorie `videos` dans `allowedTypes` (`mp4`, `webm`, `mov`,
@@ -355,9 +366,9 @@ premier module et à consigner ici.
 
 | Étape | Contenu | Livrable vérifiable |
 | --- | --- | --- |
-| V-1 | `ffmpeg` statique dans l’image, `runFfmpeg`, `probe` | Encodage de test dans le conteneur de production |
-| V-2 | Type `videos`, contrôle par signature, limites Nginx | Un enregistrement ShareX de 60 s arrive dans la galerie |
-| V-3 | Couvertures, métadonnées, `FileCard` et `FileViewer` vidéo | Lecture et déplacement dans une vidéo de la galerie |
+| V-1 | `ffmpeg` statique (téléchargé au démarrage), couverture et métadonnées | Réalisée |
+| V-2 | Type `videos`, contrôle par signature, limites Nginx | Réalisée |
+| V-3 | Couvertures, métadonnées, `FileCard` et `FileViewer` vidéo | Réalisée (sans aperçu animé au survol) |
 | V-4 | Upload direct vers un module | Envoi d’un fichier de 90 Mo sans pic de mémoire |
 
 ## 5. Critères d’acceptation transverses

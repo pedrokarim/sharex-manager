@@ -18,6 +18,7 @@ import { formatTimecode, projectDuration } from "../engine/timeline";
 import type { ClipExport, ClipProject } from "../engine/types";
 import { exportUrl, saveExport } from "../lib/client";
 import { ensureFonts } from "../lib/fonts";
+import { SendToGalleryButton } from "./gallery-button";
 
 type Stage =
   | { kind: "ready" }
@@ -217,6 +218,7 @@ export function ExportDialog({
               {stage.kind === "error" ? "Réessayer" : "Lancer l'export"}
             </Button>
           )}
+          {stage.kind === "done" && <SendToGalleryButton entry={stage.result} />}
           {stage.kind === "done" && (
             <Button asChild className="gap-2">
               <a href={exportUrl(stage.result.file)} download={`${project.name}.mp4`}>

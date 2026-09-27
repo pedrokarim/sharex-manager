@@ -11,6 +11,10 @@ import { getAbsoluteUploadPath } from "@/lib/config";
 import { PUBLIC_IMAGE_CACHE, serveFile } from "@/lib/file-handler";
 import { isFileSecure } from "@/lib/secure-files";
 import { basename } from "path";
+import { existsSync } from "fs";
+import { isVideoFile } from "@/lib/media-kind";
+import { forgetVideo } from "@/lib/media/video";
+import { serveMediaFile } from "@/lib/modules/media-response";
 
 /** Nom de fichier seul : le paramètre est décodé, « %2F.. » y devient un chemin. */
 function safeName(value: string): string | null {
@@ -46,6 +50,7 @@ export async function DELETE(
     if (!name) return new Response("Fichier introuvable", { status: 404 });
     const filePath = join(UPLOADS_DIR, name);
     await unlink(filePath);
+    await forgetVideo(name);
 
     // Si le fichier a été supprimé avec succès, supprimer aussi le token
     if (token) {
@@ -77,10 +82,15 @@ export async function GET(
     if (!session) return new Response("Fichier introuvable", { status: 404 });
   }
 
+  const cacheControl = secure ? "private, no-store" : PUBLIC_IMAGE_CACHE;
+  if (isVideoFile(filename) && existsSync(filePath)) {
+    return serveMediaFile(request, filePath, { cacheControl });
+  }
+
   return serveFile({
     filePath,
     filename,
     enableLogging: false,
-    cacheControl: secure ? "private, no-store" : PUBLIC_IMAGE_CACHE,
+    cacheControl,
   });
 }

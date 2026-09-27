@@ -9,6 +9,8 @@ import { setFileSecure, removeFileFromSecure } from "@/lib/secure-files";
 import { loadFileFlagSets, getFileMetadata } from "@/lib/file-metadata";
 import type { NextRequest } from "next/server";
 import { logger } from "@/lib/utils/logger";
+import { basename } from "path";
+import { forgetVideo } from "@/lib/media/video";
 
 const UPLOADS_DIR = getAbsoluteUploadPath();
 const PAGE_SIZE = 12; // Nombre d'images par page
@@ -200,7 +202,8 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const filename = searchParams.get("id");
 
-    if (!filename) {
+    // Un nom seul, jamais un chemin : « ../ » sortirait des uploads.
+    if (!filename || filename !== basename(filename) || filename.includes("\\") || filename.startsWith(".")) {
       return Response.json(
         { error: "Nom du fichier manquant" },
         { status: 400 }
@@ -212,6 +215,7 @@ export async function DELETE(req: NextRequest) {
     try {
       // Supprimer le fichier physiquement
       await unlink(filePath);
+      await forgetVideo(filename);
 
       // Retirer le fichier de la liste des fichiers sécurisés s'il y est
       await removeFileFromSecure(filename);

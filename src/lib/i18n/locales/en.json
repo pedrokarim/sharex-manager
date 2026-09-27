@@ -1034,12 +1034,14 @@
           "description": "Define which file types can be uploaded",
           "images": "Images (jpg, png, gif, webp)",
           "documents": "Documents (pdf, doc, txt)",
-          "archives": "Archives (zip, rar)"
+          "archives": "Archives (zip, rar)",
+          "videos": "Videos (mp4, webm, mov)"
         },
         "limits": {
           "title": "Limits",
           "description": "Configure upload limits",
           "max_file_size": "Maximum file size (MB)",
+          "max_video_size": "Maximum video size (MB)",
           "min_file_size": "Minimum file size (KB)",
           "max_files_per_upload": "Maximum files per upload",
           "max_images": "Images",

@@ -20,6 +20,8 @@ import {
 import { format, parseISO } from "date-fns";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import Image from "next/image";
+import { VideoThumbnail } from "@/components/gallery/video-thumbnail";
+import { isVideoFile } from "@/lib/media-kind";
 import { cn } from "@/lib/utils";
 import { getGalleryImageUrl } from "@/lib/utils/url";
 
@@ -183,6 +185,8 @@ export function SelectableListItemCard({
                   onDragStart={preventNativeImageDrag}
                   className="object-cover w-full h-full"
                 />
+              ) : isVideoFile(file.name) ? (
+                <VideoThumbnail name={file.name} showBadge={false} sizes="48px" />
               ) : (
                 <span className="text-xs font-bold text-muted-foreground">
                   {file.name.split(".").pop()?.toUpperCase()}
