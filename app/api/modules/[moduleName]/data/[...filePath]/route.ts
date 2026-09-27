@@ -56,5 +56,13 @@ export async function GET(
   if (!fs.statSync(resolved).isFile()) {
     return NextResponse.json({ error: "Fichier non trouvé" }, { status: 404 });
   }
+
+  // Le chemin réel compte, pas le chemin demandé : un lien symbolique posé
+  // dans les données (archive téléchargée, fichier écrit par un module) ne
+  // doit pas faire servir un fichier du système.
+  const realData = fs.realpathSync(dataDir);
+  if (!fs.realpathSync(resolved).startsWith(realData + path.sep)) {
+    return NextResponse.json({ error: "Accès interdit" }, { status: 403 });
+  }
   return serveMediaFile(request, resolved);
 }

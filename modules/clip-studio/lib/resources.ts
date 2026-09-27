@@ -8,6 +8,7 @@
  * utilisation pour le reste. Un redéploiement ne les retélécharge pas.
  */
 
+import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 import { Readable } from "stream";
@@ -30,6 +31,12 @@ export interface ResourceSpec {
   size?: number;
   /** Taille au-delà de laquelle le téléchargement est interrompu (par défaut : 2 × `size`, sinon 200 Mo). */
   maxBytes?: number;
+  /**
+   * Empreinte SHA-256 attendue. Obligatoire pour ce qui est exécuté ou chargé
+   * par un programme (moteur, voix) : une source compromise ne doit pas
+   * pouvoir glisser autre chose.
+   */
+  sha256?: string;
 }
 
 export interface ResourceState {
@@ -100,8 +107,10 @@ async function download(spec: ResourceSpec): Promise<string> {
     const limit = spec.maxBytes ?? (spec.size ? spec.size * 2 : 200 * 1024 * 1024);
     if (state.total > limit) throw new Error("Fichier plus lourd que prévu, téléchargement refusé");
 
+    const hash = createHash("sha256");
     const counter = new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {
+        hash.update(chunk);
         state.received += chunk.byteLength;
         if (state.received > limit) {
           controller.error(new Error("Fichier plus lourd que prévu, téléchargement interrompu"));
@@ -113,6 +122,11 @@ async function download(spec: ResourceSpec): Promise<string> {
     const archivePath = spec.archive ? `${temporary}.${spec.archive === "zip" ? "zip" : "tar.gz"}` : temporary;
     await pipeline(Readable.fromWeb(response.body.pipeThrough(counter) as any), fs.createWriteStream(archivePath));
 
+    const digest = hash.digest("hex");
+    if (spec.sha256 && digest !== spec.sha256.toLowerCase()) {
+      throw new Error("Empreinte inattendue : le fichier téléchargé n'est pas celui prévu, il est écarté");
+    }
+
     if (spec.archive) {
       fs.mkdirSync(temporary, { recursive: true });
       // `tar` sait lire les deux formats (bsdtar sous Windows, GNU tar sous Linux pour .tar.gz).
@@ -123,7 +137,11 @@ async function download(spec: ResourceSpec): Promise<string> {
         process.platform === "win32"
           ? path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe")
           : "tar";
-      await run(tar, args);
+      await run(tar, process.platform === "win32" ? args : ["--no-same-owner", "--no-same-permissions", ...args]);
+      // Un lien symbolique qui sortirait du dossier extrait pourrait faire
+      // servir ou charger un fichier du système : seuls les liens internes
+      // (bibliothèques `.so` versionnées) sont admis.
+      assertContained(temporary);
       fs.rmSync(archivePath, { force: true });
     }
 
@@ -140,6 +158,27 @@ async function download(spec: ResourceSpec): Promise<string> {
     state.error = error instanceof Error ? error.message : "Téléchargement impossible";
     throw new Error(`${spec.label} : ${state.error}`);
   }
+}
+
+function assertContained(root: string) {
+  const realRoot = fs.realpathSync(root);
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) {
+        let target: string;
+        try {
+          target = fs.realpathSync(full);
+        } catch {
+          throw new Error(`Lien symbolique cassé dans l'archive : ${entry.name}`);
+        }
+        if (!target.startsWith(realRoot + path.sep)) throw new Error(`Lien symbolique hors de l'archive : ${entry.name}`);
+      } else if (entry.isDirectory()) {
+        walk(full);
+      }
+    }
+  };
+  walk(root);
 }
 
 function run(command: string, args: string[]): Promise<void> {
