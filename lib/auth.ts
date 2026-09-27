@@ -66,6 +66,14 @@ export const auth = betterAuth({
       verify: ({ hash, password }) => bcrypt.compare(password, hash),
     },
   },
+  account: {
+    accountLinking: {
+      // Pas de rattachement automatique : une connexion Ascencia ID dont
+      // l'e-mail correspond à un compte existant ne doit pas en prendre le
+      // contrôle. Les comptes déjà rattachés ne changent pas.
+      disableImplicitLinking: true,
+    },
+  },
   user: {
     additionalFields: {
       role: {
