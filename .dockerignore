@@ -66,3 +66,6 @@ LICENSE
 # Typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Rapports d’audit de sécurité, locaux uniquement.
+.audits

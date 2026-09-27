@@ -78,3 +78,7 @@ tweakcn
 
 # Explorations design locales (non versionnées)
 /.design/
+
+# Rapports d’audit de sécurité : ils décrivent des failles parfois pas encore
+# corrigées, ils restent sur le poste et ne partent jamais dans le dépôt public.
+/.audits/
