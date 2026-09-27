@@ -37,7 +37,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatTimecode, projectDuration } from "../engine/timeline";
-import type { AnimKind, ClipItem, ClipProject, Motion, Track } from "../engine/types";
+import type { AnimKind, ClipItem, ClipProject, Motion, Track, TransitionKind } from "../engine/types";
 
 export const MEDIA_DRAG_TYPE = "application/x-clip-media";
 
@@ -59,6 +59,19 @@ export const ANIM_LABELS: Record<AnimKind, string> = {
   typewriter: "Machine à écrire",
   wipe: "Balayage",
 };
+
+/** « none » retire la transition : le plan arrive en coupe franche. */
+export const TRANSITION_LABELS: Record<TransitionKind | "none", string> = {
+  none: "Coupe franche",
+  fade: "Fondu enchaîné",
+  "fade-black": "Fondu au noir",
+  slide: "Glissement",
+  wipe: "Balayage",
+  zoom: "Zoom",
+};
+
+/** Durée par défaut d'une transition, en secondes. */
+export const DEFAULT_TRANSITION_SECONDS = 0.6;
 
 export const MOTION_LABELS: Record<Motion, string> = {
   none: "Fixe",
@@ -111,6 +124,26 @@ export function Timeline(props: TimelineProps) {
     userZoomed.current = true;
     setPpfState(value);
   };
+
+  // + et - zooment la timeline, hors des champs de saisie.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        userZoomed.current = true;
+        setPpfState((value) => Math.min(20, value * 1.4));
+      } else if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        userZoomed.current = true;
+        setPpfState((value) => Math.max(0.3, value / 1.4));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const duration = projectDuration(project);
   const contentFrames = duration + project.fps * 6;
@@ -282,7 +315,7 @@ export function Timeline(props: TimelineProps) {
           <Trash2 className="h-4 w-4" />
         </ToolButton>
         <div className="ml-auto flex items-center gap-1">
-          <ToolButton label="Dézoomer" onClick={() => setPpf((value) => Math.max(0.3, value / 1.4))}>
+          <ToolButton label="Dézoomer (-)" onClick={() => setPpf((value) => Math.max(0.3, value / 1.4))}>
             <Minus className="h-4 w-4" />
           </ToolButton>
           <input
@@ -294,7 +327,7 @@ export function Timeline(props: TimelineProps) {
             className="w-28 accent-primary"
             aria-label="Zoom de la timeline"
           />
-          <ToolButton label="Zoomer" onClick={() => setPpf((value) => Math.min(20, value * 1.4))}>
+          <ToolButton label="Zoomer (+)" onClick={() => setPpf((value) => Math.min(20, value * 1.4))}>
             <Plus className="h-4 w-4" />
           </ToolButton>
           <Button
@@ -567,6 +600,15 @@ function TimelineItem({
               style={{ backgroundImage: `url("${thumbnail}")`, backgroundSize: "auto 100%", backgroundRepeat: "repeat-x" }}
             />
           )}
+          {item.type !== "audio" && item.transition && (
+            // Étendue de la transition d'entrée, au début du plan.
+            <span
+              aria-hidden
+              title={TRANSITION_LABELS[item.transition.kind]}
+              className="absolute inset-y-0 left-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.28),transparent)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.22),transparent)]"
+              style={{ width: Math.min(width, item.transition.frames * ppf) }}
+            />
+          )}
           <Icon className="relative h-3.5 w-3.5 shrink-0" />
           <span className="relative truncate font-medium">{itemLabel(item)}</span>
           {!track.locked && (
@@ -591,6 +633,27 @@ function TimelineItem({
             <ContextMenuSeparator />
             <AnimSubmenu label="Animation d'entrée" value={item.animIn.kind} onPick={(kind) => props.onItemPatch(item.id, { animIn: { ...item.animIn, kind } } as Partial<ClipItem>)} />
             <AnimSubmenu label="Animation de sortie" value={item.animOut.kind} onPick={(kind) => props.onItemPatch(item.id, { animOut: { ...item.animOut, kind } } as Partial<ClipItem>)} />
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>Transition d&apos;entrée</ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-56">
+                {(Object.keys(TRANSITION_LABELS) as (TransitionKind | "none")[]).map((kind) => (
+                  <ContextMenuItem
+                    key={kind}
+                    onClick={() =>
+                      props.onItemPatch(item.id, {
+                        transition:
+                          kind === "none"
+                            ? undefined
+                            : { kind, frames: item.transition?.frames ?? Math.round(DEFAULT_TRANSITION_SECONDS * props.project.fps) },
+                      } as Partial<ClipItem>)
+                    }
+                  >
+                    <span className="flex-1">{TRANSITION_LABELS[kind]}</span>
+                    {(item.transition?.kind ?? "none") === kind && <span className="text-primary">•</span>}
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
           </>
         )}
         {item.type === "image" && (

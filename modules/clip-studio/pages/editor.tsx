@@ -289,6 +289,18 @@ function Editor({ initial }: { initial: ClipProject }) {
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
         seek(current + (event.shiftKey ? fps : 1));
+      } else if (!ctrl && event.key.toLowerCase() === "k") {
+        // J, K, L : recul, pause, lecture, comme dans les monteurs vidéo.
+        playerRef.current?.pause();
+      } else if (!ctrl && event.key.toLowerCase() === "l") {
+        if (!playerRef.current?.playing) togglePlay();
+      } else if (!ctrl && event.key.toLowerCase() === "j") {
+        // La lecture à l'envers n'existe pas : chaque appui recule d'une
+        // seconde (cinq avec Maj), lecture arrêtée.
+        playerRef.current?.pause();
+        seek(current - (event.shiftKey ? 5 : 1) * fps);
+      } else if (!ctrl && event.key.toLowerCase() === "m") {
+        setPanel((open) => (open === "media" ? null : "media"));
       } else if (event.key === "Home") {
         seek(0);
       } else if (event.key === "End") {
@@ -360,7 +372,7 @@ function Editor({ initial }: { initial: ClipProject }) {
       {/* ─── Espace de travail ──────────────────────────────────── */}
       <div className="flex min-h-0 flex-1">
         <nav className="flex w-14 shrink-0 flex-col items-center gap-1 border-r py-2" aria-label="Panneaux">
-          <RailButton label="Médias" active={panel === "media"} onClick={() => setPanel(panel === "media" ? null : "media")}>
+          <RailButton label="Médias" shortcut="M" active={panel === "media"} onClick={() => setPanel(panel === "media" ? null : "media")}>
             <FolderOpen className="h-5 w-5" />
           </RailButton>
           <RailButton label="Texte" active={panel === "text"} onClick={() => setPanel(panel === "text" ? null : "text")}>
@@ -521,11 +533,14 @@ function IconButton({
 
 function RailButton({
   label,
+  shortcut,
   active,
   onClick,
   children,
 }: {
   label: string;
+  /** Touche qui ouvre le panneau, rappelée au survol. */
+  shortcut?: string;
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
@@ -535,6 +550,8 @@ function RailButton({
       type="button"
       onClick={onClick}
       aria-pressed={active}
+      title={shortcut ? `${label} (${shortcut})` : undefined}
+      aria-keyshortcuts={shortcut}
       className={cn(
         "relative flex w-12 flex-col items-center gap-0.5 rounded-lg py-2 text-[10px] transition-colors",
         active ? "text-foreground" : "text-muted-foreground hover:text-foreground"

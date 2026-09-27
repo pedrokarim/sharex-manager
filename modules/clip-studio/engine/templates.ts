@@ -8,7 +8,10 @@
 
 import {
   TEXT_PRESETS,
+  appendSequence,
+  createImageItem,
   createProject,
+  createVideoItem,
   createTextItem,
   uid,
 } from "./edit";
@@ -22,6 +25,7 @@ import type {
   TextItem,
   TextStyle,
   Track,
+  VideoItem,
 } from "./types";
 
 export type TemplateId = "free" | "quiz" | "top" | "slideshow" | "before-after";
@@ -657,6 +661,47 @@ export function buildBeforeAfter(
     b.add("Textes", text(b, data.outro, cursor, outro, { preset: "impact", y: 0.46, height: 0.24, style: { size: vertical ? 0.06 : 0.09 } }));
   }
   return b.build();
+}
+
+// ─── Recettes d'une sélection de la galerie ──────────────────────
+
+/**
+ * - Diaporama : 3 s par image, mouvement de caméra lent alterné, fondus
+ *   enchaînés de 0,6 s ;
+ * - Rythmé : 1,2 s par image, coupes franches, zooms courts.
+ * Une vidéo garde sa durée en diaporama et se limite à 2,4 s en rythmé.
+ */
+export type SequenceRecipe = "slideshow" | "rhythm";
+
+const SLOW_MOTIONS = ["zoom-in", "pan-right", "zoom-out", "pan-left"] as const;
+const PUNCHY_MOTIONS = ["zoom-in", "zoom-out"] as const;
+
+export function buildSequence(name: string, aspect: AspectPreset, sources: MediaSource[], recipe: SequenceRecipe): ClipProject {
+  const project = createProject(name, aspect);
+  const fps = project.fps;
+  const rhythm = recipe === "rhythm";
+  let start = 0;
+  const items = sources.map((source, index) => {
+    let item: ImageItem | VideoItem;
+    if (source.kind === "video") {
+      item = createVideoItem(source, start, fps);
+      if (rhythm) item.duration = Math.min(item.duration, Math.round(2.4 * fps));
+    } else {
+      item = createImageItem(source, start, fps);
+      item.duration = Math.round((rhythm ? 1.2 : 3) * fps);
+      item.motion = rhythm ? PUNCHY_MOTIONS[index % PUNCHY_MOTIONS.length] : SLOW_MOTIONS[index % SLOW_MOTIONS.length];
+    }
+    if (rhythm) {
+      item.animIn = { kind: "none", frames: 1 };
+    } else if (index > 0) {
+      // Le fondu enchaîné remplace l'apparition : le plan précédent reste dessous.
+      item.animIn = { kind: "none", frames: 1 };
+      item.transition = { kind: "fade", frames: Math.round(0.6 * fps) };
+    }
+    start += item.duration;
+    return item;
+  });
+  return appendSequence(project, items);
 }
 
 // ─── Exemples, pour un modèle rempli à la main ───────────────────

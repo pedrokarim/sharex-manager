@@ -503,7 +503,11 @@ export function splitItem(project: ClipProject, itemId: string, frame: number): 
       : {}),
   } as ClipItem;
   if ("animOut" in left) (left as VisualItem).animOut = { kind: "none", frames: 10 };
-  if ("animIn" in right) (right as VisualItem).animIn = { kind: "none", frames: 10 };
+  if ("animIn" in right) {
+    // La coupe est franche : la seconde moitié n'hérite pas de la transition.
+    (right as VisualItem).animIn = { kind: "none", frames: 10 };
+    delete (right as VisualItem).transition;
+  }
 
   return mapTrack(project, found.track.id, (track) => ({
     ...track,

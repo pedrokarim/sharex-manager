@@ -19,6 +19,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -37,6 +45,7 @@ import type { ClipExport } from "../engine/types";
 import { callModule, exportUrl, sendExportToGallery, type ProjectSummary } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
 import { AssistantProgress, CreateDialog } from "../components/create-dialog";
+import { SendToGalleryButton } from "../components/gallery-button";
 
 /** Données gardées entre deux visites : le retour à la liste est instantané. */
 let snapshot: { projects: ProjectSummary[]; exports: ClipExport[] } | null = null;
@@ -315,74 +324,108 @@ function ProjectCard({ project, onChanged }: { project: ProjectSummary; onChange
 
 function ExportCard({ entry, onChanged }: { entry: ClipExport; onChanged: () => void }) {
   const url = exportUrl(entry.file);
+  const [open, setOpen] = useState(false);
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div className="flex flex-col gap-1.5">
-          <video
-            src={url}
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            onMouseEnter={(event) => void event.currentTarget.play().catch(() => undefined)}
-            onMouseLeave={(event) => {
-              event.currentTarget.pause();
-              event.currentTarget.currentTime = 0;
-            }}
-            className="aspect-video w-full rounded-lg bg-black object-contain"
-          />
-          <p className="truncate px-0.5 text-xs font-medium">{entry.projectName}</p>
-          <p className="px-0.5 text-[11px] text-muted-foreground tabular-nums">
-            {Math.round(entry.durationMs / 1000)} s · {(entry.sizeBytes / 1024 / 1024).toFixed(1)} Mo
-          </p>
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent className="w-48">
-        <ContextMenuItem asChild>
-          <a href={url} download={`${entry.projectName}.mp4`}>
-            <Download className="mr-2 h-4 w-4" />
-            Télécharger
-          </a>
-        </ContextMenuItem>
-        <ContextMenuItem asChild>
-          <Link href={`/m/clip-studio/edit?id=${entry.projectId}`}>Ouvrir le projet</Link>
-        </ContextMenuItem>
-        {entry.galleryFile ? (
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label={`Lire ${entry.projectName}`}
+            className="flex flex-col gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <video
+              src={url}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              onMouseEnter={(event) => void event.currentTarget.play().catch(() => undefined)}
+              onMouseLeave={(event) => {
+                event.currentTarget.pause();
+                event.currentTarget.currentTime = 0;
+              }}
+              className="aspect-video w-full rounded-lg bg-black object-contain"
+            />
+            <p className="truncate px-0.5 text-xs font-medium">{entry.projectName}</p>
+            <p className="px-0.5 text-[11px] text-muted-foreground tabular-nums">
+              {Math.round(entry.durationMs / 1000)} s · {(entry.sizeBytes / 1024 / 1024).toFixed(1)} Mo
+            </p>
+          </button>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-48">
           <ContextMenuItem asChild>
-            <Link href="/gallery">
-              <ImageUp className="mr-2 h-4 w-4" />
-              Voir dans la galerie
-            </Link>
+            <a href={url} download={`${entry.projectName}.mp4`}>
+              <Download className="mr-2 h-4 w-4" />
+              Télécharger
+            </a>
           </ContextMenuItem>
-        ) : (
+          <ContextMenuItem asChild>
+            <Link href={`/m/clip-studio/edit?id=${entry.projectId}`}>Ouvrir le projet</Link>
+          </ContextMenuItem>
+          {entry.galleryFile ? (
+            <ContextMenuItem asChild>
+              <Link href="/gallery">
+                <ImageUp className="mr-2 h-4 w-4" />
+                Voir dans la galerie
+              </Link>
+            </ContextMenuItem>
+          ) : (
+            <ContextMenuItem
+              onClick={async () => {
+                try {
+                  await sendExportToGallery(entry.id);
+                  toast.success("Clip ajouté à la galerie");
+                  onChanged();
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "Envoi impossible");
+                }
+              }}
+            >
+              <ImageUp className="mr-2 h-4 w-4" />
+              Envoyer dans la galerie
+            </ContextMenuItem>
+          )}
+          <ContextMenuSeparator />
           <ContextMenuItem
+            variant="destructive"
             onClick={async () => {
-              try {
-                await sendExportToGallery(entry.id);
-                toast.success("Clip ajouté à la galerie");
-                onChanged();
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Envoi impossible");
-              }
+              await callModule("deleteExport", entry.id);
+              onChanged();
             }}
           >
-            <ImageUp className="mr-2 h-4 w-4" />
-            Envoyer dans la galerie
+            <Trash2 className="mr-2 h-4 w-4" />
+            Supprimer l&apos;export
           </ContextMenuItem>
-        )}
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          variant="destructive"
-          onClick={async () => {
-            await callModule("deleteExport", entry.id);
-            onChanged();
-          }}
-        >
-          <Trash2 className="mr-2 h-4 w-4" />
-          Supprimer l&apos;export
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+        </ContextMenuContent>
+      </ContextMenu>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="truncate">{entry.projectName}</DialogTitle>
+            <DialogDescription>
+              {Math.round(entry.durationMs / 1000)} s · {entry.width}×{entry.height} · {(entry.sizeBytes / 1024 / 1024).toFixed(1)} Mo
+            </DialogDescription>
+          </DialogHeader>
+          <video src={url} controls autoPlay playsInline className="max-h-[65vh] w-full rounded-lg bg-black" />
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button asChild variant="ghost">
+              <Link href={`/m/clip-studio/edit?id=${entry.projectId}`}>Ouvrir le projet</Link>
+            </Button>
+            <div className="flex flex-wrap gap-2">
+              <SendToGalleryButton entry={entry} onSent={onChanged} />
+              <Button asChild className="gap-2">
+                <a href={url} download={`${entry.projectName}.mp4`}>
+                  <Download className="h-4 w-4" />
+                  Télécharger
+                </a>
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

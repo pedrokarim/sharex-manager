@@ -15,6 +15,7 @@ import {
   SquareSplitHorizontal,
   Trophy,
   X,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { appendSequence, createImageItem, createProject } from "../engine/edit";
+import { createProject } from "../engine/edit";
+import { isVideoFile, mediaCountLabel } from "@/lib/media-kind";
 import {
   SAMPLE_BEFORE_AFTER,
   SAMPLE_FREE,
@@ -39,9 +41,10 @@ import {
   SAMPLE_TOP,
   buildBeforeAfter,
   buildFromTemplate,
+  buildSequence,
   type TemplateId,
 } from "../engine/templates";
-import { ASPECTS, type AspectPreset, type Motion } from "../engine/types";
+import { ASPECTS, type AspectPreset, type MediaSource } from "../engine/types";
 import { callModule, probeMedia } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
 import { useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
@@ -83,7 +86,7 @@ const COUNT_LABELS: Partial<Record<TemplateId, string>> = {
 };
 
 /** Montage d'une sélection de la galerie. */
-type Recipe = "slideshow" | "before-after";
+type Recipe = "slideshow" | "rhythm" | "before-after";
 
 const IDEAS = [
   "L’histoire de la tour Eiffel en quelques étapes",
@@ -95,7 +98,6 @@ const IDEAS = [
   "Un quiz sur les records du monde animal",
 ];
 
-const MOTIONS: Motion[] = ["zoom-in", "pan-right", "zoom-out", "pan-left"];
 
 export function CreateDialog({
   request,
@@ -156,24 +158,18 @@ export function CreateDialog({
         project = buildFromTemplate(template, title, aspect, SAMPLES[template]);
       } else if (request.files.length && recipe === "before-after") {
         // Images prises deux par deux, dans l'ordre de la sélection.
-        const sources = await Promise.all(request.files.map((file) => gallerySource(file)));
+        const sources = await Promise.all(request.files.filter((file) => !isVideoFile(file)).map((file) => gallerySource(file)));
         const pairs = [];
         for (let index = 0; index + 1 < sources.length; index += 2) {
           pairs.push({ before: sources[index], after: sources[index + 1] });
         }
         project = buildBeforeAfter(title, aspect, { pairs });
       } else {
-        project = createProject(title, aspect);
         if (request.files.length) {
           const sources = await Promise.all(request.files.map((file) => gallerySource(file)));
-          let start = 0;
-          const items = sources.map((source, index) => {
-            const item = createImageItem(source, start, project!.fps);
-            item.motion = MOTIONS[index % MOTIONS.length];
-            start += item.duration;
-            return item;
-          });
-          project = appendSequence(project, items);
+          project = buildSequence(title, aspect, sources, recipe === "rhythm" ? "rhythm" : "slideshow");
+        } else {
+          project = createProject(title, aspect);
         }
       }
       await callModule("saveProject", project);
@@ -214,7 +210,7 @@ export function CreateDialog({
           <DialogTitle>Nouveau clip</DialogTitle>
           <DialogDescription>
             {fromGallery
-              ? `${request!.files.length} image(s) de la galerie, à monter en diaporama ou en avant / après.`
+              ? `${mediaCountLabel(request!.files)} de la galerie, à monter en diaporama, en clip rythmé ou en avant / après.`
               : "Laissez l'assistant monter un short, partez d'un modèle, ou commencez à vide."}
           </DialogDescription>
         </DialogHeader>
@@ -348,9 +344,9 @@ export function CreateDialog({
                     onChange={(next) => {
                       setRecipe(next);
                       const date = new Date().toLocaleDateString("fr-FR");
-                      setName(next === "before-after" ? `Avant / Après du ${date}` : `Diaporama du ${date}`);
+                      setName(`${next === "before-after" ? "Avant / Après" : next === "rhythm" ? "Clip rythmé" : "Diaporama"} du ${date}`);
                     }}
-                    count={request!.files.length}
+                    files={request!.files}
                   />
                 )}
               </motion.div>
@@ -378,7 +374,7 @@ export function CreateDialog({
               ) : (
                 <Button
                   onClick={createBlankOrTemplate}
-                  disabled={busy || (fromGallery && recipe === "before-after" && request!.files.length < 2)}
+                  disabled={busy || (fromGallery && recipe === "before-after" && request!.files.filter((file) => !isVideoFile(file)).length < 2)}
                   className="gap-2"
                 >
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -393,17 +389,21 @@ export function CreateDialog({
   );
 }
 
-/** Image de la galerie, prête à poser sur la timeline. */
-async function gallerySource(file: string) {
+/** Image ou vidéo de la galerie, prête à poser sur la timeline. */
+async function gallerySource(file: string): Promise<MediaSource> {
   const url = `/api/files/${encodeURIComponent(file)}`;
-  const probe = await probeMedia(url, "image");
-  return { url, ref: `upload:${file}`, name: file, kind: "image" as const, ...probe };
+  const kind = isVideoFile(file) ? "video" : "image";
+  const probe = await probeMedia(url, kind);
+  return { url, ref: `upload:${file}`, name: file, kind, ...probe };
 }
 
-function RecipePicker({ value, onChange, count }: { value: Recipe; onChange: (value: Recipe) => void; count: number }) {
+function RecipePicker({ value, onChange, files }: { value: Recipe; onChange: (value: Recipe) => void; files: string[] }) {
+  // Seules les images vont par paires ; une vidéo n'a pas de sens en avant / après.
+  const count = files.filter((file) => !isVideoFile(file)).length;
   const pairs = Math.floor(count / 2);
   const options: { id: Recipe; label: string; description: string; icon: typeof Plus }[] = [
-    { id: "slideshow", label: "Diaporama", description: "Les images à la suite, avec un mouvement de caméra lent", icon: Images },
+    { id: "slideshow", label: "Diaporama", description: "3 s par image, mouvement de caméra lent, fondus enchaînés", icon: Images },
+    { id: "rhythm", label: "Rythmé", description: "1,2 s par image, coupes franches et zooms courts", icon: Zap },
     {
       id: "before-after",
       label: "Avant / Après",
@@ -415,7 +415,7 @@ function RecipePicker({ value, onChange, count }: { value: Recipe; onChange: (va
     },
   ];
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
+    <div className="grid gap-2 sm:grid-cols-3">
       {options.map((entry) => {
         const Icon = entry.icon;
         const selected = entry.id === value;

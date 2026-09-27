@@ -7,13 +7,14 @@
  * même quand une vidéo peine à suivre.
  */
 
-import { drawFrame, type VisualResolver } from "./render";
-import { isActive, projectDuration, sourceTimeAt } from "./timeline";
+import { drawFrame, heldFrameOf, type VisualResolver } from "./render";
+import { isActive, projectDuration, sourceTimeAt, transitionAt } from "./timeline";
 import {
   hasAudio,
   type AudioItem,
   type ClipProject,
   type VideoItem,
+  type VisualItem,
 } from "./types";
 
 // ─── Médias chargés ──────────────────────────────────────────────
@@ -226,9 +227,22 @@ export class PreviewPlayer {
   private syncVideos(project: ClipProject) {
     for (const track of project.tracks) {
       if (track.kind !== "visual") continue;
+      // Vidéos qui s'en vont pendant une transition : figées sur leur fin.
+      const held = new Set<string>();
+      for (const item of track.items as VisualItem[]) {
+        if (!isActive(item, this.frame)) continue;
+        const from = transitionAt(track.items as VisualItem[], item, this.frame)?.from;
+        if (from?.type === "video") held.add(from.id);
+      }
       for (const item of track.items) {
         if (item.type !== "video") continue;
         const video = this.library.video(item);
+        if (!track.hidden && held.has(item.id)) {
+          if (!video.paused) video.pause();
+          const end = sourceTimeAt(item, heldFrameOf(item), project.fps);
+          if (Math.abs(video.currentTime - end) > 0.5 / project.fps) video.currentTime = end;
+          continue;
+        }
         if (track.hidden || !isActive(item, this.frame)) {
           if (!video.paused) video.pause();
           continue;

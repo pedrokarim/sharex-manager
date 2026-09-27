@@ -10,6 +10,8 @@ import {
   animStateAt,
   cameraAt,
   isActive,
+  transitionAt,
+  type TransitionState,
 } from "./timeline";
 import type {
   ClipProject,
@@ -47,12 +49,79 @@ export function drawFrame(
   for (let index = project.tracks.length - 1; index >= 0; index--) {
     const track = project.tracks[index];
     if (track.kind !== "visual" || track.hidden) continue;
-    for (const item of track.items as VisualItem[]) {
+    const items = track.items as VisualItem[];
+    for (const item of items) {
       if (!isActive(item, frame)) continue;
-      drawItem(ctx, project, item, frame, resolve);
+      const transition = transitionAt(items, item, frame);
+      if (transition) drawTransition(ctx, project, item, transition, frame, resolve);
+      else drawItem(ctx, project, item, frame, resolve);
     }
   }
   ctx.restore();
+}
+
+/** Retouches qu'une transition applique au dessin d'un plan. */
+interface Blend {
+  opacity?: number;
+  dx?: number;
+  scale?: number;
+  wipe?: number;
+}
+
+/** Le plan qui s'en va : figé sur sa dernière image, sans son animation de sortie. */
+export function heldFrameOf(item: VisualItem): number {
+  return item.start + item.duration - 1;
+}
+
+function drawTransition(
+  ctx: Ctx,
+  project: ClipProject,
+  item: VisualItem,
+  { kind, progress: t, from }: TransitionState,
+  frame: number,
+  resolve: VisualResolver
+) {
+  const outgoing = from ? ({ ...from, animOut: { kind: "none", frames: 0 } } as VisualItem) : null;
+  const drawOutgoing = (blend?: Blend) => {
+    if (outgoing) drawItem(ctx, project, outgoing, heldFrameOf(outgoing), resolve, blend);
+  };
+  const veil = (alpha: number) => {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, project.width, project.height);
+    ctx.restore();
+  };
+
+  switch (kind) {
+    case "fade-black":
+      // Le plan sortant s'éteint jusqu'au noir, puis le suivant s'en dégage.
+      if (t < 0.5) {
+        drawOutgoing();
+        veil(t * 2);
+      } else {
+        drawItem(ctx, project, item, frame, resolve);
+        veil((1 - t) * 2);
+      }
+      return;
+    case "slide":
+      // Le plan suivant pousse le précédent hors du cadre, vers la gauche.
+      drawOutgoing({ dx: -t });
+      drawItem(ctx, project, item, frame, resolve, { dx: 1 - t });
+      return;
+    case "wipe":
+      drawOutgoing();
+      drawItem(ctx, project, item, frame, resolve, { wipe: t });
+      return;
+    case "zoom":
+      drawOutgoing({ scale: 1 + 0.12 * t, opacity: 1 - t });
+      drawItem(ctx, project, item, frame, resolve, { opacity: t, scale: 1.15 - 0.15 * t });
+      return;
+    default:
+      drawOutgoing();
+      drawItem(ctx, project, item, frame, resolve, { opacity: t });
+  }
 }
 
 function drawItem(
@@ -60,10 +129,18 @@ function drawItem(
   project: ClipProject,
   item: VisualItem,
   frame: number,
-  resolve: VisualResolver
+  resolve: VisualResolver,
+  blend: Blend = {}
 ) {
   const { width: W, height: H } = project;
-  const anim = animStateAt(item, frame);
+  const base = animStateAt(item, frame);
+  const anim = {
+    ...base,
+    opacity: base.opacity * (blend.opacity ?? 1),
+    dx: base.dx + (blend.dx ?? 0),
+    scale: base.scale * (blend.scale ?? 1),
+    wipe: Math.min(base.wipe, blend.wipe ?? 1),
+  };
   const t = item.transform;
   const opacity = t.opacity * anim.opacity;
   if (opacity <= 0.001) return;

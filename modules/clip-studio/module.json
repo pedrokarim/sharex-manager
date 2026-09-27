@@ -47,9 +47,9 @@
     {
       "id": "create",
       "label": "Créer un clip avec la sélection",
-      "description": "Monte les images sélectionnées en clip, prêt à retoucher",
+      "description": "Monte les images et vidéos sélectionnées en clip, prêt à retoucher",
       "icon": "Clapperboard",
-      "fileTypes": ["png", "jpg", "jpeg", "webp"],
+      "fileTypes": ["png", "jpg", "jpeg", "webp", "mp4", "webm", "mov"],
       "maxFiles": 60,
       "page": "",
       "params": { "action": "create" }

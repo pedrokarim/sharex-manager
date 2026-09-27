@@ -97,6 +97,18 @@ export type Motion =
   | "pan-up"
   | "pan-down";
 
+/**
+ * Passage d'un plan au suivant sur une même piste. La transition appartient
+ * au plan qui arrive : pendant ses premières images, le plan précédent reste
+ * affiché, figé sur sa dernière image. Aucune durée ne change.
+ */
+export type TransitionKind = "fade" | "fade-black" | "slide" | "wipe" | "zoom";
+
+export interface Transition {
+  kind: TransitionKind;
+  frames: number;
+}
+
 interface ItemBase {
   id: string;
   /** Première image où l'élément est visible. */
@@ -110,6 +122,8 @@ interface VisualBase extends ItemBase {
   transform: Transform;
   animIn: Anim;
   animOut: Anim;
+  /** Transition depuis le plan qui précède, sur la même piste. */
+  transition?: Transition;
 }
 
 export interface ImageItem extends VisualBase {

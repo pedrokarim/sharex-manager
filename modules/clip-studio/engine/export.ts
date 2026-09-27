@@ -28,8 +28,8 @@ import {
 } from "mediabunny";
 import { applyGainEnvelope } from "./preview";
 import { drawFrame } from "./render";
-import { isActive, projectDuration, sourceTimeAt } from "./timeline";
-import { hasAudio, type ClipProject, type VideoItem } from "./types";
+import { isActive, projectDuration, sourceTimeAt, transitionAt } from "./timeline";
+import { hasAudio, type ClipProject, type VideoItem, type VisualItem } from "./types";
 
 export interface ExportProgress {
   phase: "prepare" | "audio" | "video" | "finalize";
@@ -135,6 +135,12 @@ export async function exportProject(
         for (const item of track.items) {
           if (item.type === "video" && isActive(item, frame)) {
             videoFrames.set(item.id, await frameFor(item, frame));
+          }
+          // Vidéo qui s'en va pendant une transition : son décodeur, arrivé
+          // au bout, rend sa dernière image.
+          if (item.type !== "audio" && isActive(item, frame)) {
+            const from = transitionAt(track.items as VisualItem[], item, frame)?.from;
+            if (from?.type === "video") videoFrames.set(from.id, await frameFor(from, frame));
           }
         }
       }

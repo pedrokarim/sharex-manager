@@ -10,6 +10,7 @@ import type {
   ClipItem,
   ClipProject,
   Motion,
+  TransitionKind,
   VisualItem,
 } from "./types";
 
@@ -118,6 +119,30 @@ export function animStateAt(item: VisualItem, frame: number): AnimState {
     Object.assign(state, applyAnim(item.animOut, clamp01(remaining / outFrames), false));
   }
   return state;
+}
+
+// ─── Transitions ─────────────────────────────────────────────────
+
+export interface TransitionState {
+  kind: TransitionKind;
+  /** 0 au début de la transition, 1 à la fin (adouci). */
+  progress: number;
+  /** Plan qui précède, collé au plan qui arrive ; absent en début de piste. */
+  from: VisualItem | null;
+}
+
+/**
+ * Transition en cours pour un plan à l'image donnée, s'il en a une. Le plan
+ * précédent doit toucher le plan qui arrive ; sinon on transite depuis le fond.
+ */
+export function transitionAt(items: VisualItem[], item: VisualItem, frame: number): TransitionState | null {
+  const transition = item.transition;
+  if (!transition || transition.frames <= 0) return null;
+  const frames = Math.min(transition.frames, item.duration);
+  const local = frame - item.start;
+  if (local < 0 || local >= frames) return null;
+  const from = items.find((other) => other.id !== item.id && other.start + other.duration === item.start) ?? null;
+  return { kind: transition.kind, progress: ease.inOutSine(clamp01((local + 1) / frames)), from };
 }
 
 // ─── Mouvement de caméra ─────────────────────────────────────────

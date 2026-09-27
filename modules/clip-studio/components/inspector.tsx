@@ -23,11 +23,12 @@ import type {
   ShapeItem,
   TextItem,
   TextStyle,
+  TransitionKind,
   VideoItem,
   VisualItem,
 } from "../engine/types";
 import { FONTS } from "../lib/fonts";
-import { ANIM_LABELS, MOTION_LABELS } from "./timeline";
+import { ANIM_LABELS, DEFAULT_TRANSITION_SECONDS, MOTION_LABELS, TRANSITION_LABELS } from "./timeline";
 
 interface InspectorProps {
   project: ClipProject;
@@ -235,6 +236,29 @@ function VisualFields({
             </Button>
           ))}
         </div>
+      </Section>
+
+      <Section title="Transition">
+        <Choice
+          label="Depuis le plan précédent"
+          value={item.transition?.kind ?? "none"}
+          options={TRANSITION_LABELS}
+          onChange={(kind: TransitionKind | "none") =>
+            onPatch(
+              {
+                transition:
+                  kind === "none"
+                    ? undefined
+                    : { kind, frames: item.transition?.frames ?? Math.round(DEFAULT_TRANSITION_SECONDS * fps) },
+              } as Partial<ClipItem>,
+              "transition"
+            )
+          }
+        />
+        {item.transition && (
+          <Slider label="Durée" unit="s" min={0.2} max={2} step={0.1} value={item.transition.frames / fps}
+            onChange={(value) => onPatch({ transition: { ...item.transition!, frames: Math.max(1, Math.round(value * fps)) } } as Partial<ClipItem>, "transition-d")} />
+        )}
       </Section>
 
       <Section title="Animations">
