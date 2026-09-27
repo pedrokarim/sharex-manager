@@ -1,5 +1,6 @@
 "use client";
 
+import { EngineLogo } from "./engine-logo";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -131,7 +132,10 @@ function JobRow({ job, onMutate }: { job: Job; onMutate: () => void }) {
             {job.request.prompt}
           </p>
           <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-            <span>{job.modelLabel}</span>
+            <span className="inline-flex items-center gap-1">
+              <EngineLogo engineId={job.engineId} className="size-3" />
+              {job.modelLabel}
+            </span>
             <span aria-hidden>·</span>
             <span className="font-mono">{job.request.size}</span>
             <span aria-hidden>·</span>

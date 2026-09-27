@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandLogo, type Brand } from "@/components/brand-logo";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, AudioLines, ExternalLink, Eye, EyeOff, Lock, TriangleAlert } from "lucide-react";
@@ -14,6 +15,12 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "
 import type { ProviderStatus } from "../lib/cloud-tts";
 import type { VoiceStatus } from "../lib/tts";
 import { callModule } from "../lib/client";
+
+const PROVIDER_BRANDS: Record<ProviderStatus["id"], Brand> = {
+  openai: "openai",
+  google: "googlecloud",
+  elevenlabs: "elevenlabs",
+};
 
 const DESCRIPTIONS: Record<ProviderStatus["id"], string> = {
   openai: "Neuf voix naturelles qui parlent français (modèle gpt-4o-mini-tts).",
@@ -130,6 +137,7 @@ function ProviderCard({
       <Field>
         <div className="flex flex-wrap items-center gap-2">
           <FieldLabel htmlFor={`tts-key-${provider.id}`} className="flex flex-wrap items-center gap-2">
+            <BrandLogo brand={PROVIDER_BRANDS[provider.id]} className="size-5" />
             {provider.label}
             {provider.configured && (
               <Badge variant="secondary" className="h-5 gap-1 px-1.5 text-[10px] font-normal">

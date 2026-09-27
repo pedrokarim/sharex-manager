@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandLogo, type Brand } from "@/components/brand-logo";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AudioLines, Download, Loader2, Mars, Venus } from "lucide-react";
@@ -78,7 +79,12 @@ export function VoicePicker({
     <div className="space-y-3">
       {groups.map((group) => (
         <div key={group.provider} className="space-y-1.5">
-          {online && <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{group.label}</p>}
+          {online && (
+            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              {group.brand && <BrandLogo brand={group.brand} className="size-3.5" />}
+              {group.label}
+            </p>
+          )}
           <div className={grid}>
             {group.voices.map((voice) => {
               const selected = voice.id === value;
@@ -127,18 +133,21 @@ export function VoicePicker({
       {!online && (
         <Link href="/m/clip-studio/voices" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
           <AudioLines className="h-3.5 w-3.5" />
-          Plus de voix : voix en ligne OpenAI, Google ou ElevenLabs
+          Plus de voix : voix en ligne
+          <BrandLogo brand="openai" labelled className="size-3.5" />
+          <BrandLogo brand="googlecloud" labelled className="size-3.5" />
+          <BrandLogo brand="elevenlabs" labelled className="size-3.5" />
         </Link>
       )}
     </div>
   );
 }
 
-const GROUPS: { provider: VoiceStatus["provider"]; label: string }[] = [
+const GROUPS: { provider: VoiceStatus["provider"]; label: string; brand?: Brand }[] = [
   { provider: "piper", label: "Locales, gratuites" },
-  { provider: "openai", label: "OpenAI" },
-  { provider: "google", label: "Google Cloud" },
-  { provider: "elevenlabs", label: "ElevenLabs" },
+  { provider: "openai", label: "OpenAI", brand: "openai" },
+  { provider: "google", label: "Google Cloud", brand: "googlecloud" },
+  { provider: "elevenlabs", label: "ElevenLabs", brand: "elevenlabs" },
 ];
 
 /** Mention des licences des voix, obligatoire pour les voix CC BY. */

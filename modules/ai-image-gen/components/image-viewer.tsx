@@ -1,5 +1,6 @@
 "use client";
 
+import { EngineLogo } from "./engine-logo";
 import { useCallback, useEffect, useState } from "react";
 import {
   ChevronLeft,
@@ -237,7 +238,8 @@ export function ImageViewer({
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
               <div className="col-span-2">
                 <dt className="text-xs text-muted-foreground">Modèle</dt>
-                <dd className="mt-0.5 font-medium">
+                <dd className="mt-0.5 flex items-center gap-1.5 font-medium">
+                  <EngineLogo engineId={item.provider} />
                   {item.modelLabel ?? item.model}
                 </dd>
               </div>

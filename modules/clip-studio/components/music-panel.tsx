@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Download, ExternalLink, Library, Loader2, Pause, Play, Plus, Search, Telescope, Trash2 } from "lucide-react";
@@ -231,6 +232,7 @@ function LibraryTab({
       </motion.ul>
 
       <p className="text-[11px] leading-4 text-muted-foreground">
+        <BrandLogo brand="jamendo" className="mr-1 inline size-3.5 align-[-3px]" />
         Morceaux de Jamendo sous licence CC BY ou CC0 : utilisables dans vos vidéos, y compris
         commerciales. Pour CC BY, citez l&apos;artiste ; les crédits sont rappelés à l&apos;export.
       </p>
@@ -308,9 +310,13 @@ function DiscoverTab({ preview, onAdded }: { preview: ReturnType<typeof usePrevi
       </div>
 
       {results === null ? (
-        <p className="py-6 text-center text-xs text-muted-foreground">
+        <div className="flex flex-col items-center gap-2 py-6 text-center text-xs text-muted-foreground">
+          <span className="flex items-center gap-2">
+            <BrandLogo brand="jamendo" labelled className="size-5" />
+            <BrandLogo brand="openverse" labelled className="size-5" />
+          </span>
           Cherchez parmi des centaines de milliers de morceaux libres de Jamendo, via Openverse.
-        </p>
+        </div>
       ) : visible.length === 0 ? (
         <p className="py-6 text-center text-xs text-muted-foreground">Aucun morceau trouvé.</p>
       ) : (

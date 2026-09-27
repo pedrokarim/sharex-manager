@@ -1,5 +1,6 @@
 "use client";
 
+import { EngineLogo } from "./engine-logo";
 import { useState } from "react";
 import {
   Copy,
@@ -208,7 +209,8 @@ export function GenerationCard({
         </p>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
+          <Badge variant="secondary" className="h-5 gap-1 px-1.5 text-[10px] font-normal">
+            <EngineLogo engineId={item.provider} className="size-3" />
             {item.modelLabel ?? item.model}
           </Badge>
           <Badge variant="outline" className="h-5 px-1.5 font-mono text-[10px]">

@@ -1,5 +1,6 @@
 "use client";
 
+import { EngineLogo } from "./engine-logo";
 import { useEffect, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -536,6 +537,7 @@ function ModelPicker({
               model?.available ? "bg-emerald-500" : "bg-destructive"
             )}
           />
+          <EngineLogo engineId={model?.engineId} className="size-3.5" />
           <span className="max-w-40 truncate">{model?.label ?? "Moteur"}</span>
           <ChevronDown className="h-3 w-3 opacity-60" />
         </DockChip>
@@ -577,7 +579,10 @@ function ModelPicker({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-medium">{entry.label}</span>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <EngineLogo engineId={entry.engineId} className="size-3.5" />
+                          <span className="truncate text-sm font-medium">{entry.label}</span>
+                        </span>
                         <span
                           className={cn(
                             "shrink-0 text-[10px]",

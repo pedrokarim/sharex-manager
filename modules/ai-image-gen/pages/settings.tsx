@@ -1,5 +1,6 @@
 "use client";
 
+import { EngineLogo } from "../components/engine-logo";
 import { useCallback, useEffect, useState } from "react";
 import {
   CheckCircle2,
@@ -246,6 +247,7 @@ export default function SettingsPage({
                   <SelectContent>
                     {availableModels.map((model) => (
                       <SelectItem key={model.id} value={model.id}>
+                        <EngineLogo engineId={model.engineId} />
                         {model.label}
                       </SelectItem>
                     ))}
@@ -452,6 +454,7 @@ function CliEngineCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-2 font-medium">
+            <EngineLogo engineId={engine.id} />
             {engine.label}
             {engine.custom && (
               <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
@@ -799,6 +802,7 @@ function ApiKeyField({
   return (
     <Field>
       <FieldLabel htmlFor={`key-${engine.id}`} className="flex items-center gap-2">
+        <EngineLogo engineId={engine.id} />
         {engine.label}
         {engine.configured && (
           <Badge
