@@ -97,7 +97,8 @@ async function validateApiKey(
       });
       return null;
     }
-    if (!isImage && !isDocument && !isArchive && !key.permissions.uploadFiles) {
+    // Une archive est un fichier comme un autre : elle demande la permission « fichiers ».
+    if (!isImage && !isDocument && !key.permissions.uploadFiles) {
       logDb.createLog({
         level: "warning",
         action: "api.request",

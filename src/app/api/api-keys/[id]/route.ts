@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { isAdmin } from "@/lib/api-guard";
 import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { NextRequest } from "next/server";
@@ -31,7 +32,8 @@ export async function DELETE(
     const keys: ApiKey[] = JSON.parse(content);
 
     const keyToDelete = keys.find((key) => key.id === id);
-    if (!keyToDelete) {
+    // Seul un admin supprime la clé d'un autre compte.
+    if (!keyToDelete || (!isAdmin(session) && keyToDelete.createdBy !== session.user.id)) {
       logDb.createLog({
         level: "warning",
         action: "api.request",

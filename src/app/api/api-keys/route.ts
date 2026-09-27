@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { isAdmin } from "@/lib/api-guard";
 import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { NextRequest, NextResponse } from "next/server";
@@ -39,8 +40,9 @@ export async function GET() {
       return new Response("Non autorisé", { status: 401 });
     }
 
+    // Un admin voit toutes les clés ; un autre compte, seulement les siennes.
     const keys = await getApiKeys();
-    return NextResponse.json(keys);
+    return NextResponse.json(isAdmin(session) ? keys : keys.filter((key) => key.createdBy === session.user.id));
   } catch (error) {
     logDb.createLog({
       level: "error",
