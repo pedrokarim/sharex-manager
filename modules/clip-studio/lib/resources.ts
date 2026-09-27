@@ -28,6 +28,8 @@ export interface ResourceSpec {
   archive?: "tar.gz" | "zip";
   /** Taille attendue, pour la progression quand le serveur ne la donne pas. */
   size?: number;
+  /** Taille au-delà de laquelle le téléchargement est interrompu (par défaut : 2 × `size`, sinon 200 Mo). */
+  maxBytes?: number;
 }
 
 export interface ResourceState {
@@ -95,10 +97,16 @@ async function download(spec: ResourceSpec): Promise<string> {
     const response = await fetch(spec.url, { redirect: "follow", headers: { "user-agent": "ShareX-Manager/clip-studio" } });
     if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
     state.total = Number(response.headers.get("content-length")) || state.total;
+    const limit = spec.maxBytes ?? (spec.size ? spec.size * 2 : 200 * 1024 * 1024);
+    if (state.total > limit) throw new Error("Fichier plus lourd que prévu, téléchargement refusé");
 
     const counter = new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {
         state.received += chunk.byteLength;
+        if (state.received > limit) {
+          controller.error(new Error("Fichier plus lourd que prévu, téléchargement interrompu"));
+          return;
+        }
         controller.enqueue(chunk);
       },
     });

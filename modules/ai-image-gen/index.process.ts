@@ -354,6 +354,45 @@ export async function listCollections(): Promise<Collection[]> {
   return readCollections().sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+/** Texte libre borné, ou absent. */
+function optionalText(value: unknown, max: number): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined;
+}
+
+/** Fichier d'image du module : un nom simple, jamais un chemin. */
+function imageFileName(value: unknown): string | undefined {
+  return typeof value === "string" && value && value === path.basename(value) && !value.startsWith(".")
+    ? value.slice(0, 200)
+    : undefined;
+}
+
+/**
+ * Champs modifiables d'une collection. Fusionner l'objet reçu tel quel
+ * laissait le navigateur réécrire l'identifiant ou glisser des chemins de
+ * fichiers arbitraires.
+ */
+function collectionFields(input: Partial<Collection>) {
+  return {
+    name: String(input.name ?? "").trim().slice(0, 120),
+    description: optionalText(input.description, 1000),
+    synopsis: optionalText(input.synopsis, 4000),
+    styleNotes: optionalText(input.styleNotes, 2000),
+    anchors: (Array.isArray(input.anchors) ? input.anchors : [])
+      .slice(0, 40)
+      .flatMap((anchor) => {
+        const file = imageFileName(anchor?.file);
+        if (!file) return [];
+        return [{
+          id: String(anchor.id ?? `anchor-${randomSlug(6)}`).slice(0, 60),
+          label: String(anchor.label ?? "").slice(0, 120),
+          file,
+          note: optionalText(anchor.note, 500),
+        }];
+      }),
+    coverFile: imageFileName(input.coverFile),
+  };
+}
+
 export async function saveCollection(
   input: Partial<Collection> & { name: string }
 ): Promise<Collection> {
@@ -366,19 +405,14 @@ export async function saveCollection(
     : undefined;
 
   if (existing) {
-    Object.assign(existing, input, { updatedAt: now });
+    Object.assign(existing, collectionFields({ ...existing, ...input }), { updatedAt: now });
     writeCollections(collections);
     return existing;
   }
 
   const created: Collection = {
     id: `col-${now}-${randomSlug(6)}`,
-    name: input.name.trim(),
-    description: input.description,
-    synopsis: input.synopsis,
-    styleNotes: input.styleNotes,
-    anchors: input.anchors ?? [],
-    coverFile: input.coverFile,
+    ...collectionFields(input),
     createdAt: now,
     updatedAt: now,
   };
@@ -453,11 +487,18 @@ export async function listPipelines(): Promise<Pipeline[]> {
   return readPipelines().sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+/** Nombre maximal d'étapes d'un pipeline. */
+const MAX_PIPELINE_STEPS = 12;
+
 export async function savePipeline(
   input: Partial<Pipeline> & { name: string; steps: Pipeline["steps"] }
 ): Promise<Pipeline> {
   if (!input.name?.trim()) throw new Error("Le nom du pipeline est vide.");
   if (!input.steps?.length) throw new Error("Un pipeline sans étape ne sert à rien.");
+  // Chaque étape peut lancer une génération payante : un pipeline reste court.
+  if (input.steps.length > MAX_PIPELINE_STEPS) {
+    throw new Error(`Un pipeline compte ${MAX_PIPELINE_STEPS} étapes au plus.`);
+  }
 
   const pipelines = readPipelines();
   const now = Date.now();
@@ -466,15 +507,20 @@ export async function savePipeline(
     : undefined;
 
   if (existing) {
-    Object.assign(existing, input, { updatedAt: now });
+    Object.assign(existing, {
+      name: input.name.trim().slice(0, 120),
+      description: optionalText(input.description, 1000),
+      steps: input.steps,
+      updatedAt: now,
+    });
     writePipelines(pipelines);
     return existing;
   }
 
   const created: Pipeline = {
     id: `pipe-${now}-${randomSlug(6)}`,
-    name: input.name.trim(),
-    description: input.description,
+    name: input.name.trim().slice(0, 120),
+    description: optionalText(input.description, 1000),
     steps: input.steps.map((step, index) => ({
       ...step,
       id: step.id || `step-${index}-${randomSlug(4)}`,

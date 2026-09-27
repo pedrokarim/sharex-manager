@@ -106,7 +106,16 @@ export function cancelAssistantJob(id: string) {
 
 // ─── Démarrage ───────────────────────────────────────────────────
 
+/**
+ * Travaux simultanés. Chacun lance Codex et jusqu'à dix illustrations sur
+ * les moteurs payants d'AI Image Gen.
+ */
+const MAX_RUNNING_JOBS = 2;
+
 export function startAssistant(request: AssistantRequest): AssistantJob {
+  if (controllers.size >= MAX_RUNNING_JOBS) {
+    throw new Error("Deux créations sont déjà en cours : attendez qu'une se termine.");
+  }
   const clean: AssistantRequest = {
     brief: String(request.brief ?? "").trim().slice(0, 600),
     template: (["quiz", "top", "slideshow"] as const).includes(request.template) ? request.template : "quiz",

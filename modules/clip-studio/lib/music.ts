@@ -68,8 +68,13 @@ export function readLibrary(): MusicTrack[] {
   return [...base, ...added.filter((track) => !ids.has(track.id))].filter(isUsable);
 }
 
+/** Un morceau de quelques minutes pèse moins de 15 Mo : au-delà, le téléchargement est coupé. */
+const MAX_TRACK_BYTES = 30 * 1024 * 1024;
+/** Morceaux ajoutés depuis l'éditeur, au plus. */
+const MAX_ADDED_TRACKS = 200;
+
 function spec(track: MusicTrack): ResourceSpec {
-  return { id: `music:${track.id}`, label: track.title, url: track.audioUrl, target: `music/${track.id}.mp3` };
+  return { id: `music:${track.id}`, label: track.title, url: track.audioUrl, target: `music/${track.id}.mp3`, maxBytes: MAX_TRACK_BYTES };
 }
 
 /** Mention à reprendre dans la description d'une vidéo publiée. */
@@ -219,6 +224,11 @@ export async function searchMusic(input: { query: string; page?: number }): Prom
     }))
     // L'écoute d'un extrait charge `audioUrl` dans le navigateur : Jamendo seulement.
     .filter((track) => track.audioUrl);
+  // Le cache ne garde que les recherches récentes.
+  for (const [entry, value] of searchCache) {
+    if (Date.now() - value.at > 10 * 60 * 1000) searchCache.delete(entry);
+  }
+  if (searchCache.size >= 200) searchCache.delete(searchCache.keys().next().value!);
   searchCache.set(key, { at: Date.now(), results });
   return results;
 }
@@ -242,6 +252,9 @@ export async function addMusic(input: { id: string; mood?: string }): Promise<Mu
   if (!track.audioUrl) throw new Error("Seuls les morceaux hébergés par Jamendo sont acceptés.");
   ensureDirs();
   const added = readJson<MusicTrack[]>(ADDED_FILE, []);
+  if (added.length >= MAX_ADDED_TRACKS) {
+    throw new Error(`La banque compte déjà ${MAX_ADDED_TRACKS} morceaux ajoutés : retirez-en avant d'en ajouter.`);
+  }
   writeAdded([...added, track]);
 
   void ensureResource(spec(track)).catch(() => undefined);

@@ -166,8 +166,18 @@ export interface SpeechResult {
  * Lit un texte avec une voix et range le son parmi les médias du module.
  * Les synthèses passent une par une : Piper occupe un cœur à plein.
  */
+/** Synthèses en attente au plus : chacune occupe un cœur et écrit un fichier. */
+const MAX_PENDING = 20;
+let pending = 0;
+
 export function synthesize(input: { text: string; voice?: string; speed?: number }): Promise<SpeechResult> {
-  const task = queue.then(() => runSynthesis(input));
+  if (pending >= MAX_PENDING) {
+    return Promise.reject(new Error("Trop de voix en cours de génération : réessayez dans un instant."));
+  }
+  pending++;
+  const task = queue.then(() => runSynthesis(input)).finally(() => {
+    pending--;
+  });
   queue = task.catch(() => undefined);
   return task;
 }

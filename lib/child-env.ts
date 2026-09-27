@@ -60,7 +60,10 @@ export function childEnv(
 ): NodeJS.ProcessEnv {
   const names = new Set(SYSTEM_NAMES);
   const prefixes = [...SYSTEM_PREFIXES, ...(options.prefixes ?? [])].map((prefix) => prefix.toUpperCase());
-  const env: NodeJS.ProcessEnv = {};
+  // `NodeJS.ProcessEnv` est augmenté par le projet (AUTH_SECRET obligatoire) :
+  // on construit un simple dictionnaire, puisque le but est justement de
+  // laisser ces variables de côté.
+  const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (value === undefined) continue;
     // Sous Windows, les noms de variables ne tiennent pas compte de la casse.
@@ -70,5 +73,5 @@ export function childEnv(
   for (const [key, value] of Object.entries(options.extra ?? {})) {
     if (value !== undefined) env[key] = value;
   }
-  return env;
+  return env as NodeJS.ProcessEnv;
 }
