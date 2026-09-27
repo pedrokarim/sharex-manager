@@ -20,6 +20,22 @@ describe("ai-image-gen remote image import", () => {
       "fd00::1",
       "fe80::1",
       "::ffff:127.0.0.1",
+      // Formes que l'analyseur d'URL produit, ou qu'un attaquant peut écrire :
+      "::ffff:7f00:1", // ::ffff:127.0.0.1 réécrit par new URL
+      "::ffff:a9fe:a9fe", // 169.254.169.254
+      "0:0:0:0:0:ffff:7f00:1",
+      "::7f00:1", // IPv4 compatible
+      "64:ff9b::7f00:1", // NAT64
+      "2002:7f00:1::", // 6to4
+      "2001:0:4136:e378::1", // Teredo
+      "2001:db8::1", // documentation
+      "fec0::1",
+      "ff02::1",
+      "::",
+      "192.0.2.10",
+      "198.51.100.7",
+      "203.0.113.1",
+      "pas une adresse",
     ]) {
       expect(isPrivateAddress(address), address).toBe(true);
     }
@@ -34,6 +50,18 @@ describe("ai-image-gen remote image import", () => {
   it("rejects non-http schemes and internal hosts before any request", async () => {
     await expect(fetchRemoteImage("file:///etc/passwd")).rejects.toThrow("http");
     await expect(fetchRemoteImage("http://127.0.0.1:3000/x.png")).rejects.toThrow(
+      "adresse interne"
+    );
+    for (const url of [
+      "http://[::ffff:127.0.0.1]:3000/x.png",
+      "http://[::ffff:169.254.169.254]/latest/meta-data/",
+      "http://2130706433/x.png", // 127.0.0.1 en décimal
+      "http://0x7f.1/x.png",
+    ]) {
+      await expect(fetchRemoteImage(url), url).rejects.toThrow("adresse interne");
+    }
+    // Un nom qui résout vers la boucle locale est refusé à la connexion.
+    await expect(fetchRemoteImage("http://localhost:3000/x.png")).rejects.toThrow(
       "adresse interne"
     );
     await expect(fetchRemoteImage("http://user:pass@example.com/x.png")).rejects.toThrow(
