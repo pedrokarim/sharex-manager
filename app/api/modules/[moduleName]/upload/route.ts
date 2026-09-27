@@ -75,7 +75,12 @@ export async function POST(
   const maxBytes = Math.min(config.uploads.maxMb ?? 50, 500) * 1024 * 1024;
   const kinds = config.uploads.kinds ?? ["image"];
 
-  const declared = Number(request.headers.get("content-length") ?? 0);
+  // `formData()` charge tout le corps en mémoire : la taille doit être
+  // annoncée et raisonnable avant de commencer à lire.
+  const declared = Number(request.headers.get("content-length"));
+  if (!Number.isFinite(declared) || declared <= 0) {
+    return NextResponse.json({ error: "Taille de l'envoi non annoncée" }, { status: 411 });
+  }
   if (declared > maxBytes + 64 * 1024) {
     return NextResponse.json(
       { error: `Fichier trop lourd (${config.uploads.maxMb ?? 50} Mo maximum)` },

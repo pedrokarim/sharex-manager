@@ -19,6 +19,17 @@ import { getStarredFiles } from "@/lib/starred-files";
 
 const API_KEYS_FILE = path.join(process.cwd(), "data/api-keys.json");
 
+/** La clé existe et n'a pas expiré (les permissions par type se vérifient ensuite). */
+async function isKnownActiveKey(apiKey: string): Promise<boolean> {
+  try {
+    const keys: ApiKey[] = JSON.parse(await readFile(API_KEYS_FILE, "utf-8"));
+    const key = keys.find((entry) => entry.key === apiKey);
+    return Boolean(key && !(key.expiresAt && new Date(key.expiresAt) < new Date()));
+  } catch {
+    return false;
+  }
+}
+
 async function validateApiKey(
   apiKey: string,
   fileType: string
@@ -146,6 +157,32 @@ export async function POST(request: NextRequest) {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
+    }
+
+    // Avant de lire le corps : une clé inconnue ou expirée, ou un envoi sans
+    // taille annoncée, ne doit pas pouvoir faire charger en mémoire des
+    // dizaines de mégaoctets.
+    if (!(await isKnownActiveKey(apiKey))) {
+      return new Response(
+        JSON.stringify({ error: "Clé API invalide ou permissions insuffisantes" }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const declared = Number(request.headers.get("content-length"));
+    const limits = (await getServerConfig()).limits;
+    // Marge pour l'enveloppe multipart autour du fichier.
+    const maxBody = limits.maxFileSize * 1024 * 1024 + 1024 * 1024;
+    if (!Number.isFinite(declared) || declared <= 0) {
+      return new Response(JSON.stringify({ error: "Taille de l'envoi non annoncée" }), {
+        status: 411,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (declared > maxBody) {
+      return new Response(
+        JSON.stringify({ error: `La taille du fichier dépasse la limite de ${limits.maxFileSize}MB` }),
+        { status: 413, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     const formData = await request.formData();
