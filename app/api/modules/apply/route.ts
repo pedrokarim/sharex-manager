@@ -8,6 +8,19 @@ import { getAbsoluteUploadPath } from "@/lib/config";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
+import { isFileSecure, setFileSecure } from "@/lib/secure-files";
+
+/** Nom d'un fichier de la galerie : un seul segment, sans chemin ni fichier caché. */
+function isGalleryFileName(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 255 &&
+    value === path.basename(value) &&
+    !value.startsWith(".") &&
+    !/[\\/\0]/.test(value)
+  );
+}
 
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -28,35 +41,10 @@ export async function POST(request: NextRequest) {
       moduleName,
       settings,
       createNewVersion = true,
-      internalProcessing = false,
-      fileBuffer: encodedBuffer,
     } = await request.json();
 
     // S'assurer que le gestionnaire de modules est initialisé
     await apiModuleManager.ensureInitialized();
-
-    // Vérifier si c'est un traitement interne (depuis le module manager)
-    if (internalProcessing) {
-      if (!moduleName || !encodedBuffer) {
-        return NextResponse.json(
-          { error: "Nom de module ou buffer d'image non fourni" },
-          { status: 400 }
-        );
-      }
-
-      // Convertir le buffer base64 en Buffer
-      const fileBuffer = Buffer.from(encodedBuffer, "base64");
-
-      // Traiter l'image avec le module
-      const processedBuffer = await apiModuleManager.processImageWithModule(
-        moduleName,
-        fileBuffer,
-        settings
-      );
-
-      // Retourner le buffer traité
-      return new NextResponse(processedBuffer);
-    }
 
     // Traitement normal (depuis l'interface utilisateur)
     if (!fileName || !moduleName) {
@@ -74,9 +62,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Le nom vient du navigateur : sans ce contrôle, « ../ » faisait lire
+    // (et publier dans la galerie) n'importe quel fichier du serveur.
+    if (!isGalleryFileName(fileName) || !/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(String(moduleName))) {
+      return NextResponse.json({ error: "Nom de fichier ou de module invalide" }, { status: 400 });
+    }
+
     // Obtenir le chemin absolu du fichier
-    const uploadPath = getAbsoluteUploadPath();
-    const filePath = path.join(uploadPath, fileName);
+    const uploadPath = path.resolve(getAbsoluteUploadPath());
+    const filePath = path.resolve(uploadPath, fileName);
+    if (!filePath.startsWith(uploadPath + path.sep)) {
+      return NextResponse.json({ error: "Nom de fichier invalide" }, { status: 400 });
+    }
 
     // Vérifier si le fichier existe
     if (!fs.existsSync(filePath)) {
@@ -122,11 +119,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Traiter l'image avec le module
+    // Traiter l'image avec le module. En mode strict, un échec remonte au lieu
+    // de rendre l'original : sinon la « nouvelle version » était une simple
+    // copie du fichier source.
     const processedBuffer = await apiModuleManager.processImageWithModule(
       moduleName,
       fileBuffer,
-      settings
+      settings,
+      { strict: true }
     );
 
     // Générer un nouveau nom de fichier si nécessaire
@@ -139,8 +139,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Écrire le fichier traité
-    const newFilePath = path.join(uploadPath, newFileName);
+    const newFilePath = path.resolve(uploadPath, newFileName);
+    if (!newFilePath.startsWith(uploadPath + path.sep)) {
+      return NextResponse.json({ error: "Nom de fichier invalide" }, { status: 400 });
+    }
     fs.writeFileSync(newFilePath, processedBuffer);
+
+    // Une version d'un fichier sécurisé reste sécurisée : sinon elle serait
+    // publique sur le domaine d'images.
+    if (createNewVersion && (await isFileSecure(fileName))) {
+      await setFileSecure(newFileName, true);
+    }
 
     // Une nouvelle version doit apparaître tout de suite dans les galeries
     // ouvertes, comme un upload ShareX.

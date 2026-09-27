@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireAccess } from "@/lib/api-guard";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import fs from "fs";
 import path from "path";
@@ -9,12 +8,12 @@ import { v4 as uuidv4 } from "uuid";
 import AdmZip from "adm-zip";
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  // Installer, activer ou supprimer un module revient à décider du code que
+  // le serveur exécute : réservé aux administrateurs.
+  const guard = await requireAccess("admin");
+  if (!guard.ok) return guard.response;
+  const session = guard.session;
   try {
-    if (!session) {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     await apiModuleManager.ensureInitialized();
 
     // Récupérer le fichier ZIP du module

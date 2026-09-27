@@ -44,6 +44,11 @@ export interface ModuleConfig {
   pages?: ModulePageConfig[];
   navItems?: ModuleNavItem[];
   fileActions?: ModuleFileAction[];
+  /**
+   * Fonctions appelables par `/api/modules/call-function`, avec le rôle
+   * minimal. Une fonction absente de la liste est réservée aux admins.
+   */
+  functions?: Record<string, "user" | "admin">;
   /** Autorise l'envoi direct de médias dans `data/assets/` du module. */
   uploads?: { maxMb?: number; kinds?: ("image" | "video" | "audio")[] };
 }

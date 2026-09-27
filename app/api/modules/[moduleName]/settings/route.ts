@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { requireAccess } from "@/lib/api-guard";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 
 export async function GET(
@@ -41,10 +42,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ moduleName: string }> }
 ) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
+  // Les réglages d'un module pilotent son comportement serveur : réservés
+  // aux administrateurs, la lecture reste ouverte aux comptes connectés.
+  const guard = await requireAccess("admin");
+  if (!guard.ok) return guard.response;
+  const session = guard.session;
 
   try {
     const { moduleName } = await params;

@@ -54,6 +54,11 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: authConfig.provider === "builtin",
+    // Outil personnel : personne ne s'inscrit seul. Le premier administrateur
+    // vient de `bun run setup` (importé depuis data/users.json), les suivants
+    // sont créés par un admin. Laisser l'inscription ouverte donnait un compte
+    // à n'importe quel visiteur, puisque le proxy laisse passer /api/auth.
+    disableSignUp: true,
     // Les comptes historiques (data/users.json) portent un hash bcrypt : on garde
     // bcrypt des deux côtés pour que les mots de passe existants restent valides.
     password: {

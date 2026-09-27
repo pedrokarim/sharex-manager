@@ -4,6 +4,10 @@ import { auth } from "@/lib/auth";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
+import { hasAccess, isAdmin } from "@/lib/api-guard";
+
+/** Fonctions appelées par le gestionnaire de modules lui-même. */
+const INTERNAL_FUNCTIONS = new Set(["initModule", "processImage", "default"]);
 
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -63,9 +67,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vérifier si le module a la fonction demandée
+    // Vérifier si le module a la fonction demandée. Les fonctions de cycle de
+    // vie sont exportées pour le gestionnaire de modules, jamais pour le
+    // navigateur.
     const capabilities = loadedModule.config.capabilities || [];
-    if (!capabilities.includes(functionName)) {
+    if (!capabilities.includes(functionName) || INTERNAL_FUNCTIONS.has(functionName)) {
       logDb.createLog({
         level: "error",
         action: "module.function" as LogAction,
@@ -77,10 +83,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: `Fonction ${functionName} non trouvée dans le module ${moduleName}`,
-          availableFunctions: capabilities,
+          ...(isAdmin(session) ? { availableFunctions: capabilities } : {}),
         },
         { status: 404 }
       );
+    }
+
+    // Chaque module déclare dans `module.json` (`functions`) ce qu'un compte
+    // « user » peut appeler ; le reste est réservé aux administrateurs. Sans
+    // cette liste, toute fonction exportée était ouverte à tout compte
+    // connecté, y compris celles qui enregistrent des commandes à exécuter.
+    const requiredAccess = loadedModule.config.functions?.[functionName] ?? "admin";
+    if (!hasAccess(session, requiredAccess)) {
+      logDb.createLog({
+        level: "warning",
+        action: "module.function" as LogAction,
+        message: `Appel refusé : ${moduleName}.${functionName} est réservé aux administrateurs`,
+        userId: session.user?.id || undefined,
+        userEmail: session.user?.email || undefined,
+      });
+      return NextResponse.json({ error: "Réservé aux administrateurs" }, { status: 403 });
     }
 
     // Désérialiser les arguments

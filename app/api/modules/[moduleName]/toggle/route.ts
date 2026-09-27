@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireAccess } from "@/lib/api-guard";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ moduleName: string }> }
 ) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  // Installer, activer ou supprimer un module revient à décider du code que
+  // le serveur exécute : réservé aux administrateurs.
+  const guard = await requireAccess("admin");
+  if (!guard.ok) return guard.response;
+  const session = guard.session;
   try {
-    if (!session) {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const { moduleName } = await params;
 
     await apiModuleManager.ensureInitialized();

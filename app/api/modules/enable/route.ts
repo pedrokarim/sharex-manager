@@ -1,24 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireAccess } from "@/lib/api-guard";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  // Installer, activer ou supprimer un module revient à décider du code que
+  // le serveur exécute : réservé aux administrateurs.
+  const guard = await requireAccess("admin");
+  if (!guard.ok) return guard.response;
+  const session = guard.session;
   try {
-    if (!session) {
-      logDb.createLog({
-        level: "warning",
-        action: "system.error" as LogAction,
-        message: "Tentative d'activation de module non autorisée",
-        userId: undefined,
-        userEmail: undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const body = await request.json();
     const { moduleName } = body;
 

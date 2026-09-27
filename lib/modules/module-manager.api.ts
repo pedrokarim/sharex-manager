@@ -31,8 +31,12 @@ const ModuleFileActionSchema = z.object({
   params: z.record(z.string(), z.string()).optional(),
 });
 
+/** Accès aux fonctions serveur d'un module via `call-function`. */
+const FunctionAccessSchema = z.record(z.string(), z.enum(["user", "admin"]));
+
 const ModuleConfigSchema = z.object({
-  name: z.string(),
+  // Le nom devient un dossier sous `modules/` : ni séparateur ni `..`.
+  name: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, "Nom de module invalide"),
   version: z.string(),
   description: z.string(),
   author: z.string(),
@@ -49,6 +53,7 @@ const ModuleConfigSchema = z.object({
   pages: z.array(ModulePageConfigSchema).optional(),
   navItems: z.array(ModuleNavItemSchema).optional(),
   fileActions: z.array(ModuleFileActionSchema).optional(),
+  functions: FunctionAccessSchema.optional(),
   uploads: z
     .object({
       maxMb: z.number().positive().optional(),
@@ -356,55 +361,47 @@ class ApiModuleManagerImpl implements ModuleManager {
     });
   }
 
+  /**
+   * Traite une image avec `processImage` du module.
+   *
+   * Par défaut, un échec rend l'image d'origine : un upload ne doit pas
+   * échouer à cause d'un module. Avec `strict`, l'échec remonte, pour les
+   * traitements demandés explicitement où l'original n'a pas de sens.
+   */
   public async processImageWithModule(
     moduleName: string,
     imageBuffer: Buffer,
-    settings?: any
+    settings?: any,
+    options: { strict?: boolean } = {}
   ): Promise<Buffer> {
+    const fail = (message: string, error?: unknown): Buffer => {
+      if (options.strict) throw new Error(message);
+      console.warn(message, error ?? "");
+      return imageBuffer;
+    };
+
     try {
       await this.ensureInitialized();
 
       const loadedModule = this.loadedModules.get(moduleName);
       if (!loadedModule || loadedModule.status !== "loaded") {
-        console.warn(`Module ${moduleName} not found or not loaded`);
-        return imageBuffer;
+        return fail(`Module ${moduleName} introuvable ou non chargé`);
       }
 
       const moduleExports = (loadedModule.module as any).__exports;
-      if (!moduleExports) {
-        console.warn(`Module ${moduleName} has no exports`);
-        return imageBuffer;
+      if (!moduleExports || typeof moduleExports.processImage !== "function") {
+        return fail(`Le module ${moduleName} ne sait pas traiter d'image`);
       }
 
-      // 1. If settings.functionName is provided and exists, call it
-      if (
-        settings?.functionName &&
-        typeof moduleExports[settings.functionName] === "function"
-      ) {
-        return await this.withTimeout(
-          moduleExports[settings.functionName](imageBuffer, settings),
-          moduleName
-        );
-      }
-
-      // 2. Otherwise, call processImage (the standard contract)
-      if (typeof moduleExports.processImage === "function") {
-        return await this.withTimeout(
-          moduleExports.processImage(imageBuffer, settings),
-          moduleName
-        );
-      }
-
-      console.warn(
-        `Module ${moduleName}: no processImage function found`
+      // Seul `processImage` est appelé : le nom d'une autre fonction ne se
+      // choisit plus depuis les réglages envoyés par le navigateur.
+      return await this.withTimeout(
+        moduleExports.processImage(imageBuffer, settings),
+        moduleName
       );
-      return imageBuffer;
     } catch (error) {
-      console.error(
-        `Error processing image with module ${moduleName}:`,
-        error
-      );
-      return imageBuffer;
+      if (options.strict) throw error;
+      return fail(`Échec du traitement de l'image par le module ${moduleName}`, error);
     }
   }
 
