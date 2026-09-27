@@ -1,3 +1,7 @@
+> Archive. Cahier des charges initial de l’application mobile (septembre 2025),
+> gardé pour l’historique : l’application existe dans `sharex-mobile/` et la
+> pile technique décrite ici (Next.js 14, NextAuth) a changé depuis.
+
 # Spécifications de l'Application Mobile ShareX Manager
 
 ## Vue d'ensemble du projet

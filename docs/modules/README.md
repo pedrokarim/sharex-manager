@@ -6,8 +6,9 @@ espace de travail sous `/m/<module>/…`, à la manière d’AI Image Gen.
 
 Chaque dossier est écrit comme si le module allait être développé : parcours,
 interface, modèle de données, fonctions serveur, intégration avec la galerie,
-performances, sécurité, découpage en étapes et critères d’acceptation. Aucun
-de ces modules n’est encore commencé ; ils seront réalisés un par un.
+performances, sécurité, découpage en étapes et critères d’acceptation. Clip
+Studio est réalisé (modèles, assistant IA, voix, musique, sous-titres : voir
+l’avancement dans son dossier) ; les autres le seront un par un.
 
 ## Sommaire
 
