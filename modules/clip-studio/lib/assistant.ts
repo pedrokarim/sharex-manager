@@ -29,9 +29,14 @@ import { MOODS, pickTrack } from "./music";
 import { synthesize, VOICES } from "./tts";
 import { DATA_DIR, ensureDirs, writeProject } from "./store";
 
+/** L'assistant écrit et illustre lui-même : l'Avant / Après, fait d'images fournies, n'en fait pas partie. */
+export type AssistantTemplate = Exclude<TemplateId, "before-after">;
+
+const ASSISTANT_TEMPLATES: readonly TemplateId[] = ["quiz", "top", "slideshow"];
+
 export interface AssistantRequest {
   brief: string;
-  template: TemplateId;
+  template: AssistantTemplate;
   aspect: AspectPreset;
   count: number;
   images: boolean;
@@ -118,7 +123,7 @@ export function startAssistant(request: AssistantRequest): AssistantJob {
   }
   const clean: AssistantRequest = {
     brief: String(request.brief ?? "").trim().slice(0, 600),
-    template: (["quiz", "top", "slideshow"] as const).includes(request.template) ? request.template : "quiz",
+    template: ASSISTANT_TEMPLATES.includes(request.template) ? request.template : "quiz",
     aspect: (["9:16", "16:9", "1:1", "4:5"] as const).includes(request.aspect) ? request.aspect : "9:16",
     count: Math.min(10, Math.max(2, Math.round(Number(request.count) || 5))),
     images: Boolean(request.images),

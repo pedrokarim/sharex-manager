@@ -24,7 +24,7 @@ import type {
   Track,
 } from "./types";
 
-export type TemplateId = "quiz" | "top" | "slideshow";
+export type TemplateId = "quiz" | "top" | "slideshow" | "before-after";
 
 /** Narration d'un segment : un son déjà synthétisé et sa durée. */
 export interface VoiceClip {
@@ -72,6 +72,18 @@ export interface SlideshowData {
   voice?: { intro?: VoiceClip; outro?: VoiceClip };
 }
 
+export interface BeforeAfterPair {
+  before?: MediaSource;
+  after?: MediaSource;
+  caption?: string;
+}
+
+export interface BeforeAfterData {
+  title?: string;
+  pairs: BeforeAfterPair[];
+  outro?: string;
+}
+
 /** Couleurs d'accent, une par segment : chaque question a sa teinte. */
 const ACCENTS = ["#8b5cf6", "#0ea5e9", "#f97316", "#10b981", "#ec4899", "#eab308"];
 
@@ -82,7 +94,7 @@ const ACCENTS = ["#8b5cf6", "#0ea5e9", "#f97316", "#10b981", "#ec4899", "#eab308
  * basse : textes au-dessus des surlignages, eux-mêmes au-dessus des cadres,
  * eux-mêmes au-dessus du fond.
  */
-const LAYERS = ["Textes", "Surlignage", "Cadres", "Voile", "Principale"] as const;
+const LAYERS = ["Textes", "Surlignage", "Cadres", "Voile", "Après", "Principale"] as const;
 type Layer = (typeof LAYERS)[number];
 
 class Builder {
@@ -468,6 +480,111 @@ export function buildSlideshow(name: string, aspect: AspectPreset, data: Slidesh
   return b.build();
 }
 
+// ─── Avant / Après ───────────────────────────────────────────────
+
+export interface BeforeAfterTiming {
+  /** Temps passé sur l'image « avant ». */
+  before: number;
+  /** Durée du balayage vers l'image « après ». */
+  wipe: number;
+  /** Temps passé sur l'image « après », une fois le balayage fini. */
+  after: number;
+}
+
+export const DEFAULT_BEFORE_AFTER_TIMING: BeforeAfterTiming = { before: 1.5, wipe: 1.2, after: 2 };
+
+/** Image plein cadre, immobile : les deux images d'une paire doivent se superposer exactement. */
+function still(start: number, duration: number, source: MediaSource, animIn: ImageItem["animIn"]): ImageItem {
+  return {
+    id: uid("i-"),
+    type: "image",
+    start,
+    duration,
+    source,
+    fit: "cover",
+    motion: "none",
+    radius: 0,
+    transform: { x: 0.5, y: 0.5, width: 1, height: 1, rotation: 0, opacity: 1 },
+    animIn,
+    animOut: { kind: "none", frames: 10 },
+  };
+}
+
+/**
+ * Paires d'images : l'image « après » recouvre l'image « avant » par un
+ * balayage de gauche à droite, sans mouvement de caméra pour que les deux
+ * restent alignées.
+ */
+export function buildBeforeAfter(
+  name: string,
+  aspect: AspectPreset,
+  data: BeforeAfterData,
+  timing: BeforeAfterTiming = DEFAULT_BEFORE_AFTER_TIMING
+): ClipProject {
+  const b = new Builder(createProject(name, aspect));
+  const vertical = aspect === "9:16" || aspect === "4:5";
+  let cursor = 0;
+
+  if (data.title) {
+    const intro = b.seconds(2.5);
+    background(b, cursor, intro, data.pairs[0]?.before, ACCENTS[0], 0);
+    b.add("Textes", text(b, data.title, cursor, intro, { preset: "impact", y: 0.46, height: 0.26, style: { size: vertical ? 0.065 : 0.09 } }));
+    cursor += intro;
+  }
+
+  const hold = b.seconds(timing.before);
+  const wipe = b.seconds(timing.wipe);
+  const total = hold + wipe + b.seconds(timing.after);
+  const label = (content: string, start: number, duration: number, x: number, color: string) => {
+    const item = text(b, content, start, duration, {
+      preset: "boxed",
+      y: vertical ? 0.08 : 0.1,
+      width: 0.34,
+      height: vertical ? 0.06 : 0.08,
+      style: { size: vertical ? 0.028 : 0.04, color: "#ffffff", background: { color, padding: 0.4, radius: 0.35 } },
+      animIn: "pop",
+    });
+    item.transform.x = x;
+    return item;
+  };
+
+  data.pairs.forEach((pair, index) => {
+    const accent = ACCENTS[index % ACCENTS.length];
+    const swap = cursor + hold;
+
+    if (pair.before) b.add("Principale", still(cursor, total, pair.before, { kind: "fade", frames: 8 }));
+    else b.add("Principale", box(b, cursor, total, { y: 0.5, height: 1, width: 1 }, "#52525b", { radius: 0, animIn: "fade" }));
+    if (pair.after) {
+      b.add("Après", still(swap, total - hold, pair.after, { kind: "wipe", frames: wipe }));
+    } else {
+      // Sans image, un aplat coloré montre tout de même le balayage.
+      const plate = box(b, swap, total - hold, { y: 0.5, height: 1, width: 1 }, shade(accent, -0.35), { radius: 0 });
+      plate.animIn = { kind: "wipe", frames: wipe };
+      b.add("Après", plate);
+    }
+
+    b.add("Textes", label("Avant", cursor, hold + wipe, 0.24, "#27272a"));
+    b.add("Textes", label("Après", swap + wipe, total - hold - wipe, 0.76, accent));
+    if (pair.caption) {
+      b.add("Textes", text(b, pair.caption, cursor + 6, total - 6, {
+        preset: "caption",
+        y: vertical ? 0.86 : 0.88,
+        height: 0.14,
+        style: { size: vertical ? 0.036 : 0.048 },
+        animIn: "slide-up",
+      }));
+    }
+    cursor += total;
+  });
+
+  if (data.outro) {
+    const outro = b.seconds(2.5);
+    background(b, cursor, outro, undefined, ACCENTS[data.pairs.length % ACCENTS.length], 0);
+    b.add("Textes", text(b, data.outro, cursor, outro, { preset: "impact", y: 0.46, height: 0.24, style: { size: vertical ? 0.06 : 0.09 } }));
+  }
+  return b.build();
+}
+
 // ─── Exemples, pour un modèle rempli à la main ───────────────────
 
 export const SAMPLE_QUIZ: QuizData = {
@@ -495,13 +612,20 @@ export const SAMPLE_SLIDESHOW: SlideshowData = {
   outro: "À bientôt",
 };
 
+export const SAMPLE_BEFORE_AFTER: BeforeAfterData = {
+  title: "Avant / Après",
+  pairs: [{ caption: "Première transformation" }, { caption: "Deuxième transformation" }],
+  outro: "Laquelle préfères-tu ?",
+};
+
 export function buildFromTemplate(
   template: TemplateId,
   name: string,
   aspect: AspectPreset,
-  data: QuizData | TopData | SlideshowData
+  data: QuizData | TopData | SlideshowData | BeforeAfterData
 ): ClipProject {
   if (template === "quiz") return buildQuiz(name, aspect, data as QuizData);
   if (template === "top") return buildTop(name, aspect, data as TopData);
+  if (template === "before-after") return buildBeforeAfter(name, aspect, data as BeforeAfterData);
   return buildSlideshow(name, aspect, data as SlideshowData);
 }

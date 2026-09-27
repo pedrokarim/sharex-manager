@@ -11,6 +11,7 @@ import {
   Loader2,
   Plus,
   Sparkles,
+  SquareSplitHorizontal,
   Trophy,
   X,
 } from "lucide-react";
@@ -30,9 +31,11 @@ import {
 import { cn } from "@/lib/utils";
 import { appendSequence, createImageItem, createProject } from "../engine/edit";
 import {
+  SAMPLE_BEFORE_AFTER,
   SAMPLE_QUIZ,
   SAMPLE_SLIDESHOW,
   SAMPLE_TOP,
+  buildBeforeAfter,
   buildFromTemplate,
   type TemplateId,
 } from "../engine/templates";
@@ -54,7 +57,21 @@ const TEMPLATES: { id: TemplateId; label: string; description: string; icon: typ
   { id: "quiz", label: "Quiz", description: "Questions, choix, compte à rebours, réponse révélée", icon: ListOrdered },
   { id: "top", label: "Top", description: "Un classement révélé du dernier au premier", icon: Trophy },
   { id: "slideshow", label: "Diaporama", description: "Des images légendées qui racontent une histoire", icon: Images },
+  { id: "before-after", label: "Avant / Après", description: "Des paires d'images, l'une balayée par l'autre", icon: SquareSplitHorizontal },
 ];
+
+/** L'assistant illustre lui-même ses clips : l'Avant / Après demande des images fournies. */
+const ASSISTANT_TEMPLATE_IDS: TemplateId[] = ["quiz", "top", "slideshow"];
+
+const SAMPLES = {
+  quiz: SAMPLE_QUIZ,
+  top: SAMPLE_TOP,
+  slideshow: SAMPLE_SLIDESHOW,
+  "before-after": SAMPLE_BEFORE_AFTER,
+} as const;
+
+/** Montage d'une sélection de la galerie. */
+type Recipe = "slideshow" | "before-after";
 
 const IDEAS = [
   "Un quiz sur les animaux de la savane",
@@ -83,6 +100,7 @@ export function CreateDialog({
   const [name, setName] = useState("");
   const [aspect, setAspect] = useState<AspectPreset>("9:16");
   const [template, setTemplate] = useState<TemplateId>("quiz");
+  const [recipe, setRecipe] = useState<Recipe>("slideshow");
   const [brief, setBrief] = useState("");
   const [count, setCount] = useState(5);
   const [withImages, setWithImages] = useState(true);
@@ -96,6 +114,7 @@ export function CreateDialog({
   useEffect(() => {
     if (!request) return;
     setMode(request.files.length ? "blank" : "assistant");
+    setRecipe("slideshow");
     setName(request.files.length ? `Diaporama du ${new Date().toLocaleDateString("fr-FR")}` : "Nouveau clip");
     setBusy(false);
     setJob(null);
@@ -120,18 +139,19 @@ export function CreateDialog({
       const title = name.trim() || "Nouveau clip";
       let project;
       if (mode === "template") {
-        const data = template === "quiz" ? SAMPLE_QUIZ : template === "top" ? SAMPLE_TOP : SAMPLE_SLIDESHOW;
-        project = buildFromTemplate(template, title, aspect, data);
+        project = buildFromTemplate(template, title, aspect, SAMPLES[template]);
+      } else if (request.files.length && recipe === "before-after") {
+        // Images prises deux par deux, dans l'ordre de la sélection.
+        const sources = await Promise.all(request.files.map((file) => gallerySource(file)));
+        const pairs = [];
+        for (let index = 0; index + 1 < sources.length; index += 2) {
+          pairs.push({ before: sources[index], after: sources[index + 1] });
+        }
+        project = buildBeforeAfter(title, aspect, { pairs });
       } else {
         project = createProject(title, aspect);
         if (request.files.length) {
-          const sources = await Promise.all(
-            request.files.map(async (file) => {
-              const url = `/api/files/${encodeURIComponent(file)}`;
-              const probe = await probeMedia(url, "image");
-              return { url, ref: `upload:${file}`, name: file, kind: "image" as const, ...probe };
-            })
-          );
+          const sources = await Promise.all(request.files.map((file) => gallerySource(file)));
           let start = 0;
           const items = sources.map((source, index) => {
             const item = createImageItem(source, start, project!.fps);
@@ -180,7 +200,7 @@ export function CreateDialog({
           <DialogTitle>Nouveau clip</DialogTitle>
           <DialogDescription>
             {fromGallery
-              ? `${request!.files.length} image(s) de la galerie, montées en diaporama.`
+              ? `${request!.files.length} image(s) de la galerie, à monter en diaporama ou en avant / après.`
               : "Laissez l'assistant monter un short, partez d'un modèle, ou commencez à vide."}
           </DialogDescription>
         </DialogHeader>
@@ -198,7 +218,10 @@ export function CreateDialog({
                     <button
                       key={entry.id}
                       type="button"
-                      onClick={() => setMode(entry.id)}
+                      onClick={() => {
+                        setMode(entry.id);
+                        if (entry.id === "assistant" && !ASSISTANT_TEMPLATE_IDS.includes(template)) setTemplate("quiz");
+                      }}
                       className={cn("relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors", active ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
                     >
                       {active && <motion.span layoutId="create-mode" className="absolute inset-0 rounded-md bg-background shadow-sm" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
@@ -231,7 +254,7 @@ export function CreateDialog({
                         ))}
                       </div>
                     </div>
-                    <TemplatePicker value={template} onChange={setTemplate} />
+                    <TemplatePicker value={template} onChange={setTemplate} only={ASSISTANT_TEMPLATE_IDS} />
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="space-y-1.5">
                         <span className="flex items-center justify-between text-sm">
@@ -304,6 +327,18 @@ export function CreateDialog({
                 {mode === "blank" && (
                   <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nom du clip" autoFocus />
                 )}
+
+                {mode === "blank" && fromGallery && (
+                  <RecipePicker
+                    value={recipe}
+                    onChange={(next) => {
+                      setRecipe(next);
+                      const date = new Date().toLocaleDateString("fr-FR");
+                      setName(next === "before-after" ? `Avant / Après du ${date}` : `Diaporama du ${date}`);
+                    }}
+                    count={request!.files.length}
+                  />
+                )}
               </motion.div>
             </AnimatePresence>
 
@@ -327,7 +362,11 @@ export function CreateDialog({
                   Créer avec l&apos;IA
                 </Button>
               ) : (
-                <Button onClick={createBlankOrTemplate} disabled={busy} className="gap-2">
+                <Button
+                  onClick={createBlankOrTemplate}
+                  disabled={busy || (fromGallery && recipe === "before-after" && request!.files.length < 2)}
+                  className="gap-2"
+                >
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Créer
                 </Button>
@@ -340,10 +379,63 @@ export function CreateDialog({
   );
 }
 
-function TemplatePicker({ value, onChange }: { value: TemplateId; onChange: (value: TemplateId) => void }) {
+/** Image de la galerie, prête à poser sur la timeline. */
+async function gallerySource(file: string) {
+  const url = `/api/files/${encodeURIComponent(file)}`;
+  const probe = await probeMedia(url, "image");
+  return { url, ref: `upload:${file}`, name: file, kind: "image" as const, ...probe };
+}
+
+function RecipePicker({ value, onChange, count }: { value: Recipe; onChange: (value: Recipe) => void; count: number }) {
+  const pairs = Math.floor(count / 2);
+  const options: { id: Recipe; label: string; description: string; icon: typeof Plus }[] = [
+    { id: "slideshow", label: "Diaporama", description: "Les images à la suite, avec un mouvement de caméra lent", icon: Images },
+    {
+      id: "before-after",
+      label: "Avant / Après",
+      description:
+        count < 2
+          ? "Sélectionnez au moins deux images"
+          : `${pairs} paire${pairs > 1 ? "s" : ""}, dans l'ordre de la sélection${count % 2 ? " ; la dernière image, seule, est écartée" : ""}`,
+      icon: SquareSplitHorizontal,
+    },
+  ];
   return (
-    <div className="grid gap-2 sm:grid-cols-3">
-      {TEMPLATES.map((entry) => {
+    <div className="grid gap-2 sm:grid-cols-2">
+      {options.map((entry) => {
+        const Icon = entry.icon;
+        const selected = entry.id === value;
+        return (
+          <button
+            key={entry.id}
+            type="button"
+            onClick={() => onChange(entry.id)}
+            className={cn("flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-colors", selected ? "border-primary bg-primary/10" : "hover:bg-muted")}
+          >
+            <Icon className={cn("h-5 w-5", selected ? "text-primary" : "text-muted-foreground")} />
+            <span className="text-sm font-medium">{entry.label}</span>
+            <span className="text-xs leading-4 text-muted-foreground">{entry.description}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TemplatePicker({
+  value,
+  onChange,
+  only,
+}: {
+  value: TemplateId;
+  onChange: (value: TemplateId) => void;
+  /** Modèles proposés ; tous par défaut. */
+  only?: TemplateId[];
+}) {
+  const templates = only ? TEMPLATES.filter((entry) => only.includes(entry.id)) : TEMPLATES;
+  return (
+    <div className={cn("grid gap-2", templates.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "sm:grid-cols-3")}>
+      {templates.map((entry) => {
         const Icon = entry.icon;
         const selected = entry.id === value;
         return (
