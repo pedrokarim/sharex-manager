@@ -30,7 +30,7 @@ const authConfig = resolveAuthConfig();
  * la vérification). AUTH_URL pointe sur le domaine de production : sans cette
  * liste, se connecter depuis http://localhost:<PORT> renvoie 403.
  */
-const trustedOrigins = [
+export const trustedOrigins = [
   process.env.AUTH_URL,
   process.env.NEXT_PUBLIC_API_URL,
   process.env.NEXT_PUBLIC_APP_DOMAIN &&

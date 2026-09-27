@@ -127,13 +127,13 @@ const nextConfig = {
                 // Security + CORS headers pour toutes les routes
                 source: '/:path*',
                 headers: [
+                    // Pas d'Access-Control-Allow-Credentials : l'application ne
+                    // s'appelle qu'elle-même. Avec, une page d'img.* ou de
+                    // ascencia.re (origines admises par le proxy) pouvait lire
+                    // les réponses d'une session connectée.
                     {
                         key: 'Access-Control-Allow-Origin',
                         value: 'https://sxm.ascencia.re',
-                    },
-                    {
-                        key: 'Access-Control-Allow-Credentials',
-                        value: 'true',
                     },
                     {
                         key: 'Access-Control-Allow-Headers',

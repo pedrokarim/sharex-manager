@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
-import { hasAccess, isAdmin } from "@/lib/api-guard";
+import { hasAccess, isAdmin, isTrustedOrigin } from "@/lib/api-guard";
 
 /** Fonctions appelées par le gestionnaire de modules lui-même. */
 const INTERNAL_FUNCTIONS = new Set(["initModule", "processImage", "default"]);
@@ -21,6 +21,15 @@ export async function POST(request: NextRequest) {
         userEmail: undefined,
       });
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    // Une page d'un autre site peut envoyer un formulaire en text/plain avec
+    // le cookie de session : seules les requêtes JSON de ce site passent.
+    if (!isTrustedOrigin(request.headers.get("origin"))) {
+      return NextResponse.json({ error: "Origine refusée" }, { status: 403 });
+    }
+    if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
+      return NextResponse.json({ error: "Corps JSON attendu" }, { status: 415 });
     }
 
     const { moduleName, functionName, args = [] } = await request.json();
