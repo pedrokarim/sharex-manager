@@ -1,8 +1,0 @@
-{
-  "name": "module-Resize",
-  "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "react-slider": "^2.0.6"
-  }
-}

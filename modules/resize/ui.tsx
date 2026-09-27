@@ -40,7 +40,7 @@ export default function ResizeUI({ fileInfo, onComplete }: ResizeUIProps) {
   const [maintainAspectRatio, setMaintainAspectRatio] = useState(true);
   const [activeTab, setActiveTab] = useState("basic");
   const [selectedPreset, setSelectedPreset] = useState("custom");
-  const [fitMode, setFitMode] = useState("contain");
+  const [fitMode, setFitMode] = useState("inside");
   const [keepMetadata, setKeepMetadata] = useState(true);
   const [originalDimensions, setOriginalDimensions] = useState({
     width: 0,

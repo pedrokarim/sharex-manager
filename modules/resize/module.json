@@ -4,7 +4,7 @@
   "description": "Redimensionne automatiquement les screenshots",
   "author": "ShareX Manager",
   "enabled": true,
-  "entry": "index.ts",
+  "entry": "index.process.ts",
   "icon": "https://cdn-icons-png.flaticon.com/512/5821/5821476.png",
   "category": "Édition",
   "hasUI": true,
@@ -20,13 +20,5 @@
     "maxHeight": 1080,
     "quality": 90,
     "maintainAspectRatio": true
-  },
-  "npmDependencies": {
-    "sharp": "^0.32.1",
-    "react-slider": "^2.0.6"
-  },
-  "capabilities": [
-    "initModule",
-    "resizeImage"
-  ]
+  }
 }

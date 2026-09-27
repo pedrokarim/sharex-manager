@@ -114,6 +114,7 @@ export function ModulesContextSection({ files }: ModulesContextSectionProps) {
                           moduleName: processor.name,
                           description: processor.description,
                           category: processor.category,
+                          processesImages: processor.processesImages,
                           file: files[0],
                         });
                       } else {

@@ -1,19 +1,27 @@
 import { ModuleHooks } from "@/types/modules";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 
-// Récupération des paramètres du module depuis module.json
-let settings: {
-  aspectRatio: number | null;
-  circularCrop: boolean;
-  quality: number;
-};
+export interface CropArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /**
+   * « % » : relatif à l'image (ce qu'envoie l'interface, qui affiche une
+   * version réduite de l'image) ; « px » : pixels de l'image d'origine.
+   */
+  unit: "%" | "px";
+}
 
-// Fonction pour recadrer une image
-async function toOutputFormat(
-  pipeline: sharp.Sharp,
-  format: string | undefined,
-  quality: number
-): Promise<Buffer> {
+export interface CropOptions {
+  crop?: CropArea;
+  circularCrop?: boolean;
+  quality?: number;
+}
+
+async function encode(pipeline: Sharp, format: string | undefined, quality: number, needsAlpha: boolean): Promise<Buffer> {
+  // Un masque circulaire a besoin de transparence : le JPEG n'en a pas.
+  if (needsAlpha && (format === "jpeg" || format === "jpg" || !format)) return pipeline.png().toBuffer();
   switch (format) {
     case "png":
       return pipeline.png().toBuffer();
@@ -30,170 +38,56 @@ async function toOutputFormat(
   }
 }
 
-export async function cropImage(
-  imageBuffer: Buffer,
-  cropData: any
-): Promise<Buffer> {
-  try {
-    console.log("Recadrage avec les données:", cropData);
-
-    // Extraire les informations de recadrage
-    const { crop, circularCrop, quality } = cropData;
-
-    // Obtenir les métadonnées de l'image originale
-    const metadata = await sharp(imageBuffer).metadata();
-    const originalWidth = metadata.width || 800;
-    const originalHeight = metadata.height || 600;
-    const inputFormat = metadata.format;
-    console.log(
-      "Métadonnées de l'image originale:",
-      originalWidth,
-      "x",
-      originalHeight
-    );
-
-    // Si crop est au format PixelCrop (valeurs en pixels)
-    if (crop.unit === "px") {
-      console.log("Recadrage en pixels:", crop);
-
-      // Vérifier que les valeurs sont dans les limites de l'image
-      const x = Math.max(0, Math.round(crop.x));
-      const y = Math.max(0, Math.round(crop.y));
-      const width = Math.min(Math.round(crop.width), originalWidth - x);
-      const height = Math.min(Math.round(crop.height), originalHeight - y);
-
-      console.log(
-        `Recadrage effectif: x=${x}, y=${y}, width=${width}, height=${height}`
-      );
-
-      if (width <= 0 || height <= 0) {
-        console.error("Dimensions de recadrage invalides");
-        return imageBuffer;
-      }
-
-      // Recadrer l'image avec les valeurs en pixels
-      let processedImage = sharp(imageBuffer).extract({
-        left: x,
-        top: y,
-        width: width,
-        height: height,
-      });
-
-      // Appliquer un masque circulaire si nécessaire
-      if (circularCrop) {
-        console.log("Application d'un masque circulaire");
-
-        // Créer un masque circulaire
-        const circleBuffer = Buffer.from(`
-          <svg width="${width}" height="${height}">
-            <circle cx="${width / 2}" cy="${height / 2}" r="${
-          Math.min(width, height) / 2
-        }" fill="white" />
-          </svg>
-        `);
-
-        // Appliquer le masque
-        processedImage = processedImage.composite([
-          {
-            input: circleBuffer,
-            blend: "dest-in",
-          },
-        ]);
-      }
-
-      const result = await toOutputFormat(processedImage, inputFormat, quality || 90);
-
-      console.log("Image recadrée avec succès");
-      return result;
-    }
-    // Si crop est au format pourcentage
-    else if (crop.unit === "%" || crop.unit === "percent") {
-      console.log("Recadrage en pourcentage:", crop);
-
-      // Convertir les pourcentages en pixels
-      const x = Math.round((crop.x / 100) * originalWidth);
-      const y = Math.round((crop.y / 100) * originalHeight);
-      const width = Math.round((crop.width / 100) * originalWidth);
-      const height = Math.round((crop.height / 100) * originalHeight);
-
-      console.log(
-        `Recadrage converti en pixels: x=${x}, y=${y}, width=${width}, height=${height}`
-      );
-
-      if (width <= 0 || height <= 0) {
-        console.error("Dimensions de recadrage invalides après conversion");
-        return imageBuffer;
-      }
-
-      // Recadrer l'image avec les valeurs converties en pixels
-      let processedImage = sharp(imageBuffer).extract({
-        left: x,
-        top: y,
-        width: width,
-        height: height,
-      });
-
-      // Appliquer un masque circulaire si nécessaire
-      if (circularCrop) {
-        console.log("Application d'un masque circulaire");
-
-        // Créer un masque circulaire
-        const circleBuffer = Buffer.from(`
-          <svg width="${width}" height="${height}">
-            <circle cx="${width / 2}" cy="${height / 2}" r="${
-          Math.min(width, height) / 2
-        }" fill="white" />
-          </svg>
-        `);
-
-        // Appliquer le masque
-        processedImage = processedImage.composite([
-          {
-            input: circleBuffer,
-            blend: "dest-in",
-          },
-        ]);
-      }
-
-      const result = await toOutputFormat(processedImage, inputFormat, quality || 90);
-
-      console.log("Image recadrée avec succès");
-      return result;
-    } else {
-      console.error("Format de recadrage non pris en charge:", crop.unit);
-      return imageBuffer;
-    }
-  } catch (error) {
-    console.error("Erreur lors du recadrage de l'image:", error);
-    return imageBuffer; // Retourner l'image originale en cas d'erreur
+/** Zone demandée, convertie en pixels de l'image et bornée à celle-ci. */
+export function toPixelArea(crop: CropArea, width: number, height: number) {
+  const scaleX = crop.unit === "%" ? width / 100 : 1;
+  const scaleY = crop.unit === "%" ? height / 100 : 1;
+  const left = Math.max(0, Math.round(Number(crop.x) * scaleX));
+  const top = Math.max(0, Math.round(Number(crop.y) * scaleY));
+  const areaWidth = Math.min(Math.round(Number(crop.width) * scaleX), width - left);
+  const areaHeight = Math.min(Math.round(Number(crop.height) * scaleY), height - top);
+  if (!Number.isFinite(areaWidth + areaHeight) || areaWidth < 1 || areaHeight < 1) {
+    throw new Error("La zone de recadrage est vide ou hors de l'image.");
   }
+  return { left, top, width: areaWidth, height: areaHeight };
 }
 
-// Top-level processImage export for the module manager
-export async function processImage(
-  imageBuffer: Buffer,
-  data?: any
-): Promise<Buffer> {
-  return await cropImage(imageBuffer, data);
+/**
+ * Recadre l'image. Une erreur remonte au lieu de rendre l'original, sans quoi
+ * l'application annonçait un recadrage qui n'avait pas eu lieu.
+ */
+export async function cropImage(imageBuffer: Buffer, options?: CropOptions): Promise<Buffer> {
+  if (!options?.crop) throw new Error("Sélectionnez la zone à garder.");
+  const metadata = await sharp(imageBuffer).metadata();
+  if (!metadata.width || !metadata.height) throw new Error("Dimensions de l'image illisibles.");
+
+  const area = toPixelArea(options.crop, metadata.width, metadata.height);
+  if (area.width === metadata.width && area.height === metadata.height && !options.circularCrop) {
+    throw new Error("La zone choisie couvre toute l'image : rien à recadrer.");
+  }
+
+  let pipeline = sharp(imageBuffer).extract(area);
+  if (options.circularCrop) {
+    const mask = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${area.width}" height="${area.height}"><ellipse cx="${area.width / 2}" cy="${area.height / 2}" rx="${area.width / 2}" ry="${area.height / 2}" fill="#fff"/></svg>`
+    );
+    // L'extraction doit être rendue avant d'appliquer le masque à sa taille.
+    pipeline = sharp(await pipeline.png().toBuffer()).ensureAlpha().composite([{ input: mask, blend: "dest-in" }]);
+  }
+  const quality = Math.min(100, Math.max(1, Math.round(Number(options.quality) || 90)));
+  return encode(pipeline, metadata.format, quality, Boolean(options.circularCrop));
 }
 
-// Hooks du module
+/** Point d'entrée du gestionnaire de modules. */
+export async function processImage(imageBuffer: Buffer, data?: CropOptions): Promise<Buffer> {
+  return cropImage(imageBuffer, data);
+}
+
 export const moduleHooks: ModuleHooks = {
-  onInit: () => {
-    console.log("Module Crop initialisé");
-  },
-  onEnable: () => {
-    console.log("Module Crop activé");
-  },
-  onDisable: () => {
-    console.log("Module Crop désactivé");
-  },
   processImage,
 };
 
-// Fonction pour initialiser les paramètres du module
-export function initModule(config: any) {
-  settings = config.settings;
+export function initModule() {
   return moduleHooks;
 }
 

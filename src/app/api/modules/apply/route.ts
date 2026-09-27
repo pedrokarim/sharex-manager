@@ -9,6 +9,17 @@ import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import { isFileSecure, setFileSecure } from "@/lib/secure-files";
+import sharp from "sharp";
+
+/** Extension d'après le format réellement produit par le module. */
+const EXTENSION_BY_FORMAT: Record<string, string> = {
+  jpeg: ".jpg",
+  png: ".png",
+  webp: ".webp",
+  gif: ".gif",
+  avif: ".avif",
+  tiff: ".tiff",
+};
 
 /** Nom d'un fichier de la galerie : un seul segment, sans chemin ni fichier caché. */
 function isGalleryFileName(value: unknown): value is string {
@@ -122,20 +133,43 @@ export async function POST(request: NextRequest) {
     // Traiter l'image avec le module. En mode strict, un échec remonte au lieu
     // de rendre l'original : sinon la « nouvelle version » était une simple
     // copie du fichier source.
-    const processedBuffer = await apiModuleManager.processImageWithModule(
-      moduleName,
-      fileBuffer,
-      settings,
-      { strict: true }
-    );
+    let processedBuffer: Buffer;
+    try {
+      processedBuffer = await apiModuleManager.processImageWithModule(
+        moduleName,
+        fileBuffer,
+        settings,
+        { strict: true }
+      );
+    } catch (error) {
+      // L'échec d'un module se dit tel quel : « Erreur lors du traitement »
+      // n'aidait personne à comprendre ce qui clochait.
+      const message = error instanceof Error ? error.message : "Le module a échoué";
+      return NextResponse.json({ error: message }, { status: 422 });
+    }
+
+    // Une « nouvelle version » identique à l'original n'est pas un succès :
+    // c'est ce qui se passait quand un module échouait en silence.
+    if (Buffer.compare(processedBuffer, fileBuffer) === 0) {
+      return NextResponse.json(
+        { error: "Le module n'a rien changé à l'image avec ces réglages." },
+        { status: 422 }
+      );
+    }
 
     // Générer un nouveau nom de fichier si nécessaire
+    // Un module peut changer de format (un recadrage rond passe en PNG pour
+    // la transparence) : l'extension suit le contenu, sinon un « .jpg »
+    // contiendrait du PNG.
+    const fileExt = path.extname(fileName);
+    const format = await sharp(processedBuffer).metadata().then((meta) => meta.format).catch(() => undefined);
+    const producedExt = format ? EXTENSION_BY_FORMAT[format] : undefined;
+    const sameFormat = !producedExt || producedExt === fileExt.toLowerCase() || (producedExt === ".jpg" && fileExt.toLowerCase() === ".jpeg");
     let newFileName = fileName;
-    if (createNewVersion) {
-      const fileExt = path.extname(fileName);
+    if (createNewVersion || !sameFormat) {
       const fileNameWithoutExt = path.basename(fileName, fileExt);
       const timestamp = Date.now();
-      newFileName = `${fileNameWithoutExt}_${moduleName}_${timestamp}${fileExt}`;
+      newFileName = `${fileNameWithoutExt}_${moduleName}_${timestamp}${sameFormat ? fileExt : producedExt}`;
     }
 
     // Écrire le fichier traité
@@ -147,13 +181,13 @@ export async function POST(request: NextRequest) {
 
     // Une version d'un fichier sécurisé reste sécurisée : sinon elle serait
     // publique sur le domaine d'images.
-    if (createNewVersion && (await isFileSecure(fileName))) {
+    if (newFileName !== fileName && (await isFileSecure(fileName))) {
       await setFileSecure(newFileName, true);
     }
 
     // Une nouvelle version doit apparaître tout de suite dans les galeries
     // ouvertes, comme un upload ShareX.
-    if (createNewVersion) {
+    if (newFileName !== fileName) {
       await announceNewUpload(newFileName);
     }
 

@@ -32,6 +32,7 @@ interface ModuleCardProps {
   module: ModuleConfig;
   onToggle: (moduleName: string) => Promise<void>;
   onDelete: (moduleName: string) => Promise<void>;
+  onAutoProcessChange?: (moduleName: string, autoProcess: boolean) => void;
 }
 
 /**
@@ -42,8 +43,35 @@ interface ModuleCardProps {
  * remontait coller au contenu et les actions se retrouvaient à une hauteur
  * différente dans chaque carte d'une même rangée, avec un vide sous elles.
  */
-export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
+export const ModuleCard = ({ module, onToggle, onDelete, onAutoProcessChange }: ModuleCardProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [savingAuto, setSavingAuto] = useState(false);
+  const processesImages = Boolean(module.capabilities?.includes("processImage")) && !module.manualOnly;
+
+  const handleAutoProcess = async (enabled: boolean) => {
+    setSavingAuto(true);
+    try {
+      const response = await fetch(`/api/modules/${encodeURIComponent(module.name)}/auto-process`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error ?? "Enregistrement impossible");
+      }
+      onAutoProcessChange?.(module.name, enabled);
+      toast.success(
+        enabled
+          ? `${module.name} s'appliquera à chaque capture envoyée`
+          : `${module.name} ne s'applique plus aux envois`
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Enregistrement impossible");
+    } finally {
+      setSavingAuto(false);
+    }
+  };
   const [imageError, setImageError] = useState(false);
   const [isInstallingDeps, setIsInstallingDeps] = useState(false);
 
@@ -199,6 +227,23 @@ export const ModuleCard = ({ module, onToggle, onDelete }: ModuleCardProps) => {
             </span>
           )}
         </div>
+
+        {processesImages && module.enabled && (
+          <label className="flex items-start justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-2">
+            <span className="text-xs leading-4">
+              Appliquer à chaque envoi
+              <span className="block text-[11px] text-muted-foreground">
+                Avec les réglages enregistrés du module
+              </span>
+            </span>
+            <Switch
+              checked={Boolean(module.autoProcess)}
+              onCheckedChange={handleAutoProcess}
+              disabled={savingAuto}
+              aria-label={`Appliquer ${module.name} à chaque capture envoyée`}
+            />
+          </label>
+        )}
 
         {npmCount > 0 && (
           <Popover>

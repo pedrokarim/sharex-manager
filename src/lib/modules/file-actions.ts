@@ -39,6 +39,8 @@ export interface ModuleProcessor {
   category?: string;
   icon?: string;
   hasUI: boolean;
+  /** Transforme l'image ; faux pour un module d'analyse. */
+  processesImages: boolean;
 }
 
 export interface ModuleFileActions {
@@ -185,6 +187,11 @@ export interface ModuleSettingsRequest {
   moduleName: string;
   description?: string;
   category?: string;
+  /**
+   * Le module transforme l'image (`processImage`). Faux pour un module
+   * d'analyse : sa fenêtre se ferme sans rien appliquer.
+   */
+  processesImages?: boolean;
   file: { name: string; url: string; size: number };
 }
 

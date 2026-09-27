@@ -51,6 +51,13 @@ export interface ModuleConfig {
   functions?: Record<string, "user" | "admin">;
   /** Autorise l'envoi direct de médias dans `data/assets/` du module. */
   uploads?: { maxMb?: number; kinds?: ("image" | "video" | "audio")[] };
+  /**
+   * Applique `processImage` à chaque capture envoyée, avec les réglages
+   * enregistrés. Choix de l'administrateur, désactivé par défaut.
+   */
+  autoProcess?: boolean;
+  /** Le traitement demande un choix à la main (zone à recadrer…) : jamais à l'envoi. */
+  manualOnly?: boolean;
 }
 
 export interface LoadedModule {

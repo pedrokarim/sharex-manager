@@ -1,150 +1,105 @@
 import { ModuleHooks } from "@/types/modules";
 import sharp from "sharp";
 
-// Récupération des paramètres du module depuis module.json
-let settings: {
+export type FitMode = "inside" | "outside" | "cover" | "contain" | "fill";
+
+export interface ResizeOptions {
   maxWidth: number;
   maxHeight: number;
   quality: number;
+  /** Faux : l'image prend exactement la taille demandée, déformée au besoin. */
   maintainAspectRatio: boolean;
+  /**
+   * - inside : tient dans le cadre, sans rognage ni agrandissement ;
+   * - outside : couvre au moins le cadre ;
+   * - cover : remplit le cadre, l'excédent est rogné ;
+   * - contain : tient dans le cadre, complété par des bandes transparentes ;
+   * - fill : étiré à la taille exacte.
+   */
+  fitMode: FitMode;
+  keepMetadata: boolean;
+}
+
+const DEFAULTS: ResizeOptions = {
+  maxWidth: 1920,
+  maxHeight: 1080,
+  quality: 90,
+  maintainAspectRatio: true,
+  fitMode: "inside",
+  keepMetadata: true,
 };
 
-// Fonction pour redimensionner une image
-export async function resizeImage(
-  imageBuffer: Buffer,
-  customSettings?: any
-): Promise<Buffer> {
-  try {
-    // Utiliser les paramètres personnalisés s'ils sont fournis, sinon utiliser les paramètres par défaut
-    const resizeSettings = customSettings ||
-      settings || {
-        maxWidth: 1920,
-        maxHeight: 1080,
-        quality: 90,
-        maintainAspectRatio: true,
-      };
+const FIT_MODES: FitMode[] = ["inside", "outside", "cover", "contain", "fill"];
 
-    console.log("Redimensionnement avec les paramètres:", resizeSettings);
+function dimension(value: unknown, fallback: number): number {
+  const number = Math.round(Number(value));
+  return Number.isFinite(number) && number > 0 ? Math.min(number, 16_384) : fallback;
+}
 
-    // Obtenir les dimensions et le format de l'image
-    const metadata = await sharp(imageBuffer).metadata();
-    const originalWidth = metadata.width || 0;
-    const originalHeight = metadata.height || 0;
-    const inputFormat = metadata.format;
+export function normalizeOptions(input: Partial<ResizeOptions> | undefined): ResizeOptions {
+  const options = { ...DEFAULTS, ...(input ?? {}) };
+  return {
+    maxWidth: dimension(options.maxWidth, DEFAULTS.maxWidth),
+    maxHeight: dimension(options.maxHeight, DEFAULTS.maxHeight),
+    quality: Math.min(100, Math.max(1, Math.round(Number(options.quality) || DEFAULTS.quality))),
+    maintainAspectRatio: options.maintainAspectRatio !== false,
+    fitMode: FIT_MODES.includes(options.fitMode) ? options.fitMode : DEFAULTS.fitMode,
+    keepMetadata: options.keepMetadata !== false,
+  };
+}
 
-    console.log("Dimensions originales:", originalWidth, "x", originalHeight);
+/**
+ * Redimensionne l'image. Si elle tient déjà dans le cadre (mode « inside »),
+ * une erreur le dit : renvoyer l'original faisait croire à un succès, et
+ * réencoder pour rien dégradait chaque capture.
+ */
+export async function resizeImage(imageBuffer: Buffer, input?: Partial<ResizeOptions>): Promise<Buffer> {
+  const options = normalizeOptions(input);
+  const metadata = await sharp(imageBuffer).metadata();
+  const width = metadata.width;
+  const height = metadata.height;
+  if (!width || !height) throw new Error("Dimensions de l'image illisibles.");
 
-    // Vérifier si l'image a besoin d'être redimensionnée
-    if (
-      originalWidth <= resizeSettings.maxWidth &&
-      originalHeight <= resizeSettings.maxHeight
-    ) {
-      console.log(
-        "L'image est déjà dans les dimensions maximales, pas de redimensionnement nécessaire"
-      );
-      return imageBuffer; // Pas besoin de redimensionner
-    }
+  const fit: FitMode = options.maintainAspectRatio ? options.fitMode : "fill";
+  if (fit === "inside" && width <= options.maxWidth && height <= options.maxHeight) {
+    throw new Error(`L'image fait déjà ${width} × ${height} px, dans la limite de ${options.maxWidth} × ${options.maxHeight}.`);
+  }
 
-    // Calculer les nouvelles dimensions
-    let newWidth = resizeSettings.maxWidth;
-    let newHeight = resizeSettings.maxHeight;
+  let pipeline = sharp(imageBuffer).resize(options.maxWidth, options.maxHeight, {
+    fit,
+    // On n'agrandit jamais une capture en mode « inside » : elle y perdrait en netteté.
+    withoutEnlargement: fit === "inside",
+    background: { r: 0, g: 0, b: 0, alpha: 0 },
+  });
+  if (options.keepMetadata) pipeline = pipeline.keepMetadata();
 
-    if (resizeSettings.maintainAspectRatio) {
-      const aspectRatio = originalWidth / originalHeight;
-
-      if (originalWidth > originalHeight) {
-        // Image horizontale
-        newWidth = resizeSettings.maxWidth;
-        newHeight = Math.round(newWidth / aspectRatio);
-
-        if (newHeight > resizeSettings.maxHeight) {
-          newHeight = resizeSettings.maxHeight;
-          newWidth = Math.round(newHeight * aspectRatio);
-        }
-      } else {
-        // Image verticale ou carrée
-        newHeight = resizeSettings.maxHeight;
-        newWidth = Math.round(newHeight * aspectRatio);
-
-        if (newWidth > resizeSettings.maxWidth) {
-          newWidth = resizeSettings.maxWidth;
-          newHeight = Math.round(newWidth / aspectRatio);
-        }
-      }
-    }
-
-    console.log(`Nouvelles dimensions: ${newWidth}x${newHeight}`);
-
-    // Redimensionner l'image en préservant le format d'entrée
-    let pipeline = sharp(imageBuffer).resize(newWidth, newHeight, {
-      fit: "inside",
-      withoutEnlargement: true,
-    });
-
-    let result: Buffer;
-    switch (inputFormat) {
-      case "png":
-        result = await pipeline.png().toBuffer();
-        break;
-      case "webp":
-        result = await pipeline.webp({ quality: resizeSettings.quality }).toBuffer();
-        break;
-      case "gif":
-        result = await pipeline.gif().toBuffer();
-        break;
-      case "avif":
-        result = await pipeline.avif({ quality: resizeSettings.quality }).toBuffer();
-        break;
-      case "tiff":
-        result = await pipeline.tiff({ quality: resizeSettings.quality }).toBuffer();
-        break;
-      default:
-        result = await pipeline.jpeg({ quality: resizeSettings.quality }).toBuffer();
-        break;
-    }
-
-    // Vérifier les dimensions après redimensionnement
-    const newMetadata = await sharp(result).metadata();
-    console.log(
-      "Dimensions après redimensionnement:",
-      newMetadata.width,
-      "x",
-      newMetadata.height
-    );
-
-    console.log("Image redimensionnée avec succès");
-    return result;
-  } catch (error) {
-    console.error("Erreur lors du redimensionnement de l'image:", error);
-    return imageBuffer; // Retourner l'image originale en cas d'erreur
+  switch (metadata.format) {
+    case "png":
+      return pipeline.png().toBuffer();
+    case "webp":
+      return pipeline.webp({ quality: options.quality }).toBuffer();
+    case "gif":
+      return pipeline.gif().toBuffer();
+    case "heif":
+      return pipeline.avif({ quality: options.quality }).toBuffer();
+    case "tiff":
+      return pipeline.tiff({ quality: options.quality }).toBuffer();
+    default:
+      // Des bandes transparentes n'existent pas en JPEG : le mode « contain » passe en PNG.
+      return fit === "contain" ? pipeline.png().toBuffer() : pipeline.jpeg({ quality: options.quality }).toBuffer();
   }
 }
 
-// Top-level processImage export for the module manager
-export async function processImage(
-  imageBuffer: Buffer,
-  data?: any
-): Promise<Buffer> {
-  return await resizeImage(imageBuffer, data);
+/** Point d'entrée du gestionnaire de modules. */
+export async function processImage(imageBuffer: Buffer, data?: Partial<ResizeOptions>): Promise<Buffer> {
+  return resizeImage(imageBuffer, data);
 }
 
-// Hooks du module
 export const moduleHooks: ModuleHooks = {
-  onInit: () => {
-    console.log("Module Resize initialisé");
-  },
-  onEnable: () => {
-    console.log("Module Resize activé");
-  },
-  onDisable: () => {
-    console.log("Module Resize désactivé");
-  },
   processImage,
 };
 
-// Fonction pour initialiser les paramètres du module
-export function initModule(config: any) {
-  settings = config.settings;
+export function initModule() {
   return moduleHooks;
 }
 

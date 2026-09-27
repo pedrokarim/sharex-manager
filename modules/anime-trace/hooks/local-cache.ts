@@ -8,7 +8,11 @@ interface CacheConfig {
   maxEntries: number; // Nombre maximum d'entrées dans le cache
 }
 
-export function useLocalCache<T>(key: string, config: CacheConfig) {
+/**
+ * Cache des résultats dans le navigateur. Une simple fonction : l'ancien nom
+ * en « use… » la faisait passer pour un hook React, appelé dans un gestionnaire.
+ */
+export function createLocalCache<T>(key: string, config: CacheConfig) {
   const CACHE_PREFIX = "anime_trace_cache_";
   const cacheKey = CACHE_PREFIX + key;
 

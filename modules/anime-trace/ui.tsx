@@ -22,8 +22,7 @@ import {
 } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { useLocalCache } from "./hooks/useLocalCache";
-import { createHash } from "crypto";
+import { createLocalCache } from "./hooks/local-cache";
 
 interface AnimeTraceUIProps {
   fileInfo: {
@@ -48,16 +47,18 @@ export default function AnimeTraceUI({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<EnrichedAnimeResult[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** Meilleure correspondance d'une recherche sans résultat retenu, pour le dire. */
+  const [bestMiss, setBestMiss] = useState<number | null>(null);
 
   // Enregistrer les traductions du module
   useModuleTranslations("anime_trace", moduleTranslations);
   const { t } = useTranslation();
 
-  // Créer une clé de cache unique basée sur l'URL de l'image
+  // Clé de cache : empreinte du contenu de l'image, calculée par le navigateur.
   const generateCacheKey = async (url: string): Promise<string> => {
     const response = await fetch(url);
-    const buffer = await response.arrayBuffer();
-    const hash = createHash("md5").update(Buffer.from(buffer)).digest("hex");
+    const digest = await crypto.subtle.digest("SHA-256", await response.arrayBuffer());
+    const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
     return `image_${hash}`;
   };
 
@@ -65,7 +66,7 @@ export default function AnimeTraceUI({
     anilistId: number
   ): Promise<AnilistMedia | undefined> => {
     // Cache pour les informations Anilist
-    const anilistCache = useLocalCache<AnilistMedia>(
+    const anilistCache = createLocalCache<AnilistMedia>(
       `anilist_${anilistId}`,
       CACHE_CONFIG
     );
@@ -134,10 +135,11 @@ export default function AnimeTraceUI({
     try {
       setIsAnalyzing(true);
       setError(null);
+      setBestMiss(null);
 
       // Générer la clé de cache
       const cacheKey = await generateCacheKey(fileInfo.url);
-      const resultsCache = useLocalCache<EnrichedAnimeResult[]>(
+      const resultsCache = createLocalCache<EnrichedAnimeResult[]>(
         cacheKey,
         CACHE_CONFIG
       );
@@ -183,6 +185,12 @@ export default function AnimeTraceUI({
 
       // Filtrer les résultats par similarité (seuil de 0.85 par défaut)
       const filteredResults = data.result.filter((r) => r.similarity >= 0.85);
+      if (filteredResults.length === 0) {
+        // Rien de fiable : on le dit, plutôt que de laisser l'écran d'accueil.
+        setBestMiss(Math.max(0, ...data.result.map((r) => r.similarity)));
+        setResults([]);
+        return;
+      }
 
       // Enrichir les résultats avec les informations Anilist
       const enrichedResults = await Promise.all(
@@ -274,7 +282,16 @@ export default function AnimeTraceUI({
               </div>
             )}
 
-            {!isAnalyzing && results.length === 0 && (
+            {!isAnalyzing && bestMiss !== null && (
+              <div className="rounded-md bg-muted p-4 text-sm">
+                <p className="font-medium">Aucune scène d’anime reconnue.</p>
+                <p className="mt-1 text-muted-foreground">
+                  La correspondance la plus proche n’atteint que {Math.round(bestMiss * 100)} %, sous le seuil de 85 % : l’image ne semble pas venir d’un anime référencé par trace.moe.
+                </p>
+              </div>
+            )}
+
+            {!isAnalyzing && results.length === 0 && bestMiss === null && (
               <div className="flex flex-col items-center justify-center h-full space-y-4 py-12">
                 <Upload className="h-12 w-12 text-muted-foreground" />
                 <p className="text-lg text-muted-foreground text-center">

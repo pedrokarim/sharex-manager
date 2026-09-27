@@ -71,7 +71,10 @@ export async function GET(request: NextRequest) {
         category: module.category,
         icon: module.icon,
         hasUI: module.hasUI,
-      }));
+        processesImages: Boolean(module.capabilities?.includes("processImage")),
+      }))
+      // Sans interface ni traitement, un module n'aurait rien à faire ici.
+      .filter((processor) => processor.hasUI || processor.processesImages);
 
     return NextResponse.json({ links, processors });
   } catch (error) {

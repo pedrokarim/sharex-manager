@@ -139,8 +139,11 @@ RUN mkdir -p /app/.next/static \
 # il embarque les siens. Codex, lui, valide TLS avec ceux du système, et sans
 # eux toute connexion sortante de l'agent échoue sur un laconique « error
 # sending request » — y compris la connexion au compte.
+#
+# Des polices, aussi : sharp dessine les textes (filigrane…) en SVG avec
+# celles du système, et sans aucune le texte disparaissait simplement.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates fontconfig fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Codex, plus son `rg` et son `bwrap`. Le PATH plutôt qu'un lien symbolique :

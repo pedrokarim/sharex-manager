@@ -4,7 +4,7 @@
   "description": "Module d'analyse d'images pour identifier les animes avec trace.moe",
   "author": "System",
   "enabled": true,
-  "entry": "index.ts",
+  "entry": "index.process.ts",
   "icon": "https://img.ascencia.re/kUHNekXzLfQb.png",
   "category": "analysis",
   "hasUI": true,
@@ -18,8 +18,5 @@
   "settings": {
     "cacheSize": 1000,
     "similarityThreshold": 0.85
-  },
-  "capabilities": [
-    "initModule"
-  ]
+  }
 }

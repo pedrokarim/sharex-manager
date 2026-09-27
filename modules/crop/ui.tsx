@@ -5,7 +5,7 @@ import ReactCrop, {
   centerCrop,
   makeAspectCrop,
   Crop,
-  PixelCrop,
+  PercentCrop,
 } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,9 @@ export default function CropUI({ fileInfo, onComplete }: CropUIProps) {
 
   const { t } = useTranslation();
   const [crop, setCrop] = useState<Crop>();
-  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  // En pourcentage : l'image est affichée réduite, des pixels d'écran ne
+  // correspondraient pas à ceux du fichier d'origine.
+  const [completedCrop, setCompletedCrop] = useState<PercentCrop>();
   const [aspect, setAspect] = useState<number | undefined>(undefined);
   const [circularCrop, setCircularCrop] = useState(false);
   const [quality, setQuality] = useState(90);
@@ -101,29 +103,13 @@ export default function CropUI({ fileInfo, onComplete }: CropUIProps) {
 
   // Appliquer le recadrage
   function handleApply() {
-    if (!completedCrop) {
-      // Si aucun recadrage n'est sélectionné, utiliser l'image entière
-      onComplete({
-        crop: {
-          x: 0,
-          y: 0,
-          width: imgWidth,
-          height: imgHeight,
-          unit: "px",
-        },
-        circularCrop,
-        quality,
-      });
-      return;
-    }
-
-    // Envoyer les données de recadrage
+    // Sans sélection, le serveur répond « Sélectionnez la zone à garder ».
+    // Un cadre posé par un ratio (en %) vaut sélection, même sans glisser.
+    const area = completedCrop ?? (crop?.unit === "%" ? crop : undefined);
     onComplete({
-      crop: completedCrop,
+      crop: area ? { ...area, unit: "%" } : undefined,
       circularCrop,
       quality,
-      gridOverlay,
-      gridType,
     });
   }
 
@@ -142,7 +128,7 @@ export default function CropUI({ fileInfo, onComplete }: CropUIProps) {
             <ReactCrop
               crop={crop}
               onChange={(c) => setCrop(c)}
-              onComplete={(c) => setCompletedCrop(c)}
+              onComplete={(_pixels, percent) => setCompletedCrop(percent)}
               aspect={aspect}
               circularCrop={circularCrop}
               className="max-h-[400px] overflow-hidden rounded-md"

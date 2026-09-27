@@ -4,10 +4,11 @@
   "description": "Recadre les images avec une interface interactive",
   "author": "ShareX Manager",
   "enabled": true,
-  "entry": "index.ts",
+  "entry": "index.process.ts",
   "icon": "https://cdn-icons-png.flaticon.com/512/1251/1251717.png",
   "category": "Édition",
   "hasUI": true,
+  "manualOnly": true,
   "supportedFileTypes": [
     "jpg",
     "jpeg",
@@ -19,13 +20,5 @@
     "aspectRatio": "free",
     "circularCrop": false,
     "quality": 90
-  },
-  "npmDependencies": {
-    "sharp": "^0.32.1",
-    "react-image-crop": "^10.1.5"
-  },
-  "capabilities": [
-    "cropImage",
-    "initModule"
-  ]
+  }
 }

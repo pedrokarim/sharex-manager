@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     await apiModuleManager.ensureInitialized();
 
     // Désactiver le module
-    const success = await apiModuleManager.toggleModule(moduleName);
+    const success = await apiModuleManager.setEnabled(moduleName, false);
 
     if (success) {
       logDb.createLog({

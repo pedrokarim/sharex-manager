@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -73,6 +73,19 @@ export default function WatermarkUI({
       label: t("modules.watermark.positions.bottom_right"),
     },
   ];
+
+  // L'aperçu montre l'image entière et met le texte à son échelle : les
+  // tailles valent pour une image de 1 000 px de large, comme côté serveur.
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [previewWidth, setPreviewWidth] = useState(0);
+  useEffect(() => {
+    const node = previewRef.current;
+    if (!node) return;
+    const observer = new ResizeObserver(([entry]) => setPreviewWidth(entry.contentRect.width));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  const previewScale = previewWidth / 1000;
 
   // Appliquer le filigrane
   const handleApply = () => {
@@ -180,13 +193,13 @@ export default function WatermarkUI({
             <div className="flex justify-between">
               <Label>{t("modules.watermark.font_size")}</Label>
               <span className="text-sm text-muted-foreground">
-                {fontSize}px
+                {fontSize}
               </span>
             </div>
             <Slider
               value={[fontSize]}
               min={8}
-              max={72}
+              max={160}
               step={1}
               onValueChange={(values) => setFontSize(values[0])}
             />
@@ -195,7 +208,7 @@ export default function WatermarkUI({
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label>{t("modules.watermark.padding")}</Label>
-              <span className="text-sm text-muted-foreground">{padding}px</span>
+              <span className="text-sm text-muted-foreground">{padding}</span>
             </div>
             <Slider
               value={[padding]}
@@ -233,11 +246,12 @@ export default function WatermarkUI({
             <h3 className="text-sm font-medium mb-2">
               {t("modules.watermark.preview")}
             </h3>
-            <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
+            <div ref={previewRef} className="relative overflow-hidden rounded-md bg-muted">
+              {/* L'image entière, à ses proportions : un aperçu rogné mentait sur la place du texte. */}
               <img
                 src={fileInfo.url}
                 alt={t("modules.watermark.preview")}
-                className="w-full h-full object-cover"
+                className="block h-auto w-full"
               />
               <div
                 className="absolute"
@@ -245,16 +259,18 @@ export default function WatermarkUI({
                   top: getPreviewPosition(position).top,
                   left: getPreviewPosition(position).left,
                   transform: getPreviewPosition(position).transform,
-                  padding: `${padding}px`,
+                  padding: `${padding * previewScale}px`,
                   opacity: opacity / 100,
                 }}
               >
                 <div
                   style={{
                     color: color,
-                    fontSize: `${fontSize}px`,
+                    fontSize: `${Math.max(4, fontSize * previewScale)}px`,
                     fontWeight: "bold",
-                    textShadow: "1px 1px 2px rgba(0,0,0,0.7)",
+                    fontFamily: "'DejaVu Sans', Arial, Helvetica, sans-serif",
+                    whiteSpace: "nowrap",
+                    textShadow: "1px 1px 2px rgba(0,0,0,0.45)",
                   }}
                 >
                   {text}

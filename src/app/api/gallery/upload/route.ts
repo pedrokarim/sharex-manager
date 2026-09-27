@@ -9,8 +9,10 @@ import { handleFileUpload } from "@/lib/upload";
 import { logDb } from "@/lib/utils/db";
 
 export async function POST(request: NextRequest) {
+  // Hors du try : le bloc catch en a besoin pour journaliser l'erreur, et y
+  // faire référence depuis le try le faisait échouer à son tour.
+  const session = await auth.api.getSession({ headers: await headers() });
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
 
     if (!session) {
       logDb.createLog({

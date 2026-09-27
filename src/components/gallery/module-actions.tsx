@@ -125,6 +125,12 @@ export function ModuleActions({
   const handleModuleUIComplete = useCallback(
     async (result: any) => {
       if (!selectedModule) return;
+      // Un module d'analyse (anime-trace…) ne modifie pas l'image : sa
+      // fenêtre se ferme, sans demander une application vouée à l'échec.
+      if (!selectedModule.capabilities?.includes("processImage")) {
+        setModuleUIOpen(false);
+        return;
+      }
 
       try {
         setProcessingModule(selectedModule.name);

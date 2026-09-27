@@ -191,6 +191,11 @@ export const ModuleList = () => {
                 module={module}
                 onToggle={handleToggleModule}
                 onDelete={handleDeleteModule}
+                onAutoProcessChange={(name, autoProcess) =>
+                  setModules((current) =>
+                    current.map((entry) => (entry.name === name ? { ...entry, autoProcess } : entry))
+                  )
+                }
               />
             ))}
           </div>

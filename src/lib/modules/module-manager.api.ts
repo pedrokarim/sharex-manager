@@ -60,9 +60,60 @@ const ModuleConfigSchema = z.object({
       kinds: z.array(z.enum(["image", "video", "audio"])).optional(),
     })
     .optional(),
+  autoProcess: z.boolean().optional(),
+  manualOnly: z.boolean().optional(),
 });
 
 const PROCESS_TIMEOUT_MS = 30_000;
+
+/**
+ * État propre à l'instance : modules activés, réglages, traitement à l'envoi.
+ *
+ * `module.json` fait partie du code et de l'image Docker : y écrire perdait
+ * tous les choix de l'administrateur au déploiement suivant. Il ne porte plus
+ * que les valeurs par défaut ; ce fichier, dans le volume `data/`, les
+ * surcharge.
+ */
+const STATE_FILE = path.join(process.cwd(), "data", "modules-state.json");
+
+interface ModuleState {
+  enabled?: boolean;
+  settings?: Record<string, unknown>;
+  autoProcess?: boolean;
+}
+
+function readState(): Record<string, ModuleState> {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(STATE_FILE, "utf-8"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeState(change: (state: Record<string, ModuleState>) => void) {
+  const state = readState();
+  change(state);
+  fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+  const temporary = `${STATE_FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(state, null, 2));
+  fs.renameSync(temporary, STATE_FILE);
+}
+
+/** Configuration effective : `module.json` surchargé par l'état de l'instance. */
+function withState(config: ModuleConfig): ModuleConfig {
+  const saved = readState()[config.name] ?? {};
+  return {
+    ...config,
+    enabled: saved.enabled ?? config.enabled,
+    settings: { ...((config.settings as Record<string, unknown>) ?? {}), ...(saved.settings ?? {}) },
+    autoProcess: saved.autoProcess ?? config.autoProcess ?? false,
+  };
+}
+
+function readConfig(configPath: string): ModuleConfig {
+  return withState(ModuleConfigSchema.parse(JSON.parse(fs.readFileSync(configPath, "utf-8"))) as ModuleConfig);
+}
 
 class ApiModuleManagerImpl implements ModuleManager {
   private modulesDir: string;
@@ -115,11 +166,9 @@ class ApiModuleManagerImpl implements ModuleManager {
             continue;
           }
 
-          const configContent = fs.readFileSync(configPath, "utf-8");
           let config: ModuleConfig;
-
           try {
-            config = ModuleConfigSchema.parse(JSON.parse(configContent));
+            config = readConfig(configPath);
           } catch {
             console.error(
               `Module ${folderName}: invalid module.json, skipping`
@@ -234,10 +283,9 @@ class ApiModuleManagerImpl implements ModuleManager {
 
     if (!fs.existsSync(configPath)) return;
 
-    const configContent = fs.readFileSync(configPath, "utf-8");
     let config: ModuleConfig;
     try {
-      config = ModuleConfigSchema.parse(JSON.parse(configContent));
+      config = readConfig(configPath);
     } catch {
       return;
     }
@@ -324,8 +372,11 @@ class ApiModuleManagerImpl implements ModuleManager {
           );
           if (!fs.existsSync(configPath)) continue;
 
-          const configContent = fs.readFileSync(configPath, "utf-8");
-          const config = ModuleConfigSchema.parse(JSON.parse(configContent));
+          const config = readConfig(configPath);
+          // Capacités réelles, détectées au chargement (`processImage`…),
+          // plutôt que la liste déclarative et souvent périmée du fichier.
+          const loaded = this.loadedModules.get(config.name);
+          if (loaded?.status === "loaded") config.capabilities = loaded.config.capabilities;
           modules.push(config);
         } catch {
           // Skip invalid modules
@@ -394,29 +445,38 @@ class ApiModuleManagerImpl implements ModuleManager {
       }
 
       // Seul `processImage` est appelé : le nom d'une autre fonction ne se
-      // choisit plus depuis les réglages envoyés par le navigateur.
-      return await this.withTimeout(
-        moduleExports.processImage(imageBuffer, settings),
-        moduleName
-      );
+      // choisit plus depuis les réglages envoyés par le navigateur. Les
+      // réglages enregistrés du module servent de valeurs par défaut.
+      const merged = {
+        ...((loadedModule.config.settings as Record<string, unknown>) ?? {}),
+        ...(settings && typeof settings === "object" ? settings : {}),
+      };
+      return await this.withTimeout(moduleExports.processImage(imageBuffer, merged), moduleName);
     } catch (error) {
       if (options.strict) throw error;
       return fail(`Échec du traitement de l'image par le module ${moduleName}`, error);
     }
   }
 
+  /**
+   * Traitement automatique d'un envoi : seuls les modules dont
+   * l'administrateur a activé « Appliquer à chaque envoi » s'appliquent,
+   * avec leurs réglages enregistrés. Avant, tout module actif doté de
+   * `processImage` passait sur chaque capture, sans réglages.
+   */
   public async processImage(imageBuffer: Buffer): Promise<Buffer> {
     await this.ensureInitialized();
 
     let processedBuffer = imageBuffer;
 
     for (const loadedModule of this.loadedModules.values()) {
-      if (loadedModule.status !== "loaded") continue;
-      if (!loadedModule.module.processImage) continue;
+      if (loadedModule.status !== "loaded" || !loadedModule.config.autoProcess || loadedModule.config.manualOnly) continue;
+      const exports = (loadedModule.module as any).__exports;
+      if (typeof exports?.processImage !== "function") continue;
 
       try {
         processedBuffer = await this.withTimeout(
-          loadedModule.module.processImage(processedBuffer, {}),
+          exports.processImage(processedBuffer, loadedModule.config.settings ?? {}),
           loadedModule.name
         );
       } catch (error) {
@@ -446,38 +506,41 @@ class ApiModuleManagerImpl implements ModuleManager {
   }
 
   public async toggleModule(moduleName: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const modulePath = this.findModulePathByName(moduleName);
+    if (!modulePath) return false;
+    const current = readConfig(path.join(modulePath, "module.json"));
+    return this.setEnabled(moduleName, !current.enabled);
+  }
+
+  /** Active ou désactive un module ; le choix survit aux déploiements. */
+  public async setEnabled(moduleName: string, enabled: boolean): Promise<boolean> {
     try {
       await this.ensureInitialized();
-
-      // Find the module on the filesystem (not just in loadedModules)
-      const modulePath = this.findModulePathByName(moduleName);
-      if (!modulePath) {
-        console.error(`Module ${moduleName} not found on filesystem`);
-        return false;
-      }
-
-      const configPath = path.join(modulePath, "module.json");
-      if (!fs.existsSync(configPath)) {
-        return false;
-      }
-
-      const configContent = fs.readFileSync(configPath, "utf-8");
-      const config = JSON.parse(configContent);
-
-      // Toggle enabled state
-      config.enabled = !config.enabled;
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-
-      console.log(
-        `Module ${moduleName} ${config.enabled ? "enabled" : "disabled"}`
-      );
-
-      // Reload only this specific module
+      if (!this.findModulePathByName(moduleName)) return false;
+      writeState((state) => {
+        state[moduleName] = { ...state[moduleName], enabled };
+      });
       await this.reloadModule(moduleName);
-
       return true;
     } catch (error) {
-      console.error(`Error toggling module ${moduleName}:`, error);
+      console.error(`Error switching module ${moduleName}:`, error);
+      return false;
+    }
+  }
+
+  /** Applique (ou non) le module à chaque capture envoyée. */
+  public async setAutoProcess(moduleName: string, autoProcess: boolean): Promise<boolean> {
+    try {
+      await this.ensureInitialized();
+      if (!this.findModulePathByName(moduleName)) return false;
+      writeState((state) => {
+        state[moduleName] = { ...state[moduleName], autoProcess };
+      });
+      await this.reloadModule(moduleName);
+      return true;
+    } catch (error) {
+      console.error(`Error updating auto-processing of module ${moduleName}:`, error);
       return false;
     }
   }
@@ -530,7 +593,7 @@ class ApiModuleManagerImpl implements ModuleManager {
       const configContent = fs.readFileSync(configPath, "utf-8");
       let config: ModuleConfig;
       try {
-        config = ModuleConfigSchema.parse(JSON.parse(configContent));
+        config = ModuleConfigSchema.parse(JSON.parse(configContent)) as ModuleConfig;
       } catch {
         console.error(`Invalid module.json in ${modulePath}`);
         return false;
@@ -665,15 +728,13 @@ class ApiModuleManagerImpl implements ModuleManager {
         return false;
       }
 
-      const configPath = path.join(modulePath, "module.json");
-      if (!fs.existsSync(configPath)) return false;
-
-      const configContent = fs.readFileSync(configPath, "utf-8");
-      const config = JSON.parse(configContent);
-
-      // Merge new settings into existing settings
-      config.settings = { ...(config.settings || {}), ...newSettings };
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+      // Enregistrés dans l'état de l'instance, jamais dans module.json.
+      writeState((state) => {
+        state[moduleName] = {
+          ...state[moduleName],
+          settings: { ...(state[moduleName]?.settings ?? {}), ...newSettings },
+        };
+      });
 
       // Reload the module to pick up new settings
       await this.reloadModule(moduleName);

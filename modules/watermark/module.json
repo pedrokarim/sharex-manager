@@ -4,7 +4,7 @@
   "description": "Ajoute un watermark aux screenshots",
   "author": "ShareX Manager",
   "enabled": true,
-  "entry": "index.ts",
+  "entry": "index.process.ts",
   "icon": "https://cdn-icons-png.flaticon.com/512/5610/5610944.png",
   "category": "Marque",
   "hasUI": true,
@@ -19,13 +19,5 @@
     "position": "bottom-right",
     "opacity": 0.7,
     "text": "© ShareX Manager"
-  },
-  "npmDependencies": {
-    "sharp": "^0.32.1",
-    "react-colorful": "^5.6.1"
-  },
-  "capabilities": [
-    "addWatermark",
-    "initModule"
-  ]
+  }
 }
