@@ -4,6 +4,11 @@ import type { ClipAsset, ClipExport, ClipProject, MediaSource } from "../engine/
 
 export const MODULE_NAME = "clip-studio";
 
+/** « 3,5 Mo » : taille d'un fichier, écrite à la française. */
+export function formatMegabytes(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Mo`;
+}
+
 export interface ProjectSummary {
   id: string;
   name: string;

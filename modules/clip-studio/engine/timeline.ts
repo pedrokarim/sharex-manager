@@ -175,11 +175,20 @@ export function cameraAt(motion: Motion, progress: number): CameraState {
   }
 }
 
+/** Vitesses proposées pour une vidéo. */
+export const MIN_SPEED = 0.25;
+export const MAX_SPEED = 4;
+
+export function speedOf(item: { speed?: number }): number {
+  const speed = Number(item.speed);
+  return Number.isFinite(speed) && speed > 0 ? Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed)) : 1;
+}
+
 /** Instant, dans la source, lu par une vidéo à l'image `frame` du projet. */
 export function sourceTimeAt(
-  item: { start: number; trimStart: number },
+  item: { start: number; trimStart: number; speed?: number },
   frame: number,
   fps: number
 ): number {
-  return (item.trimStart + (frame - item.start)) / fps;
+  return (item.trimStart + (frame - item.start) * speedOf(item)) / fps;
 }

@@ -8,7 +8,7 @@
  */
 
 import { drawFrame, heldFrameOf, type VisualResolver } from "./render";
-import { isActive, projectDuration, sourceTimeAt, transitionAt } from "./timeline";
+import { isActive, projectDuration, sourceTimeAt, speedOf, transitionAt } from "./timeline";
 import {
   hasAudio,
   type AudioItem,
@@ -248,6 +248,8 @@ export class PreviewPlayer {
           continue;
         }
         const target = sourceTimeAt(item, this.frame, project.fps);
+        const rate = speedOf(item);
+        if (video.playbackRate !== rate) video.playbackRate = rate;
         if (this.playing) {
           if (video.paused) {
             video.currentTime = target;
@@ -277,14 +279,17 @@ export class PreviewPlayer {
         if (!buffer) continue;
 
         const fps = project.fps;
+        const rate = item.type === "video" ? speedOf(item) : 1;
         const delay = Math.max(0, (item.start - fromFrame) / fps);
         const skip = Math.max(0, (fromFrame - item.start) / fps);
-        const offset = item.trimStart / fps + skip;
-        const length = item.duration / fps - skip;
+        // Décalage et longueur se comptent en temps de source.
+        const offset = item.trimStart / fps + skip * rate;
+        const length = (item.duration / fps - skip) * rate;
         if (offset >= buffer.duration || length <= 0) continue;
 
         const source = ctx.createBufferSource();
         source.buffer = buffer;
+        source.playbackRate.value = rate;
         const gain = ctx.createGain();
         applyGainEnvelope(gain.gain, item, now + delay - skip, fps);
         source.connect(gain).connect(ctx.destination);

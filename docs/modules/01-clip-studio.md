@@ -79,6 +79,7 @@ Ajoutés pour ce module et réutilisables par tous :
 | 5 | Galerie vidéo (socle, partie vidéo) : un clip exporté s’envoie dans la galerie (menu de l’export ou bouton en fin d’export), avec couverture, durée et lecture ; les vidéos ShareX s’activent dans les réglages d’envoi (95 Mo au plus) | Réalisée |
 | 6 | Banque de musique libre de droits : sélection de base versionnée (`music/library.json`, morceaux Jamendo sous CC0 ou CC BY via Openverse), téléchargée au démarrage dans les données du module ; recherche et ajout depuis l’éditeur (onglet Découvrir) ; musique de fond choisie par l’assistant selon l’ambiance ; crédits rappelés à l’export | Réalisée |
 | 7 | Compléments du cahier des charges : transitions entre plans (fondu enchaîné, fondu au noir, glissement, balayage, zoom), le plan précédent figé sur sa dernière image sans changer les durées ; recettes « Diaporama » (fondus de 0,6 s), « Rythmé » (1,2 s par image, coupes franches) et « Avant / Après » depuis la galerie, vidéos comprises ; raccourcis J, K, L, + et -, M ; lecture d’un export au clic | Réalisée |
+| 8 | Vitesse d’un plan vidéo (×0,25 à ×4, le son suit) ; forme d’onde des pistes son ; normalisation du volume à l’export (−16 dB en moyenne, crête sous −1 dB) ; « Créer un clip » depuis une série d’AI Image Gen | Réalisée |
 
 ## 1. Pourquoi ce module
 

@@ -28,7 +28,7 @@ import {
 } from "mediabunny";
 import { applyGainEnvelope } from "./preview";
 import { drawFrame } from "./render";
-import { isActive, projectDuration, sourceTimeAt, transitionAt } from "./timeline";
+import { isActive, projectDuration, sourceTimeAt, speedOf, transitionAt } from "./timeline";
 import { hasAudio, type ClipProject, type VideoItem, type VisualItem } from "./types";
 
 export interface ExportProgress {
@@ -61,9 +61,11 @@ export async function exportProject(
   options: {
     onProgress?: (progress: ExportProgress) => void;
     signal?: AbortSignal;
+    /** Ramène le niveau moyen du mixage vers −16 dB, sans saturer. */
+    normalize?: boolean;
   } = {}
 ): Promise<ExportResult> {
-  const { onProgress, signal } = options;
+  const { onProgress, signal, normalize = true } = options;
   const fps = project.fps;
   const totalFrames = projectDuration(project);
   const throwIfAborted = () => {
@@ -91,6 +93,7 @@ export async function exportProject(
   // ─── Son ───────────────────────────────────────────────────────
   onProgress?.({ phase: "audio", ratio: 0 });
   const mixed = await mixAudio(project, totalFrames);
+  if (mixed && normalize) normalizeLoudness(mixed);
   throwIfAborted();
 
   // ─── Sortie ────────────────────────────────────────────────────
@@ -224,6 +227,55 @@ async function openVideo(item: VideoItem, project: ClipProject): Promise<VideoDe
   };
 }
 
+// ─── Normalisation du volume ─────────────────────────────────────
+
+/** Niveau moyen visé : environ −16 dB, l'usage courant des vidéos courtes. */
+const TARGET_RMS = Math.pow(10, -16 / 20);
+/** Crête maximale après correction : −1 dB, pour ne jamais saturer. */
+const PEAK_CEILING = Math.pow(10, -1 / 20);
+/** Seuil sous lequel un passage compte comme silence (−50 dB). */
+const SILENCE = Math.pow(10, -50 / 20);
+const MAX_GAIN = 8;
+
+/**
+ * Corrige le volume de tout le mixage d'un seul gain : le niveau moyen des
+ * passages sonores (les silences ne comptent pas) va vers la cible, mais la
+ * crête la plus forte ne dépasse jamais −1 dB. Un gain unique garde les
+ * nuances du montage, là où une compression les écraserait.
+ */
+export function normalizeLoudness(buffer: AudioBuffer): number {
+  const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
+  const block = Math.max(1, Math.round(buffer.sampleRate * 0.05));
+  let energy = 0;
+  let counted = 0;
+  let peak = 0;
+  for (let start = 0; start < buffer.length; start += block) {
+    const end = Math.min(buffer.length, start + block);
+    let sum = 0;
+    for (const data of channels) {
+      for (let index = start; index < end; index++) {
+        const value = data[index];
+        sum += value * value;
+        const magnitude = Math.abs(value);
+        if (magnitude > peak) peak = magnitude;
+      }
+    }
+    const samples = (end - start) * channels.length;
+    if (Math.sqrt(sum / samples) > SILENCE) {
+      energy += sum;
+      counted += samples;
+    }
+  }
+  if (counted === 0 || peak === 0) return 1;
+  const rms = Math.sqrt(energy / counted);
+  const gain = Math.min(TARGET_RMS / rms, PEAK_CEILING / peak, MAX_GAIN);
+  if (Math.abs(gain - 1) < 0.01) return 1;
+  for (const data of channels) {
+    for (let index = 0; index < data.length; index++) data[index] *= gain;
+  }
+  return gain;
+}
+
 // ─── Mixage audio hors temps réel ────────────────────────────────
 
 async function mixAudio(project: ClipProject, totalFrames: number): Promise<AudioBuffer | null> {
@@ -256,13 +308,15 @@ async function mixAudio(project: ClipProject, totalFrames: number): Promise<Audi
     if (!buffer) continue;
     const offset = item.trimStart / fps;
     if (offset >= buffer.duration) continue;
+    const rate = item.type === "video" ? speedOf(item) : 1;
     const source = offline.createBufferSource();
     source.buffer = buffer;
+    source.playbackRate.value = rate;
     const gain = offline.createGain();
     const when = item.start / fps;
     applyGainEnvelope(gain.gain, item, when, fps);
     source.connect(gain).connect(offline.destination);
-    source.start(when, offset, item.duration / fps);
+    source.start(when, offset, (item.duration / fps) * rate);
     scheduled++;
   }
   if (scheduled === 0) return null;

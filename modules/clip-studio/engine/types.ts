@@ -142,6 +142,11 @@ export interface VideoItem extends VisualBase {
   trimStart: number;
   volume: number;
   radius: number;
+  /**
+   * Vitesse de lecture (1 par défaut) : à 2, une seconde de timeline lit deux
+   * secondes de source. `trimStart` reste compté en images de la source.
+   */
+  speed?: number;
 }
 
 export interface TextStyle {

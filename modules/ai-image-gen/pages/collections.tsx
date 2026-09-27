@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
   Anchor,
+  ArrowLeft,
+  Clapperboard,
   Layers,
   Pencil,
   Plus,
@@ -11,6 +12,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -266,6 +268,16 @@ export default function CollectionsPage({ settings }: CollectionsPageProps) {
 
 // ─── Détail d'une série ──────────────────────────────────────────
 
+/** Ouvre Clip Studio avec les images de la série, de la plus ancienne à la plus récente. */
+function clipStudioHref(items: HistoryItem[]): string {
+  const files = [...items]
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .flatMap((item) => item.imageFiles)
+    .slice(0, 60)
+    .map((file) => `ai-image-gen:${file}`);
+  return `/m/clip-studio?${new URLSearchParams({ action: "create", files: files.join(",") })}`;
+}
+
 function CollectionDetail({
   collection,
   items,
@@ -341,6 +353,15 @@ function CollectionDetail({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {items.length > 0 && (
+            <Button asChild variant="outline" size="sm" className="gap-2">
+              {/* La série se lit dans l'ordre de création : la première scène ouvre le clip. */}
+              <Link href={clipStudioHref(items)}>
+                <Clapperboard className="h-3.5 w-3.5" />
+                Créer un clip
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={onEdit} className="gap-2">
             <Pencil className="h-3.5 w-3.5" />
             Modifier

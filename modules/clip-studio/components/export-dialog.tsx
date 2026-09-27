@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Copy, Download, Film } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,7 @@ import {
 import { canExportInBrowser, exportProject, type ExportProgress } from "../engine/export";
 import { formatTimecode, projectDuration } from "../engine/timeline";
 import type { ClipExport, ClipProject } from "../engine/types";
-import { exportUrl, saveExport } from "../lib/client";
+import { exportUrl, formatMegabytes, saveExport } from "../lib/client";
 import { ensureFonts } from "../lib/fonts";
 import { SendToGalleryButton } from "./gallery-button";
 
@@ -86,6 +87,7 @@ export function ExportDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [stage, setStage] = useState<Stage>({ kind: "ready" });
+  const [normalize, setNormalize] = useState(true);
   const controller = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -109,6 +111,7 @@ export function ExportDialog({
       await ensureFonts();
       const { blob, durationMs } = await exportProject(project, {
         signal: controller.current.signal,
+        normalize,
         onProgress: (progress) => setStage({ kind: "rendering", progress, startedAt }),
       });
       setStage({ kind: "uploading", ratio: 0 });
@@ -157,6 +160,17 @@ export function ExportDialog({
                 </p>
               </div>
             )}
+            {stage.kind === "ready" && (
+              <label className="mt-3 flex items-start justify-between gap-3 rounded-lg border p-3">
+                <span className="text-sm">
+                  Normaliser le volume
+                  <span className="block text-xs text-muted-foreground">
+                    Un seul réglage pour tout le clip&nbsp;: niveau moyen vers −16&nbsp;dB, sans jamais saturer.
+                  </span>
+                </span>
+                <Switch checked={normalize} onCheckedChange={setNormalize} />
+              </label>
+            )}
             {stage.kind === "ready" && <CreditsBox credits={credits} />}
 
             {(stage.kind === "rendering" || stage.kind === "uploading") && (
@@ -185,7 +199,7 @@ export function ExportDialog({
               <div className="space-y-3">
                 <p className="flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
                   <CheckCircle2 className="h-4 w-4" />
-                  Clip prêt, {(stage.result.sizeBytes / 1024 / 1024).toFixed(1)} Mo
+                  Clip prêt, {formatMegabytes(stage.result.sizeBytes)}
                 </p>
                 <video
                   src={exportUrl(stage.result.file)}

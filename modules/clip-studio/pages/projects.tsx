@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatTimecode } from "../engine/timeline";
 import type { ClipExport } from "../engine/types";
-import { callModule, exportUrl, sendExportToGallery, type ProjectSummary } from "../lib/client";
+import { callModule, exportUrl, formatMegabytes, sendExportToGallery, type ProjectSummary } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
 import { AssistantProgress, CreateDialog } from "../components/create-dialog";
 import { SendToGalleryButton } from "../components/gallery-button";
@@ -350,7 +350,7 @@ function ExportCard({ entry, onChanged }: { entry: ClipExport; onChanged: () => 
             />
             <p className="truncate px-0.5 text-xs font-medium">{entry.projectName}</p>
             <p className="px-0.5 text-[11px] text-muted-foreground tabular-nums">
-              {Math.round(entry.durationMs / 1000)} s · {(entry.sizeBytes / 1024 / 1024).toFixed(1)} Mo
+              {Math.round(entry.durationMs / 1000)} s · {formatMegabytes(entry.sizeBytes)}
             </p>
           </button>
         </ContextMenuTrigger>
@@ -406,7 +406,7 @@ function ExportCard({ entry, onChanged }: { entry: ClipExport; onChanged: () => 
           <DialogHeader>
             <DialogTitle className="truncate">{entry.projectName}</DialogTitle>
             <DialogDescription>
-              {Math.round(entry.durationMs / 1000)} s · {entry.width}×{entry.height} · {(entry.sizeBytes / 1024 / 1024).toFixed(1)} Mo
+              {Math.round(entry.durationMs / 1000)} s · {entry.width}×{entry.height} · {formatMegabytes(entry.sizeBytes)}
             </DialogDescription>
           </DialogHeader>
           <video src={url} controls autoPlay playsInline className="max-h-[65vh] w-full rounded-lg bg-black" />

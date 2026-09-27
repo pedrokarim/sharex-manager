@@ -210,7 +210,7 @@ export function CreateDialog({
           <DialogTitle>Nouveau clip</DialogTitle>
           <DialogDescription>
             {fromGallery
-              ? `${mediaCountLabel(request!.files)} de la galerie, à monter en diaporama, en clip rythmé ou en avant / après.`
+              ? `${mediaCountLabel(request!.files)} ${request!.files.every((file) => file.startsWith(GENERATED_PREFIX)) ? "d'AI Image Gen" : "de la galerie"}, à monter en diaporama, en clip rythmé ou en avant / après.`
               : "Laissez l'assistant monter un short, partez d'un modèle, ou commencez à vide."}
           </DialogDescription>
         </DialogHeader>
@@ -389,8 +389,20 @@ export function CreateDialog({
   );
 }
 
-/** Image ou vidéo de la galerie, prête à poser sur la timeline. */
+/** Préfixe des images venues d'une série d'AI Image Gen. */
+const GENERATED_PREFIX = "ai-image-gen:";
+
+/**
+ * Image ou vidéo de la sélection, prête à poser sur la timeline : un fichier
+ * de la galerie, ou une image d'AI Image Gen (`ai-image-gen:<fichier>`).
+ */
 async function gallerySource(file: string): Promise<MediaSource> {
+  if (file.startsWith(GENERATED_PREFIX)) {
+    const name = file.slice(GENERATED_PREFIX.length);
+    const url = `/api/modules/ai-image-gen/data/images/${encodeURIComponent(name)}`;
+    const probe = await probeMedia(url, "image");
+    return { url, ref: `module:ai-image-gen/images/${name}`, name, kind: "image", ...probe };
+  }
   const url = `/api/files/${encodeURIComponent(file)}`;
   const kind = isVideoFile(file) ? "video" : "image";
   const probe = await probeMedia(url, kind);

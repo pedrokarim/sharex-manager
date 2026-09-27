@@ -3,7 +3,7 @@
  * renvoie un nouveau projet. C'est ce qui rend « Annuler » trivial.
  */
 
-import { msToFrames, projectDuration } from "./timeline";
+import { msToFrames, projectDuration, speedOf } from "./timeline";
 import {
   ASPECTS,
   type Anim,
@@ -458,19 +458,21 @@ export function trimItem(
       ? msToFrames(item.source.durationMs, project.fps)
       : Infinity;
   const trim = "trimStart" in item ? item.trimStart : 0;
+  // Une vidéo accélérée consomme plus d'une image de source par image de timeline.
+  const speed = item.type === "video" ? speedOf(item) : 1;
   const neighbours = found.track.items.filter((other) => other.id !== itemId);
 
   if (edge === "start") {
     const previousEnd = Math.max(0, ...neighbours.filter((o) => o.start < item.start).map((o) => o.start + o.duration));
     let start = Math.min(Math.max(Math.round(frame), previousEnd), end - 1);
     // On ne peut pas reculer avant le début de la source.
-    if ("trimStart" in item) start = Math.max(start, item.start - trim);
+    if ("trimStart" in item) start = Math.max(start, item.start - Math.floor(trim / speed));
     const delta = start - item.start;
     return updateItem(project, itemId, (current: ClipItem) => ({
       ...current,
       start,
       duration: end - start,
-      ...("trimStart" in current ? { trimStart: current.trimStart + delta } : {}),
+      ...("trimStart" in current ? { trimStart: Math.max(0, current.trimStart + Math.round(delta * speed)) } : {}),
       ...(current.type === "text" && current.karaoke
         ? { karaoke: { ...current.karaoke, offset: current.karaoke.offset + delta } }
         : {}),
@@ -479,7 +481,7 @@ export function trimItem(
 
   const nextStart = Math.min(...neighbours.filter((o) => o.start >= end).map((o) => o.start), Infinity);
   let newEnd = Math.max(Math.round(frame), item.start + 1);
-  newEnd = Math.min(newEnd, nextStart, item.start + (sourceFrames - trim));
+  newEnd = Math.min(newEnd, nextStart, item.start + Math.floor((sourceFrames - trim) / speed));
   return updateItem(project, itemId, { duration: newEnd - item.start } as Partial<ClipItem>);
 }
 
@@ -497,7 +499,9 @@ export function splitItem(project: ClipProject, itemId: string, frame: number): 
     id: uid(item.id.split("-")[0] + "-"),
     start: cut,
     duration: item.start + item.duration - cut,
-    ...("trimStart" in item ? { trimStart: item.trimStart + (cut - item.start) } : {}),
+    ...("trimStart" in item
+      ? { trimStart: item.trimStart + Math.round((cut - item.start) * (item.type === "video" ? speedOf(item) : 1)) }
+      : {}),
     ...(item.type === "text" && item.karaoke
       ? { karaoke: { ...structuredClone(item.karaoke), offset: item.karaoke.offset + (cut - item.start) } }
       : {}),
@@ -515,6 +519,30 @@ export function splitItem(project: ClipProject, itemId: string, frame: number): 
       .flatMap((entry) => (entry.id === itemId ? [left, right] : [entry]))
       .sort((a, b) => a.start - b.start),
   }));
+}
+
+/**
+ * Change la vitesse d'une vidéo en gardant le même passage de la source : le
+ * plan s'allonge ou raccourcit, sans déborder sur le plan qui suit.
+ */
+export function setVideoSpeed(project: ClipProject, itemId: string, speed: number): ClipProject {
+  const patch = videoSpeedPatch(project, itemId, speed);
+  return patch ? updateItem(project, itemId, patch as Partial<ClipItem>) : project;
+}
+
+/** Vitesse et durée qui en découle, sans les appliquer (pour l'inspecteur). */
+export function videoSpeedPatch(project: ClipProject, itemId: string, speed: number): { speed: number; duration: number } | null {
+  const found = findItem(project, itemId);
+  if (!found || found.item.type !== "video") return null;
+  const item = found.item;
+  const next = speedOf({ speed });
+  const sourceSpan = item.duration * speedOf(item);
+  const nextStart = Math.min(
+    ...found.track.items.filter((other) => other.id !== itemId && other.start >= item.start + item.duration).map((other) => other.start),
+    Infinity
+  );
+  const duration = Math.max(1, Math.min(Math.round(sourceSpan / next), nextStart - item.start));
+  return { speed: next, duration };
 }
 
 /** Duplique un élément juste après lui, ou sur une autre piste s'il n'y a pas la place. */

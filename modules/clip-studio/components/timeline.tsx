@@ -37,6 +37,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatTimecode, projectDuration } from "../engine/timeline";
+import { Waveform } from "./waveform";
 import type { AnimKind, ClipItem, ClipProject, Motion, Track, TransitionKind } from "../engine/types";
 
 export const MEDIA_DRAG_TYPE = "application/x-clip-media";
@@ -600,6 +601,7 @@ function TimelineItem({
               style={{ backgroundImage: `url("${thumbnail}")`, backgroundSize: "auto 100%", backgroundRepeat: "repeat-x" }}
             />
           )}
+          {item.type === "audio" && <Waveform item={item} fps={props.project.fps} />}
           {item.type !== "audio" && item.transition && (
             // Étendue de la transition d'entrée, au début du plan.
             <span

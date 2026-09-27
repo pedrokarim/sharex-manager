@@ -12,7 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { TEXT_PRESETS } from "../engine/edit";
+import { TEXT_PRESETS, videoSpeedPatch } from "../engine/edit";
+import { MAX_SPEED, MIN_SPEED, speedOf } from "../engine/timeline";
 import type {
   AnimKind,
   AudioItem,
@@ -56,7 +57,7 @@ export function Inspector({ project, item, onPatch, onClose, onCaption }: Inspec
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
         {item.type === "text" && <TextFields item={item} onPatch={onPatch} />}
         {item.type === "image" && <ImageFields item={item} onPatch={onPatch} />}
-        {item.type === "video" && <VideoFields item={item} onPatch={onPatch} />}
+        {item.type === "video" && <VideoFields item={item} project={project} onPatch={onPatch} />}
         {item.type === "shape" && <ShapeFields item={item} onPatch={onPatch} />}
         {item.type === "audio" && <AudioFields item={item} fps={fps} onPatch={onPatch} />}
         {item.type === "audio" &&
@@ -142,8 +143,8 @@ function Slider({
       <span className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
         <span className="font-mono tabular-nums">
-          {Number(value.toFixed(step < 1 ? 2 : 0))}
-          {unit ? ` ${unit}` : ""}
+          {Number(value.toFixed(step < 1 ? 2 : 0)).toLocaleString("fr-FR")}
+          {unit ? ` ${unit}` : ""}
         </span>
       </span>
       <input
@@ -402,10 +403,28 @@ function ImageFields({ item, onPatch }: { item: ImageItem; onPatch: InspectorPro
   );
 }
 
-function VideoFields({ item, onPatch }: { item: VideoItem; onPatch: InspectorProps["onPatch"] }) {
+function VideoFields({ item, project, onPatch }: { item: VideoItem; project: ClipProject; onPatch: InspectorProps["onPatch"] }) {
+  const setSpeed = (speed: number) => {
+    const patch = videoSpeedPatch(project, item.id, speed);
+    if (patch) onPatch(patch as Partial<ClipItem>, "speed");
+  };
   return (
     <Section title="Vidéo">
       <Choice label="Cadrage" value={item.fit} options={{ cover: "Remplir", contain: "Contenir" }} onChange={(fit) => onPatch({ fit } as Partial<ClipItem>, "fit")} />
+      <Slider label="Vitesse" unit="×" min={MIN_SPEED} max={MAX_SPEED} step={0.05} value={speedOf(item)} onChange={setSpeed} />
+      <div className="grid grid-cols-5 gap-1">
+        {[0.5, 1, 1.5, 2, 3].map((speed) => (
+          <Button
+            key={speed}
+            variant={speedOf(item) === speed ? "secondary" : "outline"}
+            size="sm"
+            className="h-7 px-1 text-[11px] tabular-nums"
+            onClick={() => setSpeed(speed)}
+          >
+            ×{String(speed).replace(".", ",")}
+          </Button>
+        ))}
+      </div>
       <Slider label="Volume" unit="%" min={0} max={200} step={1} value={item.volume * 100} onChange={(value) => onPatch({ volume: value / 100 } as Partial<ClipItem>, "volume")} />
       <Slider label="Coins arrondis" min={0} max={200} step={1} value={item.radius} onChange={(radius) => onPatch({ radius } as Partial<ClipItem>, "radius")} />
     </Section>
