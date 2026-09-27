@@ -7,7 +7,7 @@ import {
   capitalize,
   hslToHex,
   hexToHsl,
-} from "../../lib/utils";
+} from "@/lib/utils";
 
 describe("lib/utils", () => {
   describe("cn", () => {

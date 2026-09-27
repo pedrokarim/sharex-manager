@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { storageConfig, getAbsoluteUploadPath } from "../../lib/config";
+import { storageConfig, getAbsoluteUploadPath } from "@/lib/config";
 
 describe("lib/config", () => {
   describe("storageConfig", () => {

@@ -26,9 +26,12 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./"),
-    },
+    // Même résolution que tsconfig.json : les modules restent à la racine,
+    // le reste du code est sous src/.
+    alias: [
+      { find: /^@\/modules\//, replacement: path.resolve(__dirname, "./modules") + "/" },
+      { find: /^@\//, replacement: path.resolve(__dirname, "./src") + "/" },
+    ],
   },
   define: {
     "process.env": {},

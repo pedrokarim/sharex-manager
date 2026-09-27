@@ -14,7 +14,7 @@ import { ensureResource, resourcePath, resourceState, type ResourceSpec, type Re
 import { alignWords } from "./align";
 import { ASSETS_DIR, ensureDirs, readAssets, writeAssets } from "./store";
 
-import { childEnv } from "../../../lib/child-env";
+import { childEnv } from "@/lib/child-env";
 const PIPER_RELEASE = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2";
 // Révision figée du dépôt des voix : `main` bouge, et une empreinte ne vaut
 // que pour une version précise des fichiers.

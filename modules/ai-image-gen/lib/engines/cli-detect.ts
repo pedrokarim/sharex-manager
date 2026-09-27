@@ -13,7 +13,7 @@ import os from "os";
 import path from "path";
 import { execFile } from "child_process";
 
-import { childEnv } from "../../../../lib/child-env";
+import { childEnv } from "@/lib/child-env";
 import { CLI_ENV_PREFIXES } from "./cli-runner";
 const IS_WINDOWS = process.platform === "win32";
 

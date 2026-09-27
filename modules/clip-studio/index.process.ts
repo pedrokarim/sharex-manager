@@ -8,7 +8,7 @@
 
 import fs from "fs";
 import path from "path";
-import { ModuleHooks } from "../../types/modules";
+import { ModuleHooks } from "@/types/modules";
 import type { ClipAsset, ClipExport, ClipProject } from "./engine/types";
 import {
   ASSETS_DIR,

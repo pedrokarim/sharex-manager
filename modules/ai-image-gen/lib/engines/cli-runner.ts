@@ -17,7 +17,7 @@ import type {
   LogLine,
   ReferenceImage,
 } from "./types";
-import { childEnv } from "../../../../lib/child-env";
+import { childEnv } from "@/lib/child-env";
 import { decodeImage } from "../image-type";
 import { EngineError } from "./types";
 

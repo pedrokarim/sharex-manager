@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import { resolveAuthProvider, type AuthProvider } from "../lib/auth-config";
+import { resolveAuthProvider, type AuthProvider } from "@/lib/auth-config";
 
 export interface SetupOptions {
   authProvider: AuthProvider;

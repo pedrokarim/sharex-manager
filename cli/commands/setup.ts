@@ -21,7 +21,7 @@ import {
   setupEnvironment,
   type SetupOptions,
 } from "../setup-config";
-import { resolveAuthProvider } from "../../lib/auth-config";
+import { resolveAuthProvider } from "@/lib/auth-config";
 
 export const description = "Configuration initiale de ShareX Manager";
 export const usage = `bun run setup [options]

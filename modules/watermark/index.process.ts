@@ -1,4 +1,4 @@
-import { ModuleHooks } from "../../types/modules";
+import { ModuleHooks } from "@/types/modules";
 import sharp from "sharp";
 
 // Récupération des paramètres du module depuis module.json

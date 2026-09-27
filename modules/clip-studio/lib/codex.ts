@@ -15,7 +15,7 @@ import { spawn } from "child_process";
 import { resolveBinary } from "../../ai-image-gen/lib/engines/cli-detect";
 import { readSecrets } from "../../ai-image-gen/lib/store";
 
-import { childEnv } from "../../../lib/child-env";
+import { childEnv } from "@/lib/child-env";
 import { resolveSandbox } from "../../ai-image-gen/lib/engines/sandbox";
 export interface CodexOptions {
   timeoutMs?: number;

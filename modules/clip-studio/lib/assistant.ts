@@ -12,7 +12,7 @@
 
 import fs from "fs";
 import path from "path";
-import { apiModuleManager } from "../../../lib/modules/module-manager.api";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import {
   buildFromTemplate,
   type QuizData,

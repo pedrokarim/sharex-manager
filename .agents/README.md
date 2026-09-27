@@ -8,7 +8,7 @@ d'index opérationnel ; la politique de versioning canonique reste
 
 | Périmètre | Répertoires principaux | Instructions |
 | --- | --- | --- |
-| Serveur web et API | `app/`, `components/`, `lib/`, `modules/`, racine | [server.md](server.md) |
+| Serveur web et API | `src/` (app, components, lib…), `modules/`, `cli/`, racine | [server.md](server.md) |
 | Application mobile | `sharex-mobile/` | [mobile.md](mobile.md) |
 | Versioning et releases | tout fichier de version, tag ou workflow | [`docs/versioning.md`](../docs/versioning.md) |
 

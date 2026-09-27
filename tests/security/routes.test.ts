@@ -12,10 +12,10 @@ import { fileURLToPath } from "url";
 
 /** Routes publiques par conception, et pourquoi. */
 const PUBLIC_ROUTES: Record<string, string> = {
-  "app/api/auth/[...all]/route.ts": "connexion et session (better-auth)",
-  "app/api/contact/route.ts": "formulaire de la page vitrine, limité en débit",
-  "app/api/public/albums/[slug]/route.ts": "albums publiés",
-  "app/api/public/catalog/route.ts": "catalogue public",
+  "src/app/api/auth/[...all]/route.ts": "connexion et session (better-auth)",
+  "src/app/api/contact/route.ts": "formulaire de la page vitrine, limité en débit",
+  "src/app/api/public/albums/[slug]/route.ts": "albums publiés",
+  "src/app/api/public/catalog/route.ts": "catalogue public",
 };
 
 /** Marques d'un contrôle d'accès dans le code d'une route. */
@@ -36,7 +36,7 @@ function routeFiles(dir: string): string[] {
 
 describe("contrôle d'accès des routes", () => {
   const root = fileURLToPath(new URL("../..", import.meta.url));
-  const files = routeFiles(join(root, "app")).map((file) => relative(root, file).split("\\").join("/"));
+  const files = routeFiles(join(root, "src", "app")).map((file) => relative(root, file).split("\\").join("/"));
 
   test("chaque route a un contrôle d'accès ou est déclarée publique", () => {
     const unguarded = files.filter((file) => {

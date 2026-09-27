@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { HistoryEntry } from "../../lib/types/history";
+import type { HistoryEntry } from "@/lib/types/history";
 
 describe("lib/history", () => {
   const mockHistoryData: HistoryEntry[] = [

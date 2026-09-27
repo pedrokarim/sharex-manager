@@ -16,7 +16,7 @@ import { pipeline } from "stream/promises";
 import { spawn } from "child_process";
 import { DATA_DIR } from "./store";
 
-import { childEnv } from "../../../lib/child-env";
+import { childEnv } from "@/lib/child-env";
 export const RESOURCES_DIR = path.join(DATA_DIR, "resources");
 
 export interface ResourceSpec {

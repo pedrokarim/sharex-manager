@@ -54,7 +54,7 @@ describe("themeDb", () => {
     }>(
       dbPath,
       `
-        import { themeDb } from "./lib/theme/theme-db";
+        import { themeDb } from "./src/lib/theme/theme-db";
         console.log(JSON.stringify(themeDb.getGlobalThemeConfig()));
       `
     );
@@ -73,8 +73,8 @@ describe("themeDb", () => {
     }>(
       dbPath,
       `
-        import { themeDb } from "./lib/theme/theme-db";
-        import { defaultThemeState } from "./config/theme";
+        import { themeDb } from "./src/lib/theme/theme-db";
+        import { defaultThemeState } from "./src/config/theme";
 
         themeDb.updateGlobalThemeConfig({
           mode: "dark",
@@ -112,7 +112,7 @@ describe("themeDb", () => {
     }>(
       dbPath,
       `
-        import { themeDb } from "./lib/theme/theme-db";
+        import { themeDb } from "./src/lib/theme/theme-db";
 
         themeDb.upsertUserThemePreferences("user-1", {
           modeOverride: "dark",

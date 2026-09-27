@@ -1,4 +1,4 @@
-import { ModuleHooks } from "../../types/modules";
+import { ModuleHooks } from "@/types/modules";
 import React from "react";
 import { Crop as CropIcon } from "lucide-react";
 import dynamic from "next/dynamic";

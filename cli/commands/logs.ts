@@ -4,8 +4,8 @@ import chalk from "chalk";
 import prompts from "prompts";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { logDb } from "../../lib/utils/db";
-import type { Log, LogLevel, LogAction } from "../../lib/types/logs";
+import { logDb } from "@/lib/utils/db";
+import type { Log, LogLevel, LogAction } from "@/lib/types/logs";
 
 export const description = "Gestion des logs du système";
 export const usage = "bun cli logs [list|search|clear|stats|live]";
