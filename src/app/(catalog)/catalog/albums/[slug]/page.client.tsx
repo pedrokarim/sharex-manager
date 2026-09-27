@@ -9,6 +9,8 @@ import { ArrowLeft, Images } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Loading } from "@/components/ui/loading";
 import { PublicImageViewer } from "@/components/catalog/public-image-viewer";
+import { VideoThumbnail } from "@/components/gallery/video-thumbnail";
+import { isImageFile, isVideoFile, mediaCountLabel } from "@/lib/media-kind";
 import { CatalogMosaic } from "@/components/catalog/catalog-mosaic";
 import { cn } from "@/lib/utils";
 import type { Album } from "@/types/albums";
@@ -21,6 +23,7 @@ interface AlbumImage {
   name: string;
   url: string;
   addedAt: string;
+  durationMs?: number;
 }
 
 type Density = "dense" | "normal" | "large";
@@ -65,13 +68,12 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
       setAlbum(data);
 
       const imageFiles: AlbumImage[] = (data.files || [])
-        .filter((entry: any) =>
-          /\.(jpg|jpeg|png|gif|webp)$/i.test(entry.fileName),
-        )
+        .filter((entry: any) => isImageFile(entry.fileName) || isVideoFile(entry.fileName))
         .map((entry: any) => ({
           name: entry.fileName,
           url: `/api/files/${encodeURIComponent(entry.fileName)}`,
           addedAt: entry.addedAt,
+          durationMs: entry.durationMs,
         }));
       setFiles(imageFiles);
     } catch (error) {
@@ -150,9 +152,8 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
             </p>
           ) : null}
           <div className="mt-5 flex flex-wrap gap-5 font-mono text-xs text-white/60">
-            <span>
-              <b className="font-semibold text-white">{files.length}</b>{" "}
-              {files.length === 1 ? "image" : "images"}
+            <span className="font-semibold text-white">
+              {mediaCountLabel(files.map((file) => file.name))}
             </span>
             {updatedAt ? (
               <span>
@@ -186,7 +187,7 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
               ))}
             </div>
             <span className="ml-auto font-mono text-xs text-muted-foreground">
-              {files.length} {files.length === 1 ? "image" : "images"}
+              {mediaCountLabel(files.map((file) => file.name))}
             </span>
           </div>
         ) : null}
@@ -196,7 +197,7 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
             <Images className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
             <h3 className="font-semibold">Album vide</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Cet album ne contient aucune image.
+              Cet album ne contient aucune image ni vidéo.
             </p>
           </div>
         ) : (
@@ -209,13 +210,17 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
                 className="group relative aspect-square overflow-hidden rounded-sm bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label={`Ouvrir ${file.name}`}
               >
-                <Image
-                  src={thumb(file.name)}
-                  alt=""
-                  fill
-                  sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw"
-                  className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                />
+                {isVideoFile(file.name) ? (
+                  <VideoThumbnail name={file.name} durationMs={file.durationMs} sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw" />
+                ) : (
+                  <Image
+                    src={thumb(file.name)}
+                    alt=""
+                    fill
+                    sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw"
+                    className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                  />
+                )}
               </button>
             ))}
           </div>

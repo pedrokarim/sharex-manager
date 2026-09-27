@@ -16,8 +16,10 @@ import {
   RotateCcw,
   Calendar,
   Folder,
+  Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isVideoFile } from "@/lib/media-kind";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
 
@@ -79,6 +81,8 @@ export function PublicImageViewer({
   const pinchRef = useRef<{ distance: number; scale: number } | null>(null);
 
   const isOpen = index !== null;
+  // Une vidéo a son propre lecteur : ni zoom, ni déplacement, ni molette.
+  const showsVideo = index !== null && Boolean(items[index]) && isVideoFile(items[index].name);
 
   /**
    * Bornes réelles du déplacement : on les calcule sur la taille rendue de
@@ -159,7 +163,7 @@ export function PublicImageViewer({
    */
   useEffect(() => {
     const stage = stageRef.current;
-    if (!stage || !isOpen) return;
+    if (!stage || !isOpen || showsVideo) return;
 
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
@@ -188,7 +192,7 @@ export function PublicImageViewer({
 
     stage.addEventListener("wheel", handleWheel, { passive: false });
     return () => stage.removeEventListener("wheel", handleWheel);
-  }, [isOpen, clampPan]);
+  }, [isOpen, showsVideo, clampPan]);
 
   // Un redimensionnement peut laisser l'image hors cadre : on la recadre.
   useEffect(() => {
@@ -388,7 +392,7 @@ export function PublicImageViewer({
         </div>
         <div className="flex items-center gap-2">
           {/* Zoom controls */}
-          <div className="flex items-center gap-1 bg-black/20 rounded-lg p-1">
+          <div className={cn("flex items-center gap-1 bg-black/20 rounded-lg p-1", showsVideo && "hidden")}>
             <Button
               variant="ghost"
               size="icon"
@@ -457,13 +461,17 @@ export function PublicImageViewer({
       {/* Main image area */}
       <div
         ref={stageRef}
-        className="relative flex-1 overflow-hidden w-full touch-none"
+        className={cn("relative flex-1 overflow-hidden w-full", !showsVideo && "touch-none")}
         onClick={(e) => e.stopPropagation()}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onDoubleClick={handleDoubleClick}
+        {...(showsVideo
+          ? {}
+          : {
+              onPointerDown: handlePointerDown,
+              onPointerMove: handlePointerMove,
+              onPointerUp: handlePointerUp,
+              onPointerCancel: handlePointerUp,
+              onDoubleClick: handleDoubleClick,
+            })}
         style={{
           cursor: view.scale > 1 ? (isDragging ? "grabbing" : "grab") : "default",
         }}
@@ -473,31 +481,46 @@ export function PublicImageViewer({
           scène, ce dont dépend l'ancrage du zoom. L'image, elle, garde sa taille
           naturelle au maximum – pas d'agrandissement forcé, pas de débordement.
         */}
-        <div
-          className="absolute inset-0 flex items-center justify-center p-4"
-          style={{
-            transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
-            transformOrigin: "center center",
-            // Pas de transition pendant le geste : sinon l'image traîne
-            // derrière le curseur et le déplacement paraît cassé.
-            transition:
-              isDragging || pinchRef.current
-                ? "none"
-                : "transform 150ms ease-out",
-            willChange: "transform",
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element -- taille rendue
-              nécessaire au calcul des bornes ; l'optimisation d'image est
-              désactivée globalement (next.config). */}
-          <img
-            ref={imageRef}
-            src={currentItem.url}
-            alt={currentItem.name}
-            className="max-w-full max-h-full object-contain select-none"
-            draggable={false}
-          />
-        </div>
+        {showsVideo ? (
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <video
+              key={currentItem.name}
+              src={currentItem.url}
+              poster={thumbnailUrl(currentItem.name)}
+              controls
+              autoPlay
+              playsInline
+              preload="metadata"
+              className="max-h-full max-w-full bg-black"
+            />
+          </div>
+        ) : (
+          <div
+            className="absolute inset-0 flex items-center justify-center p-4"
+            style={{
+              transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+              transformOrigin: "center center",
+              // Pas de transition pendant le geste : sinon l'image traîne
+              // derrière le curseur et le déplacement paraît cassé.
+              transition:
+                isDragging || pinchRef.current
+                  ? "none"
+                  : "transform 150ms ease-out",
+              willChange: "transform",
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- taille rendue
+                nécessaire au calcul des bornes ; l'optimisation d'image est
+                désactivée globalement (next.config). */}
+            <img
+              ref={imageRef}
+              src={currentItem.url}
+              alt={currentItem.name}
+              className="max-w-full max-h-full object-contain select-none"
+              draggable={false}
+            />
+          </div>
+        )}
 
         {/* Navigation buttons */}
         {hasPrevious && (
@@ -550,13 +573,18 @@ export function PublicImageViewer({
                     : "border-white/20 hover:border-white/60 opacity-60 hover:opacity-100",
                 )}
               >
-                <Image
-                  src={thumbnailUrl(item.name)}
-                  alt={item.name}
-                  width={48}
-                  height={48}
-                  className="w-full h-full object-cover"
-                />
+                <span className="relative block h-full w-full">
+                  <Image
+                    src={thumbnailUrl(item.name)}
+                    alt={item.name}
+                    width={48}
+                    height={48}
+                    className="w-full h-full object-cover"
+                  />
+                  {isVideoFile(item.name) && (
+                    <Play className="absolute inset-0 m-auto h-4 w-4 fill-white text-white drop-shadow" />
+                  )}
+                </span>
               </button>
             ))}
           </div>
@@ -569,8 +597,9 @@ export function PublicImageViewer({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-white/60 text-sm bg-black/20 px-3 py-1 rounded-full inline-block">
-          Utilisez les flèches ← → pour naviguer • Échap pour fermer • Molette ou
-          double-clic pour zoomer • Glissez pour déplacer quand zoomé
+          {showsVideo
+            ? "Utilisez les flèches ← → pour naviguer • Échap pour fermer"
+            : "Utilisez les flèches ← → pour naviguer • Échap pour fermer • Molette ou double-clic pour zoomer • Glissez pour déplacer quand zoomé"}
         </div>
       </div>
     </div>

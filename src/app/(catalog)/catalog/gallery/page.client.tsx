@@ -6,6 +6,8 @@ import { Images } from "lucide-react";
 
 import { Loading } from "@/components/ui/loading";
 import { PublicImageViewer } from "@/components/catalog/public-image-viewer";
+import { VideoThumbnail } from "@/components/gallery/video-thumbnail";
+import { isVideoFile } from "@/lib/media-kind";
 import { cn } from "@/lib/utils";
 
 interface GalleryImage {
@@ -13,6 +15,7 @@ interface GalleryImage {
   url: string;
   addedAt?: string;
   album?: { name: string; slug: string };
+  durationMs?: number;
 }
 
 type Density = "dense" | "normal" | "large";
@@ -45,6 +48,7 @@ export function CatalogGalleryPage() {
   const [hasMore, setHasMore] = useState(true);
   const [nextOffset, setNextOffset] = useState(0);
   const [total, setTotal] = useState<number | null>(null);
+  const [videosTotal, setVideosTotal] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [density, setDensity] = useState<Density>("normal");
   const [album, setAlbum] = useState<string | null>(null);
@@ -55,6 +59,7 @@ export function CatalogGalleryPage() {
       name: item.name,
       url: `/api/files/${encodeURIComponent(item.name)}`,
       addedAt: item.addedAt,
+      durationMs: item.durationMs,
       album: item.albumSlug
         ? { name: item.albumName, slug: item.albumSlug }
         : undefined,
@@ -89,6 +94,7 @@ export function CatalogGalleryPage() {
             : page.length,
         );
         setTotal(typeof data.imagesTotal === "number" ? data.imagesTotal : null);
+        setVideosTotal(typeof data.videosTotal === "number" ? data.videosTotal : 0);
       } catch (error) {
         console.error("Erreur:", error);
       } finally {
@@ -173,7 +179,7 @@ export function CatalogGalleryPage() {
             </span>
             <h1 className="mt-4 max-w-[18ch] text-3xl font-bold tracking-tighter text-balance sm:text-4xl lg:text-5xl">
               {total
-                ? `${total} images, de la plus récente à la plus ancienne.`
+                ? `${total} ${videosTotal ? "images et vidéos" : "images"}, de la plus récente à la plus ancienne.`
                 : "Galerie"}
             </h1>
             <p className="mt-3 max-w-[54ch] text-base leading-relaxed text-muted-foreground">
@@ -276,13 +282,17 @@ export function CatalogGalleryPage() {
                       className="group relative aspect-square overflow-hidden rounded-sm bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={`Ouvrir ${image.name}`}
                     >
-                      <Image
-                        src={thumb(image.name)}
-                        alt=""
-                        fill
-                        sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw"
-                        className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                      />
+                      {isVideoFile(image.name) ? (
+                        <VideoThumbnail name={image.name} durationMs={image.durationMs} sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw" />
+                      ) : (
+                        <Image
+                          src={thumb(image.name)}
+                          alt=""
+                          fill
+                          sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw"
+                          className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                        />
+                      )}
                       {image.album ? (
                         <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/75 to-transparent px-2 pb-1 pt-5 text-left font-mono text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
                           {image.album.name}

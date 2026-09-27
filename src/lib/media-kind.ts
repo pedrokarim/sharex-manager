@@ -31,6 +31,16 @@ export function sniffVideo(head: Uint8Array): "mp4" | "mov" | "webm" | null {
   return null;
 }
 
+/** « 12 images et 2 vidéos », « 1 image » : le compte d'une liste de fichiers. */
+export function mediaCountLabel(names: string[]): string {
+  const videos = names.filter(isVideoFile).length;
+  const images = names.length - videos;
+  const plural = (count: number, word: string) => `${count} ${word}${count > 1 ? "s" : ""}`;
+  if (!videos) return plural(images, "image");
+  if (!images) return plural(videos, "vidéo");
+  return `${plural(images, "image")} et ${plural(videos, "vidéo")}`;
+}
+
 /** Limite des vidéos en Mo : réglée à part, les vidéos pèsent plus lourd que les captures. */
 export const DEFAULT_MAX_VIDEO_MB = 95;
 

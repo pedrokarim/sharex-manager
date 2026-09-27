@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { useSession, signOut } from "@/lib/auth-client";
 import {
   BadgeCheck,
@@ -28,8 +29,14 @@ import { Avatar, AvatarImage, AvatarFallback } from "@radix-ui/react-avatar";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
 
+const subscribeNothing = () => () => {};
+
 export function NavUser() {
-  const { data: session } = useSession();
+  const { data: session, isPending } = useSession();
+  // Le serveur ne connaît pas la session du client : jusqu'au montage, les
+  // deux rendent le même squelette, sinon l'hydratation échoue quand la
+  // session est déjà en cache côté navigateur.
+  const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const { isMobile } = useSidebar();
   const { t } = useTranslation();
 
@@ -38,6 +45,22 @@ export function NavUser() {
     toast.success(t("common.logout_success"));
     window.location.href = "/";
   };
+
+  if (!mounted || (isPending && !session)) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <div className="flex h-12 items-center gap-2 px-2" aria-hidden>
+            <div className="size-8 shrink-0 animate-pulse rounded-lg bg-sidebar-accent" />
+            <div className="grid flex-1 gap-1.5">
+              <div className="h-3 w-20 animate-pulse rounded bg-sidebar-accent" />
+              <div className="h-2.5 w-28 animate-pulse rounded bg-sidebar-accent" />
+            </div>
+          </div>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
+  }
 
   if (!session?.user) return null;
 

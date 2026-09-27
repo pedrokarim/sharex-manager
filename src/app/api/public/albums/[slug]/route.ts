@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { albumsDb } from "@/lib/utils/albums-db";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
+import { isVideoFile } from "@/lib/media-kind";
+import { videoMeta } from "@/lib/media/video";
 
 // GET /api/public/albums/[slug] - Récupérer un album public par son slug
 export async function GET(
@@ -48,7 +50,10 @@ export async function GET(
 
     return NextResponse.json({
       ...album,
-      files,
+      // La durée d'une vidéo s'affiche sur sa vignette.
+      files: files.map((entry) =>
+        isVideoFile(entry.fileName) ? { ...entry, durationMs: videoMeta(entry.fileName)?.durationMs } : entry
+      ),
     });
   } catch (error) {
     logDb.createLog({

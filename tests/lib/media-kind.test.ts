@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fileKind, formatDuration, maxVideoMb, sniffVideo } from "@/lib/media-kind";
+import { fileKind, formatDuration, maxVideoMb, mediaCountLabel, sniffVideo } from "@/lib/media-kind";
 import { parseVideoInfo } from "@/lib/media/ffmpeg";
 
 const bytes = (...parts: (string | number[])[]) =>
@@ -53,5 +53,15 @@ describe("parseVideoInfo", () => {
 
   it("ne renvoie rien d'inventé quand la sortie est vide", () => {
     expect(parseVideoInfo("")).toEqual({});
+  });
+});
+
+describe("mediaCountLabel", () => {
+  it("compte images et vidéos, au pluriel près", () => {
+    expect(mediaCountLabel(["a.png"])).toBe("1 image");
+    expect(mediaCountLabel(["a.png", "b.jpg"])).toBe("2 images");
+    expect(mediaCountLabel(["c.mp4"])).toBe("1 vidéo");
+    expect(mediaCountLabel(["a.png", "b.jpg", "c.mp4"])).toBe("2 images et 1 vidéo");
+    expect(mediaCountLabel([])).toBe("0 image");
   });
 });

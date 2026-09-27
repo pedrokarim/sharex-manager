@@ -186,7 +186,7 @@ export function SelectableListItemCard({
                   className="object-cover w-full h-full"
                 />
               ) : isVideoFile(file.name) ? (
-                <VideoThumbnail name={file.name} showBadge={false} sizes="48px" />
+                <VideoThumbnail name={file.name} showBadge={false} preview={false} sizes="48px" />
               ) : (
                 <span className="text-xs font-bold text-muted-foreground">
                   {file.name.split(".").pop()?.toUpperCase()}

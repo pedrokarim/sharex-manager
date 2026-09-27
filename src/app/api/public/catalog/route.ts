@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { albumsDb } from "@/lib/utils/albums-db";
+import { isImageFile, isVideoFile } from "@/lib/media-kind";
+import { videoMeta } from "@/lib/media/video";
 
 // GET /api/public/catalog - Récupérer tous les albums publics
 export async function GET(request: NextRequest) {
@@ -16,19 +18,22 @@ export async function GET(request: NextRequest) {
     const allAlbums = albumsDb.getAlbums();
     const publicAlbums = allAlbums.filter((album) => album.isPublic);
 
-    // Si on veut lister toutes les images (pagination pour infinite scroll)
+    // Si on veut lister toutes les images (pagination pour infinite scroll).
+    // Les vidéos des albums publics y figurent aussi ; le héros et les
+    // couvertures d'album, eux, restent des images.
     if (images) {
-      const allImages: Array<{ name: string; addedAt: string; albumSlug: string; albumName: string }> = [];
+      const allImages: Array<{ name: string; addedAt: string; albumSlug: string; albumName: string; durationMs?: number }> = [];
 
       for (const album of publicAlbums) {
         const fileEntries = albumsDb.getAlbumFileEntries(album.id);
         const imgs = fileEntries
-          .filter((entry) => /\.(jpg|jpeg|png|gif|webp)$/i.test(entry.fileName))
+          .filter((entry) => isImageFile(entry.fileName) || isVideoFile(entry.fileName))
           .map((entry) => ({
             name: entry.fileName,
             addedAt: entry.addedAt,
             albumSlug: album.publicSlug || "",
             albumName: album.name,
+            ...(isVideoFile(entry.fileName) ? { durationMs: videoMeta(entry.fileName)?.durationMs } : {}),
           }));
         allImages.push(...imgs);
       }
@@ -38,7 +43,7 @@ export async function GET(request: NextRequest) {
         allImages.reduce((acc, img) => {
           if (!acc.has(img.name)) acc.set(img.name, img);
           return acc;
-        }, new Map<string, { name: string; addedAt: string; albumSlug: string; albumName: string }>())
+        }, new Map<string, { name: string; addedAt: string; albumSlug: string; albumName: string; durationMs?: number }>())
           .values(),
       ).sort((a, b) => {
         const ta = new Date(a.addedAt).getTime();
@@ -52,6 +57,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         images: slice,
         imagesTotal: deduped.length,
+        videosTotal: deduped.filter((entry) => isVideoFile(entry.name)).length,
         imagesNextOffset: nextOffset,
         imagesHasMore: nextOffset < deduped.length,
       });
