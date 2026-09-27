@@ -86,7 +86,33 @@ function summarize(project: ClipProject): ProjectSummary {
   };
 }
 
-/** Contrôle de forme minimal : on refuse ce qui n'est manifestement pas un projet. */
+const ITEM_TYPES = new Set(["image", "video", "audio", "text", "shape"]);
+/** Trente minutes à 60 images par seconde : au-delà, un projet est forcément abîmé. */
+const MAX_FRAME = 30 * 60 * 60;
+
+/**
+ * Adresse d'un média : un chemin de ce site sous `/api/`. Une adresse
+ * extérieure ferait charger n'importe quelle page à qui ouvre le projet.
+ */
+function isLocalMediaUrl(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    value.length <= 1000 &&
+    /^\/api\/[A-Za-z0-9._~%!$&'()*+,;=:@\/-]+$/.test(value) &&
+    !value.startsWith("//") &&
+    !value.includes("..")
+  );
+}
+
+function isFrame(value: unknown, min: number): boolean {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= MAX_FRAME;
+}
+
+/**
+ * Contrôle de forme à l'enregistrement. Il ne décrit pas chaque réglage
+ * d'un élément, mais écarte ce qui casserait la liste des projets, figerait
+ * l'éditeur (durées démesurées) ou ferait charger une adresse extérieure.
+ */
 function validateProject(project: ClipProject) {
   if (!project || typeof project !== "object" || project.version !== 1) {
     throw new Error("Projet invalide");
@@ -95,21 +121,54 @@ function validateProject(project: ClipProject) {
   if (typeof project.name !== "string" || project.name.length > 200) {
     throw new Error("Nom de projet invalide");
   }
-  if (!Array.isArray(project.tracks) || project.tracks.length > 50) {
-    throw new Error("Pistes invalides");
-  }
-  const items = project.tracks.reduce((total, track) => total + (track.items?.length ?? 0), 0);
-  if (items > 2000) throw new Error("Trop d'éléments dans le projet");
   if (!Number.isFinite(project.fps) || project.fps < 1 || project.fps > 60) {
     throw new Error("Cadence invalide");
   }
+  for (const size of [project.width, project.height]) {
+    if (!Number.isInteger(size) || size < 16 || size > 4096) throw new Error("Dimensions invalides");
+  }
+  if (typeof project.background !== "string" || project.background.length > 64) {
+    throw new Error("Fond invalide");
+  }
+  if (!Array.isArray(project.tracks) || project.tracks.length > 50) {
+    throw new Error("Pistes invalides");
+  }
+
+  let count = 0;
+  for (const track of project.tracks) {
+    if (!track || typeof track !== "object" || !Array.isArray(track.items)) throw new Error("Piste invalide");
+    if (track.kind !== "visual" && track.kind !== "audio") throw new Error("Type de piste invalide");
+    if (typeof track.name !== "string" || track.name.length > 100) throw new Error("Nom de piste invalide");
+    for (const item of track.items) {
+      count++;
+      if (!item || typeof item !== "object" || !ITEM_TYPES.has(item.type)) throw new Error("Élément invalide");
+      if (!isFrame(item.start, 0) || !isFrame(item.duration, 1)) throw new Error("Durée d'élément invalide");
+      if ("source" in item) {
+        const source = item.source;
+        if (!source || typeof source !== "object" || !isLocalMediaUrl(source.url)) {
+          throw new Error("Adresse de média invalide : seuls les médias de ce site sont acceptés");
+        }
+      }
+      if (item.type === "text" && (typeof item.text !== "string" || item.text.length > 5000)) {
+        throw new Error("Texte invalide");
+      }
+    }
+  }
+  if (count > 2000) throw new Error("Trop d'éléments dans le projet");
 }
 
 // ─── Projets ─────────────────────────────────────────────────────
 
 export async function listProjects(): Promise<ProjectSummary[]> {
+  // Un projet illisible est ignoré plutôt que de rendre la liste vide pour tous.
   return listProjectFiles()
-    .map(summarize)
+    .flatMap((project) => {
+      try {
+        return [summarize(project)];
+      } catch {
+        return [];
+      }
+    })
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
