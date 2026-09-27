@@ -306,8 +306,8 @@ premier module et à consigner ici.
 > `data/tools/` depuis une version épinglée de ffmpeg-static, vérifiée par
 > SHA-256 (`src/lib/media/ffmpeg.ts`) ; durée et dimensions sont lues dans
 > la sortie de `ffmpeg -i`, sans `ffprobe` ; le `.mkv` n’est pas accepté ;
-> pas encore d’aperçu animé au survol ; le catalogue public reste réservé
-> aux images.
+> l’aperçu au survol lit la vidéo d’origine, sans version réduite à 480 px.
+> Les vidéos des albums publics apparaissent aussi dans le catalogue.
 
 **Types et limites.**
 
@@ -368,7 +368,7 @@ premier module et à consigner ici.
 | --- | --- | --- |
 | V-1 | `ffmpeg` statique (téléchargé au démarrage), couverture et métadonnées | Réalisée |
 | V-2 | Type `videos`, contrôle par signature, limites Nginx | Réalisée |
-| V-3 | Couvertures, métadonnées, `FileCard` et `FileViewer` vidéo | Réalisée (sans aperçu animé au survol) |
+| V-3 | Couvertures, métadonnées, `FileCard` et `FileViewer` vidéo | Réalisée |
 | V-4 | Upload direct vers un module | Envoi d’un fichier de 90 Mo sans pic de mémoire |
 
 ## 5. Critères d’acceptation transverses
