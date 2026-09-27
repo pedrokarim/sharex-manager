@@ -28,7 +28,7 @@ import { addItem, createMusicItems } from "../engine/edit";
 import { projectDuration } from "../engine/timeline";
 import { askCodex, extractJson } from "./codex";
 import { MOODS, pickTrack } from "./music";
-import { synthesize, VOICES } from "./tts";
+import { isKnownVoice, synthesize } from "./tts";
 import { DATA_DIR, ensureDirs, writeProject } from "./store";
 
 /** L'assistant écrit et illustre lui-même : l'Avant / Après, fait d'images fournies, n'en fait pas partie. */
@@ -129,7 +129,7 @@ export function startAssistant(request: AssistantRequest): AssistantJob {
     aspect: (["9:16", "16:9", "1:1", "4:5"] as const).includes(request.aspect) ? request.aspect : "9:16",
     count: Math.min(10, Math.max(2, Math.round(Number(request.count) || 5))),
     images: Boolean(request.images),
-    voice: VOICES.some((voice) => voice.id === request.voice) ? request.voice : undefined,
+    voice: isKnownVoice(request.voice) ? request.voice : undefined,
     music: request.music === "auto" || (MOODS as readonly string[]).includes(String(request.music)) ? request.music : undefined,
   };
   if (clean.brief.length < 3) throw new Error("Décrivez le short à créer.");

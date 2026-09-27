@@ -1,5 +1,6 @@
 /**
- * Voix de synthèse avec Piper, localement et sans clé API.
+ * Voix de synthèse avec Piper, localement et sans clé API, et voix en ligne
+ * par clé API (voir `cloud-tts.ts`).
  *
  * Le moteur et les voix sont téléchargés dans les données du module (voir
  * `resources.ts`). Seules des voix sous licence libre réutilisable sont
@@ -13,6 +14,8 @@ import type { ClipAsset, TimedWord } from "../engine/types";
 import { ensureResource, resourcePath, resourceState, type ResourceSpec, type ResourceState } from "./resources";
 import { alignWords } from "./align";
 import { ASSETS_DIR, ensureDirs, readAssets, writeAssets } from "./store";
+import { cloudVoiceLabel, isCloudVoiceUsable, listCloudVoices, parseCloudVoice, synthesizeCloud, type CloudProvider } from "./cloud-tts";
+import { toPcmWav } from "@/lib/media/ffmpeg";
 
 import { childEnv } from "@/lib/child-env";
 const PIPER_RELEASE = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2";
@@ -138,15 +141,54 @@ function findVoice(id: string): Voice {
 
 // ─── État ────────────────────────────────────────────────────────
 
-export interface VoiceStatus extends Voice {
+/** Voix proposée à l'interface, locale ou en ligne. */
+export interface VoiceStatus {
+  id: string;
+  label: string;
+  description: string;
+  gender?: "female" | "male";
+  provider: "piper" | CloudProvider;
+  /** Voix locale : mention de licence. En ligne : nom du fournisseur. */
+  credit: string;
+  license?: string;
   state: ResourceState;
 }
 
-export function voiceStatuses(): { engine: ResourceState; voices: VoiceStatus[] } {
+const READY = (id: string): ResourceState => ({ id, label: id, status: "ready", received: 0, total: 0 });
+
+const PROVIDER_LABELS: Record<CloudProvider, string> = { openai: "OpenAI", google: "Google Cloud", elevenlabs: "ElevenLabs" };
+
+export async function voiceStatuses(): Promise<{ engine: ResourceState; voices: VoiceStatus[] }> {
+  const cloud = await listCloudVoices();
   return {
     engine: resourceState(PIPER),
-    voices: VOICES.map((voice) => ({ ...voice, state: resourceState(voiceResources(voice)[0]) })),
+    voices: [
+      ...VOICES.map((voice): VoiceStatus => ({
+        id: voice.id,
+        label: voice.label,
+        description: voice.description,
+        gender: voice.gender,
+        provider: "piper",
+        credit: voice.credit,
+        license: voice.license,
+        state: resourceState(voiceResources(voice)[0]),
+      })),
+      ...cloud.map((voice): VoiceStatus => ({
+        id: voice.id,
+        label: voice.label,
+        description: voice.description,
+        gender: voice.gender,
+        provider: voice.provider,
+        credit: PROVIDER_LABELS[voice.provider],
+        state: READY(voice.id),
+      })),
+    ],
   };
+}
+
+/** Voix acceptée par la synthèse : locale, ou en ligne avec une clé configurée. */
+export function isKnownVoice(id: unknown): id is string {
+  return typeof id === "string" && (VOICES.some((voice) => voice.id === id) || isCloudVoiceUsable(id));
 }
 
 /** Téléchargement au démarrage : le moteur et la voix par défaut. */
@@ -159,6 +201,8 @@ export function prefetchTts() {
 }
 
 export async function prepareVoice(id: string) {
+  // Une voix en ligne n'a rien à télécharger.
+  if (parseCloudVoice(id)) return;
   const voice = findVoice(id);
   await ensureResource(PIPER);
   for (const spec of voiceResources(voice)) await ensureResource(spec);
@@ -213,6 +257,12 @@ export function synthesize(input: { text: string; voice?: string; speed?: number
     return Promise.reject(new Error("Trop de voix en cours de génération : réessayez dans un instant."));
   }
   pending++;
+  // Une voix en ligne ne charge pas le processeur : elle n'attend pas Piper.
+  if (parseCloudVoice(String(input.voice ?? ""))) {
+    return runCloudSynthesis(input).finally(() => {
+      pending--;
+    });
+  }
   const task = queue.then(() => runSynthesis(input)).finally(() => {
     pending--;
   });
@@ -220,9 +270,57 @@ export function synthesize(input: { text: string; voice?: string; speed?: number
   return task;
 }
 
-async function runSynthesis(input: { text: string; voice?: string; speed?: number }): Promise<SpeechResult> {
-  const text = String(input.text ?? "").replace(/\s+/g, " ").trim().slice(0, 2000);
+function cleanText(value: unknown): string {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim().slice(0, 2000);
   if (!text) throw new Error("Rien à lire.");
+  return text;
+}
+
+/** Durée, alignement et rangement parmi les médias : communs aux deux moteurs. */
+function registerSpeech(file: string, text: string, label: string, credit: string): SpeechResult {
+  const output = path.join(ASSETS_DIR, file);
+  const durationMs = wavDurationMs(output);
+  let words: TimedWord[] = [];
+  try {
+    words = alignWords(output, text);
+  } catch {
+    // Sans alignement, la voix reste utilisable ; seuls les sous-titres manquent.
+  }
+  const asset: ClipAsset = {
+    file,
+    kind: "audio",
+    originalName: `Voix ${label} : ${text.slice(0, 60)}`,
+    size: fs.statSync(output).size,
+    durationMs,
+    credit,
+    words,
+    createdAt: Date.now(),
+  };
+  writeAssets([asset, ...readAssets()]);
+  return { asset, durationMs, words };
+}
+
+async function runCloudSynthesis(input: { text: string; voice?: string; speed?: number }): Promise<SpeechResult> {
+  const text = cleanText(input.text);
+  const voice = String(input.voice);
+  const speed = Math.min(1.6, Math.max(0.7, Number(input.speed) || 1));
+  ensureDirs();
+  const { audio, extension } = await synthesizeCloud(voice, text, speed);
+  const stem = `voice-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const raw = path.join(ASSETS_DIR, `${stem}.source.${extension}`);
+  const file = `${stem}.wav`;
+  fs.writeFileSync(raw, audio);
+  try {
+    await toPcmWav(raw, path.join(ASSETS_DIR, file));
+  } finally {
+    fs.rmSync(raw, { force: true });
+  }
+  const { label, provider } = await cloudVoiceLabel(voice);
+  return registerSpeech(file, text, label, `Voix ${label} : synthèse ${provider}, voix générée par IA`);
+}
+
+async function runSynthesis(input: { text: string; voice?: string; speed?: number }): Promise<SpeechResult> {
+  const text = cleanText(input.text);
   const voice = findVoice(input.voice ?? DEFAULT_VOICE);
   await prepareVoice(voice.id);
   ensureDirs();
@@ -263,23 +361,5 @@ async function runSynthesis(input: { text: string; voice?: string; speed?: numbe
     child.stdin.end();
   });
 
-  const durationMs = wavDurationMs(output);
-  let words: TimedWord[] = [];
-  try {
-    words = alignWords(output, text);
-  } catch {
-    // Sans alignement, la voix reste utilisable ; seuls les sous-titres manquent.
-  }
-  const asset: ClipAsset = {
-    file,
-    kind: "audio",
-    originalName: `Voix ${voice.label} : ${text.slice(0, 60)}`,
-    size: fs.statSync(output).size,
-    durationMs,
-    credit: `Voix ${voice.label} : ${voice.credit}, ${voice.license}`,
-    words,
-    createdAt: Date.now(),
-  };
-  writeAssets([asset, ...readAssets()]);
-  return { asset, durationMs, words };
+  return registerSpeech(file, text, voice.label, `Voix ${voice.label} : ${voice.credit}, ${voice.license}`);
 }

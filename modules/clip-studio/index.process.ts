@@ -30,6 +30,7 @@ import {
   writeProject,
 } from "./lib/store";
 import { prefetchTts, prepareVoice as downloadVoice, synthesize, voiceStatuses } from "./lib/tts";
+import { isCloudProvider, providerStatuses, saveProviderKey, type ProviderStatus } from "./lib/cloud-tts";
 import {
   addMusic,
   downloadTrack,
@@ -361,6 +362,21 @@ export async function getVoices() {
 export async function prepareVoice(id: string): Promise<{ success: boolean }> {
   void downloadVoice(String(id)).catch(() => undefined);
   return { success: true };
+}
+
+/**
+ * Fournisseurs de voix en ligne et état de leur clé. Absente de `functions`
+ * dans module.json : réservée aux admins, comme `saveTtsKey`.
+ */
+export async function getTtsProviders(): Promise<ProviderStatus[]> {
+  return providerStatuses();
+}
+
+/** Enregistre (ou efface, avec une chaîne vide) la clé d'un fournisseur. */
+export async function saveTtsKey(input: { provider: string; key: string }): Promise<ProviderStatus[]> {
+  if (!isCloudProvider(input?.provider)) throw new Error("Fournisseur inconnu.");
+  saveProviderKey(input.provider, String(input.key ?? ""));
+  return providerStatuses();
 }
 
 /** Lit un texte et range le son parmi les médias du module. */

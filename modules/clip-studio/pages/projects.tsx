@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
+  AudioLines,
   Clapperboard,
   Copy,
   Download,
@@ -112,7 +113,13 @@ export default function ProjectsPage() {
               Montez des clips à partir de vos images, vidéos et sons, puis exportez-les en MP4.
             </p>
           </div>
-          <Button className="ml-auto gap-2" onClick={() => setCreating({ files: [] })}>
+          <Button asChild variant="outline" className="ml-auto gap-2">
+            <Link href="/m/clip-studio/voices">
+              <AudioLines className="h-4 w-4" />
+              Voix en ligne
+            </Link>
+          </Button>
+          <Button className="gap-2" onClick={() => setCreating({ files: [] })}>
             <Plus className="h-4 w-4" />
             Nouveau clip
           </Button>

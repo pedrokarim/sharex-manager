@@ -37,7 +37,8 @@
   },
   "pages": [
     { "path": "", "title": "Projets", "component": "pages/projects.tsx" },
-    { "path": "edit", "title": "Éditeur", "component": "pages/editor.tsx" }
+    { "path": "edit", "title": "Éditeur", "component": "pages/editor.tsx" },
+    { "path": "voices", "title": "Voix en ligne", "component": "pages/voices.tsx" }
   ],
   "navItems": [
     { "title": "Clip Studio", "icon": "Clapperboard" }

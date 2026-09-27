@@ -148,6 +148,26 @@ export function parseVideoInfo(stderr: string): VideoInfo {
 }
 
 /**
+ * Convertit un son quelconque (MP3, WAV…) en WAV PCM 16 bits mono : le format
+ * que lisent la mesure de durée et l'alignement des sous-titres.
+ */
+export async function toPcmWav(input: string, output: string, sampleRate = 24_000): Promise<void> {
+  const binary = await ensureFfmpeg();
+  if (!binary) throw new Error("ffmpeg n'est pas disponible pour convertir le son.");
+  const result = await run(binary, [
+    "-threads", "2",
+    "-i", input,
+    "-ac", "1",
+    "-ar", String(sampleRate),
+    "-c:a", "pcm_s16le",
+    "-y", output,
+  ]);
+  if (result.code !== 0 || !fs.existsSync(output)) {
+    throw new Error(`Conversion du son impossible. ${result.stderr.split("\n").filter(Boolean).slice(-1).join("")}`.trim());
+  }
+}
+
+/**
  * Image de couverture (JPEG, 640 px de large au plus) et métadonnées d'une
  * vidéo. Prend l'image à 1 s, ou la première si la vidéo est plus courte.
  */
