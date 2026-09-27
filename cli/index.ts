@@ -229,8 +229,10 @@ async function main() {
   }
 }
 
-// On n'exécute le main que si ce fichier est appelé directement
-if (import.meta.url === `file://${process.argv[1]}`) {
+// On n'exécute le main que si ce fichier est appelé directement. Comparer
+// import.meta.url au chemin du script échouait sous Windows (lettre de lecteur,
+// barres obliques inverses) : le CLI se terminait sans rien faire.
+if (import.meta.main) {
   main().catch((error) => {
     console.error(chalk.red("\n❌ Une erreur est survenue:"), error.message);
     console.log("\nPour obtenir de l'aide, exécutez:");
