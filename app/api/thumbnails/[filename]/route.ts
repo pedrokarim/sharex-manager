@@ -3,7 +3,10 @@ import { NextRequest } from "next/server";
 import sharp from "sharp";
 import { createReadStream } from "fs";
 import { stat } from "fs/promises";
+import { basename } from "path";
 import { getAbsoluteUploadPath } from "@/lib/config";
+import { auth } from "@/lib/auth";
+import { isFileSecure } from "@/lib/secure-files";
 
 const UPLOADS_DIR = getAbsoluteUploadPath();
 const THUMBNAIL_SIZE = 300;
@@ -14,7 +17,19 @@ export async function GET(
 ) {
   try {
     const { filename } = await params;
+    // Un nom de fichier seul : le paramètre est décodé, un « %2F.. » y
+    // devenait un chemin vers une image hors des uploads.
+    if (!filename || filename !== basename(filename) || filename.includes("\\") || filename.startsWith(".")) {
+      return new Response("Fichier non trouvé", { status: 404 });
+    }
     const filePath = join(UPLOADS_DIR, filename);
+
+    // Miniature d'un fichier sécurisé : mêmes règles que l'image elle-même.
+    const secure = await isFileSecure(filename);
+    if (secure) {
+      const session = await auth.api.getSession({ headers: request.headers });
+      if (!session?.user) return new Response("Fichier non trouvé", { status: 404 });
+    }
 
     // Vérifier si le fichier existe
     try {
@@ -45,7 +60,8 @@ export async function GET(
     return new Response(thumbnailStream as any, {
       headers: {
         "Content-Type": "image/jpeg",
-        "Cache-Control": "public, max-age=31536000",
+        // Jamais en cache partagé pour un fichier sécurisé.
+        "Cache-Control": secure ? "private, no-store" : "public, max-age=31536000",
       },
     });
   } catch (error) {
