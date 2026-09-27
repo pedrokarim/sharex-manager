@@ -64,7 +64,8 @@ export function readLibrary(): MusicTrack[] {
   const base = readJson<MusicTrack[]>(LIBRARY_FILE, []);
   const added = readJson<MusicTrack[]>(ADDED_FILE, []).map((track) => ({ ...track, added: true }));
   const ids = new Set(base.map((track) => track.id));
-  return [...base, ...added.filter((track) => !ids.has(track.id))];
+  // Un fichier modifié à la main ne doit pas pouvoir nommer un chemin hors du dossier.
+  return [...base, ...added.filter((track) => !ids.has(track.id))].filter(isUsable);
 }
 
 function spec(track: MusicTrack): ResourceSpec {
@@ -129,18 +130,43 @@ export interface MusicCandidate extends MusicTrack {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const searchCache = new Map<string, { at: number; results: MusicCandidate[] }>();
 
-function toTrack(item: OpenverseAudio, mood: Mood): MusicTrack {
+/** Lien https seulement : les adresses venues d'Openverse s'affichent en liens cliquables. */
+function httpsUrl(value: unknown): string | undefined {
+  try {
+    const url = new URL(String(value));
+    return url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Fichier audio téléchargeable : https et hébergé par Jamendo. */
+function jamendoAudioUrl(value: unknown): string | undefined {
+  const url = httpsUrl(value);
+  return url && /(^|\.)jamendo\.com$/.test(new URL(url).hostname) ? url : undefined;
+}
+
+/** Morceau exploitable : identifiant sûr pour un nom de fichier, et source Jamendo. */
+function isUsable(track: Pick<MusicTrack, "id" | "audioUrl">): boolean {
+  return UUID.test(track.id) && Boolean(jamendoAudioUrl(track.audioUrl));
+}
+
+/**
+ * `id` sert à nommer le fichier téléchargé : c'est l'identifiant déjà validé
+ * qui est passé, jamais celui renvoyé par Openverse.
+ */
+function toTrack(item: OpenverseAudio, mood: Mood, id: string): MusicTrack {
   return {
-    id: item.id,
+    id,
     title: (item.title ?? "Sans titre").trim().slice(0, 120),
     artist: (item.creator ?? "Artiste inconnu").trim().slice(0, 80),
     mood,
     durationMs: Math.round(item.duration ?? 0),
-    genres: (item.genres ?? []).slice(0, 5),
+    genres: (Array.isArray(item.genres) ? item.genres : []).filter((genre): genre is string => typeof genre === "string").slice(0, 5),
     license: item.license === "cc0" ? "CC0" : `CC BY ${item.license_version ?? ""}`.trim(),
-    licenseUrl: item.license_url,
-    pageUrl: item.foreign_landing_url,
-    audioUrl: item.url,
+    licenseUrl: httpsUrl(item.license_url),
+    pageUrl: httpsUrl(item.foreign_landing_url),
+    audioUrl: jamendoAudioUrl(item.url) ?? "",
   };
 }
 
@@ -185,12 +211,14 @@ export async function searchMusic(input: { query: string; page?: number }): Prom
     items = items.slice(0, 40);
   }
   const results = items
-    .filter((item) => (item.duration ?? 0) >= 20_000)
+    .filter((item) => (item.duration ?? 0) >= 20_000 && typeof item.id === "string" && UUID.test(item.id))
     .map((item) => ({
-      ...toTrack(item, "chill"),
+      ...toTrack(item, "chill", item.id),
       instrumental: (item.tags ?? []).some((tag) => tag.name === "instrumental"),
       inLibrary: library.has(item.id),
-    }));
+    }))
+    // L'écoute d'un extrait charge `audioUrl` dans le navigateur : Jamendo seulement.
+    .filter((track) => track.audioUrl);
   searchCache.set(key, { at: Date.now(), results });
   return results;
 }
@@ -210,15 +238,11 @@ export async function addMusic(input: { id: string; mood?: string }): Promise<Mu
   if (item.license !== "cc0" && item.license !== "by") {
     throw new Error("Seuls les morceaux sous CC0 ou CC BY peuvent entrer dans la banque.");
   }
-  const host = new URL(item.url).hostname;
-  if (!/(^|\.)jamendo\.com$/.test(host)) throw new Error("Seuls les morceaux hébergés par Jamendo sont acceptés.");
-
-  const track = toTrack(item, mood);
+  const track = toTrack(item, mood, id);
+  if (!track.audioUrl) throw new Error("Seuls les morceaux hébergés par Jamendo sont acceptés.");
   ensureDirs();
   const added = readJson<MusicTrack[]>(ADDED_FILE, []);
-  const temporary = `${ADDED_FILE}.${Date.now()}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify([...added, track], null, 2));
-  fs.renameSync(temporary, ADDED_FILE);
+  writeAdded([...added, track]);
 
   void ensureResource(spec(track)).catch(() => undefined);
   return listMusic().find((entry) => entry.id === id)!;
@@ -229,8 +253,16 @@ export function removeMusic(id: string) {
   const added = readJson<MusicTrack[]>(ADDED_FILE, []);
   const track = added.find((entry) => entry.id === id);
   if (!track) throw new Error("Seuls les morceaux ajoutés depuis l'éditeur peuvent être retirés.");
-  fs.writeFileSync(ADDED_FILE, JSON.stringify(added.filter((entry) => entry.id !== id), null, 2));
-  fs.rmSync(resourcePath(spec(track)), { force: true });
+  writeAdded(added.filter((entry) => entry.id !== id));
+  if (isUsable(track)) fs.rmSync(resourcePath(spec(track)), { force: true });
+}
+
+/** Écriture atomique : un nom temporaire unique, puis un renommage. */
+function writeAdded(tracks: MusicTrack[]) {
+  ensureDirs();
+  const temporary = `${ADDED_FILE}.${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(tracks, null, 2));
+  fs.renameSync(temporary, ADDED_FILE);
 }
 
 /** Un morceau prêt de l'humeur demandée, pour l'assistant. */

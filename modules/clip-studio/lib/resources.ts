@@ -48,7 +48,12 @@ const registry = ((globalThis as any).__clipStudioResources ??= {
 const { states, inflight } = registry;
 
 export function resourcePath(spec: ResourceSpec) {
-  return path.join(RESOURCES_DIR, spec.target);
+  // `target` peut venir d'une source extérieure (banque de musique) : il ne
+  // doit jamais sortir du dossier des ressources.
+  const root = path.resolve(RESOURCES_DIR);
+  const resolved = path.resolve(root, spec.target);
+  if (!resolved.startsWith(root + path.sep)) throw new Error(`Chemin de ressource invalide : ${spec.target}`);
+  return resolved;
 }
 
 export function isReady(spec: ResourceSpec) {
