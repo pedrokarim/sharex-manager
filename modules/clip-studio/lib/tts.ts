@@ -14,6 +14,7 @@ import { ensureResource, resourcePath, resourceState, type ResourceSpec, type Re
 import { alignWords } from "./align";
 import { ASSETS_DIR, ensureDirs, readAssets, writeAssets } from "./store";
 
+import { childEnv } from "../../../lib/child-env";
 const PIPER_RELEASE = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2";
 const VOICES_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR";
 
@@ -195,7 +196,7 @@ async function runSynthesis(input: { text: string; voice?: string; speed?: numbe
 
   await new Promise<void>((resolve, reject) => {
     const binary = piperBinary();
-    const child = spawn(binary, args, { cwd: path.dirname(binary), windowsHide: true, stdio: ["pipe", "ignore", "pipe"] });
+    const child = spawn(binary, args, { cwd: path.dirname(binary), env: childEnv(), windowsHide: true, stdio: ["pipe", "ignore", "pipe"] });
     let stderr = "";
     const timer = setTimeout(() => child.kill("SIGTERM"), 120_000);
     child.stderr.on("data", (chunk) => {

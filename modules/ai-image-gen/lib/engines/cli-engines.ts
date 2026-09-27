@@ -23,6 +23,7 @@ import path from "path";
 import type { CliEngineSpec, CliPlanInput, CliRunState } from "./cli-runner";
 import type { EngineModelSpec, LogLine } from "./types";
 
+import { resolveSandbox } from "./sandbox";
 /**
  * Le prompt de l'utilisateur est une donnée, pas une consigne. On l'isole dans
  * un bloc balisé et on le dit explicitement à l'agent : sans cette précaution,
@@ -167,8 +168,8 @@ const codexEngine: CliEngineSpec = {
     // Codex s'appuie sur bubblewrap, qui a besoin des espaces de noms
     // utilisateur. Un hôte qui les refuse ferait échouer toutes les
     // générations sans que rien ne puisse être fait depuis l'interface.
-    const sandbox =
-      typeof input.options.sandbox === "string" ? input.options.sandbox : "read-only";
+    // « off » n'est appliqué que si le serveur l'autorise (voir sandbox.ts).
+    const sandbox = resolveSandbox(input.options.sandbox);
 
     const args = [
       "exec",

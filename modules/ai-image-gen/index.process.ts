@@ -52,6 +52,7 @@ import {
   type Pipeline,
 } from "./lib/store";
 
+import { assertSandboxSetting } from "./lib/engines/sandbox";
 // ─── Catalogue et moteurs ────────────────────────────────────────
 
 export interface CatalogPayload {
@@ -129,6 +130,7 @@ export async function saveCliSettings(
     sandbox?: string;
   }
 ): Promise<{ success: boolean }> {
+  assertSandboxSetting(settings.sandbox);
   const secrets = readSecrets();
   const current = secrets.cli[engineId] ?? {};
   const next = { ...current, ...settings };

@@ -15,6 +15,8 @@ import { spawn } from "child_process";
 import { resolveBinary } from "../../ai-image-gen/lib/engines/cli-detect";
 import { readSecrets } from "../../ai-image-gen/lib/store";
 
+import { childEnv } from "../../../lib/child-env";
+import { resolveSandbox } from "../../ai-image-gen/lib/engines/sandbox";
 export interface CodexOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
@@ -43,7 +45,9 @@ export async function askCodex(prompt: string, options: CodexOptions = {}): Prom
 
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "clip-studio-"));
   const output = path.join(workspace, "answer.txt");
-  const sandbox = codexSettings().sandbox ?? "read-only";
+  // L'assistant n'a besoin que de lire : jamais d'écriture, et pas de bac à
+  // sable désactivé sauf si le serveur l'autorise (hôte sans espaces de noms).
+  const sandbox = resolveSandbox(codexSettings().sandbox) === "off" ? "off" : "read-only";
   const args = [
     "exec",
     "--skip-git-repo-check",
@@ -59,7 +63,7 @@ export async function askCodex(prompt: string, options: CodexOptions = {}): Prom
     await new Promise<void>((resolve, reject) => {
       const child = spawn(binary, args, {
         cwd: workspace,
-        env: process.env,
+        env: childEnv({ prefixes: ["CODEX_", "OPENAI_"] }),
         windowsHide: true,
         stdio: ["pipe", "pipe", "pipe"],
       });

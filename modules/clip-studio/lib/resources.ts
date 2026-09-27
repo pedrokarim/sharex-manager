@@ -15,6 +15,7 @@ import { pipeline } from "stream/promises";
 import { spawn } from "child_process";
 import { DATA_DIR } from "./store";
 
+import { childEnv } from "../../../lib/child-env";
 export const RESOURCES_DIR = path.join(DATA_DIR, "resources");
 
 export interface ResourceSpec {
@@ -130,7 +131,7 @@ async function download(spec: ResourceSpec): Promise<string> {
 
 function run(command: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
+    const child = spawn(command, args, { env: childEnv(), windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
     child.stderr.on("data", (chunk) => {
       stderr = (stderr + chunk).slice(-1000);

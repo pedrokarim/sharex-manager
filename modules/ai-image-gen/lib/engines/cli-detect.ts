@@ -13,6 +13,8 @@ import os from "os";
 import path from "path";
 import { execFile } from "child_process";
 
+import { childEnv } from "../../../../lib/child-env";
+import { CLI_ENV_PREFIXES } from "./cli-runner";
 const IS_WINDOWS = process.platform === "win32";
 
 /** Extensions exécutables à essayer quand le nom est donné sans suffixe. */
@@ -96,7 +98,7 @@ export function runCommand(
       {
         timeout: timeoutMs,
         cwd,
-        env: env ? { ...process.env, ...env } : process.env,
+        env: childEnv({ prefixes: CLI_ENV_PREFIXES, extra: env }),
         windowsHide: true,
         maxBuffer: 4 * 1024 * 1024,
       },

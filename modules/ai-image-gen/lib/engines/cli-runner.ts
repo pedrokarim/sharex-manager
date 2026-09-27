@@ -17,8 +17,12 @@ import type {
   LogLine,
   ReferenceImage,
 } from "./types";
+import { childEnv } from "../../../../lib/child-env";
 import { decodeImage } from "../image-type";
 import { EngineError } from "./types";
+
+/** Variables d'authentification propres aux CLI d'images, seules transmises avec le système. */
+export const CLI_ENV_PREFIXES = ["CODEX_", "OPENAI_", "GEMINI_", "GOOGLE_", "CLOUDSDK_", "ANTHROPIC_", "CLAUDE_"];
 
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 
@@ -168,7 +172,9 @@ export async function runCliEngine(
 
   const child = spawn(binaryPath, plan.args, {
     cwd: input.workspace,
-    env: { ...process.env, ...(plan.env ?? {}) },
+    // Environnement minimal : les secrets du serveur n'ont rien à faire chez
+    // un agent qu'un prompt piégé peut détourner.
+    env: childEnv({ prefixes: CLI_ENV_PREFIXES, extra: plan.env }),
     windowsHide: true,
     stdio: ["pipe", "pipe", "pipe"],
   });
