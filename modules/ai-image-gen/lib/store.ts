@@ -9,6 +9,7 @@
 import fs from "fs";
 import path from "path";
 import type { CustomEngineConfig, CliEngineSettings } from "./engines/registry";
+import { decodeImage } from "./image-type";
 import type { LogLine } from "./engines/types";
 
 export const MODULE_DIR = path.join(process.cwd(), "modules", "ai-image-gen");
@@ -347,10 +348,11 @@ export function storeReference(
   role?: "reference" | "edit-target"
 ): JobReference {
   ensureDataDirs();
-  const extension = (mimeType.split("/")[1] || "png").split("+")[0];
-  const file = `ref-${Date.now()}-${randomSlug(6)}.${extension}`;
-  fs.writeFileSync(path.join(REFS_DIR, file), Buffer.from(b64, "base64"));
-  return { file, mimeType, role };
+  // Type et extension lus dans les octets, jamais dans le `mimeType` reçu.
+  const { buffer, kind } = decodeImage(b64);
+  const file = `ref-${Date.now()}-${randomSlug(6)}.${kind.extension}`;
+  fs.writeFileSync(path.join(REFS_DIR, file), buffer);
+  return { file, mimeType: kind.mimeType, role };
 }
 
 /** Relit une référence pour la passer au moteur. */

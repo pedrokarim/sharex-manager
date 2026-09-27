@@ -97,6 +97,9 @@ function log(job: Job, level: LogLine["level"], text: string) {
 
 // ─── Dépôt ───────────────────────────────────────────────────────
 
+/** Images de départ acceptées par génération ; chacune est écrite sur le disque. */
+const MAX_REFERENCES = 8;
+
 export interface EnqueueInput extends Omit<JobRequest, "references"> {
   /** Images de départ envoyées par le client, en base64 nu. */
   references?: { b64: string; mimeType: string; role?: "reference" | "edit-target" }[];
@@ -119,6 +122,9 @@ export function enqueueJob(input: EnqueueInput): Job {
     throw new Error("Pipeline introuvable.");
   }
 
+  if ((input.references?.length ?? 0) > MAX_REFERENCES) {
+    throw new Error(`${MAX_REFERENCES} images de référence au plus.`);
+  }
   const references = (input.references ?? []).map((reference) =>
     storeReference(reference.b64, reference.mimeType, reference.role)
   );

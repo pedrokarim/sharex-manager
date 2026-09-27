@@ -17,6 +17,7 @@ import type {
   LogLine,
   ReferenceImage,
 } from "./types";
+import { decodeImage } from "../image-type";
 import { EngineError } from "./types";
 
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
@@ -86,9 +87,9 @@ export function writeReferences(
   if (!references?.length) return [];
   fs.mkdirSync(dir, { recursive: true });
   return references.map((ref, index) => {
-    const extension = (ref.mimeType.split("/")[1] || "png").split("+")[0];
-    const file = path.join(dir, `reference-${index + 1}.${extension}`);
-    fs.writeFileSync(file, Buffer.from(ref.b64, "base64"));
+    const { buffer, kind } = decodeImage(ref.b64);
+    const file = path.join(dir, `reference-${index + 1}.${kind.extension}`);
+    fs.writeFileSync(file, buffer);
     return file;
   });
 }
