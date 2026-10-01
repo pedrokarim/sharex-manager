@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ClipAsset, MediaSource } from "../engine/types";
 import { assetToSource, callModule } from "../lib/client";
 import { useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
+import { useAccountPreference } from "@/hooks/use-account-preference";
 
 const SPEEDS = [
   { value: 0.85, label: "Posée" },
@@ -38,24 +39,18 @@ export function VoicePanel({
   const [busy, setBusy] = useState(false);
   const [captions, setCaptions] = useState(true);
 
+  // Voix, vitesse et sous-titres suivent le compte, d'une visite et d'un
+  // appareil à l'autre.
+  const preference = useAccountPreference<{ voice?: string; speed?: number; captions?: boolean }>("clip-studio.voice", {});
+  const saved = preference.value;
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("clip-studio:voice") ?? "null");
-      if (saved?.voice) setVoice(saved.voice);
-      if (saved?.speed) setSpeed(saved.speed);
-      if (typeof saved?.captions === "boolean") setCaptions(saved.captions);
-    } catch {
-      // Préférence absente ou illisible : on garde les valeurs par défaut.
-    }
-  }, []);
+    if (!preference.ready) return;
+    if (typeof saved.voice === "string" && saved.voice) setVoice(saved.voice);
+    if (typeof saved.speed === "number" && saved.speed > 0) setSpeed(saved.speed);
+    if (typeof saved.captions === "boolean") setCaptions(saved.captions);
+  }, [preference.ready, saved.voice, saved.speed, saved.captions]);
 
-  const remember = (next: { voice?: string; speed?: number; captions?: boolean }) => {
-    try {
-      localStorage.setItem("clip-studio:voice", JSON.stringify({ voice, speed, captions, ...next }));
-    } catch {
-      // Stockage indisponible : la préférence ne sera simplement pas retenue.
-    }
-  };
+  const remember = preference.update;
 
   const selected = info?.voices.find((entry) => entry.id === voice);
   const engineMissing = info?.engine.status === "missing" || info?.engine.status === "error";

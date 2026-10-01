@@ -13,6 +13,8 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
+import { useAccountPreference } from "@/hooks/use-account-preference";
+import { COMPOSER_PREFERENCE_SCOPE, type ComposerPreference } from "../lib/composer-preference";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -302,7 +304,21 @@ function CollectionDetail({
   onOpenViewer: (item: HistoryItem, fileIndex: number) => void;
 }) {
   const [scenePrompt, setScenePrompt] = useState("");
-  const [model, setModel] = useState(settings.default_model ?? "");
+  const [model, setModelState] = useState(settings.default_model ?? "");
+  // Même moteur que dans le studio : celui que le compte a choisi en dernier.
+  const preference = useAccountPreference<ComposerPreference>(COMPOSER_PREFERENCE_SCOPE, {});
+  const savedModel = preference.value.model;
+  useEffect(() => {
+    if (preference.ready && savedModel) setModelState(savedModel);
+  }, [preference.ready, savedModel]);
+  const updatePreference = preference.update;
+  const setModel = useCallback(
+    (next: string) => {
+      setModelState(next);
+      updatePreference({ model: next });
+    },
+    [updatePreference]
+  );
   const [busy, setBusy] = useState(false);
   const [anchorPicker, setAnchorPicker] = useState(false);
 
@@ -310,7 +326,8 @@ function CollectionDetail({
 
   useEffect(() => {
     if (!models.length) return;
-    if (!models.some((entry) => entry.id === model)) setModel(models[0].id);
+    // Repli automatique : il ne remplace pas le moteur retenu par le compte.
+    if (!models.some((entry) => entry.id === model)) setModelState(models[0].id);
   }, [models, model]);
 
   const addScene = async () => {

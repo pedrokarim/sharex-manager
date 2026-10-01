@@ -62,6 +62,13 @@ import {
   type Pipeline,
 } from "../lib/client";
 import { useImageIntake } from "../lib/use-image-intake";
+import { useAccountPreference } from "@/hooks/use-account-preference";
+import {
+  COMPOSER_PREFERENCE_SCOPE,
+  pickComposerPreference,
+  touchesComposerPreference,
+  type ComposerPreference,
+} from "../lib/composer-preference";
 
 interface GeneratePageProps {
   moduleName: string;
@@ -156,9 +163,30 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
 
   const { jobs, history, ready, refresh } = useStudioState(60);
 
+  // Les réglages du compositeur suivent le compte : sans cela, moteur, format
+  // et qualité revenaient aux valeurs par défaut à chaque visite.
+  const preference = useAccountPreference<ComposerPreference>(COMPOSER_PREFERENCE_SCOPE, {});
+  const hadDraft = useRef(draftSnapshot !== null);
+  const preferenceApplied = useRef(false);
+  useEffect(() => {
+    if (!preference.ready || preferenceApplied.current) return;
+    preferenceApplied.current = true;
+    // Un brouillon en cours (retour depuis la bibliothèque) garde la main.
+    if (hadDraft.current) return;
+    const saved = pickComposerPreference(preference.value);
+    if (Object.keys(saved).length) setState((prev) => ({ ...prev, ...saved }));
+  }, [preference.ready, preference.value]);
+
+  // Seuls les changements faits par l'utilisateur passent par ici et sont
+  // retenus ; un repli automatique (moteur indisponible) ne remplace pas son
+  // choix enregistré.
+  const updatePreference = preference.update;
   const patch = useCallback(
-    (next: Partial<ComposerState>) => setState((prev) => ({ ...prev, ...next })),
-    []
+    (next: Partial<ComposerState>) => {
+      setState((prev) => ({ ...prev, ...next }));
+      if (touchesComposerPreference(next)) updatePreference(pickComposerPreference(next));
+    },
+    [updatePreference]
   );
 
   useEffect(() => {
@@ -172,18 +200,20 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
         setCatalogue(cat);
         setCollections(cols);
         setPipelines(pipes);
-        // Le modèle par défaut peut ne plus être disponible (clé retirée, CLI
-        // désinstallé). Basculer sur le premier utilisable évite un bouton
-        // « Générer » définitivement grisé sans explication.
-        setState((prev) => {
-          const current = cat.models.find((model) => model.id === prev.model);
-          if (current?.available) return prev;
-          const fallback = cat.models.find((model) => model.available);
-          return fallback ? { ...prev, model: fallback.id } : prev;
-        });
       })
       .catch(() => setCatalogue({ models: [], cli: [], apiEngines: [] }));
   }, []);
+
+  // Le moteur choisi peut ne plus être disponible (clé retirée, CLI
+  // désinstallé). Basculer sur le premier utilisable évite un bouton
+  // « Générer » définitivement grisé sans explication. Vérifié à chaque
+  // changement : la préférence du compte arrive après le catalogue.
+  useEffect(() => {
+    if (!catalogue) return;
+    if (catalogue.models.find((model) => model.id === state.model)?.available) return;
+    const fallback = catalogue.models.find((model) => model.available);
+    if (fallback && fallback.id !== state.model) setState((prev) => ({ ...prev, model: fallback.id }));
+  }, [catalogue, state.model]);
 
   const collectionsById = useMemo(
     () => new Map(collections.map((collection) => [collection.id, collection])),
@@ -794,36 +824,17 @@ function ActivitySheet({
 
 // ─── Choix de la vue ─────────────────────────────────────────────
 
-const VIEW_KEY = "ai-image-gen:view";
-
 const VIEWS: { id: FeedView; label: string; icon: typeof LayoutGrid }[] = [
   { id: "mosaic", label: "Mosaïque", icon: LayoutGrid },
   { id: "list", label: "Liste", icon: Rows3 },
   { id: "chat", label: "Conversation", icon: MessagesSquare },
 ];
 
-/** Vue du fil, retenue d'une visite à l'autre dans ce navigateur. */
+/** Vue du fil, retenue par le compte d'une visite et d'un appareil à l'autre. */
 function useFeedView() {
-  const [view, setView] = useState<FeedView>("mosaic");
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(VIEW_KEY);
-      if (saved && VIEWS.some((entry) => entry.id === saved)) setView(saved as FeedView);
-    } catch {
-      // Stockage indisponible : la mosaïque reste la vue par défaut.
-    }
-  }, []);
-
-  const change = useCallback((next: FeedView) => {
-    setView(next);
-    try {
-      localStorage.setItem(VIEW_KEY, next);
-    } catch {
-      // Sans stockage, le choix vaut pour la visite en cours.
-    }
-  }, []);
-
+  const { value, update } = useAccountPreference<{ view?: string }>("ai-image-gen.feed", {});
+  const view: FeedView = VIEWS.some((entry) => entry.id === value.view) ? (value.view as FeedView) : "mosaic";
+  const change = useCallback((next: FeedView) => update({ view: next }), [update]);
   return [view, change] as const;
 }
 
