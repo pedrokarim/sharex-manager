@@ -22,6 +22,7 @@
   },
   "functions": {
     "getCatalogue": "user",
+    "enhancePrompt": "user",
     "enqueueGeneration": "user",
     "cancelGeneration": "user",
     "getStudioState": "user",

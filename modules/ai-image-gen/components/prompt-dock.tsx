@@ -1,6 +1,7 @@
 "use client";
 
 import { EngineLogo } from "./engine-logo";
+import { PromptEnhancer } from "./prompt-enhancer";
 import { useEffect, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -272,6 +273,10 @@ export function PromptDock({
           onSelect={(count) => onChange({ count })}
         />
         <StylePicker
+          prompt={state.prompt}
+          onChange={(prompt) => onChange({ prompt })}
+        />
+        <PromptEnhancer
           prompt={state.prompt}
           onChange={(prompt) => onChange({ prompt })}
         />

@@ -6,6 +6,8 @@
  * il valide, délègue, et ne contient aucune logique métier.
  */
 
+import { enhancePrompt as runEnhancePrompt } from "./lib/enhance";
+import type { EnhanceRequest } from "./lib/enhance-options";
 import fs from "fs";
 import path from "path";
 import { ModuleHooks } from "@/types/modules";
@@ -104,6 +106,14 @@ export async function getCatalogue(): Promise<CatalogPayload> {
     cli: full.cli.map((engine) => ({ ...engine, binaryPath: null, configuredPath: undefined, account: null })),
     apiEngines: full.apiEngines.map((engine) => ({ ...engine, hint: "" })),
   };
+}
+
+/**
+ * Assistant d'écriture : corrige, enrichit ou réécrit le prompt d'une image
+ * (trois niveaux), avec des renforts d'ambiance et une demande libre.
+ */
+export async function enhancePrompt(input: Partial<EnhanceRequest>): Promise<{ prompt: string }> {
+  return runEnhancePrompt(input);
 }
 
 /** Catalogue complet, pour la page des réglages (réservé aux admins). */
