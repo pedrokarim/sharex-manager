@@ -23,6 +23,7 @@ import {
   Trash2,
   Unlock,
   X,
+  Download,
 } from "lucide-react";
 import Image from "next/image";
 import { isVideoFile } from "@/lib/media-kind";
@@ -36,6 +37,7 @@ import { FileAlbumsSection } from "@/components/gallery/file-albums-section";
 import { toast } from "sonner";
 import { ModuleActions } from "./module-actions";
 import { GalleryProvenanceSection } from "./gallery-provenance";
+import { DownloadMenu } from "./download-menu";
 import { getGalleryImageUrl, getFileStoragePath } from "@/lib/utils/url";
 import { useRouter } from "next/navigation";
 import { AddToAlbumDialog } from "@/components/albums/add-to-album-dialog";
@@ -405,6 +407,12 @@ function FileViewerBody({
                         {t("gallery.file_viewer.actions")}
                       </p>
                       <div className="grid grid-cols-2 gap-2">
+                        <DownloadMenu file={file} align="start">
+                          <Button variant="outline" size="sm" className="col-span-2">
+                            <Download className="mr-2 h-4 w-4" />
+                            {t("gallery.file_card.actions.download")}
+                          </Button>
+                        </DownloadMenu>
                         <Button
                           variant="outline"
                           size="sm"

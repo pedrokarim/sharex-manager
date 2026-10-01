@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BadgeCheck, Sparkles } from "lucide-react";
-import { ProvenanceDisclosure, createSummaryStore } from "@/components/provenance/provenance-view";
+import { ProvenanceDetails, ProvenanceDisclosure, createSummaryStore } from "@/components/provenance/provenance-view";
 import { isImageFile } from "@/lib/media-kind";
 import type { ProvenanceReport, ProvenanceSummary, ProvenanceVerdict } from "@/lib/provenance/types";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,7 @@ const useSummary = createSummaryStore(async (names) => {
   return ((await response.json()).summaries ?? {}) as Record<string, ProvenanceSummary>;
 });
 
-function Badge({ name, className }: { name: string; className?: string }) {
+function Badge({ name, className, inline }: { name: string; className?: string; inline?: boolean }) {
   const summary = useSummary(name);
   // Presque aucune capture ne porte de marque : on ne signale que ce qui en
   // dit quelque chose, une signature ou une déclaration de génération.
@@ -34,7 +34,10 @@ function Badge({ name, className }: { name: string; className?: string }) {
       title={title}
       aria-label={title}
       className={cn(
-        "pointer-events-none absolute z-10 flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-md bg-black/60 px-1.5 py-1 text-[10px] font-medium leading-none text-white backdrop-blur-sm",
+        "flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium leading-none",
+        inline
+          ? "shrink-0 bg-muted text-muted-foreground"
+          : "pointer-events-none absolute z-10 max-w-[calc(100%-1rem)] bg-black/60 text-white backdrop-blur-sm",
         className
       )}
     >
@@ -45,9 +48,53 @@ function Badge({ name, className }: { name: string; className?: string }) {
 }
 
 /** Pastille d'origine sur une vignette de la galerie, quand le fichier déclare quelque chose. */
-export function GalleryProvenanceBadge({ name, className }: { name: string; className?: string }) {
+export function GalleryProvenanceBadge({
+  name,
+  className,
+  inline,
+}: {
+  name: string;
+  className?: string;
+  /** Dans une ligne de texte plutôt que posée sur une vignette. */
+  inline?: boolean;
+}) {
   // Seules les images portent ces marques : inutile d'interroger le serveur pour une archive.
-  return isImageFile(name) ? <Badge name={name} className={className} /> : null;
+  return isImageFile(name) ? <Badge name={name} className={className} inline={inline} /> : null;
+}
+
+/** Origine d'un fichier, dépliée : pour une fenêtre ou une bulle qui lui est consacrée. */
+export function GalleryProvenanceDetails({ name }: { name: string }) {
+  const [detail, setDetail] = useState<Detail | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDetail(null);
+    setFailed(false);
+    fetch(`/api/files/${encodeURIComponent(name)}/provenance`, { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error(String(response.status)))))
+      .then((data) => {
+        if (!cancelled) setDetail(data);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [name]);
+
+  if (failed) return <p className="text-xs text-muted-foreground">Lecture des marques d’origine impossible.</p>;
+  if (!detail) return <p className="text-xs text-muted-foreground">Lecture du fichier…</p>;
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-sm font-medium">{detail.verdict.title}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{detail.verdict.reason}</p>
+      </div>
+      <ProvenanceDetails report={detail.report} />
+    </div>
+  );
 }
 
 interface Detail {

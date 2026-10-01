@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Loading } from "@/components/ui/loading";
 import { PublicImageViewer } from "@/components/catalog/public-image-viewer";
 import { VideoThumbnail } from "@/components/gallery/video-thumbnail";
+import { GalleryProvenanceBadge } from "@/components/gallery/gallery-provenance";
 import { isImageFile, isVideoFile, mediaCountLabel } from "@/lib/media-kind";
 import { CatalogMosaic } from "@/components/catalog/catalog-mosaic";
 import { cn } from "@/lib/utils";
@@ -289,6 +290,7 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
                         className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                       />
                     )}
+                    <GalleryProvenanceBadge name={file.name} className="left-1.5 top-1.5" />
                   </button>
                 ))}
               </div>

@@ -1,8 +1,10 @@
 "use client";
 
+import { useDownloads } from "@/components/gallery/download-menu";
 import {
   Copy,
   Download,
+  Eraser,
   ExternalLink,
   Star,
   Lock,
@@ -73,18 +75,10 @@ export function FileContextMenuContent({
     onCopy?.();
   };
 
+  const downloads = useDownloads(file);
   const handleDownload = () => {
-    if (onDownload) {
-      onDownload();
-    } else {
-      // Fallback : téléchargement direct
-      const link = document.createElement("a");
-      link.href = file.url;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+    if (onDownload) onDownload();
+    else downloads.original();
   };
 
   const handleExternalOpen = () => {
@@ -114,8 +108,14 @@ export function FileContextMenuContent({
 
       <ContextMenuItem onClick={handleDownload}>
         <Download className="h-4 w-4 mr-2" />
-        Télécharger
+        {downloads.cleanable ? t("gallery.download.original") : t("gallery.file_card.actions.download")}
       </ContextMenuItem>
+      {downloads.cleanable && (
+        <ContextMenuItem onClick={() => void downloads.clean()}>
+          <Eraser className="h-4 w-4 mr-2" />
+          {t("gallery.download.clean")}
+        </ContextMenuItem>
+      )}
 
       <ContextMenuItem onClick={handleExternalOpen}>
         <ExternalLink className="h-4 w-4 mr-2" />

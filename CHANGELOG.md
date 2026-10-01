@@ -26,6 +26,13 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   EXIF, XMP, paramètres de génération. Rien n’est enregistré.
 - Galerie : origine des fichiers. Une pastille signale les images signées ou
   déclarées générées, et la visionneuse détaille ce que le fichier porte.
+  Présent partout où des images s’affichent en grille : galerie (grille et
+  liste), albums, favoris, fichiers sécurisés, et côté public la galerie du
+  catalogue, les albums et leur visionneuse.
+- Galerie : deux téléchargements pour chaque image, l’original ou une version
+  sans métadonnées (pixels identiques, sans recompression), depuis la carte,
+  la liste, le menu contextuel, la visionneuse et la visionneuse publique. Un
+  fichier marqué privé reste réservé aux comptes connectés.
 - AI Image Gen : origine des images. Un indicateur sur chaque vignette et un
   panneau « Origine » dans la visionneuse montrent ce que le fichier porte :
   manifeste C2PA (générateur, nature de l’image, actions, signature contrôlée
@@ -116,6 +123,9 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Galerie : les cartes n’affichent plus leur rangée de quatre boutons. Les
+  actions (télécharger, copier le lien, ouvrir, supprimer, favori) apparaissent
+  au survol de l’image ; le nom, la taille et la date tiennent sur deux lignes.
 - Galerie : barre d’outils allégée. Vue, tri, période et actualisation
   automatique sont rangés derrière « Affichage » ; un seul bouton « Ajouter »
   remplace le bouton flottant et l’ancienne fenêtre d’envoi à un fichier. La

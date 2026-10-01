@@ -21,6 +21,8 @@ import { format, parseISO } from "date-fns";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import Image from "next/image";
 import { VideoThumbnail } from "@/components/gallery/video-thumbnail";
+import { DownloadMenu } from "@/components/gallery/download-menu";
+import { GalleryProvenanceBadge } from "@/components/gallery/gallery-provenance";
 import { isVideoFile } from "@/lib/media-kind";
 import { cn } from "@/lib/utils";
 import { getGalleryImageUrl } from "@/lib/utils/url";
@@ -199,6 +201,7 @@ export function SelectableListItemCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="font-medium truncate">{file.name}</h3>
+              <GalleryProvenanceBadge name={file.name} inline />
               {file.isSecure && (
                 <Lock className="h-3 w-3 text-yellow-500 flex-shrink-0" />
               )}
@@ -243,11 +246,11 @@ export function SelectableListItemCard({
             >
               <Copy className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" asChild>
-              <a href={file.url} download onClick={(e) => e.stopPropagation()}>
+            <DownloadMenu file={file}>
+              <Button variant="ghost" size="icon" aria-label="Télécharger">
                 <Download className="h-4 w-4" />
-              </a>
-            </Button>
+              </Button>
+            </DownloadMenu>
             <Button variant="ghost" size="icon" asChild>
               <a
                 href={getGalleryImageUrl(file.name)}

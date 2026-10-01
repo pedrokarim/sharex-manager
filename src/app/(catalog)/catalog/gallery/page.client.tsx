@@ -7,6 +7,7 @@ import { CalendarSearch, ChevronDown, Images } from "lucide-react";
 import { Loading } from "@/components/ui/loading";
 import { PublicImageViewer } from "@/components/catalog/public-image-viewer";
 import { VideoThumbnail } from "@/components/gallery/video-thumbnail";
+import { GalleryProvenanceBadge } from "@/components/gallery/gallery-provenance";
 import { isVideoFile } from "@/lib/media-kind";
 import { TimelineNavigator, timelineGroupProps } from "@/components/timeline/timeline-navigator";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
@@ -336,6 +337,7 @@ export function CatalogGalleryPage() {
                           className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                         />
                       )}
+                      <GalleryProvenanceBadge name={image.name} className="left-1.5 top-1.5" />
                       {image.album ? (
                         <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/75 to-transparent px-2 pb-1 pt-5 text-left font-mono text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
                           {image.album.name}

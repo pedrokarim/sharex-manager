@@ -325,6 +325,15 @@
     }
   },
   "gallery": {
+    "download": {
+      "original": "Télécharger l’original",
+      "clean": "Télécharger une version propre",
+      "clean_hint": "Sans métadonnées, pixels identiques",
+      "clean_done": "Version propre : {size} de métadonnées en moins, pixels identiques",
+      "clean_nothing": "Version propre : rien à retirer, fichier identique",
+      "clean_error": "Version propre indisponible",
+      "origin": "Origine de l’image"
+    },
     "add": {
       "title": "Ajouter à la galerie",
       "description": "Choisissez d’où viennent les fichiers.",
@@ -562,6 +571,16 @@
       "loading_files": "Erreur lors du chargement des fichiers"
     },
     "file_card": {
+      "actions": {
+        "download": "Télécharger",
+        "copy": "Copier le lien",
+        "open": "Ouvrir dans un nouvel onglet",
+        "delete": "Supprimer",
+        "star": "Ajouter aux favoris",
+        "unstar": "Retirer des favoris",
+        "make_private": "Rendre privé",
+        "make_public": "Rendre public"
+      },
       "delete_success": "Le fichier a été supprimé avec succès",
       "delete_error": "Une erreur est survenue lors de la suppression du fichier",
       "delete_confirmation": {

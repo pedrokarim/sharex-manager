@@ -107,6 +107,19 @@ export function createProvenanceReader(directory: () => string) {
     return { name, entry, buffer: read };
   };
 
+  /** La version sans métadonnées, en octets. L'original reste intact. */
+  const cleanFile = async (
+    file: unknown
+  ): Promise<{ fileName: string; mimeType: string; output: Buffer; clean: CleanResult }> => {
+    const { name, entry, buffer } = load(file);
+    const original = buffer();
+    const format = sniffFormat(original);
+    if (!format) throw new Error(entry.report.removableReason ?? "Format non géré pour le retrait.");
+    const { output, result } = await cleanOf(original);
+    entry.clean = result;
+    return { fileName: cleanFileName(name), mimeType: MIME_TYPES[format], output, clean: result };
+  };
+
   return {
     /** Indicateur d'origine de plusieurs images, en un seul appel. */
     inspectMany(files: unknown): Record<string, ProvenanceSummary> {
@@ -139,15 +152,12 @@ export function createProvenanceReader(directory: () => string) {
       return { report: entry.report, clean: entry.clean };
     },
 
-    /** La version sans métadonnées, prête à être téléchargée. L'original reste intact. */
+    cleanFile,
+
+    /** La même, encodée pour voyager dans une réponse JSON. */
     async cleanCopy(file: unknown): Promise<{ fileName: string; mimeType: string; b64: string; clean: CleanResult }> {
-      const { name, entry, buffer } = load(file);
-      const original = buffer();
-      const format = sniffFormat(original);
-      if (!format) throw new Error(entry.report.removableReason ?? "Format non géré pour le retrait.");
-      const { output, result } = await cleanOf(original);
-      entry.clean = result;
-      return { fileName: cleanFileName(name), mimeType: MIME_TYPES[format], b64: output.toString("base64"), clean: result };
+      const { output, ...rest } = await cleanFile(file);
+      return { ...rest, b64: output.toString("base64") };
     },
   };
 }

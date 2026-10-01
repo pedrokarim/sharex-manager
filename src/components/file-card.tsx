@@ -25,12 +25,7 @@ import {
   showThumbnailsAtom,
 } from "@/lib/atoms/preferences";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,8 +35,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { DownloadMenu } from "@/components/gallery/download-menu";
 import { formatBytes } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { FileInfo } from "@/types/files";
@@ -76,6 +71,7 @@ export function FileCard({
   const { t } = useTranslation();
   const locale = useDateLocale();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [defaultShowFileInfo] = useAtom(showFileInfoAtom);
   const [defaultShowFileSize] = useAtom(showFileSizeAtom);
   const [defaultShowUploadDate] = useAtom(showUploadDateAtom);
@@ -174,13 +170,24 @@ export function FileCard({
     event.preventDefault();
   };
 
+  /** Bouton d'action posé sur l'image : discret, lisible sur n'importe quel fond. */
+  const overlayButton =
+    cn(
+    "flex items-center justify-center rounded-lg bg-black/55 text-white backdrop-blur-md transition-colors hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+    // Sur les petites vignettes, quatre boutons doivent tenir dans la largeur.
+    size === "small" || size === "tiny" ? "h-7 w-7" : "h-8 w-8",
+  );
+  /** Caché au repos, révélé au survol de la carte, au clavier, ou tant qu'un de ses menus est ouvert. */
+  const revealed =
+    "opacity-0 transition-opacity duration-150 group-hover/card:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100";
+
   return (
     <Card
       className={cn(
         // py-0 gap-0 : depuis shadcn v4, Card porte py-6 et gap-6 en dur.
         // Sans ces annulations, une bande vide apparaît au-dessus de l'image
         // même avec un CardHeader en p-0.
-        "gap-0 overflow-hidden py-0 transition-all duration-500",
+        "group/card gap-0 overflow-hidden py-0 transition-all duration-500",
         isNew && "animate-in fade-in-0 zoom-in-95",
       )}
     >
@@ -195,6 +202,7 @@ export function FileCard({
           onClick={onSelect}
           onDragStart={preventNativeImageDrag}
           onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               onSelect?.();
@@ -202,32 +210,30 @@ export function FileCard({
           }}
         >
           {onToggleStar && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Toggle favorite"
+            <button
+              type="button"
+              aria-label={t(file.isStarred ? "gallery.file_card.actions.unstar" : "gallery.file_card.actions.star")}
+              title={t(file.isStarred ? "gallery.file_card.actions.unstar" : "gallery.file_card.actions.star")}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleStar();
               }}
               className={cn(
-                "h-8 w-8 absolute top-2 right-2 z-10",
-                "backdrop-blur-md border border-white/20",
-                "bg-white/10 dark:bg-black/10",
-                "hover:bg-white/20 dark:hover:bg-black/20",
-                "transition-all duration-200",
-                file.isStarred
-                  ? "text-white bg-yellow-500/40 border-yellow-500/30 hover:bg-yellow-500/50"
-                  : "text-white hover:text-white",
+                overlayButton,
+                "absolute top-2 right-2 z-10",
+                // Un favori reste marqué ; l'étoile vide n'apparaît qu'au survol.
+                file.isStarred ? "bg-yellow-500/80 hover:bg-yellow-500" : revealed,
               )}
             >
-              <Star
-                className={cn("h-4 w-4", file.isStarred && "fill-current")}
-              />
-            </Button>
+              <Star className={cn("h-4 w-4", file.isStarred && "fill-current")} />
+            </button>
           )}
 
-          <GalleryProvenanceBadge name={file.name} className="bottom-2 left-2" />
+          {/* La pastille cède la place aux actions quand elles apparaissent. */}
+          <GalleryProvenanceBadge
+            name={file.name}
+            className="bottom-2 left-2 transition-opacity duration-150 group-hover/card:opacity-0"
+          />
 
           {isImage ? (
             showThumbnails ? (
@@ -256,16 +262,75 @@ export function FileCard({
               </span>
             </div>
           )}
+
+          {/* Actions : elles ne chargent pas la grille, elles viennent au survol. */}
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-end gap-1 bg-gradient-to-t from-black/50 to-transparent p-2 pt-8",
+              revealed,
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="pointer-events-auto flex gap-1">
+              <DownloadMenu file={file}>
+                <button
+                  type="button"
+                  aria-label={t("gallery.file_card.actions.download")}
+                  title={t("gallery.file_card.actions.download")}
+                  className={overlayButton}
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+              </DownloadMenu>
+              {onCopy && (
+                <button
+                  type="button"
+                  aria-label={t("gallery.file_card.actions.copy")}
+                  title={t("gallery.file_card.actions.copy")}
+                  className={overlayButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCopy();
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
+              )}
+              <a
+                href={getGalleryImageUrl(file.name)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("gallery.file_card.actions.open")}
+                title={t("gallery.file_card.actions.open")}
+                className={overlayButton}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+              <button
+                type="button"
+                aria-label={t("gallery.file_card.actions.delete")}
+                title={t("gallery.file_card.actions.delete")}
+                disabled={isDeleting}
+                className={cn(overlayButton, "hover:bg-destructive")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmDelete(true);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </CardHeader>
       {showFileInfo && (
-        <CardContent className={cn("p-4", size === "small" && "p-2")}>
+        <CardContent className={cn("px-3 py-2.5", size === "small" && "p-2")}>
           <div className="min-w-0">
             <div className="flex items-start gap-2">
               <p
                 className={cn(
-                  "min-w-0 flex-1 line-clamp-1 font-medium",
-                  size === "small" && "text-sm",
+                  "min-w-0 flex-1 line-clamp-1 text-sm font-medium",
                 )}
                 title={file.name}
               >
@@ -275,6 +340,8 @@ export function FileCard({
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label={t(file.isSecure ? "gallery.file_card.actions.make_public" : "gallery.file_card.actions.make_private")}
+                  title={t(file.isSecure ? "gallery.file_card.actions.make_public" : "gallery.file_card.actions.make_private")}
                   onClick={(e) => {
                     e.stopPropagation();
                     onToggleSecurity();
@@ -282,7 +349,9 @@ export function FileCard({
                   className={cn(
                     "mt-0.5 h-7 w-7 shrink-0 rounded-full text-muted-foreground hover:text-foreground",
                     size === "small" && "mt-0 h-6 w-6",
-                    file.isSecure && "text-amber-500 hover:text-amber-500",
+                    file.isSecure
+                      ? "text-amber-500 hover:text-amber-500"
+                      : "opacity-0 transition-opacity group-hover/card:opacity-100 focus-visible:opacity-100",
                   )}
                 >
                   {file.isSecure ? (
@@ -303,28 +372,22 @@ export function FileCard({
                 </Button>
               )}
             </div>
-            {showFileSize && (
-              <p
+            {(showFileSize || showUploadDate) && (
+              <div
                 className={cn(
-                  "mt-1 text-sm text-muted-foreground",
-                  size === "small" && "mt-0.5 text-xs",
+                  "mt-0.5 flex items-center gap-2 text-xs text-muted-foreground",
+                  size === "small" && "text-[11px]",
                 )}
               >
-                {formatBytes(file.size)}
-              </p>
-            )}
-            {showUploadDate && (
-              <div className="mt-1 flex items-center gap-2">
-                <p
-                  className={cn(
-                    "text-sm text-muted-foreground",
-                    size === "small" && "text-xs",
-                  )}
-                >
-                  {formatDistanceToNow(new Date(file.createdAt), {
-                    addSuffix: true,
-                    locale,
-                  })}
+                <p className="min-w-0 truncate">
+                  {[
+                    showFileSize ? formatBytes(file.size) : null,
+                    showUploadDate
+                      ? formatDistanceToNow(new Date(file.createdAt), { addSuffix: true, locale })
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
                 {albumIndicator && <>{albumIndicator}</>}
               </div>
@@ -332,86 +395,26 @@ export function FileCard({
           </div>
         </CardContent>
       )}
-      <CardFooter
-        className={cn(
-          "grid grid-cols-4 gap-2 p-4 pt-0",
-          size === "small" && "p-2 pt-0 gap-1",
-          !showFileInfo && "pt-4",
-        )}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Button variant="secondary" className="w-full" asChild>
-          <a
-            href={file.url}
-            download
-            aria-label="Download file"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Download
-              className={cn("mr-2 h-4 w-4", size === "small" && "mr-0 h-3 w-3")}
-            />
-          </a>
-        </Button>
-        {onCopy && (
-          <Button
-            variant="secondary"
-            className="w-full"
-            aria-label="Copy link"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCopy();
-            }}
-          >
-            <Copy className={cn("h-4 w-4", size === "small" && "h-3 w-3")} />
-          </Button>
-        )}
-        <Button variant="secondary" className="w-full" asChild>
-          <a
-            href={getGalleryImageUrl(file.name)}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Open in new tab"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ExternalLink
-              className={cn("h-4 w-4", size === "small" && "h-3 w-3")}
-            />
-          </a>
-        </Button>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              variant="destructive"
-              className="w-full"
-              aria-label="Delete file"
-              disabled={isDeleting}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Trash2
-                className={cn("h-4 w-4", size === "small" && "h-3 w-3")}
-              />
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {t("gallery.file_card.delete_confirmation.title")}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {t("gallery.file_card.delete_confirmation.description")}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>
-                {t("gallery.file_card.delete_confirmation.cancel")}
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>
-                {t("gallery.file_card.delete_confirmation.confirm")}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </CardFooter>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("gallery.file_card.delete_confirmation.title")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("gallery.file_card.delete_confirmation.description")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {t("gallery.file_card.delete_confirmation.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>
+              {t("gallery.file_card.delete_confirmation.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

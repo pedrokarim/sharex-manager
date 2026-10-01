@@ -1,5 +1,8 @@
 "use client";
 
+import { DownloadMenu } from "@/components/gallery/download-menu";
+import { GalleryProvenanceDetails } from "@/components/gallery/gallery-provenance";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { format, parseISO } from "date-fns";
@@ -17,6 +20,7 @@ import {
   Calendar,
   Folder,
   Play,
+  ScanSearch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isVideoFile } from "@/lib/media-kind";
@@ -330,13 +334,6 @@ export function PublicImageViewer({
   const hasPrevious = index > 0;
   const hasNext = index < items.length - 1;
 
-  const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = currentItem.url;
-    link.download = currentItem.name;
-    link.click();
-  };
-
   const formattedDate = currentItem.addedAt
     ? format(parseISO(currentItem.addedAt), "dd MMMM yyyy à HH:mm", {
         locale: fr,
@@ -426,15 +423,35 @@ export function PublicImageViewer({
           </div>
 
           {/* Actions */}
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Download image"
-            className="h-10 w-10 text-white hover:bg-white/10"
-            onClick={handleDownload}
-          >
-            <Download className="h-5 w-5" />
-          </Button>
+          {!showsVideo && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t("gallery.download.origin")}
+                  title={t("gallery.download.origin")}
+                  className="h-10 w-10 text-white hover:bg-white/10"
+                >
+                  <ScanSearch className="h-5 w-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] overflow-y-auto">
+                <GalleryProvenanceDetails name={currentItem.name} />
+              </PopoverContent>
+            </Popover>
+          )}
+          <DownloadMenu file={currentItem}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t("gallery.file_card.actions.download")}
+              title={t("gallery.file_card.actions.download")}
+              className="h-10 w-10 text-white hover:bg-white/10"
+            >
+              <Download className="h-5 w-5" />
+            </Button>
+          </DownloadMenu>
           <Button
             variant="ghost"
             size="icon"

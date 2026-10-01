@@ -25,6 +25,7 @@ const GUARDS = [
   /auth\.api\.getSession\(/, // contrôle de session écrit à la main
   /x-api-key/, // envoi ShareX par clé API
   /isFileSecure\(/, // fichier public sauf s'il est sécurisé
+  /visitorAccess\(/, // même règle, pour ce qui dérive d'un fichier (origine, version propre)
 ];
 
 function routeFiles(dir: string): string[] {

@@ -324,6 +324,15 @@
     }
   },
   "gallery": {
+    "download": {
+      "original": "Download the original",
+      "clean": "Download a clean version",
+      "clean_hint": "No metadata, identical pixels",
+      "clean_done": "Clean version: {size} of metadata removed, identical pixels",
+      "clean_nothing": "Clean version: nothing to remove, identical file",
+      "clean_error": "Clean version unavailable",
+      "origin": "Image origin"
+    },
     "add": {
       "title": "Add to the gallery",
       "description": "Choose where the files come from.",
@@ -547,6 +556,16 @@
       "loading_files": "Error loading files"
     },
     "file_card": {
+      "actions": {
+        "download": "Download",
+        "copy": "Copy link",
+        "open": "Open in a new tab",
+        "delete": "Delete",
+        "star": "Add to favourites",
+        "unstar": "Remove from favourites",
+        "make_private": "Make private",
+        "make_public": "Make public"
+      },
       "delete_success": "The file has been successfully deleted",
       "delete_error": "An error occurred while deleting the file",
       "delete_confirmation": {
