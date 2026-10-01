@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { albumsDb } from "@/lib/utils/albums-db";
 import { isImageFile, isVideoFile } from "@/lib/media-kind";
 import { videoMeta } from "@/lib/media/video";
+import { summarizeMonths } from "@/lib/timeline";
 
 // GET /api/public/catalog - Récupérer tous les albums publics
 export async function GET(request: NextRequest) {
@@ -50,6 +51,15 @@ export async function GET(request: NextRequest) {
         const tb = new Date(b.addedAt).getTime();
         return tb - ta;
       });
+
+      // Frise des mois : de quoi dessiner le rail de défilement et sauter à une date.
+      if (searchParams.get("timeline") === "1") {
+        const tzOffset = parseInt(searchParams.get("tz") || "0") || 0;
+        return NextResponse.json({
+          months: summarizeMonths(deduped.map((entry) => entry.addedAt), tzOffset),
+          total: deduped.length,
+        });
+      }
 
       const slice = deduped.slice(imagesOffset, imagesOffset + imagesLimit);
       const nextOffset = imagesOffset + slice.length;

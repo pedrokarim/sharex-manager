@@ -325,6 +325,35 @@
     }
   },
   "gallery": {
+    "toolbar": {
+      "add": "Ajouter",
+      "refresh": "Actualiser",
+      "go_to_date": "Aller à une date",
+      "count_one": "{count} fichier",
+      "count_many": "{count} fichiers"
+    },
+    "timeline": {
+      "description": "Choisissez une année, puis un mois si vous voulez être plus précis.",
+      "open_year": "Ouvrir {year}",
+      "select_month": "Sélectionner tout le mois",
+      "deselect_month": "Retirer la sélection pour"
+    },
+    "display": {
+      "button": "Affichage",
+      "filter_active": "Un filtre de période est actif",
+      "view": "Vue",
+      "sort": "Tri",
+      "period": "Période",
+      "period_all": "Toutes les dates",
+      "auto_refresh": "Actualisation automatique",
+      "refresh_off": "Non",
+      "newest_first": "Du plus récent au plus ancien",
+      "oldest_first": "Du plus ancien au plus récent",
+      "a_to_z": "De A à Z",
+      "z_to_a": "De Z à A",
+      "largest_first": "Du plus lourd au plus léger",
+      "smallest_first": "Du plus léger au plus lourd"
+    },
     "no_files": "Aucun fichier trouvé",
     "upload": "Téléverser",
     "select_all": "Tout sélectionner",

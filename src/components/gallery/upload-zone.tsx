@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   X,
@@ -29,6 +29,11 @@ interface FileWithPreview extends File {
 interface UploadZoneProps {
   children: React.ReactNode;
   onFinishUpload?: () => void;
+  /**
+   * Reçoit la fonction qui ouvre le sélecteur de fichiers : le bouton
+   * « Ajouter » de la galerie passe par là, il n'y a qu'un seul circuit d'envoi.
+   */
+  pickerRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 const fileRejectionMessages = {
@@ -45,7 +50,7 @@ const fileRejectionMessages = {
     "gallery.upload_zone.rejection_messages.file_too_many_archives",
 };
 
-export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
+export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZoneProps) => {
   const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const [filesToUpload, setFilesToUpload] = useState<FileWithPreview[]>([]);
@@ -214,7 +219,7 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
     [config]
   );
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     onDropRejected(fileRejections, event) {
       for (const file of fileRejections) {
@@ -232,6 +237,14 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
     noClick: true,
     disabled: isLoading || Object.keys(acceptedFileTypes).length === 0,
   });
+
+  useEffect(() => {
+    if (!pickerRef) return;
+    pickerRef.current = open;
+    return () => {
+      pickerRef.current = null;
+    };
+  }, [pickerRef, open]);
 
   const removeFile = (fileId: string) => {
     setFilesToUpload((files) => {
@@ -313,49 +326,12 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
-
   return (
     <div {...getRootProps()} className="relative w-full h-full">
       <input {...getInputProps()} />
 
       {/* Le contenu de la galerie */}
       {children}
-
-      {/* Bouton flottant pour sélectionner les fichiers */}
-      <Button
-        size="lg"
-        className="fixed bottom-6 right-6 shadow-lg z-40"
-        onClick={(e) => {
-          e.stopPropagation();
-          const input = document.createElement("input");
-          input.type = "file";
-          input.multiple = true;
-          input.accept = Object.entries(acceptedFileTypes)
-            .map(([type, exts]) => [
-              ...(type === "image/*" ? [type] : []),
-              ...exts,
-            ])
-            .join(",");
-          input.onchange = (e) => {
-            const files = (e.target as HTMLInputElement).files;
-            if (files) {
-              onDrop(Array.from(files));
-            }
-          };
-          input.click();
-        }}
-        disabled={Object.keys(acceptedFileTypes).length === 0}
-      >
-        <Upload className="w-4 h-4 mr-2" />
-        {t("gallery.upload_zone.add_files")}
-      </Button>
 
       {/* Overlay de drop */}
       {isDragActive && (
@@ -494,22 +470,7 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
               className="w-full"
               onClick={(e) => {
                 e.stopPropagation();
-                const input = document.createElement("input");
-                input.type = "file";
-                input.multiple = true;
-                input.accept = Object.entries(acceptedFileTypes)
-                  .map(([type, exts]) => [
-                    ...(type === "image/*" ? [type] : []),
-                    ...exts,
-                  ])
-                  .join(",");
-                input.onchange = (e) => {
-                  const files = (e.target as HTMLInputElement).files;
-                  if (files) {
-                    onDrop(Array.from(files));
-                  }
-                };
-                input.click();
+                open();
               }}
               disabled={
                 isUploading || Object.keys(acceptedFileTypes).length === 0
@@ -523,7 +484,7 @@ export const UploadZone = ({ children, onFinishUpload }: UploadZoneProps) => {
       )}
 
       {/* Message si aucun type de fichier n'est autorisé */}
-      {Object.keys(acceptedFileTypes).length === 0 && (
+      {!isLoading && Object.keys(acceptedFileTypes).length === 0 && (
         <div className="fixed bottom-6 right-6 z-40">
           <Alert variant="destructive" className="w-96">
             <AlertCircle className="h-4 w-4" />

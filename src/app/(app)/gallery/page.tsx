@@ -28,7 +28,7 @@ export default async function GalleryPage({
 
   try {
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/files?page=1&limit=20&q=${
+      `${process.env.NEXT_PUBLIC_API_URL}/api/files?page=1&limit=24&q=${
         resolvedSearchParams.q || ""
       }`,
       {

@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Images } from "lucide-react";
+import { CalendarSearch, ChevronDown, Images } from "lucide-react";
 
 import { Loading } from "@/components/ui/loading";
 import { PublicImageViewer } from "@/components/catalog/public-image-viewer";
 import { VideoThumbnail } from "@/components/gallery/video-thumbnail";
 import { isVideoFile } from "@/lib/media-kind";
+import { TimelineNavigator, timelineGroupProps } from "@/components/timeline/timeline-navigator";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
+import { formatMonthKey, monthKeyOf, type TimelineMonth } from "@/lib/timeline";
 import { cn } from "@/lib/utils";
 
 interface GalleryImage {
@@ -31,28 +34,30 @@ const PAGE_SIZE = 60;
 /** La grille affiche des miniatures ; la visionneuse sert la pleine résolution. */
 const thumb = (name: string) => `/api/thumbnails/${encodeURIComponent(name)}`;
 
-const monthLabel = (iso?: string) => {
-  if (!iso) return "Sans date";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "Sans date";
-  return new Intl.DateTimeFormat("fr-FR", {
-    month: "long",
-    year: "numeric",
-  }).format(d);
+/** Hauteur de la barre du site, qui recouvre le haut de la page. */
+const STICKY_OFFSET = 100;
+
+const monthKey = (iso?: string) => {
+  if (!iso) return "0000-00";
+  const date = new Date(iso);
+  return monthKeyOf(date, Number.isNaN(date.getTime()) ? 0 : date.getTimezoneOffset());
 };
 
+const monthLabel = (key: string) => (key === "0000-00" ? "Sans date" : formatMonthKey(key, "long", "fr-FR"));
+
+const scrollingElement = () => (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+
 export function CatalogGalleryPage() {
-  const [images, setImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [nextOffset, setNextOffset] = useState(0);
   const [total, setTotal] = useState<number | null>(null);
   const [videosTotal, setVideosTotal] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [density, setDensity] = useState<Density>("normal");
   const [album, setAlbum] = useState<string | null>(null);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [months, setMonths] = useState<TimelineMonth[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerKey, setPickerKey] = useState<string | null>(null);
+  const galleryRef = useRef<HTMLDivElement | null>(null);
 
   const mapPage = (raw: any[]): GalleryImage[] =>
     raw.map((item) => ({
@@ -65,80 +70,67 @@ export function CatalogGalleryPage() {
         : undefined,
     }));
 
-  const dedupe = (items: GalleryImage[]) => {
-    const map = new Map<string, GalleryImage>();
-    for (const item of items) if (!map.has(item.name)) map.set(item.name, item);
-    return Array.from(map.values());
-  };
-
-  const fetchPage = useCallback(async (offset: number) => {
+  /** Une page de la galerie : les pages sont numérotées à partir de 1. */
+  const fetchPage = useCallback(async (page: number) => {
+    const offset = (page - 1) * PAGE_SIZE;
     const response = await fetch(
       `/api/public/catalog?images=true&imagesLimit=${PAGE_SIZE}&imagesOffset=${offset}`,
     );
     if (!response.ok) throw new Error("Impossible de charger la galerie");
-    return response.json();
+    const data = await response.json();
+    setTotal(typeof data.imagesTotal === "number" ? data.imagesTotal : null);
+    setVideosTotal(typeof data.videosTotal === "number" ? data.videosTotal : 0);
+    return { data: mapPage(data.images || []), hasMore: Boolean(data.imagesHasMore) };
   }, []);
+
+  const {
+    data: images,
+    loading: loadingMore,
+    loadingPrevious,
+    ref: sentinelRef,
+    topRef,
+    firstPage,
+    resetAt,
+  } = useInfiniteScroll<GalleryImage>({
+    initialData: [],
+    initialHasMore: false,
+    fetchMore: fetchPage,
+    rootMargin: "800px 0px",
+    getScrollElement: scrollingElement,
+  });
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await fetchPage(0);
-        if (cancelled) return;
-        const page = mapPage(data.images || []);
-        setImages(dedupe(page));
-        setHasMore(Boolean(data.imagesHasMore));
-        setNextOffset(
-          typeof data.imagesNextOffset === "number"
-            ? data.imagesNextOffset
-            : page.length,
-        );
-        setTotal(typeof data.imagesTotal === "number" ? data.imagesTotal : null);
-        setVideosTotal(typeof data.videosTotal === "number" ? data.videosTotal : 0);
+        const first = await fetchPage(1);
+        if (!cancelled) resetAt(first.data, first.hasMore, 1);
       } catch (error) {
         console.error("Erreur:", error);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
+    fetch(`/api/public/catalog?images=true&timeline=1&tz=${new Date().getTimezoneOffset()}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.months) setMonths(data.months);
+      })
+      .catch((error) => console.error("Erreur:", error));
     return () => {
       cancelled = true;
     };
-  }, [fetchPage]);
+  }, [fetchPage, resetAt]);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || !hasMore) return;
-
-    const observer = new IntersectionObserver(
-      async (entries) => {
-        if (!entries[0]?.isIntersecting) return;
-        if (loading || loadingMore || !hasMore) return;
-
-        setLoadingMore(true);
-        try {
-          const data = await fetchPage(nextOffset);
-          const page = mapPage(data.images || []);
-          setImages((prev) => dedupe([...prev, ...page]));
-          setHasMore(Boolean(data.imagesHasMore));
-          setNextOffset(
-            typeof data.imagesNextOffset === "number"
-              ? data.imagesNextOffset
-              : nextOffset + page.length,
-          );
-        } catch (error) {
-          console.error("Erreur:", error);
-          setHasMore(false);
-        } finally {
-          setLoadingMore(false);
-        }
-      },
-      { root: null, rootMargin: "800px 0px", threshold: 0 },
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [fetchPage, hasMore, loading, loadingMore, nextOffset]);
+  /** Saut à une date : la galerie repart de la page qui contient ce rang. */
+  const loadAt = useCallback(
+    async (index: number) => {
+      const page = Math.floor(index / PAGE_SIZE) + 1;
+      const next = await fetchPage(page);
+      resetAt(next.data, next.hasMore, page);
+    },
+    [fetchPage, resetAt],
+  );
 
   /** Albums présents parmi les images déjà chargées. */
   const albumOptions = useMemo(() => {
@@ -153,6 +145,25 @@ export function CatalogGalleryPage() {
     () => (album ? images.filter((i) => i.album?.slug === album) : images),
     [images, album],
   );
+
+  /** Mois consécutifs de la liste affichée, avec leur rang dans la galerie entière. */
+  const groups = useMemo(() => {
+    const windowStart = (firstPage - 1) * PAGE_SIZE;
+    const result: { key: string; start: number; offset: number; items: GalleryImage[] }[] = [];
+    visible.forEach((image, index) => {
+      const key = monthKey(image.addedAt);
+      const last = result[result.length - 1];
+      if (last?.key === key) last.items.push(image);
+      else result.push({ key, start: windowStart + index, offset: index, items: [image] });
+    });
+    return result;
+  }, [visible, firstPage]);
+
+  /** La frise compte toute la galerie : elle n'a pas de sens sous un filtre d'album. */
+  const timelineMonths = album ? [] : months;
+  /** La dernière image chargée est aussi la dernière de la galerie. */
+  const atEnd = typeof total === "number" && (firstPage - 1) * PAGE_SIZE + images.length >= total;
+  const canPickDate = timelineMonths.length > 1;
 
   /**
    * La visionneuse navigue dans la liste affichée : sans ça, les flèches
@@ -224,6 +235,20 @@ export function CatalogGalleryPage() {
                 ))}
               </div>
 
+              {canPickDate ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPickerKey(null);
+                    setPickerOpen(true);
+                  }}
+                  className="flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <CalendarSearch className="h-3.5 w-3.5" />
+                  Aller à une date
+                </button>
+              ) : null}
+
               <div className="flex overflow-hidden rounded-md border">
                 {(["dense", "normal", "large"] as Density[]).map((mode) => (
                   <button
@@ -246,7 +271,14 @@ export function CatalogGalleryPage() {
           </div>
         ) : null}
 
-        <div className="container mx-auto px-4 pt-6 sm:px-6 lg:px-8">
+        <div ref={galleryRef} className="container mx-auto px-4 pt-6 [overflow-anchor:none] sm:px-6 lg:px-8">
+          {/* Après un saut à une date, ce qui précède se recharge en remontant. */}
+          {firstPage > 1 ? (
+            <div ref={topRef} className="flex h-10 items-center justify-center">
+              {loadingPrevious ? <Loading /> : null}
+            </div>
+          ) : null}
+
           {visible.length === 0 ? (
             <div className="rounded-xl border border-dashed py-20 text-center">
               <Images className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
@@ -260,25 +292,36 @@ export function CatalogGalleryPage() {
               </p>
             </div>
           ) : (
-            <div className={cn("grid", DENSITY[density])}>
-              {visible.map((image, index) => {
-                const previous = visible[index - 1];
-                const showMonth =
-                  index === 0 ||
-                  monthLabel(previous?.addedAt) !== monthLabel(image.addedAt);
-
-                return (
-                  <div key={image.name} className="contents">
-                    {showMonth ? (
-                      <div className="col-span-full mb-1 mt-6 flex items-baseline gap-3 border-b pb-2 first:mt-0">
-                        <span className="font-mono text-xs font-medium capitalize">
-                          {monthLabel(image.addedAt)}
-                        </span>
-                      </div>
-                    ) : null}
+            groups.map((group) => (
+              <section
+                key={`${group.key}-${group.start}`}
+                className="mt-6 first:mt-0"
+                {...timelineGroupProps(group.key, group.start, group.items.length)}
+              >
+                <div className="mb-2 flex items-baseline gap-3 border-b pb-2">
+                  {canPickDate ? (
                     <button
                       type="button"
-                      onClick={() => openViewer(index)}
+                      onClick={() => {
+                        setPickerKey(group.key);
+                        setPickerOpen(true);
+                      }}
+                      title="Aller à une date"
+                      className="group/month inline-flex items-center gap-1 font-mono text-xs font-medium capitalize transition-colors hover:text-primary"
+                    >
+                      {monthLabel(group.key)}
+                      <ChevronDown className="h-3 w-3 opacity-0 transition-opacity group-hover/month:opacity-100 group-focus-visible/month:opacity-100" />
+                    </button>
+                  ) : (
+                    <span className="font-mono text-xs font-medium capitalize">{monthLabel(group.key)}</span>
+                  )}
+                </div>
+                <div className={cn("grid", DENSITY[density])}>
+                  {group.items.map((image, indexInGroup) => (
+                    <button
+                      key={image.name}
+                      type="button"
+                      onClick={() => openViewer(group.offset + indexInGroup)}
                       className="group relative aspect-square overflow-hidden rounded-sm bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={`Ouvrir ${image.name}`}
                     >
@@ -299,15 +342,13 @@ export function CatalogGalleryPage() {
                         </span>
                       ) : null}
                     </button>
-                  </div>
-                );
-              })}
-            </div>
+                  ))}
+                </div>
+              </section>
+            ))
           )}
 
-          {images.length > 0 && hasMore ? (
-            <div ref={sentinelRef} className="h-10 w-full" aria-hidden />
-          ) : null}
+          {images.length > 0 ? <div ref={sentinelRef} className="h-10 w-full" aria-hidden /> : null}
 
           {loadingMore ? (
             <div className="flex justify-center py-10">
@@ -315,15 +356,24 @@ export function CatalogGalleryPage() {
             </div>
           ) : null}
 
-          {!loadingMore && images.length > 0 && !hasMore ? (
+          {!loadingMore && images.length > 0 && atEnd ? (
             <p className="py-10 text-center font-mono text-xs text-muted-foreground">
-              {typeof total === "number"
-                ? `${images.length} / ${total} – fin de la galerie`
-                : "Fin de la galerie"}
+              {typeof total === "number" ? `${total} – fin de la galerie` : "Fin de la galerie"}
             </p>
           ) : null}
         </div>
       </div>
+
+      <TimelineNavigator
+        months={timelineMonths}
+        containerRef={galleryRef}
+        topOffset={STICKY_OFFSET}
+        loadAt={loadAt}
+        pickerOpen={pickerOpen}
+        onPickerOpenChange={setPickerOpen}
+        pickerKey={pickerKey}
+        locale="fr-FR"
+      />
 
       <PublicImageViewer
         items={visible}

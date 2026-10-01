@@ -1,12 +1,13 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { readdir, unlink } from "fs/promises";
+import { unlink } from "fs/promises";
 import { join } from "path";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getAbsoluteUploadPath } from "@/lib/config";
 import { setFileSecure, removeFileFromSecure } from "@/lib/secure-files";
-import { loadFileFlagSets, getFileMetadata } from "@/lib/file-metadata";
+import { galleryQueryFrom, listGalleryFiles } from "@/lib/gallery-listing";
+import { summarizeMonths } from "@/lib/timeline";
 import type { NextRequest } from "next/server";
 import { logger } from "@/lib/utils/logger";
 import { basename } from "path";
@@ -25,13 +26,6 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const page = Number.parseInt(searchParams.get("page") || "1", 10);
-    const search = searchParams.get("q") || "";
-    const secureOnly = searchParams.get("secure") === "true";
-    const starredOnly = searchParams.get("starred") === "true";
-    const sort = searchParams.get("sort") || "date"; // name | date | size
-    const order = searchParams.get("order") || "desc"; // asc | desc
-    const startDate = searchParams.get("start");
-    const endDate = searchParams.get("end");
     // Les sélecteurs à grille dense demandent plus de 12 vignettes à la fois.
     const pageSize = Math.min(
       Math.max(Number.parseInt(searchParams.get("limit") || "", 10) || PAGE_SIZE, 1),
@@ -41,76 +35,20 @@ export async function GET(request: Request) {
     // Force la revalidation du dossier public/uploads
     revalidatePath("/uploads");
 
-    // Récupérer tous les fichiers et leurs stats
-    const entries = await readdir(UPLOADS_DIR, { withFileTypes: true });
-    const fileFlagSets = await loadFileFlagSets();
+    const query = galleryQueryFrom(searchParams);
+    const validFiles = await listGalleryFiles(query);
 
-    const filesInfo = await Promise.all(
-      entries
-        .filter((entry) => entry.isFile())
-        .filter((entry) =>
-          search
-            ? entry.name.toLowerCase().includes(search.toLowerCase())
-            : true
-        )
-        .map(async (entry) => {
-          const fileMetadata = await getFileMetadata(entry.name, fileFlagSets);
-
-          if (!fileMetadata) {
-            return null;
-          }
-
-          // Si on veut uniquement les fichiers sécurisés et que ce fichier n'est pas sécurisé, on le saute
-          if (secureOnly && !fileMetadata.isSecure) {
-            return null;
-          }
-
-          // Si on veut uniquement les fichiers favoris et que ce fichier n'est pas favori, on le saute
-          if (starredOnly && !fileMetadata.isStarred) {
-            return null;
-          }
-
-          return fileMetadata;
-        })
-    );
-
-    // Filtrer les fichiers null (ceux qui ont été sautés)
-    let validFiles = filesInfo.filter(
-      (file): file is NonNullable<typeof file> => file !== null
-    );
-
-    // Filtrer par plage de dates
-    if (startDate) {
-      const start = new Date(startDate).getTime();
-      validFiles = validFiles.filter(
-        (file) => new Date(file.createdAt).getTime() >= start
+    // Frise des mois : le nombre de fichiers par mois, sans les fichiers
+    // eux-mêmes, pour le rail de défilement et le saut à une date.
+    if (searchParams.get("timeline") === "1") {
+      const tzOffset = Number.parseInt(searchParams.get("tz") || "0", 10) || 0;
+      const months =
+        query.sort === "date" ? summarizeMonths(validFiles.map((file) => file.createdAt), tzOffset) : [];
+      return NextResponse.json(
+        { months, total: validFiles.length, pageSize },
+        { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
       );
     }
-    if (endDate) {
-      const end = new Date(endDate).getTime();
-      validFiles = validFiles.filter(
-        (file) => new Date(file.createdAt).getTime() <= end
-      );
-    }
-
-    // Tri dynamique
-    validFiles.sort((a, b) => {
-      let comparison = 0;
-      switch (sort) {
-        case "name":
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case "size":
-          comparison = a.size - b.size;
-          break;
-        case "date":
-        default:
-          comparison =
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-          break;
-      }
-      return order === "asc" ? comparison : -comparison;
-    });
 
     // Pagination
     const start = (page - 1) * pageSize;

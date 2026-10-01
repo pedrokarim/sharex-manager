@@ -324,6 +324,35 @@
     }
   },
   "gallery": {
+    "toolbar": {
+      "add": "Add",
+      "refresh": "Refresh",
+      "go_to_date": "Go to date",
+      "count_one": "{count} file",
+      "count_many": "{count} files"
+    },
+    "timeline": {
+      "description": "Pick a year, then a month if you want to be more precise.",
+      "open_year": "Open {year}",
+      "select_month": "Select the whole month",
+      "deselect_month": "Clear the selection for"
+    },
+    "display": {
+      "button": "Display",
+      "filter_active": "A date filter is active",
+      "view": "View",
+      "sort": "Sort",
+      "period": "Period",
+      "period_all": "All dates",
+      "auto_refresh": "Auto refresh",
+      "refresh_off": "Off",
+      "newest_first": "Newest first",
+      "oldest_first": "Oldest first",
+      "a_to_z": "A to Z",
+      "z_to_a": "Z to A",
+      "largest_first": "Largest first",
+      "smallest_first": "Smallest first"
+    },
     "no_files": "No files found",
     "upload": "Upload",
     "select_all": "Select All",

@@ -4,8 +4,6 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useSession } from "@/lib/auth-client";
 import { redirect } from "next/navigation";
 import { toast } from "sonner";
-import { format, parseISO } from "date-fns";
-import { fr } from "date-fns/locale";
 import { useAtom } from "jotai";
 import {
   galleryViewModeAtom,
@@ -19,9 +17,10 @@ import {
   thumbnailSizeAtom,
   sortByAtom,
   sortOrderAtom,
+  languageAtom,
 } from "@/lib/atoms/preferences";
 import { Button } from "@/components/ui/button";
-import { Check, ImageOff, Minus, RefreshCcw } from "lucide-react";
+import { CalendarSearch, Check, ChevronDown, ImageOff, Minus, RefreshCcw, Upload } from "lucide-react";
 import { useSimpleSelection } from "@/hooks/use-simple-selection";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { SelectionToolbar } from "@/components/gallery/selection-toolbar";
@@ -33,37 +32,16 @@ import {
   readApiError,
 } from "@/lib/utils/chunk";
 import { useQueryState } from "nuqs";
-import { ViewSelector } from "@/components/view-selector";
 import { GridView } from "@/components/gallery/grid-view";
 import { ListView } from "@/components/gallery/list-view";
 import { FileViewer } from "@/components/gallery/file-viewer";
 import { UploadZone } from "@/components/gallery/upload-zone";
 import { KeyboardShortcutsDialog } from "@/components/gallery/keyboard-shortcuts-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { capitalize, cn } from "@/lib/utils";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2 } from "lucide-react";
-import { RefreshInterval } from "@/components/refresh-interval";
 import { Loading } from "@/components/ui/loading";
-import { SortSelector } from "@/components/sort-selector";
-import { DateRangeFilter } from "@/components/gallery/date-range-filter";
-import { Separator } from "@/components/ui/separator";
+import { GalleryDisplayMenu } from "@/components/gallery/gallery-display-menu";
+import { TimelineNavigator, timelineGroupProps } from "@/components/timeline/timeline-navigator";
+import { formatMonthKey, monthKeyOf, type TimelineMonth } from "@/lib/timeline";
 import { useTranslation } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import { useRoutedFileViewer } from "@/hooks/use-routed-file-viewer";
@@ -77,8 +55,24 @@ interface FileInfo {
   isStarred?: boolean;
 }
 
-interface GroupedFiles {
-  [key: string]: FileInfo[];
+interface MonthGroup {
+  /** « 2026-09 ». */
+  key: string;
+  files: FileInfo[];
+  /** Rang du premier fichier du groupe dans la galerie entière. */
+  start: number;
+}
+
+/** Fichiers demandés à chaque page ; le serveur plafonne à 60. */
+const PAGE_SIZE = 24;
+
+/** L'ancêtre qui défile : dans l'application, ce n'est pas la fenêtre. */
+function findScrollParent(node: HTMLElement | null): HTMLElement | null {
+  for (let current = node?.parentElement ?? null; current; current = current.parentElement) {
+    const overflow = getComputedStyle(current).overflowY;
+    if (overflow === "auto" || overflow === "scroll") return current;
+  }
+  return null;
 }
 
 const dedupeFilesByName = (input: FileInfo[]) =>
@@ -93,98 +87,6 @@ interface GalleryClientProps {
   initialSearch?: string;
   secureOnly?: boolean;
   starredOnly?: boolean;
-}
-
-interface UploadModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onUpload: (file: File) => Promise<void>;
-  isSecure?: boolean;
-  onSecureChange?: (isSecure: boolean) => void;
-}
-
-function UploadModal({
-  isOpen,
-  onClose,
-  onUpload,
-  isSecure,
-  onSecureChange,
-}: UploadModalProps) {
-  const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const { t } = useTranslation();
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      setIsUploading(true);
-      await onUpload(file);
-      onClose();
-    } catch (error) {
-      console.error("Erreur lors de l'upload:", error);
-      toast.error(t("gallery.upload_zone.upload_error"));
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("gallery.upload_modal.title")}</DialogTitle>
-          <DialogDescription>
-            {t("gallery.upload_modal.description")}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4">
-          <div className="grid gap-2">
-            <Label>{t("gallery.upload_modal.file_label")}</Label>
-            <Input type="file" onChange={handleFileChange} />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="secure"
-              checked={isSecure}
-              onCheckedChange={(checked) =>
-                onSecureChange?.(checked as boolean)
-              }
-            />
-            <Label htmlFor="secure">
-              {t("gallery.upload_modal.private_file")}
-            </Label>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button
-            type="submit"
-            onClick={handleUpload}
-            disabled={!file || isUploading}
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {t("gallery.upload_modal.uploading")}
-              </>
-            ) : (
-              t("gallery.upload_modal.upload_button")
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 export function GalleryClient({
@@ -208,6 +110,7 @@ export function GalleryClient({
   const [thumbnailSize] = useAtom(thumbnailSizeAtom);
   const [sortBy] = useAtom(sortByAtom);
   const [sortOrder] = useAtom(sortOrderAtom);
+  const [language] = useAtom(languageAtom);
 
   const [search] = useQueryState("q");
   const [startDate] = useQueryState("start");
@@ -223,9 +126,16 @@ export function GalleryClient({
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [newFileIds, setNewFileIds] = useState<string[]>([]);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [isSecureUpload, setIsSecureUpload] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [timeline, setTimeline] = useState<{ months: TimelineMonth[]; total: number | null }>({
+    months: [],
+    total: null,
+  });
+  const [timelineVersion, setTimelineVersion] = useState(0);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [datePickerKey, setDatePickerKey] = useState<string | null>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
+  const openFilePickerRef = useRef<(() => void) | null>(null);
+  const getScrollElement = useCallback(() => findScrollParent(galleryRef.current), []);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [activeMonthHeader, setActiveMonthHeader] = useState<string | null>(null);
   const [isAddToAlbumDialogOpen, setIsAddToAlbumDialogOpen] = useState(false);
@@ -256,15 +166,6 @@ export function GalleryClient({
   useEffect(() => {
     fileAlbumsCacheRef.current = fileAlbumsCache;
   }, [fileAlbumsCache]);
-
-  useEffect(() => {
-    // Simuler un temps de chargement pour une meilleure expérience utilisateur
-    const timer = setTimeout(() => {
-      setIsInitialLoading(false);
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, []);
 
   // Charger les albums disponibles
   useEffect(() => {
@@ -344,6 +245,7 @@ export function GalleryClient({
       try {
         const searchParams = new URLSearchParams();
         searchParams.set("page", page.toString());
+        searchParams.set("limit", PAGE_SIZE.toString());
         if (search) searchParams.set("q", search);
         if (secureOnly) searchParams.set("secure", "true");
         if (starredOnly) searchParams.set("starred", "true");
@@ -375,13 +277,18 @@ export function GalleryClient({
   const {
     data: files,
     loading,
+    loadingPrevious,
     ref,
+    topRef,
+    firstPage,
     reset,
+    resetAt,
     updateData,
     prependItem,
   } = useInfiniteScroll<FileInfo>({
     initialData: initialFiles,
     initialHasMore,
+    getScrollElement,
     fetchMore: useCallback(
       async (page) => {
         const { files, hasMore } = await fetchFiles(page);
@@ -403,12 +310,52 @@ export function GalleryClient({
       highestLoadedPageRef.current = 1;
       hasMorePagesRef.current = nextHasMore;
       reset(nextFiles, nextHasMore);
+      setTimelineVersion((version) => version + 1);
     },
     [reset],
   );
 
   const prependItemRef = useRef(prependItem);
   prependItemRef.current = prependItem;
+
+  const firstPageRef = useRef(firstPage);
+  firstPageRef.current = firstPage;
+
+  // Frise des mois : mêmes filtres que la liste, rechargée quand elle change.
+  useEffect(() => {
+    const params = new URLSearchParams({ timeline: "1", tz: String(new Date().getTimezoneOffset()) });
+    if (search) params.set("q", search);
+    if (secureOnly) params.set("secure", "true");
+    if (starredOnly) params.set("starred", "true");
+    params.set("sort", sortBy);
+    params.set("order", sortOrder);
+    if (startDate) params.set("start", startDate);
+    if (endDate) params.set("end", endDate);
+
+    let cancelled = false;
+    fetch(`/api/files?${params.toString()}`, { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        setTimeline({ months: data.months ?? [], total: typeof data.total === "number" ? data.total : null });
+      })
+      .catch((error) => console.error("Erreur lors du chargement de la frise:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [search, secureOnly, starredOnly, sortBy, sortOrder, startDate, endDate, timelineVersion]);
+
+  /** Saut à une date : la galerie repart de la page qui contient ce rang. */
+  const loadAt = useCallback(
+    async (index: number) => {
+      const page = Math.floor(index / PAGE_SIZE) + 1;
+      const { files: nextFiles, hasMore } = await fetchFilesRef.current(page);
+      highestLoadedPageRef.current = page;
+      hasMorePagesRef.current = hasMore;
+      resetAt(nextFiles, hasMore, page);
+    },
+    [resetAt],
+  );
 
   const enableUploadNotificationsRef = useRef(enableUploadNotifications);
   enableUploadNotificationsRef.current = enableUploadNotifications;
@@ -473,7 +420,11 @@ export function GalleryClient({
             const hasActiveFilters =
               searchRef.current || startDateRef.current || endDateRef.current;
 
-            if (!hasActiveFilters) {
+            setTimelineVersion((version) => version + 1);
+
+            // Après un saut dans le passé, le haut de la liste n'est pas le
+            // présent : le nouveau fichier n'y a pas sa place.
+            if (!hasActiveFilters && firstPageRef.current === 1) {
               const newFile: FileInfo = {
                 name: data.file.name,
                 url: `/api/files/${data.file.name}`,
@@ -756,18 +707,18 @@ export function GalleryClient({
     return uniqueFiles.findIndex((file) => file.name === viewerFileName);
   }, [viewerFileName, uniqueFiles]);
 
-  const groupedFiles = useMemo(() => {
-    return uniqueFiles.reduce((acc: GroupedFiles, file) => {
-      const date = format(parseISO(file.createdAt), "MMMM yyyy", {
-        locale: fr,
-      });
-      if (!acc[date]) {
-        acc[date] = [];
-      }
-      acc[date].push(file);
-      return acc;
-    }, {});
-  }, [uniqueFiles]);
+  const monthGroups = useMemo(() => {
+    const groups = new Map<string, MonthGroup>();
+    const windowStart = (firstPage - 1) * PAGE_SIZE;
+    uniqueFiles.forEach((file, index) => {
+      const date = new Date(file.createdAt);
+      const key = monthKeyOf(date, date.getTimezoneOffset());
+      const group = groups.get(key);
+      if (group) group.files.push(file);
+      else groups.set(key, { key, files: [file], start: windowStart + index });
+    });
+    return Array.from(groups.values());
+  }, [uniqueFiles, firstPage]);
 
   const handlePrevious = useCallback(() => {
     if (viewerFileIndex > 0) {
@@ -837,31 +788,6 @@ export function GalleryClient({
       console.error("Erreur lors de la copie:", error);
     }
   };
-
-  const handleUpload = useCallback(
-    async (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch("/api/gallery/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || t("gallery.upload_zone.upload_error"));
-      }
-
-      await fetchFilesRef.current(1).then(({ files, hasMore }) => {
-        applyReset(files, hasMore);
-        if (files[0]) {
-          openViewerFile(files[0].name);
-        }
-      });
-    },
-    [applyReset, openViewerFile, t],
-  );
 
   const handleToggleSecurity = async (file: FileInfo) => {
     try {
@@ -1220,10 +1146,6 @@ export function GalleryClient({
     }
   }, [viewMode, defaultViewMode, setDefaultViewMode]);
 
-  if (isInitialLoading) {
-    return <Loading fullHeight />;
-  }
-
   const galleryTitle = secureOnly
     ? t("gallery.secure_files")
     : starredOnly
@@ -1232,67 +1154,60 @@ export function GalleryClient({
 
   return (
     <>
-      <div>
-        <section className="mb-4 flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+      <div ref={galleryRef} className="[overflow-anchor:none]">
+        <UploadZone onFinishUpload={handleFinishUpload} pickerRef={openFilePickerRef}>
+        <section className="mb-4 flex flex-wrap items-center justify-between gap-2 pt-2 sm:pr-10">
+          <div className="flex min-w-0 items-center gap-2">
             {(secureOnly || starredOnly) && (
-              <>
-                <span className="px-1 text-sm font-medium text-foreground">
-                  {galleryTitle}
-                </span>
-                <Separator
-                  orientation="vertical"
-                  className="hidden h-5 sm:block"
-                />
-              </>
+              <span className="px-1 text-sm font-medium text-foreground">
+                {galleryTitle}
+              </span>
             )}
-
-            <div className="flex items-center gap-2">
-              <span className="px-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                Vue
+            {timeline.total !== null && (
+              <span className="px-1 text-sm tabular-nums text-muted-foreground">
+                {t(timeline.total > 1 ? "gallery.toolbar.count_many" : "gallery.toolbar.count_one", {
+                  count: timeline.total.toLocaleString(language),
+                })}
               </span>
-              <ViewSelector />
-            </div>
-
-            <Separator orientation="vertical" className="hidden h-5 sm:block" />
-
-            <div className="flex items-center gap-2">
-              <span className="px-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                Tri
-              </span>
-              <SortSelector />
-            </div>
-
-            <Separator orientation="vertical" className="hidden h-5 sm:block" />
-
-            <div className="flex items-center gap-2">
-              <span className="px-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                Filtres
-              </span>
-              <DateRangeFilter />
-              <RefreshInterval />
+            )}
+            {timeline.months.length > 1 && (
               <Button
-                variant="outline"
-                size="icon"
-                onClick={handleRefresh}
-                className={cn(
-                  "h-9 w-9 rounded-xl border border-border/60 bg-background shadow-sm transition-colors hover:bg-muted/70",
-                  isRefreshing && "animate-spin text-primary",
-                )}
-                disabled={isRefreshing}
+                variant="ghost"
+                size="sm"
+                className="h-9 gap-2 rounded-xl px-3 text-xs sm:text-sm"
+                onClick={() => {
+                  setDatePickerKey(null);
+                  setIsDatePickerOpen(true);
+                }}
               >
-                <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4" />
+                <CalendarSearch className="h-4 w-4" />
+                {t("gallery.toolbar.go_to_date")}
               </Button>
-            </div>
+            )}
           </div>
 
-          <Button
-            onClick={() => setIsUploadModalOpen(true)}
-            size="sm"
-            className="h-9 rounded-xl px-5 text-xs sm:text-sm"
-          >
-            {t("gallery.upload")}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleRefresh}
+              aria-label={t("gallery.toolbar.refresh")}
+              title={t("gallery.toolbar.refresh")}
+              className="h-9 w-9 rounded-xl"
+              disabled={isRefreshing}
+            >
+              <RefreshCcw className={cn("h-4 w-4", isRefreshing && "animate-spin text-primary")} />
+            </Button>
+            <GalleryDisplayMenu />
+            <Button
+              onClick={() => openFilePickerRef.current?.()}
+              size="sm"
+              className="h-9 gap-2 rounded-xl px-4 text-xs sm:text-sm"
+            >
+              <Upload className="h-4 w-4" />
+              {t("gallery.toolbar.add")}
+            </Button>
+          </div>
         </section>
 
         {files.length === 0 ? (
@@ -1309,10 +1224,20 @@ export function GalleryClient({
           </div>
         ) : (
           <>
-            <UploadZone onFinishUpload={handleFinishUpload}>
-              {Object.entries(groupedFiles).map(([date, filesInGroup]) => (
-                <div key={date} className="mb-6 sm:mb-8">
+              {/* Après un saut à une date, ce qui précède se recharge en remontant. */}
+              {firstPage > 1 && (
+                <div ref={topRef} className="flex h-10 items-center justify-center">
+                  {loadingPrevious && <Loading variant="minimal" size="sm" showMessage={true} className="text-xs" />}
+                </div>
+              )}
+              {monthGroups.map(({ key: monthKey, files: filesInGroup, start }) => (
+                <div
+                  key={monthKey}
+                  className="mb-6 sm:mb-8"
+                  {...timelineGroupProps(monthKey, start, filesInGroup.length)}
+                >
                   {(() => {
+                    const date = formatMonthKey(monthKey, "long", language);
                     const groupFileNames = filesInGroup.map(
                       (file) => file.name,
                     );
@@ -1323,17 +1248,17 @@ export function GalleryClient({
                       selectedInGroupCount === groupFileNames.length &&
                       groupFileNames.length > 0;
                     const hasGroupSelection = selectedInGroupCount > 0;
-                    const isMonthActionVisible = activeMonthHeader === date;
+                    const isMonthActionVisible = activeMonthHeader === monthKey;
 
                     return (
                       <div className="mb-3 px-2 sm:mb-4 sm:px-0">
                         <motion.div
                           className="relative inline-flex min-w-0 items-center"
                           initial={false}
-                          onHoverStart={() => setActiveMonthHeader(date)}
+                          onHoverStart={() => setActiveMonthHeader(monthKey)}
                           onHoverEnd={() =>
                             setActiveMonthHeader((current) =>
-                              current === date ? null : current,
+                              current === monthKey ? null : current,
                             )
                           }
                         >
@@ -1359,8 +1284,8 @@ export function GalleryClient({
                               tabIndex={isMonthActionVisible ? 0 : -1}
                               aria-label={
                                 isGroupFullySelected
-                                  ? `Retirer la sélection pour ${date}`
-                                  : `Sélectionner tout le mois ${date}`
+                                  ? `${t("gallery.timeline.deselect_month")} ${date}`
+                                  : `${t("gallery.timeline.select_month")} ${date}`
                               }
                               onClick={() =>
                                 handleToggleMonthSelection(filesInGroup)
@@ -1393,7 +1318,22 @@ export function GalleryClient({
                             }}
                             transition={{ duration: 0.18, ease: "easeOut" }}
                           >
-                            {capitalize(date)}
+                            {timeline.months.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDatePickerKey(monthKey);
+                                  setIsDatePickerOpen(true);
+                                }}
+                                title={t("gallery.toolbar.go_to_date")}
+                                className="group/month inline-flex items-center gap-1.5 rounded-md transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                              >
+                                {capitalize(date)}
+                                <ChevronDown className="h-4 w-4 opacity-0 transition-opacity group-hover/month:opacity-100 group-focus-visible/month:opacity-100" />
+                              </button>
+                            ) : (
+                              capitalize(date)
+                            )}
                           </motion.h2>
                         </motion.div>
                       </div>
@@ -1468,7 +1408,6 @@ export function GalleryClient({
                   )}
                 </div>
               ))}
-            </UploadZone>
 
             <div ref={ref} className="h-10 flex items-center justify-center">
               {loading && (
@@ -1482,7 +1421,28 @@ export function GalleryClient({
             </div>
           </>
         )}
+        </UploadZone>
       </div>
+
+      <TimelineNavigator
+        months={timeline.months}
+        containerRef={galleryRef}
+        getScrollElement={getScrollElement}
+        loadAt={loadAt}
+        pickerOpen={isDatePickerOpen}
+        onPickerOpenChange={setIsDatePickerOpen}
+        pickerKey={datePickerKey}
+        locale={language}
+        pickerLabels={{
+          title: t("gallery.toolbar.go_to_date"),
+          description: t("gallery.timeline.description"),
+          openYear: (year) => t("gallery.timeline.open_year", { year }),
+          count: (count) =>
+            t(count > 1 ? "gallery.toolbar.count_many" : "gallery.toolbar.count_one", {
+              count: count.toLocaleString(language),
+            }),
+        }}
+      />
 
       <FileViewer
         file={viewerFile}
@@ -1499,17 +1459,6 @@ export function GalleryClient({
         hasNext={viewerFileIndex >= 0 && viewerFileIndex < uniqueFiles.length - 1}
         isLoading={isViewerLoading}
         loadingName={viewerFileName}
-      />
-
-      <UploadModal
-        isOpen={isUploadModalOpen}
-        onClose={() => {
-          setIsUploadModalOpen(false);
-          setIsSecureUpload(false);
-        }}
-        onUpload={handleUpload}
-        isSecure={isSecureUpload}
-        onSecureChange={setIsSecureUpload}
       />
 
       {/* Barre d'outils de sélection */}
