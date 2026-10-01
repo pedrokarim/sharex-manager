@@ -7,6 +7,15 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Recherche inversée : nouveau module à pages, qui remplace « anime-trace ».
+  On dépose, colle ou désigne une image (ordinateur, lien, fichier de la
+  galerie par le menu contextuel) et plusieurs moteurs répondent côte à côte :
+  trace.moe et IQDB sans rien configurer, SauceNAO avec sa clé gratuite,
+  Google Lens et Yandex avec une clé SerpApi. Tous les moteurs, TinEye,
+  ascii2d et Bing compris, s’ouvrent aussi dans un onglet avec l’image déjà
+  transmise, par son adresse publique ou par un lien temporaire de trente
+  minutes. Les recherches sont gardées dans un historique, sauf en mode
+  éphémère, où rien n’est écrit sur le disque.
 - Galerie : frise chronologique à la place de la barre de défilement. Elle
   apparaît quand on défile ou qu’on approche du bord droit, étage les années
   selon la quantité de contenu, pose un point par mois et nomme dans une bulle
@@ -164,6 +173,9 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Removed
 
+- Module « anime-trace » : remplacé par « Recherche inversée », qui reprend
+  trace.moe. Sa fenêtre dans la visionneuse disparaît au profit de l’action
+  « Rechercher l’origine de l’image » du menu contextuel.
 - Rendu de skins Minecraft : page, route de test, scripts NameMC et commande
   de rendu. Le service MCInfo assure cette fonction.
 - Page « Test Couleurs ».

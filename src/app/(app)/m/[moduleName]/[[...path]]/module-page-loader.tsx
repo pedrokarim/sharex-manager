@@ -26,6 +26,11 @@ const MODULE_PAGES: Record<string, Record<string, PageLoader>> = {
     edit: () => import("@/modules/clip-studio/pages/editor"),
     voices: () => import("@/modules/clip-studio/pages/voices"),
   },
+  "reverse-search": {
+    "": () => import("@/modules/reverse-search/pages/search"),
+    history: () => import("@/modules/reverse-search/pages/history"),
+    settings: () => import("@/modules/reverse-search/pages/settings"),
+  },
 };
 
 /**

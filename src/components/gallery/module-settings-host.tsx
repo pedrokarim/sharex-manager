@@ -65,7 +65,7 @@ export function ModuleSettingsHost() {
   const apply = useCallback(
     async (settings: unknown) => {
       if (!request) return;
-      // Un module d'analyse (anime-trace…) ne modifie pas l'image.
+      // Un module d'analyse (analyse…) ne modifie pas l'image.
       if (request.processesImages === false) {
         close();
         return;

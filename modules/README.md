@@ -6,10 +6,10 @@ Un module étend ShareX Manager de deux façons, qui peuvent se combiner :
   redimensionnement), à la demande depuis la galerie ou automatiquement à
   chaque envoi ;
 - **module à pages** : il a son propre espace de travail sous `/m/<module>`
-  (AI Image Gen, Clip Studio).
+  (AI Image Gen, Clip Studio, Recherche inversée).
 
-Un module peut aussi seulement **analyser** une image sans la modifier
-(anime-trace) : il a une interface, mais pas de `processImage`.
+Un module peut aussi seulement **analyser** une image sans la modifier : il a
+une interface (`ui.tsx`) ou des pages, mais pas de `processImage`.
 
 ## Table des matières
 
@@ -304,4 +304,4 @@ conflit.
 5. **Traductions** : au moins le français et l’anglais.
 
 Exemples : `modules/watermark`, `modules/crop`, `modules/resize`, et
-`modules/anime-trace` pour un module d’analyse.
+`modules/reverse-search` pour un module à pages qui analyse sans modifier.

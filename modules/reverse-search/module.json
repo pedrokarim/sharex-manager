@@ -1,0 +1,42 @@
+{
+  "name": "reverse-search",
+  "version": "2.0.0",
+  "description": "Recherche inversée d'images : trace.moe, SauceNAO, IQDB, Google Lens, Yandex, TinEye, ascii2d, Bing",
+  "author": "ShareX Manager",
+  "enabled": true,
+  "entry": "index.process.ts",
+  "category": "Analyse",
+  "hasUI": false,
+  "supportedFileTypes": [],
+  "settings": {},
+  "functions": {
+    "getCatalogue": "user",
+    "startSearch": "user",
+    "openSearch": "user",
+    "closeSearch": "user",
+    "runEngine": "user",
+    "getLinks": "user",
+    "listHistory": "user",
+    "deleteSearch": "user",
+    "clearHistory": "user"
+  },
+  "pages": [
+    { "path": "", "title": "Recherche", "component": "pages/search.tsx" },
+    { "path": "history", "title": "Historique", "component": "pages/history.tsx" },
+    { "path": "settings", "title": "Moteurs", "component": "pages/settings.tsx" }
+  ],
+  "navItems": [
+    { "title": "Recherche inversée", "icon": "ScanSearch" }
+  ],
+  "fileActions": [
+    {
+      "id": "search",
+      "label": "Rechercher l'origine de l'image",
+      "description": "Recherche inversée sur trace.moe, SauceNAO, IQDB, Google Lens, Yandex…",
+      "icon": "ScanSearch",
+      "fileTypes": ["png", "jpg", "jpeg", "webp", "gif"],
+      "maxFiles": 1,
+      "page": ""
+    }
+  ]
+}

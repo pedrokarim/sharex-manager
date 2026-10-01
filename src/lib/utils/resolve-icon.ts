@@ -15,6 +15,8 @@ import {
   Music,
   Video,
   Camera,
+  Clapperboard,
+  ScanSearch,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,6 +37,8 @@ const iconMap: Record<string, LucideIcon> = {
   Music,
   Video,
   Camera,
+  Clapperboard,
+  ScanSearch,
 };
 
 export function resolveIcon(name?: string): LucideIcon {
