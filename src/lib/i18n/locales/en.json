@@ -440,6 +440,7 @@
       }
     },
     "file_viewer": {
+      "origin": "Origin",
       "details": "Details",
       "accessibility": "Image added on {date}. File size: {size} KB. {navigation}",
       "previous_button": "Use the previous button to see the previous image.",
@@ -606,7 +607,28 @@
   },
   "tools": {
     "title": "Tools",
+    "origin": {
+      "back": "Back to tools",
+      "kicker": "Tool",
+      "title": "Where does this image come from?",
+      "subtitle": "Drop an image: the tool reads what the file declares about its origin, without interpreting anything. C2PA manifest and its signature, generator, EXIF, XMP, generation parameters.",
+      "drop": "Drop an image here",
+      "drop_hint": "PNG, JPEG or WebP, 30 MB at most. You can also paste it (Ctrl + V).",
+      "browse": "Choose an image",
+      "reading": "Reading the file…",
+      "too_large": "Image too large (30 MB maximum).",
+      "error": "Analysis failed.",
+      "unknown_format": "Unknown format",
+      "note_limits": "This tool reads what is written in the file. It does not recognise a generated image from its pixels, cannot see invisible watermarks (SynthID and the like), and an image without a signature is not necessarily a real photo: provenance marks can be removed.",
+      "note_privacy": "The image is sent to the server while it is read, then forgotten: it is neither stored nor logged."
+    },
     "hub": {
+      "local_title": "Hosted here",
+      "external_title": "Side services",
+      "origin": {
+        "name": "Image origin",
+        "description": "Drop an image to read what it declares about itself: AI-generated or not, signature, generator, metadata."
+      },
       "back": "Back to home",
       "kicker": "Companion services",
       "title": "The tools live next door, and they are far better there.",

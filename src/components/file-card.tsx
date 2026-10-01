@@ -3,6 +3,7 @@
 import { DragEvent, useState } from "react";
 import Image from "next/image";
 import { VideoThumbnail } from "@/components/gallery/video-thumbnail";
+import { GalleryProvenanceBadge } from "@/components/gallery/gallery-provenance";
 import { isVideoFile } from "@/lib/media-kind";
 import { formatDistanceToNow } from "date-fns";
 import { useDateLocale } from "@/lib/i18n/date-locales";
@@ -225,6 +226,8 @@ export function FileCard({
               />
             </Button>
           )}
+
+          <GalleryProvenanceBadge name={file.name} className="bottom-2 left-2" />
 
           {isImage ? (
             showThumbnails ? (

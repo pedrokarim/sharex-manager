@@ -35,6 +35,7 @@ import { useTranslation } from "@/lib/i18n";
 import { FileAlbumsSection } from "@/components/gallery/file-albums-section";
 import { toast } from "sonner";
 import { ModuleActions } from "./module-actions";
+import { GalleryProvenanceSection } from "./gallery-provenance";
 import { getGalleryImageUrl, getFileStoragePath } from "@/lib/utils/url";
 import { useRouter } from "next/navigation";
 import { AddToAlbumDialog } from "@/components/albums/add-to-album-dialog";
@@ -462,6 +463,8 @@ function FileViewerBody({
                         </Button>
                       </div>
                     </div>
+
+                    <GalleryProvenanceSection name={file.name} title={t("gallery.file_viewer.origin")} />
 
                     <Separator />
 

@@ -442,6 +442,7 @@
       }
     },
     "file_viewer": {
+      "origin": "Origine",
       "details": "Détails",
       "accessibility": "Image ajoutée le {date}. Taille du fichier : {size} Ko. {navigation}",
       "previous_button": "Utilisez le bouton précédent pour voir l'image précédente.",
@@ -623,7 +624,28 @@
   "tools": {
     "title": "Outils",
     "description": "Fonctionnalités supplémentaires pour améliorer votre expérience",
+    "origin": {
+      "back": "Retour aux outils",
+      "kicker": "Outil",
+      "title": "D’où vient cette image ?",
+      "subtitle": "Déposez une image : l’outil lit ce que le fichier déclare de son origine, sans rien interpréter. Manifeste C2PA et sa signature, générateur, EXIF, XMP, paramètres de génération.",
+      "drop": "Déposez une image ici",
+      "drop_hint": "PNG, JPEG ou WebP, 30 Mo au plus. Vous pouvez aussi la coller (Ctrl + V).",
+      "browse": "Choisir une image",
+      "reading": "Lecture du fichier…",
+      "too_large": "Image trop lourde (30 Mo maximum).",
+      "error": "Analyse impossible.",
+      "unknown_format": "Format inconnu",
+      "note_limits": "Cet outil lit ce qui est écrit dans le fichier. Il ne reconnaît pas une image générée à ses pixels, ne voit pas les filigranes invisibles (SynthID et équivalents), et une image sans signature n’est pas pour autant une vraie photo : les marques d’origine se retirent.",
+      "note_privacy": "L’image est envoyée au serveur le temps de la lecture, puis oubliée : elle n’est ni enregistrée ni journalisée."
+    },
     "hub": {
+      "local_title": "Sur place",
+      "external_title": "Services annexes",
+      "origin": {
+        "name": "Origine d’une image",
+        "description": "Déposez une image pour lire ce qu’elle déclare d’elle-même : générée par IA ou non, signature, générateur, métadonnées."
+      },
       "back": "Retour à l'accueil",
       "kicker": "Services annexes",
       "title": "Les outils vivent à côté, et ils sont bien mieux là-bas.",

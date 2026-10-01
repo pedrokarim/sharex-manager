@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Boxes, Wrench } from "lucide-react";
+import { ArrowLeft, ArrowRight, Boxes, ScanSearch, Wrench } from "lucide-react";
 
 import { ServiceCard } from "@/components/tools/service-card";
 import { useTranslation } from "@/lib/i18n";
@@ -79,7 +79,32 @@ export function ToolsPageClient() {
           </p>
         </header>
 
-        <div className="mt-12 grid gap-6 lg:mt-16 lg:grid-cols-2 lg:gap-8">
+        {/* Outils hébergés ici même, sans compte. */}
+        <section className="mt-12 lg:mt-16">
+          <h2 className="text-xs font-bold tracking-[0.14em] text-muted-foreground uppercase">
+            {t("tools.hub.local_title")}
+          </h2>
+          <Link
+            href="/tools/origine-image"
+            className="group mt-4 flex items-start gap-4 rounded-2xl border border-border/70 bg-card p-5 transition-colors hover:border-primary/50 sm:items-center sm:p-6"
+          >
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <ScanSearch className="size-6" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-lg font-semibold tracking-tight">{t("tools.hub.origin.name")}</span>
+              <span className="mt-1 block text-sm text-pretty text-muted-foreground">
+                {t("tools.hub.origin.description")}
+              </span>
+            </span>
+            <ArrowRight className="mt-1 size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary sm:mt-0" />
+          </Link>
+        </section>
+
+        <h2 className="mt-12 text-xs font-bold tracking-[0.14em] text-muted-foreground uppercase">
+          {t("tools.hub.external_title")}
+        </h2>
+        <div className="mt-4 grid gap-6 lg:grid-cols-2 lg:gap-8">
           {SERVICES.map((service) => (
             <ServiceCard
               key={service.key}

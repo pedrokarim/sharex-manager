@@ -20,6 +20,12 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   serveur, adresses internes refusées), et contenus des modules activés
   (rendus d’AI Image Gen, clips de Clip Studio). Les modules déclarent leurs
   sources dans `gallerySources` ; la copie se fait côté serveur.
+- Outils : « Origine d’une image », premier outil hébergé sur place, ouvert
+  sans compte depuis `/tools`. On y dépose (ou colle) une image pour lire ce
+  qu’elle déclare : image générée ou capture, manifeste C2PA et sa signature,
+  EXIF, XMP, paramètres de génération. Rien n’est enregistré.
+- Galerie : origine des fichiers. Une pastille signale les images signées ou
+  déclarées générées, et la visionneuse détaille ce que le fichier porte.
 - AI Image Gen : origine des images. Un indicateur sur chaque vignette et un
   panneau « Origine » dans la visionneuse montrent ce que le fichier porte :
   manifeste C2PA (générateur, nature de l’image, actions, signature contrôlée

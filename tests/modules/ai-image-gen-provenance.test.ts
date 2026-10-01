@@ -23,7 +23,7 @@ import {
   stripMetadata,
 } from "@/modules/ai-image-gen/lib/provenance";
 import { cleanCopy, inspectMany, inspectOne, samePixels } from "@/modules/ai-image-gen/lib/provenance-service";
-import { cleanFileName, provenanceLabel } from "@/modules/ai-image-gen/lib/provenance-types";
+import { cleanFileName, provenanceLabel, provenanceVerdict } from "@/modules/ai-image-gen/lib/provenance-types";
 
 // ─── Fabrique de fichiers d'essai ────────────────────────────────
 
@@ -413,6 +413,40 @@ describe("origine : rien trouvé (critères 3 et 7)", () => {
   });
 });
 
+describe("origine : ce que le fichier déclare", () => {
+  it("reconnaît une image déclarée générée par son manifeste", () => {
+    const verdict = provenanceVerdict(inspectImage(fixtures.signedPng));
+    expect(verdict.kind).toBe("generated");
+    expect(verdict.reason).toContain("trainedAlgorithmicMedia");
+    expect(verdict.reason).toContain("Service d'essai");
+  });
+
+  it("reconnaît les paramètres de génération d'un PNG", () => {
+    const png = insertPngChunks(fixtures.plainPng, pngChunk("tEXt", Buffer.from("parameters\0un phare\nSteps: 20, Seed: 4", "latin1")));
+    const verdict = provenanceVerdict(inspectImage(png));
+    expect(verdict.kind).toBe("generated");
+    expect(verdict.reason).toContain("parameters");
+    // Avec une déclaration XMP en plus, c'est elle qui est citée.
+    expect(provenanceVerdict(inspectImage(fixtures.parametersPng)).reason).toContain("Les métadonnées XMP indiquent");
+  });
+
+  it("lit la nature déclarée en XMP quand il n'y a pas de manifeste", () => {
+    const xmp = '<x:xmpmeta><rdf:Description Iptc4xmpExt:DigitalSourceType="http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture"/></x:xmpmeta>';
+    const png = insertPngChunks(
+      fixtures.plainPng,
+      pngChunk("iTXt", Buffer.concat([Buffer.from("XML:com.adobe.xmp\0\0\0\0\0", "latin1"), Buffer.from(xmp, "utf8")]))
+    );
+    expect(provenanceVerdict(inspectImage(png)).kind).toBe("capture");
+  });
+
+  it("ne conclut rien d'une image sans marque, ni dans un sens ni dans l'autre", () => {
+    const verdict = provenanceVerdict(inspectImage(fixtures.plainPng));
+    expect(verdict.kind).toBe("undetermined");
+    expect(verdict.title).toBe("Aucune signature trouvée dans le fichier");
+    expect(verdict.reason).toContain("ne prouve rien");
+  });
+});
+
 // ─── Retrait ─────────────────────────────────────────────────────
 
 describe("origine : version propre (critères 4 et 6)", () => {
@@ -497,8 +531,13 @@ describe("origine : fichiers du module (critère 5)", () => {
   it("résume toute une page en un appel, sans sortir du dossier", () => {
     const summaries = inspectMany(["gen-1-a-0.png", "gen-2-b-0.png", "absente.png", "../secret.png", 42]);
     expect(summaries).toEqual({
-      "gen-1-a-0.png": { status: "signed", generator: "Service d'essai", digitalSourceType: "trainedAlgorithmicMedia" },
-      "gen-2-b-0.png": { status: "none", generator: undefined, digitalSourceType: undefined },
+      "gen-1-a-0.png": {
+        status: "signed",
+        generator: "Service d'essai",
+        digitalSourceType: "trainedAlgorithmicMedia",
+        declared: "generated",
+      },
+      "gen-2-b-0.png": { status: "none", generator: undefined, digitalSourceType: undefined, declared: "undetermined" },
     });
   });
 
