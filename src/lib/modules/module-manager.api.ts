@@ -31,6 +31,15 @@ const ModuleFileActionSchema = z.object({
   params: z.record(z.string(), z.string()).optional(),
 });
 
+const ModuleGallerySourceSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.string().optional(),
+  icon: z.string().optional(),
+  list: z.string(),
+  import: z.string(),
+});
+
 /** Accès aux fonctions serveur d'un module via `call-function`. */
 const FunctionAccessSchema = z.record(z.string(), z.enum(["user", "admin"]));
 
@@ -53,6 +62,7 @@ const ModuleConfigSchema = z.object({
   pages: z.array(ModulePageConfigSchema).optional(),
   navItems: z.array(ModuleNavItemSchema).optional(),
   fileActions: z.array(ModuleFileActionSchema).optional(),
+  gallerySources: z.array(ModuleGallerySourceSchema).optional(),
   functions: FunctionAccessSchema.optional(),
   uploads: z
     .object({

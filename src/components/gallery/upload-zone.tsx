@@ -30,10 +30,17 @@ interface UploadZoneProps {
   children: React.ReactNode;
   onFinishUpload?: () => void;
   /**
-   * Reçoit la fonction qui ouvre le sélecteur de fichiers : le bouton
+   * Reçoit de quoi alimenter la file d'envoi depuis l'extérieur : la fenêtre
    * « Ajouter » de la galerie passe par là, il n'y a qu'un seul circuit d'envoi.
    */
-  pickerRef?: React.MutableRefObject<(() => void) | null>;
+  pickerRef?: React.MutableRefObject<UploadZoneHandle | null>;
+}
+
+export interface UploadZoneHandle {
+  /** Ouvre le sélecteur de fichiers du système. */
+  open: () => void;
+  /** Ajoute des fichiers à la file, comme s'ils avaient été déposés. */
+  addFiles: (files: File[]) => void;
 }
 
 const fileRejectionMessages = {
@@ -240,11 +247,11 @@ export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZonePr
 
   useEffect(() => {
     if (!pickerRef) return;
-    pickerRef.current = open;
+    pickerRef.current = { open, addFiles: onDrop };
     return () => {
       pickerRef.current = null;
     };
-  }, [pickerRef, open]);
+  }, [pickerRef, open, onDrop]);
 
   const removeFile = (fileId: string) => {
     setFilesToUpload((files) => {

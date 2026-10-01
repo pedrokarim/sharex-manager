@@ -23,6 +23,8 @@
     "registerExport": "user",
     "deleteExport": "user",
     "sendExportToGallery": "user",
+    "listGalleryItems": "user",
+    "importGalleryItems": "user",
     "startAssistant": "user",
     "getAssistantJob": "user",
     "listAssistantJobs": "user",
@@ -42,6 +44,16 @@
   ],
   "navItems": [
     { "title": "Clip Studio", "icon": "Clapperboard" }
+  ],
+  "gallerySources": [
+    {
+      "id": "exports",
+      "label": "Clip Studio",
+      "description": "Clips exportés",
+      "icon": "Clapperboard",
+      "list": "listGalleryItems",
+      "import": "importGalleryItems"
+    }
   ],
   "fileActions": [
     {

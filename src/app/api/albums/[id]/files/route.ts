@@ -10,8 +10,10 @@ import { join, resolve } from "path";
 import { getAbsoluteUploadPath } from "@/lib/config";
 import { isFileSecure } from "@/lib/secure-files";
 import { isFileStarred } from "@/lib/starred-files";
+import { summarizeMonths } from "@/lib/timeline";
 
 const PAGE_SIZE = 12;
+const MAX_PAGE_SIZE = 60;
 const IdSchema = z.coerce.number().int().positive();
 
 const FileNamesSchema = z.object({
@@ -58,15 +60,30 @@ export async function GET(
       return NextResponse.json({ error: "Accès interdit" }, { status: 403 });
     }
 
-    const allFileNames = albumsDb.getAlbumFiles(albumId);
-    const details = request.nextUrl.searchParams.get("details") === "true";
-    const page = parseInt(request.nextUrl.searchParams.get("page") || "0", 10);
+    // Du plus récemment ajouté au plus ancien : c'est l'ordre de l'album.
+    const entries = albumsDb.getAlbumFileEntries(albumId);
+    const allFileNames = entries.map((entry) => entry.fileName);
+    const addedAt = new Map(entries.map((entry) => [entry.fileName, entry.addedAt]));
+    const searchParams = request.nextUrl.searchParams;
+
+    // Frise des mois d'ajout, pour le rail de défilement et le saut à une date.
+    if (searchParams.get("timeline") === "1") {
+      const tzOffset = parseInt(searchParams.get("tz") || "0", 10) || 0;
+      return NextResponse.json({
+        months: summarizeMonths(entries.map((entry) => entry.addedAt), tzOffset),
+        total: entries.length,
+      });
+    }
+
+    const details = searchParams.get("details") === "true";
+    const page = parseInt(searchParams.get("page") || "0", 10);
+    const pageSize = Math.min(Math.max(parseInt(searchParams.get("limit") || "", 10) || PAGE_SIZE, 1), MAX_PAGE_SIZE);
 
     // If page=0 or not provided, return all files (backwards compatible)
     // If page>=1, return paginated results
     const paginated = page >= 1;
-    const start = paginated ? (page - 1) * PAGE_SIZE : 0;
-    const end = paginated ? start + PAGE_SIZE : allFileNames.length;
+    const start = paginated ? (page - 1) * pageSize : 0;
+    const end = paginated ? start + pageSize : allFileNames.length;
     const pageFileNames = allFileNames.slice(start, end);
     const hasMore = paginated ? end < allFileNames.length : false;
 
@@ -86,6 +103,7 @@ export async function GET(
               url: `/api/files/${encodeURIComponent(fileName)}`,
               size: stats.size,
               createdAt: stats.mtime.toISOString(),
+              addedAt: addedAt.get(fileName),
               isSecure: secure,
               isStarred: starred,
             };

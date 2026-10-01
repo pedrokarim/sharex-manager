@@ -23,6 +23,15 @@ const SETTLE_QUIET_MS = 1500;
 /** … sans jamais la retenir plus longtemps que ceci. */
 const SETTLE_MAX_MS = 8000;
 
+/** L'ancêtre qui défile : dans l'application, ce n'est pas la fenêtre. */
+export function findScrollParent(node: HTMLElement | null): HTMLElement | null {
+  for (let current = node?.parentElement ?? null; current; current = current.parentElement) {
+    const overflow = getComputedStyle(current).overflowY;
+    if (overflow === "auto" || overflow === "scroll") return current;
+  }
+  return null;
+}
+
 interface TimelineNavigatorProps {
   /** Mois de la galerie entière, dans l'ordre d'affichage. Vide : pas de frise. */
   months: TimelineMonth[];

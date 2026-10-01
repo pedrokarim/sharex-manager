@@ -10,7 +10,13 @@ import { enhancePrompt as runEnhancePrompt } from "./lib/enhance";
 import type { EnhanceRequest } from "./lib/enhance-options";
 import fs from "fs";
 import path from "path";
-import { ModuleHooks } from "@/types/modules";
+import type {
+  GallerySourceImport,
+  GallerySourceItem,
+  GallerySourcePage,
+  GallerySourceQuery,
+  ModuleHooks,
+} from "@/types/modules";
 import {
   getCatalog,
   probeCliEngines,
@@ -372,6 +378,48 @@ export async function sendAllToGallery(id: string) {
 
 export async function upscale(id: string, file: string, scale = 2) {
   return upscaleImage(id, file, scale);
+}
+
+// ─── Source pour la galerie ──────────────────────────────────────
+
+/** Les rendus du studio, proposés dans la fenêtre « Ajouter » de la galerie. */
+export async function listGalleryItems(query: GallerySourceQuery = {}): Promise<GallerySourcePage> {
+  const search = typeof query.search === "string" ? query.search.trim().toLowerCase() : "";
+  const offset = Math.max(0, Math.floor(Number(query.offset) || 0));
+  const limit = Math.min(Math.max(Math.floor(Number(query.limit) || 48), 1), 96);
+
+  const items: GallerySourceItem[] = readHistory()
+    .filter((item) => !search || item.prompt.toLowerCase().includes(search))
+    .flatMap((item) =>
+      item.imageFiles.map((file) => ({
+        id: file,
+        name: file,
+        kind: "image" as const,
+        thumbnail: `/api/modules/ai-image-gen/data/images/${encodeURIComponent(file)}`,
+        createdAt: item.createdAt,
+        caption: item.prompt.slice(0, 160),
+        galleryFile: item.savedToGallery?.[file],
+      }))
+    );
+  return { items: items.slice(offset, offset + limit), total: items.length, hasMore: offset + limit < items.length };
+}
+
+/** Copie des rendus dans la galerie. Un rendu déjà copié n'est pas dupliqué. */
+export async function importGalleryItems(ids: string[]): Promise<GallerySourceImport> {
+  const result: GallerySourceImport = { saved: [], failed: [] };
+  if (!Array.isArray(ids)) return result;
+  for (const id of ids.slice(0, 60)) {
+    const file = imageFileName(id);
+    const item = file && readHistory().find((entry) => entry.imageFiles.includes(file));
+    if (!file || !item) {
+      result.failed.push({ id: String(id), error: "Rendu introuvable" });
+      continue;
+    }
+    const saved = await saveToGallery(item.id, file);
+    if (saved.success && saved.fileName) result.saved.push({ id: file, fileName: saved.fileName });
+    else result.failed.push({ id: file, error: saved.error ?? "Copie impossible" });
+  }
+  return result;
 }
 
 // ─── Marques d'origine ───────────────────────────────────────────

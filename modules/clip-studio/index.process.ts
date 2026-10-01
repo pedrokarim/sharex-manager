@@ -6,6 +6,7 @@
  * produits.
  */
 
+import type { GallerySourceImport, GallerySourceItem, GallerySourcePage, GallerySourceQuery } from "@/types/modules";
 import fs from "fs";
 import path from "path";
 import { randomBytes } from "crypto";
@@ -327,6 +328,44 @@ export async function sendExportToGallery(id: string): Promise<{ fileName: strin
   writeExports(exports);
   await announceNewUpload(fileName);
   return { fileName };
+}
+
+// ─── Source pour la galerie ──────────────────────────────────────
+
+/** Les clips exportés, proposés dans la fenêtre « Ajouter » de la galerie. */
+export async function listGalleryItems(query: GallerySourceQuery = {}): Promise<GallerySourcePage> {
+  const search = typeof query.search === "string" ? query.search.trim().toLowerCase() : "";
+  const offset = Math.max(0, Math.floor(Number(query.offset) || 0));
+  const limit = Math.min(Math.max(Math.floor(Number(query.limit) || 48), 1), 96);
+
+  const items: GallerySourceItem[] = (await listExports())
+    .filter((entry) => !search || entry.projectName.toLowerCase().includes(search))
+    .map((entry) => ({
+      id: entry.id,
+      name: entry.projectName,
+      kind: "video" as const,
+      thumbnail: `/api/modules/clip-studio/data/exports/${encodeURIComponent(entry.file)}`,
+      createdAt: entry.createdAt,
+      caption: `${entry.width} × ${entry.height}`,
+      durationMs: entry.durationMs,
+      galleryFile: entry.galleryFile,
+    }));
+  return { items: items.slice(offset, offset + limit), total: items.length, hasMore: offset + limit < items.length };
+}
+
+/** Copie des clips dans la galerie. Un clip déjà copié n'est pas dupliqué. */
+export async function importGalleryItems(ids: string[]): Promise<GallerySourceImport> {
+  const result: GallerySourceImport = { saved: [], failed: [] };
+  if (!Array.isArray(ids)) return result;
+  for (const id of ids.slice(0, 20)) {
+    try {
+      const { fileName } = await sendExportToGallery(String(id));
+      result.saved.push({ id: String(id), fileName });
+    } catch (error) {
+      result.failed.push({ id: String(id), error: error instanceof Error ? error.message : "Copie impossible" });
+    }
+  }
+  return result;
 }
 
 // ─── Assistant IA ────────────────────────────────────────────────

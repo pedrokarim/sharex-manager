@@ -39,6 +39,8 @@
     "inspectImages": "user",
     "inspectImageDetail": "user",
     "getCleanImage": "user",
+    "listGalleryItems": "user",
+    "importGalleryItems": "user",
     "listCollections": "user",
     "saveCollection": "user",
     "deleteCollection": "user",
@@ -57,6 +59,16 @@
   ],
   "navItems": [
     { "title": "AI Image Gen", "icon": "Sparkles" }
+  ],
+  "gallerySources": [
+    {
+      "id": "renders",
+      "label": "AI Image Gen",
+      "description": "Rendus du studio",
+      "icon": "Sparkles",
+      "list": "listGalleryItems",
+      "import": "importGalleryItems"
+    }
   ],
   "fileActions": [
     {

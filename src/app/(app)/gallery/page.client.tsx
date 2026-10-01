@@ -35,12 +35,13 @@ import { useQueryState } from "nuqs";
 import { GridView } from "@/components/gallery/grid-view";
 import { ListView } from "@/components/gallery/list-view";
 import { FileViewer } from "@/components/gallery/file-viewer";
-import { UploadZone } from "@/components/gallery/upload-zone";
+import { UploadZone, type UploadZoneHandle } from "@/components/gallery/upload-zone";
+import { AddDialog } from "@/components/gallery/add-dialog";
 import { KeyboardShortcutsDialog } from "@/components/gallery/keyboard-shortcuts-dialog";
 import { capitalize, cn } from "@/lib/utils";
 import { Loading } from "@/components/ui/loading";
 import { GalleryDisplayMenu } from "@/components/gallery/gallery-display-menu";
-import { TimelineNavigator, timelineGroupProps } from "@/components/timeline/timeline-navigator";
+import { TimelineNavigator, findScrollParent, timelineGroupProps } from "@/components/timeline/timeline-navigator";
 import { formatMonthKey, monthKeyOf, type TimelineMonth } from "@/lib/timeline";
 import { useTranslation } from "@/lib/i18n";
 import { motion } from "framer-motion";
@@ -65,15 +66,6 @@ interface MonthGroup {
 
 /** Fichiers demandés à chaque page ; le serveur plafonne à 60. */
 const PAGE_SIZE = 24;
-
-/** L'ancêtre qui défile : dans l'application, ce n'est pas la fenêtre. */
-function findScrollParent(node: HTMLElement | null): HTMLElement | null {
-  for (let current = node?.parentElement ?? null; current; current = current.parentElement) {
-    const overflow = getComputedStyle(current).overflowY;
-    if (overflow === "auto" || overflow === "scroll") return current;
-  }
-  return null;
-}
 
 const dedupeFilesByName = (input: FileInfo[]) =>
   input.filter(
@@ -134,7 +126,8 @@ export function GalleryClient({
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [datePickerKey, setDatePickerKey] = useState<string | null>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
-  const openFilePickerRef = useRef<(() => void) | null>(null);
+  const uploadZoneRef = useRef<UploadZoneHandle | null>(null);
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const getScrollElement = useCallback(() => findScrollParent(galleryRef.current), []);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [activeMonthHeader, setActiveMonthHeader] = useState<string | null>(null);
@@ -1155,7 +1148,7 @@ export function GalleryClient({
   return (
     <>
       <div ref={galleryRef} className="[overflow-anchor:none]">
-        <UploadZone onFinishUpload={handleFinishUpload} pickerRef={openFilePickerRef}>
+        <UploadZone onFinishUpload={handleFinishUpload} pickerRef={uploadZoneRef}>
         <section className="mb-4 flex flex-wrap items-center justify-between gap-2 pt-2 sm:pr-10">
           <div className="flex min-w-0 items-center gap-2">
             {(secureOnly || starredOnly) && (
@@ -1200,7 +1193,7 @@ export function GalleryClient({
             </Button>
             <GalleryDisplayMenu />
             <Button
-              onClick={() => openFilePickerRef.current?.()}
+              onClick={() => setIsAddOpen(true)}
               size="sm"
               className="h-9 gap-2 rounded-xl px-4 text-xs sm:text-sm"
             >
@@ -1442,6 +1435,14 @@ export function GalleryClient({
               count: count.toLocaleString(language),
             }),
         }}
+      />
+
+      <AddDialog
+        open={isAddOpen}
+        onOpenChange={setIsAddOpen}
+        onFiles={(added) => uploadZoneRef.current?.addFiles(added)}
+        onBrowse={() => uploadZoneRef.current?.open()}
+        onAdded={handleRefresh}
       />
 
       <FileViewer

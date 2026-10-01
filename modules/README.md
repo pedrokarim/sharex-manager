@@ -74,6 +74,7 @@ fenêtre de réglage. Il n’y a pas d’autre point d’entrée.
 | `settings` | Réglages **par défaut**, fusionnés sous ceux de l’interface |
 | `manualOnly` | Le traitement demande un choix à la main (zone à recadrer) : il ne peut pas s’appliquer à chaque envoi |
 | `fileActions` | Actions de la galerie vers les pages du module (voir plus bas) |
+| `gallerySources` | Fichiers du module proposés dans la fenêtre « Ajouter » de la galerie (voir plus bas) |
 | `pages`, `navItems` | Pages sous `/m/<module>` et entrée du menu |
 | `functions` | Fonctions serveur appelables par un compte connecté (`"user"`) ; les autres sont réservées aux admins |
 | `uploads` | Autorise l’envoi direct de médias dans `data/assets/` du module |
@@ -211,6 +212,49 @@ La page reçoit les fichiers dans l’adresse :
 Les modules de traitement (`supportedFileTypes`) apparaissent aussi dans ce
 menu : sans interface, ils s’appliquent à toute la sélection ; avec interface,
 ils ouvrent leur fenêtre de réglages pour une image.
+
+## Sources pour la galerie (`gallerySources`)
+
+Un module qui détient des images ou des vidéos (rendus d’un studio, clips
+exportés…) peut les proposer dans la fenêtre « Ajouter » de la galerie. La
+galerie ne connaît pas le module : elle lit la déclaration, appelle la fonction
+`list` pour afficher les éléments, puis la fonction `import` avec ceux que
+l’utilisateur a choisis.
+
+```json
+"functions": {
+  "listGalleryItems": "user",
+  "importGalleryItems": "user"
+},
+"gallerySources": [
+  {
+    "id": "renders",
+    "label": "AI Image Gen",
+    "description": "Rendus du studio",
+    "icon": "Sparkles",
+    "list": "listGalleryItems",
+    "import": "importGalleryItems"
+  }
+]
+```
+
+Les deux fonctions vivent dans `index.process.ts` et suivent les types de
+`@/types/modules` :
+
+```ts
+export async function listGalleryItems(query: GallerySourceQuery): Promise<GallerySourcePage>;
+export async function importGalleryItems(ids: string[]): Promise<GallerySourceImport>;
+```
+
+- `list` reçoit `search`, `offset` et `limit`, et rend des éléments avec une
+  vignette de même origine. Un élément déjà copié porte `galleryFile` : il est
+  affiché comme tel et ne peut pas être choisi une seconde fois.
+- `import` copie les fichiers **côté serveur**, sans repasser par le
+  navigateur, appelle `announceNewUpload` pour chacun, et rend la liste des
+  réussites et des échecs. Les identifiants viennent du navigateur : les
+  vérifier comme n’importe quelle entrée.
+- Une source dont l’une des deux fonctions n’est pas ouverte au rôle `user`
+  n’est pas proposée. Un module désactivé n’apparaît jamais.
 
 ## Traductions
 

@@ -7,6 +7,25 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Galerie : frise chronologique à la place de la barre de défilement. Elle
+  apparaît quand on défile ou qu’on approche du bord droit, étage les années
+  selon la quantité de contenu, pose un point par mois et nomme dans une bulle
+  le mois visé ; un clic ou un glisser y amène la galerie, même à une date pas
+  encore chargée. Les séparateurs de mois ouvrent « Aller à une date » (année,
+  puis mois). Disponible dans la galerie, la recherche, les favoris, les
+  fichiers sécurisés, les albums, et côté public dans la galerie du catalogue
+  et les albums ; les albums sont désormais groupés par mois d’ajout.
+- Galerie : fenêtre « Ajouter », qui réunit toutes les provenances : fichiers
+  de l’ordinateur, image d’un autre site par son lien (téléchargée par le
+  serveur, adresses internes refusées), et contenus des modules activés
+  (rendus d’AI Image Gen, clips de Clip Studio). Les modules déclarent leurs
+  sources dans `gallerySources` ; la copie se fait côté serveur.
+- AI Image Gen : origine des images. Un indicateur sur chaque vignette et un
+  panneau « Origine » dans la visionneuse montrent ce que le fichier porte :
+  manifeste C2PA (générateur, nature de l’image, actions, signature contrôlée
+  contre son certificat, empreintes), XMP, EXIF et textes. Deux
+  téléchargements : l’original, ou une version sans métadonnées produite sans
+  recompression, pixels identiques.
 - AI Image Gen : studio repensé. Les rendus forment une mosaïque justifiée,
   groupée par jour, qui remplit toute la largeur ; une génération en cours y
   occupe déjà sa place, et un échec s'y affiche avec son message et son
@@ -91,6 +110,11 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Galerie : barre d’outils allégée. Vue, tri, période et actualisation
+  automatique sont rangés derrière « Affichage » ; un seul bouton « Ajouter »
+  remplace le bouton flottant et l’ancienne fenêtre d’envoi à un fichier. La
+  galerie charge 24 fichiers par page, et le faux chargement pleine page à
+  l’ouverture disparaît.
 - Page « Mon compte » entièrement refondue et intégrée au shell de
   l’application : profil réel, rôle, fournisseur d’identité, état de session
   et raccourcis utiles remplacent les cartes vides « bientôt ».

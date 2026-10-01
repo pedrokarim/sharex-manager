@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  ChevronDown,
   ArrowLeft,
   Edit2,
   Trash2,
@@ -44,10 +45,21 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { Album } from "@/types/albums";
 import type { FileInfo } from "@/types/files";
 import { useRoutedFileViewer } from "@/hooks/use-routed-file-viewer";
+import { TimelineNavigator, findScrollParent, timelineGroupProps } from "@/components/timeline/timeline-navigator";
+import { formatMonthKey, monthKeyOf, type TimelineMonth } from "@/lib/timeline";
+import { languageAtom } from "@/lib/atoms/preferences";
+import { useAtomValue } from "jotai";
+import { capitalize } from "@/lib/utils";
 
 interface AlbumViewClientProps {
   albumId: number;
 }
+
+/** Fichiers demandés à chaque page ; le serveur plafonne à 60. */
+const PAGE_SIZE = 24;
+
+/** Un fichier d'album porte aussi la date de son ajout, qui ordonne l'album. */
+type AlbumFile = FileInfo & { addedAt?: string };
 
 const dedupeFilesByName = (input: FileInfo[]) =>
   input.filter(
@@ -178,7 +190,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     async (page: number) => {
       try {
         const res = await fetch(
-          `/api/albums/${albumId}/files?details=true&page=${page}`
+          `/api/albums/${albumId}/files?details=true&page=${page}&limit=${PAGE_SIZE}`
         );
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
@@ -218,15 +230,28 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     });
   }, [fetchAlbumFiles]);
 
+  const language = useAtomValue(languageAtom);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const getScrollElement = useCallback(() => findScrollParent(pageRef.current), []);
+  const [months, setMonths] = useState<TimelineMonth[]>([]);
+  const [timelineVersion, setTimelineVersion] = useState(0);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [datePickerKey, setDatePickerKey] = useState<string | null>(null);
+
   const {
     data: files,
     loading,
+    loadingPrevious,
     ref: sentinelRef,
+    topRef,
+    firstPage,
     reset,
+    resetAt,
     updateData,
   } = useInfiniteScroll<FileInfo>({
     initialData: initialData.files,
     initialHasMore: initialData.hasMore,
+    getScrollElement,
     fetchMore: useCallback(
       async (page) => {
         const { files, hasMore } = await fetchAlbumFiles(page);
@@ -243,8 +268,35 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       highestLoadedPageRef.current = 1;
       hasMorePagesRef.current = nextHasMore;
       reset(nextFiles, nextHasMore);
+      setTimelineVersion((version) => version + 1);
     },
     [reset],
+  );
+
+  // Frise des mois d'ajout : rechargée quand le contenu de l'album change.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/albums/${albumId}/files?timeline=1&tz=${new Date().getTimezoneOffset()}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.months) setMonths(data.months);
+      })
+      .catch((error) => console.error("Erreur lors du chargement de la frise:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [albumId, timelineVersion]);
+
+  /** Saut à une date : l'album repart de la page qui contient ce rang. */
+  const loadAt = useCallback(
+    async (index: number) => {
+      const page = Math.floor(index / PAGE_SIZE) + 1;
+      const { files: nextFiles, hasMore } = await fetchAlbumFiles(page);
+      highestLoadedPageRef.current = page;
+      hasMorePagesRef.current = hasMore;
+      resetAt(nextFiles, hasMore, page);
+    },
+    [fetchAlbumFiles, resetAt],
   );
 
   // When initialData loads, reset the infinite scroll with real data
@@ -257,6 +309,20 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   }, [initialData, applyReset]);
 
   const uniqueFiles = useMemo(() => dedupeFilesByName(files), [files]);
+
+  /** Mois d'ajout consécutifs, avec leur rang dans l'album entier. */
+  const monthGroups = useMemo(() => {
+    const windowStart = (firstPage - 1) * PAGE_SIZE;
+    const groups: { key: string; start: number; files: FileInfo[] }[] = [];
+    uniqueFiles.forEach((file, index) => {
+      const date = new Date((file as AlbumFile).addedAt ?? file.createdAt);
+      const key = monthKeyOf(date, Number.isNaN(date.getTime()) ? 0 : date.getTimezoneOffset());
+      const last = groups[groups.length - 1];
+      if (last?.key === key) last.files.push(file);
+      else groups.push({ key, start: windowStart + index, files: [file] });
+    });
+    return groups;
+  }, [uniqueFiles, firstPage]);
 
   const fetchViewerFileMetadata = useCallback(async (fileName: string) => {
     const response = await fetch(
@@ -801,7 +867,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   }
 
   return (
-    <div>
+    <div ref={pageRef} className="[overflow-anchor:none]">
       {/* En-tête de l'album */}
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3 sm:gap-4">
@@ -989,56 +1055,86 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         </div>
       ) : (
         <div>
-          {!viewMode || viewMode === "grid" ? (
-            <GridView
-              files={files}
-              onCopy={copyToClipboard}
-              onDelete={handleRemoveFromAlbum}
-              onSelect={(file) => openViewerFile(file.name)}
-              onToggleSecurity={handleToggleSecurity}
-              onToggleStar={handleToggleStar}
-              onToggleSelection={toggleFile}
-              isSelected={isSelected}
-              isSelectionMode={isSelectionMode}
-              showSelectionCheckbox={isSelectionMode}
-              allSelectedFiles={getSelectedFilesData(uniqueFiles)}
-              selectedCount={selectedCount}
-              hasSelection={hasSelection}
-              onClearSelection={clearSelection}
-              onCopyUrls={handleCopySelectedUrls}
-              onDeleteSelected={handleDeleteSelected}
-              onToggleStarSelected={handleToggleStarSelected}
-              onToggleSecuritySelected={handleToggleSecuritySelected}
-              onStartSelectionMode={handleStartSelectionMode}
-              onAddToAlbum={handleAddToAlbum}
-              newFileIds={[]}
-            />
-          ) : (
-            <ListView
-              files={files}
-              onCopy={copyToClipboard}
-              onDelete={handleRemoveFromAlbum}
-              onSelect={(file) => openViewerFile(file.name)}
-              onToggleSecurity={handleToggleSecurity}
-              onToggleStar={handleToggleStar}
-              onToggleSelection={toggleFile}
-              isSelected={isSelected}
-              isSelectionMode={isSelectionMode}
-              showSelectionCheckbox={isSelectionMode}
-              allSelectedFiles={getSelectedFilesData(uniqueFiles)}
-              selectedCount={selectedCount}
-              hasSelection={hasSelection}
-              onClearSelection={clearSelection}
-              onCopyUrls={handleCopySelectedUrls}
-              onDeleteSelected={handleDeleteSelected}
-              onToggleStarSelected={handleToggleStarSelected}
-              onToggleSecuritySelected={handleToggleSecuritySelected}
-              onStartSelectionMode={handleStartSelectionMode}
-              onAddToAlbum={handleAddToAlbum}
-              detailed={viewMode === "details"}
-              newFileIds={[]}
-            />
+          {/* Après un saut à une date, ce qui précède se recharge en remontant. */}
+          {firstPage > 1 && (
+            <div ref={topRef} className="flex h-10 items-center justify-center">
+              {loadingPrevious && <Loading variant="minimal" size="sm" showMessage={true} className="text-xs" />}
+            </div>
           )}
+          {monthGroups.map((group) => (
+            <div
+              key={`${group.key}-${group.start}`}
+              className="mb-6 sm:mb-8"
+              {...timelineGroupProps(group.key, group.start, group.files.length)}
+            >
+              {months.length > 1 && (
+                <h2 className="mb-3 text-lg font-semibold text-muted-foreground sm:mb-4 sm:text-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDatePickerKey(group.key);
+                      setIsDatePickerOpen(true);
+                    }}
+                    title={t("gallery.toolbar.go_to_date")}
+                    className="group/month inline-flex items-center gap-1.5 rounded-md transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                  >
+                    {capitalize(formatMonthKey(group.key, "long", language))}
+                    <ChevronDown className="h-4 w-4 opacity-0 transition-opacity group-hover/month:opacity-100 group-focus-visible/month:opacity-100" />
+                  </button>
+                </h2>
+              )}
+              {!viewMode || viewMode === "grid" ? (
+                <GridView
+                  files={group.files}
+                  onCopy={copyToClipboard}
+                  onDelete={handleRemoveFromAlbum}
+                  onSelect={(file) => openViewerFile(file.name)}
+                  onToggleSecurity={handleToggleSecurity}
+                  onToggleStar={handleToggleStar}
+                  onToggleSelection={toggleFile}
+                  isSelected={isSelected}
+                  isSelectionMode={isSelectionMode}
+                  showSelectionCheckbox={isSelectionMode}
+                  allSelectedFiles={getSelectedFilesData(uniqueFiles)}
+                  selectedCount={selectedCount}
+                  hasSelection={hasSelection}
+                  onClearSelection={clearSelection}
+                  onCopyUrls={handleCopySelectedUrls}
+                  onDeleteSelected={handleDeleteSelected}
+                  onToggleStarSelected={handleToggleStarSelected}
+                  onToggleSecuritySelected={handleToggleSecuritySelected}
+                  onStartSelectionMode={handleStartSelectionMode}
+                  onAddToAlbum={handleAddToAlbum}
+                  newFileIds={[]}
+                />
+              ) : (
+                <ListView
+                  files={group.files}
+                  onCopy={copyToClipboard}
+                  onDelete={handleRemoveFromAlbum}
+                  onSelect={(file) => openViewerFile(file.name)}
+                  onToggleSecurity={handleToggleSecurity}
+                  onToggleStar={handleToggleStar}
+                  onToggleSelection={toggleFile}
+                  isSelected={isSelected}
+                  isSelectionMode={isSelectionMode}
+                  showSelectionCheckbox={isSelectionMode}
+                  allSelectedFiles={getSelectedFilesData(uniqueFiles)}
+                  selectedCount={selectedCount}
+                  hasSelection={hasSelection}
+                  onClearSelection={clearSelection}
+                  onCopyUrls={handleCopySelectedUrls}
+                  onDeleteSelected={handleDeleteSelected}
+                  onToggleStarSelected={handleToggleStarSelected}
+                  onToggleSecuritySelected={handleToggleSecuritySelected}
+                  onStartSelectionMode={handleStartSelectionMode}
+                  onAddToAlbum={handleAddToAlbum}
+                  detailed={viewMode === "details"}
+                  newFileIds={[]}
+                />
+              )}
+            </div>
+          ))}
 
           <div ref={sentinelRef} className="h-10 flex items-center justify-center">
             {loading && (
@@ -1052,6 +1148,26 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           </div>
         </div>
       )}
+
+      <TimelineNavigator
+        months={months}
+        containerRef={pageRef}
+        getScrollElement={getScrollElement}
+        loadAt={loadAt}
+        pickerOpen={isDatePickerOpen}
+        onPickerOpenChange={setIsDatePickerOpen}
+        pickerKey={datePickerKey}
+        locale={language}
+        pickerLabels={{
+          title: t("gallery.toolbar.go_to_date"),
+          description: t("gallery.timeline.description"),
+          openYear: (year) => t("gallery.timeline.open_year", { year }),
+          count: (count) =>
+            t(count > 1 ? "gallery.toolbar.count_many" : "gallery.toolbar.count_one", {
+              count: count.toLocaleString(language),
+            }),
+        }}
+      />
 
       {/* Visionneuse de fichiers */}
       <FileViewer

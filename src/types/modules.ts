@@ -26,6 +26,57 @@ export interface ModuleFileAction {
   params?: Record<string, string>;
 }
 
+/**
+ * Source de fichiers proposée dans la fenêtre « Ajouter » de la galerie.
+ *
+ * Un module qui détient des images ou des vidéos (rendus d'un studio, clips
+ * exportés…) en déclare une dans `gallerySources`. La galerie n'a rien à
+ * connaître du module : elle appelle `list` pour afficher ses éléments, puis
+ * `import` avec ceux que l'utilisateur a choisis. La copie se fait côté
+ * serveur, sans repasser par le navigateur. Les deux fonctions doivent être
+ * déclarées dans `functions`.
+ */
+export interface ModuleGallerySource {
+  id: string;
+  label: string;
+  description?: string;
+  icon?: string; // nom d'icône Lucide
+  /** Fonction serveur : `(query: GallerySourceQuery) => GallerySourcePage`. */
+  list: string;
+  /** Fonction serveur : `(ids: string[]) => GallerySourceImport`. */
+  import: string;
+}
+
+export interface GallerySourceQuery {
+  search?: string;
+  offset?: number;
+  limit?: number;
+}
+
+export interface GallerySourceItem {
+  id: string;
+  name: string;
+  kind: "image" | "video";
+  /** URL de même origine, affichable dans une vignette. */
+  thumbnail: string;
+  createdAt: number;
+  caption?: string;
+  durationMs?: number;
+  /** Nom du fichier dans la galerie, si l'élément y a déjà été copié. */
+  galleryFile?: string;
+}
+
+export interface GallerySourcePage {
+  items: GallerySourceItem[];
+  total: number;
+  hasMore: boolean;
+}
+
+export interface GallerySourceImport {
+  saved: { id: string; fileName: string }[];
+  failed: { id: string; error: string }[];
+}
+
 export interface ModuleConfig {
   name: string;
   version: string;
@@ -44,6 +95,7 @@ export interface ModuleConfig {
   pages?: ModulePageConfig[];
   navItems?: ModuleNavItem[];
   fileActions?: ModuleFileAction[];
+  gallerySources?: ModuleGallerySource[];
   /**
    * Fonctions appelables par `/api/modules/call-function`, avec le rôle
    * minimal. Une fonction absente de la liste est réservée aux admins.
