@@ -21,6 +21,7 @@ import {
 } from "./lib/engines/registry";
 import { buildEngineConfig, saveToGallery, upscaleImage } from "./lib/generate";
 import { fetchRemoteImage } from "./lib/remote-image";
+import { cleanCopy, inspectMany, inspectOne } from "./lib/provenance-service";
 import {
   cancelJob,
   clearFinishedJobs,
@@ -371,6 +372,23 @@ export async function sendAllToGallery(id: string) {
 
 export async function upscale(id: string, file: string, scale = 2) {
   return upscaleImage(id, file, scale);
+}
+
+// ─── Marques d'origine ───────────────────────────────────────────
+
+/** Indicateur d'origine de plusieurs images : un appel pour toute une page de la grille. */
+export async function inspectImages(files: string[]) {
+  return inspectMany(files);
+}
+
+/** Tout ce que le fichier porte, et ce que donnerait le retrait des métadonnées. */
+export async function inspectImageDetail(file: string) {
+  return inspectOne(file);
+}
+
+/** La même image sans ses métadonnées, pixels identiques. L'original n'est pas touché. */
+export async function getCleanImage(file: string) {
+  return cleanCopy(file);
 }
 
 // ─── Collections ─────────────────────────────────────────────────

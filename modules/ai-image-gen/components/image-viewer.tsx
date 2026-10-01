@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Copy,
   Check,
-  Download,
   ImageDown,
   Trash2,
 } from "lucide-react";
@@ -24,11 +23,11 @@ import { Separator } from "@/components/ui/separator";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import {
   callModule,
-  downloadImage,
   formatDuration,
   imageUrl,
   type HistoryItem,
 } from "../lib/client";
+import { ProvenancePanel } from "./provenance";
 
 /** Une image précise au sein d'une génération. */
 export interface Shot {
@@ -89,14 +88,6 @@ export function ImageViewer({
     await navigator.clipboard.writeText(item.prompt);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleDownload = async () => {
-    try {
-      await downloadImage(imageUrl(file), file);
-    } catch {
-      toast.error("Téléchargement impossible");
-    }
   };
 
   const handleSaveToGallery = async () => {
@@ -278,11 +269,13 @@ export function ImageViewer({
               </div>
             )}
 
+            <Separator />
+
+            {/* Origine du fichier et ses deux téléchargements : l'original, ou
+                le même sans ses métadonnées. */}
+            <ProvenancePanel file={file} />
+
             <div className="mt-auto flex flex-col gap-2 pt-2">
-              <Button onClick={handleDownload} className="w-full gap-2">
-                <Download className="h-4 w-4" />
-                Télécharger
-              </Button>
               <Button
                 variant="outline"
                 onClick={handleSaveToGallery}

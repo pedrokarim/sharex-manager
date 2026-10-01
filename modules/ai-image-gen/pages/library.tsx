@@ -60,6 +60,7 @@ import {
   type HistoryItem,
   type ModuleStats,
 } from "../lib/client";
+import { ProvenanceBadge } from "../components/provenance";
 
 interface LibraryPageProps {
   moduleName: string;
@@ -363,6 +364,7 @@ export default function LibraryPage({}: LibraryPageProps) {
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                   />
                 </button>
+                <ProvenanceBadge file={shot.file} className="left-2 top-2" />
 
                 {/* Actions rapides, sans passer par la visionneuse */}
                 <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">

@@ -7,6 +7,7 @@ import {
   ClipboardCopy,
   Copy,
   Download,
+  Eraser,
   EyeOff,
   ImageDown,
   Layers,
@@ -41,7 +42,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   callModule,
+  downloadCleanImage,
   downloadImage,
+  formatBytes,
   imageUrl,
   type Collection,
   type HistoryItem,
@@ -203,7 +206,23 @@ export function GenerationMenuItems({
           </Item>
           <Item onClick={() => downloadImage(imageUrl(file), file)}>
             <Download className="mr-2 h-4 w-4" />
-            Télécharger
+            Télécharger l&apos;original
+          </Item>
+          <Item
+            disabled={actions.busy}
+            onClick={() =>
+              run(async () => {
+                const clean = await downloadCleanImage(file);
+                toast.success(
+                  clean.savedBytes > 0
+                    ? `Version propre : ${formatBytes(clean.savedBytes)} de métadonnées en moins, pixels identiques`
+                    : "Version propre : rien à retirer, fichier identique"
+                );
+              })
+            }
+          >
+            <Eraser className="mr-2 h-4 w-4" />
+            Télécharger une version propre
           </Item>
           <Item
             disabled={actions.busy || Boolean(item.savedToGallery?.[file])}

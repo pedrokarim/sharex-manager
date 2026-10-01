@@ -40,6 +40,7 @@ import {
   type Collection,
   type HistoryItem,
 } from "../lib/client";
+import { ProvenanceBadge } from "./provenance";
 
 interface GenerationCardProps {
   item: HistoryItem;
@@ -148,6 +149,7 @@ export function GenerationCard({
                 className="h-full w-full object-cover transition-transform duration-300 group-hover/shot:scale-[1.02]"
               />
             </button>
+            <ProvenanceBadge file={file} className="left-1.5 top-1.5" />
 
             {/* Actions au survol : elles portent sur cette image précise, pas
                 sur le lot entier. */}

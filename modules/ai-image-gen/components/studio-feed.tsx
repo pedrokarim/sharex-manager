@@ -58,6 +58,7 @@ import {
   type HistoryItem,
   type Job,
 } from "../lib/client";
+import { ProvenanceBadge } from "./provenance";
 import {
   GenerationMenuItems,
   JobMenuItems,
@@ -935,6 +936,7 @@ function ShotStrip({
               className="h-full w-full object-cover opacity-0 transition-[opacity,transform] duration-500 ease-out group-hover/shot:scale-[1.03] data-[loaded]:opacity-100"
             />
           </button>
+          <ProvenanceBadge file={file} className="right-2 top-2" />
 
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0 opacity-0 transition-opacity duration-200 group-hover/shot:opacity-100" />
           <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 opacity-0 transition-opacity duration-200 group-hover/shot:pointer-events-auto group-hover/shot:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">

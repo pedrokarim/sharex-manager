@@ -9,6 +9,7 @@
 
 "use client";
 
+import type { CleanResult } from "./provenance-types";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const MODULE_NAME = "ai-image-gen";
@@ -344,7 +345,10 @@ export const NEGATIVE_PRESETS = [
  */
 export async function downloadImage(url: string, fileName: string) {
   const response = await fetch(url);
-  const blob = await response.blob();
+  saveBlob(await response.blob(), fileName);
+}
+
+function saveBlob(blob: Blob, fileName: string) {
   const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = objectUrl;
@@ -353,6 +357,23 @@ export async function downloadImage(url: string, fileName: string) {
   link.click();
   link.remove();
   URL.revokeObjectURL(objectUrl);
+}
+
+/**
+ * Télécharge la version sans métadonnées d'une image du module. Le serveur la
+ * produit à la volée, sans recompression, et ne la rend que si les pixels sont
+ * identiques à ceux de l'original.
+ */
+export async function downloadCleanImage(file: string): Promise<CleanResult> {
+  const result = await callModule<{ fileName: string; mimeType: string; b64: string; clean: CleanResult }>(
+    "getCleanImage",
+    file
+  );
+  const binary = atob(result.b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  saveBlob(new Blob([bytes], { type: result.mimeType }), result.fileName);
+  return result.clean;
 }
 
 /** Lit un fichier choisi par l'utilisateur en base64 nu (sans le préfixe `data:`). */
