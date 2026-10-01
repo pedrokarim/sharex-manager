@@ -12,30 +12,13 @@ import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
 
-/** Une portée : minuscules, chiffres, points et tirets, comme « module.sujet ». */
-const SCOPE = /^[a-z0-9][a-z0-9.-]{0,63}$/;
-/** Une préférence est un réglage, pas un espace de stockage. */
-export const MAX_PREFERENCE_BYTES = 8 * 1024;
-const MAX_SCOPES_PER_USER = 100;
+import {
+  MAX_SCOPES_PER_USER,
+  parsePreferenceValue,
+  type PreferenceValue,
+} from "@/lib/user-preferences-rules";
 
-export type PreferenceValue = Record<string, unknown>;
-
-export function isPreferenceScope(value: unknown): value is string {
-  return typeof value === "string" && SCOPE.test(value);
-}
-
-/** Objet JSON simple, de taille raisonnable ; sinon `null`. */
-export function parsePreferenceValue(value: unknown): PreferenceValue | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  let serialized: string;
-  try {
-    serialized = JSON.stringify(value);
-  } catch {
-    return null;
-  }
-  if (Buffer.byteLength(serialized) > MAX_PREFERENCE_BYTES) return null;
-  return JSON.parse(serialized) as PreferenceValue;
-}
+export { MAX_PREFERENCE_BYTES, isPreferenceScope, parsePreferenceValue, type PreferenceValue } from "@/lib/user-preferences-rules";
 
 let database: Database | null = null;
 
