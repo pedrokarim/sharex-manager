@@ -103,7 +103,8 @@ export const TEAM_INFO = {
   CONTACT: {
     EMAIL: "contact@ascencia.re",
     WEBSITE: "https://ascencia.re",
-    GITHUB: "https://github.com/PedroKarim",
+    // Le dossier de l'application mobile, dans le dépôt du projet.
+    GITHUB: "https://github.com/pedrokarim/sharex-manager/tree/main/sharex-mobile",
   },
 
   // Informations de l'application
