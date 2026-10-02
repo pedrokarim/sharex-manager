@@ -1,52 +1,78 @@
-# ShareX Manager
+<p align="center">
+  <img src="docs/images/logo.png" alt="" width="96" height="96" />
+</p>
+
+<h1 align="center">ShareX Manager</h1>
+
+<p align="center">
+  Vos captures, chez vous.
+</p>
 
 Le point de chute de vos captures d’écran, sur votre propre serveur. ShareX,
 Flameshot ou l’application Android envoient, ShareX Manager range, génère les
 miniatures et renvoie un lien public prêt à partager.
 
-📖 **[Site et documentation](https://pedrokarim.github.io/sharex-manager/)** · 📚 **[Wiki](https://github.com/pedrokarim/sharex-manager/wiki)** · 🚀 **[Démo](https://sxm.ascencia.re)**
+📖 **[Site](https://pedrokarim.github.io/sharex-manager/)** · 📚 **[Wiki](https://github.com/pedrokarim/sharex-manager/wiki)** · 🚀 **[Démo](https://sxm.ascencia.re)**
 
 ![Galerie](docs/images/galerie.webp)
 
 ## Fonctionnalités
 
-- **Galerie** en mosaïque ou en liste, regroupée par mois, avec recherche,
-  filtres, favoris et visionneuse plein écran.
+- **Galerie** en grille, en liste ou en détails, regroupée par mois, avec
+  recherche, favoris et une frise chronologique pour remonter les années. La
+  fenêtre « Ajouter » réunit les fichiers de l’ordinateur, une image d’un
+  autre site et les contenus des modules.
+- **Visionneuse** en plein écran ou en fenêtre, au choix dans les
+  préférences ; elle détaille l’origine du fichier et propose l’original ou
+  une version sans métadonnées.
 - **Liens publics par défaut** : chaque capture envoyée est immédiatement
   partageable. Une capture peut être rendue privée depuis l’interface ; elle
   n’est alors visible que connecté.
-- **Albums** et **catalogue public** : publier une sélection sur une page
-  soignée, sans rien exposer d’autre.
+- **Albums** à trois visibilités : privé (par défaut), public par lien, ou
+  public et présenté dans le **catalogue**, une vitrine qui a sa propre
+  navigation et n’expose rien d’autre.
 - **Clés API** avec permissions par type de fichier, et configuration `.sxcu`
   générée pour ShareX (et Flameshot via `fu`).
 - **Historique et statistiques** des envois, par jour, par méthode et par clé.
-- **Modules** qui s’activent à la demande :
+- **Modules** qui s’activent à la demande, chacun avec son logo :
   - traitements automatiques à l’envoi : filigrane, redimensionnement,
     recadrage ;
-  - **AI Image Gen**, un studio de génération d’images (agents CLI connectés
-    comme Codex, ou clés API) ;
+  - **AI Image Gen**, un studio de génération et de retouche d’images (agents
+    CLI connectés comme Codex, ou clés API) ;
   - **Clip Studio**, un éditeur de clips vidéo avec timeline, modèles (quiz,
     top, diaporama), assistant IA, voix de synthèse locales, banque de
     musique libre de droits et sous-titres animés, export MP4 dans le
-    navigateur.
+    navigateur ;
+  - **Recherche inversée**, qui interroge plusieurs moteurs d’un coup
+    (trace.moe, IQDB, SauceNAO, Google Lens, Yandex) et garde un historique.
+- **Outils publics**, ouverts sans compte : « Origine d’une image » lit ce
+  qu’un fichier déclare (manifeste C2PA, EXIF, XMP, paramètres de
+  génération) sans rien enregistrer.
 - **Application Android** (`sharex-mobile/`) pour envoyer depuis le partage
   du téléphone.
 - **Authentification** intégrée (comptes créés par l’administrateur) ou via
   [Ascencia ID](docs/authentication.md) en OIDC.
-- Interface en français, thèmes clair et sombre, adaptée au mobile.
+- **Thème global** : l’administrateur règle le mode et les couleurs du site
+  à partir de 42 palettes ; chaque navigateur choisit ensuite clair, sombre
+  ou système.
+- Interface en français et en anglais, adaptée au mobile.
 
-| Visionneuse | Albums |
+| Accueil | Visionneuse |
 | --- | --- |
-| ![Visionneuse](docs/images/visionneuse.webp) | ![Albums](docs/images/albums.webp) |
+| ![Accueil](docs/images/accueil.webp) | ![Visionneuse](docs/images/visionneuse.webp) |
+| **Albums** | **Catalogue public** |
+| ![Albums](docs/images/albums.webp) | ![Catalogue public](docs/images/catalogue-public.webp) |
 | **Statistiques** | **Clés API et configuration ShareX** |
-| ![Statistiques](docs/images/statistiques.webp) | ![Configuration ShareX](docs/images/configuration-sharex.webp) |
+| ![Statistiques](docs/images/statistiques.webp) | ![Configuration ShareX](docs/images/configuration-sharex.webp) |
 | **Clip Studio** | **AI Image Gen** |
-| ![Éditeur Clip Studio](docs/images/clip-studio-editeur.webp) | ![AI Image Gen](docs/images/ai-image-gen.webp) |
-| **Catalogue public** | **Modules** |
-| ![Catalogue public](docs/images/catalogue-public.webp) | ![Modules](docs/images/modules.webp) |
+| ![Éditeur Clip Studio](docs/images/clip-studio-editeur.webp) | ![AI Image Gen](docs/images/ai-image-gen.webp) |
+| **Recherche inversée** | **Origine d’une image** |
+| ![Recherche inversée](docs/images/recherche-inversee.webp) | ![Origine d’une image](docs/images/origine-image.webp) |
+| **Modules** | **Thème global** |
+| ![Modules](docs/images/modules.webp) | ![Thème global](docs/images/theme-global.webp) |
 
-D’autres captures (thème clair, mobile, historique, configuration) sont dans
-[`docs/images/`](docs/images/).
+D’autres captures (thème clair, mobile, historique, préférences, connexion,
+administration) sont dans [`docs/images/`](docs/images/).
 
 ## Installation
 
@@ -118,14 +144,14 @@ sharex-manager/
 │   ├── hooks/          # Hooks React
 │   ├── proxy.ts        # Proxy Next.js (en-têtes, routes publiques)
 │   └── instrumentation.ts
-├── modules/            # Modules (AI Image Gen, Clip Studio, traitements…)
+├── modules/            # Modules (AI Image Gen, Clip Studio, Recherche inversée…)
 ├── cli/                # CLI : bun run setup, journaux, déploiement
 ├── scripts/            # Scripts de maintenance et de release
 ├── tests/              # Tests Vitest
 ├── public/             # Fichiers statiques
 ├── config/             # Réglages d’exécution (uploads.json)
 ├── docs/               # Documentation et captures
-├── website/            # Site GitHub Pages
+│   └── website/        # Site GitHub Pages
 └── sharex-mobile/      # Application Android (Expo)
 ```
 
@@ -152,5 +178,6 @@ Le serveur et l’application mobile ont des versions indépendantes (tags
 
 GNU General Public License v3.0. Voir [`LICENSE`](LICENSE).
 
-Les photos des captures d’écran de ce dépôt sont sous licence CC0 (domaine
-public), issues d’[Openverse](https://openverse.org/).
+Les photos visibles sur les captures d’écran viennent de
+[Lorem Picsum](https://picsum.photos/) (photos Unsplash, libres
+d’utilisation) et d’[Openverse](https://openverse.org/) (CC0).

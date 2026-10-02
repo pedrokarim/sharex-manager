@@ -20,7 +20,7 @@ export default defineConfig([
     // Projets et données qui ne font pas partie du serveur.
     "sharex-mobile/**",
     "tweakcn/**",
-    "website/**",
+    "docs/website/**",
     "uploads/**",
     "data/**",
     "modules/*/data/**",
