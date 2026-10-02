@@ -6,7 +6,8 @@ import { PhotoHeader } from "@/components/front/photo-header";
 import { Reveal } from "@/components/front/reveal";
 import { ACCENT, KICKER } from "@/components/front/styles";
 import { PageTransition } from "@/components/page-transition";
-import { Github } from "@/components/ui/icons";
+import { Discord, Github, XLogo } from "@/components/ui/icons";
+import { SITE_LINKS } from "@/config/links";
 import { publicPageMetadata } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { ContactForm } from "./contact-form";
@@ -19,9 +20,11 @@ export const metadata = publicPageMetadata({
 });
 
 const CHANNELS = [
-  { icon: Mail, label: "contact@ascencia.re", href: "mailto:contact@ascencia.re" },
-  { icon: Globe, label: "ascencia.re", href: "https://ascencia.re" },
-  { icon: Github, label: "GitHub", href: "https://github.com/ascencia" },
+  { icon: Mail, label: SITE_LINKS.email, href: `mailto:${SITE_LINKS.email}` },
+  { icon: Discord, label: "Discord de support", href: SITE_LINKS.discord },
+  { icon: Github, label: "GitHub", href: SITE_LINKS.repository },
+  { icon: XLogo, label: `X · ${SITE_LINKS.xHandle}`, href: SITE_LINKS.x },
+  { icon: Globe, label: "ascencia.re", href: SITE_LINKS.ascencia },
 ];
 
 export default function ContactPage() {

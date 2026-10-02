@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { Github } from "@/components/ui/icons";
+import { SITE_LINKS } from "@/config/links";
 import { Button } from "@/components/ui/button";
 import { DocPage, type DocSection } from "../_components/doc-page";
 import { publicPageMetadata } from "@/lib/seo";
@@ -109,7 +110,7 @@ const sections: DocSection[] = [
         <div className="not-prose mt-6">
           <Button variant="secondary" className="h-12 gap-2 rounded-full px-6" asChild>
             <a
-              href="https://github.com/pedrokarim/sharex-manager"
+              href={SITE_LINKS.repository}
               target="_blank"
               rel="noopener noreferrer"
             >

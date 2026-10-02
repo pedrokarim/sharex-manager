@@ -1,3 +1,5 @@
+import { SITE_LINKS } from "@/config/links";
+
 /**
  * Source unique des informations légales, réutilisée par toutes les pages
  * du dossier /legal pour éviter les divergences.
@@ -7,9 +9,9 @@ export const LEGAL_INFO = {
   domain: "sxm.ascencia.re",
   url: "https://sxm.ascencia.re",
   editor: "Ascencia, structure informelle représentée par Ahmed Karim",
-  editorSite: "https://ascencia.re",
+  editorSite: SITE_LINKS.ascencia,
   publicationDirector: "Ahmed Karim",
-  contactEmail: "contact@ascencia.re",
+  contactEmail: SITE_LINKS.email,
   host: {
     name: "Contabo GmbH",
     address: "Aschauer Straße 32a, 81549 München, Allemagne",
@@ -18,6 +20,6 @@ export const LEGAL_INFO = {
   /** Le dépôt est publié sous GPL v3 (cf. fichier LICENSE à la racine). */
   license: "GNU General Public License v3.0",
   licenseUrl: "https://www.gnu.org/licenses/gpl-3.0.html",
-  repository: "https://github.com/pedrokarim/sharex-manager",
+  repository: SITE_LINKS.repository,
   lastUpdated: "4 août 2026",
 } as const;

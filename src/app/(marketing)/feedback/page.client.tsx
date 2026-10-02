@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight, MessageCircle, Send } from "lucide-react";
+import { ArrowUpRight, Send } from "lucide-react";
 
 import { FRONT_CONTAINER } from "@/components/front/container";
 import { DISPLAY } from "@/components/front/fonts";
 import { PhotoHeader } from "@/components/front/photo-header";
 import { Reveal } from "@/components/front/reveal";
 import { ACCENT, FIELD, FIELD_AREA, KICKER, PILL_SOLID } from "@/components/front/styles";
-import { Github } from "@/components/ui/icons";
+import { Discord, Github } from "@/components/ui/icons";
+import { SITE_LINKS } from "@/config/links";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,8 +31,8 @@ export function FeedbackPageClient() {
   };
 
   const channels = [
-    { icon: MessageCircle, label: t("feedback.channels.discord"), href: "https://discord.gg/rTd95UpUEb" },
-    { icon: Github, label: t("feedback.channels.github"), href: "https://github.com/AliasPedroKarim/sharex-manager/issues" },
+    { icon: Discord, label: t("feedback.channels.discord"), href: SITE_LINKS.discord },
+    { icon: Github, label: t("feedback.channels.github"), href: SITE_LINKS.issues },
   ];
 
   return (

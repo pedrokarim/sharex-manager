@@ -1,3 +1,4 @@
+import { SITE_LINKS } from "@/config/links";
 import Link from "next/link";
 import { FRONT_WIDE } from "@/components/front/container";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -48,7 +49,7 @@ export function Footer() {
                 Confidentialité
               </Link>
               <Link
-                href="https://ascencia.re"
+                href={SITE_LINKS.ascencia}
                 className="hover:text-primary transition-colors"
                 target="_blank"
                 rel="noopener noreferrer"

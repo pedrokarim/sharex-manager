@@ -243,6 +243,12 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Liens officiels : la page Contact renvoyait vers un compte GitHub homonyme
+  qui n’est pas celui du projet, et les pages Support et Feedback vers l’ancien
+  nom du dépôt. Toutes les adresses (dépôt, tickets, wiki, Discord de support,
+  compte X, site d’Ascencia, e-mail) viennent désormais d’un seul fichier,
+  `src/config/links.ts`. La page Contact gagne le Discord de support et le
+  compte X, avec leurs logos.
 - Galerie : au rechargement, la page pouvait s’ouvrir sur « Aucune image »
   quand l’adresse d’API configurée ne désignait pas le serveur en cours. Elle
   montre maintenant ses fichiers d’emblée, et un gabarit tant qu’un

@@ -1,24 +1,25 @@
 "use client";
 
-import { ArrowUpRight, MessageCircle } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 import { FRONT_CONTAINER, FRONT_NARROW } from "@/components/front/container";
 import { DISPLAY } from "@/components/front/fonts";
 import { PhotoHeader } from "@/components/front/photo-header";
 import { Reveal } from "@/components/front/reveal";
 import { ACCENT, KICKER, PILL_SOFT, PILL_SOLID } from "@/components/front/styles";
-import { Github } from "@/components/ui/icons";
+import { Discord, Github } from "@/components/ui/icons";
+import { SITE_LINKS } from "@/config/links";
 import { useTranslation } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const CHANNELS = [
   {
     key: "discord",
-    icon: MessageCircle,
+    icon: Discord,
     listTitle: "support.discord.benefits",
     list: "support.discord.benefits_list",
     button: "support.discord.join_button",
-    href: "https://discord.gg/rTd95UpUEb",
+    href: SITE_LINKS.discord,
     pill: PILL_SOLID,
   },
   {
@@ -27,7 +28,7 @@ const CHANNELS = [
     listTitle: "support.github.available",
     list: "support.github.available_list",
     button: "support.github.view_button",
-    href: "https://github.com/AliasPedroKarim/sharex-manager",
+    href: SITE_LINKS.repository,
     pill: PILL_SOFT,
   },
 ] as const;
