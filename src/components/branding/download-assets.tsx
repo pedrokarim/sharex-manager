@@ -6,7 +6,6 @@ interface DownloadAssetsProps {
   title: string;
   description: string;
   downloadKitLabel: string;
-  downloadLogoPngLabel: string;
   downloadLogoSimplePngLabel: string;
   downloadLogoSvgLabel: string;
 }
@@ -15,14 +14,13 @@ export const DownloadAssets = ({
   title,
   description,
   downloadKitLabel,
-  downloadLogoPngLabel,
   downloadLogoSimplePngLabel,
   downloadLogoSvgLabel,
 }: DownloadAssetsProps) => {
   return (
     <section className="container mx-auto px-4 py-10 sm:py-14">
       <div className="mx-auto mb-8 max-w-2xl text-center">
-        <h2 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+        <h2 className="font-[family-name:var(--font-front-display)] text-balance text-4xl font-medium tracking-[-0.035em] sm:text-5xl">
           {title}
         </h2>
         <p className="mt-3 text-pretty text-muted-foreground sm:text-lg">
@@ -31,17 +29,11 @@ export const DownloadAssets = ({
       </div>
 
       <div className="mx-auto max-w-5xl">
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden rounded-[22px] border-0 bg-foreground/[0.045] shadow-none">
           <CardHeader>
             <CardTitle className="text-base">{downloadKitLabel}</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <a href="/images/logo-sxm.png" download>
-              <Button variant="outline" className="w-full gap-2">
-                <Download className="h-4 w-4" />
-                {downloadLogoPngLabel}
-              </Button>
-            </a>
+          <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             <a href="/images/logo-sxm-simple.png" download>
               <Button variant="outline" className="w-full gap-2">
                 <Download className="h-4 w-4" />

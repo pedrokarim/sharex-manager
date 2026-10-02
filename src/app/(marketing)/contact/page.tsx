@@ -1,87 +1,72 @@
-import { Metadata } from "next";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Mail, MessageSquare, User, Globe, Send } from "lucide-react";
+import { Globe, Mail } from "lucide-react";
+
+import { FRONT_CONTAINER } from "@/components/front/container";
+import { DISPLAY } from "@/components/front/fonts";
+import { PhotoHeader } from "@/components/front/photo-header";
+import { Reveal } from "@/components/front/reveal";
+import { ACCENT, KICKER } from "@/components/front/styles";
+import { PageTransition } from "@/components/page-transition";
 import { Github } from "@/components/ui/icons";
-import { Card } from "@/components/ui/card";
-import { ContactForm } from "./contact-form";
 import { publicPageMetadata } from "@/lib/seo";
+import { cn } from "@/lib/utils";
+import { ContactForm } from "./contact-form";
 
 export const metadata = publicPageMetadata({
   title: "Contact",
   description:
-    "Une question, un signalement ou une demande : écrivez-nous.",
+    "Une question, un signalement ou une demande : écrivez-nous.",
   path: "/contact",
 });
 
+const CHANNELS = [
+  { icon: Mail, label: "contact@ascencia.re", href: "mailto:contact@ascencia.re" },
+  { icon: Globe, label: "ascencia.re", href: "https://ascencia.re" },
+  { icon: Github, label: "GitHub", href: "https://github.com/ascencia" },
+];
 
 export default function ContactPage() {
   return (
-    <div className="container max-w-6xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-3 mb-8">
-        <MessageSquare className="h-8 w-8 text-primary" />
-        <h1 className="text-4xl font-bold">Contactez-nous</h1>
+    <PageTransition>
+      <PhotoHeader
+        photo="lake"
+        kicker="Contact"
+        title="Une question ?"
+        titleAccent="Écrivez-nous."
+        description="Un bug, une idée, un signalement ou une simple question : le formulaire arrive directement dans notre boîte."
+      />
+
+      <div className={cn(FRONT_CONTAINER, "grid gap-14 pt-6 pb-24 sm:pb-32 lg:grid-cols-12")}>
+        <Reveal className="lg:col-span-7">
+          <ContactForm />
+        </Reveal>
+
+        <Reveal delay={0.12} className="lg:col-span-4 lg:col-start-9">
+          <p className={cn(KICKER, ACCENT)}>Autrement</p>
+          <h2 className={cn(DISPLAY, "mt-4 text-3xl sm:text-4xl")}>D&apos;autres chemins</h2>
+          {/* Une liste séparée par des filets, pas une pile d'encadrés. */}
+          <ul className="mt-6">
+            {CHANNELS.map((channel) => (
+              <li key={channel.href} className="border-b border-border/70 first:border-t">
+                <a
+                  href={channel.href}
+                  {...(channel.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                  className="flex items-center gap-4 py-4 font-medium transition-colors hover:text-emerald-700 dark:hover:text-emerald-400"
+                >
+                  <channel.icon className={cn("size-5 shrink-0", ACCENT)} />
+                  {channel.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+
+          <h3 className={cn(DISPLAY, "mt-12 text-2xl")}>Délai de réponse</h3>
+          <p className="mt-3 text-pretty text-muted-foreground">
+            ShareX Manager est un projet personnel, maintenu sur le temps libre : les réponses arrivent dès que
+            possible, sans garantie de délai. Pour un bug ou une suggestion, une issue GitHub est souvent le chemin le
+            plus rapide.
+          </p>
+        </Reveal>
       </div>
-
-      <div className="grid md:grid-cols-3 gap-8">
-        <div className="md:col-span-2">
-          <Card className="p-6">
-            <ContactForm />
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">
-              Autres moyens de nous contacter
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Mail className="h-5 w-5 text-primary" />
-                <a
-                  href="mailto:contact@ascencia.re"
-                  className="hover:text-primary"
-                >
-                  contact@ascencia.re
-                </a>
-              </div>
-              <div className="flex items-center gap-3">
-                <Globe className="h-5 w-5 text-primary" />
-                <a
-                  href="https://ascencia.re"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-primary"
-                >
-                  ascencia.re
-                </a>
-              </div>
-              <div className="flex items-center gap-3">
-                <Github className="h-5 w-5 text-primary" />
-                <a
-                  href="https://github.com/ascencia"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-primary"
-                >
-                  GitHub
-                </a>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-2">Délai de réponse</h2>
-            <p className="text-sm text-muted-foreground">
-              ShareX Manager est un projet personnel, maintenu sur le temps
-              libre : les réponses arrivent dès que possible, sans garantie de
-              délai. Pour un bug ou une suggestion, une issue GitHub est souvent
-              le chemin le plus rapide.
-            </p>
-          </Card>
-        </div>
-      </div>
-    </div>
+    </PageTransition>
   );
 }

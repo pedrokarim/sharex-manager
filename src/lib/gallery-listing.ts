@@ -72,3 +72,33 @@ export async function listGalleryFiles(query: GalleryQuery): Promise<FileInfo[]>
   });
   return files;
 }
+
+/** Taille de la première page servie avec la galerie. */
+export const GALLERY_FIRST_PAGE_SIZE = 24;
+
+export interface GalleryFirstPage {
+  /** `null` : la lecture a échoué, la page chargera sa liste elle-même. */
+  files: FileInfo[] | null;
+  hasMore: boolean;
+}
+
+/**
+ * Première page de la galerie, lue directement sur le disque.
+ *
+ * Les pages la demandaient avant à `/api/files` par une requête HTTP vers
+ * `NEXT_PUBLIC_API_URL`. Dès que cette adresse ne désignait pas le serveur en
+ * cours (un autre port en développement, un hôte interne en production), la
+ * requête échouait et la galerie s'ouvrait sur « Aucune image ».
+ */
+export async function readGalleryFirstPage(query: GalleryQuery): Promise<GalleryFirstPage> {
+  try {
+    const files = await listGalleryFiles({ sort: "date", order: "desc", ...query });
+    return {
+      files: files.slice(0, GALLERY_FIRST_PAGE_SIZE),
+      hasMore: files.length > GALLERY_FIRST_PAGE_SIZE,
+    };
+  } catch (error) {
+    console.error("Erreur lors du chargement initial des fichiers:", error);
+    return { files: null, hasMore: false };
+  }
+}

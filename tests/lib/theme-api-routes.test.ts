@@ -5,7 +5,6 @@ const { authMock, themeStore } = vi.hoisted(() => ({
   authMock: vi.fn(),
   themeStore: {
     globalTheme: null as any,
-    userPreferences: new Map<string, any>(),
   },
 }));
 
@@ -31,35 +30,6 @@ vi.mock("@/lib/theme/theme-db", () => ({
 
       return themeStore.globalTheme;
     }),
-    getUserThemePreferences: vi.fn((userId: string) => {
-      return themeStore.userPreferences.get(userId) ?? null;
-    }),
-    upsertUserThemePreferences: vi.fn((userId: string, updates: any) => {
-      const current =
-        themeStore.userPreferences.get(userId) ?? {
-          userId,
-          modeOverride: "inherit",
-          overrideEnabled: false,
-          lightColorOverrides: {},
-          darkColorOverrides: {},
-          dayStartHour: 7,
-          dayEndHour: 19,
-          updatedAt: new Date(0).toISOString(),
-        };
-
-      const next = {
-        ...current,
-        ...updates,
-        lightColorOverrides:
-          updates.lightColorOverrides ?? current.lightColorOverrides,
-        darkColorOverrides:
-          updates.darkColorOverrides ?? current.darkColorOverrides,
-        updatedAt: new Date().toISOString(),
-      };
-
-      themeStore.userPreferences.set(userId, next);
-      return next;
-    }),
   },
 }));
 
@@ -72,7 +42,6 @@ describe("theme API routes", () => {
       updatedAt: "2026-03-30T12:00:00.000Z",
       updatedByUserId: null,
     };
-    themeStore.userPreferences = new Map();
     vi.resetModules();
   });
 
@@ -129,54 +98,7 @@ describe("theme API routes", () => {
     expect(body.globalTheme.updatedByUserId).toBe("admin-1");
     expect(body.payload.globalTheme.mode).toBe("dark");
     expect(body.payload.styles.dark.primary).toBe("oklch(0.72 0.19 250)");
-  });
-
-  it("should require authentication on /api/settings/theme", async () => {
-    authMock.mockResolvedValue(null);
-
-    const { GET } = await import("@/app/api/settings/theme/route");
-    const response = await GET();
-
-    expect(response.status).toBe(401);
-  });
-
-  it("should store user theme preferences on /api/settings/theme", async () => {
-    authMock.mockResolvedValue({
-      user: {
-        id: "user-1",
-        role: "user",
-      },
-    });
-
-    const { PUT } = await import("@/app/api/settings/theme/route");
-    const response = await PUT(
-      new Request("http://localhost/api/settings/theme", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          modeOverride: "time-based",
-          overrideEnabled: true,
-          lightColorOverrides: {
-            background: "oklch(0.98 0.02 200)",
-          },
-          darkColorOverrides: {
-            background: "oklch(0.16 0.02 260)",
-          },
-          dayStartHour: 9,
-          dayEndHour: 18,
-        }),
-      })
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.userPreferences.modeOverride).toBe("time-based");
-    expect(body.userPreferences.overrideEnabled).toBe(true);
-    expect(body.userPreferences.dayStartHour).toBe(9);
-    expect(body.payload.modeSource).toBe("user");
-    expect(body.payload.styles.light.background).toBe("oklch(0.98 0.02 200)");
-    expect(body.payload.styles.dark.background).toBe("oklch(0.16 0.02 260)");
+    // Le site n'a qu'un thème : la réponse ne porte plus de préférences par compte.
+    expect(body.userPreferences).toBeUndefined();
   });
 });

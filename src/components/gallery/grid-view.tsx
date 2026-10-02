@@ -1,3 +1,4 @@
+import { GALLERY_GRID_COLUMNS } from "@/components/skeletons/page-skeletons";
 import { FileInfo } from "@/types/files";
 import { SelectableFileCard } from "@/components/gallery/selectable-file-card";
 import { useAtom } from "jotai";
@@ -79,15 +80,8 @@ export function GridView({
     },
   });
 
-  const gridSizeClasses = {
-    small:
-      "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8",
-    medium: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
-    large: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3",
-  };
-
   return (
-    <div className={cn("grid gap-2 sm:gap-4", gridSizeClasses[thumbnailSize])}>
+    <div className={cn("grid gap-2 sm:gap-4", GALLERY_GRID_COLUMNS[thumbnailSize])}>
       {files.map((file) => (
         <SelectableFileCard
           key={file.url}

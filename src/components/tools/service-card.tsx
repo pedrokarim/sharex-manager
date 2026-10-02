@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
 
+import { DISPLAY } from "@/components/front/fonts";
 import { cn } from "@/lib/utils";
 
 export interface ServiceHighlight {
@@ -21,14 +22,13 @@ interface ServiceCardProps {
   /** Couleur d'accent du service, en classes Tailwind explicites. */
   accent: {
     glow: string;
-    border: string;
     button: string;
   };
   className?: string;
 }
 
 /**
- * Carte d'un service externe.
+ * Tuile d'un service externe, sans contour : un fond teinté suffit à la poser.
  *
  * La capture du site occupe la moitié haute : c'est elle qui donne envie de
  * cliquer, bien plus qu'une icône et trois lignes de texte. Elle se rapproche
@@ -52,9 +52,8 @@ export function ServiceCard({
       target="_blank"
       rel="noreferrer"
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-3xl border border-border/70 bg-card shadow-xl transition-all duration-300",
-        "hover:-translate-y-1 hover:shadow-2xl focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-        accent.border,
+        "group relative isolate flex flex-col overflow-hidden rounded-[28px] bg-foreground/[0.045] transition-transform duration-500",
+        "hover:-translate-y-1 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
         className,
       )}
     >
@@ -67,7 +66,7 @@ export function ServiceCard({
         )}
       />
 
-      <div className="relative overflow-hidden border-b border-border/60">
+      <div className="relative overflow-hidden">
         <Image
           src={preview.src}
           alt={preview.alt}
@@ -75,10 +74,6 @@ export function ServiceCard({
           height={720}
           sizes="(min-width: 1024px) 50vw, 100vw"
           className="aspect-[16/8] w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]"
-        />
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card to-transparent"
         />
       </div>
 
@@ -89,10 +84,10 @@ export function ServiceCard({
             alt={logo.alt}
             width={52}
             height={52}
-            className="size-13 shrink-0 rounded-xl border border-border/60 bg-background/60 object-contain p-1.5 shadow-sm"
+            className="size-13 shrink-0 object-contain"
           />
           <div className="min-w-0">
-            <h2 className="text-xl font-bold tracking-tight">{name}</h2>
+            <h2 className={cn(DISPLAY, "text-3xl")}>{name}</h2>
             <p className="mt-0.5 text-sm font-medium text-muted-foreground">
               {tagline}
             </p>
@@ -105,7 +100,7 @@ export function ServiceCard({
           {highlights.map((highlight) => (
             <li
               key={highlight}
-              className="rounded-lg border border-border/60 bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground"
+              className="rounded-full bg-foreground/[0.06] px-3 py-1 text-xs font-medium text-muted-foreground"
             >
               {highlight}
             </li>
@@ -115,14 +110,14 @@ export function ServiceCard({
         <div className="mt-auto flex items-center justify-between gap-4 pt-7">
           <span
             className={cn(
-              "inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform group-hover:scale-[1.02]",
+              "inline-flex h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold text-white transition-transform group-hover:scale-[1.02]",
               accent.button,
             )}
           >
             {`Ouvrir ${name}`}
             <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </span>
-          <span className="truncate font-mono text-xs text-muted-foreground">
+          <span className="truncate text-sm text-muted-foreground">
             {domain}
           </span>
         </div>

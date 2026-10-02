@@ -19,9 +19,10 @@ une interface (`ui.tsx`) ou des pages, mais pas de `processImage`.
 4. [Interface de réglage : ui.tsx](#interface-de-réglage--uitsx)
 5. [Réglages, activation et traitement à l’envoi](#réglages-activation-et-traitement-à-lenvoi)
 6. [Actions sur les fichiers](#actions-sur-les-fichiers-fileactions)
-7. [Traductions](#traductions)
-8. [Dépendances](#dépendances)
-9. [Bonnes pratiques](#bonnes-pratiques)
+7. [Identité visuelle](#identité-visuelle-branding)
+8. [Traductions](#traductions)
+9. [Dépendances](#dépendances)
+10. [Bonnes pratiques](#bonnes-pratiques)
 
 ## Structure d’un module
 
@@ -260,6 +261,33 @@ export async function importGalleryItems(ids: string[]): Promise<GallerySourceIm
   déclare ici devient aussi une provenance pour **choisir** une image.
 - Une source dont l’une des deux fonctions n’est pas ouverte au rôle `user`
   n’est pas proposée. Un module désactivé n’apparaît jamais.
+
+## Identité visuelle (`branding`)
+
+Un module emporte son logo avec lui : le fichier vit dans son dossier, et son
+`module.json` le déclare. Rien n’est à déposer dans `public/`.
+
+```json
+"branding": {
+  "logo": "branding/logo.png",
+  "logoSmall": "branding/logo-96.png",
+  "accent": "#e5392e"
+}
+```
+
+- `logo` : image carrée sur fond transparent (512 × 512 conseillé), en PNG,
+  WebP ou JPEG. Le SVG n’est pas servi.
+- `logoSmall` : version réduite (96 × 96), pour la barre latérale et les
+  listes. Absente, c’est `logo` qui sert.
+- `accent` : couleur du module, en hexadécimal à six chiffres.
+
+Les chemins sont relatifs au dossier du module et ne peuvent pas en sortir. La
+route `/api/modules/<nom>/logo` (`?size=small` pour la petite version) sert le
+fichier aux comptes connectés ; `moduleLogoUrl()` de `src/lib/modules/branding.ts`
+en construit l’adresse. Le logo remplace alors l’icône du module dans la barre
+latérale, sur la page des modules et dans les fenêtres de la galerie. Une page
+du module peut aussi l’importer directement : `import logo from
+"../branding/logo-96.png"`.
 
 ## Traductions
 

@@ -1,3 +1,4 @@
+import { isInCatalog } from "@/lib/album-visibility";
 import { albumsDb } from "@/lib/utils/albums-db";
 
 const IMAGE_PATTERN = /\.(jpe?g|png|gif|webp)$/i;
@@ -9,6 +10,8 @@ export interface PublicAlbumSummary {
   /** Les quatre premières images, pour composer l'aperçu partagé. */
   covers: string[];
   updatedAt?: string;
+  /** Listé au catalogue. Sinon l'album n'est joignable que par son adresse. */
+  inCatalog: boolean;
 }
 
 /**
@@ -39,6 +42,7 @@ export function getPublicAlbumSummary(slug: string): PublicAlbumSummary | null {
       imageCount: images.length,
       covers: ordered.slice(0, 4),
       updatedAt: album.updatedAt,
+      inCatalog: isInCatalog(album),
     };
   } catch (error) {
     // Un aperçu manquant ne doit jamais empêcher la page de s'afficher.

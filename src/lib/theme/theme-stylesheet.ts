@@ -1,4 +1,3 @@
-import { resolveThemeRuntimeState } from "@/lib/theme/runtime-theme";
 import type { ThemeStyleProps, ThemeStyles } from "@/types/theme";
 import type { ResolvedThemePayload } from "@/types/theme-runtime";
 
@@ -70,28 +69,21 @@ export function buildThemeStylesheet(styles: ThemeStyles): string {
 }
 
 /**
- * Classe de thème à poser sur `<html>` dès le rendu serveur.
- *
- * Pour un utilisateur connecté, la préférence est connue : la décision est
- * prise ici, définitivement. Pour « système », on délègue au CSS. Le mode
- * horaire est calculé avec l'heure du serveur et corrigé ensuite côté client
- * si le fuseau diffère – c'est le seul cas qui peut encore bouger après coup.
+ * Classe de thème à poser sur `<html>` dès le rendu serveur : celle du mode
+ * du site. Un navigateur qui a choisi un autre mode est corrigé avant la
+ * première peinture par le script du `<head>`.
  */
 export function resolveThemeHtmlClass(
   payload: ResolvedThemePayload,
-  isAuthenticated: boolean,
 ): ThemeHtmlClass {
-  const state = resolveThemeRuntimeState(payload, {
-    isAuthenticated,
-    // Le serveur ne connaît ni la préférence anonyme (localStorage) ni le
-    // `prefers-color-scheme` du visiteur : `system` est traité en CSS.
-    anonymousPreference: null,
-    prefersDark: false,
-  });
+  // Le serveur ne connaît ni le choix du navigateur (localStorage) ni le
+  // `prefers-color-scheme` du visiteur : il rend le mode du site, et
+  // `system` est traité en CSS.
+  const mode = payload.globalTheme.mode;
 
-  if (state.modePreference === "system") {
+  if (mode === "system") {
     return "theme-system";
   }
 
-  return state.activeMode === "dark" ? "dark" : "";
+  return mode === "dark" ? "dark" : "";
 }

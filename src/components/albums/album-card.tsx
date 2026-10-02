@@ -9,20 +9,27 @@ import {
   FolderOpen,
   MoreVertical,
   Edit2,
+  ExternalLink,
   Trash2,
   Calendar,
-  Image as ImageIcon,
-  Globe,
-  GlobeLock,
   Copy,
   Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -35,13 +42,18 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { toast } from "sonner";
 import type { Album } from "@/types/albums";
+import type { AlbumVisibility } from "@/lib/album-visibility";
+import {
+  AlbumVisibilityBadge,
+  AlbumVisibilityOptions,
+  type MenuKit,
+} from "@/components/albums/album-visibility";
 
 interface AlbumCardProps {
   album: Album;
@@ -49,6 +61,18 @@ interface AlbumCardProps {
   onDelete: () => void;
   onEdit: () => void;
 }
+
+/** Le menu de l'album existe en deux formes : le bouton « ⋮ » et le clic droit. */
+const DROPDOWN: MenuKit & { Separator: typeof DropdownMenuSeparator } = {
+  Item: DropdownMenuItem,
+  Label: DropdownMenuLabel,
+  Separator: DropdownMenuSeparator,
+};
+const CONTEXT: MenuKit & { Separator: typeof ContextMenuSeparator } = {
+  Item: ContextMenuItem,
+  Label: ContextMenuLabel,
+  Separator: ContextMenuSeparator,
+};
 
 export function AlbumCard({
   album,
@@ -59,6 +83,7 @@ export function AlbumCard({
   const { t } = useTranslation();
   const locale = useDateLocale();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [imageFiles, setImageFiles] = useState<string[]>([]);
   const [isTogglingPublic, setIsTogglingPublic] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -108,7 +133,7 @@ export function AlbumCard({
     }
   };
 
-  const handleTogglePublic = async () => {
+  const handleVisibilityChange = async (visibility: AlbumVisibility) => {
     setIsTogglingPublic(true);
     try {
       const response = await fetch(`/api/albums/${album.id}`, {
@@ -116,40 +141,34 @@ export function AlbumCard({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          isPublic: !album.isPublic,
-        }),
+        body: JSON.stringify({ visibility }),
       });
 
       if (!response.ok) {
         throw new Error("Erreur lors de la mise à jour");
       }
 
-      const updatedAlbum = await response.json();
-      toast.success(
-        updatedAlbum.isPublic
-          ? "Album rendu public avec succès"
-          : "Album rendu privé avec succès"
-      );
+      toast.success(t(`albums.visibility.${visibility}.done`));
 
       // Recharger la page pour mettre à jour l'état
       window.location.reload();
     } catch (error) {
       console.error("Erreur:", error);
-      toast.error("Erreur lors de la mise à jour de la visibilité");
+      toast.error(t("albums.errors.toggle_visibility"));
     } finally {
       setIsTogglingPublic(false);
     }
   };
 
-  const handleCopyPublicUrl = async () => {
-    if (!album.publicSlug) return;
+  const publicPath = album.isPublic && album.publicSlug ? `/catalog/albums/${album.publicSlug}` : null;
 
-    const publicUrl = `${window.location.origin}/catalog/albums/${album.publicSlug}`;
+  const handleCopyPublicUrl = async () => {
+    if (!publicPath) return;
+
     try {
-      await navigator.clipboard.writeText(publicUrl);
+      await navigator.clipboard.writeText(`${window.location.origin}${publicPath}`);
       setCopiedUrl(true);
-      toast.success("URL publique copiée dans le presse-papiers");
+      toast.success(t("albums.url_copied"));
       setTimeout(() => setCopiedUrl(false), 2000);
     } catch (error) {
       console.error("Erreur lors de la copie:", error);
@@ -157,135 +176,131 @@ export function AlbumCard({
     }
   };
 
+  /**
+   * Entrées du menu de l'album, les mêmes derrière « ⋮ » et au clic droit :
+   * modifier, choisir la visibilité, partager la page publique, supprimer.
+   */
+  const menuItems = (kit: typeof DROPDOWN | typeof CONTEXT) => (
+    <>
+      <kit.Item onClick={onEdit} className="text-sm">
+        <Edit2 className="mr-2 h-4 w-4" />
+        {t("common.edit")}
+      </kit.Item>
+      <kit.Separator />
+      <AlbumVisibilityOptions
+        album={album}
+        onChange={handleVisibilityChange}
+        disabled={isTogglingPublic}
+        kit={kit}
+      />
+      {publicPath ? (
+        <>
+          <kit.Separator />
+          <kit.Item onClick={handleCopyPublicUrl} className="text-sm">
+            {copiedUrl ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+            {copiedUrl ? t("albums.url_copied") : t("albums.copy_public_url")}
+          </kit.Item>
+          <kit.Item onClick={() => window.open(publicPath, "_blank")} className="text-sm">
+            <ExternalLink className="mr-2 h-4 w-4" />
+            {t("albums.open_new_tab")}
+          </kit.Item>
+        </>
+      ) : null}
+      <kit.Separator />
+      {/* La confirmation s'ouvre hors du menu : il peut alors se refermer. */}
+      <kit.Item onClick={() => setConfirmDelete(true)} className="text-sm text-destructive focus:text-destructive">
+        <Trash2 className="mr-2 h-4 w-4" />
+        {t("albums.delete_album")}
+      </kit.Item>
+    </>
+  );
+
+  const actionsButton = (className?: string) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className={cn("h-7 w-7 sm:h-8 sm:w-8", className)} aria-label="Album actions">
+          <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">{menuItems(DROPDOWN)}</DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const deleteDialog = (
+    <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Supprimer l&apos;album ?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Cette action est irréversible. L&apos;album « {album.name} » sera supprimé définitivement. Les fichiers
+            contenus ne seront pas supprimés.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {t("common.delete")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (viewMode === "list") {
     return (
-      <Card className="hover:bg-accent/50 transition-colors">
-        <CardContent className="p-3 sm:p-4">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FolderOpen className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-              </div>
-            </div>
+      <>
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <Card className="hover:bg-accent/50 transition-colors">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <FolderOpen className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                    </div>
+                  </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
-                <Link
-                  href={`/albums/${album.id}`}
-                  className="font-medium hover:underline truncate text-sm sm:text-base"
-                >
-                  {album.name}
-                </Link>
-                <Badge variant="secondary" className="text-xs w-fit">
-                  {t("albums.files_count", { count: album.fileCount })}
-                </Badge>
-              </div>
-
-              {album.description && (
-                <p className="text-xs sm:text-sm text-muted-foreground truncate mb-1">
-                  {album.description}
-                </p>
-              )}
-
-              <div className="flex items-center text-xs text-muted-foreground gap-2 sm:gap-4">
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {format(parseISO(album.createdAt), "PPP", { locale })}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex-shrink-0">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 sm:h-8 sm:w-8"
-                    aria-label="Album actions"
-                  >
-                    <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={onEdit} className="text-sm">
-                    <Edit2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    Modifier
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleTogglePublic}
-                    disabled={isTogglingPublic}
-                    className="text-sm"
-                  >
-                    {album.isPublic ? (
-                      <>
-                        <GlobeLock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                        Rendre privé
-                      </>
-                    ) : (
-                      <>
-                        <Globe className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                        Rendre public
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  {album.isPublic && album.publicSlug && (
-                    <DropdownMenuItem
-                      onClick={handleCopyPublicUrl}
-                      className="text-sm"
-                    >
-                      {copiedUrl ? (
-                        <>
-                          <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                          URL copiée
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                          Copier l'URL publique
-                        </>
-                      )}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive text-sm"
-                        onSelect={(e) => e.preventDefault()}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
+                      <Link
+                        href={`/albums/${album.id}`}
+                        className="font-medium hover:underline truncate text-sm sm:text-base"
                       >
-                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                        {t("albums.delete_album")}
-                      </DropdownMenuItem>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Supprimer l'album ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Cette action est irréversible. L'album "{album.name}"
-                          sera supprimé définitivement. Les fichiers contenus ne
-                          seront pas supprimés.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleDelete}
-                          disabled={isDeleting}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Supprimer
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                        {album.name}
+                      </Link>
+                      <AlbumVisibilityBadge album={album} />
+                      <Badge variant="secondary" className="text-xs w-fit">
+                        {t("albums.files_count", { count: album.fileCount })}
+                      </Badge>
+                    </div>
+
+                    {album.description && (
+                      <p className="text-xs sm:text-sm text-muted-foreground truncate mb-1">
+                        {album.description}
+                      </p>
+                    )}
+
+                    <div className="flex items-center text-xs text-muted-foreground gap-2 sm:gap-4">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {format(parseISO(album.createdAt), "PPP", { locale })}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex-shrink-0">{actionsButton()}</div>
+                </div>
+              </CardContent>
+            </Card>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="w-64">{menuItems(CONTEXT)}</ContextMenuContent>
+        </ContextMenu>
+        {deleteDialog}
+      </>
     );
   }
 
@@ -346,145 +361,60 @@ export function AlbumCard({
   };
 
   return (
-    // py-0 gap-0 : depuis shadcn v4, Card porte py-6 et gap-6 en dur, ce qui
-    // insérait une bande vide au-dessus de la couverture.
-    // hover:scale retiré : sur une grille, la carte agrandie chevauchait ses
-    // voisines. L'ombre suffit à signaler le survol.
-    <Card className="group gap-0 overflow-hidden py-0 transition-shadow duration-200 hover:shadow-md">
-      <CardHeader className="p-0">
-        <Link href={`/albums/${album.id}`}>
-          <div className="relative aspect-video overflow-hidden bg-muted">
-            {renderThumbnail()}
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          {/* py-0 gap-0 : depuis shadcn v4, Card porte py-6 et gap-6 en dur, ce qui
+              insérait une bande vide au-dessus de la couverture.
+              hover:scale retiré : sur une grille, la carte agrandie chevauchait ses
+              voisines. L'ombre suffit à signaler le survol. */}
+          <Card className="group gap-0 overflow-hidden py-0 transition-shadow duration-200 hover:shadow-md">
+            <CardHeader className="p-0">
+              <Link href={`/albums/${album.id}`}>
+                <div className="relative aspect-video overflow-hidden bg-muted">
+                  {renderThumbnail()}
 
-            {/* Badge du nombre de fichiers */}
-            <div className="absolute top-1 right-1 sm:top-2 sm:right-2 z-10 flex gap-1">
-              {album.isPublic && (
-                <Badge variant="default" className="text-xs bg-green-600">
-                  <Globe className="h-2.5 w-2.5 mr-1" />
-                  Public
-                </Badge>
-              )}
-              <Badge variant="secondary" className="text-xs">
-                {album.fileCount}
-              </Badge>
-            </div>
-          </div>
-        </Link>
-      </CardHeader>
+                  {/* Visibilité et nombre de fichiers */}
+                  <div className="absolute top-1 right-1 sm:top-2 sm:right-2 z-10 flex gap-1">
+                    <AlbumVisibilityBadge album={album} />
+                    <Badge variant="secondary" className="text-xs">
+                      {album.fileCount}
+                    </Badge>
+                  </div>
+                </div>
+              </Link>
+            </CardHeader>
 
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <Link
-              href={`/albums/${album.id}`}
-              className="font-medium hover:underline truncate block text-sm sm:text-base"
-            >
-              {album.name}
-            </Link>
-
-            {album.description && (
-              <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mt-1">
-                {album.description}
-              </p>
-            )}
-
-            <div className="flex items-center text-xs text-muted-foreground mt-2">
-              <Calendar className="h-3 w-3 mr-1" />
-              {format(parseISO(album.createdAt), "PPP", { locale })}
-            </div>
-          </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "h-7 w-7 sm:h-8 sm:w-8 opacity-0 group-hover:opacity-100 transition-opacity",
-                  "hover:bg-accent"
-                )}
-                aria-label="Album actions"
-              >
-                <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit} className="text-sm">
-                <Edit2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                Modifier
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={handleTogglePublic}
-                disabled={isTogglingPublic}
-                className="text-sm"
-              >
-                {album.isPublic ? (
-                  <>
-                    <GlobeLock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    Rendre privé
-                  </>
-                ) : (
-                  <>
-                    <Globe className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    Rendre public
-                  </>
-                )}
-              </DropdownMenuItem>
-              {album.isPublic && album.publicSlug && (
-                <DropdownMenuItem
-                  onClick={handleCopyPublicUrl}
-                  className="text-sm"
-                >
-                  {copiedUrl ? (
-                    <>
-                      <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                      URL copiée
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                      Copier l'URL publique
-                    </>
-                  )}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive text-sm"
-                    onSelect={(e) => e.preventDefault()}
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <Link
+                    href={`/albums/${album.id}`}
+                    className="font-medium hover:underline truncate block text-sm sm:text-base"
                   >
-                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    {t("albums.delete_album")}
-                  </DropdownMenuItem>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Supprimer l'album ?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Cette action est irréversible. L'album "{album.name}" sera
-                      supprimé définitivement. Les fichiers contenus ne seront
-                      pas supprimés.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Annuler</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Supprimer
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardContent>
-    </Card>
+                    {album.name}
+                  </Link>
+
+                  {album.description && (
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mt-1">
+                      {album.description}
+                    </p>
+                  )}
+
+                  <div className="flex items-center text-xs text-muted-foreground mt-2">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    {format(parseISO(album.createdAt), "PPP", { locale })}
+                  </div>
+                </div>
+
+                {actionsButton("opacity-0 group-hover:opacity-100 transition-opacity hover:bg-accent")}
+              </div>
+            </CardContent>
+          </Card>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-64">{menuItems(CONTEXT)}</ContextMenuContent>
+      </ContextMenu>
+      {deleteDialog}
+    </>
   );
 }

@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
 import { CreateAlbumDialog } from "@/components/albums/create-album-dialog";
 import { AlbumCard } from "@/components/albums/album-card";
-import { Loading } from "@/components/ui/loading";
+import { CardsPageSkeleton } from "@/components/skeletons/page-skeletons";
 import type { Album } from "@/types/albums";
 
 export function AlbumsClient() {
@@ -131,7 +131,7 @@ export function AlbumsClient() {
   );
 
   if (loading) {
-    return <Loading fullHeight />;
+    return <CardsPageSkeleton count={8} />;
   }
 
   return (

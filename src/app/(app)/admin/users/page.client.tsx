@@ -1,9 +1,10 @@
 "use client";
 
-import { useSession } from "@/lib/auth-client";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { UserDialog } from "@/components/user-dialog";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { FilterBar, FilterSearch, FilterSelect } from "@/components/filters/filter-bar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -52,8 +53,11 @@ interface User {
 
 export default function UsersPageClient({
   initialUsers,
+  currentUserId,
 }: {
   initialUsers: User[];
+  /** Le compte connecté : on ne se supprime pas soi-même. */
+  currentUserId: string;
 }) {
   const { t } = useTranslation();
   const [users, setUsers] = useState<User[]>(initialUsers);
@@ -61,7 +65,6 @@ export default function UsersPageClient({
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "user">("all");
-  const { data: session } = useSession();
 
   const stats = {
     total: users.length,
@@ -121,32 +124,15 @@ export default function UsersPageClient({
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-              <Users className="h-3.5 w-3.5" />
-              Gestion des accès
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              {t("admin.users.title")}
-            </h1>
-            <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
-              Gérez les comptes, les rôles et les interventions sur les accès
-              sans perdre le fil de l’exploitation.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button
-              variant="outline"
-              onClick={refreshUsers}
-              disabled={isLoading}
-              className="text-sm"
-            >
-              <RefreshCw
-                className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-              />
+      <AdminPageHeader
+        icon={Users}
+        title={t("admin.users.title")}
+        // Les trois chiffres tiennent dans la phrase : pas besoin de tuiles.
+        description={`${stats.total} ${stats.total > 1 ? "comptes" : "compte"}, dont ${stats.admins} ${stats.admins > 1 ? "administrateurs" : "administrateur"}. Gérez les rôles et les accès.`}
+        actions={
+          <>
+            <Button variant="outline" onClick={refreshUsers} disabled={isLoading} className="text-sm">
+              <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
               Rafraîchir
             </Button>
             <UserDialog
@@ -158,84 +144,33 @@ export default function UsersPageClient({
                 </Button>
               }
             />
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              {t("admin.users.stats.total")}
-            </p>
-            <p className="mt-2 text-2xl font-semibold">{stats.total}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Comptes actuellement disponibles dans l’instance.
-            </p>
-          </div>
-          <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              {t("admin.users.stats.admins")}
-            </p>
-            <p className="mt-2 text-2xl font-semibold">{stats.admins}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Utilisateurs ayant accès aux panneaux sensibles.
-            </p>
-          </div>
-          <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              {t("admin.users.stats.users")}
-            </p>
-            <p className="mt-2 text-2xl font-semibold">{stats.users}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Comptes standard pour l’usage quotidien de la plateforme.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <Card className="rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
-          <CardTitle className="text-lg sm:text-xl">
-            Répertoire des comptes
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Filtrez rapidement les utilisateurs avant d’éditer un rôle ou de
-            supprimer un accès.
-          </CardDescription>
-        </CardHeader>
+      <Card className="gap-0 rounded-2xl border-border/70 py-0 shadow-sm">
         <CardContent className="space-y-4 p-5 sm:p-6">
-          <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={t("admin.users.search_placeholder")}
-                className="pl-9 text-sm"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <Select
+          <FilterBar
+            onReset={
+              searchQuery || roleFilter !== "all"
+                ? () => {
+                    setSearchQuery("");
+                    setRoleFilter("all");
+                  }
+                : null
+            }
+          >
+            <FilterSearch value={searchQuery} onChange={setSearchQuery} placeholder={t("admin.users.search_placeholder")} />
+            <FilterSelect
               value={roleFilter}
-              onValueChange={(value: "all" | "admin" | "user") =>
-                setRoleFilter(value)
-              }
-            >
-              <SelectTrigger className="text-sm">
-                <SelectValue placeholder={t("admin.users.filter_by_role")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-sm">
-                  {t("admin.users.roles.all")}
-                </SelectItem>
-                <SelectItem value="admin" className="text-sm">
-                  {t("admin.users.roles.admin")}
-                </SelectItem>
-                <SelectItem value="user" className="text-sm">
-                  {t("admin.users.roles.user")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              onChange={setRoleFilter}
+              label={t("admin.users.filter_by_role")}
+              options={(["all", "admin", "user"] as const).map((value) => ({
+                value,
+                label: t(`admin.users.roles.${value}`),
+              }))}
+            />
+          </FilterBar>
 
           <div className="overflow-x-auto rounded-xl border border-border/60">
             <Table>
@@ -329,7 +264,7 @@ export default function UsersPageClient({
                               </Button>
                             }
                           />
-                          {session?.user?.id !== user.id && (
+                          {currentUserId !== user.id && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button

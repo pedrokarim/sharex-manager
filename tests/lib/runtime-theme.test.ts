@@ -1,112 +1,68 @@
 import { describe, expect, it } from "vitest";
 import { defaultThemeState } from "@/config/theme";
-import { resolveThemePayloadFromState } from "@/lib/theme/resolve-theme";
-import {
-  parseAnonymousThemePreference,
-  resolveThemeRuntimeState,
-} from "@/lib/theme/runtime-theme";
-import type { GlobalThemeConfig, UserThemePreferences } from "@/types/theme-runtime";
+import { resolveThemePayload } from "@/lib/theme/resolve-theme";
+import { parseThemePreference, resolveThemeRuntimeState } from "@/lib/theme/runtime-theme";
+import { createThemeBootstrapScript } from "@/lib/theme/create-theme-bootstrap-script";
+import { resolveThemeHtmlClass } from "@/lib/theme/theme-stylesheet";
+import type { ThemeStyles } from "@/types/theme";
+import type { GlobalThemeConfig } from "@/types/theme-runtime";
 
-const baseGlobalTheme: GlobalThemeConfig = {
-  mode: "system",
-  styles: defaultThemeState.styles,
+const globalTheme = (mode: GlobalThemeConfig["mode"]): GlobalThemeConfig => ({
+  mode,
+  styles: defaultThemeState.styles as ThemeStyles,
   updatedAt: "2026-04-02T10:00:00.000Z",
   updatedByUserId: null,
-};
+});
 
-function createUserPreferences(
-  overrides: Partial<UserThemePreferences> = {},
-): UserThemePreferences {
-  return {
-    userId: "user-1",
-    modeOverride: "inherit",
-    overrideEnabled: false,
-    lightColorOverrides: {},
-    darkColorOverrides: {},
-    dayStartHour: 7,
-    dayEndHour: 19,
-    updatedAt: "2026-04-02T10:00:00.000Z",
-    ...overrides,
-  };
-}
+describe("mode d'affichage d'un navigateur", () => {
+  it("sans choix local, le mode du site s'applique", () => {
+    const state = resolveThemeRuntimeState(resolveThemePayload(globalTheme("dark")), { prefersDark: false });
 
-describe("runtime theme resolution", () => {
-  it("keeps inherit as the selected preference for authenticated users", () => {
-    const payload = resolveThemePayloadFromState(baseGlobalTheme, null);
-    const runtimeState = resolveThemeRuntimeState(payload, {
-      isAuthenticated: true,
+    expect(state.themePreference).toBe("dark");
+    expect(state.activeMode).toBe("dark");
+  });
+
+  it("le choix du navigateur l'emporte sur le mode du site", () => {
+    const state = resolveThemeRuntimeState(resolveThemePayload(globalTheme("dark")), {
+      localPreference: "light",
       prefersDark: true,
-      now: new Date("2026-04-02T22:00:00.000Z"),
     });
 
-    expect(runtimeState.themePreference).toBe("inherit");
-    expect(runtimeState.modePreference).toBe("system");
-    expect(runtimeState.activeMode).toBe("dark");
+    expect(state.themePreference).toBe("light");
+    expect(state.activeMode).toBe("light");
   });
 
-  it("resolves time-based mode from the stored user window", () => {
-    const payload = resolveThemePayloadFromState(
-      baseGlobalTheme,
-      createUserPreferences({
-        modeOverride: "time-based",
-        dayStartHour: 8,
-        dayEndHour: 18,
-      }),
-    );
-    const runtimeState = resolveThemeRuntimeState(payload, {
-      isAuthenticated: true,
-      now: new Date("2026-04-02T21:00:00.000Z"),
-      prefersDark: false,
-    });
+  it("« système » suit l'appareil", () => {
+    const payload = resolveThemePayload(globalTheme("light"));
 
-    expect(runtimeState.themePreference).toBe("time-based");
-    expect(runtimeState.activeMode).toBe("dark");
+    expect(resolveThemeRuntimeState(payload, { localPreference: "system", prefersDark: true }).activeMode).toBe("dark");
+    expect(resolveThemeRuntimeState(payload, { localPreference: "system", prefersDark: false }).activeMode).toBe("light");
   });
 
-  it("prefers the anonymous local mode over the public site mode", () => {
-    const payload = resolveThemePayloadFromState(
-      {
-        ...baseGlobalTheme,
-        mode: "light",
-      },
-      null,
-    );
-    const runtimeState = resolveThemeRuntimeState(payload, {
-      isAuthenticated: false,
-      anonymousPreference: "dark",
-      prefersDark: false,
-      now: new Date("2026-04-02T12:00:00.000Z"),
-    });
+  it("n'accepte que les trois modes connus", () => {
+    expect(parseThemePreference("light")).toBe("light");
+    expect(parseThemePreference("dark")).toBe("dark");
+    expect(parseThemePreference("system")).toBe("system");
+    // Anciennes valeurs des préférences par compte : ignorées.
+    expect(parseThemePreference("inherit")).toBeNull();
+    expect(parseThemePreference("time-based")).toBeNull();
+    expect(parseThemePreference(null)).toBeNull();
+  });
+});
 
-    expect(runtimeState.themePreference).toBe("dark");
-    expect(runtimeState.modePreference).toBe("dark");
-    expect(runtimeState.activeMode).toBe("dark");
+describe("rendu serveur du thème", () => {
+  it("la classe de <html> ne dépend que du mode du site", () => {
+    expect(resolveThemeHtmlClass(resolveThemePayload(globalTheme("light")))).toBe("");
+    expect(resolveThemeHtmlClass(resolveThemePayload(globalTheme("dark")))).toBe("dark");
+    expect(resolveThemeHtmlClass(resolveThemePayload(globalTheme("system")))).toBe("theme-system");
   });
 
-  it("falls back to the public site mode for anonymous visitors without local choice", () => {
-    const payload = resolveThemePayloadFromState(
-      {
-        ...baseGlobalTheme,
-        mode: "dark",
-      },
-      null,
-    );
-    const runtimeState = resolveThemeRuntimeState(payload, {
-      isAuthenticated: false,
-      anonymousPreference: null,
-      prefersDark: false,
-      now: new Date("2026-04-02T12:00:00.000Z"),
-    });
+  it("le script de démarrage lit le choix du navigateur, connecté ou non", () => {
+    const script = createThemeBootstrapScript({ initialTheme: resolveThemePayload(globalTheme("system")) });
 
-    expect(runtimeState.themePreference).toBe("dark");
-    expect(runtimeState.activeMode).toBe("dark");
-  });
-
-  it("validates the anonymous preference storage values", () => {
-    expect(parseAnonymousThemePreference("light")).toBe("light");
-    expect(parseAnonymousThemePreference("dark")).toBe("dark");
-    expect(parseAnonymousThemePreference("system")).toBe("system");
-    expect(parseAnonymousThemePreference("inherit")).toBeNull();
-    expect(parseAnonymousThemePreference(null)).toBeNull();
+    expect(script).toContain("anonymous-theme-preference-v1");
+    expect(script).toContain('"modePreference":"system"');
+    expect(script).not.toContain("isAuthenticated");
+    expect(script).not.toContain("time-based");
   });
 });

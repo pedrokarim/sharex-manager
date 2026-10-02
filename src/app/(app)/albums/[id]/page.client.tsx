@@ -37,12 +37,15 @@ import { KeyboardShortcutsDialog } from "@/components/gallery/keyboard-shortcuts
 import { AddToAlbumDialog } from "@/components/albums/add-to-album-dialog";
 import { ViewSelector } from "@/components/view-selector";
 import { useTranslation } from "@/lib/i18n";
-import { Loading } from "@/components/ui/loading";
+import { MediaGridSkeleton, PageHeaderSkeleton } from "@/components/skeletons/page-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useQueryState } from "nuqs";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { useSimpleSelection } from "@/hooks/use-simple-selection";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { Album } from "@/types/albums";
+import { albumVisibility, type AlbumVisibility } from "@/lib/album-visibility";
+import { AlbumVisibilityBadge, AlbumVisibilityOptions, VISIBILITY_ICONS } from "@/components/albums/album-visibility";
 import type { FileInfo } from "@/types/files";
 import { useRoutedFileViewer } from "@/hooks/use-routed-file-viewer";
 import { TimelineNavigator, findScrollParent, timelineGroupProps } from "@/components/timeline/timeline-navigator";
@@ -94,7 +97,6 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     openFile: openViewerFile,
     navigateToFile: navigateViewerFile,
     closeFile: closeViewerFile,
-    setPresentation: setViewerPresentation,
   } = useRoutedFileViewer();
   const [viewerFallbackFile, setViewerFallbackFile] = useState<FileInfo | null>(
     null,
@@ -501,7 +503,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     }
   };
 
-  const handleTogglePublic = async () => {
+  const handleVisibilityChange = async (visibility: AlbumVisibility) => {
     setIsTogglingPublic(true);
     try {
       const response = await fetch(`/api/albums/${albumId}`, {
@@ -509,22 +511,15 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          isPublic: !album?.isPublic,
-        }),
+        body: JSON.stringify({ visibility }),
       });
 
       if (!response.ok) {
         throw new Error();
       }
 
-      const updatedAlbum = await response.json();
-      setAlbum(updatedAlbum);
-      toast.success(
-        updatedAlbum.isPublic
-          ? t("albums.now_public")
-          : t("albums.now_private")
-      );
+      setAlbum(await response.json());
+      toast.success(t(`albums.visibility.${visibility}.done`));
     } catch {
       toast.error(t("albums.errors.toggle_visibility"));
     } finally {
@@ -859,12 +854,19 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   });
 
   if (albumLoading || !initialData.loaded) {
-    return <Loading fullHeight />;
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeaderSkeleton actions />
+        <MediaGridSkeleton />
+      </div>
+    );
   }
 
   if (!album) {
     return null;
   }
+
+  const VisibilityIcon = VISIBILITY_ICONS[albumVisibility(album)];
 
   return (
     <div ref={pageRef} className="[overflow-anchor:none]">
@@ -885,15 +887,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
               <h1 className="text-lg sm:text-2xl font-bold truncate">
                 {album.name}
               </h1>
-              {album.isPublic && (
-                <Badge
-                  variant="default"
-                  className="text-xs sm:text-sm w-fit bg-green-600"
-                >
-                  <Globe className="h-2.5 w-2.5 mr-1" />
-                  Public
-                </Badge>
-              )}
+              <AlbumVisibilityBadge album={album} className="sm:text-sm" />
               <Badge variant="secondary" className="text-xs sm:text-sm w-fit">
                 {/* fileCount et non files.length : la liste est paginée, le compteur
                      affichait sinon le nombre de fichiers déjà chargés et
@@ -919,31 +913,15 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
                 size="icon"
                 className="h-8 w-8 sm:h-9 sm:w-9"
               >
-                {album.isPublic ? (
-                  <Globe className="h-3 w-3 sm:h-4 sm:w-4" />
-                ) : (
-                  <GlobeLock className="h-3 w-3 sm:h-4 sm:w-4" />
-                )}
+                <VisibilityIcon className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={handleTogglePublic}
+              <AlbumVisibilityOptions
+                album={album}
+                onChange={handleVisibilityChange}
                 disabled={isTogglingPublic}
-                className="text-sm"
-              >
-                {album.isPublic ? (
-                  <>
-                    <GlobeLock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    {t("albums.make_private")}
-                  </>
-                ) : (
-                  <>
-                    <Globe className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    {t("albums.make_public")}
-                  </>
-                )}
-              </DropdownMenuItem>
+              />
               {album.isPublic && album.publicSlug && (
                 <>
                   <DropdownMenuSeparator />
@@ -997,7 +975,10 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           qu'il fallait sélectionner à la main. */}
       {album.isPublic && album.publicSlug && (
         <div className="mb-6 flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 sm:mb-8">
-          <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <VisibilityIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="hidden shrink-0 text-xs font-medium text-muted-foreground sm:inline">
+            {t(`albums.visibility.${albumVisibility(album)}.label`)}
+          </span>
           <a
             href={`/catalog/albums/${album.publicSlug}`}
             target="_blank"
@@ -1058,7 +1039,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           {/* Après un saut à une date, ce qui précède se recharge en remontant. */}
           {firstPage > 1 && (
             <div ref={topRef} className="flex h-10 items-center justify-center">
-              {loadingPrevious && <Loading variant="minimal" size="sm" showMessage={true} className="text-xs" />}
+              {loadingPrevious && <Skeleton className="h-2 w-40 rounded-full" />}
             </div>
           )}
           {monthGroups.map((group) => (
@@ -1137,14 +1118,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           ))}
 
           <div ref={sentinelRef} className="h-10 flex items-center justify-center">
-            {loading && (
-              <Loading
-                variant="minimal"
-                size="sm"
-                showMessage={true}
-                className="text-xs"
-              />
-            )}
+            {loading && <Skeleton className="h-2 w-40 rounded-full" />}
           </div>
         </div>
       )}
@@ -1173,7 +1147,6 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       <FileViewer
         file={viewerFile}
         presentation={viewerPresentation}
-        onPresentationChange={setViewerPresentation}
         onClose={closeViewerFile}
         onDelete={handleDeleteFile}
         onCopy={copyToClipboard}

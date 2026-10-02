@@ -1,3 +1,4 @@
+import { PageTransition } from "@/components/page-transition";
 import { publicPageMetadata } from "@/lib/seo";
 import { ImageOriginTool } from "./page.client";
 
@@ -9,5 +10,9 @@ export const metadata = publicPageMetadata({
 });
 
 export default function ImageOriginPage() {
-  return <ImageOriginTool />;
+  return (
+    <PageTransition>
+      <ImageOriginTool />
+    </PageTransition>
+  );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import type * as React from "react";
-import { useState, useEffect } from "react";
 import {
   Home,
   Image as ImageIcon,
@@ -30,17 +29,22 @@ import {
   BarChart3,
   Tag,
   Grid3X3,
+  LayoutDashboard,
+  ScrollText,
+  Server,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useSession } from "@/lib/auth-client";
 import Image from "next/image";
 import { useTranslation } from "@/lib/i18n";
+import type { ModuleNavEntry } from "@/lib/modules/nav-items";
 import { resolveIcon } from "@/lib/utils/resolve-icon";
 
 import { NavMain } from "./nav-main";
 import { NavSecondary } from "./nav-secondary";
-import { NavUser } from "./nav-user";
+import { NavUser, type NavUserData } from "./nav-user";
+import { ThemeToggle } from "../theme-toggle";
 import {
   Sidebar,
   SidebarContent,
@@ -52,34 +56,26 @@ import {
   SidebarRail,
 } from "../ui/sidebar";
 
-interface ModuleNavApiItem {
-  moduleName: string;
-  title: string;
-  url: string;
-  icon: string;
-  subItems: { title: string; url: string }[];
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  /**
+   * Rôle et modules lus côté serveur. Demandés depuis le navigateur, ils
+   * arrivaient après l'affichage : la section « Administration » et les
+   * modules surgissaient dans une barre déjà en place.
+   */
+  isAdmin: boolean;
+  moduleNavItems: ModuleNavEntry[];
+  user: NavUserData;
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "admin";
+export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSidebarProps) {
   const { t } = useTranslation();
-  const [moduleNavItems, setModuleNavItems] = useState<ModuleNavApiItem[]>([]);
-
-  useEffect(() => {
-    fetch("/api/modules/nav-items")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.items) setModuleNavItems(data.items);
-      })
-      .catch(() => {});
-  }, []);
 
   // Convert module nav items to sidebar format
   const moduleMenuItems = moduleNavItems.map((item) => ({
     title: item.title,
     url: item.url,
     icon: resolveIcon(item.icon),
+    image: item.logo,
     items: item.subItems.map((sub) => ({
       title: sub.title,
       url: sub.url,
@@ -87,11 +83,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }));
 
   const data = {
-    user: {
-      name: "Admin",
-      email: "admin@sharex.com",
-      avatar: "/avatars/admin.jpg",
-    },
     navMain: [
       {
         title: t("sidebar.main.gallery"),
@@ -171,11 +162,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             icon: Sliders,
           },
           {
-            title: t("sidebar.secondary.theme"),
-            url: "/settings/theme",
-            icon: Palette,
-          },
-          {
             title: t("sidebar.settings.general"),
             url: "/settings/general",
             icon: Settings,
@@ -203,33 +189,43 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ],
       },
     ],
+    // À plat : la section s'appelle déjà « Administration », chaque page y a
+    // son entrée. Aucune de ces pages n'a de sous-page, donc pas de sous-menu.
     navAdmin: [
       {
-        title: t("sidebar.admin.administration"),
+        title: t("sidebar.admin.overview"),
         url: "/admin",
+        icon: LayoutDashboard,
+      },
+      {
+        title: t("sidebar.admin.users"),
+        url: "/admin/users",
+        icon: Users,
+      },
+      {
+        title: t("sidebar.admin.logs"),
+        url: "/admin/logs",
+        icon: ScrollText,
+      },
+      {
+        title: t("sidebar.admin.global_theme"),
+        url: "/admin/theme",
+        icon: Palette,
+      },
+      {
+        title: t("sidebar.admin.system_config"),
+        url: "/admin/system",
+        icon: Server,
+      },
+      {
+        title: t("sidebar.admin.modules"),
+        url: "/admin/modules",
+        icon: Package,
+      },
+      {
+        title: t("sidebar.admin.security"),
+        url: "/admin/security",
         icon: Shield,
-        items: [
-          {
-            title: t("sidebar.admin.users"),
-            url: "/admin/users",
-          },
-          {
-            title: t("sidebar.admin.logs"),
-            url: "/admin/logs",
-          },
-          {
-            title: "Thème global",
-            url: "/admin/theme",
-          },
-          {
-            title: t("sidebar.admin.system_config"),
-            url: "/admin/system",
-          },
-          {
-            title: t("sidebar.admin.security"),
-            url: "/admin/security",
-          },
-        ],
       },
     ],
     navOther: [
@@ -273,17 +269,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton
               size="lg"
               asChild
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="pr-10 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:pr-0"
             >
               <Link href="/">
-                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Image
-                    src="/images/logo-sxm-simple.png"
-                    alt="ShareX Manager Logo"
-                    width={32}
-                    height={32}
-                  />
-                </div>
+                {/* Le pictogramme seul, sans cadre : une boîte autour le
+                    rapetisserait encore. */}
+                <Image
+                  src="/images/logo-sxm-simple.png"
+                  alt=""
+                  width={36}
+                  height={36}
+                  className="size-9 shrink-0 group-data-[collapsible=icon]:size-8"
+                />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">
                     {t("sidebar.app_name")}
@@ -294,6 +291,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </div>
               </Link>
             </SidebarMenuButton>
+            {/* Le thème se règle ici, en tête, au bout de la ligne du nom. Barre
+                repliée, il reste dans le menu du compte. */}
+            <ThemeToggle className="absolute top-1/2 right-1 size-8 -translate-y-1/2 text-sidebar-foreground/70 hover:text-sidebar-foreground group-data-[collapsible=icon]:hidden" />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -312,7 +312,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser />
+        <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

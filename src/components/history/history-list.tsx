@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useQueryState } from "nuqs";
@@ -42,13 +42,9 @@ import { useDateLocale } from "@/lib/i18n/date-locales";
 import { useTranslation } from "@/lib/i18n";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
 
-interface HistoryListProps {
-  filters?: URLSearchParams;
-}
-
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
-export const HistoryList = ({ filters }: HistoryListProps) => {
+export const HistoryList = () => {
   const { t } = useTranslation();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,10 +59,22 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
   const [totalItems, setTotalItems] = useState(0);
   const locale = useDateLocale();
 
-  const loadHistory = async (searchParams?: URLSearchParams) => {
+  // Les filtres vivent dans l'adresse, écrits par `HistoryFilters` : la liste
+  // les y lit directement. Ils passaient avant par une propriété que personne
+  // ne renseignait, et ne filtraient donc rien.
+  const [searchQuery] = useQueryState("q");
+  const [uploadMethod] = useQueryState("method");
+  const [startDate] = useQueryState("start");
+  const [endDate] = useQueryState("end");
+
+  const loadHistory = async () => {
     try {
       setIsLoading(true);
-      const params = new URLSearchParams(searchParams);
+      const params = new URLSearchParams();
+      if (searchQuery) params.set("q", searchQuery);
+      if (uploadMethod) params.set("uploadMethod", uploadMethod);
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
       params.set("page", page);
       params.set("pageSize", pageSize);
       params.set("sortField", sortField);
@@ -90,8 +98,18 @@ export const HistoryList = ({ filters }: HistoryListProps) => {
   };
 
   useEffect(() => {
-    loadHistory(filters);
-  }, [filters, page, pageSize, sortField, sortOrder]);
+    loadHistory();
+  }, [searchQuery, uploadMethod, startDate, endDate, page, pageSize, sortField, sortOrder]);
+
+  // Un filtre qui change ramène à la première page : la page 4 d'une liste
+  // réduite à dix lignes serait vide.
+  const filterKey = [searchQuery, uploadMethod, startDate, endDate].join("|");
+  const previousFilterKey = useRef(filterKey);
+  useEffect(() => {
+    if (previousFilterKey.current === filterKey) return;
+    previousFilterKey.current = filterKey;
+    if (page !== "1") setPage("1");
+  }, [filterKey, page, setPage]);
 
   const totalPages = Math.ceil(totalItems / Number(pageSize));
   const currentPage = Number(page);

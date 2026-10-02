@@ -4,32 +4,22 @@ import {
   Settings,
   Upload,
   Database,
-  RefreshCw,
-  Server,
   Package,
   Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/lib/i18n";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Progress } from "@/components/ui/progress";
-
-interface SystemStats {
-  cpuUsage: number;
-  memoryUsage: number;
-  diskUsage: number;
-  uptime: string;
-}
 
 interface ModuleDependencyResult {
   name: string;
@@ -39,41 +29,11 @@ interface ModuleDependencyResult {
 
 export default function SystemPageClient() {
   const { t } = useTranslation();
-  const [isLoading, setIsLoading] = useState(false);
   const [isInstallingDependencies, setIsInstallingDependencies] =
     useState(false);
   const [dependencyResults, setDependencyResults] = useState<
     ModuleDependencyResult[]
   >([]);
-  const [systemStats, setSystemStats] = useState<SystemStats>({
-    cpuUsage: 12,
-    memoryUsage: 45,
-    diskUsage: 38,
-    uptime: "3d 7h 22m",
-  });
-
-  const refreshSystemStats = async () => {
-    setIsLoading(true);
-    try {
-      // Simulation d'une requête pour obtenir les statistiques système
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Simuler de nouvelles valeurs
-      setSystemStats({
-        cpuUsage: Math.floor(Math.random() * 30) + 5,
-        memoryUsage: Math.floor(Math.random() * 60) + 20,
-        diskUsage: Math.floor(Math.random() * 20) + 30,
-        uptime: "3d 7h " + Math.floor(Math.random() * 59) + "m",
-      });
-
-      toast.success(t("admin.system.stats.refresh_success"));
-    } catch (error) {
-      toast.error(t("admin.system.stats.refresh_error"));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const installAllModuleDependencies = async () => {
     setIsInstallingDependencies(true);
     setDependencyResults([]);
@@ -112,84 +72,12 @@ export default function SystemPageClient() {
 
   return (
     <div className="w-full space-y-6">
-      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
-        <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-          <Settings className="h-3.5 w-3.5" />
-          Administration système
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-          <Settings className="h-6 w-6 sm:h-8 sm:w-8" />
-          {t("admin.system.title")}
-        </h1>
-        <p className="text-sm sm:text-base text-muted-foreground mt-2">
-          {t("admin.system.description")}
-        </p>
-      </section>
-
-      {/* Statistiques système */}
-      <Card className="rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="flex flex-col border-b border-border/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-6">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-              <Server className="h-4 w-4 sm:h-5 sm:w-5" />
-              {t("admin.system.stats.title")}
-            </CardTitle>
-            <CardDescription className="text-sm">
-              {t("admin.system.stats.subtitle")}
-            </CardDescription>
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={refreshSystemStats}
-            disabled={isLoading}
-            className="h-8 w-8 sm:h-9 sm:w-9"
-          >
-            <RefreshCw
-              className={`h-3 w-3 sm:h-4 sm:w-4 ${
-                isLoading ? "animate-spin" : ""
-              }`}
-            />
-          </Button>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6 pt-0">
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-4">
-              <div className="flex justify-between text-sm">
-                <span>{t("admin.system.stats.cpu")}</span>
-                <span>{systemStats.cpuUsage}%</span>
-              </div>
-              <Progress value={systemStats.cpuUsage} className="h-2" />
-            </div>
-
-            <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-4">
-              <div className="flex justify-between text-sm">
-                <span>{t("admin.system.stats.memory")}</span>
-                <span>{systemStats.memoryUsage}%</span>
-              </div>
-              <Progress value={systemStats.memoryUsage} className="h-2" />
-            </div>
-
-            <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-4">
-              <div className="flex justify-between text-sm">
-                <span>{t("admin.system.stats.disk")}</span>
-                <span>{systemStats.diskUsage}%</span>
-              </div>
-              <Progress value={systemStats.diskUsage} className="h-2" />
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="p-4 sm:p-6 pt-0">
-          <div className="text-xs sm:text-sm text-muted-foreground">
-            {t("admin.system.stats.uptime")}: {systemStats.uptime}
-          </div>
-        </CardFooter>
-      </Card>
+      <AdminPageHeader icon={Settings} title={t("admin.system.title")} description={t("admin.system.description")} />
 
       <div className="grid gap-6 xl:grid-cols-2">
         {/* Gestion des modules */}
-        <Card className="rounded-2xl border-border/70 shadow-sm">
-          <CardHeader className="border-b border-border/60 p-4 sm:p-6">
+        <Card className="gap-0 rounded-2xl border-border/70 py-0 shadow-sm">
+          <CardHeader className="border-b border-border/60 p-5 sm:p-6">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Package className="h-4 w-4 sm:h-5 sm:w-5" />
               Gestion des modules
@@ -198,8 +86,8 @@ export default function SystemPageClient() {
               Gérez les modules et leurs dépendances
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
+          <CardContent className="p-5 sm:p-6">
+            <div className="space-y-4">
               <p className="text-sm">
                 Installez les dépendances NPM de tous les modules en une seule
                 fois.
@@ -246,8 +134,8 @@ export default function SystemPageClient() {
         </Card>
 
         {/* Configuration des uploads */}
-        <Card className="rounded-2xl border-border/70 shadow-sm">
-          <CardHeader className="border-b border-border/60 p-4 sm:p-6">
+        <Card className="gap-0 rounded-2xl border-border/70 py-0 shadow-sm">
+          <CardHeader className="border-b border-border/60 p-5 sm:p-6">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
               {t("admin.system.upload_config.title")}
@@ -256,8 +144,8 @@ export default function SystemPageClient() {
               {t("admin.system.upload_config.subtitle")}
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
+          <CardContent className="p-5 sm:p-6">
+            <div className="space-y-4">
               <p className="text-sm">
                 {t("admin.system.upload_config.description")}
               </p>
@@ -271,8 +159,8 @@ export default function SystemPageClient() {
         </Card>
 
         {/* Configuration système */}
-        <Card className="rounded-2xl border-border/70 shadow-sm xl:col-span-2">
-          <CardHeader className="border-b border-border/60 p-4 sm:p-6">
+        <Card className="gap-0 rounded-2xl border-border/70 py-0 shadow-sm xl:col-span-2">
+          <CardHeader className="border-b border-border/60 p-5 sm:p-6">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Database className="h-4 w-4 sm:h-5 sm:w-5" />
               {t("admin.system.advanced_config.title")}
@@ -281,8 +169,8 @@ export default function SystemPageClient() {
               {t("admin.system.advanced_config.subtitle")}
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
+          <CardContent className="p-5 sm:p-6">
+            <div className="space-y-4">
               <p className="text-sm">
                 {t("admin.system.advanced_config.description")}
               </p>

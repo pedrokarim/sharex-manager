@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ScanSearch } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
+import logo from "../branding/logo-96.png";
 import { MODULE_PATH } from "../lib/client";
 
 const TABS = [
@@ -24,9 +25,7 @@ export function ModuleShell({ current, actions, children }: ModuleShellProps) {
     <div className="flex flex-1 flex-col gap-4">
       <header className="z-20 -mx-4 flex flex-wrap items-center gap-x-4 gap-y-3 bg-background/95 px-4 py-3 backdrop-blur-md xl:sticky xl:top-0 xl:h-14 xl:flex-nowrap xl:py-0">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <ScanSearch className="h-4 w-4" />
-          </span>
+          <Image src={logo} alt="" width={36} height={36} className="size-9 shrink-0" />
           <h1 className="text-lg font-semibold tracking-tight">Recherche inversée</h1>
         </div>
         <span aria-hidden className="hidden h-5 w-px bg-border sm:block" />

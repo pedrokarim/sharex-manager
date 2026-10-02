@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
+import { AlbumVisibilityIcon } from "@/components/albums/album-visibility";
 
 interface Album {
   id: number;
@@ -17,6 +18,8 @@ interface Album {
   description?: string;
   createdAt: string;
   fileCount: number;
+  isPublic?: boolean;
+  inCatalog?: boolean;
 }
 
 interface AlbumIndicatorProps {
@@ -66,8 +69,9 @@ export function AlbumIndicator({
             </div>
             <div className="space-y-1">
               {albums.map((album) => (
-                <div key={album.id} className="text-xs text-muted-foreground">
-                  • {album.name}
+                <div key={album.id} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <AlbumVisibilityIcon album={album} />
+                  {album.name}
                 </div>
               ))}
             </div>

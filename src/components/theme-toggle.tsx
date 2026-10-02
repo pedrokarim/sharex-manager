@@ -9,39 +9,65 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Clock, Globe2, Monitor, Moon, Sun } from "lucide-react";
+import { Check, Monitor, Moon, Sun } from "lucide-react";
 
 type ThemeToggleProps = Pick<
   React.ComponentProps<typeof Button>,
   "variant" | "size" | "className"
 >;
 
+const THEME_OPTIONS = [
+  { value: "light", label: "Clair", icon: Sun },
+  { value: "dark", label: "Sombre", icon: Moon },
+  { value: "system", label: "Système", icon: Monitor },
+] as const;
+
+/** Icône du réglage de thème en cours. */
+export function useThemeIcon() {
+  const { themePreference } = useTheme();
+  return THEME_OPTIONS.find((option) => option.value === themePreference)?.icon ?? Sun;
+}
+
+/**
+ * Les modes d'affichage, à poser dans n'importe quel menu déroulant : le
+ * bouton de thème et le menu du compte montrent les mêmes, avec le choix en
+ * cours coché. Le choix vaut pour ce navigateur ; les couleurs, elles, sont
+ * celles du site pour tout le monde.
+ */
+export function ThemeOptions() {
+  const { themePreference, setThemePreference } = useTheme();
+
+  return (
+    <>
+      {THEME_OPTIONS.map((option) => (
+        <DropdownMenuItem
+          key={option.value}
+          // Le clic donne le point de départ de la révélation circulaire.
+          onClick={(event) =>
+            setThemePreference(option.value, {
+              x: event.clientX,
+              y: event.clientY,
+            })
+          }
+        >
+          <option.icon className="mr-2 h-4 w-4" />
+          {option.label}
+          {themePreference === option.value ? (
+            <Check className="ml-auto h-4 w-4" />
+          ) : null}
+        </DropdownMenuItem>
+      ))}
+    </>
+  );
+}
+
 export function ThemeToggle({
   variant = "ghost",
   size = "icon",
   className,
 }: ThemeToggleProps) {
-  const { isAuthenticated, themePreference, setThemePreference, timeWindow } =
-    useTheme();
   const isMobile = useIsMobile();
-
-  const themeIcons = {
-    inherit: Globe2,
-    light: Sun,
-    dark: Moon,
-    system: Monitor,
-    "time-based": Clock,
-  };
-
-  const Icon = themeIcons[themePreference] || Sun;
-
-  const handleThemeChange = (
-    preference: "inherit" | "light" | "dark" | "system" | "time-based",
-    event?: React.MouseEvent
-  ) => {
-    const coords = event ? { x: event.clientX, y: event.clientY } : undefined;
-    setThemePreference(preference, coords);
-  };
+  const Icon = useThemeIcon();
 
   return (
     <DropdownMenu>
@@ -52,34 +78,7 @@ export function ThemeToggle({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side={isMobile ? "bottom" : "right"} align="end">
-        {isAuthenticated && (
-          <DropdownMenuItem
-            onClick={(event) => handleThemeChange("inherit", event)}
-          >
-            <Globe2 className="mr-2 h-4 w-4" />
-            Suivre le site
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={(event) => handleThemeChange("light", event)}>
-          <Sun className="mr-2 h-4 w-4" />
-          Clair
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={(event) => handleThemeChange("dark", event)}>
-          <Moon className="mr-2 h-4 w-4" />
-          Sombre
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={(event) => handleThemeChange("system", event)}>
-          <Monitor className="mr-2 h-4 w-4" />
-          Système
-        </DropdownMenuItem>
-        {isAuthenticated && (
-          <DropdownMenuItem
-            onClick={(event) => handleThemeChange("time-based", event)}
-          >
-            <Clock className="mr-2 h-4 w-4" />
-            Automatique ({timeWindow.dayStartHour}h-{timeWindow.dayEndHour}h)
-          </DropdownMenuItem>
-        )}
+        <ThemeOptions />
       </DropdownMenuContent>
     </DropdownMenu>
   );

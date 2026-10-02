@@ -33,6 +33,12 @@ export function BreadcrumbNav() {
       create: t("common.create"),
       admin: t("sidebar.admin.administration"),
       users: t("sidebar.admin.users"),
+      logs: t("sidebar.admin.logs"),
+      system: t("sidebar.admin.system_config"),
+      security: t("sidebar.admin.security"),
+      theme: pathname.startsWith("/admin") ? t("sidebar.admin.global_theme") : t("sidebar.secondary.theme"),
+      modules: t("sidebar.admin.modules"),
+      albums: t("albums.title"),
       preferences: t("sidebar.secondary.preferences"),
       account: t("account.my_account"),
     };

@@ -1,3 +1,4 @@
+import { PageTransition } from "@/components/page-transition";
 import { CatalogGalleryPage } from "./page.client";
 import { publicPageMetadata } from "@/lib/seo";
 
@@ -10,6 +11,10 @@ export const metadata = publicPageMetadata({
 
 
 export default function GalleryPage() {
-  return <CatalogGalleryPage />;
+  return (
+    <PageTransition>
+      <CatalogGalleryPage />
+    </PageTransition>
+  );
 }
 

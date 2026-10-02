@@ -20,6 +20,8 @@ type ResponsiveDialogContextProps = {
   onlyDrawer?: boolean;
   onlyDialog?: boolean;
   alert?: boolean;
+  /** Largeur d'écran lue par la racine, partagée avec ses enfants. */
+  isDesktop?: boolean | null;
 };
 
 type ResponsiveDialogProviderProps = {
@@ -36,11 +38,12 @@ const ResponsiveDialogProvider = ({
   onlyDrawer = false,
   onlyDialog = false,
   alert = false,
+  isDesktop = null,
   children,
 }: ResponsiveDialogProviderProps) => {
   return (
     <ResponsiveDialogContext.Provider
-      value={{ modal, dismissible, direction, onlyDrawer, onlyDialog, alert }}
+      value={{ modal, dismissible, direction, onlyDrawer, onlyDialog, alert, isDesktop }}
     >
       {children}
     </ResponsiveDialogContext.Provider>
@@ -56,6 +59,15 @@ export const useResponsiveDialog = () => {
 
   return context;
 };
+
+/**
+ * La racine choisit entre fenêtre et tiroir d'après la largeur de l'écran, et
+ * ses enfants doivent faire le même choix au même rendu. Chacun lisait la
+ * largeur de son côté : un enfant passait en « fenêtre » avant la racine, et
+ * Radix refusait un `DialogPortal` hors de son `Dialog`. Ils lisent maintenant
+ * la valeur de la racine.
+ */
+const useIsDesktop = () => useResponsiveDialog().isDesktop ?? null;
 
 const ResponsiveDialog = ({
   modal = true,
@@ -94,6 +106,7 @@ const ResponsiveDialog = ({
       onlyDrawer={onlyDrawer}
       onlyDialog={onlyDialog}
       alert={alert}
+      isDesktop={isDesktop}
     >
       <ResponsiveDialog
         modal={effectiveModal}
@@ -114,7 +127,7 @@ const ResponsiveDialogTrigger = ({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Trigger>) => {
   const { onlyDrawer, onlyDialog } = useResponsiveDialog();
-  const isDesktop = useMediaQuery(MOBILE_BREAKPOINT);
+  const isDesktop = useIsDesktop();
 
   const shouldUseDialog = onlyDialog || (!onlyDrawer && isDesktop);
   const ResponsiveDialogTrigger = shouldUseDialog
@@ -128,7 +141,7 @@ const ResponsiveDialogPortal = ({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Portal>) => {
   const { onlyDrawer, onlyDialog } = useResponsiveDialog();
-  const isDesktop = useMediaQuery(MOBILE_BREAKPOINT);
+  const isDesktop = useIsDesktop();
 
   const shouldUseDialog = onlyDialog || (!onlyDrawer && isDesktop);
   const ResponsiveDialogPortal = shouldUseDialog ? DialogPrimitive.Portal : DrawerPrimitive.Portal;
@@ -141,7 +154,7 @@ const ResponsiveDialogOverlay = ({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Overlay>) => {
   const { onlyDrawer, onlyDialog } = useResponsiveDialog();
-  const isDesktop = useMediaQuery(MOBILE_BREAKPOINT);
+  const isDesktop = useIsDesktop();
 
   const shouldUseDialog = onlyDialog || (!onlyDrawer && isDesktop);
   const ResponsiveDialogOverlay = shouldUseDialog
@@ -163,7 +176,7 @@ const ResponsiveDialogClose = ({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Close>) => {
   const { dismissible, alert, onlyDrawer, onlyDialog } = useResponsiveDialog();
-  const isDesktop = useMediaQuery(MOBILE_BREAKPOINT);
+  const isDesktop = useIsDesktop();
 
   const shouldUseDialog = onlyDialog || (!onlyDrawer && isDesktop);
   const ResponsiveDialogClose = shouldUseDialog ? DialogPrimitive.Close : DrawerPrimitive.Close;
@@ -251,7 +264,7 @@ const ResponsiveDialogContent = React.forwardRef<
   ) => {
     const { direction, modal, dismissible, alert, onlyDrawer, onlyDialog } = useResponsiveDialog();
 
-    const isDesktop = useMediaQuery(MOBILE_BREAKPOINT);
+    const isDesktop = useIsDesktop();
     const shouldUseDialog = onlyDialog || (!onlyDrawer && isDesktop);
     const ResponsiveDialogContent = shouldUseDialog ? DialogPrimitive.Content : VaulDrawerContent;
 
@@ -333,7 +346,7 @@ const ResponsiveDialogTitle = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
 >(({ className, ...props }, ref) => {
   const { onlyDrawer, onlyDialog } = useResponsiveDialog();
-  const isDesktop = useMediaQuery(MOBILE_BREAKPOINT);
+  const isDesktop = useIsDesktop();
 
   const shouldUseDialog = onlyDialog || (!onlyDrawer && isDesktop);
   const ResponsiveDialogTitle = shouldUseDialog ? DialogPrimitive.Title : DrawerPrimitive.Title;
@@ -353,7 +366,7 @@ const ResponsiveDialogDescription = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(({ className, ...props }, ref) => {
   const { onlyDrawer, onlyDialog } = useResponsiveDialog();
-  const isDesktop = useMediaQuery(MOBILE_BREAKPOINT);
+  const isDesktop = useIsDesktop();
 
   const shouldUseDialog = onlyDialog || (!onlyDrawer && isDesktop);
   const ResponsiveDialogDescription = shouldUseDialog

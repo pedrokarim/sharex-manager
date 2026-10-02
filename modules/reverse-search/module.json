@@ -6,6 +6,11 @@
   "enabled": true,
   "entry": "index.process.ts",
   "category": "Analyse",
+  "branding": {
+    "logo": "branding/logo.png",
+    "logoSmall": "branding/logo-96.png",
+    "accent": "#1e9be9"
+  },
   "hasUI": false,
   "supportedFileTypes": [],
   "settings": {},

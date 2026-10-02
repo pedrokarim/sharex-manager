@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FileInfo } from "@/types/files";
-import type { FileViewerPresentation } from "@/hooks/use-routed-file-viewer";
+import type { FileViewerPresentation } from "@/lib/atoms/preferences";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +46,6 @@ import { CreateAlbumDialog } from "@/components/albums/create-album-dialog";
 interface FileViewerProps {
   file: FileInfo | null;
   presentation: FileViewerPresentation;
-  onPresentationChange: (presentation: FileViewerPresentation) => void;
   onClose: () => void;
   onDelete: (filename: string) => Promise<void>;
   onCopy: (url: string) => void;
@@ -82,7 +81,6 @@ function shouldIgnoreViewerHotkeys(target: EventTarget | null) {
 function FileViewerBody({
   file,
   presentation,
-  onPresentationChange,
   onClose,
   onDelete,
   onCopy,
@@ -209,27 +207,6 @@ function FileViewerBody({
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="hidden items-center rounded-xl border border-border/60 bg-background/70 p-1 sm:flex">
-              <Button
-                type="button"
-                variant={presentation === "fullscreen" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-8 rounded-lg px-3 text-xs"
-                onClick={() => onPresentationChange("fullscreen")}
-              >
-                {t("gallery.file_viewer.presentation.fullscreen")}
-              </Button>
-              <Button
-                type="button"
-                variant={presentation === "modal" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-8 rounded-lg px-3 text-xs"
-                onClick={() => onPresentationChange("modal")}
-              >
-                {t("gallery.file_viewer.presentation.modal")}
-              </Button>
-            </div>
-
             <Button
               variant="ghost"
               size="icon"
@@ -509,26 +486,6 @@ function FileViewerBody({
                 {t("gallery.file_viewer.details")}
               </Button>
 
-              <div className="flex items-center rounded-xl border border-border/60 bg-background/70 p-1 sm:hidden">
-                <Button
-                  type="button"
-                  variant={presentation === "fullscreen" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-8 rounded-lg px-3 text-xs"
-                  onClick={() => onPresentationChange("fullscreen")}
-                >
-                  {t("gallery.file_viewer.presentation.fullscreen")}
-                </Button>
-                <Button
-                  type="button"
-                  variant={presentation === "modal" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-8 rounded-lg px-3 text-xs"
-                  onClick={() => onPresentationChange("modal")}
-                >
-                  {t("gallery.file_viewer.presentation.modal")}
-                </Button>
-              </div>
 
               {!showDetails && file ? (
                 <>
@@ -628,7 +585,6 @@ function FileViewerBody({
 export function FileViewer({
   file,
   presentation,
-  onPresentationChange,
   onClose,
   onDelete,
   onCopy,
@@ -711,7 +667,6 @@ export function FileViewer({
     <FileViewerBody
       file={file}
       presentation={presentation}
-      onPresentationChange={onPresentationChange}
       onClose={onClose}
       onDelete={onDelete}
       onCopy={onCopy}
@@ -731,7 +686,7 @@ export function FileViewer({
   if (presentation === "modal") {
     return (
       <Dialog open={Boolean(file) || isLoading} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="max-w-[96vw] gap-0 overflow-hidden border-none bg-background/95 p-0 backdrop-blur-xl [&>button]:hidden">
+        <DialogContent className="max-w-[96vw] gap-0 rounded-2xl sm:max-w-[min(92vw,1400px)] overflow-hidden border-none bg-background/95 p-0 backdrop-blur-xl [&>button]:hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>{dialogTitle}</DialogTitle>
             <DialogDescription>{dialogDescription}</DialogDescription>

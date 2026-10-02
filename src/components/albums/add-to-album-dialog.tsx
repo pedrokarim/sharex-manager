@@ -17,6 +17,7 @@ import { Search, FolderOpen, Plus, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
 import { CreateAlbumDialog } from "./create-album-dialog";
+import { AlbumVisibilityIcon } from "./album-visibility";
 import { chunk, FILES_BATCH_LIMIT, readApiError } from "@/lib/utils/chunk";
 import type { Album } from "@/types/albums";
 
@@ -290,6 +291,7 @@ export function AddToAlbumDialog({
                             <span className="truncate text-sm font-medium sm:text-base">
                               {album.name}
                             </span>
+                            <AlbumVisibilityIcon album={album} />
                             <Badge variant="secondary" className="flex-shrink-0 text-[11px]">
                               {album.fileCount}
                             </Badge>

@@ -1,29 +1,18 @@
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { AuthNotice, AuthShell } from "@/components/front/auth-shell";
+import { PageTransition } from "@/components/page-transition";
 import { privatePageMetadata } from "@/lib/seo";
 
 export const metadata = privatePageMetadata({ title: "Créer un compte" });
 
-
 export default function RegisterPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-      <div className="w-full max-w-md text-center">
-        <Alert variant="default" className="border-primary">
-          <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-          <AlertTitle className="text-base sm:text-lg">
-            Inscription non disponible
-          </AlertTitle>
-          <AlertDescription className="mt-2 text-sm sm:text-base">
-            L&apos;inscription n&apos;est pas encore disponible. Veuillez
-            contacter l&apos;administrateur pour créer un compte.
-          </AlertDescription>
-        </Alert>
-        <Button variant="link" className="mt-4 text-sm" asChild>
-          <a href="/login">Retourner à la connexion</a>
-        </Button>
-      </div>
-    </div>
+    <PageTransition>
+      <AuthShell photo="lake">
+        <AuthNotice title="Inscription" titleAccent="sur invitation." action={{ label: "Retour à la connexion", href: "/login" }}>
+          L&apos;inscription n&apos;est pas encore ouverte. Pour obtenir un compte, contactez l&apos;administrateur de
+          cette instance.
+        </AuthNotice>
+      </AuthShell>
+    </PageTransition>
   );
 }

@@ -65,12 +65,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  const initialTheme = await getResolvedThemePayload(session?.user?.id ?? null);
+  const initialTheme = await getResolvedThemePayload();
 
-  const themeBootstrapScript = createThemeBootstrapScript({
-    initialTheme,
-    isAuthenticated: !!session?.user,
-  });
+  const themeBootstrapScript = createThemeBootstrapScript({ initialTheme });
 
   // Un thème enregistré depuis l'éditeur référence des familles Google par leur
   // nom (« Plus Jakarta Sans, sans-serif ») : sans cette feuille de style, le
@@ -80,7 +77,7 @@ export default async function RootLayout({
   // Le thème est décidé ici, pas après l'hydratation : la classe part dans le
   // HTML et les variables dans une feuille de style du <head>. C'est ce qui
   // supprime le flash – le navigateur peint directement les bonnes couleurs.
-  const themeClass = resolveThemeHtmlClass(initialTheme, !!session?.user);
+  const themeClass = resolveThemeHtmlClass(initialTheme);
   const themeStylesheet = buildThemeStylesheet(initialTheme.styles);
 
   return (

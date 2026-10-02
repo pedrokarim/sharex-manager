@@ -6,6 +6,11 @@
   "enabled": true,
   "entry": "index.process.ts",
   "category": "Vidéo",
+  "branding": {
+    "logo": "branding/logo.png",
+    "logoSmall": "branding/logo-96.png",
+    "accent": "#e5392e"
+  },
   "hasUI": false,
   "supportedFileTypes": [],
   "settings": {},

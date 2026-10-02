@@ -5,12 +5,16 @@ import { albumsDb } from "@/lib/utils/albums-db";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 import { z } from "zod";
+import { ALBUM_VISIBILITIES, visibilityFlags } from "@/lib/album-visibility";
+import type { Album } from "@/types/albums";
 
 const UpdateAlbumSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional(),
   thumbnailFile: z.string().optional(),
   isPublic: z.boolean().optional(),
+  /** Visibilité : privé, public par son lien, ou public au catalogue. */
+  visibility: z.enum(ALBUM_VISIBILITIES).optional(),
 });
 
 const IdSchema = z.coerce.number().int().positive();
@@ -167,16 +171,24 @@ export async function PUT(
       return NextResponse.json({ error: "Accès interdit" }, { status: 403 });
     }
 
-    // Gérer la visibilité publique
-    const finalUpdates = { ...updates };
-    if (updates.isPublic !== undefined) {
-      if (updates.isPublic && !existingAlbum.publicSlug) {
+    // Gérer la visibilité. `visibility` fait foi ; `isPublic` seul reste
+    // accepté pour les anciens clients, et garde alors le sens qu'il avait :
+    // public voulait dire « au catalogue ».
+    const { visibility, ...fields } = updates;
+    const finalUpdates: Partial<Album> = { ...fields };
+    if (visibility !== undefined) {
+      Object.assign(finalUpdates, visibilityFlags(visibility));
+    } else if (updates.isPublic !== undefined) {
+      finalUpdates.inCatalog = updates.isPublic;
+    }
+    if (finalUpdates.isPublic !== undefined) {
+      if (finalUpdates.isPublic && !existingAlbum.publicSlug) {
         // Générer un slug unique si l'album devient public
         finalUpdates.publicSlug = albumsDb.generateUniqueSlug(
           existingAlbum.name,
           albumId
         );
-      } else if (!updates.isPublic) {
+      } else if (!finalUpdates.isPublic) {
         // Supprimer le slug si l'album devient privé
         finalUpdates.publicSlug = undefined;
       }

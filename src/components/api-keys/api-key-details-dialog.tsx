@@ -93,7 +93,7 @@ export function ApiKeyDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90svh] w-[calc(100vw-1.5rem)] max-w-4xl overflow-y-auto rounded-2xl border border-border/70 p-0 shadow-2xl">
+      <DialogContent className="max-h-[90svh] w-[calc(100vw-1.5rem)] max-w-4xl overflow-y-auto sm:max-w-4xl rounded-2xl border border-border/70 p-0 shadow-2xl">
         <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
           <DialogTitle>Détails de la clé API</DialogTitle>
           <DialogDescription>

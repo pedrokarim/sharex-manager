@@ -1,134 +1,110 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, FolderOpen, Search } from "lucide-react";
 
-import { Input } from "@/components/ui/input";
-import { Loading } from "@/components/ui/loading";
 import { CatalogAlbumCard } from "@/components/catalog/catalog-album-card";
-import type { Album } from "@/types/albums";
+import { FRONT_NARROW, FRONT_WIDE } from "@/components/front/container";
+import { DISPLAY } from "@/components/front/fonts";
+import { PhotoHeader } from "@/components/front/photo-header";
+import { Reveal } from "@/components/front/reveal";
+import { ACCENT, KICKER, PILL_SOLID } from "@/components/front/styles";
+import type { CatalogAlbum } from "@/lib/public-catalog";
+import { cn } from "@/lib/utils";
 
-export function CatalogAlbumsPage() {
-  const [albums, setAlbums] = useState<(Album & { coverImages?: string[] })[]>(
-    [],
-  );
-  const [loading, setLoading] = useState(true);
+interface CatalogAlbumsPageProps {
+  albums: CatalogAlbum[];
+}
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+export function CatalogAlbumsPage({ albums }: CatalogAlbumsPageProps) {
   const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    const fetchAlbums = async () => {
-      try {
-        const response = await fetch(
-          "/api/public/catalog?includeImages=true&limit=200",
-        );
-        if (response.ok) {
-          const result = await response.json();
-          setAlbums(result.albums ?? []);
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement du catalogue:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAlbums();
-  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return albums;
     return albums.filter(
-      (album) =>
-        album.name.toLowerCase().includes(q) ||
-        (album.description ?? "").toLowerCase().includes(q),
+      (album) => album.name.toLowerCase().includes(q) || (album.description ?? "").toLowerCase().includes(q),
     );
   }, [albums, search]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[calc(100vh-6rem)] items-center justify-center pt-24">
-        <Loading />
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto px-4 pb-20 pt-24 sm:px-6 lg:px-8">
-      <header>
-        <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-          {albums.length} {albums.length > 1 ? "albums publics" : "album public"}
-        </span>
-        <h1 className="mt-4 max-w-[18ch] text-3xl font-bold tracking-tighter text-balance sm:text-4xl lg:text-5xl">
-          Chaque série, prise à part.
-        </h1>
-        <p className="mt-3 max-w-[54ch] text-base leading-relaxed text-muted-foreground">
-          Les albums regroupent les captures par sujet. Ouvrez-en un pour le
-          parcourir seul, ou passez par la galerie pour tout voir d&apos;un bloc.
-        </p>
-
-        <div className="relative mt-6 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+    <>
+      <PhotoHeader
+        photo="lake"
+        kicker={`${albums.length} ${albums.length > 1 ? "albums publics" : "album public"}`}
+        title="Chaque série,"
+        titleAccent="prise à part."
+        description="Les albums regroupent les captures par sujet. Ouvrez-en un pour le parcourir seul, ou passez par la galerie pour tout voir d'un bloc."
+      >
+        {/* Le champ de recherche est posé sur la photo, en verre dépoli. */}
+        <label className="relative mx-auto block max-w-md">
+          <span className="sr-only">Rechercher un album</span>
+          <Search className="pointer-events-none absolute top-1/2 left-5 z-10 size-4 -translate-y-1/2 text-white/70" />
+          <input
             type="search"
             placeholder="Rechercher un album…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="pl-10"
+            className="h-12 w-full rounded-full bg-white/12 pr-5 pl-12 text-sm text-white backdrop-blur-md transition outline-none placeholder:text-white/60 focus-visible:bg-white/20 focus-visible:ring-[3px] focus-visible:ring-white/40"
           />
-        </div>
-        <p className="mt-3 font-mono text-xs text-muted-foreground">
-          {filtered.length === 0
-            ? "aucun résultat"
-            : `${filtered.length} ${filtered.length > 1 ? "albums" : "album"}`}
-        </p>
-      </header>
+        </label>
+      </PhotoHeader>
 
-      <div className="mt-8">
+      <section className={cn(FRONT_WIDE, "pt-4 pb-24 sm:pb-32")}>
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          {filtered.length === 0
+            ? "Aucun résultat"
+            : `${filtered.length} ${filtered.length > 1 ? "albums" : "album"}${search.trim() ? " pour cette recherche" : ""}`}
+        </p>
+
         {filtered.length === 0 ? (
-          <div className="rounded-xl border border-dashed py-20 text-center">
-            <FolderOpen className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-            <h3 className="font-semibold">
-              {search ? "Aucun album ne correspond" : "Aucun album public"}
-            </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {search
-                ? "Essayez un autre terme, ou effacez la recherche."
-                : "Aucun album n'est partagé pour le moment."}
+          <div className="py-24 text-center">
+            <FolderOpen className={cn("mx-auto size-9", ACCENT)} strokeWidth={1.5} />
+            <h2 className={cn(DISPLAY, "mt-5 text-3xl")}>{search ? "Aucun album ne correspond" : "Aucun album public"}</h2>
+            <p className="mt-2 text-muted-foreground">
+              {search ? "Essayez un autre terme, ou effacez la recherche." : "Aucun album n'est partagé pour le moment."}
             </p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filtered.map((album) => (
-              <CatalogAlbumCard key={album.id} album={album} />
-            ))}
-          </div>
+          <ul className="mt-6 grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+            {/* La liste suit la recherche : les albums glissent à leur nouvelle place. */}
+            <AnimatePresence mode="popLayout" initial={false}>
+              {filtered.map((album) => (
+                <motion.li
+                  key={album.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ duration: 0.4, ease: EASE }}
+                >
+                  <CatalogAlbumCard album={album} />
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </ul>
         )}
-      </div>
-
-      <section className="mt-14 border-t pt-8">
-        <div className="flex flex-wrap items-baseline gap-3">
-          <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-            Raccourci
-          </span>
-          <h2 className="text-xl font-semibold tracking-tight">
-            Vous cherchez une image précise ?
-          </h2>
-          <Link
-            href="/catalog/gallery"
-            className="ml-auto inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Ouvrir la galerie
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-        <p className="mt-2 max-w-[56ch] text-sm text-muted-foreground">
-          La galerie réunit les images de tous les albums, de la plus récente à
-          la plus ancienne.
-        </p>
       </section>
-    </div>
+
+      <section className="bg-foreground/[0.035] py-24 sm:py-28">
+        <Reveal className={cn(FRONT_NARROW, "text-center")}>
+          <p className={cn(KICKER, ACCENT)}>Raccourci</p>
+          <h2 className={cn(DISPLAY, "mt-4 text-4xl leading-[1.05] text-balance sm:text-5xl")}>
+            Vous cherchez une image précise ?
+          </h2>
+          <p className="mt-5 text-pretty text-muted-foreground sm:text-lg">
+            La galerie réunit les images de tous les albums, de la plus récente à la plus ancienne.
+          </p>
+          <Link href="/catalog/gallery" className={cn(PILL_SOLID, "mt-9")}>
+            Ouvrir la galerie
+            <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        </Reveal>
+      </section>
+    </>
   );
 }

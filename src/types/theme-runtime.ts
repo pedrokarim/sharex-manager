@@ -1,39 +1,19 @@
 import { THEME_COLOR_KEYS } from "@/lib/theme/constants";
-import {
-  ThemeStyleProps,
-  themeStylesSchema,
-  type ThemeStyles,
-} from "@/types/theme";
+import { themeStylesSchema } from "@/types/theme";
 import * as z from "zod";
 
+/**
+ * Le site n'a qu'un thème : celui que l'administrateur publie. Il n'existe pas
+ * de thème personnel. Seul le mode d'affichage – clair, sombre ou celui de
+ * l'appareil – peut être choisi par chaque navigateur, et ce choix reste dans
+ * le navigateur.
+ */
 export const globalThemeModeSchema = z.enum(["light", "dark", "system"]);
-export const userThemeModeSchema = z.enum([
-  "inherit",
-  "light",
-  "dark",
-  "system",
-  "time-based",
-]);
 
 export type GlobalThemeMode = z.infer<typeof globalThemeModeSchema>;
-export type UserThemeMode = z.infer<typeof userThemeModeSchema>;
 export type RuntimeThemeMode = "light" | "dark";
-export type ThemeColorOverrideKey = (typeof THEME_COLOR_KEYS)[number];
-export type ThemeColorOverrides = Partial<
-  Pick<ThemeStyleProps, ThemeColorOverrideKey>
->;
-
-const themeColorOverrideShape = THEME_COLOR_KEYS.reduce(
-  (shape, key) => {
-    shape[key] = z.string().optional();
-    return shape;
-  },
-  {} as Record<ThemeColorOverrideKey, z.ZodOptional<z.ZodString>>,
-);
-
-export const themeColorOverridesSchema = z
-  .object(themeColorOverrideShape)
-  .partial();
+/** Une couleur du thème, parmi celles que l'on peut régler. */
+export type ThemeColorKey = (typeof THEME_COLOR_KEYS)[number];
 
 export const globalThemeConfigSchema = z.object({
   mode: globalThemeModeSchema,
@@ -42,33 +22,18 @@ export const globalThemeConfigSchema = z.object({
   updatedByUserId: z.string().nullable(),
 });
 
-export const userThemePreferencesSchema = z.object({
-  userId: z.string(),
-  modeOverride: userThemeModeSchema,
-  overrideEnabled: z.boolean(),
-  lightColorOverrides: themeColorOverridesSchema,
-  darkColorOverrides: themeColorOverridesSchema,
-  stylesOverride: themeStylesSchema.nullable().optional(),
-  dayStartHour: z.number().int().min(0).max(23),
-  dayEndHour: z.number().int().min(0).max(23),
-  updatedAt: z.string(),
-});
-
 export const resolvedThemePayloadSchema = z.object({
   globalTheme: globalThemeConfigSchema,
-  userPreferences: userThemePreferencesSchema.nullable(),
   styles: themeStylesSchema,
-  modePreference: z.enum(["light", "dark", "system", "time-based"]),
-  modeSource: z.enum(["global", "user"]),
+  /** Mode du site, tant que le navigateur n'en a pas choisi un autre. */
+  modePreference: globalThemeModeSchema,
   activeMode: z.enum(["light", "dark"]),
 });
 
 export type GlobalThemeConfig = z.infer<typeof globalThemeConfigSchema>;
-export type UserThemePreferences = z.infer<typeof userThemePreferencesSchema>;
 export type ResolvedThemePayload = z.infer<typeof resolvedThemePayloadSchema>;
 
 export interface ThemeRuntimeUpdateResponse {
   payload: ResolvedThemePayload;
-  userPreferences: UserThemePreferences | null;
   globalTheme: GlobalThemeConfig;
 }

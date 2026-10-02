@@ -5,8 +5,12 @@
   "author": "ShareX Manager",
   "enabled": true,
   "entry": "index.process.ts",
-  "icon": "/images/modules/ai-image-gen.png",
   "category": "AI",
+  "branding": {
+    "logo": "branding/logo.png",
+    "logoSmall": "branding/logo-96.png",
+    "accent": "#f59e0b"
+  },
   "hasUI": false,
   "supportedFileTypes": [],
   "settings": {

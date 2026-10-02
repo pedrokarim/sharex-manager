@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { resolveThemePayloadFromState } from "@/lib/theme/resolve-theme";
+import { resolveThemePayload } from "@/lib/theme/resolve-theme";
 import { themeDb } from "@/lib/theme/theme-db";
 import { globalThemeModeSchema } from "@/types/theme-runtime";
 import { themeStylesSchema } from "@/types/theme";
@@ -22,7 +22,7 @@ export async function GET() {
 
   return Response.json({
     globalTheme,
-    payload: resolveThemePayloadFromState(globalTheme, themeDb.getUserThemePreferences(session.user.id)),
+    payload: resolveThemePayload(globalTheme),
   });
 }
 
@@ -50,11 +50,9 @@ export async function PUT(request: Request) {
     ...parsed.data,
     updatedByUserId: session.user.id,
   });
-  const userPreferences = themeDb.getUserThemePreferences(session.user.id);
 
   return Response.json({
     globalTheme,
-    userPreferences,
-    payload: resolveThemePayloadFromState(globalTheme, userPreferences),
+    payload: resolveThemePayload(globalTheme),
   });
 }

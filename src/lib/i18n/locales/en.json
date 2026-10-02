@@ -22,6 +22,7 @@
     "more": "More",
     "create": "New",
     "reset": "Reset",
+    "period": "Period",
     "preview": "Preview",
     "yes": "Yes",
     "no": "No",
@@ -251,6 +252,12 @@
     },
     "gallery": {
       "view_mode": "View Mode",
+      "viewer_presentation": {
+        "title": "Opening a file",
+        "description": "How a file opens from the gallery and albums.",
+        "fullscreen": { "label": "Full screen", "hint": "The file takes up the whole window." },
+        "modal": { "label": "Window", "hint": "The file opens in a window, with the page still visible behind it." }
+      },
       "thumbnail_size": "Thumbnail Size",
       "thumbnail_sizes": {
         "large": "Extra Large Icons",
@@ -468,10 +475,6 @@
       "accessibility": "Image added on {date}. File size: {size} KB. {navigation}",
       "previous_button": "Use the previous button to see the previous image.",
       "next_button": "Use the next button to see the next image.",
-      "presentation": {
-        "fullscreen": "Fullscreen",
-        "modal": "Modal"
-      },
       "file_unavailable": "This file is no longer available.",
       "file_not_in_album": "This file is not available in this album.",
       "info_panel": {
@@ -593,6 +596,7 @@
   "sidebar": {
     "app_name": "ShareX Manager",
     "app_description": "Image Manager",
+    "theme": "Theme",
     "search": "Search",
     "search_placeholder": "Search...",
     "toggle": "Toggle",
@@ -614,6 +618,9 @@
     },
     "admin": {
       "administration": "Administration",
+      "overview": "Overview",
+      "global_theme": "Global theme",
+      "modules": "Modules",
       "users": "Users",
       "logs": "Logs",
       "system_config": "System Configuration",
@@ -755,11 +762,64 @@
     "title": "ShareX Manager",
     "subtitle": "A modern and powerful interface to manage your screenshots and files uploaded via ShareX",
     "landing": {
+      "nav": {
+        "modules": "Modules",
+        "catalog": "Catalog",
+        "tools": "Tools",
+        "about": "About",
+        "contact": "Contact",
+        "setup": "Getting started"
+      },
+      "modules": {
+        "kicker": "Modules",
+        "title": "Much more than a screenshot host",
+        "description": "Once your images live in one place, you might as well use them. Each module turns on or off in one click and works directly on your gallery.",
+        "try": "Try it without an account",
+        "items": {
+          "ai": {
+            "name": "AI Image Gen",
+            "description": "A studio to generate and edit images, plugged into your own keys or agents.",
+            "points": [
+              "Edit a screenshot",
+              "Series and variants",
+              "Prompt assistant"
+            ]
+          },
+          "clip": {
+            "name": "Clip Studio",
+            "description": "A clip editor in the browser: images, videos, animated text, voice and music.",
+            "points": [
+              "Multitrack timeline",
+              "Synthetic voices",
+              "MP4 export"
+            ]
+          },
+          "reverse": {
+            "name": "Reverse search",
+            "description": "Find where an image comes from: several engines queried at once, results side by side.",
+            "points": [
+              "trace.moe, SauceNAO, IQDB",
+              "Google Lens, Yandex",
+              "Ephemeral mode"
+            ]
+          },
+          "origin": {
+            "name": "Image origin",
+            "description": "Read what a file declares about itself: AI-generated or not, signature, metadata.",
+            "points": [
+              "C2PA manifest",
+              "EXIF and XMP",
+              "Metadata-free copy"
+            ]
+          }
+        }
+      },
       "hero": {
         "title": "Your screenshots,",
         "title_accent": "on your server.",
         "subtitle": "The landing place for everything you capture: upload with a shortcut, get a public link instantly, plus albums, statistics and API keys. On your server, not someone else's.",
-        "compatibility": "ShareX · Flameshot · Android · Permanent links · No ads",
+        "works_with": "Works with",
+        "promises": ["Permanent links", "No ads"],
         "screenshot_alt": "The ShareX Manager gallery, images grouped by month",
         "cta_primary": "Explore the catalog",
         "cta_secondary": "Sign in",
@@ -773,7 +833,7 @@
         "description": "ShareX on Windows, Flameshot on Linux, native sharing from the Android app: everything lands in the same place, indexed right away.",
         "bullets": [
           "Link copied to the clipboard as soon as the upload finishes",
-          "Thumbnails, search and filtering by date",
+          "Images and videos, search, and a timeline to scroll back through the years",
           "Private albums, or published in one click"
         ],
         "image_alt": "The upload history, showing date, size and method for every file"
@@ -797,8 +857,9 @@
       },
       "tools": {
         "kicker": "The ecosystem",
-        "title": "And two more services, right next door",
-        "description": "ShareX Manager does one thing. For everything else — encoding, formatting, generating a palette, querying a Minecraft server — two dedicated services take over, with no account and no install.",
+        "title": "Tools, hosted here and right next door",
+        "origin_tagline": "Is an image AI-generated? Drop it to find out",
+        "description": "One tool lives right here, open without an account. To encode, format, build a palette or query a Minecraft server, two dedicated services take over.",
         "cta": "Discover the tools"
       },
       "setup": {
@@ -1318,6 +1379,27 @@
     "now_public": "Album is now public",
     "now_private": "Album is now private",
     "url_copied": "Public URL copied",
+    "visibility": {
+      "title": "Visibility",
+      "private": {
+        "label": "Private",
+        "hint": "Only you can see it.",
+        "badge": "Private",
+        "done": "The album is now private"
+      },
+      "link": {
+        "label": "Public by link",
+        "hint": "Reachable with its address, not listed in the catalog.",
+        "badge": "By link",
+        "done": "The album is public by link, outside the catalog"
+      },
+      "catalog": {
+        "label": "Public in the catalog",
+        "hint": "Open to everyone and listed in the catalog.",
+        "badge": "Catalog",
+        "done": "The album is public and listed in the catalog"
+      }
+    },
     "make_public": "Make public",
     "make_private": "Make private",
     "copy_public_url": "Copy public URL",

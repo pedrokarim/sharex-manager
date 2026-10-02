@@ -20,6 +20,8 @@ const thumb = (name: string) => `/api/thumbnails/${encodeURIComponent(name)}`;
 
 /**
  * Fond du héros : une mosaïque de vignettes qui se renouvelle en continu.
+ * Elle ne pose aucun voile : c'est l'en-tête qui la reçoit (`PhotoHeader`) qui
+ * l'assombrit et la fond dans la page.
  *
  * Chaque case porte deux couches superposées. Pour changer d'image, on peint la
  * couche cachée puis on croise les opacités : les deux se recouvrant pendant la
@@ -146,20 +148,6 @@ export function CatalogMosaic({
         className="sxm-mosaic absolute inset-0"
         style={{ ["--fade" as string]: `${fade}ms` }}
       />
-      {/*
-        Voile sombre indépendant du thème : les images doivent rester lisibles
-        sous du texte clair, y compris en thème clair où un voile blanc les
-        délaverait.
-      */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.86)_28%,rgba(0,0,0,0.62)_62%,rgba(0,0,0,0.34)_100%)]" />
-
-      {/* Renfort sous la navigation : sans lui, les liens se perdent dès qu'une
-          vignette claire passe derrière eux. */}
-      <div className="absolute inset-x-0 top-0 h-36 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.72),transparent)]" />
-
-      {/* Raccord avec le reste de la page. Le contenu du héros doit rester
-          au-dessus de cette bande, sinon il se délave en thème clair. */}
-      <div className="absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(to_top,var(--background),transparent)]" />
     </div>
   );
 }

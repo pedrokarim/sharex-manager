@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { GalleryClient } from "../page.client";
+import { readGalleryFirstPage } from "@/lib/gallery-listing";
 
 export const metadata: Metadata = {
   title: "Fichiers sécurisés",
@@ -20,49 +21,26 @@ export default async function SecureGalleryPage({
   searchParams: Promise<SearchParams>;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  const headersList = await headers();
   const resolvedSearchParams = await searchParams;
 
   if (!session?.user) {
     redirect("/login");
   }
 
-  try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/files?page=1&limit=24&q=${
-        resolvedSearchParams.q || ""
-      }&secure=true`,
-      {
-        cache: "no-store",
-        headers: {
-          Cookie: headersList.get("cookie") || "",
-        },
-      }
-    );
+  // Lecture directe : la page arrive avec ses fichiers, sans requête vers
+  // sa propre API.
+  const firstPage = await readGalleryFirstPage({
+    search: resolvedSearchParams.q || "",
+    secureOnly: true,
+  });
 
-    const data = await res.json();
-
-    return (
-      <GalleryClient
-        initialFiles={data.files}
-        initialHasMore={data.hasMore}
-        initialView={resolvedSearchParams.view as "grid" | "list" | "details"}
-        initialSearch={resolvedSearchParams.q}
-
-        secureOnly
-      />
-    );
-  } catch (error) {
-    console.error("Erreur lors du chargement initial des fichiers:", error);
-    return (
-      <GalleryClient
-        initialFiles={[]}
-        initialHasMore={false}
-        initialView={resolvedSearchParams.view as "grid" | "list" | "details"}
-        initialSearch={resolvedSearchParams.q}
-
-        secureOnly
-      />
-    );
-  }
+  return (
+    <GalleryClient
+      initialFiles={firstPage.files}
+      initialHasMore={firstPage.hasMore}
+      initialView={resolvedSearchParams.view as "grid" | "list" | "details"}
+      initialSearch={resolvedSearchParams.q}
+      secureOnly
+    />
+  );
 }

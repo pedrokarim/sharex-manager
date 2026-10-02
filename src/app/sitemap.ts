@@ -1,3 +1,4 @@
+import { isInCatalog } from "@/lib/album-visibility";
 import type { MetadataRoute } from "next";
 
 import { absoluteUrl } from "@/lib/seo";
@@ -42,7 +43,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   try {
     for (const album of albumsDb.getAlbums()) {
-      if (!album.isPublic || !album.publicSlug) continue;
+      // Un album public par son seul lien n'est pas annoncé aux moteurs.
+      if (!isInCatalog(album) || !album.publicSlug) continue;
 
       entries.push({
         url: absoluteUrl(`/catalog/albums/${album.publicSlug}`),

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import {
   SidebarGroup,
@@ -29,6 +30,8 @@ interface MenuItem {
   title: string;
   url: string;
   icon: LucideIcon;
+  /** Logo affiché à la place de l'icône : celui d'un module. */
+  image?: string;
   isActive?: boolean;
   items?: SubItem[];
 }
@@ -50,10 +53,15 @@ export function NavMain({
           <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip={item.title}>
-                <a href={item.url}>
-                  <item.icon />
+                <Link href={item.url}>
+                  {item.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- logo servi par le module
+                    <img src={item.image} alt="" className="size-5 shrink-0 object-contain" />
+                  ) : (
+                    <item.icon />
+                  )}
                   <span>{item.title}</span>
-                </a>
+                </Link>
               </SidebarMenuButton>
               {item.items?.length ? (
                 <>
@@ -68,12 +76,12 @@ export function NavMain({
                       {item.items?.map((subItem) => (
                         <SidebarMenuSubItem key={subItem.title}>
                           <SidebarMenuSubButton asChild>
-                            <a href={subItem.url}>
+                            <Link href={subItem.url}>
                               {subItem.icon && (
                                 <subItem.icon className="h-4 w-4" />
                               )}
                               <span>{subItem.title}</span>
-                            </a>
+                            </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       ))}

@@ -1,8 +1,9 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
-import { Sparkles } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
+import logo from "../branding/logo-96.png";
 
 /**
  * En-tête commun aux pages du module.
@@ -78,9 +79,7 @@ export function ModuleShell({
             étroit, il passe sur plusieurs lignes et défile avec la page. */}
         <header className="z-20 -mx-4 flex flex-wrap items-center gap-x-4 gap-y-3 bg-background/95 px-4 py-3 backdrop-blur-md xl:sticky xl:top-0 xl:h-14 xl:flex-nowrap xl:py-0">
           <div className="flex items-center gap-2.5" title={description}>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Sparkles className="h-4 w-4" />
-            </span>
+            <Image src={logo} alt="" width={36} height={36} className="size-9 shrink-0" />
             <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
           </div>
           <span aria-hidden className="hidden h-5 w-px bg-border sm:block" />
@@ -99,9 +98,7 @@ export function ModuleShell({
       <header className="flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Sparkles className="h-5 w-5" />
-            </span>
+            <Image src={logo} alt="" width={44} height={44} className="size-11 shrink-0" />
             <div className="min-w-0">
               <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
               <p className="text-sm text-muted-foreground">{description}</p>

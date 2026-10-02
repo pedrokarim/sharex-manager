@@ -161,6 +161,8 @@ export function FileCard({
    * d'origine plutôt que d'afficher une case vide.
    */
   const [thumbFailed, setThumbFailed] = useState(false);
+  /** La vignette est arrivée : elle remplace alors la case d'attente, en fondu. */
+  const [thumbLoaded, setThumbLoaded] = useState(false);
   const previewUrl =
     isImage && !thumbFailed
       ? `/api/thumbnails/${encodeURIComponent(file.name)}`
@@ -237,6 +239,8 @@ export function FileCard({
 
           {isImage ? (
             showThumbnails ? (
+              <>
+              {!thumbLoaded && <div aria-hidden className="absolute inset-0 animate-pulse bg-foreground/10" />}
               <Image
                 src={previewUrl}
                 alt={file.name}
@@ -244,10 +248,12 @@ export function FileCard({
                 draggable={false}
                 onDragStart={preventNativeImageDrag}
                 onError={() => setThumbFailed(true)}
+                onLoad={() => setThumbLoaded(true)}
                 loading="lazy"
-                className="object-cover"
+                className={cn("object-cover transition-opacity duration-300", thumbLoaded ? "opacity-100" : "opacity-0")}
                 sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 16vw"
               />
+              </>
             ) : (
               <div className="flex h-full items-center justify-center">
                 <span className="text-2xl font-bold">IMG</span>

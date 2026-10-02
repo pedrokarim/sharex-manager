@@ -7,6 +7,32 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Albums : trois visibilités au lieu d’un simple public/privé. Un album est
+  privé à sa création, peut devenir public par lien (accessible à qui connaît
+  son adresse, absent du catalogue) ou public au catalogue. Le réglage est
+  présent partout où un album se manipule : création, modification, menu de la
+  carte et menu contextuel, page de l’album ; une icône rappelle la visibilité
+  là où un album est cité (ajout d’un fichier depuis la galerie, visionneuse).
+  Les albums déjà publics restent au catalogue. L’API accepte `visibility` à
+  la création et à la modification.
+- Préférences : « Ouverture d’un fichier », pour choisir une fois pour toutes
+  si la visionneuse s’ouvre en plein écran ou dans une fenêtre.
+- Thème global : 42 palettes prêtes à l’emploi, avec un aperçu, à retoucher
+  couleur par couleur pour le clair et pour le sombre.
+- Modules : identité visuelle. Un module range son logo dans son dossier
+  (`branding/`, déclaré dans `module.json`) ; il s’affiche dans le menu
+  latéral, la gestion des modules, l’en-tête du module et la page d’accueil.
+  AI Image Gen, Clip Studio et Recherche inversée ont chacun le leur.
+- Barre de filtres commune (`FilterBar`), condensée sur une ligne : recherche,
+  listes et période. L’historique des envois l’utilise, et ses filtres, restés
+  sans effet jusque-là, filtrent réellement la liste.
+- Gabarits de chargement : chaque page de l’application montre la forme de
+  son contenu pendant qu’il arrive (galerie, albums, historique,
+  administration, réglages), et les vignettes apparaissent en fondu.
+- Vignettes : `?size=large` sert une version de 1200 px, pour les couvertures
+  affichées en grand.
+- Site GitHub Pages refait au dessin de la page d’accueil, avec le logo et de
+  nouvelles captures ; il vit désormais dans `docs/website/`.
 - Recherche inversée : nouveau module à pages, qui remplace « anime-trace ».
   On dépose, colle ou désigne une image (ordinateur, lien, fichier de la
   galerie par le menu contextuel) et plusieurs moteurs répondent côte à côte :
@@ -136,6 +162,28 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Pages publiques : catalogue, albums publics, connexion, inscription, mot de
+  passe oublié, outils, contact, pages légales et pages d’information suivent
+  le dessin de la page d’accueil (photos de nature, titres en Fraunces,
+  boutons en pastille, largeurs de colonne variées) et partagent un socle
+  commun (`src/components/front/`).
+- Thème : il n’y a plus qu’un thème, celui du site. La page « Thème global »
+  ne règle que le mode et les couleurs ; chaque navigateur choisit ensuite
+  clair, sombre ou système, depuis le menu latéral.
+- Menu latéral : logo sans cadre, bouton clair/sombre dans l’en-tête, section
+  « Administration » à plat (vue d’ensemble, utilisateurs, logs, thème global,
+  configuration système, modules, sécurité) au lieu d’un sous-menu du même
+  nom. La section s’affiche dès le premier rendu, sans attendre une
+  vérification côté navigateur, et les liens ne rechargent plus la page.
+- Administration : pages allégées, avec une icône, un titre et une phrase
+  pour en-tête, sans carte d’en-tête, pastille ni tuiles d’information.
+- Visionneuse : le sélecteur « Plein écran / Modal » quitte la visionneuse
+  pour les préférences, et la présentation ne figure plus dans l’adresse. La
+  fenêtre occupe désormais presque toute la largeur.
+- Galerie : la première page est lue directement par le serveur, sans requête
+  vers sa propre API.
+- Images générées (logos, photos des pages publiques) : métadonnées et
+  signatures retirées avant leur entrée dans le dépôt.
 - Galerie : les cartes n’affichent plus leur rangée de quatre boutons. Les
   actions (télécharger, copier le lien, ouvrir, supprimer, favori) apparaissent
   au survol de l’image ; le nom, la taille et la date tiennent sur deux lignes.
@@ -177,6 +225,12 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Removed
 
+- Thème personnel : page `/settings/theme`, route `/api/settings/theme`,
+  synchronisation avec le thème global et mode selon l’heure.
+- Éditeur de thème complet (polices, rayons, espacements, ombres, assistant) et
+  ses composants ; restent le mode et les couleurs.
+- Ancien logo complet (`logo-sxm.png`) et anciennes captures de la page
+  d’accueil.
 - Module « anime-trace » : remplacé par « Recherche inversée », qui reprend
   trace.moe. Sa fenêtre dans la visionneuse disparaît au profit de l’action
   « Rechercher l’origine de l’image » du menu contextuel.
@@ -189,6 +243,14 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Galerie : au rechargement, la page pouvait s’ouvrir sur « Aucune image »
+  quand l’adresse d’API configurée ne désignait pas le serveur en cours. Elle
+  montre maintenant ses fichiers d’emblée, et un gabarit tant qu’un
+  chargement est en cours.
+- Pages de réglages : le dernier bloc ne touche plus le bas de la zone de
+  défilement.
+- Fenêtres larges (visionneuse en fenêtre, détails d’une clé API) : elles
+  restaient bloquées à 512 px, leur contenu débordait.
 - Galerie : une nouvelle version produite par un module, ou une image
   envoyée depuis le studio AI Image Gen, apparaît tout de suite dans les
   galeries ouvertes. Seuls les uploads ShareX étaient annoncés jusqu'ici.

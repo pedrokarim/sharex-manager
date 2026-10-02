@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
   AudioLines,
-  Clapperboard,
   Copy,
   Download,
   Film,
@@ -16,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import logo from "../branding/logo-96.png";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -113,9 +114,7 @@ export default function ProjectsPage() {
     <MotionConfig reducedMotion="user">
       <div className="flex flex-col gap-8">
         <header className="flex flex-wrap items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Clapperboard className="h-5 w-5" />
-          </span>
+          <Image src={logo} alt="" width={44} height={44} className="size-11 shrink-0" />
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">Clip Studio</h1>
             <p className="text-sm text-muted-foreground">

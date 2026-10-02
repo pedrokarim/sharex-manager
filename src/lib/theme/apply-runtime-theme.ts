@@ -1,17 +1,12 @@
 import { getThemeFontFamilies } from "@/lib/theme/theme-font-families";
 import { buildThemeStylesheet } from "@/lib/theme/theme-stylesheet";
 import { loadGoogleFont } from "@/utils/fonts/google-fonts";
-import type { RuntimeThemeMode } from "@/types/theme-runtime";
+import type { GlobalThemeMode, RuntimeThemeMode } from "@/types/theme-runtime";
 import type { ThemeStyles } from "@/types/theme";
 
 /** Identifiant de la balise `<style>` rendue par le serveur dans le `<head>`. */
 const THEME_STYLE_ID = "theme-tokens";
 
-/**
- * Préférence de mode, telle que résolue par `resolveThemeRuntimeState`.
- * « system » délègue la décision au navigateur, les autres sont explicites.
- */
-type ModePreference = "light" | "dark" | "system" | "time-based";
 
 /**
  * Applique un thème au document.
@@ -26,7 +21,8 @@ export function applyRuntimeThemeToElement(
   root: HTMLElement,
   styles: ThemeStyles,
   mode: RuntimeThemeMode,
-  modePreference: ModePreference,
+  /** « system » délègue la décision au navigateur, les autres sont explicites. */
+  modePreference: GlobalThemeMode,
 ) {
   if (!root || !styles?.[mode]) {
     return;

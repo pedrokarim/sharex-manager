@@ -2,18 +2,15 @@
 
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useSetAtom } from "jotai";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { useRoutedFileViewer } from "@/hooks/use-routed-file-viewer";
+import { fileViewerPresentationAtom } from "@/lib/atoms/preferences";
 
 function HookHarness() {
-  const {
-    fileName,
-    presentation,
-    openFile,
-    closeFile,
-    setPresentation,
-  } = useRoutedFileViewer();
+  const { fileName, presentation, openFile, closeFile } = useRoutedFileViewer();
+  const setPresentation = useSetAtom(fileViewerPresentationAtom);
 
   return (
     <div>
@@ -23,10 +20,10 @@ function HookHarness() {
         open
       </button>
       <button type="button" onClick={() => setPresentation("modal")}>
-        modal
+        prefer modal
       </button>
       <button type="button" onClick={() => setPresentation("fullscreen")}>
-        fullscreen
+        prefer fullscreen
       </button>
       <button type="button" onClick={closeFile}>
         close
@@ -36,6 +33,10 @@ function HookHarness() {
 }
 
 describe("useRoutedFileViewer", () => {
+  beforeEach(async () => {
+    window.localStorage.clear();
+  });
+
   it("opens in fullscreen by default and preserves unrelated query params", async () => {
     const onUrlUpdate = vi.fn();
     const user = userEvent.setup();
@@ -50,6 +51,7 @@ describe("useRoutedFileViewer", () => {
       </NuqsTestingAdapter>,
     );
 
+    await user.click(screen.getByRole("button", { name: "prefer fullscreen" }));
     await user.click(screen.getByRole("button", { name: "open" }));
 
     await waitFor(() =>
@@ -60,7 +62,7 @@ describe("useRoutedFileViewer", () => {
     const openEvent = onUrlUpdate.mock.calls.at(-1)?.[0];
     expect(openEvent.options.history).toBe("push");
     expect(openEvent.searchParams.get("file")).toBe("hello world.png");
-    expect(openEvent.searchParams.get("viewer")).toBe("fullscreen");
+    expect(openEvent.searchParams.get("viewer")).toBeNull();
     expect(openEvent.searchParams.get("view")).toBe("details");
     expect(openEvent.searchParams.get("q")).toBe("flowers");
     expect(openEvent.searchParams.get("sort")).toBe("name");
@@ -68,7 +70,7 @@ describe("useRoutedFileViewer", () => {
     expect(openEvent.searchParams.get("end")).toBe("2026-04-02");
   });
 
-  it("switches presentation with replace history and clears viewer params on close", async () => {
+  it("follows the preference, keeps it out of the URL and clears the file on close", async () => {
     const onUrlUpdate = vi.fn();
     const user = userEvent.setup();
 
@@ -82,35 +84,35 @@ describe("useRoutedFileViewer", () => {
       </NuqsTestingAdapter>,
     );
 
+    await user.click(screen.getByRole("button", { name: "prefer modal" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("presentation")).toHaveTextContent("modal"),
+    );
+    // La préférence ne touche pas à l'adresse.
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("fileViewerPresentation")).toBe('"modal"');
+
     await user.click(screen.getByRole("button", { name: "open" }));
     await waitFor(() =>
       expect(screen.getByTestId("file-name")).toHaveTextContent("hello world.png"),
     );
+    expect(screen.getByTestId("presentation")).toHaveTextContent("modal");
 
-    await user.click(screen.getByRole("button", { name: "modal" }));
-
-    await waitFor(() =>
-      expect(screen.getByTestId("presentation")).toHaveTextContent("modal"),
-    );
-
-    const modalEvent = onUrlUpdate.mock.calls.at(-1)?.[0];
-    expect(modalEvent.options.history).toBe("replace");
-    expect(modalEvent.searchParams.get("file")).toBe("hello world.png");
-    expect(modalEvent.searchParams.get("viewer")).toBe("modal");
-    expect(modalEvent.searchParams.get("view")).toBe("list");
-    expect(modalEvent.searchParams.get("q")).toBe("archive");
+    const openEvent = onUrlUpdate.mock.calls.at(-1)?.[0];
+    expect(openEvent.searchParams.get("file")).toBe("hello world.png");
+    expect(openEvent.searchParams.get("viewer")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "close" }));
 
     await waitFor(() =>
       expect(screen.getByTestId("file-name")).toHaveTextContent("none"),
     );
-    expect(screen.getByTestId("presentation")).toHaveTextContent("fullscreen");
+    // Fermer un fichier ne remet pas la préférence à zéro.
+    expect(screen.getByTestId("presentation")).toHaveTextContent("modal");
 
     const closeEvent = onUrlUpdate.mock.calls.at(-1)?.[0];
     expect(closeEvent.options.history).toBe("replace");
     expect(closeEvent.searchParams.get("file")).toBeNull();
-    expect(closeEvent.searchParams.get("viewer")).toBeNull();
     expect(closeEvent.searchParams.get("view")).toBe("list");
     expect(closeEvent.searchParams.get("q")).toBe("archive");
   });

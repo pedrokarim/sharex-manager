@@ -1,5 +1,7 @@
 "use client";
 
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { FilterBar, FilterDateRange, FilterSearch, FilterSelect } from "@/components/filters/filter-bar";
 import { useEffect, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
@@ -9,7 +11,8 @@ import type { Log, LogAction, LogLevel } from "@/lib/types/logs";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
 import { useDateLocale } from "@/lib/i18n/date-locales";
-import { Loading } from "@/components/ui/loading";
+import { RowsSkeleton } from "@/components/skeletons/page-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -53,6 +56,7 @@ import {
   RefreshCw,
   ScrollText,
   Search,
+  Trash2,
 } from "lucide-react";
 
 const ITEMS_PER_PAGE = 50;
@@ -63,6 +67,25 @@ const levelColors = {
   error: "bg-red-500",
   debug: "bg-gray-500",
 } as const;
+
+/** Actions proposées au filtre, avec la clé de leur libellé. */
+const ACTION_OPTIONS: { value: LogAction | "all"; label: string }[] = [
+  { value: "all", label: "admin.logs.actions.all" },
+  { value: "auth.login", label: "admin.logs.actions.login" },
+  { value: "auth.logout", label: "admin.logs.actions.logout" },
+  { value: "file.upload", label: "admin.logs.actions.upload" },
+  { value: "file.delete", label: "admin.logs.actions.delete" },
+  { value: "file.update", label: "admin.logs.actions.update" },
+  { value: "file.download", label: "admin.logs.actions.download" },
+  { value: "admin.action", label: "admin.logs.actions.admin" },
+  { value: "user.create", label: "admin.logs.actions.user_create" },
+  { value: "user.update", label: "admin.logs.actions.user_update" },
+  { value: "user.delete", label: "admin.logs.actions.user_delete" },
+  { value: "config.update", label: "admin.logs.actions.config_update" },
+  { value: "api.request", label: "admin.logs.actions.api_request" },
+  { value: "api.error", label: "admin.logs.actions.api_error" },
+  { value: "system.error", label: "admin.logs.actions.system_error" },
+];
 
 export default function LogsPage() {
   const { t } = useTranslation();
@@ -137,6 +160,15 @@ export default function LogsPage() {
     }
   }, [inView, hasNextPage, fetchNextPage]);
 
+  const hasFilters = level !== "all" || action !== "all" || Boolean(search || startDate || endDate);
+  const resetFilters = () => {
+    setLevel("all");
+    setAction("all");
+    setSearch(null);
+    setStartDate(null);
+    setEndDate(null);
+  };
+
   const handleClearLogs = async () => {
     try {
       const response = await fetch("/api/admin/logs", {
@@ -154,7 +186,6 @@ export default function LogsPage() {
     }
   };
 
-  const hasDateFilter = Boolean(startDate || endDate);
 
   if (isError) {
     return (
@@ -166,244 +197,56 @@ export default function LogsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
-        <div className="space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <ScrollText className="h-3.5 w-3.5" />
-            Journal d’exploitation
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              {t("admin.sections.logs.title")}
-            </h1>
-            <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
-              Explorez les événements importants avec des filtres regroupés,
-              lisibles et suffisamment d’espace pour parcourir les détails.
-            </p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                Niveau
-              </p>
-              <p className="mt-1 text-sm">
-                {level === "all" ? "Tous les niveaux" : level}
-              </p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                Fenêtre
-              </p>
-              <p className="mt-1 text-sm">
-                {hasDateFilter ? "Filtre de dates actif" : "Période complète"}
-              </p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                Actualisation
-              </p>
-              <p className="mt-1 text-sm">
-                {REFRESH_INTERVALS[refreshInterval]}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <AdminPageHeader
+        icon={ScrollText}
+        title={t("admin.sections.logs.title")}
+        description={t("admin.sections.logs.description")}
+      />
 
-      <Card className="rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
-          <CardTitle className="text-lg sm:text-xl">
-            Filtres de consultation
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Affinez le journal avant d’ouvrir un événement particulier.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 p-5 sm:p-6">
-          <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 xl:grid-cols-4">
-            <Select
-              value={level}
-              onValueChange={(value) => setLevel(value as LogLevel | "all")}
-            >
-              <SelectTrigger className="text-sm">
-                <SelectValue
-                  placeholder={t("admin.logs.filters.select_level")}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-sm">
-                  {t("admin.logs.levels.all")}
-                </SelectItem>
-                <SelectItem value="info" className="text-sm">
-                  {t("admin.logs.levels.info")}
-                </SelectItem>
-                <SelectItem value="warning" className="text-sm">
-                  {t("admin.logs.levels.warning")}
-                </SelectItem>
-                <SelectItem value="error" className="text-sm">
-                  {t("admin.logs.levels.error")}
-                </SelectItem>
-                <SelectItem value="debug" className="text-sm">
-                  {t("admin.logs.levels.debug")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={action}
-              onValueChange={(value) => setAction(value as LogAction | "all")}
-            >
-              <SelectTrigger className="text-sm">
-                <SelectValue
-                  placeholder={t("admin.logs.filters.select_action")}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-sm">
-                  {t("admin.logs.actions.all")}
-                </SelectItem>
-                <SelectItem value="auth.login" className="text-sm">
-                  {t("admin.logs.actions.login")}
-                </SelectItem>
-                <SelectItem value="auth.logout" className="text-sm">
-                  {t("admin.logs.actions.logout")}
-                </SelectItem>
-                <SelectItem value="file.upload" className="text-sm">
-                  {t("admin.logs.actions.upload")}
-                </SelectItem>
-                <SelectItem value="file.delete" className="text-sm">
-                  {t("admin.logs.actions.delete")}
-                </SelectItem>
-                <SelectItem value="file.update" className="text-sm">
-                  {t("admin.logs.actions.update")}
-                </SelectItem>
-                <SelectItem value="file.download" className="text-sm">
-                  {t("admin.logs.actions.download")}
-                </SelectItem>
-                <SelectItem value="admin.action" className="text-sm">
-                  {t("admin.logs.actions.admin")}
-                </SelectItem>
-                <SelectItem value="user.create" className="text-sm">
-                  {t("admin.logs.actions.user_create")}
-                </SelectItem>
-                <SelectItem value="user.update" className="text-sm">
-                  {t("admin.logs.actions.user_update")}
-                </SelectItem>
-                <SelectItem value="user.delete" className="text-sm">
-                  {t("admin.logs.actions.user_delete")}
-                </SelectItem>
-                <SelectItem value="config.update" className="text-sm">
-                  {t("admin.logs.actions.config_update")}
-                </SelectItem>
-                <SelectItem value="api.request" className="text-sm">
-                  {t("admin.logs.actions.api_request")}
-                </SelectItem>
-                <SelectItem value="api.error" className="text-sm">
-                  {t("admin.logs.actions.api_error")}
-                </SelectItem>
-                <SelectItem value="system.error" className="text-sm">
-                  {t("admin.logs.actions.system_error")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={t("admin.logs.filters.search_placeholder")}
-                value={search || ""}
-                onChange={(e) => setSearch(e.target.value || null)}
-                className="pl-9 text-sm"
-              />
-            </div>
-
-            <Select
+      <FilterBar
+        onReset={hasFilters ? resetFilters : null}
+        actions={
+          <>
+            <FilterSelect
               value={refreshInterval}
-              onValueChange={(value) =>
-                setRefreshInterval(value as keyof typeof REFRESH_INTERVALS)
-              }
-            >
-              <SelectTrigger className="text-sm">
-                <SelectValue placeholder={t("admin.logs.refresh_interval")} />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(REFRESH_INTERVALS).map(([value, label]) => (
-                  <SelectItem key={value} value={value} className="text-sm">
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="justify-start text-left text-sm font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {startDate
-                    ? format(new Date(startDate), "P", { locale })
-                    : t("admin.logs.start_date")}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={startDate ? new Date(startDate) : undefined}
-                  onSelect={(date) => setStartDate(date?.toISOString() || null)}
-                  initialFocus
-                  locale={locale}
-                />
-              </PopoverContent>
-            </Popover>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="justify-start text-left text-sm font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {endDate
-                    ? format(new Date(endDate), "P", { locale })
-                    : t("admin.logs.end_date")}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={endDate ? new Date(endDate) : undefined}
-                  onSelect={(date) => setEndDate(date?.toISOString() || null)}
-                  initialFocus
-                  locale={locale}
-                />
-              </PopoverContent>
-            </Popover>
-
-            <Button
-              variant="destructive"
-              onClick={handleClearLogs}
-              className="text-sm"
-            >
+              onChange={setRefreshInterval}
+              neutral="0"
+              label={t("admin.logs.refresh_interval")}
+              icon={RefreshCw}
+              options={(Object.keys(REFRESH_INTERVALS) as (keyof typeof REFRESH_INTERVALS)[]).map((value) => ({
+                value,
+                label: REFRESH_INTERVALS[value],
+              }))}
+            />
+            <Button variant="ghost" size="sm" onClick={handleClearLogs} className="h-8 gap-1.5 rounded-lg px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive">
+              <Trash2 className="size-3.5" />
               {t("admin.logs.clear_logs")}
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </>
+        }
+      >
+        <FilterSearch value={search ?? ""} onChange={(value) => setSearch(value || null)} placeholder={t("admin.logs.filters.search_placeholder")} />
+        <FilterSelect
+          value={level}
+          onChange={setLevel}
+          label={t("admin.logs.filters.select_level")}
+          options={(["all", "info", "warning", "error", "debug"] as const).map((value) => ({
+            value,
+            label: t(`admin.logs.levels.${value}`),
+          }))}
+        />
+        <FilterSelect value={action} onChange={setAction} label={t("admin.logs.filters.select_action")} options={ACTION_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
+        <FilterDateRange
+          start={startDate}
+          end={endDate}
+          onChange={(start, end) => {
+            setStartDate(start);
+            setEndDate(end);
+          }}
+        />
+      </FilterBar>
 
-      <Card className="rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
-          <CardTitle className="text-lg sm:text-xl">
-            Flux des événements
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Parcourez les lignes du journal et ouvrez un événement pour voir son
-            contexte complet.
-          </CardDescription>
-        </CardHeader>
+      <Card className="gap-0 rounded-2xl border-border/70 py-0 shadow-sm">
         <CardContent className="space-y-4 p-5 sm:p-6">
           <div className="overflow-x-auto rounded-xl border border-border/60">
             <Table>
@@ -486,16 +329,10 @@ export default function LogsPage() {
             </Table>
           </div>
 
-          {isLoading && (
-            <div className="flex justify-center">
-              <Loading variant="minimal" size="sm" showMessage={true} />
-            </div>
-          )}
+          {isLoading && <RowsSkeleton rows={6} />}
 
           <div ref={ref} className="flex h-10 items-center justify-center">
-            {hasNextPage && (
-              <Loading variant="minimal" size="sm" showMessage={true} />
-            )}
+            {hasNextPage && <Skeleton className="h-2 w-40 rounded-full" />}
           </div>
         </CardContent>
       </Card>

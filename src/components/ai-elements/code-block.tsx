@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useSyncExternalStore } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useTheme } from "../theme-provider";
+
+const subscribeNothing = () => () => {};
 
 type CodeBlockContextType = {
   code: string;
@@ -33,6 +35,12 @@ export const CodeBlock = ({
   ...props
 }: CodeBlockProps) => {
   const { theme } = useTheme();
+  // Le serveur ne connaît pas toujours le thème réel (préférence « système ») :
+  // jusqu'au montage, les deux rendent le style clair, puis le client prend le
+  // sien. Sans ça, l'hydratation garde les couleurs du serveur – du texte
+  // sombre sur fond sombre.
+  const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
+  const dark = mounted && theme !== "light";
   return (
     <CodeBlockContext.Provider value={{ code }}>
       <div
@@ -62,7 +70,7 @@ export const CodeBlock = ({
               minWidth: "2.5rem",
             }}
             showLineNumbers={showLineNumbers}
-            style={theme === "light" ? oneLight : oneDark}
+            style={dark ? oneDark : oneLight}
           >
             {code}
           </SyntaxHighlighter>

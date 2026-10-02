@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-guard";
+import { moduleLogoUrl } from "@/lib/modules/branding";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 
 /**
@@ -25,6 +26,7 @@ export async function GET() {
           label: source.label,
           description: source.description,
           icon: source.icon,
+          logo: moduleLogoUrl(module, "small"),
           kinds: source.kinds,
           list: source.list,
           import: source.import,

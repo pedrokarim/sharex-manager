@@ -1,3 +1,4 @@
+import { PageTransition } from "@/components/page-transition";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -37,6 +38,8 @@ export async function generateMetadata({
     title: album.name,
     description,
     alternates: { canonical: url },
+    // Public par son seul lien : la page se partage, elle ne se référence pas.
+    ...(album.inCatalog ? {} : { robots: { index: false, follow: false } }),
     openGraph: {
       type: "article",
       siteName: SITE_NAME,
@@ -63,6 +66,10 @@ export default async function AlbumDetailPage({
     notFound();
   }
 
-  return <CatalogAlbumDetailPage slug={slug} />;
+  return (
+    <PageTransition>
+      <CatalogAlbumDetailPage slug={slug} summary={getPublicAlbumSummary(slug)} />
+    </PageTransition>
+  );
 }
 

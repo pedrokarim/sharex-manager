@@ -79,8 +79,8 @@ const sections: DocSection[] = [
     content: (
       <div className="grid gap-4 sm:grid-cols-2">
         {features.map((feature) => (
-          <div key={feature.title} className="rounded-lg border bg-card p-5">
-            <feature.icon className="mb-3 h-5 w-5 text-primary" />
+          <div key={feature.title} className="rounded-[22px] bg-foreground/[0.045] p-6">
+            <feature.icon className="mb-4 size-6 text-emerald-700 dark:text-emerald-400" strokeWidth={1.75} />
             <h3 className="mb-1.5 font-semibold">{feature.title}</h3>
             <p className="text-sm leading-relaxed text-muted-foreground">
               {feature.description}
@@ -107,7 +107,7 @@ const sections: DocSection[] = [
           l&apos;héberger pour son propre usage et y contribuer.
         </p>
         <div className="not-prose mt-6">
-          <Button variant="outline" className="gap-2" asChild>
+          <Button variant="secondary" className="h-12 gap-2 rounded-full px-6" asChild>
             <a
               href="https://github.com/pedrokarim/sharex-manager"
               target="_blank"
@@ -127,7 +127,9 @@ export default function AboutPage() {
   return (
     <DocPage
       eyebrow="À propos"
-      title="ShareX Manager"
+      title="Vos fichiers,"
+      titleAccent="sur votre serveur."
+      photo="pines"
       icon={Info}
       intro={
         <p>

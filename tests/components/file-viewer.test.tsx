@@ -12,8 +12,6 @@ const { pushMock, translations } = vi.hoisted(() => ({
   translations: {
     "common.loading": "Loading...",
     "gallery.file_viewer.details": "Details",
-    "gallery.file_viewer.presentation.fullscreen": "Fullscreen",
-    "gallery.file_viewer.presentation.modal": "Modal",
     "gallery.file_viewer.previous_button": "Previous",
     "gallery.file_viewer.next_button": "Next",
     "gallery.file_viewer.name": "Name",
@@ -93,7 +91,6 @@ function buildProps(
   return {
     file,
     presentation: "fullscreen",
-    onPresentationChange: vi.fn(),
     onClose: vi.fn(),
     onDelete: vi.fn(async () => {}),
     onCopy: vi.fn(),
@@ -108,39 +105,15 @@ function buildProps(
 }
 
 describe("FileViewer", () => {
-  it("renders the fullscreen presentation without a dialog wrapper", async () => {
-    const user = userEvent.setup();
-    const onPresentationChange = vi.fn();
-
-    render(
-      <FileViewer
-        {...buildProps({
-          presentation: "fullscreen",
-          onPresentationChange,
-        })}
-      />,
-    );
+  it("renders the fullscreen presentation without a dialog wrapper", () => {
+    render(<FileViewer {...buildProps({ presentation: "fullscreen" })} />);
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getAllByText("viewer-file.png").length).toBeGreaterThan(0);
-
-    await user.click(screen.getAllByRole("button", { name: "Modal" })[0]);
-
-    expect(onPresentationChange).toHaveBeenCalledWith("modal");
   });
 
-  it("renders the modal presentation and lets the user switch back to fullscreen", async () => {
-    const user = userEvent.setup();
-    const onPresentationChange = vi.fn();
-
-    render(
-      <FileViewer
-        {...buildProps({
-          presentation: "modal",
-          onPresentationChange,
-        })}
-      />,
-    );
+  it("renders the modal presentation inside a dialog", () => {
+    render(<FileViewer {...buildProps({ presentation: "modal" })} />);
 
     expect(
       screen.getByRole("dialog", {
@@ -148,10 +121,12 @@ describe("FileViewer", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("viewer-file.png").length).toBeGreaterThan(0);
+  });
 
-    await user.click(screen.getAllByRole("button", { name: "Fullscreen" })[0]);
+  it("offers no presentation switch: it is a preference, not a viewer control", () => {
+    render(<FileViewer {...buildProps({ presentation: "fullscreen" })} />);
 
-    expect(onPresentationChange).toHaveBeenCalledWith("fullscreen");
+    expect(screen.queryByRole("button", { name: /fullscreen|modal/i })).not.toBeInTheDocument();
   });
 
   it("supports keyboard navigation with the arrow keys and escape", async () => {

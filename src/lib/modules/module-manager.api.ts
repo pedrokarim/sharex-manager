@@ -53,6 +53,13 @@ const ModuleConfigSchema = z.object({
   enabled: z.boolean(),
   entry: z.string(),
   icon: z.string().optional(),
+  branding: z
+    .object({
+      logo: z.string().optional(),
+      logoSmall: z.string().optional(),
+      accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    })
+    .optional(),
   category: z.string().optional(),
   hasUI: z.boolean().default(false),
   supportedFileTypes: z.array(z.string()).default([]),

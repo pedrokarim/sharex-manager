@@ -1,6 +1,7 @@
 "use client";
 
 import { Shield } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import {
   Card,
   CardContent,
@@ -32,22 +33,10 @@ export default function SecurityPageClient() {
 
   return (
     <div className="w-full space-y-6">
-      <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
-        <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-          <Shield className="h-3.5 w-3.5" />
-          Sécurité
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-          <Shield className="h-6 w-6 sm:h-8 sm:w-8" />
-          {t("admin.security.title")}
-        </h1>
-        <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-          {t("admin.security.description")}
-        </p>
-      </section>
+      <AdminPageHeader icon={Shield} title={t("admin.security.title")} description={t("admin.security.description")} />
 
-      <Card className="rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="border-b border-border/60 p-4 sm:p-6">
+      <Card className="gap-0 rounded-2xl border-border/70 py-0 shadow-sm">
+        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
             {t("admin.security.scan.title")}
@@ -56,8 +45,8 @@ export default function SecurityPageClient() {
             {t("admin.security.scan.subtitle")}
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-4 sm:p-6 pt-0">
-          <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
+        <CardContent className="p-5 sm:p-6">
+          <div className="space-y-4">
             <p className="text-sm sm:text-base">
               {t("admin.security.scan.description")}
             </p>
@@ -79,8 +68,8 @@ export default function SecurityPageClient() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="border-b border-border/60 p-4 sm:p-6">
+      <Card className="gap-0 rounded-2xl border-border/70 py-0 shadow-sm">
+        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
             {t("admin.security.coming_soon.title")}
@@ -89,8 +78,8 @@ export default function SecurityPageClient() {
             {t("admin.security.coming_soon.subtitle")}
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-4 sm:p-6 pt-0">
-          <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
+        <CardContent className="p-5 sm:p-6">
+          <div className="space-y-4">
             <p className="text-sm sm:text-base">
               {t("admin.security.coming_soon.description")}
             </p>

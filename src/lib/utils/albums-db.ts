@@ -12,6 +12,7 @@ export interface Album {
   thumbnailFile?: string;
   fileCount: number;
   isPublic?: boolean;
+  inCatalog?: boolean;
   publicSlug?: string;
 }
 
@@ -81,6 +82,15 @@ export class AlbumsDatabase {
       db.run(`ALTER TABLE albums ADD COLUMN public_slug TEXT`);
     } catch (e) {
       // La colonne existe déjà, ignorer l'erreur
+    }
+
+    // Migration : un album public n'est plus forcément listé au catalogue.
+    // Les albums déjà publics y figuraient tous : ils y restent.
+    try {
+      db.run(`ALTER TABLE albums ADD COLUMN in_catalog INTEGER DEFAULT 0`);
+      db.run(`UPDATE albums SET in_catalog = 1 WHERE is_public = 1`);
+    } catch (e) {
+      // La colonne existe déjà : la reprise a été faite à sa création.
     }
 
     // Index pour les recherches publiques
@@ -228,6 +238,11 @@ export class AlbumsDatabase {
     if (updates.isPublic !== undefined) {
       fields.push("is_public = ?");
       values.push(updates.isPublic ? 1 : 0);
+    }
+
+    if (updates.inCatalog !== undefined) {
+      fields.push("in_catalog = ?");
+      values.push(updates.inCatalog ? 1 : 0);
     }
 
     if (updates.publicSlug !== undefined) {
@@ -487,6 +502,8 @@ export class AlbumsDatabase {
       isPublic: row.hasOwnProperty("is_public")
         ? Boolean(row.is_public)
         : false,
+      // Jamais au catalogue sans être public, quoi que dise la colonne.
+      inCatalog: Boolean(row.is_public) && Boolean(row.in_catalog),
       publicSlug: row.hasOwnProperty("public_slug")
         ? row.public_slug || undefined
         : undefined,

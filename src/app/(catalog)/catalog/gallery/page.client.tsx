@@ -1,14 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
-import { CalendarSearch, ChevronDown, Images } from "lucide-react";
+import { Images } from "lucide-react";
 
-import { Loading } from "@/components/ui/loading";
+import {
+  CATALOG_STICKY_OFFSET,
+  CatalogToolbar,
+  DateChip,
+  DensitySwitch,
+  MediaGrid,
+  MediaGridSkeleton,
+  MediaTile,
+  MonthHeading,
+  type Density,
+} from "@/components/catalog/catalog-grid";
 import { PublicImageViewer } from "@/components/catalog/public-image-viewer";
-import { VideoThumbnail } from "@/components/gallery/video-thumbnail";
-import { GalleryProvenanceBadge } from "@/components/gallery/gallery-provenance";
-import { isVideoFile } from "@/lib/media-kind";
+import { FRONT_FULL } from "@/components/front/container";
+import { DISPLAY } from "@/components/front/fonts";
+import { PhotoHeader } from "@/components/front/photo-header";
+import { ACCENT, CHIP, CHIP_ACTIVE, CHIP_IDLE } from "@/components/front/styles";
+import { Loading } from "@/components/ui/loading";
 import { TimelineNavigator, timelineGroupProps } from "@/components/timeline/timeline-navigator";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { formatMonthKey, monthKeyOf, type TimelineMonth } from "@/lib/timeline";
@@ -22,21 +33,7 @@ interface GalleryImage {
   durationMs?: number;
 }
 
-type Density = "dense" | "normal" | "large";
-
-const DENSITY: Record<Density, string> = {
-  dense: "grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10 gap-1",
-  normal: "grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-1.5",
-  large: "grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2",
-};
-
 const PAGE_SIZE = 60;
-
-/** La grille affiche des miniatures ; la visionneuse sert la pleine résolution. */
-const thumb = (name: string) => `/api/thumbnails/${encodeURIComponent(name)}`;
-
-/** Hauteur de la barre du site, qui recouvre le haut de la page. */
-const STICKY_OFFSET = 100;
 
 const monthKey = (iso?: string) => {
   if (!iso) return "0000-00";
@@ -172,204 +169,130 @@ export function CatalogGalleryPage() {
    */
   const openViewer = (indexInVisible: number) => setSelectedIndex(indexInVisible);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[calc(100vh-6rem)] items-center justify-center pt-24">
-        <Loading />
-      </div>
-    );
-  }
+  const countLabel =
+    typeof total === "number"
+      ? `${new Intl.NumberFormat("fr-FR").format(total)} ${videosTotal ? "images et vidéos" : total > 1 ? "images" : "image"}`
+      : null;
 
   return (
     <>
-      <div className="pb-16 pt-24">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <header>
-            <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-              Tous albums confondus
-            </span>
-            <h1 className="mt-4 max-w-[18ch] text-3xl font-bold tracking-tighter text-balance sm:text-4xl lg:text-5xl">
-              {total
-                ? `${total} ${videosTotal ? "images et vidéos" : "images"}, de la plus récente à la plus ancienne.`
-                : "Galerie"}
-            </h1>
-            <p className="mt-3 max-w-[54ch] text-base leading-relaxed text-muted-foreground">
-              Filtrez par album, ajustez la densité. Les images se chargent au
-              fil du défilement.
-            </p>
-          </header>
-        </div>
+      <PhotoHeader
+        photo="glade"
+        kicker="Tous albums confondus"
+        title="Toutes les images,"
+        titleAccent="au fil du temps."
+        description="De la plus récente à la plus ancienne. Filtrez par album, réglez la taille des vignettes, ou sautez à une date."
+      />
 
-        {images.length > 0 ? (
-          <div className="sticky top-0 z-20 mt-8 border-y bg-background/85 backdrop-blur">
-            <div className="container mx-auto flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-              <div className="flex flex-1 gap-1.5 overflow-x-auto">
-                <button
-                  type="button"
-                  onClick={() => setAlbum(null)}
-                  aria-pressed={album === null}
-                  className={cn(
-                    "shrink-0 rounded-full border px-3 py-1.5 font-mono text-xs transition-colors",
-                    album === null
-                      ? "border-foreground bg-foreground text-background"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  Tous
-                </button>
-                {albumOptions.map((option) => (
-                  <button
-                    key={option.slug}
-                    type="button"
-                    onClick={() => setAlbum(option.slug)}
-                    aria-pressed={album === option.slug}
-                    className={cn(
-                      "shrink-0 rounded-full border px-3 py-1.5 font-mono text-xs transition-colors",
-                      album === option.slug
-                        ? "border-foreground bg-foreground text-background"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {option.name}
-                  </button>
-                ))}
-              </div>
+      {images.length > 0 ? (
+        <CatalogToolbar>
+          <div className="flex min-w-0 flex-1 basis-full gap-2 overflow-x-auto sm:basis-0">
+            <button
+              type="button"
+              onClick={() => setAlbum(null)}
+              aria-pressed={album === null}
+              className={cn(CHIP, album === null ? CHIP_ACTIVE : CHIP_IDLE)}
+            >
+              Tous
+            </button>
+            {albumOptions.map((option) => (
+              <button
+                key={option.slug}
+                type="button"
+                onClick={() => setAlbum(option.slug)}
+                aria-pressed={album === option.slug}
+                className={cn(CHIP, album === option.slug ? CHIP_ACTIVE : CHIP_IDLE)}
+              >
+                {option.name}
+              </button>
+            ))}
+          </div>
 
-              {canPickDate ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPickerKey(null);
-                    setPickerOpen(true);
-                  }}
-                  className="flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <CalendarSearch className="h-3.5 w-3.5" />
-                  Aller à une date
-                </button>
-              ) : null}
+          {countLabel ? <span className="hidden text-sm text-muted-foreground lg:block">{countLabel}</span> : null}
+          {canPickDate ? (
+            <DateChip
+              onClick={() => {
+                setPickerKey(null);
+                setPickerOpen(true);
+              }}
+            />
+          ) : null}
+          <DensitySwitch value={density} onChange={setDensity} />
+        </CatalogToolbar>
+      ) : null}
 
-              <div className="flex overflow-hidden rounded-md border">
-                {(["dense", "normal", "large"] as Density[]).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setDensity(mode)}
-                    aria-pressed={density === mode}
-                    className={cn(
-                      "px-3 py-1.5 font-mono text-xs capitalize transition-colors",
-                      density === mode
-                        ? "bg-foreground text-background"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {mode === "large" ? "grand" : mode}
-                  </button>
-                ))}
-              </div>
-            </div>
+      <div ref={galleryRef} className={cn(FRONT_FULL, "pt-6 pb-24 [overflow-anchor:none]")}>
+        {/* Après un saut à une date, ce qui précède se recharge en remontant. */}
+        {firstPage > 1 ? (
+          <div ref={topRef} className="flex h-10 items-center justify-center">
+            {loadingPrevious ? <Loading variant="spinner" size="sm" /> : null}
           </div>
         ) : null}
 
-        <div ref={galleryRef} className="container mx-auto px-4 pt-6 [overflow-anchor:none] sm:px-6 lg:px-8">
-          {/* Après un saut à une date, ce qui précède se recharge en remontant. */}
-          {firstPage > 1 ? (
-            <div ref={topRef} className="flex h-10 items-center justify-center">
-              {loadingPrevious ? <Loading /> : null}
-            </div>
-          ) : null}
-
-          {visible.length === 0 ? (
-            <div className="rounded-xl border border-dashed py-20 text-center">
-              <Images className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-              <h3 className="font-semibold">
-                {album ? "Aucune image dans ce filtre" : "Galerie vide"}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {album
-                  ? "Choisissez un autre album, ou revenez à « Tous »."
-                  : "Aucune image n'est disponible pour le moment."}
-              </p>
-            </div>
-          ) : (
-            groups.map((group) => (
-              <section
-                key={`${group.key}-${group.start}`}
-                className="mt-6 first:mt-0"
-                {...timelineGroupProps(group.key, group.start, group.items.length)}
-              >
-                <div className="mb-2 flex items-baseline gap-3 border-b pb-2">
-                  {canPickDate ? (
-                    <button
-                      type="button"
-                      onClick={() => {
+        {loading ? (
+          <div className="pt-16">
+            <MediaGridSkeleton density={density} />
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="py-24 text-center">
+            <Images className={cn("mx-auto size-9", ACCENT)} strokeWidth={1.5} />
+            <h2 className={cn(DISPLAY, "mt-5 text-3xl")}>{album ? "Aucune image dans ce filtre" : "Galerie vide"}</h2>
+            <p className="mt-2 text-muted-foreground">
+              {album ? "Choisissez un autre album, ou revenez à « Tous »." : "Aucune image n'est disponible pour le moment."}
+            </p>
+          </div>
+        ) : (
+          groups.map((group) => (
+            <section
+              key={`${group.key}-${group.start}`}
+              className="mt-12 first:mt-4"
+              {...timelineGroupProps(group.key, group.start, group.items.length)}
+            >
+              <MonthHeading
+                label={monthLabel(group.key)}
+                onPick={
+                  canPickDate
+                    ? () => {
                         setPickerKey(group.key);
                         setPickerOpen(true);
-                      }}
-                      title="Aller à une date"
-                      className="group/month inline-flex items-center gap-1 font-mono text-xs font-medium capitalize transition-colors hover:text-primary"
-                    >
-                      {monthLabel(group.key)}
-                      <ChevronDown className="h-3 w-3 opacity-0 transition-opacity group-hover/month:opacity-100 group-focus-visible/month:opacity-100" />
-                    </button>
-                  ) : (
-                    <span className="font-mono text-xs font-medium capitalize">{monthLabel(group.key)}</span>
-                  )}
-                </div>
-                <div className={cn("grid", DENSITY[density])}>
-                  {group.items.map((image, indexInGroup) => (
-                    <button
-                      key={image.name}
-                      type="button"
-                      onClick={() => openViewer(group.offset + indexInGroup)}
-                      className="group relative aspect-square overflow-hidden rounded-sm bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={`Ouvrir ${image.name}`}
-                    >
-                      {isVideoFile(image.name) ? (
-                        <VideoThumbnail name={image.name} durationMs={image.durationMs} sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw" />
-                      ) : (
-                        <Image
-                          src={thumb(image.name)}
-                          alt=""
-                          fill
-                          sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw"
-                          className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                        />
-                      )}
-                      <GalleryProvenanceBadge name={image.name} className="left-1.5 top-1.5" />
-                      {image.album ? (
-                        <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/75 to-transparent px-2 pb-1 pt-5 text-left font-mono text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
-                          {image.album.name}
-                        </span>
-                      ) : null}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))
-          )}
+                      }
+                    : undefined
+                }
+              />
+              <MediaGrid density={density}>
+                {group.items.map((image, indexInGroup) => (
+                  <MediaTile
+                    key={image.name}
+                    name={image.name}
+                    durationMs={image.durationMs}
+                    caption={image.album?.name}
+                    onOpen={() => openViewer(group.offset + indexInGroup)}
+                  />
+                ))}
+              </MediaGrid>
+            </section>
+          ))
+        )}
 
-          {images.length > 0 ? <div ref={sentinelRef} className="h-10 w-full" aria-hidden /> : null}
+        {images.length > 0 ? <div ref={sentinelRef} className="h-10 w-full" aria-hidden /> : null}
 
-          {loadingMore ? (
-            <div className="flex justify-center py-10">
-              <Loading />
-            </div>
-          ) : null}
+        {loadingMore ? (
+          <div className="pt-2">
+            <MediaGridSkeleton density={density} count={14} />
+          </div>
+        ) : null}
 
-          {!loadingMore && images.length > 0 && atEnd ? (
-            <p className="py-10 text-center font-mono text-xs text-muted-foreground">
-              {typeof total === "number" ? `${total} – fin de la galerie` : "Fin de la galerie"}
-            </p>
-          ) : null}
-        </div>
+        {!loadingMore && images.length > 0 && atEnd ? (
+          <p className="pt-16 text-center text-sm text-muted-foreground">
+            {countLabel ? `${countLabel} – fin de la galerie` : "Fin de la galerie"}
+          </p>
+        ) : null}
       </div>
 
       <TimelineNavigator
         months={timelineMonths}
         containerRef={galleryRef}
-        topOffset={STICKY_OFFSET}
+        topOffset={CATALOG_STICKY_OFFSET}
         loadAt={loadAt}
         pickerOpen={pickerOpen}
         onPickerOpenChange={setPickerOpen}

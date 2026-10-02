@@ -23,6 +23,8 @@ interface ModuleSource {
   label: string;
   description?: string;
   icon?: string;
+  /** Logo du module qui fournit la source. */
+  logo?: string;
   list: string;
   import: string;
 }
@@ -81,7 +83,7 @@ export function AddDialog({ open, onOpenChange, onFiles, onBrowse, onAdded }: Ad
   }, [open]);
 
   const entries = useMemo(() => {
-    const list: { key: string; label: string; hint: string; icon: LucideIcon; source?: ModuleSource }[] = [
+    const list: { key: string; label: string; hint: string; icon: LucideIcon; logo?: string; source?: ModuleSource }[] = [
       { key: "device", label: t("gallery.add.device"), hint: t("gallery.add.device_hint"), icon: HardDrive },
     ];
     for (const source of sources) {
@@ -90,6 +92,7 @@ export function AddDialog({ open, onOpenChange, onFiles, onBrowse, onAdded }: Ad
         label: source.label,
         hint: source.description ?? "",
         icon: moduleIcon(source.icon),
+        logo: source.logo,
         source,
       });
     }
@@ -133,7 +136,12 @@ export function AddDialog({ open, onOpenChange, onFiles, onBrowse, onAdded }: Ad
                     selected ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
-                  <Icon className={cn("h-4 w-4 shrink-0", selected && "text-primary")} />
+                  {entry.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- logo servi par le module
+                    <img src={entry.logo} alt="" className="h-5 w-5 shrink-0 object-contain" />
+                  ) : (
+                    <Icon className={cn("h-4 w-4 shrink-0", selected && "text-primary")} />
+                  )}
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium">{entry.label}</span>
                     {entry.hint && (

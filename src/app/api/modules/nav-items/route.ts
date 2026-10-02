@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { apiModuleManager } from "@/lib/modules/module-manager.api";
+import { readModuleNavEntries } from "@/lib/modules/nav-items";
 
 export async function GET() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -10,35 +10,7 @@ export async function GET() {
   }
 
   try {
-    await apiModuleManager.ensureInitialized();
-
-    const loadedModules = apiModuleManager.getAllLoadedModules();
-
-    const items = loadedModules
-      .filter((m) => m.config.navItems && m.config.navItems.length > 0)
-      .flatMap((m) =>
-        m.config.navItems!.map((navItem) => {
-          const url = navItem.url || `/m/${m.name}`;
-
-          // Generate sub-items from pages that have a non-empty path
-          const subItems = (m.config.pages || [])
-            .filter((page) => page.path !== "")
-            .map((page) => ({
-              title: page.title,
-              url: `/m/${m.name}/${page.path}`,
-            }));
-
-          return {
-            moduleName: m.name,
-            title: navItem.title,
-            url,
-            icon: navItem.icon || "Puzzle",
-            subItems,
-          };
-        })
-      );
-
-    return NextResponse.json({ items });
+    return NextResponse.json({ items: await readModuleNavEntries() });
   } catch (error) {
     console.error("Error fetching module nav items:", error);
     return NextResponse.json(

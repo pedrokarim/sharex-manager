@@ -1,5 +1,7 @@
-import { CatalogAlbumsPage } from "./page.client";
+import { PageTransition } from "@/components/page-transition";
+import { readCatalogOverviewSafely } from "@/lib/public-catalog";
 import { publicPageMetadata } from "@/lib/seo";
+import { CatalogAlbumsPage } from "./page.client";
 
 export const metadata = publicPageMetadata({
   title: "Albums publics",
@@ -8,8 +10,13 @@ export const metadata = publicPageMetadata({
   path: "/catalog/albums",
 });
 
-
 export default function AlbumsPage() {
-  return <CatalogAlbumsPage />;
-}
+  // Lus côté serveur : la liste arrive avec la page, sans écran d'attente.
+  const { albums } = readCatalogOverviewSafely({ limit: 200, includeImages: true });
 
+  return (
+    <PageTransition>
+      <CatalogAlbumsPage albums={albums} />
+    </PageTransition>
+  );
+}

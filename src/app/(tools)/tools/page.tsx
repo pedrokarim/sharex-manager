@@ -1,3 +1,4 @@
+import { PageTransition } from "@/components/page-transition";
 import { Metadata } from "next";
 import { ToolsPageClient } from "./page.client";
 import { publicPageMetadata } from "@/lib/seo";
@@ -11,5 +12,9 @@ export const metadata = publicPageMetadata({
 
 
 export default function ToolsPage() {
-  return <ToolsPageClient />;
+  return (
+    <PageTransition>
+      <ToolsPageClient />
+    </PageTransition>
+  );
 }

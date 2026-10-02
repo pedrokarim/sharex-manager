@@ -1,7 +1,9 @@
+import { PageTransition } from "@/components/page-transition";
 import { statSync } from "fs";
 import { join } from "path";
 
 import { getAbsoluteUploadPath } from "@/lib/config";
+import { isInCatalog } from "@/lib/album-visibility";
 import { albumsDb } from "@/lib/utils/albums-db";
 import { HomePageClient, type HomeShowcase } from "./page.client";
 import { publicPageMetadata } from "@/lib/seo";
@@ -42,7 +44,7 @@ function pickSpread<T>(items: T[], count: number): T[] {
 
 function readPublicShowcase(): HomeShowcase {
   try {
-    const publicAlbums = albumsDb.getAlbums().filter((album) => album.isPublic);
+    const publicAlbums = albumsDb.getAlbums().filter(isInCatalog);
 
     const seen = new Map<string, string>();
     for (const album of publicAlbums) {
@@ -91,6 +93,8 @@ export default function HomePage() {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
   return (
-    <HomePageClient showcase={readPublicShowcase()} apiBaseUrl={apiBaseUrl} />
+    <PageTransition>
+      <HomePageClient showcase={readPublicShowcase()} apiBaseUrl={apiBaseUrl} />
+    </PageTransition>
   );
 }

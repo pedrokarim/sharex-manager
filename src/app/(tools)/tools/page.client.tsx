@@ -1,10 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Boxes, ScanSearch, Wrench } from "lucide-react";
+import { ArrowRight, ScanSearch } from "lucide-react";
 
+import { FRONT_CONTAINER, FRONT_NARROW, FRONT_WIDE } from "@/components/front/container";
+import { DISPLAY } from "@/components/front/fonts";
+import { PhotoHeader } from "@/components/front/photo-header";
+import { Reveal } from "@/components/front/reveal";
+import { ACCENT, KICKER } from "@/components/front/styles";
 import { ServiceCard } from "@/components/tools/service-card";
 import { useTranslation } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 /**
  * Services annexes présentés sur la page.
@@ -22,8 +28,7 @@ const SERVICES = [
     preview: "/images/tools/just-tools.jpg",
     accent: {
       glow: "bg-indigo-500/30",
-      border: "hover:border-indigo-500/50",
-      button: "bg-indigo-600 shadow-indigo-600/30 hover:bg-indigo-600/90",
+      button: "bg-indigo-600 hover:bg-indigo-600/90",
     },
   },
   {
@@ -35,8 +40,7 @@ const SERVICES = [
     preview: "/images/tools/mcinfo.jpg",
     accent: {
       glow: "bg-amber-500/30",
-      border: "hover:border-amber-500/50",
-      button: "bg-amber-600 shadow-amber-600/30 hover:bg-amber-600/90",
+      button: "bg-amber-600 hover:bg-amber-600/90",
     },
   },
 ] as const;
@@ -50,88 +54,61 @@ export function ToolsPageClient() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      {/* Halo de fond, sous le titre. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
+    <>
+      <PhotoHeader
+        photo="path"
+        kicker={t("tools.hub.kicker")}
+        title={t("tools.hub.title")}
+        description={t("tools.hub.subtitle")}
       />
 
-      <div className="relative mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
-        <Link
-          href="/"
-          className="group mb-10 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5" />
-          {t("tools.hub.back")}
-        </Link>
-
-        <header className="max-w-2xl">
-          <p className="flex items-center gap-2 text-xs font-bold tracking-[0.14em] text-primary uppercase">
-            <Wrench className="size-3.5" />
-            {t("tools.hub.kicker")}
-          </p>
-          <h1 className="mt-4 text-3xl font-bold tracking-tighter text-balance sm:text-4xl lg:text-5xl">
-            {t("tools.hub.title")}
-          </h1>
-          <p className="mt-5 text-pretty text-muted-foreground sm:text-lg">
-            {t("tools.hub.subtitle")}
-          </p>
-        </header>
-
-        {/* Outils hébergés ici même, sans compte. */}
-        <section className="mt-12 lg:mt-16">
-          <h2 className="text-xs font-bold tracking-[0.14em] text-muted-foreground uppercase">
-            {t("tools.hub.local_title")}
-          </h2>
-          <Link
-            href="/tools/origine-image"
-            className="group mt-4 flex items-start gap-4 rounded-2xl border border-border/70 bg-card p-5 transition-colors hover:border-primary/50 sm:items-center sm:p-6"
-          >
-            <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <ScanSearch className="size-6" />
-            </span>
+      {/* L'outil hébergé ici même, sans compte : une ligne, pas un encadré. */}
+      <section className={cn(FRONT_NARROW, "pt-6")}>
+        <Reveal>
+          <p className={cn(KICKER, ACCENT)}>{t("tools.hub.local_title")}</p>
+          <Link href="/tools/origine-image" className="group mt-4 flex items-center gap-5 border-y border-border/70 py-6">
+            <ScanSearch className={cn("size-11 shrink-0 p-1.5", ACCENT)} strokeWidth={1.5} />
             <span className="min-w-0 flex-1">
-              <span className="block text-lg font-semibold tracking-tight">{t("tools.hub.origin.name")}</span>
-              <span className="mt-1 block text-sm text-pretty text-muted-foreground">
+              <span className={cn(DISPLAY, "block text-2xl sm:text-3xl")}>{t("tools.hub.origin.name")}</span>
+              <span className="mt-1.5 block text-sm text-pretty text-muted-foreground sm:text-base">
                 {t("tools.hub.origin.description")}
               </span>
             </span>
-            <ArrowRight className="mt-1 size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary sm:mt-0" />
+            <ArrowRight className="size-5 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-foreground" />
           </Link>
-        </section>
+        </Reveal>
+      </section>
 
-        <h2 className="mt-12 text-xs font-bold tracking-[0.14em] text-muted-foreground uppercase">
-          {t("tools.hub.external_title")}
-        </h2>
-        <div className="mt-4 grid gap-6 lg:grid-cols-2 lg:gap-8">
-          {SERVICES.map((service) => (
-            <ServiceCard
-              key={service.key}
-              name={service.name}
-              tagline={t(`tools.hub.services.${service.key}.tagline`)}
-              description={t(`tools.hub.services.${service.key}.description`)}
-              highlights={asList(`tools.hub.services.${service.key}.highlights`)}
-              href={service.href}
-              domain={service.domain}
-              logo={{
-                src: service.logo,
-                alt: `Logo ${service.name}`,
-              }}
-              preview={{
-                src: service.preview,
-                alt: t(`tools.hub.services.${service.key}.preview_alt`),
-              }}
-              accent={service.accent}
-            />
+      <section className="pt-24 pb-24 sm:pt-28 sm:pb-32">
+        <Reveal className={cn(FRONT_CONTAINER, "text-center")}>
+          <p className={cn(KICKER, ACCENT)}>{t("tools.hub.external_title")}</p>
+        </Reveal>
+        <div className={cn(FRONT_WIDE, "mt-8 grid gap-6 lg:grid-cols-2 lg:gap-8")}>
+          {SERVICES.map((service, index) => (
+            <Reveal key={service.key} delay={index * 0.1} className="flex">
+              <ServiceCard
+                name={service.name}
+                tagline={t(`tools.hub.services.${service.key}.tagline`)}
+                description={t(`tools.hub.services.${service.key}.description`)}
+                highlights={asList(`tools.hub.services.${service.key}.highlights`)}
+                href={service.href}
+                domain={service.domain}
+                logo={{
+                  src: service.logo,
+                  alt: `Logo ${service.name}`,
+                }}
+                preview={{
+                  src: service.preview,
+                  alt: t(`tools.hub.services.${service.key}.preview_alt`),
+                }}
+                accent={service.accent}
+                className="w-full"
+              />
+            </Reveal>
           ))}
         </div>
-
-        <footer className="mt-14 flex items-start gap-3 rounded-2xl border border-border/70 bg-muted/40 p-5 text-sm text-muted-foreground">
-          <Boxes className="mt-0.5 size-4 shrink-0 text-primary" />
-          <p className="text-pretty">{t("tools.hub.note")}</p>
-        </footer>
-      </div>
-    </div>
+        <p className={cn(FRONT_NARROW, "mt-12 text-center text-sm text-pretty text-muted-foreground")}>{t("tools.hub.note")}</p>
+      </section>
+    </>
   );
 }

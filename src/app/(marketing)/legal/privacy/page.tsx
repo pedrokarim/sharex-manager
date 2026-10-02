@@ -317,6 +317,7 @@ export default function PrivacyPage() {
       title="Politique de confidentialité"
       icon={Shield}
       backHref="/legal"
+      backLabel="Mentions légales"
       lastUpdated={LEGAL_INFO.lastUpdated}
       intro={
         <p>

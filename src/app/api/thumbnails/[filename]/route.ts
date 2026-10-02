@@ -13,6 +13,12 @@ import { prepareVideo, videoCoverPath } from "@/lib/media/video";
 
 const UPLOADS_DIR = getAbsoluteUploadPath();
 const THUMBNAIL_SIZE = 300;
+/**
+ * Vignette agrandie, pour une couverture affichée en grand (`?size=large`).
+ * Deux tailles fixes, pas une taille libre : chaque variante occupe une entrée
+ * de cache, on ne laisse pas un visiteur en fabriquer à volonté.
+ */
+const LARGE_THUMBNAIL_SIZE = 1200;
 
 export async function GET(
   request: NextRequest,
@@ -58,8 +64,9 @@ export async function GET(
     const imageStream = createReadStream(sourcePath);
 
     // Générer la miniature
+    const size = request.nextUrl.searchParams.get("size") === "large" ? LARGE_THUMBNAIL_SIZE : THUMBNAIL_SIZE;
     const transform = sharp()
-      .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, {
+      .resize(size, size, {
         fit: "inside",
         withoutEnlargement: true,
       })

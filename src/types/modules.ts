@@ -90,6 +90,17 @@ export interface ModuleConfig {
   enabled: boolean;
   entry: string;
   icon?: string;
+  /**
+   * Identité visuelle, rangée dans le dossier du module. Les chemins sont
+   * relatifs à ce dossier ; la route `/api/modules/<nom>/logo` les sert.
+   */
+  branding?: {
+    logo?: string;
+    /** Petite version, pour une barre latérale ou une liste. */
+    logoSmall?: string;
+    /** Couleur d'accent du module, en hexadécimal. */
+    accent?: string;
+  };
   category?: string;
   supportedFileTypes: string[];
   hasUI: boolean;

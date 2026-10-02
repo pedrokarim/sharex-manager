@@ -1,22 +1,21 @@
-import {
-  ANONYMOUS_THEME_PREFERENCE_STORAGE_KEY,
-  DEFAULT_DAY_END_HOUR,
-  DEFAULT_DAY_START_HOUR,
-} from "@/lib/theme/constants";
+import { THEME_PREFERENCE_STORAGE_KEY } from "@/lib/theme/constants";
 import { resolveRuntimeThemeMode } from "@/lib/theme/resolve-theme";
 import type {
   GlobalThemeMode,
   ResolvedThemePayload,
   RuntimeThemeMode,
-  UserThemeMode,
 } from "@/types/theme-runtime";
 
-export type ThemePreference = UserThemeMode;
-export type AnonymousThemePreference = GlobalThemeMode;
+/**
+ * Mode d'affichage choisi dans ce navigateur. Ce n'est pas un thème : les
+ * couleurs sont celles du site pour tout le monde. Le choix vit dans
+ * `localStorage`, connecté ou non, et n'est jamais envoyé au serveur.
+ */
+export type ThemePreference = GlobalThemeMode;
 
-export function parseAnonymousThemePreference(
+export function parseThemePreference(
   value: string | null | undefined,
-): AnonymousThemePreference | null {
+): ThemePreference | null {
   if (value === "light" || value === "dark" || value === "system") {
     return value;
   }
@@ -24,103 +23,53 @@ export function parseAnonymousThemePreference(
   return null;
 }
 
-export function readAnonymousThemePreference(): AnonymousThemePreference | null {
+export function readThemePreference(): ThemePreference | null {
   if (typeof window === "undefined") {
     return null;
   }
 
-  return parseAnonymousThemePreference(
-    window.localStorage.getItem(ANONYMOUS_THEME_PREFERENCE_STORAGE_KEY),
-  );
+  try {
+    return parseThemePreference(
+      window.localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY),
+    );
+  } catch {
+    // Stockage indisponible (navigation privée, cookies bloqués).
+    return null;
+  }
 }
 
-export function writeAnonymousThemePreference(
-  preference: AnonymousThemePreference,
-) {
+export function writeThemePreference(preference: ThemePreference) {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(
-    ANONYMOUS_THEME_PREFERENCE_STORAGE_KEY,
-    preference,
-  );
-}
-
-export function clearAnonymousThemePreference() {
-  if (typeof window === "undefined") {
-    return;
+  try {
+    window.localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, preference);
+  } catch {
+    // Le choix vaudra pour cette page seulement.
   }
-
-  window.localStorage.removeItem(ANONYMOUS_THEME_PREFERENCE_STORAGE_KEY);
 }
 
-export function getThemeTimeWindow(resolvedTheme: ResolvedThemePayload) {
-  return {
-    dayStartHour:
-      resolvedTheme.userPreferences?.dayStartHour ?? DEFAULT_DAY_START_HOUR,
-    dayEndHour: resolvedTheme.userPreferences?.dayEndHour ?? DEFAULT_DAY_END_HOUR,
-  };
-}
-
-export function getThemePreference(
-  resolvedTheme: ResolvedThemePayload,
-  options: {
-    isAuthenticated: boolean;
-    anonymousPreference?: AnonymousThemePreference | null;
-  },
-): ThemePreference {
-  if (options.isAuthenticated) {
-    return resolvedTheme.userPreferences?.modeOverride ?? "inherit";
-  }
-
-  return options.anonymousPreference ?? resolvedTheme.globalTheme.mode;
-}
-
-export function getResolvedModePreference(
-  themePreference: ThemePreference,
-  globalThemeMode: GlobalThemeMode,
-): Exclude<UserThemeMode, "inherit"> | GlobalThemeMode {
-  if (themePreference === "inherit") {
-    return globalThemeMode;
-  }
-
-  return themePreference;
-}
-
+/**
+ * Le mode à afficher : celui que ce navigateur a choisi, sinon celui du site.
+ */
 export function resolveThemeRuntimeState(
   resolvedTheme: ResolvedThemePayload,
   options: {
-    isAuthenticated: boolean;
-    anonymousPreference?: AnonymousThemePreference | null;
-    now?: Date;
+    localPreference?: ThemePreference | null;
     prefersDark?: boolean;
-  },
+  } = {},
 ): {
   themePreference: ThemePreference;
-  modePreference: Exclude<UserThemeMode, "inherit"> | GlobalThemeMode;
   activeMode: RuntimeThemeMode;
-  timeWindow: {
-    dayStartHour: number;
-    dayEndHour: number;
-  };
 } {
-  const themePreference = getThemePreference(resolvedTheme, options);
-  const modePreference = getResolvedModePreference(
-    themePreference,
-    resolvedTheme.globalTheme.mode,
-  );
-  const timeWindow = getThemeTimeWindow(resolvedTheme);
+  const themePreference =
+    options.localPreference ?? resolvedTheme.globalTheme.mode;
 
   return {
     themePreference,
-    modePreference,
-    activeMode: resolveRuntimeThemeMode(modePreference, {
+    activeMode: resolveRuntimeThemeMode(themePreference, {
       prefersDark: options.prefersDark,
-      now: options.now,
-      dayStartHour: timeWindow.dayStartHour,
-      dayEndHour: timeWindow.dayEndHour,
     }),
-    timeWindow,
   };
 }

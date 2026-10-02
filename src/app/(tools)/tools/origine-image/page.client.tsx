@@ -3,8 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useDropzone } from "react-dropzone";
-import { ArrowLeft, Camera, HelpCircle, Loader2, ScanSearch, Sparkles, Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, Camera, HelpCircle, Loader2, Sparkles, Upload } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { FRONT_CONTAINER, FRONT_NARROW } from "@/components/front/container";
+import { DISPLAY } from "@/components/front/fonts";
+import { PhotoHeader } from "@/components/front/photo-header";
+import { ACCENT, PILL_SOLID } from "@/components/front/styles";
 import { ProvenanceDetails } from "@/components/provenance/provenance-view";
 import { useTranslation } from "@/lib/i18n";
 import type { ProvenanceReport, ProvenanceVerdict } from "@/lib/provenance/types";
@@ -20,9 +24,9 @@ interface Analysis {
 }
 
 const VERDICT_STYLES = {
-  generated: { icon: Sparkles, tone: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300" },
-  capture: { icon: Camera, tone: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
-  undetermined: { icon: HelpCircle, tone: "border-border bg-muted/50 text-foreground" },
+  generated: { icon: Sparkles, tone: "bg-violet-500/10 text-violet-700 dark:text-violet-300" },
+  capture: { icon: Camera, tone: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
+  undetermined: { icon: HelpCircle, tone: "bg-foreground/[0.05] text-foreground" },
 } as const;
 
 /**
@@ -86,83 +90,91 @@ export function ImageOriginTool() {
   const VerdictIcon = verdictStyle?.icon;
 
   return (
-    <div className="relative mx-auto w-full max-w-5xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
-      <Link
-        href="/tools"
-        className="group mb-10 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5" />
-        {t("tools.origin.back")}
-      </Link>
+    <>
+      <PhotoHeader
+        photo="mist"
+        kicker={
+          <Link href="/tools" className="group inline-flex items-center gap-2 transition-colors hover:text-white">
+            <ArrowLeft className="size-3.5 transition-transform group-hover:-translate-x-0.5" />
+            {t("tools.origin.back")}
+          </Link>
+        }
+        title={t("tools.origin.title")}
+        description={t("tools.origin.subtitle")}
+      />
 
-      <header className="max-w-2xl">
-        <p className="flex items-center gap-2 text-xs font-bold tracking-[0.14em] text-primary uppercase">
-          <ScanSearch className="size-3.5" />
-          {t("tools.origin.kicker")}
-        </p>
-        <h1 className="mt-4 text-3xl font-bold tracking-tighter text-balance sm:text-4xl">{t("tools.origin.title")}</h1>
-        <p className="mt-4 text-pretty text-muted-foreground sm:text-lg">{t("tools.origin.subtitle")}</p>
-      </header>
-
-      <div
-        {...getRootProps()}
-        className={cn(
-          "mt-10 flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors",
-          isDragActive ? "border-primary bg-primary/5" : "border-border bg-muted/30"
-        )}
-      >
-        <input {...getInputProps()} />
-        {loading ? (
-          <Loader2 className="size-9 animate-spin text-primary" />
-        ) : (
-          <Upload className={cn("size-9 text-muted-foreground", isDragActive && "text-primary")} />
-        )}
-        <div className="space-y-1">
-          <p className="font-medium">{loading ? t("tools.origin.reading") : t("tools.origin.drop")}</p>
-          <p className="text-sm text-muted-foreground">{t("tools.origin.drop_hint")}</p>
+      <div className={cn(FRONT_NARROW, "pt-6")}>
+        {/* Le pointillé n'est pas un décor : il dessine la zone où déposer. */}
+        <div
+          {...getRootProps()}
+          className={cn(
+            "flex flex-col items-center justify-center gap-5 rounded-[28px] border-2 border-dashed px-6 py-14 text-center transition-colors",
+            isDragActive ? "border-emerald-600 bg-emerald-500/10" : "border-foreground/15 bg-foreground/[0.03]",
+          )}
+        >
+          <input {...getInputProps()} />
+          {loading ? (
+            <Loader2 className={cn("size-9 animate-spin", ACCENT)} />
+          ) : (
+            <Upload className={cn("size-9", isDragActive ? ACCENT : "text-muted-foreground")} strokeWidth={1.5} />
+          )}
+          <div className="space-y-1.5">
+            <p className={cn(DISPLAY, "text-2xl sm:text-3xl")}>{loading ? t("tools.origin.reading") : t("tools.origin.drop")}</p>
+            <p className="text-sm text-muted-foreground">{t("tools.origin.drop_hint")}</p>
+          </div>
+          <button type="button" onClick={open} disabled={loading} className={cn(PILL_SOLID, "disabled:opacity-50")}>
+            {t("tools.origin.browse")}
+          </button>
+          {error && <p className="rounded-full bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</p>}
         </div>
-        <Button onClick={open} disabled={loading}>
-          {t("tools.origin.browse")}
-        </Button>
-        {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
       </div>
 
-      {analysis && verdictStyle && VerdictIcon && (
-        <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-          <div className="space-y-3">
-            <div className="overflow-hidden rounded-xl border bg-muted">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={analysis.preview} alt="" className="max-h-80 w-full object-contain" />
+      {/* Le résultat arrive en douceur, et cède la place au suivant de même. */}
+      <AnimatePresence mode="wait">
+        {analysis && verdictStyle && VerdictIcon && (
+          <motion.section
+            key={analysis.preview}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className={cn(FRONT_CONTAINER, "mt-12 grid gap-8 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]")}
+          >
+            <div className="space-y-3">
+              <div className="overflow-hidden rounded-[22px] bg-foreground/[0.045]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={analysis.preview} alt="" className="max-h-80 w-full object-contain" />
+              </div>
+              <p className="truncate font-medium" title={analysis.name}>
+                {analysis.name}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {analysis.report.format?.toUpperCase() ?? t("tools.origin.unknown_format")}
+                {analysis.report.width ? ` · ${analysis.report.width} × ${analysis.report.height}` : ""}
+                {` · ${(analysis.report.bytes / 1024 / 1024).toFixed(2)} Mo`}
+              </p>
             </div>
-            <p className="truncate text-sm font-medium" title={analysis.name}>
-              {analysis.name}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {analysis.report.format?.toUpperCase() ?? t("tools.origin.unknown_format")}
-              {analysis.report.width ? ` · ${analysis.report.width} × ${analysis.report.height}` : ""}
-              {` · ${(analysis.report.bytes / 1024 / 1024).toFixed(2)} Mo`}
-            </p>
-          </div>
 
-          <div className="space-y-4">
-            <div className={cn("flex items-start gap-3 rounded-xl border p-4", verdictStyle.tone)}>
-              <VerdictIcon className="mt-0.5 size-5 shrink-0" />
-              <div className="space-y-1">
-                <p className="font-semibold">{analysis.verdict.title}</p>
-                <p className="text-sm opacity-90">{analysis.verdict.reason}</p>
+            <div className="space-y-4">
+              <div className={cn("flex items-start gap-4 rounded-[22px] p-6", verdictStyle.tone)}>
+                <VerdictIcon className="mt-1 size-6 shrink-0" strokeWidth={1.75} />
+                <div className="space-y-1.5">
+                  <p className={cn(DISPLAY, "text-2xl sm:text-3xl")}>{analysis.verdict.title}</p>
+                  <p className="opacity-90">{analysis.verdict.reason}</p>
+                </div>
+              </div>
+              <div className="rounded-[22px] bg-foreground/[0.045] p-6">
+                <ProvenanceDetails report={analysis.report} />
               </div>
             </div>
-            <div className="rounded-xl border p-4">
-              <ProvenanceDetails report={analysis.report} />
-            </div>
-          </div>
-        </section>
-      )}
+          </motion.section>
+        )}
+      </AnimatePresence>
 
-      <footer className="mt-12 space-y-2 rounded-2xl border border-border/70 bg-muted/40 p-5 text-sm text-muted-foreground">
+      <footer className={cn(FRONT_NARROW, "space-y-3 pt-14 pb-24 text-sm text-muted-foreground sm:pb-32")}>
         <p className="text-pretty">{t("tools.origin.note_limits")}</p>
         <p className="text-pretty">{t("tools.origin.note_privacy")}</p>
       </footer>
-    </div>
+    </>
   );
 }

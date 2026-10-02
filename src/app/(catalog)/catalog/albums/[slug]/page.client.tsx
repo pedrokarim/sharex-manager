@@ -2,24 +2,37 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, CalendarSearch, ChevronDown, Images } from "lucide-react";
+import { ArrowLeft, Images } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Loading } from "@/components/ui/loading";
-import { PublicImageViewer } from "@/components/catalog/public-image-viewer";
-import { VideoThumbnail } from "@/components/gallery/video-thumbnail";
-import { GalleryProvenanceBadge } from "@/components/gallery/gallery-provenance";
-import { isImageFile, isVideoFile, mediaCountLabel } from "@/lib/media-kind";
+import {
+  CATALOG_STICKY_OFFSET,
+  CatalogToolbar,
+  DateChip,
+  DensitySwitch,
+  MediaGrid,
+  MediaGridSkeleton,
+  MediaTile,
+  MonthHeading,
+  type Density,
+} from "@/components/catalog/catalog-grid";
 import { CatalogMosaic } from "@/components/catalog/catalog-mosaic";
-import { cn } from "@/lib/utils";
-import type { Album } from "@/types/albums";
+import { PublicImageViewer } from "@/components/catalog/public-image-viewer";
+import { FRONT_FULL } from "@/components/front/container";
+import { DISPLAY } from "@/components/front/fonts";
+import { PhotoHeader } from "@/components/front/photo-header";
+import { ACCENT, PILL_GLASS } from "@/components/front/styles";
 import { TimelineNavigator, timelineGroupProps } from "@/components/timeline/timeline-navigator";
+import { isImageFile, isVideoFile, mediaCountLabel } from "@/lib/media-kind";
+import type { PublicAlbumSummary } from "@/lib/seo-album";
 import { formatMonthKey, monthKeyOf } from "@/lib/timeline";
+import { cn } from "@/lib/utils";
 
 interface CatalogAlbumDetailPageProps {
   slug: string;
+  /** Nom et description, lus côté serveur : l'en-tête s'affiche sans attendre. */
+  summary: PublicAlbumSummary | null;
 }
 
 interface AlbumImage {
@@ -28,19 +41,6 @@ interface AlbumImage {
   addedAt: string;
   durationMs?: number;
 }
-
-type Density = "dense" | "normal" | "large";
-
-const DENSITY: Record<Density, string> = {
-  dense: "grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10 gap-1",
-  normal: "grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-1.5",
-  large: "grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2",
-};
-
-const thumb = (name: string) => `/api/thumbnails/${encodeURIComponent(name)}`;
-
-/** Hauteur de la barre du site, qui recouvre le haut de la page. */
-const STICKY_OFFSET = 100;
 
 const monthKey = (iso?: string) => {
   if (!iso) return "0000-00";
@@ -60,10 +60,10 @@ const formatDate = (iso?: string) => {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(d);
 };
 
-export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
-  const [album, setAlbum] = useState<Album | null>(null);
+export function CatalogAlbumDetailPage({ slug, summary }: CatalogAlbumDetailPageProps) {
+  const [missing, setMissing] = useState(summary === null);
   const [files, setFiles] = useState<AlbumImage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(summary !== null);
   const [density, setDensity] = useState<Density>("normal");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -92,15 +92,13 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
       if (!response.ok) {
         if (response.status === 404) {
           // L'écran « album introuvable » suffit : un toast en plus fait doublon.
-          setAlbum(null);
+          setMissing(true);
           return;
         }
         throw new Error("Erreur lors du chargement");
       }
 
       const data = await response.json();
-      setAlbum(data);
-
       const imageFiles: AlbumImage[] = (data.files || [])
         .filter((entry: any) => isImageFile(entry.fileName) || isVideoFile(entry.fileName))
         .map((entry: any) => ({
@@ -118,182 +116,127 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
     }
   }, [slug]);
 
+  const known = summary !== null;
   useEffect(() => {
-    fetchAlbumData();
-  }, [fetchAlbumData]);
+    // Un album que le serveur n'a pas trouvé n'a rien à charger.
+    if (known) fetchAlbumData();
+  }, [known, fetchAlbumData]);
 
-  if (loading) {
+  const mosaicNames = useMemo(() => files.slice(0, 24).map((file) => file.name), [files]);
+
+  if (!summary || missing) {
     return (
-      <div className="pt-24">
-        <Loading fullHeight />
-      </div>
+      <>
+        <PhotoHeader
+          photo="path"
+          kicker="Albums"
+          title="Album"
+          titleAccent="introuvable."
+          description="Cet album n'existe pas, ou n'est plus partagé publiquement."
+        >
+          <Link href="/catalog/albums" className={PILL_GLASS}>
+            <ArrowLeft className="size-4" />
+            Retour aux albums
+          </Link>
+        </PhotoHeader>
+        <div className="h-24" />
+      </>
     );
   }
 
-  if (!album) {
-    return (
-      <div className="pb-16 pt-24">
-        <div className="container mx-auto px-4 py-16 text-center sm:px-6 lg:px-8">
-          <Images className="mx-auto mb-4 h-14 w-14 text-muted-foreground/30" />
-          <h1 className="text-2xl font-bold">Album introuvable</h1>
-          <p className="mt-2 text-muted-foreground">
-            Cet album n&apos;existe pas ou n&apos;est plus accessible.
-          </p>
-          <Button variant="outline" className="mt-6 gap-2" asChild>
-            <Link href="/catalog/albums">
-              <ArrowLeft className="h-4 w-4" />
-              Retour aux albums
-            </Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const updatedAt = formatDate(files[0]?.addedAt);
+  const updatedAt = formatDate(files[0]?.addedAt ?? summary.updatedAt);
+  const countLabel = loading ? null : mediaCountLabel(files.map((file) => file.name));
 
   return (
     <>
-      {/* Bandeau volontairement plus court que l'accueil : un album se présente,
-          il n'a pas à rejouer l'ouverture du site. */}
-      <section className="relative flex min-h-[44vh] items-end overflow-hidden">
-        {files.length > 0 ? (
-          <CatalogMosaic
-            images={files.slice(0, 24).map((file) => file.name)}
-            rate={1.2}
-            fade={1800}
-          />
-        ) : (
-          <div className="absolute inset-0 bg-muted" />
-        )}
-
-        {/* Même parti pris que l'accueil : contenu clair sur voile sombre,
-            quel que soit le thème de l'application. */}
-        {/* pb-28 : même raison que sur l'accueil, rester au-dessus du fondu. */}
-        <div className="container relative z-10 mx-auto px-4 pb-28 text-white sm:px-6 lg:px-8">
-          <p className="font-mono text-xs text-white/60">
-            <Link href="/catalog/albums" className="hover:text-white">
+      {/* L'en-tête d'un album est plus court que celui du catalogue : il se
+          présente, il n'a pas à rejouer l'ouverture du site. Ses propres images
+          en font le fond, dès qu'elles sont connues. */}
+      <PhotoHeader
+        photo="path"
+        backdrop={
+          mosaicNames.length > 0 ? (
+            <motion.div className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.2 }}>
+              <CatalogMosaic images={mosaicNames} rate={1.2} fade={1800} />
+            </motion.div>
+          ) : loading ? (
+            <span />
+          ) : undefined
+        }
+        kicker={
+          <>
+            <Link href="/catalog/albums" className="transition-colors hover:text-white">
               Albums
-            </Link>{" "}
-            / {album.name}
-          </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tighter text-balance sm:text-4xl lg:text-5xl">
-            {album.name}
-          </h1>
-          {album.description ? (
-            <p className="mt-3 max-w-[54ch] leading-relaxed text-white/75">
-              {album.description}
-            </p>
+            </Link>
+            <span className="mx-2 text-white/40">/</span>
+            <span className="text-white/70">{summary.name}</span>
+          </>
+        }
+        title={summary.name}
+        description={summary.description}
+      >
+        {/* La hauteur est réservée : la date arrive sans faire bouger le titre. */}
+        <p className="min-h-5 text-sm text-white/65">
+          {updatedAt ? (
+            <>
+              Mis à jour le <span className="font-semibold text-white">{updatedAt}</span>
+            </>
           ) : null}
-          <div className="mt-5 flex flex-wrap gap-5 font-mono text-xs text-white/60">
-            <span className="font-semibold text-white">
-              {mediaCountLabel(files.map((file) => file.name))}
-            </span>
-            {updatedAt ? (
-              <span>
-                mis à jour le{" "}
-                <b className="font-semibold text-white">{updatedAt}</b>
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </section>
+        </p>
+      </PhotoHeader>
 
-      <div ref={galleryRef} className="container mx-auto px-4 pb-16 sm:px-6 lg:px-8">
-        {files.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-3 border-b py-4">
-            <div className="flex overflow-hidden rounded-md border">
-              {(["dense", "normal", "large"] as Density[]).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setDensity(mode)}
-                  aria-pressed={density === mode}
-                  className={cn(
-                    "px-3 py-1.5 font-mono text-xs capitalize transition-colors",
-                    density === mode
-                      ? "bg-foreground text-background"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {mode === "large" ? "grand" : mode}
-                </button>
-              ))}
-            </div>
-            {canPickDate ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setPickerKey(null);
-                  setPickerOpen(true);
-                }}
-                className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <CalendarSearch className="h-3.5 w-3.5" />
-                Aller à une date
-              </button>
-            ) : null}
-            <span className="ml-auto font-mono text-xs text-muted-foreground">
-              {mediaCountLabel(files.map((file) => file.name))}
-            </span>
-          </div>
-        ) : null}
+      {files.length > 0 ? (
+        <CatalogToolbar>
+          <span className="flex-1 text-sm text-muted-foreground">{countLabel}</span>
+          {canPickDate ? (
+            <DateChip
+              onClick={() => {
+                setPickerKey(null);
+                setPickerOpen(true);
+              }}
+            />
+          ) : null}
+          <DensitySwitch value={density} onChange={setDensity} />
+        </CatalogToolbar>
+      ) : null}
 
-        {files.length === 0 ? (
-          <div className="mt-8 rounded-xl border border-dashed py-20 text-center">
-            <Images className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-            <h3 className="font-semibold">Album vide</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Cet album ne contient aucune image ni vidéo.
-            </p>
+      <div ref={galleryRef} className={cn(FRONT_FULL, "pt-6 pb-24")}>
+        {loading ? (
+          <div className="pt-16">
+            <MediaGridSkeleton density={density} />
+          </div>
+        ) : files.length === 0 ? (
+          <div className="py-24 text-center">
+            <Images className={cn("mx-auto size-9", ACCENT)} strokeWidth={1.5} />
+            <h2 className={cn(DISPLAY, "mt-5 text-3xl")}>Album vide</h2>
+            <p className="mt-2 text-muted-foreground">Cet album ne contient aucune image ni vidéo.</p>
           </div>
         ) : (
           groups.map((group) => (
             <section
               key={`${group.key}-${group.start}`}
-              className="mt-5"
+              className="mt-12 first:mt-4"
               {...timelineGroupProps(group.key, group.start, group.items.length)}
             >
               {canPickDate ? (
-                <div className="mb-2 flex items-baseline gap-3 border-b pb-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPickerKey(group.key);
-                      setPickerOpen(true);
-                    }}
-                    title="Aller à une date"
-                    className="group/month inline-flex items-center gap-1 font-mono text-xs font-medium capitalize transition-colors hover:text-primary"
-                  >
-                    {monthLabel(group.key)}
-                    <ChevronDown className="h-3 w-3 opacity-0 transition-opacity group-hover/month:opacity-100 group-focus-visible/month:opacity-100" />
-                  </button>
-                </div>
+                <MonthHeading
+                  label={monthLabel(group.key)}
+                  onPick={() => {
+                    setPickerKey(group.key);
+                    setPickerOpen(true);
+                  }}
+                />
               ) : null}
-              <div className={cn("grid", DENSITY[density])}>
+              <MediaGrid density={density}>
                 {group.items.map((file, indexInGroup) => (
-                  <button
+                  <MediaTile
                     key={file.name}
-                    type="button"
-                    onClick={() => setSelectedIndex(group.start + indexInGroup)}
-                    className="group relative aspect-square overflow-hidden rounded-sm bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label={`Ouvrir ${file.name}`}
-                  >
-                    {isVideoFile(file.name) ? (
-                      <VideoThumbnail name={file.name} durationMs={file.durationMs} sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw" />
-                    ) : (
-                      <Image
-                        src={thumb(file.name)}
-                        alt=""
-                        fill
-                        sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw"
-                        className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                      />
-                    )}
-                    <GalleryProvenanceBadge name={file.name} className="left-1.5 top-1.5" />
-                  </button>
+                    name={file.name}
+                    durationMs={file.durationMs}
+                    onOpen={() => setSelectedIndex(group.start + indexInGroup)}
+                  />
                 ))}
-              </div>
+              </MediaGrid>
             </section>
           ))
         )}
@@ -302,7 +245,7 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
       <TimelineNavigator
         months={months}
         containerRef={galleryRef}
-        topOffset={STICKY_OFFSET}
+        topOffset={CATALOG_STICKY_OFFSET}
         loadAt={nothingToLoad}
         pickerOpen={pickerOpen}
         onPickerOpenChange={setPickerOpen}
@@ -313,7 +256,7 @@ export function CatalogAlbumDetailPage({ slug }: CatalogAlbumDetailPageProps) {
       <PublicImageViewer
         items={files.map((file) => ({
           ...file,
-          album: { name: album.name, slug: album.publicSlug || "" },
+          album: { name: summary.name, slug },
         }))}
         index={selectedIndex}
         onClose={() => setSelectedIndex(null)}

@@ -1,7 +1,5 @@
-"use client";
-
-import { Loading } from "@/components/ui/loading";
+import { GalleryPageSkeleton } from "@/components/skeletons/page-skeletons";
 
 export default function LoadingPage() {
-  return <Loading fullScreen />;
+  return <GalleryPageSkeleton />;
 }

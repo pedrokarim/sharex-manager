@@ -335,6 +335,7 @@ export default function TermsPage() {
       title="Conditions Générales d'Utilisation"
       icon={ScrollText}
       backHref="/legal"
+      backLabel="Mentions légales"
       lastUpdated={LEGAL_INFO.lastUpdated}
       intro={
         <p>

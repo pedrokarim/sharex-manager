@@ -15,5 +15,8 @@ export default async function UsersPage() {
   if (!session) redirect("/login");
   if (!isAdmin(session)) redirect("/");
 
-  return <UsersPageClient initialUsers={await listAppUsers()} />;
+  // L'identifiant du compte connecté part avec la page : lu côté client, il
+  // n'était pas connu du rendu serveur, qui affichait « Supprimer » sur sa
+  // propre ligne avant que l'hydratation ne le retire.
+  return <UsersPageClient initialUsers={await listAppUsers()} currentUserId={session.user.id} />;
 }

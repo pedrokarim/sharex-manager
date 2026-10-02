@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { FRONT_WIDE } from "@/components/front/container";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { cn } from "@/lib/utils";
 
 export function Footer() {
   return (
     <footer className="border-t">
-      <div className="container mx-auto px-4 py-6">
+      {/* Même colonne que la barre de navigation : le pied s'aligne sur elle. */}
+      <div className={cn(FRONT_WIDE, "py-6")}>
         <div className="flex flex-col items-center justify-between gap-4 md:h-16 md:flex-row">
           <div className="text-center md:text-left">
             <p className="text-sm text-muted-foreground">
@@ -13,7 +16,7 @@ export function Footer() {
           </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <div className="flex gap-4 text-sm text-muted-foreground">
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
               <Link
                 href="/about"
                 className="hover:text-primary transition-colors"

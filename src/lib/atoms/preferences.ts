@@ -5,6 +5,9 @@ export type ThumbnailSize = "tiny" | "small" | "medium" | "large";
 export type Language = "fr" | "en";
 export type SortOrder = "asc" | "desc";
 export type SortBy = "name" | "date" | "size";
+/** Comment un fichier s'ouvre : sur toute la fenêtre, ou dans une fenêtre posée sur la page. */
+export const FILE_VIEWER_PRESENTATIONS = ["fullscreen", "modal"] as const;
+export type FileViewerPresentation = (typeof FILE_VIEWER_PRESENTATIONS)[number];
 
 interface PreferencesState {
   language: Language;
@@ -57,6 +60,10 @@ export const galleryViewModeAtom = atomWithStorage<GalleryViewMode>(
 export const thumbnailSizeAtom = atomWithStorage<ThumbnailSize>(
   "thumbnailSize",
   "medium"
+);
+export const fileViewerPresentationAtom = atomWithStorage<FileViewerPresentation>(
+  "fileViewerPresentation",
+  "fullscreen"
 );
 export const showFileInfoAtom = atomWithStorage<boolean>("showFileInfo", true);
 export const showFileSizeAtom = atomWithStorage<boolean>("showFileSize", true);

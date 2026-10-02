@@ -31,6 +31,8 @@ interface ModuleSource {
   label: string;
   description?: string;
   icon?: string;
+  /** Logo du module qui fournit la source. */
+  logo?: string;
   list: string;
   kinds?: string[];
 }
@@ -75,11 +77,11 @@ export function ImagePickerDialog({ open, onOpenChange, onPick, title, descripti
   }, [open]);
 
   const entries = useMemo(() => {
-    const list: { key: string; label: string; hint: string; icon: LucideIcon; source?: ModuleSource }[] = [
+    const list: { key: string; label: string; hint: string; icon: LucideIcon; logo?: string; source?: ModuleSource }[] = [
       { key: "gallery", label: t("gallery.picker.gallery"), hint: t("gallery.picker.gallery_hint"), icon: Images },
     ];
     for (const source of sources) {
-      list.push({ key: `${source.module}:${source.id}`, label: source.label, hint: source.description ?? "", icon: moduleIcon(source.icon), source });
+      list.push({ key: `${source.module}:${source.id}`, label: source.label, hint: source.description ?? "", icon: moduleIcon(source.icon), logo: source.logo, source });
     }
     list.push(
       { key: "device", label: t("gallery.add.device"), hint: t("gallery.add.device_hint"), icon: HardDrive },
@@ -127,7 +129,12 @@ export function ImagePickerDialog({ open, onOpenChange, onPick, title, descripti
                     selected ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
-                  <Icon className={cn("h-4 w-4 shrink-0", selected && "text-primary")} />
+                  {entry.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- logo servi par le module
+                    <img src={entry.logo} alt="" className="h-5 w-5 shrink-0 object-contain" />
+                  ) : (
+                    <Icon className={cn("h-4 w-4 shrink-0", selected && "text-primary")} />
+                  )}
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium">{entry.label}</span>
                     {entry.hint && <span className="hidden truncate text-[11px] text-muted-foreground md:block">{entry.hint}</span>}

@@ -26,6 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { moduleLogoUrl } from "@/lib/modules/branding";
 import { cn } from "@/lib/utils";
 
 interface ModuleCardProps {
@@ -73,6 +74,9 @@ export const ModuleCard = ({ module, onToggle, onDelete, onAutoProcessChange }: 
     }
   };
   const [imageError, setImageError] = useState(false);
+  // Le logo que le module emporte avec lui, sinon son ancienne icône.
+  const branded = Boolean(module.branding?.logo);
+  const logo = moduleLogoUrl(module) ?? module.icon;
   const [isInstallingDeps, setIsInstallingDeps] = useState(false);
 
   const npmDependencies = module.npmDependencies ?? {};
@@ -149,17 +153,19 @@ export const ModuleCard = ({ module, onToggle, onDelete, onAutoProcessChange }: 
       <div className="flex items-start gap-3 p-5">
         <span
           className={cn(
-            "relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted ring-1 ring-border/60",
+            "relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden",
+            // Un logo de module se montre seul, sans cadre derrière lui.
+            !branded && "rounded-xl bg-muted ring-1 ring-border/60",
             !module.enabled && "grayscale"
           )}
         >
-          {module.icon && !imageError ? (
+          {logo && !imageError ? (
             <Image
-              src={module.icon}
+              src={logo}
               alt=""
               width={48}
               height={48}
-              className="h-full w-full object-cover"
+              className={cn("h-full w-full", branded ? "object-contain" : "object-cover")}
               onError={() => setImageError(true)}
             />
           ) : (

@@ -223,11 +223,11 @@ export default function LegalIndexPage() {
               <Link
                 key={doc.href}
                 href={doc.href}
-                className="group flex flex-col gap-2 rounded-lg border bg-card p-5 transition-colors hover:border-primary/50 hover:bg-accent/50"
+                className="group flex flex-col gap-2 rounded-[22px] bg-foreground/[0.045] p-6 transition-colors hover:bg-foreground/[0.08]"
               >
                 <div className="flex items-center gap-2">
-                  <doc.icon className="h-5 w-5 shrink-0 text-primary" />
-                  <span className="font-semibold text-foreground group-hover:text-primary">
+                  <doc.icon className="size-5 shrink-0 text-emerald-700 dark:text-emerald-400" strokeWidth={1.75} />
+                  <span className="font-semibold text-foreground">
                     {doc.title}
                   </span>
                 </div>

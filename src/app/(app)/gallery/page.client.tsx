@@ -39,7 +39,8 @@ import { UploadZone, type UploadZoneHandle } from "@/components/gallery/upload-z
 import { AddDialog } from "@/components/gallery/add-dialog";
 import { KeyboardShortcutsDialog } from "@/components/gallery/keyboard-shortcuts-dialog";
 import { capitalize, cn } from "@/lib/utils";
-import { Loading } from "@/components/ui/loading";
+import { MediaGridSkeleton } from "@/components/skeletons/page-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { GalleryDisplayMenu } from "@/components/gallery/gallery-display-menu";
 import { TimelineNavigator, findScrollParent, timelineGroupProps } from "@/components/timeline/timeline-navigator";
 import { formatMonthKey, monthKeyOf, type TimelineMonth } from "@/lib/timeline";
@@ -73,7 +74,8 @@ const dedupeFilesByName = (input: FileInfo[]) =>
   );
 
 interface GalleryClientProps {
-  initialFiles: FileInfo[];
+  /** `null` quand le serveur n'a pas pu lire les fichiers : la page les charge alors elle-même. */
+  initialFiles: FileInfo[] | null;
   initialHasMore: boolean;
   initialView?: "grid" | "list" | "details";
   initialSearch?: string;
@@ -117,6 +119,12 @@ export function GalleryClient({
     },
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  /**
+   * La liste se recharge depuis le début (filtre, tri, ou première page que le
+   * serveur n'a pas fournie). Tant que c'est le cas, une liste vide ne veut
+   * pas dire « aucune image » : on montre un squelette.
+   */
+  const [isReloading, setIsReloading] = useState(initialFiles === null);
   const [newFileIds, setNewFileIds] = useState<string[]>([]);
   const [timeline, setTimeline] = useState<{ months: TimelineMonth[]; total: number | null }>({
     months: [],
@@ -146,7 +154,6 @@ export function GalleryClient({
     openFile: openViewerFile,
     navigateToFile: navigateViewerFile,
     closeFile: closeViewerFile,
-    setPresentation: setViewerPresentation,
   } = useRoutedFileViewer();
   const [viewerFallbackFile, setViewerFallbackFile] = useState<FileInfo | null>(
     null,
@@ -279,7 +286,7 @@ export function GalleryClient({
     updateData,
     prependItem,
   } = useInfiniteScroll<FileInfo>({
-    initialData: initialFiles,
+    initialData: initialFiles ?? [],
     initialHasMore,
     getScrollElement,
     fetchMore: useCallback(
@@ -482,11 +489,25 @@ export function GalleryClient({
       mountedRef.current = true;
       return;
     }
-    fetchFilesRef.current(1).then(({ files, hasMore }) => {
-      applyReset(files, hasMore);
-    });
+    setIsReloading(true);
+    fetchFilesRef.current(1)
+      .then(({ files, hasMore }) => {
+        applyReset(files, hasMore);
+      })
+      .finally(() => setIsReloading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchFiles accessed via ref
   }, [search, sortBy, sortOrder, startDate, endDate, applyReset]);
+
+  // Le serveur n'a rien pu envoyer : la première page se charge ici.
+  useEffect(() => {
+    if (initialFiles !== null) return;
+    fetchFilesRef.current(1)
+      .then(({ files, hasMore }) => {
+        applyReset(files, hasMore);
+      })
+      .finally(() => setIsReloading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- au montage seulement
+  }, []);
 
   // Fonction pour gérer la sélection vide
   const handleSelectionEmpty = useCallback(() => {
@@ -1203,7 +1224,9 @@ export function GalleryClient({
           </div>
         </section>
 
-        {files.length === 0 ? (
+        {files.length === 0 && (isReloading || isRefreshing || loading) ? (
+          <MediaGridSkeleton size={thumbnailSize === "tiny" ? "small" : thumbnailSize} />
+        ) : files.length === 0 ? (
           <div className="flex flex-col items-center justify-center space-y-4 py-12 sm:py-24 text-center px-4">
             <ImageOff className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground" />
             <div className="space-y-2">
@@ -1220,7 +1243,7 @@ export function GalleryClient({
               {/* Après un saut à une date, ce qui précède se recharge en remontant. */}
               {firstPage > 1 && (
                 <div ref={topRef} className="flex h-10 items-center justify-center">
-                  {loadingPrevious && <Loading variant="minimal" size="sm" showMessage={true} className="text-xs" />}
+                  {loadingPrevious && <Skeleton className="h-2 w-40 rounded-full" />}
                 </div>
               )}
               {monthGroups.map(({ key: monthKey, files: filesInGroup, start }) => (
@@ -1402,16 +1425,9 @@ export function GalleryClient({
                 </div>
               ))}
 
-            <div ref={ref} className="h-10 flex items-center justify-center">
-              {loading && (
-                <Loading
-                  variant="minimal"
-                  size="sm"
-                  showMessage={true}
-                  className="text-xs"
-                />
-              )}
-            </div>
+            {/* La suite arrive : des cartes d'attente tiennent sa place. */}
+            {loading && <MediaGridSkeleton count={8} size={thumbnailSize === "tiny" ? "small" : thumbnailSize} />}
+            <div ref={ref} className="h-10" />
           </>
         )}
         </UploadZone>
@@ -1448,7 +1464,6 @@ export function GalleryClient({
       <FileViewer
         file={viewerFile}
         presentation={viewerPresentation}
-        onPresentationChange={setViewerPresentation}
         onClose={closeViewerFile}
         onDelete={handleDelete}
         onCopy={copyToClipboard}

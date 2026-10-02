@@ -5,6 +5,8 @@ import {
   preferencesAtom,
   languageAtom,
   galleryViewModeAtom,
+  fileViewerPresentationAtom,
+  FILE_VIEWER_PRESENTATIONS,
   thumbnailSizeAtom,
   showFileInfoAtom,
   showFileSizeAtom,
@@ -34,6 +36,8 @@ import {
   Grid,
   LayoutGrid,
   Table2,
+  Maximize2,
+  AppWindow,
 } from "lucide-react";
 import {
   Select,
@@ -54,7 +58,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
 import { useTranslation } from "@/lib/i18n";
-import { ThemeModePreferencesPanel } from "@/components/settings/theme-mode-preferences-panel";
+import { cn } from "@/lib/utils";
 
 const settingsPanelClassName =
   "rounded-2xl border border-border/70 bg-card px-4 py-4 shadow-sm sm:px-5 sm:py-5";
@@ -66,6 +70,9 @@ export function PreferencesPageClient() {
   const [language, setLanguage] = useAtom(languageAtom);
   const [galleryViewMode, setGalleryViewMode] = useAtom(galleryViewModeAtom);
   const [thumbnailSize, setThumbnailSize] = useAtom(thumbnailSizeAtom);
+  const [fileViewerPresentation, setFileViewerPresentation] = useAtom(
+    fileViewerPresentationAtom,
+  );
   const [showFileInfo, setShowFileInfo] = useAtom(showFileInfoAtom);
   const [showFileSize, setShowFileSize] = useAtom(showFileSizeAtom);
   const [showUploadDate, setShowUploadDate] = useAtom(showUploadDateAtom);
@@ -107,6 +114,11 @@ export function PreferencesPageClient() {
     details: LayoutList,
   };
 
+  const viewerPresentationIcons = {
+    fullscreen: Maximize2,
+    modal: AppWindow,
+  } as const;
+
   const thumbnailSizeIcons = {
     large: LayoutGrid,
     medium: Grid,
@@ -122,7 +134,11 @@ export function PreferencesPageClient() {
   } as const;
 
   return (
-    <div className="flex h-full flex-col gap-6">
+    // min-h-full et shrink-0, pas h-full : avec une hauteur fixe (ou un bloc
+    // que la colonne flex peut tasser), le contenu déborde de ce
+    // bloc et la marge basse de la zone de défilement ne s'applique plus sous
+    // le dernier élément, qui vient toucher le bord.
+    <div className="flex min-h-full shrink-0 flex-col gap-6">
       <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
@@ -158,8 +174,6 @@ export function PreferencesPageClient() {
                 {t("settings.appearance_description")}
               </p>
             </div>
-
-            <ThemeModePreferencesPanel />
 
             <div
               className={`${settingsPanelClassName} flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between`}
@@ -278,6 +292,50 @@ export function PreferencesPageClient() {
                   )}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className={settingsBlockClassName}>
+              <div className="space-y-1">
+                <Label className="text-sm font-medium sm:text-base">
+                  {t("settings.gallery.viewer_presentation.title")}
+                </Label>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  {t("settings.gallery.viewer_presentation.description")}
+                </p>
+              </div>
+              <div
+                role="radiogroup"
+                aria-label={t("settings.gallery.viewer_presentation.title")}
+                className="grid gap-2 sm:grid-cols-2"
+              >
+                {FILE_VIEWER_PRESENTATIONS.map((presentation) => {
+                  const Icon = viewerPresentationIcons[presentation];
+                  const selected = presentation === fileViewerPresentation;
+                  return (
+                    <button
+                      key={presentation}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setFileViewerPresentation(presentation)}
+                      className={cn(
+                        "flex flex-col gap-1 rounded-xl border p-3 text-left transition-colors",
+                        selected
+                          ? "border-primary bg-primary/10"
+                          : "border-border/60 bg-background hover:border-foreground/30",
+                      )}
+                    >
+                      <span className="flex items-center gap-2 text-sm font-medium">
+                        <Icon className="h-4 w-4 shrink-0" />
+                        {t(`settings.gallery.viewer_presentation.${presentation}.label`)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {t(`settings.gallery.viewer_presentation.${presentation}.hint`)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className={settingsBlockClassName}>

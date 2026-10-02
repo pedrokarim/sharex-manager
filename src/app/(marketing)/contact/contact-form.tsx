@@ -4,9 +4,11 @@ import { useState } from "react";
 import { Loader2, Mail, MessageSquare, Send, User } from "lucide-react";
 import { toast } from "sonner";
 
+import { FIELD, FIELD_AREA, PILL_SOLID } from "@/components/front/styles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 export function ContactForm() {
   const [isSending, setIsSending] = useState(false);
@@ -69,6 +71,7 @@ export function ContactForm() {
           maxLength={100}
           required
           disabled={isSending}
+          className={FIELD}
         />
       </div>
 
@@ -88,6 +91,7 @@ export function ContactForm() {
           maxLength={254}
           required
           disabled={isSending}
+          className={FIELD}
         />
       </div>
 
@@ -108,6 +112,7 @@ export function ContactForm() {
           maxLength={150}
           required
           disabled={isSending}
+          className={FIELD}
         />
       </div>
 
@@ -122,12 +127,13 @@ export function ContactForm() {
         <Textarea
           id="message"
           name="message"
-          placeholder="Votre message..."
+          placeholder="Votre message…"
           rows={6}
           minLength={10}
           maxLength={5000}
           required
           disabled={isSending}
+          className={FIELD_AREA}
         />
       </div>
 
@@ -143,7 +149,7 @@ export function ContactForm() {
         />
       </div>
 
-      <Button type="submit" className="w-full gap-2" disabled={isSending}>
+      <Button type="submit" className={cn(PILL_SOLID, "justify-center")} disabled={isSending}>
         {isSending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />

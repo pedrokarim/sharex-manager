@@ -7,7 +7,10 @@ export interface Album {
   userId?: string;
   thumbnailFile?: string;
   fileCount: number;
+  /** L'album a une page publique. Faux par défaut : un album naît privé. */
   isPublic?: boolean;
+  /** Sa page publique est listée dans le catalogue. Suppose `isPublic`. */
+  inCatalog?: boolean;
   publicSlug?: string;
 }
 

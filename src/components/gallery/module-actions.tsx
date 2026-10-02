@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { FileInfo } from "@/types/files";
 import { ModuleConfig } from "@/types/modules";
+import { moduleLogoUrl } from "@/lib/modules/branding";
 import {
   Wand2,
   Loader2,
@@ -305,14 +306,15 @@ export function ModuleActions({
   // Fonction pour afficher l'icône du module avec gestion d'erreur
   const renderModuleIcon = useCallback(
     (module: ModuleConfig) => {
-      // Vérifier si l'icône est valide (doit être une URL)
-      if (!module.icon || !module.icon.startsWith("http")) {
+      // Le logo du module d'abord, sinon son icône quand c'est une adresse.
+      const source = moduleLogoUrl(module, "small") ?? (module.icon?.startsWith("http") ? module.icon : undefined);
+      if (!source) {
         return getDefaultIcon(module.category);
       }
 
       return (
         <img
-          src={module.icon}
+          src={source}
           alt={module.name}
           className="w-4 h-4"
           onError={() => {

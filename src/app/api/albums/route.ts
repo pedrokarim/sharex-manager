@@ -1,3 +1,4 @@
+import { ALBUM_VISIBILITIES, visibilityFlags } from "@/lib/album-visibility";
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
@@ -9,6 +10,8 @@ import { z } from "zod";
 const CreateAlbumSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
+  /** Privé si rien n'est dit : un album ne devient public que sur demande. */
+  visibility: z.enum(ALBUM_VISIBILITIES).optional(),
 });
 
 const SearchSchema = z
@@ -140,13 +143,21 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description } = CreateAlbumSchema.parse(body);
+    const { name, description, visibility = "private" } = CreateAlbumSchema.parse(body);
 
-    const album = albumsDb.createAlbum({
+    const created = albumsDb.createAlbum({
       name,
       description,
       userId: session.user.id || undefined,
     });
+    // Public dès sa création : il lui faut ses drapeaux et son adresse.
+    const album =
+      visibility === "private"
+        ? created
+        : (albumsDb.updateAlbum(created.id, {
+            ...visibilityFlags(visibility),
+            publicSlug: albumsDb.generateUniqueSlug(name, created.id),
+          }) ?? created);
 
     logDb.createLog({
       level: "info",

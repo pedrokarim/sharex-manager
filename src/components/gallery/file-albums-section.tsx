@@ -5,6 +5,7 @@ import { Folder, FolderOpen, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
+import { AlbumVisibilityIcon } from "@/components/albums/album-visibility";
 
 interface Album {
   id: number;
@@ -12,6 +13,8 @@ interface Album {
   description?: string;
   createdAt: string;
   fileCount: number;
+  isPublic?: boolean;
+  inCatalog?: boolean;
 }
 
 interface FileAlbumsSectionProps {
@@ -91,6 +94,7 @@ export function FileAlbumsSection({
               <div className="flex items-center gap-2">
                 <Folder className="h-4 w-4 text-blue-500" />
                 <span className="text-sm font-medium">{album.name}</span>
+                <AlbumVisibilityIcon album={album} />
                 {album.description && (
                   <span className="text-xs text-muted-foreground">
                     - {album.description}

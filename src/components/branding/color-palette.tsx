@@ -137,7 +137,7 @@ export const ColorPalette = ({
         <Badge variant="secondary" className="mb-3">
           Theme-aware
         </Badge>
-        <h2 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+        <h2 className="font-[family-name:var(--font-front-display)] text-balance text-4xl font-medium tracking-[-0.035em] sm:text-5xl">
           {title}
         </h2>
         <p className="mt-3 text-pretty text-muted-foreground sm:text-lg">
@@ -163,7 +163,7 @@ export const ColorPalette = ({
                     viewport={{ once: true, margin: "-120px" }}
                     transition={{ duration: 0.35 }}
                   >
-                    <Card className="overflow-hidden">
+                    <Card className="overflow-hidden rounded-[22px] border-0 bg-foreground/[0.045] shadow-none">
                       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
                         <div>
                           <CardTitle className="text-sm">{token.label}</CardTitle>

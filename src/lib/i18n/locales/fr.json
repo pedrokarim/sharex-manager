@@ -22,6 +22,7 @@
     "more": "Plus",
     "create": "Nouvelle",
     "reset": "Réinitialiser",
+    "period": "Période",
     "preview": "Aperçu",
     "yes": "Oui",
     "no": "Non",
@@ -252,6 +253,12 @@
     },
     "gallery": {
       "view_mode": "Mode d'affichage",
+      "viewer_presentation": {
+        "title": "Ouverture d’un fichier",
+        "description": "Comment un fichier s’ouvre depuis la galerie et les albums.",
+        "fullscreen": { "label": "Plein écran", "hint": "Le fichier occupe toute la fenêtre." },
+        "modal": { "label": "Fenêtre", "hint": "Le fichier s’ouvre dans une fenêtre, la page reste visible derrière." }
+      },
       "thumbnail_size": "Taille des vignettes",
       "thumbnail_sizes": {
         "large": "Très grandes icônes",
@@ -470,10 +477,6 @@
       "accessibility": "Image ajoutée le {date}. Taille du fichier : {size} Ko. {navigation}",
       "previous_button": "Utilisez le bouton précédent pour voir l'image précédente.",
       "next_button": "Utilisez le bouton suivant pour voir l'image suivante.",
-      "presentation": {
-        "fullscreen": "Plein écran",
-        "modal": "Modal"
-      },
       "file_unavailable": "Ce fichier n'est plus disponible.",
       "file_not_in_album": "Ce fichier n'est pas disponible dans cet album.",
       "info_panel": {
@@ -608,6 +611,7 @@
   "sidebar": {
     "app_name": "ShareX Manager",
     "app_description": "Gestionnaire d'images",
+    "theme": "Thème",
     "search": "Rechercher",
     "search_placeholder": "Rechercher…",
     "toggle": "Basculer",
@@ -629,6 +633,9 @@
     },
     "admin": {
       "administration": "Administration",
+      "overview": "Vue d’ensemble",
+      "global_theme": "Thème global",
+      "modules": "Modules",
       "users": "Utilisateurs",
       "logs": "Logs",
       "system_config": "Configuration système",
@@ -722,11 +729,64 @@
     "title": "ShareX Manager",
     "subtitle": "Gérez vos captures d'écran et images avec facilité",
     "landing": {
+      "nav": {
+        "modules": "Modules",
+        "catalog": "Catalogue",
+        "tools": "Outils",
+        "about": "À propos",
+        "contact": "Contact",
+        "setup": "Mise en route"
+      },
+      "modules": {
+        "kicker": "Les modules",
+        "title": "Bien plus qu’un hébergeur de captures",
+        "description": "Une fois vos images au même endroit, autant s’en servir. Chaque module s’active ou se coupe d’un clic, et travaille directement sur votre galerie.",
+        "try": "Essayer sans compte",
+        "items": {
+          "ai": {
+            "name": "AI Image Gen",
+            "description": "Un studio de génération et de retouche d’images, branché sur vos propres clés ou vos agents.",
+            "points": [
+              "Retouche d’une capture",
+              "Séries et variantes",
+              "Assistant de prompt"
+            ]
+          },
+          "clip": {
+            "name": "Clip Studio",
+            "description": "Un éditeur de clips dans le navigateur : images, vidéos, textes animés, voix et musique.",
+            "points": [
+              "Timeline multipiste",
+              "Voix de synthèse",
+              "Export MP4"
+            ]
+          },
+          "reverse": {
+            "name": "Recherche inversée",
+            "description": "Retrouvez d’où vient une image : plusieurs moteurs interrogés d’un coup, résultats côte à côte.",
+            "points": [
+              "trace.moe, SauceNAO, IQDB",
+              "Google Lens, Yandex",
+              "Mode éphémère"
+            ]
+          },
+          "origin": {
+            "name": "Origine d’une image",
+            "description": "Lisez ce qu’un fichier déclare de lui-même : généré par IA ou non, signature, métadonnées.",
+            "points": [
+              "Manifeste C2PA",
+              "EXIF et XMP",
+              "Version sans métadonnées"
+            ]
+          }
+        }
+      },
       "hero": {
         "title": "Vos captures,",
         "title_accent": "chez vous.",
         "subtitle": "Le point de chute de tout ce que vous capturez : upload en un raccourci, lien public immédiat, albums, statistiques et clés d'API. Sur votre serveur, pas celui d'un autre.",
-        "compatibility": "ShareX · Flameshot · Android · Liens permanents · Sans publicité",
+        "works_with": "Fonctionne avec",
+        "promises": ["Liens permanents", "Sans publicité"],
         "screenshot_alt": "La galerie de ShareX Manager, images classées par mois",
         "cta_primary": "Explorer le catalogue",
         "cta_secondary": "Se connecter",
@@ -739,8 +799,8 @@
         "title": "Du raccourci clavier au lien public",
         "description": "ShareX sur Windows, Flameshot sur Linux, l'app Android en partage natif : tout arrive au même endroit, immédiatement indexé.",
         "bullets": [
-          "Lien copié dans le presse-papiers dès la fin de l'upload",
-          "Miniatures, recherche et filtres par date",
+          "Lien copié dans le presse-papiers dès la fin de l’upload",
+          "Images et vidéos, recherche, et une frise pour remonter les années",
           "Albums privés ou publiés en un clic"
         ],
         "image_alt": "L'historique des uploads, avec la date, la taille et la méthode de chaque fichier"
@@ -764,8 +824,9 @@
       },
       "tools": {
         "kicker": "L'écosystème",
-        "title": "Et deux services de plus, juste à côté",
-        "description": "ShareX Manager ne fait qu'une chose. Pour encoder, formater, générer une palette ou interroger un serveur Minecraft, deux services dédiés prennent le relais, sans compte et sans installation.",
+        "title": "Des outils, sur place et juste à côté",
+        "origin_tagline": "Une image est-elle générée par IA ? Déposez-la pour le savoir",
+        "description": "Un outil vit ici même, ouvert sans compte. Pour encoder, formater, générer une palette ou interroger un serveur Minecraft, deux services dédiés prennent le relais.",
         "cta": "Découvrir les outils"
       },
       "setup": {
@@ -913,7 +974,7 @@
       "theme": {
         "title": "Thème global",
         "badge": "Design system",
-        "description": "Publiez la base visuelle du site et préparez les futures extensions de branding."
+        "description": "Le mode et les couleurs du site, pour tous les visiteurs."
       },
       "system": {
         "title": "Configuration système",
@@ -1333,6 +1394,27 @@
     "now_public": "Album rendu public avec succès",
     "now_private": "Album rendu privé avec succès",
     "url_copied": "URL publique copiée",
+    "visibility": {
+      "title": "Visibilité",
+      "private": {
+        "label": "Privé",
+        "hint": "Vous seul le voyez.",
+        "badge": "Privé",
+        "done": "L’album est maintenant privé"
+      },
+      "link": {
+        "label": "Public par lien",
+        "hint": "Accessible avec son adresse, absent du catalogue.",
+        "badge": "Par lien",
+        "done": "L’album est public par son lien, hors catalogue"
+      },
+      "catalog": {
+        "label": "Public au catalogue",
+        "hint": "Accessible à tous et listé dans le catalogue.",
+        "badge": "Catalogue",
+        "done": "L’album est public et listé au catalogue"
+      }
+    },
     "make_public": "Rendre public",
     "make_private": "Rendre privé",
     "copy_public_url": "Copier l'URL publique",

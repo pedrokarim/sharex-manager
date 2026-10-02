@@ -4,6 +4,8 @@ import { useState } from "react";
 import { authClient, signIn } from "@/lib/auth-client";
 import { toast } from "sonner";
 
+import { DISPLAY } from "@/components/front/fonts";
+import { FIELD, PILL_SOLID } from "@/components/front/styles";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,9 +78,9 @@ export function LoginForm({
       {...props}
       onSubmit={handleSubmit}
     >
-      <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold">Connexion</h1>
-        <p className="text-balance text-sm text-muted-foreground">
+      <div>
+        <h1 className={cn(DISPLAY, "text-5xl leading-[1.05]")}>Connexion</h1>
+        <p className="mt-3 text-pretty text-muted-foreground">
           {authProvider === "ascencia"
             ? "Utilisez votre compte Ascencia ID autorisé"
             : "Entrez vos identifiants pour accéder à votre compte"}
@@ -94,14 +96,16 @@ export function LoginForm({
                 name="username"
                 type="text"
                 placeholder="Votre nom d'utilisateur"
+                autoComplete="username"
                 required
                 disabled={isLoading}
+                className={FIELD}
               />
             </div>
             <div className="grid gap-2">
               <div className="flex items-center">
                 <Label htmlFor="password">Mot de passe</Label>
-                <Button variant="link" className="ml-auto px-0 text-sm" asChild>
+                <Button variant="link" className="ml-auto h-auto px-0 py-0 text-sm text-emerald-700 dark:text-emerald-400" asChild>
                   <a href="/forgot-password">Mot de passe oublié ?</a>
                 </Button>
               </div>
@@ -112,9 +116,11 @@ export function LoginForm({
                 required
                 disabled={isLoading}
                 placeholder="Votre mot de passe"
+                autoComplete="current-password"
+                className={FIELD}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className={cn(PILL_SOLID, "w-full justify-center")} disabled={isLoading}>
               {isLoading && (
                 <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
               )}
@@ -124,7 +130,7 @@ export function LoginForm({
         ) : (
           <Button
             type="button"
-            className="w-full"
+            className={cn(PILL_SOLID, "w-full justify-center")}
             disabled={isLoading}
             onClick={handleAscenciaSignIn}
           >
@@ -136,14 +142,14 @@ export function LoginForm({
         )}
       </div>
       {authProvider === "builtin" && (
-        <div className="text-center text-sm">
+        <div className="text-sm text-muted-foreground">
           Vous n&apos;avez pas de compte ?{" "}
-          <Button variant="link" className="px-0" asChild>
+          <Button variant="link" className="h-auto px-0 py-0 text-emerald-700 dark:text-emerald-400" asChild>
             <a href="/register">Créer un compte</a>
           </Button>
         </div>
       )}
-      <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-primary">
+      <div className="text-pretty text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-primary">
         En vous connectant, vous acceptez nos{" "}
         <a href="/legal/terms">Conditions Générales d&apos;Utilisation</a> et
         notre <a href="/legal/privacy">Politique de confidentialité</a>.

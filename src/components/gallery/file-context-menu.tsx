@@ -24,6 +24,7 @@ import {
   ContextMenuShortcut,
 } from "@/components/ui/context-menu";
 import { useTranslation } from "@/lib/i18n";
+import { AlbumVisibilityIcon } from "@/components/albums/album-visibility";
 import type { FileInfo } from "@/types/files";
 import { getGalleryImageUrl } from "@/lib/utils/url";
 import { ModulesContextSection } from "@/components/gallery/modules-context-section";
@@ -41,7 +42,7 @@ interface FileContextMenuContentProps {
   onAddSingleFileToAlbum?: (fileName: string) => void;
   onShowInfo?: () => void;
   onShare?: () => void;
-  albums?: Array<{ id: number; name: string }>;
+  albums?: Array<{ id: number; name: string; isPublic?: boolean; inCatalog?: boolean }>;
   onAddToSpecificAlbum?: (albumId: number) => void;
 }
 
@@ -164,7 +165,8 @@ export function FileContextMenuContent({
                 key={album.id}
                 onClick={() => onAddToSpecificAlbum?.(album.id)}
               >
-                {album.name}
+                <AlbumVisibilityIcon album={album} className="mr-2" />
+                <span className="truncate">{album.name}</span>
               </ContextMenuItem>
             ))}
             {albums.length > 10 && (

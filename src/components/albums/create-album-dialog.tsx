@@ -15,17 +15,28 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
+import { albumVisibility, type AlbumVisibility } from "@/lib/album-visibility";
+import { AlbumVisibilityField } from "./album-visibility";
 
 interface Album {
   id: number;
   name: string;
   description?: string;
+  isPublic?: boolean;
+  inCatalog?: boolean;
+}
+
+/** Ce que la fenêtre remet à sa page : de quoi créer ou modifier l'album. */
+export interface AlbumFormData {
+  name: string;
+  description?: string;
+  visibility: AlbumVisibility;
 }
 
 interface CreateAlbumDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: { name: string; description?: string }) => Promise<void>;
+  onSubmit: (data: AlbumFormData) => Promise<void>;
   album?: Album | null;
 }
 
@@ -39,6 +50,8 @@ export function CreateAlbumDialog({
   const isEditMode = !!album;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  // Un nouvel album naît privé ; en modification, on part de son état.
+  const [visibility, setVisibility] = useState<AlbumVisibility>("private");
   const [loading, setLoading] = useState(false);
 
   // Pré-remplir le formulaire en mode édition
@@ -46,9 +59,11 @@ export function CreateAlbumDialog({
     if (open && album) {
       setName(album.name);
       setDescription(album.description || "");
+      setVisibility(albumVisibility(album));
     } else if (open && !album) {
       setName("");
       setDescription("");
+      setVisibility("private");
     }
   }, [open, album]);
 
@@ -64,6 +79,7 @@ export function CreateAlbumDialog({
       await onSubmit({
         name: name.trim(),
         description: description.trim() || undefined,
+        visibility,
       });
 
       // Reset form
@@ -86,7 +102,7 @@ export function CreateAlbumDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[560px] overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
+      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[640px] sm:max-w-[640px] overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
         <form onSubmit={handleSubmit}>
           <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
             <DialogTitle className="text-lg sm:text-xl">
@@ -130,6 +146,11 @@ export function CreateAlbumDialog({
                 disabled={loading}
                 className="min-h-[120px] resize-none rounded-xl border-border/70 bg-muted/20 text-sm"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm">{t("albums.visibility.title")}</Label>
+              <AlbumVisibilityField value={visibility} onChange={setVisibility} disabled={loading} />
             </div>
           </div>
 

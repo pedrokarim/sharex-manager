@@ -1,12 +1,11 @@
 "use client";
 
+import { startThemeTransition } from "@/lib/theme/theme-transition";
 import {
   createContext,
-  Suspense,
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import type {
@@ -16,58 +15,51 @@ import type {
 import { applyRuntimeThemeToElement } from "@/lib/theme/apply-runtime-theme";
 import {
   resolveThemeRuntimeState,
-  readAnonymousThemePreference,
+  readThemePreference,
   type ThemePreference,
-  writeAnonymousThemePreference,
+  writeThemePreference,
 } from "@/lib/theme/runtime-theme";
-import { useThemePresetFromUrl } from "@/hooks/use-theme-preset-from-url";
 
 type Coords = { x: number; y: number };
 
 type ThemeProviderState = {
+  /** Mode affiché : clair ou sombre. */
   theme: RuntimeThemeMode;
+  /** Mode choisi dans ce navigateur, sinon celui du site. */
   themePreference: ThemePreference;
   resolvedTheme: ResolvedThemePayload;
-  isAuthenticated: boolean;
   setThemePreference: (preference: ThemePreference, coords?: Coords) => void;
   toggleTheme: (coords?: Coords) => void;
+  /** Remplace le thème du site, après une publication. */
   replaceResolvedTheme: (
     payload: ResolvedThemePayload,
     options?: { animate?: boolean; coords?: Coords }
   ) => void;
-  timeWindow: {
-    dayStartHour: number;
-    dayEndHour: number;
-  };
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState | null>(null);
 
-function ThemePresetHandler() {
-  useThemePresetFromUrl();
-  return null;
-}
-
+/**
+ * Le thème du site, le même pour tout le monde. Chaque navigateur ne choisit
+ * que son mode d'affichage (clair, sombre, celui de l'appareil), gardé dans
+ * `localStorage` : rien n'est enregistré par compte.
+ */
 export function ThemeProvider({
   children,
   initialTheme,
-  isAuthenticated,
 }: {
   children: React.ReactNode;
   initialTheme: ResolvedThemePayload;
-  isAuthenticated: boolean;
 }) {
   const [resolvedTheme, setResolvedTheme] = useState(initialTheme);
-  const [anonymousPreference, setAnonymousPreference] = useState(() =>
-    readAnonymousThemePreference(),
+  const [localPreference, setLocalPreference] = useState(() =>
+    readThemePreference(),
   );
   const [prefersDark, setPrefersDark] = useState(() =>
     typeof window !== "undefined" &&
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
-  const [now, setNow] = useState(() => new Date());
-  const latestPreferenceRequestRef = useRef(0);
 
   useEffect(() => {
     setResolvedTheme(initialTheme);
@@ -85,25 +77,11 @@ export function ThemeProvider({
   const runtimeState = useMemo(
     () =>
       resolveThemeRuntimeState(resolvedTheme, {
-        isAuthenticated,
-        anonymousPreference,
-        now,
+        localPreference,
         prefersDark,
       }),
-    [anonymousPreference, isAuthenticated, now, prefersDark, resolvedTheme],
+    [localPreference, prefersDark, resolvedTheme],
   );
-
-  useEffect(() => {
-    if (runtimeState.modePreference !== "time-based") {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setNow(new Date());
-    }, 60_000);
-
-    return () => window.clearInterval(interval);
-  }, [runtimeState.modePreference]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -111,14 +89,13 @@ export function ThemeProvider({
       root,
       resolvedTheme.styles,
       runtimeState.activeMode,
-      runtimeState.modePreference,
+      runtimeState.themePreference,
     );
     root.dataset.themePreference = runtimeState.themePreference;
     root.dataset.themeMode = runtimeState.activeMode;
   }, [
     resolvedTheme.styles,
     runtimeState.activeMode,
-    runtimeState.modePreference,
     runtimeState.themePreference,
   ]);
 
@@ -136,9 +113,7 @@ export function ThemeProvider({
       return;
     }
 
-    document.startViewTransition(() => {
-      updater();
-    });
+    startThemeTransition(updater);
   };
 
   const setThemePreference = (preference: ThemePreference, coords?: Coords) => {
@@ -146,57 +121,10 @@ export function ThemeProvider({
       return;
     }
 
-    if (!isAuthenticated) {
-      if (
-        preference !== "light" &&
-        preference !== "dark" &&
-        preference !== "system"
-      ) {
-        return;
-      }
-
-      runWithTransition(coords, () => {
-        writeAnonymousThemePreference(preference);
-        setAnonymousPreference(preference);
-      });
-      return;
-    }
-
-    const requestId = latestPreferenceRequestRef.current + 1;
-    latestPreferenceRequestRef.current = requestId;
-
-    void fetch("/api/settings/theme", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        modeOverride: preference,
-      }),
-    })
-      .then(async (response) => {
-        const data = (await response.json()) as {
-          error?: string;
-          payload: ResolvedThemePayload;
-        };
-
-        if (!response.ok) {
-          throw new Error(data.error || "Impossible de mettre à jour le thème");
-        }
-
-        if (requestId !== latestPreferenceRequestRef.current) {
-          return;
-        }
-
-        replaceResolvedTheme(data.payload, { coords });
-      })
-      .catch((error) => {
-        if (requestId !== latestPreferenceRequestRef.current) {
-          return;
-        }
-
-        console.error("Failed to persist theme preference", error);
-      });
+    runWithTransition(coords, () => {
+      writeThemePreference(preference);
+      setLocalPreference(preference);
+    });
   };
 
   const toggleTheme = (coords?: Coords) => {
@@ -225,27 +153,20 @@ export function ThemeProvider({
       theme: runtimeState.activeMode,
       themePreference: runtimeState.themePreference,
       resolvedTheme,
-      isAuthenticated,
       setThemePreference,
       toggleTheme,
       replaceResolvedTheme,
-      timeWindow: runtimeState.timeWindow,
     }),
     [
-      isAuthenticated,
       replaceResolvedTheme,
       resolvedTheme,
       runtimeState.activeMode,
       runtimeState.themePreference,
-      runtimeState.timeWindow,
     ],
   );
 
   return (
     <ThemeProviderContext.Provider value={value}>
-      <Suspense fallback={null}>
-        <ThemePresetHandler />
-      </Suspense>
       {children}
     </ThemeProviderContext.Provider>
   );

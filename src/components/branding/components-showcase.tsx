@@ -18,7 +18,7 @@ export const ComponentsShowcase = ({ title, description }: ComponentsShowcasePro
   return (
     <section className="container mx-auto px-4 py-10 sm:py-14">
       <div className="mx-auto mb-8 max-w-2xl text-center">
-        <h2 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+        <h2 className="font-[family-name:var(--font-front-display)] text-balance text-4xl font-medium tracking-[-0.035em] sm:text-5xl">
           {title}
         </h2>
         <p className="mt-3 text-pretty text-muted-foreground sm:text-lg">
@@ -27,7 +27,7 @@ export const ComponentsShowcase = ({ title, description }: ComponentsShowcasePro
       </div>
 
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="rounded-[22px] border-0 bg-foreground/[0.045] shadow-none">
           <CardHeader>
             <CardTitle className="text-base">Boutons & Badges</CardTitle>
           </CardHeader>
@@ -47,7 +47,7 @@ export const ComponentsShowcase = ({ title, description }: ComponentsShowcasePro
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-[22px] border-0 bg-foreground/[0.045] shadow-none">
           <CardHeader>
             <CardTitle className="text-base">Formulaire</CardTitle>
           </CardHeader>
@@ -63,7 +63,7 @@ export const ComponentsShowcase = ({ title, description }: ComponentsShowcasePro
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
+        <Card className="rounded-[22px] border-0 bg-foreground/[0.045] shadow-none lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">États & Navigation</CardTitle>
           </CardHeader>

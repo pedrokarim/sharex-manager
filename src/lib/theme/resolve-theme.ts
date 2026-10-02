@@ -1,113 +1,34 @@
-import {
-  DEFAULT_DAY_END_HOUR,
-  DEFAULT_DAY_START_HOUR,
-  THEME_COLOR_KEYS,
-} from "@/lib/theme/constants";
 import type {
   GlobalThemeConfig,
+  GlobalThemeMode,
   ResolvedThemePayload,
   RuntimeThemeMode,
-  ThemeColorOverrideKey,
-  ThemeColorOverrides,
-  UserThemeMode,
-  UserThemePreferences,
 } from "@/types/theme-runtime";
-import type { ThemeStyles } from "@/types/theme";
 
-const defaultTimeWindow = {
-  dayStartHour: DEFAULT_DAY_START_HOUR,
-  dayEndHour: DEFAULT_DAY_END_HOUR,
-};
-
-export function getModePreference(
-  globalTheme: GlobalThemeConfig,
-  userPreferences: UserThemePreferences | null,
-): Exclude<UserThemeMode, "inherit"> | GlobalThemeConfig["mode"] {
-  if (!userPreferences || userPreferences.modeOverride === "inherit") {
-    return globalTheme.mode;
-  }
-
-  return userPreferences.modeOverride;
-}
-
+/**
+ * Mode réellement affiché. « system » dépend de l'appareil : sans cette
+ * information (rendu serveur), on retombe sur le clair, et le CSS fait le
+ * reste par media query.
+ */
 export function resolveRuntimeThemeMode(
-  modePreference: "light" | "dark" | "system" | "time-based",
-  options?: {
-    prefersDark?: boolean;
-    now?: Date;
-    dayStartHour?: number;
-    dayEndHour?: number;
-  },
+  modePreference: GlobalThemeMode,
+  options?: { prefersDark?: boolean },
 ): RuntimeThemeMode {
   if (modePreference === "light" || modePreference === "dark") {
     return modePreference;
   }
 
-  if (modePreference === "system") {
-    return options?.prefersDark ? "dark" : "light";
-  }
-
-  const now = options?.now ?? new Date();
-  const currentHour = now.getHours();
-  const dayStartHour = options?.dayStartHour ?? defaultTimeWindow.dayStartHour;
-  const dayEndHour = options?.dayEndHour ?? defaultTimeWindow.dayEndHour;
-  const isDayTime = currentHour >= dayStartHour && currentHour < dayEndHour;
-  return isDayTime ? "light" : "dark";
+  return options?.prefersDark ? "dark" : "light";
 }
 
-export function mergeColorOverrides(
-  baseStyles: ThemeStyles,
-  lightOverrides: ThemeColorOverrides = {},
-  darkOverrides: ThemeColorOverrides = {},
-): ThemeStyles {
-  const nextLight = { ...baseStyles.light };
-  const nextDark = { ...baseStyles.dark };
-
-  for (const key of THEME_COLOR_KEYS) {
-    const lightValue = lightOverrides[key as ThemeColorOverrideKey];
-    if (lightValue) {
-      nextLight[key] = lightValue;
-    }
-
-    const darkValue = darkOverrides[key as ThemeColorOverrideKey];
-    if (darkValue) {
-      nextDark[key] = darkValue;
-    }
-  }
-
-  return {
-    light: nextLight,
-    dark: nextDark,
-  };
-}
-
-export function resolveThemePayloadFromState(
+/** Ce que le serveur envoie au navigateur : le thème du site, tel que publié. */
+export function resolveThemePayload(
   globalTheme: GlobalThemeConfig,
-  userPreferences: UserThemePreferences | null,
 ): ResolvedThemePayload {
-  const modePreference = getModePreference(globalTheme, userPreferences);
-  const fallbackStyles = mergeColorOverrides(
-    globalTheme.styles,
-    userPreferences?.lightColorOverrides,
-    userPreferences?.darkColorOverrides,
-  );
-  const styles = userPreferences?.overrideEnabled
-    ? (userPreferences.stylesOverride ?? fallbackStyles)
-    : globalTheme.styles;
-
   return {
     globalTheme,
-    userPreferences,
-    styles,
-    modePreference,
-    modeSource:
-      !userPreferences || userPreferences.modeOverride === "inherit"
-        ? "global"
-        : "user",
-    activeMode: resolveRuntimeThemeMode(modePreference, {
-      now: new Date(),
-      dayStartHour: userPreferences?.dayStartHour,
-      dayEndHour: userPreferences?.dayEndHour,
-    }),
+    styles: globalTheme.styles,
+    modePreference: globalTheme.mode,
+    activeMode: resolveRuntimeThemeMode(globalTheme.mode),
   };
 }

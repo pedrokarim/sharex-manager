@@ -1,17 +1,9 @@
 import { defaultThemeState } from "@/config/theme";
-import {
-  DEFAULT_DAY_END_HOUR,
-  DEFAULT_DAY_START_HOUR,
-  DEFAULT_GLOBAL_THEME_MODE,
-} from "@/lib/theme/constants";
+import { DEFAULT_GLOBAL_THEME_MODE } from "@/lib/theme/constants";
 import {
   globalThemeConfigSchema,
-  userThemePreferencesSchema,
   type GlobalThemeConfig,
   type GlobalThemeMode,
-  type ThemeColorOverrides,
-  type UserThemeMode,
-  type UserThemePreferences,
 } from "@/types/theme-runtime";
 import type { ThemeStyles } from "@/types/theme";
 import { Database } from "bun:sqlite";
@@ -59,22 +51,8 @@ class ThemeDatabase {
       )
     `);
 
-    db.run(`
-      CREATE TABLE IF NOT EXISTS user_theme_preferences (
-        user_id TEXT PRIMARY KEY,
-        mode_override TEXT NOT NULL,
-        override_enabled INTEGER NOT NULL DEFAULT 0,
-        light_color_overrides TEXT NOT NULL DEFAULT '{}',
-        dark_color_overrides TEXT NOT NULL DEFAULT '{}',
-        light_theme_styles TEXT,
-        dark_theme_styles TEXT,
-        day_start_hour INTEGER NOT NULL DEFAULT ${DEFAULT_DAY_START_HOUR},
-        day_end_hour INTEGER NOT NULL DEFAULT ${DEFAULT_DAY_END_HOUR},
-        updated_at TEXT NOT NULL
-      )
-    `);
-
-    ThemeDatabase.ensureUserThemePreferenceColumns(db);
+    // L'ancienne table `user_theme_preferences` (thèmes personnels) n'est plus
+    // lue ni créée. Elle reste en place là où elle existe : rien n'est effacé.
 
     const existing = db
       .prepare("SELECT id FROM global_theme_config WHERE id = ?")
@@ -104,25 +82,6 @@ class ThemeDatabase {
     }
   }
 
-  private static ensureUserThemePreferenceColumns(db: Database) {
-    const columns = db
-      .prepare("PRAGMA table_info(user_theme_preferences)")
-      .all() as Array<{ name: string }>;
-    const columnNames = new Set(columns.map((column) => column.name));
-
-    if (!columnNames.has("light_theme_styles")) {
-      db.run(
-        "ALTER TABLE user_theme_preferences ADD COLUMN light_theme_styles TEXT",
-      );
-    }
-
-    if (!columnNames.has("dark_theme_styles")) {
-      db.run(
-        "ALTER TABLE user_theme_preferences ADD COLUMN dark_theme_styles TEXT",
-      );
-    }
-  }
-
   private static parseStyles(row: {
     light_styles: string;
     dark_styles: string;
@@ -142,26 +101,6 @@ class ThemeDatabase {
     });
 
     return parsed;
-  }
-
-  private static mapUserPreferences(row: any): UserThemePreferences {
-    return userThemePreferencesSchema.parse({
-      userId: row.user_id,
-      modeOverride: row.mode_override,
-      overrideEnabled: Boolean(row.override_enabled),
-      lightColorOverrides: JSON.parse(row.light_color_overrides || "{}"),
-      darkColorOverrides: JSON.parse(row.dark_color_overrides || "{}"),
-      stylesOverride:
-        row.light_theme_styles && row.dark_theme_styles
-          ? normalizeLegacyFontTokens({
-              light: JSON.parse(row.light_theme_styles),
-              dark: JSON.parse(row.dark_theme_styles),
-            })
-          : null,
-      dayStartHour: row.day_start_hour,
-      dayEndHour: row.day_end_hour,
-      updatedAt: row.updated_at,
-    });
   }
 
   public static getGlobalThemeConfig(): GlobalThemeConfig {
@@ -199,108 +138,8 @@ class ThemeDatabase {
     return ThemeDatabase.getGlobalThemeConfig();
   }
 
-  public static getUserThemePreferences(
-    userId: string,
-  ): UserThemePreferences | null {
-    const db = ThemeDatabase.getConnection();
-    const row = db
-      .prepare("SELECT * FROM user_theme_preferences WHERE user_id = ?")
-      .get(userId);
-
-    if (!row) {
-      return null;
-    }
-
-    return ThemeDatabase.mapUserPreferences(row);
-  }
-
-  public static getDefaultUserThemePreferences(
-    userId: string,
-  ): UserThemePreferences {
-    return {
-      userId,
-      modeOverride: "inherit",
-      overrideEnabled: false,
-      lightColorOverrides: {},
-      darkColorOverrides: {},
-      stylesOverride: null,
-      dayStartHour: DEFAULT_DAY_START_HOUR,
-      dayEndHour: DEFAULT_DAY_END_HOUR,
-      updatedAt: new Date(0).toISOString(),
-    };
-  }
-
-  public static upsertUserThemePreferences(
-    userId: string,
-    updates: {
-      modeOverride?: UserThemeMode;
-      overrideEnabled?: boolean;
-      lightColorOverrides?: ThemeColorOverrides;
-      darkColorOverrides?: ThemeColorOverrides;
-      stylesOverride?: ThemeStyles | null;
-      dayStartHour?: number;
-      dayEndHour?: number;
-    },
-  ): UserThemePreferences {
-    const db = ThemeDatabase.getConnection();
-    const current =
-      ThemeDatabase.getUserThemePreferences(userId) ??
-      ThemeDatabase.getDefaultUserThemePreferences(userId);
-    const next: UserThemePreferences = {
-      ...current,
-      ...updates,
-      lightColorOverrides:
-        updates.lightColorOverrides ?? current.lightColorOverrides,
-      darkColorOverrides:
-        updates.darkColorOverrides ?? current.darkColorOverrides,
-      stylesOverride: updates.stylesOverride ?? current.stylesOverride ?? null,
-      updatedAt: new Date().toISOString(),
-    };
-
-    db.prepare(
-      `
-      INSERT INTO user_theme_preferences (
-        user_id,
-        mode_override,
-        override_enabled,
-        light_color_overrides,
-        dark_color_overrides,
-        light_theme_styles,
-        dark_theme_styles,
-        day_start_hour,
-        day_end_hour,
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET
-        mode_override = excluded.mode_override,
-        override_enabled = excluded.override_enabled,
-        light_color_overrides = excluded.light_color_overrides,
-        dark_color_overrides = excluded.dark_color_overrides,
-        light_theme_styles = excluded.light_theme_styles,
-        dark_theme_styles = excluded.dark_theme_styles,
-        day_start_hour = excluded.day_start_hour,
-        day_end_hour = excluded.day_end_hour,
-        updated_at = excluded.updated_at
-    `,
-    ).run(
-      next.userId,
-      next.modeOverride,
-      next.overrideEnabled ? 1 : 0,
-      JSON.stringify(next.lightColorOverrides),
-      JSON.stringify(next.darkColorOverrides),
-      next.stylesOverride ? JSON.stringify(next.stylesOverride.light) : null,
-      next.stylesOverride ? JSON.stringify(next.stylesOverride.dark) : null,
-      next.dayStartHour,
-      next.dayEndHour,
-      next.updatedAt,
-    );
-
-    return ThemeDatabase.getUserThemePreferences(userId)!;
-  }
-
   public static resetThemeDb() {
     const db = ThemeDatabase.getConnection();
-    db.prepare("DELETE FROM user_theme_preferences").run();
     db.prepare("DELETE FROM global_theme_config").run();
     ThemeDatabase.initTables(db);
   }

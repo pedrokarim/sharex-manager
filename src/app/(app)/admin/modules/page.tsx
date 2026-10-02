@@ -1,21 +1,21 @@
-import { apiModuleManager } from "@/lib/modules/module-manager.api";
+import { Package } from "lucide-react";
+
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ModuleList } from "@/components/modules/module-list";
-import { Metadata } from "next";
 
 export const metadata = {
   title: "Administration des modules",
   description: "Gérez les modules installés dans ShareX Manager",
 };
 
-export default async function ModulesPage() {
-  await apiModuleManager.ensureInitialized();
-
-  // Récupérer la liste des modules
-  const modules = await apiModuleManager.getModules();
-
+export default function ModulesPage() {
   return (
-    <div className="container mx-auto py-6">
-      <h1 className="text-2xl font-bold mb-6">Gestion des modules</h1>
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader
+        icon={Package}
+        title="Gestion des modules"
+        description="Installez, activez, désactivez et supprimez des modules pour étendre les fonctionnalités de votre application."
+      />
       <ModuleList />
     </div>
   );

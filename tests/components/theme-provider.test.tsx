@@ -6,17 +6,14 @@ import userEvent from "@testing-library/user-event";
 import { describe, beforeEach, expect, it, vi } from "vitest";
 import { defaultThemeState } from "@/config/theme";
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
-import { resolveThemePayloadFromState } from "@/lib/theme/resolve-theme";
-import { ANONYMOUS_THEME_PREFERENCE_STORAGE_KEY } from "@/lib/theme/constants";
+import { resolveThemePayload } from "@/lib/theme/resolve-theme";
+import { THEME_PREFERENCE_STORAGE_KEY } from "@/lib/theme/constants";
+import type { ThemeStyles } from "@/types/theme";
 import type { GlobalThemeConfig } from "@/types/theme-runtime";
-
-vi.mock("@/hooks/use-theme-preset-from-url", () => ({
-  useThemePresetFromUrl: () => {},
-}));
 
 const baseGlobalTheme: GlobalThemeConfig = {
   mode: "light",
-  styles: defaultThemeState.styles,
+  styles: defaultThemeState.styles as ThemeStyles,
   updatedAt: "2026-04-02T10:00:00.000Z",
   updatedByUserId: null,
 };
@@ -32,6 +29,13 @@ function ThemeProbe() {
     </div>
   );
 }
+
+const renderProvider = () =>
+  render(
+    <ThemeProvider initialTheme={resolveThemePayload(baseGlobalTheme)}>
+      <ThemeProbe />
+    </ThemeProvider>,
+  );
 
 describe("ThemeProvider", () => {
   beforeEach(() => {
@@ -63,43 +67,18 @@ describe("ThemeProvider", () => {
     vi.stubGlobal("fetch", vi.fn());
   });
 
-  it("does not auto-migrate legacy theme data on mount", () => {
-    localStorage.setItem("preferredThemeMode", JSON.stringify("dark"));
-    localStorage.setItem(
-      "timeBasedTheme",
-      JSON.stringify({ dayStartHour: 8, dayEndHour: 18 }),
-    );
-    localStorage.setItem(
-      "preferences",
-      JSON.stringify({
-        lightColors: { background: "oklch(0.95 0.01 200)" },
-        darkColors: { background: "oklch(0.18 0.01 260)" },
-      }),
-    );
+  it("sans choix local, affiche le mode du site", () => {
+    renderProvider();
 
-    render(
-      <ThemeProvider
-        initialTheme={resolveThemePayloadFromState(baseGlobalTheme, null)}
-        isAuthenticated={true}
-      >
-        <ThemeProbe />
-      </ThemeProvider>,
-    );
-
+    expect(screen.getByTestId("theme-value").textContent).toBe("light");
+    expect(screen.getByTestId("theme-preference").textContent).toBe("light");
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("hydrates anonymous visitors from the dedicated local preference", async () => {
-    localStorage.setItem(ANONYMOUS_THEME_PREFERENCE_STORAGE_KEY, "dark");
+  it("reprend le mode choisi dans ce navigateur", async () => {
+    localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, "dark");
 
-    render(
-      <ThemeProvider
-        initialTheme={resolveThemePayloadFromState(baseGlobalTheme, null)}
-        isAuthenticated={false}
-      >
-        <ThemeProbe />
-      </ThemeProvider>,
-    );
+    renderProvider();
 
     await waitFor(() => {
       expect(screen.getByTestId("theme-value").textContent).toBe("dark");
@@ -110,54 +89,18 @@ describe("ThemeProvider", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("persists authenticated theme changes through the settings theme API", async () => {
+  it("enregistre un changement de mode dans le navigateur, jamais sur le serveur", async () => {
     const user = userEvent.setup();
-    const updatedPayload = resolveThemePayloadFromState(
-      baseGlobalTheme,
-      {
-        userId: "user-1",
-        modeOverride: "dark",
-        overrideEnabled: false,
-        lightColorOverrides: {},
-        darkColorOverrides: {},
-        stylesOverride: null,
-        dayStartHour: 7,
-        dayEndHour: 19,
-        updatedAt: "2026-04-02T10:05:00.000Z",
-      },
-    );
 
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        payload: updatedPayload,
-      }),
-    } as Response);
-
-    render(
-      <ThemeProvider
-        initialTheme={resolveThemePayloadFromState(baseGlobalTheme, null)}
-        isAuthenticated={true}
-      >
-        <ThemeProbe />
-      </ThemeProvider>,
-    );
-
+    renderProvider();
     await user.click(screen.getByRole("button", { name: "force-dark" }));
-
-    await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith(
-        "/api/settings/theme",
-        expect.objectContaining({
-          method: "PUT",
-        }),
-      );
-    });
 
     await waitFor(() => {
       expect(screen.getByTestId("theme-preference").textContent).toBe("dark");
     });
 
+    expect(localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY)).toBe("dark");
     expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

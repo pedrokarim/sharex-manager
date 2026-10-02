@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PageTransition } from "@/components/page-transition";
 import { BrandingPageClient } from "@/components/branding/branding-page.client";
 import { publicPageMetadata } from "@/lib/seo";
 
@@ -11,7 +12,11 @@ export const metadata = publicPageMetadata({
 
 
 const Page = () => {
-  return <BrandingPageClient />;
+  return (
+    <PageTransition>
+      <BrandingPageClient />
+    </PageTransition>
+  );
 };
 
 export default Page;
