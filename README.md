@@ -12,7 +12,7 @@ Le point de chute de vos captures d’écran, sur votre propre serveur. ShareX,
 Flameshot ou l’application Android envoient, ShareX Manager range, génère les
 miniatures et renvoie un lien public prêt à partager.
 
-📖 **[Site](https://pedrokarim.github.io/sharex-manager/)** · 📚 **[Wiki](https://github.com/pedrokarim/sharex-manager/wiki)** · 🚀 **[Démo](https://sxm.ascencia.re)**
+📖 **[Site](https://pedrokarim.github.io/sharex-manager/)** · 📚 **[Wiki](https://github.com/pedrokarim/sharex-manager/wiki)**
 
 ![Galerie](docs/images/galerie.webp)
 
