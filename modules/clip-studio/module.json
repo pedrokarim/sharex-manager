@@ -51,6 +51,7 @@
       "label": "Clip Studio",
       "description": "Clips exportés",
       "icon": "Clapperboard",
+      "kinds": ["video"],
       "list": "listGalleryItems",
       "import": "importGalleryItems"
     }

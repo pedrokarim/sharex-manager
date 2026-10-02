@@ -325,6 +325,20 @@
     }
   },
   "gallery": {
+    "picker": {
+      "title": "Choisir une image",
+      "description": "Galerie, modules, ordinateur ou lien.",
+      "gallery": "Galerie",
+      "gallery_hint": "Vos fichiers envoyés",
+      "search_gallery": "Rechercher dans la galerie",
+      "empty_gallery": "La galerie ne contient aucune image.",
+      "empty_source": "Cette source ne contient aucune image pour l’instant.",
+      "drop_title": "Déposez une image ici",
+      "drop_description": "Ou parcourez votre ordinateur pour en choisir une.",
+      "link_title": "Image d’un autre site",
+      "link_description": "Collez l’adresse d’une image publique. Le serveur la télécharge pour vous.",
+      "use_link": "Utiliser ce lien"
+    },
     "download": {
       "original": "Télécharger l’original",
       "clean": "Télécharger une version propre",

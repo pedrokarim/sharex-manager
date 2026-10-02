@@ -36,6 +36,7 @@ const ModuleGallerySourceSchema = z.object({
   label: z.string(),
   description: z.string().optional(),
   icon: z.string().optional(),
+  kinds: z.array(z.enum(["image", "video"])).optional(),
   list: z.string(),
   import: z.string(),
 });

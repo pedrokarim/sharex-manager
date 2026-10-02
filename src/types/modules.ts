@@ -41,6 +41,11 @@ export interface ModuleGallerySource {
   label: string;
   description?: string;
   icon?: string; // nom d'icône Lucide
+  /**
+   * Ce que la source contient. Le sélecteur d'image ne propose que les sources
+   * qui ont des images ; absent, la source est supposée en contenir.
+   */
+  kinds?: ("image" | "video")[];
   /** Fonction serveur : `(query: GallerySourceQuery) => GallerySourcePage`. */
   list: string;
   /** Fonction serveur : `(ids: string[]) => GallerySourceImport`. */

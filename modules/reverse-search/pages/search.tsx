@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Ghost, History, ImagePlus, Link2, Loader2, Plus, Trophy, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/brand-logo";
+import { ImagePickerDialog } from "@/components/gallery/image-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -31,6 +33,7 @@ import {
   formatSimilarity,
   type EngineId,
   type EngineResult,
+  type HistoryEntry,
   type SearchView,
 } from "../lib/types";
 
@@ -53,10 +56,14 @@ export default function SearchPage() {
   const [links, setLinks] = useState<ExternalLinks | null>(null);
   const [url, setUrl] = useState("");
   const [dragging, setDragging] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [recent, setRecent] = useState<HistoryEntry[]>([]);
   const dragDepth = useRef(0);
+  const pickerOpenRef = useRef(false);
   const current = useRef<SearchView | null>(null);
   current.current = search;
+
+  pickerOpenRef.current = pickerOpen;
 
   /** Moteurs dont les résultats peuvent s'afficher dans la page. */
   const inlineReady = useMemo(
@@ -140,6 +147,20 @@ export default function SearchPage() {
     setLinks(null);
   }, [release]);
 
+  // Dernières recherches enregistrées, sous la zone de dépôt.
+  useEffect(() => {
+    if (search) return;
+    let cancelled = false;
+    callModule<{ entries: HistoryEntry[] }>("listHistory", { limit: 10 })
+      .then((page) => {
+        if (!cancelled) setRecent(page.entries);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [search]);
+
   // Une recherche éphémère ne survit pas à la page.
   useEffect(() => {
     const onLeave = () => release(current.current);
@@ -178,6 +199,7 @@ export default function SearchPage() {
 
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
+      if (pickerOpenRef.current) return;
       const file = Array.from(event.clipboardData?.files ?? []).find((entry) => entry.type.startsWith("image/"));
       if (file) {
         event.preventDefault();
@@ -190,6 +212,8 @@ export default function SearchPage() {
       if (!target?.closest("input, textarea") && /^https?:\/\/\S+$/.test(text)) void start({ url: text });
     };
     const carriesImage = (event: DragEvent) => {
+      // La fenêtre de choix gère elle-même ses dépôts.
+      if (pickerOpenRef.current) return false;
       const types = Array.from(event.dataTransfer?.types ?? []);
       return types.includes("Files") || types.includes("text/uri-list");
     };
@@ -297,66 +321,107 @@ export default function SearchPage() {
         </>
       }
     >
-      <input
-        ref={fileInput}
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={(event) => {
-          void startFromFile(event.target.files?.[0]);
-          event.target.value = "";
+      <ImagePickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        title="Image à rechercher"
+        onPick={(image) => {
+          if (image.kind === "gallery") void start({ galleryFile: image.name });
+          else if (image.kind === "url") void start({ url: image.url });
+          else void startFromFile(image.file);
         }}
       />
 
       {!search ? (
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-4 sm:py-10">
-          <button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            disabled={starting}
-            className={cn(
-              "flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-6 py-14 text-center transition-colors",
-              dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/40"
-            )}
-          >
-            {starting ? <Loader2 className="h-10 w-10 animate-spin text-primary" /> : <ImagePlus className="h-10 w-10 text-muted-foreground" />}
-            <span className="space-y-1">
-              <span className="block text-lg font-semibold">{starting ? "Préparation de l’image…" : "Déposez une image pour retrouver son origine"}</span>
-              <span className="block text-sm text-muted-foreground">
-                Glissez-la ici, collez-la (Ctrl + V) ou cliquez pour la choisir. PNG, JPEG, WebP, GIF ou AVIF, 20 Mo au plus.
+        // L'accueil est un plan de travail : la zone de dépôt prend toute la
+        // place disponible, les moteurs et les recherches récentes l'encadrent.
+        <div className="grid flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,26vw)]">
+          <div className="flex min-h-[420px] flex-col gap-4">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              disabled={starting}
+              className={cn(
+                "flex flex-1 flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors",
+                dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/40"
+              )}
+            >
+              {starting ? <Loader2 className="h-12 w-12 animate-spin text-primary" /> : <ImagePlus className="h-12 w-12 text-muted-foreground" />}
+              <span className="space-y-1.5">
+                <span className="block text-xl font-semibold">{starting ? "Préparation de l’image…" : "Quelle image voulez-vous retrouver ?"}</span>
+                <span className="block text-sm text-muted-foreground">
+                  Déposez-la n’importe où sur la page, collez-la (Ctrl + V), ou cliquez pour la choisir.
+                </span>
               </span>
-            </span>
-          </button>
+              <span className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground">
+                {["Galerie", "AI Image Gen et autres modules", "Ordinateur", "Lien"].map((label) => (
+                  <span key={label} className="rounded-full border px-2.5 py-1">
+                    {label}
+                  </span>
+                ))}
+              </span>
+            </button>
 
-          <form
-            className="flex gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (url.trim()) void start({ url: url.trim() }).then(() => setUrl(""));
-            }}
-          >
-            <div className="relative flex-1">
-              <Link2 className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="url"
-                inputMode="url"
-                value={url}
-                onChange={(event) => setUrl(event.target.value)}
-                placeholder="… ou collez l’adresse d’une image"
-                className="h-10 pl-9"
-              />
-            </div>
-            <Button type="submit" variant="outline" className="h-10" disabled={!url.trim() || starting}>
-              Rechercher
-            </Button>
-          </form>
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (url.trim()) void start({ url: url.trim() }).then(() => setUrl(""));
+              }}
+            >
+              <div className="relative flex-1">
+                <Link2 className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="url"
+                  inputMode="url"
+                  value={url}
+                  onChange={(event) => setUrl(event.target.value)}
+                  placeholder="… ou collez directement l’adresse d’une image"
+                  className="h-10 pl-9"
+                />
+              </div>
+              <Button type="submit" variant="outline" className="h-10" disabled={!url.trim() || starting}>
+                Rechercher
+              </Button>
+            </form>
 
-          <section className="space-y-3">
-            <div className="flex items-baseline justify-between gap-3">
+            {recent.length > 0 && (
+              <section className="space-y-2">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="text-sm font-semibold">Recherches récentes</h2>
+                  <Link href={`${MODULE_PATH}/history`} className="text-xs font-medium text-primary hover:underline">
+                    Tout l’historique
+                  </Link>
+                </div>
+                <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8 2xl:grid-cols-10">
+                  {recent.map((entry) => (
+                    <li key={entry.id}>
+                      <Link
+                        href={`${MODULE_PATH}?search=${entry.id}`}
+                        title={entry.best?.title ?? entry.name}
+                        className="group relative block aspect-square overflow-hidden rounded-lg border bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- aperçu servi par le module */}
+                        <img src={entry.preview} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                        {entry.best && formatSimilarity(entry.best.similarity) && (
+                          <span className="absolute right-1 bottom-1 rounded bg-black/65 px-1 py-0.5 text-[10px] font-medium tabular-nums text-white">
+                            {formatSimilarity(entry.best.similarity)}
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+
+          <section className="flex flex-col gap-3 rounded-2xl border p-4">
+            <div>
               <h2 className="text-sm font-semibold">Moteurs interrogés</h2>
               <p className="text-xs text-muted-foreground">Votre choix est retenu dans votre compte.</p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
               {ENGINES.map((engine) => {
                 const ready = inlineReady.has(engine.id);
                 const linkOnly = engine.inline === "none";
@@ -399,19 +464,19 @@ export default function SearchPage() {
                 );
               })}
             </div>
-            <p className="text-xs leading-5 text-muted-foreground">
+            <p className="mt-auto text-xs leading-5 text-muted-foreground">
               Les moteurs « Dans la page » répondent ici même. Les autres s’ouvrent dans un onglet depuis l’écran de
               résultats : l’image leur est alors transmise par un lien temporaire.
             </p>
           </section>
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)]">
           {/* ─── Image interrogée ─── */}
           <aside className="flex flex-col gap-4 lg:sticky lg:top-16 lg:self-start">
             <div className="overflow-hidden rounded-xl border bg-muted/40">
               {/* eslint-disable-next-line @next/next/no-img-element -- aperçu local ou servi par le module */}
-              <img src={search.preview} alt="" className="max-h-80 w-full object-contain" />
+              <img src={search.preview} alt="" className="max-h-80 w-full object-contain 2xl:max-h-[26rem]" />
             </div>
             <div className="space-y-1">
               <p className="truncate text-sm font-medium" title={search.query.name}>

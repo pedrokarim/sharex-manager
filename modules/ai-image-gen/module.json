@@ -66,6 +66,7 @@
       "label": "AI Image Gen",
       "description": "Rendus du studio",
       "icon": "Sparkles",
+      "kinds": ["image"],
       "list": "listGalleryItems",
       "import": "importGalleryItems"
     }

@@ -324,6 +324,20 @@
     }
   },
   "gallery": {
+    "picker": {
+      "title": "Choose an image",
+      "description": "Gallery, modules, computer or link.",
+      "gallery": "Gallery",
+      "gallery_hint": "Your uploaded files",
+      "search_gallery": "Search the gallery",
+      "empty_gallery": "The gallery has no image.",
+      "empty_source": "This source has no image yet.",
+      "drop_title": "Drop an image here",
+      "drop_description": "Or browse your computer to choose one.",
+      "link_title": "Image from another site",
+      "link_description": "Paste the address of a public image. The server downloads it for you.",
+      "use_link": "Use this link"
+    },
     "download": {
       "original": "Download the original",
       "clean": "Download a clean version",

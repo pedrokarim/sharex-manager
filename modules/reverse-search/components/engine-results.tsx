@@ -221,7 +221,7 @@ export function EngineSection({ engine, result, showWeak, onRetry, onOpenExterna
       )}
 
       {shown.length > 0 && (
-        <ul className="grid gap-2 xl:grid-cols-2">
+        <ul className="grid gap-2 xl:grid-cols-2 min-[1900px]:grid-cols-3">
           {shown.map((match, index) => (
             <MatchCard key={`${match.links[0]?.url ?? match.title}-${index}`} match={match} index={index} />
           ))}

@@ -232,6 +232,7 @@ l’utilisateur a choisis.
     "label": "AI Image Gen",
     "description": "Rendus du studio",
     "icon": "Sparkles",
+    "kinds": ["image"],
     "list": "listGalleryItems",
     "import": "importGalleryItems"
   }
@@ -253,6 +254,10 @@ export async function importGalleryItems(ids: string[]): Promise<GallerySourceIm
   navigateur, appelle `announceNewUpload` pour chacun, et rend la liste des
   réussites et des échecs. Les identifiants viennent du navigateur : les
   vérifier comme n’importe quelle entrée.
+- `kinds` dit ce que la source contient (`image`, `video`). Le sélecteur
+  d’image commun (`ImagePickerDialog`, utilisé par exemple par la recherche
+  inversée) ne propose que les sources qui ont des images : un module qui se
+  déclare ici devient aussi une provenance pour **choisir** une image.
 - Une source dont l’une des deux fonctions n’est pas ouverte au rôle `user`
   n’est pas proposée. Un module désactivé n’apparaît jamais.
 

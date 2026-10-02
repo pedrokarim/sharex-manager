@@ -21,7 +21,7 @@ interface ModuleShellProps {
 /** En-tête commun aux pages du module : son nom, ses trois vues, et les actions de la page. */
 export function ModuleShell({ current, actions, children }: ModuleShellProps) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-1 flex-col gap-4">
       <header className="z-20 -mx-4 flex flex-wrap items-center gap-x-4 gap-y-3 bg-background/95 px-4 py-3 backdrop-blur-md xl:sticky xl:top-0 xl:h-14 xl:flex-nowrap xl:py-0">
         <div className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">

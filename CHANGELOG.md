@@ -16,6 +16,10 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   transmise, par son adresse publique ou par un lien temporaire de trente
   minutes. Les recherches sont gardées dans un historique, sauf en mode
   éphémère, où rien n’est écrit sur le disque.
+- Sélecteur d’image commun (`ImagePickerDialog`) : galerie, modules activés
+  qui détiennent des images, ordinateur ou lien. La recherche inversée s’en
+  sert pour choisir son image ; les modules s’y branchent par `gallerySources`,
+  qui gagne un champ `kinds`.
 - Galerie : frise chronologique à la place de la barre de défilement. Elle
   apparaît quand on défile ou qu’on approche du bord droit, étage les années
   selon la quantité de contenu, pose un point par mois et nomme dans une bulle

@@ -25,6 +25,7 @@ export async function GET() {
           label: source.label,
           description: source.description,
           icon: source.icon,
+          kinds: source.kinds,
           list: source.list,
           import: source.import,
         }))
