@@ -252,6 +252,14 @@
       }
     },
     "gallery": {
+      "elements": {
+        "title": "Éléments de la galerie",
+        "description": "Ce que la galerie affiche en plus des fichiers. Ces réglages suivent votre compte, d’un appareil à l’autre.",
+        "day_separators": "Séparations par jour",
+        "day_separators_hint": "Dans chaque mois, les fichiers sont regroupés par jour. Plusieurs jours partagent une même rangée pour ne pas perdre de place.",
+        "highlights": "À la une",
+        "highlights_hint": "Une rangée de raccourcis illustrés en haut de la galerie : souvenirs, favoris, fichiers privés, dernier album et dernières créations des modules activés."
+      },
       "view_mode": "Mode d'affichage",
       "viewer_presentation": {
         "title": "Ouverture d’un fichier",
@@ -391,6 +399,25 @@
       "go_to_date": "Aller à une date",
       "count_one": "{count} fichier",
       "count_many": "{count} fichiers"
+    },
+    "days": {
+      "today": "Aujourd’hui",
+      "yesterday": "Hier",
+      "select_day": "Sélectionner la journée",
+      "deselect_day": "Retirer la sélection de la journée"
+    },
+    "highlights": {
+      "title": "À la une",
+      "memory": "Revivez ce moment",
+      "one_year_ago": "Il y a un an",
+      "years_ago": "Il y a {count} ans",
+      "starred": "Favoris",
+      "secure": "Fichiers privés",
+      "album": "Dernier album",
+      "one_file": "1 fichier",
+      "files": "{count} fichiers",
+      "previous": "Cartes précédentes",
+      "next": "Cartes suivantes"
     },
     "timeline": {
       "description": "Choisissez une année, puis un mois si vous voulez être plus précis.",

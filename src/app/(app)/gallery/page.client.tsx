@@ -33,6 +33,9 @@ import {
 } from "@/lib/utils/chunk";
 import { useQueryState } from "nuqs";
 import { GridView } from "@/components/gallery/grid-view";
+import { DaySections } from "@/components/gallery/day-sections";
+import { GalleryHighlights } from "@/components/gallery/gallery-highlights";
+import { useGalleryDisplay } from "@/hooks/use-gallery-display";
 import { ListView } from "@/components/gallery/list-view";
 import { FileViewer } from "@/components/gallery/file-viewer";
 import { UploadZone, type UploadZoneHandle } from "@/components/gallery/upload-zone";
@@ -105,6 +108,9 @@ export function GalleryClient({
   const [sortBy] = useAtom(sortByAtom);
   const [sortOrder] = useAtom(sortOrderAtom);
   const [language] = useAtom(languageAtom);
+  const { value: galleryDisplay } = useGalleryDisplay();
+  // Les jours n'ont de sens que si la galerie est rangée par date.
+  const showDaySeparators = galleryDisplay.daySeparators && sortBy === "date";
 
   const [search] = useQueryState("q");
   const [startDate] = useQueryState("start");
@@ -1224,6 +1230,11 @@ export function GalleryClient({
           </div>
         </section>
 
+        {/* À la une : seulement sur la galerie entière, pas sur une recherche ni un filtre. */}
+        {galleryDisplay.highlights && !secureOnly && !starredOnly && !search && !startDate && !endDate && (
+          <GalleryHighlights />
+        )}
+
         {files.length === 0 && (isReloading || isRefreshing || loading) ? (
           <MediaGridSkeleton size={thumbnailSize === "tiny" ? "small" : thumbnailSize} />
         ) : files.length === 0 ? (
@@ -1355,9 +1366,17 @@ export function GalleryClient({
                       </div>
                     );
                   })()}
-                  {!viewMode || viewMode === "grid" ? (
+                  <DaySections
+                    files={filesInGroup}
+                    enabled={showDaySeparators}
+                    layout={!viewMode || viewMode === "grid" ? "grid" : "list"}
+                    locale={language}
+                    isSelected={isSelected}
+                    onToggleDay={handleToggleMonthSelection}
+                  >
+                  {(dayFiles) => !viewMode || viewMode === "grid" ? (
                     <GridView
-                      files={filesInGroup}
+                      files={dayFiles}
                       onCopy={copyToClipboard}
                       onDelete={(name) => {
                         updateData((prev) =>
@@ -1390,7 +1409,7 @@ export function GalleryClient({
                     />
                   ) : (
                     <ListView
-                      files={filesInGroup}
+                      files={dayFiles}
                       onCopy={copyToClipboard}
                       onDelete={(name) => {
                         updateData((prev) =>
@@ -1422,6 +1441,7 @@ export function GalleryClient({
                       newFileIds={newFileIds}
                     />
                   )}
+                  </DaySections>
                 </div>
               ))}
 

@@ -222,6 +222,10 @@ galerie ne connaît pas le module : elle lit la déclaration, appelle la fonctio
 `list` pour afficher les éléments, puis la fonction `import` avec ceux que
 l’utilisateur a choisis.
 
+La même déclaration alimente le bandeau « À la une » de la galerie, pour les
+comptes qui l’ont activé : le dernier élément renvoyé par `list` y devient une
+carte, avec le logo du module, qui mène à sa page. Il n’y a rien à ajouter.
+
 ```json
 "functions": {
   "listGalleryItems": "user",

@@ -7,6 +7,19 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Galerie : séparations par jour à l’intérieur de chaque mois (« Aujourd’hui »,
+  « Hier », puis la date). En grille, les jours se suivent sans case perdue :
+  plusieurs jours partagent une rangée, l’étiquette de chacun se pose au-dessus
+  de sa première carte, et un jour trop long continue à la rangée suivante.
+  Chaque étiquette permet de sélectionner la journée. Activé par défaut.
+- Galerie : bandeau « À la une », une rangée de raccourcis illustrés en tête de
+  page : souvenir d’une année précédente, favoris, fichiers privés, dernier
+  album, et la dernière création de chaque module activé qui déclare une source
+  (`gallerySources`). Un module coupé disparaît du bandeau sans autre réglage.
+  Désactivé par défaut.
+- Préférences : section « Éléments de la galerie », pour allumer ou éteindre ces
+  deux éléments. Ces réglages sont rattachés au compte et le suivent d’un
+  appareil à l’autre.
 - Albums : trois visibilités au lieu d’un simple public/privé. Un album est
   privé à sa création, peut devenir public par lien (accessible à qui connaît
   son adresse, absent du catalogue) ou public au catalogue. Le réglage est

@@ -36,6 +36,8 @@ import {
   Grid,
   LayoutGrid,
   Table2,
+  CalendarDays,
+  GalleryHorizontalEnd,
   Maximize2,
   AppWindow,
 } from "lucide-react";
@@ -58,6 +60,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
 import { useTranslation } from "@/lib/i18n";
+import { GALLERY_DISPLAY_DEFAULTS, useGalleryDisplay } from "@/hooks/use-gallery-display";
 import { cn } from "@/lib/utils";
 
 const settingsPanelClassName =
@@ -86,6 +89,7 @@ export function PreferencesPageClient() {
   );
 
   const { t } = useTranslation();
+  const galleryDisplay = useGalleryDisplay();
 
   const handleReset = () => {
     setPreferences({
@@ -105,6 +109,7 @@ export function PreferencesPageClient() {
       defaultSortOrder: "desc",
       enableUploadNotifications: true,
     });
+    galleryDisplay.update(GALLERY_DISPLAY_DEFAULTS);
     toast.success(t("settings.save_success"));
   };
 
@@ -335,6 +340,48 @@ export function PreferencesPageClient() {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            <div className={settingsBlockClassName}>
+              <div className="space-y-1">
+                <Label className="text-sm font-medium sm:text-base">
+                  {t("settings.gallery.elements.title")}
+                </Label>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  {t("settings.gallery.elements.description")}
+                </p>
+              </div>
+              <div className="space-y-2">
+                {(
+                  [
+                    { key: "daySeparators", icon: CalendarDays, label: "day_separators" },
+                    { key: "highlights", icon: GalleryHorizontalEnd, label: "highlights" },
+                  ] as const
+                ).map(({ key, icon: Icon, label }) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background px-4 py-3"
+                  >
+                    <div className="flex min-w-0 items-start gap-3">
+                      <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div className="min-w-0 space-y-0.5">
+                        <Label htmlFor={`gallery-${key}`} className="text-sm sm:text-base">
+                          {t(`settings.gallery.elements.${label}`)}
+                        </Label>
+                        <p className="text-xs text-muted-foreground sm:text-sm">
+                          {t(`settings.gallery.elements.${label}_hint`)}
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      id={`gallery-${key}`}
+                      checked={galleryDisplay.value[key]}
+                      disabled={!galleryDisplay.ready}
+                      onCheckedChange={(checked) => galleryDisplay.update({ [key]: checked })}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 

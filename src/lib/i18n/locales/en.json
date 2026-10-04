@@ -251,6 +251,14 @@
       }
     },
     "gallery": {
+      "elements": {
+        "title": "Gallery elements",
+        "description": "What the gallery shows besides the files. These settings follow your account across devices.",
+        "day_separators": "Day separators",
+        "day_separators_hint": "Within each month, files are grouped by day. Several days share a row so no space is wasted.",
+        "highlights": "Highlights",
+        "highlights_hint": "A row of illustrated shortcuts at the top of the gallery: memories, favourites, private files, latest album and the latest creations from enabled modules."
+      },
       "view_mode": "View Mode",
       "viewer_presentation": {
         "title": "Opening a file",
@@ -390,6 +398,25 @@
       "go_to_date": "Go to date",
       "count_one": "{count} file",
       "count_many": "{count} files"
+    },
+    "days": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "select_day": "Select the day",
+      "deselect_day": "Clear the selection for the day"
+    },
+    "highlights": {
+      "title": "Highlights",
+      "memory": "Relive this moment",
+      "one_year_ago": "1 year ago",
+      "years_ago": "{count} years ago",
+      "starred": "Favourites",
+      "secure": "Private files",
+      "album": "Latest album",
+      "one_file": "1 file",
+      "files": "{count} files",
+      "previous": "Previous cards",
+      "next": "Next cards"
     },
     "timeline": {
       "description": "Pick a year, then a month if you want to be more precise.",
