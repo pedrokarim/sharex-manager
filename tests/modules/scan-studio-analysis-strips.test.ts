@@ -140,7 +140,9 @@ describe("ordre de lecture par format", () => {
 
 // ─── Bandes hautes ───────────────────────────────────────────────
 
-describe("bande de webtoon découpée en tranches", () => {
+// Repérage complet d'une longue bande, parfois deux fois de suite : la machine de
+// la CI y met plus de dix secondes là où un poste en met une.
+describe("bande de webtoon découpée en tranches", { timeout: 60_000 }, () => {
   /**
    * Une bande de 600 × 7000 : trois tranches (0 à 3200, 2720 à 5920, 5440 à
    * 7000). Une bulle est posée sur le bas de la première, une ligne de signes
