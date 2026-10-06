@@ -14,7 +14,7 @@ const withSources = configs.filter((config) => config.gallerySources?.length);
 
 describe("sources des modules pour la galerie", () => {
   it("existent pour AI Image Gen et Clip Studio", () => {
-    expect(withSources.map((config) => config.name).sort()).toEqual(["ai-image-gen", "clip-studio"]);
+    expect(withSources.map((config) => config.name).sort()).toEqual(["ai-image-gen", "clip-studio", "scan-studio"]);
   });
 
   it.each(withSources.map((config) => [config.name, config] as const))(

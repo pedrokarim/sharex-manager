@@ -84,3 +84,7 @@ tweakcn
 # Rapports d’audit de sécurité : ils décrivent des failles parfois pas encore
 # corrigées, ils restent sur le poste et ne partent jamais dans le dépôt public.
 /.audits/
+
+# Moteur de lecture de Scan Studio (script de travail, cœur WebAssembly, données
+# de langue) : recopié depuis node_modules par scripts/copy-ocr-assets.ts.
+/public/scan-studio-ocr/

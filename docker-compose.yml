@@ -45,6 +45,8 @@ services:
       - ./module-data/clip-studio:/app/modules/clip-studio/data
       # Historique des recherches inversées, leurs images et les clés d'API.
       - ./module-data/reverse-search:/app/modules/reverse-search/data
+      # Dossiers, chapitres, pages et exports de Scan Studio.
+      - ./module-data/scan-studio:/app/modules/scan-studio/data
       # Session Codex du module ai-image-gen. Sans ce montage, il faudrait se
       # reconnecter après chaque redéploiement : le jeton vit dans ce dossier.
       # Connexion initiale, une seule fois, sans navigateur sur le serveur :

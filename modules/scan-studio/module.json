@@ -1,0 +1,121 @@
+{
+  "name": "scan-studio",
+  "version": "0.1.0",
+  "description": "Traduction de scans : dossiers, chapitres et pages, zones de texte, masque et lettrage dans un atelier retouchable",
+  "author": "ShareX Manager",
+  "enabled": true,
+  "entry": "index.process.ts",
+  "category": "Édition",
+  "branding": {
+    "logo": "branding/logo.png",
+    "logoSmall": "branding/logo-96.png",
+    "accent": "#e8473f"
+  },
+  "hasUI": false,
+  "supportedFileTypes": [],
+  "settings": {},
+  "uploads": {
+    "maxMb": 40,
+    "kinds": [
+      "image"
+    ]
+  },
+  "functions": {
+    "listFolders": "user",
+    "getFolder": "user",
+    "createFolder": "user",
+    "updateFolder": "user",
+    "deleteFolder": "user",
+    "getChapter": "user",
+    "createChapter": "user",
+    "updateChapter": "user",
+    "deleteChapter": "user",
+    "reorderChapters": "user",
+    "importPages": "user",
+    "importGalleryFiles": "user",
+    "reorderPages": "user",
+    "deletePage": "user",
+    "getPage": "user",
+    "savePage": "user",
+    "registerExport": "user",
+    "sendChapterToGallery": "user",
+    "listGalleryItems": "user",
+    "importGalleryItems": "user",
+    "translateTexts": "user",
+    "estimateTranslation": "user",
+    "getEngines": "user",
+    "setPageSkipped": "user",
+    "listSources": "user",
+    "previewLink": "user",
+    "importFromLink": "user",
+    "getLinkImport": "user",
+    "cancelLinkImport": "user",
+    "importLinkToLibrary": "user"
+  },
+  "pages": [
+    {
+      "path": "",
+      "title": "Bibliothèque",
+      "component": "pages/library.tsx"
+    },
+    {
+      "path": "folder",
+      "title": "Dossier",
+      "component": "pages/folder.tsx"
+    },
+    {
+      "path": "chapter",
+      "title": "Chapitre",
+      "component": "pages/chapter.tsx"
+    },
+    {
+      "path": "edit",
+      "title": "Atelier",
+      "component": "pages/editor.tsx"
+    },
+    {
+      "path": "engines",
+      "title": "Moteurs",
+      "component": "pages/engines.tsx"
+    },
+    {
+      "path": "sources",
+      "title": "Sources",
+      "component": "pages/sources.tsx"
+    }
+  ],
+  "navItems": [
+    {
+      "title": "Scan Studio",
+      "icon": "BookOpenText"
+    }
+  ],
+  "fileActions": [
+    {
+      "id": "translate",
+      "label": "Traduire dans Scan Studio",
+      "description": "Ajoute ces images à un chapitre pour les traduire",
+      "icon": "Languages",
+      "fileTypes": [
+        "png",
+        "jpg",
+        "jpeg",
+        "webp"
+      ],
+      "page": ""
+    }
+  ],
+  "gallerySources": [
+    {
+      "id": "exports",
+      "label": "Scan Studio",
+      "description": "Pages traduites",
+      "icon": "BookOpenText",
+      "kinds": [
+        "image"
+      ],
+      "list": "listGalleryItems",
+      "import": "importGalleryItems"
+    }
+  ]
+}

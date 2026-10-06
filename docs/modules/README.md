@@ -20,6 +20,7 @@ l’avancement dans son dossier) ; les autres le seront un par un.
 | [03 – Atelier capture vidéo](03-atelier-capture-video.md) | Couper, recadrer, accélérer, sous-titrer et convertir les enregistrements d’écran | Socle vidéo |
 | [04 – Mockups](04-mockups.md) | Poser une capture dans un cadre de navigateur, de téléphone ou sur un fond soigné | Socle images, rendu SVG |
 | [05 – Tutoriels pas à pas](05-tutoriels-pas-a-pas.md) | Transformer une série de captures annotées en guide partageable | Socle images, rendu SVG, pages publiques |
+| [06 – Scan Studio](06-scan-studio.md) | Traduire les pages d’un scan de manga : repérer le texte, le lire, le traduire, masquer l’original et relettrer, dans un atelier retouchable | Moteurs d’AI Image Gen et Codex CLI, facultatifs |
 
 ## Ordre de réalisation recommandé
 

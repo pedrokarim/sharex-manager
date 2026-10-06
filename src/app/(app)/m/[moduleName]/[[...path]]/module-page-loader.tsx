@@ -31,6 +31,14 @@ const MODULE_PAGES: Record<string, Record<string, PageLoader>> = {
     history: () => import("@/modules/reverse-search/pages/history"),
     settings: () => import("@/modules/reverse-search/pages/settings"),
   },
+  "scan-studio": {
+    "": () => import("@/modules/scan-studio/pages/library"),
+    folder: () => import("@/modules/scan-studio/pages/folder"),
+    chapter: () => import("@/modules/scan-studio/pages/chapter"),
+    edit: () => import("@/modules/scan-studio/pages/editor"),
+    engines: () => import("@/modules/scan-studio/pages/engines"),
+    sources: () => import("@/modules/scan-studio/pages/sources"),
+  },
 };
 
 /**

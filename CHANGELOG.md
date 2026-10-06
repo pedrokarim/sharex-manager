@@ -7,6 +7,41 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Scan Studio : nouveau module à pages, pour traduire les pages d’un scan.
+  - Bibliothèque à trois étages (dossiers, chapitres, pages) ; import d’images,
+    d’archives `.zip` ou `.cbz` et de fichiers de la galerie.
+  - Atelier : on trace les zones de texte (rectangle ou contour libre), on
+    masque l’original (forme, couleur prélevée sur la page, retouche au
+    pinceau) et on pose la traduction dans un bloc librement déplaçable,
+    tournable et redimensionnable, dont la taille s’ajuste à la bulle. Cinq
+    polices libres, historique, enregistrement automatique, export à la
+    résolution de la page.
+  - Analyse automatique des pages en anglais, dans le navigateur : les zones
+    de texte sont repérées sur les pixels puis lues par Tesseract, sans rien
+    envoyer nulle part. Les lectures douteuses sont signalées.
+  - Traduction par DeepL et LibreTranslate, l’un relayant l’autre : une
+    requête par page, glossaire et mémoire de traduction par dossier, cache,
+    plafond mensuel, mise à l’écart d’un moteur après trois échecs, et une
+    estimation affichée avant chaque lot. Rien ne part sans un clic.
+  - Page « Moteurs » (clés, ordre d’appel, consommation) et glossaire par
+    dossier.
+  - Import d’un chapitre par son lien : le site est reconnu d’après le lien,
+    par un adaptateur ; MangaDex est le premier, par son API publique. Une
+    seule page, « Import par lien » : le lien, son aperçu et le suivi en haut,
+    les sites gérés en dessous, à activer ou désactiver, avec l’icône de
+    chacun. Un import à la fois, les pages l’une après l’autre,
+    et un message propre à chaque cas d’échec.
+    Un lien suffit : le chapitre se range dans le dossier de sa série, créés
+    l’un et l’autre s’ils n’existent pas, et la couverture de la série, quand
+    le site en donne une, illustre le dossier.
+    Quatre autres sites gérés, lus par leurs pages ordinaires : lelscanfr.com,
+    lelscans.net, mushokutensei-manga.com et cocomic.co.
+  - Pages « à laisser telles quelles » (couvertures, bannières) : l’analyse et
+    la traduction les ignorent, et l’analyse d’un chapitre propose d’écarter
+    celles qui semblent n’avoir rien à traduire.
+  - Les pages envoyées dans la galerie y entrent en privé.
+  Dossier de conception : `docs/modules/06-scan-studio.md` ; banc d’essai de
+  la lecture : `docs/modules/06-scan-studio-banc-essai.md`.
 - Galerie : séparations par jour à l’intérieur de chaque mois (« Aujourd’hui »,
   « Hier », puis la date). En grille, les jours se suivent sans case perdue :
   plusieurs jours partagent une rangée, l’étiquette de chacun se pose au-dessus
