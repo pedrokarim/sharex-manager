@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createRegion, setMaskColor } from "@/modules/scan-studio/lib/region-edit";
 import { rgbToHex, sampleBackgroundColor, sampleColorAt, type PixelData } from "@/modules/scan-studio/lib/mask-color";
 
 type Rgb = [number, number, number];
@@ -73,5 +74,28 @@ describe("sampleColorAt", () => {
 describe("rgbToHex", () => {
   it("écrit chaque canal sur deux chiffres", () => {
     expect(rgbToHex([0, 10.4, 255])).toBe("#000aff");
+  });
+});
+
+describe("setMaskColor (pipette et nuancier)", () => {
+  const base = createRegion("abcdefghijkl", [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], "#ffffff");
+  const stroke = (color: string) => ({ points: [{ x: 1, y: 1 }], width: 6, color });
+
+  it("recolore les retouches peintes dans l'ancienne couleur, pas les autres", () => {
+    const painted = { ...base, mask: { ...base.mask, strokes: [stroke("#ffffff"), stroke("#FFFFFF"), stroke("#102030")] } };
+    const next = setMaskColor(painted, "#F0E0D0");
+    expect(next.mask.color).toBe("#f0e0d0");
+    expect(next.mask.strokes.map((entry) => entry.color)).toEqual(["#f0e0d0", "#f0e0d0", "#102030"]);
+    // La zone d'origine n'est pas modifiée.
+    expect(painted.mask.strokes[0].color).toBe("#ffffff");
+  });
+
+  it("rend la même zone quand la couleur ne change pas", () => {
+    expect(setMaskColor(base, "#FFFFFF")).toBe(base);
+  });
+
+  it("garde le mode du masque : un fond reconstruit garde sa couleur de repli", () => {
+    const inpainted = { ...base, mask: { ...base.mask, kind: "inpaint" as const } };
+    expect(setMaskColor(inpainted, "#000000").mask).toMatchObject({ kind: "inpaint", color: "#000000" });
   });
 });

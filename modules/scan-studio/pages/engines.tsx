@@ -5,12 +5,15 @@ import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { CheckCircle2, Languages, Loader2, RefreshCw, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
+import { DetectorSettings } from "../components/library/detector-settings";
 import { ENGINE_NAMES, EngineLogo, EngineName } from "../components/library/engine-logo";
 import { ModuleShell } from "../components/module-shell";
 import { api } from "../lib/client";
@@ -101,14 +104,16 @@ export default function EnginesPage() {
           </Button>
         }
       >
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
           <div className="flex items-start gap-3">
-            <Languages aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold">Moteurs de traduction</h2>
+            <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Languages aria-hidden className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-xl font-semibold tracking-tight">Moteurs</h2>
               <p className="max-w-3xl text-sm text-muted-foreground">
-                Une traduction ne part chez un moteur que d’un clic sur « Traduire », une requête par page, et seulement si le glossaire, la mémoire et le
-                cache ne peuvent pas répondre.
+                Ce qui repère le texte, et ce qui le traduit. Une traduction ne part chez un moteur que d’un clic sur « Traduire », et seulement si le
+                glossaire, la mémoire et le cache ne peuvent pas répondre.
               </p>
             </div>
           </div>
@@ -127,57 +132,76 @@ export default function EnginesPage() {
             )
           ) : (
             <>
-              <section className="flex flex-col gap-3" aria-labelledby="scan-studio-engine-order">
-                <div className="space-y-1">
-                  <h3 id="scan-studio-engine-order" className="text-sm font-semibold">
-                    Ordre d’appel
-                  </h3>
-                  <p className="text-sm text-muted-foreground">Le premier moteur traduit ; le second ne sert que si le premier ne répond pas.</p>
-                </div>
-                {isAdmin ? (
-                  <RadioGroup value={primary ?? ""} onValueChange={(next) => void saveOrder(next as TranslationEngineId)} disabled={savingOrder} className="gap-3">
-                    {ORDER_CHOICES.map((choice) => (
-                      <div key={choice.primary} className="flex items-start gap-3">
-                        <RadioGroupItem id={`scan-studio-order-${choice.primary}`} value={choice.primary} className="mt-1" />
-                        <Label htmlFor={`scan-studio-order-${choice.primary}`} className="flex flex-col items-start gap-1 font-normal">
-                          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                            <EngineName engine={choice.primary} /> en premier, <EngineName engine={choice.fallback} /> en secours
-                          </span>
-                          <span className="max-w-3xl text-xs leading-snug text-muted-foreground">{choice.description}</span>
-                        </Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                ) : currentChoice ? (
-                  <div className="flex flex-col gap-1 text-sm">
-                    <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                      <EngineName engine={currentChoice.primary} /> en premier, <EngineName engine={currentChoice.fallback} /> en secours
-                    </p>
-                    <p className="max-w-3xl text-xs leading-snug text-muted-foreground">{currentChoice.description}</p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Aucun ordre n’est enregistré.</p>
-                )}
-                {!isAdmin && <p className="text-xs text-muted-foreground">Les clés, les plafonds et l’ordre des moteurs sont réglés par un administrateur.</p>}
-              </section>
+              <div className="grid items-start gap-x-8 gap-y-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+                <div className="flex min-w-0 flex-col gap-6">
+                  <Card role="region" aria-labelledby="scan-studio-engine-order">
+                    <CardHeader>
+                      <CardTitle>
+                        <h3 id="scan-studio-engine-order">Ordre d’appel</h3>
+                      </CardTitle>
+                      <CardDescription>
+                        Le premier moteur traduit ; le second ne sert que si le premier ne répond pas. MyMemory passe en dernier : il marche sans clé, avec
+                        un quota par jour, et traduit seul tant qu’aucun des deux autres n’est réglé.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-3">
+                      {isAdmin ? (
+                        <RadioGroup value={primary ?? ""} onValueChange={(next) => void saveOrder(next as TranslationEngineId)} disabled={savingOrder} className="gap-0">
+                          <ItemGroup className="gap-3">
+                            {ORDER_CHOICES.map((choice) => (
+                              <Item key={choice.primary} variant="outline" role="listitem" className="items-start">
+                                <ItemMedia>
+                                  <RadioGroupItem id={`scan-studio-order-${choice.primary}`} value={choice.primary} className="mt-0.5" />
+                                </ItemMedia>
+                                <ItemContent>
+                                  <ItemTitle>
+                                    <Label htmlFor={`scan-studio-order-${choice.primary}`} className="flex flex-wrap items-center gap-x-1.5 gap-y-1 font-medium">
+                                      <EngineName engine={choice.primary} /> en premier, <EngineName engine={choice.fallback} /> en secours
+                                    </Label>
+                                  </ItemTitle>
+                                  <ItemDescription className="line-clamp-none text-pretty">{choice.description}</ItemDescription>
+                                </ItemContent>
+                              </Item>
+                            ))}
+                          </ItemGroup>
+                        </RadioGroup>
+                      ) : currentChoice ? (
+                        <Item variant="outline" className="items-start">
+                          <ItemContent>
+                            <ItemTitle className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                              <EngineName engine={currentChoice.primary} /> en premier, <EngineName engine={currentChoice.fallback} /> en secours
+                            </ItemTitle>
+                            <ItemDescription className="line-clamp-none text-pretty">{currentChoice.description}</ItemDescription>
+                          </ItemContent>
+                        </Item>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Aucun ordre n’est enregistré.</p>
+                      )}
+                      {!isAdmin && <p className="text-xs text-muted-foreground">Les clés, les plafonds et l’ordre des moteurs sont réglés par un administrateur.</p>}
+                    </CardContent>
+                  </Card>
 
-              <ul className="flex flex-col divide-y border-y">
-                <AnimatePresence initial={false}>
-                  {engines.map((engine) => (
-                    <motion.li
-                      key={engine.id}
-                      layout="position"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="list-none py-5"
-                    >
-                      <EngineRow engine={engine} rankLabel={rankOf(order, engine.id) === 0 ? "Moteur principal" : "Moteur de secours"} isAdmin={isAdmin} onSaved={store} />
-                    </motion.li>
-                  ))}
-                </AnimatePresence>
-              </ul>
+                  <DetectorSettings isAdmin={isAdmin} />
+                </div>
+
+                <section className="flex min-w-0 flex-col gap-3" aria-labelledby="scan-studio-engine-list">
+                  <div className="space-y-1">
+                    <h3 id="scan-studio-engine-list" className="text-base font-semibold">
+                      Moteurs de traduction
+                    </h3>
+                    <p className="text-sm text-muted-foreground">Dans l’ordre où ils sont appelés. Le texte des bulles part chez le moteur qui traduit.</p>
+                  </div>
+                  <div className="grid gap-4">
+                    <AnimatePresence initial={false}>
+                      {engines.map((engine) => (
+                        <motion.div key={engine.id} layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                          <EngineRow engine={engine} rankLabel={engine.id === "mymemory" ? "Sans clé, en dernier" : rankOf(order, engine.id) === 0 ? "Moteur principal" : "Moteur de secours"} isAdmin={isAdmin} onSaved={store} />
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                </section>
+              </div>
             </>
           )}
         </div>
@@ -194,21 +218,22 @@ function rankOf(order: TranslationEngineId[], id: TranslationEngineId): number {
 /** Les deux moteurs, avant leur arrivée : même gabarit que les lignes. */
 function EnginesSkeleton() {
   return (
-    <div className="flex flex-col gap-8" aria-hidden>
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="h-4 w-full max-w-xl" />
-        <Skeleton className="h-4 w-full max-w-lg" />
+    <div className="grid items-start gap-x-8 gap-y-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]" aria-hidden>
+      <div className="flex flex-col gap-3 rounded-xl border p-6">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
       </div>
-      <div className="flex flex-col divide-y border-y">
-        {[0, 1].map((index) => (
-          <div key={index} className="flex flex-col gap-3 py-5">
+      <div className="grid gap-4">
+        {[0, 1, 2].map((index) => (
+          <div key={index} className="flex flex-col gap-3 rounded-xl border p-6">
             <div className="flex items-center gap-3">
               <Skeleton className="size-6 rounded" />
               <Skeleton className="h-4 w-36" />
               <Skeleton className="ml-auto h-4 w-24" />
             </div>
-            <Skeleton className="h-1.5 w-full max-w-xl rounded-full" />
+            <Skeleton className="h-1.5 w-full rounded-full" />
             <Skeleton className="h-3 w-64" />
           </div>
         ))}
@@ -223,8 +248,37 @@ function timeLabel(timestamp: number): string {
   return date.toLocaleString("fr-FR", sameDay ? { timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" });
 }
 
+/** Consommation du jour, face au quota journalier d'un service qui en a un. */
+function DailyUsageLine({ engine, dailyLimit }: { engine: EngineStatus; dailyLimit: number }) {
+  const { day, month } = engine.usage;
+  const ratio = Math.min(1, day / dailyLimit);
+  const reached = day >= dailyLimit;
+  return (
+    <div className="flex max-w-xl flex-col gap-1.5">
+      <div
+        role="progressbar"
+        aria-label={`Consommation du jour de ${engine.label}`}
+        aria-valuemin={0}
+        aria-valuemax={dailyLimit}
+        aria-valuenow={Math.min(day, dailyLimit)}
+        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+      >
+        <div
+          className={cn("h-full rounded-full transition-[width] duration-300", reached ? "bg-destructive" : ratio >= WARNING_RATIO ? "bg-amber-500" : "bg-primary")}
+          style={{ width: `${Math.round(ratio * 100)}%` }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground tabular-nums">
+        Aujourd’hui : {formatNumber(day)} caractères sur {formatNumber(dailyLimit)} · ce mois : {formatNumber(month)}
+      </p>
+      {reached && <p className="text-xs text-destructive">Quota du jour atteint : ce moteur est mis de côté jusqu’à demain.</p>}
+    </div>
+  );
+}
+
 /** Consommation du jour et du mois, face au plafond mensuel. */
 function UsageLine({ engine }: { engine: EngineStatus }) {
+  if (engine.dailyLimit) return <DailyUsageLine engine={engine} dailyLimit={engine.dailyLimit} />;
   const { day, month } = engine.usage;
   const limit = engine.monthlyLimit;
   const ratio = limit > 0 ? Math.min(1, month / limit) : 0;
@@ -280,25 +334,26 @@ function EngineRow({ engine, rankLabel, isAdmin, onSaved }: EngineRowProps) {
       : [engine.url, engine.keyHint ? `clé se terminant par ${engine.keyHint}` : null].filter(Boolean).join(" · ") || null;
 
   return (
-    <div className="grid gap-x-10 gap-y-5 xl:grid-cols-2">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2.5">
           <EngineLogo engine={engine.id} className="size-6" />
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold">{engine.label || ENGINE_NAMES[engine.id]}</h3>
-            <p className="text-xs text-muted-foreground">{rankLabel}</p>
-          </div>
+          <h4>{engine.label || ENGINE_NAMES[engine.id]}</h4>
+        </CardTitle>
+        <CardDescription>{rankLabel}</CardDescription>
+        <CardAction>
           <p
             className={cn(
-              "ml-auto flex items-center gap-1.5 text-sm",
+              "flex items-center gap-1.5 text-sm",
               engine.available ? "text-emerald-700 dark:text-emerald-300" : engine.configured ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground"
             )}
           >
             {engine.available ? <CheckCircle2 aria-hidden className="h-4 w-4" /> : <XCircle aria-hidden className="h-4 w-4" />}
             {engine.available ? "Disponible" : engine.configured ? "Indisponible" : "Non configuré"}
           </p>
-        </div>
-
+        </CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
         {access && <p className="break-all font-mono text-xs text-muted-foreground">{access}</p>}
         {!engine.available && engine.reason && <p className="text-sm">{engine.reason}</p>}
         {paused && engine.pausedUntil !== undefined && (
@@ -307,15 +362,109 @@ function EngineRow({ engine, rankLabel, isAdmin, onSaved }: EngineRowProps) {
           </p>
         )}
         <UsageLine engine={engine} />
-      </div>
-
-      {isAdmin && <EngineForm engine={engine} onSaved={onSaved} />}
-    </div>
+      </CardContent>
+      {isAdmin && (
+        <CardContent className="border-t pt-6">
+          <EngineForm engine={engine} onSaved={onSaved} />
+        </CardContent>
+      )}
+    </Card>
   );
 }
 
-/** Réglages d'un moteur, réservés aux administrateurs : clé, adresse, plafond, essai. */
+/**
+ * Réglages de MyMemory : rien n'est obligatoire. Une adresse de contact, si on
+ * en donne une, élève le quota du jour chez le service.
+ */
+function MyMemoryForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (catalogue: EngineCatalogue) => void }) {
+  const saved = engine.contactEmail ?? "";
+  const [email, setEmail] = useState(saved);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
+
+  useEffect(() => setEmail(saved), [saved]);
+  const dirty = email.trim() !== saved;
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!dirty || saving) return;
+    setSaving(true);
+    try {
+      onSaved(await api.saveEngineSettings({ myMemoryEmail: email.trim() }));
+      setTest(null);
+      toast.success(email.trim() ? "Adresse de contact enregistrée" : "Adresse de contact retirée");
+    } catch (error) {
+      toast.error(errorMessage(error, "Ces réglages n’ont pas pu être enregistrés."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const runTest = async () => {
+    if (testing) return;
+    setTesting(true);
+    setTest(null);
+    try {
+      setTest(await api.testEngine(engine.id));
+    } catch (error) {
+      toast.error(errorMessage(error, "Essai impossible."));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const id = `scan-studio-engine-${engine.id}`;
+  return (
+    <form onSubmit={submit} className="flex max-w-xl flex-col gap-4">
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Service public de Translated, utilisable sans clé : c’est lui qui traduit tant qu’aucun autre moteur n’est réglé. Il ne prend qu’une phrase par
+        requête : une page part donc bulle après bulle, avec une seconde entre deux. Le texte des bulles est envoyé à ce service.
+      </p>
+      <div className="grid gap-2">
+        <Label htmlFor={`${id}-email`}>Adresse de contact (facultative)</Label>
+        <Input
+          id={`${id}-email`}
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="vous@exemple.org"
+          autoComplete="off"
+          spellCheck={false}
+          className="h-9 font-mono text-xs"
+        />
+        <p className="text-xs text-muted-foreground">
+          Sans adresse, MyMemory accorde 5 000 caractères par jour ; avec une adresse, 50 000. Elle est jointe à chaque requête : n’en mettez une que si
+          cela vous convient.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" size="sm" className="gap-2" disabled={!dirty || saving}>
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          Enregistrer
+        </Button>
+        <Button type="button" variant="outline" size="sm" disabled={testing || dirty} onClick={() => void runTest()} title="Envoie une courte phrase d’essai à ce moteur">
+          {testing && <Loader2 className="h-4 w-4 animate-spin" />}
+          Tester
+        </Button>
+        {test && (
+          <p className={cn("flex items-center gap-1.5 text-xs", test.ok ? "text-emerald-700 dark:text-emerald-300" : "text-destructive")} aria-live="polite">
+            {test.ok ? <CheckCircle2 aria-hidden className="h-3.5 w-3.5 shrink-0" /> : <XCircle aria-hidden className="h-3.5 w-3.5 shrink-0" />}
+            {test.message}
+          </p>
+        )}
+      </div>
+    </form>
+  );
+}
+
+/** Réglages d'un moteur, réservés aux administrateurs : clé, adresse, plafond, essai. */
 function EngineForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (catalogue: EngineCatalogue) => void }) {
+  if (engine.id === "mymemory") return <MyMemoryForm engine={engine} onSaved={onSaved} />;
+  return <KeyedEngineForm engine={engine} onSaved={onSaved} />;
+}
+
+function KeyedEngineForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (catalogue: EngineCatalogue) => void }) {
   const isDeepl = engine.id === "deepl";
   const [key, setKey] = useState("");
   const [url, setUrl] = useState(engine.url ?? "");
@@ -372,6 +521,20 @@ function EngineForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (catal
       setTest(await api.testEngine(engine.id));
     } catch (error) {
       toast.error(errorMessage(error, "Essai impossible."));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  /** Une lecture, d'un clic : le quota du compte, demandé au service. */
+  const readUsage = async () => {
+    if (testing) return;
+    setTesting(true);
+    setTest(null);
+    try {
+      setTest(await api.readEngineUsage(engine.id));
+    } catch (error) {
+      toast.error(errorMessage(error, "Lecture du quota impossible."));
     } finally {
       setTesting(false);
     }
@@ -458,6 +621,18 @@ function EngineForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (catal
           {testing && <Loader2 className="h-4 w-4 animate-spin" />}
           Tester
         </Button>
+        {isDeepl && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!engine.configured || testing || dirty}
+            onClick={() => void readUsage()}
+            title={dirty ? "Enregistrez d’abord vos changements" : "Demande à DeepL ce que le compte a consommé : une requête, aucun texte envoyé"}
+          >
+            Lire le quota
+          </Button>
+        )}
         {test && (
           <p className={cn("flex items-center gap-1.5 text-xs", test.ok ? "text-emerald-700 dark:text-emerald-300" : "text-destructive")} aria-live="polite">
             {test.ok ? <CheckCircle2 aria-hidden className="h-3.5 w-3.5 shrink-0" /> : <XCircle aria-hidden className="h-3.5 w-3.5 shrink-0" />}

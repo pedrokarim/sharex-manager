@@ -82,6 +82,84 @@ export interface GallerySourceImport {
   failed: { id: string; error: string }[];
 }
 
+/**
+ * Section publique apportée au catalogue par un module.
+ *
+ * Le catalogue ne connaît aucun module : il lit `catalogSections`, ajoute la
+ * rubrique à sa navigation et sert trois pages, `/catalog/<id>` (les
+ * collections), `/catalog/<id>/<collection>` (ses éléments) et
+ * `/catalog/<id>/<collection>/<élément>` (la lecture). Le contenu vient des
+ * quatre fonctions du module, qui doivent toutes être déclarées avec
+ * l'audience `public` dans `functions` : elles ne rendent que ce qui peut être
+ * montré sans compte. Module désactivé, la section, ses pages et ses médias
+ * répondent 404.
+ */
+export interface ModuleCatalogSection {
+  /** Segment d'adresse : « scans » donne `/catalog/scans`. */
+  id: string;
+  label: string;
+  description?: string;
+  icon?: string; // nom d'icône Lucide
+  /** Ce que la section fait lire. `reader` : des suites d'images, dans l'ordre. */
+  kind: "reader";
+  /** Fonction serveur : `() => CatalogSectionListing`. */
+  list: string;
+  /** Fonction serveur : `(collection: string) => CatalogSectionCollection | null`. */
+  collection: string;
+  /** Fonction serveur : `(collection: string, item: string) => CatalogSectionItem | null`. */
+  item: string;
+  /** Fonction serveur : `(path: string[]) => CatalogSectionMedia | null`. */
+  media: string;
+}
+
+/** Une carte du catalogue : une collection dans la section, ou un élément dans sa collection. */
+export interface CatalogSectionCard {
+  slug: string;
+  title: string;
+  subtitle?: string;
+  /** Adresse d'image publique, de même origine. */
+  cover?: string;
+  /** Ce que la carte contient : éléments d'une collection, pages d'un élément. */
+  count?: number;
+  updatedAt?: number;
+}
+
+export interface CatalogSectionListing {
+  collections: CatalogSectionCard[];
+}
+
+export interface CatalogSectionCollection {
+  slug: string;
+  title: string;
+  description?: string;
+  cover?: string;
+  items: CatalogSectionCard[];
+}
+
+export interface CatalogSectionItem {
+  slug: string;
+  title: string;
+  collection: { slug: string; title: string };
+  /** Listé au catalogue. Sinon l'élément n'est joignable que par son adresse, et n'est pas proposé à l'indexation. */
+  listed: boolean;
+  /** Une page à la fois, de droite à gauche ou de gauche à droite, ou une bande qui défile. */
+  reading: "paged-rtl" | "paged-ltr" | "scroll";
+  pages: { url: string; width: number; height: number }[];
+  cover?: string;
+  previous?: { slug: string; title: string };
+  next?: { slug: string; title: string };
+  /** Mentions affichées avec la lecture : source, crédit. */
+  credits?: { label: string; value: string; href?: string }[];
+  updatedAt?: number;
+}
+
+/** Un média à servir : chemin relatif au répertoire `data/` du module. */
+export interface CatalogSectionMedia {
+  file: string;
+  /** Faux : l'image n'est pas proposée à l'indexation. */
+  indexable?: boolean;
+}
+
 export interface ModuleConfig {
   name: string;
   version: string;
@@ -112,11 +190,14 @@ export interface ModuleConfig {
   navItems?: ModuleNavItem[];
   fileActions?: ModuleFileAction[];
   gallerySources?: ModuleGallerySource[];
+  catalogSections?: ModuleCatalogSection[];
   /**
    * Fonctions appelables par `/api/modules/call-function`, avec le rôle
    * minimal. Une fonction absente de la liste est réservée aux admins.
+   * `public` désigne une fonction du catalogue public (`catalogSections`) :
+   * appelée par le serveur sans session, jamais par `call-function`.
    */
-  functions?: Record<string, "user" | "admin">;
+  functions?: Record<string, "user" | "admin" | "public">;
   /** Autorise l'envoi direct de médias dans `data/assets/` du module. */
   uploads?: { maxMb?: number; kinds?: ("image" | "video" | "audio")[] };
   /**

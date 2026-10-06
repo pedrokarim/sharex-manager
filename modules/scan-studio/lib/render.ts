@@ -28,6 +28,18 @@ export interface PageRenderOptions {
   minSize?: number;
   /** Mises en lignes déjà calculées. À vider quand les polices finissent de charger. */
   layoutCache?: WeakMap<ScanRegion, TextLayout>;
+  /**
+   * Fond reconstruit d'une zone dont le masque est en mode « inpaint », s'il est
+   * prêt. Absent ou `null` : la zone garde son aplat de couleur.
+   */
+  resolveInpaint?: (region: ScanRegion) => InpaintPatch | null;
+}
+
+/** Fond reconstruit, prêt à être posé : une image transparente hors du masque, et son coin dans la page. */
+export interface InpaintPatch {
+  image: CanvasImageSource;
+  x: number;
+  y: number;
 }
 
 /** Valeur de `ctx.font` pour un style et une taille. Le nom de police est une donnée : il est assaini. */
@@ -37,11 +49,39 @@ export function fontOf(style: TextStyle, size: number, resolveWeight?: ResolveWe
   return `${style.italic ? "italic " : ""}${weight} ${size}px "${family}", sans-serif`;
 }
 
+/** Espace ajouté entre deux lettres, en pixels, à une taille donnée. */
+export function letterSpacingOf(style: TextStyle, size: number): number {
+  return style.letterSpacing ? style.letterSpacing * size : 0;
+}
+
+/** Étirement horizontal des lettres ; 1 quand le style n'en demande pas. */
+export function stretchOf(style: TextStyle): number {
+  return style.stretch && style.stretch > 0 ? style.stretch : 1;
+}
+
+/**
+ * Chasse de chaque caractère d'une ligne, quand les lettres sont espacées : le
+ * texte est alors posé lettre par lettre, par la mesure comme par le dessin.
+ */
+function advancesOf(ctx: CanvasRenderingContext2D, line: string): { characters: string[]; advances: number[] } {
+  const characters = Array.from(line);
+  return { characters, advances: characters.map((character) => ctx.measureText(character).width) };
+}
+
+/** Largeur d'une ligne telle qu'elle sera dessinée, espacement et étirement compris. `ctx.font` est déjà réglé. */
+function lineWidth(ctx: CanvasRenderingContext2D, line: string, style: TextStyle, size: number): number {
+  const spacing = letterSpacingOf(style, size);
+  if (!spacing) return ctx.measureText(line).width * stretchOf(style);
+  const { advances } = advancesOf(ctx, line);
+  const letters = advances.reduce((sum, advance) => sum + advance, 0);
+  return (letters + spacing * Math.max(0, advances.length - 1)) * stretchOf(style);
+}
+
 /** Mesure fondée sur un canevas. Elle modifie `ctx.font` : l'appelant l'entoure d'un `save` / `restore`. */
 export function createMeasure(ctx: CanvasRenderingContext2D, resolveWeight?: ResolveWeight): Measure {
   return (text, style, size) => {
     ctx.font = fontOf(style, size, resolveWeight);
-    return ctx.measureText(text).width;
+    return lineWidth(ctx, text, style, size);
   };
 }
 
@@ -73,6 +113,8 @@ export function layoutRegion(
   const layout = layoutText(region.translation.text, style, region.text.box, measure, {
     autoFit: region.text.autoFit,
     minSize: options.minSize,
+    // Jamais plus gros que le lettrage d'origine : les bulles d'une page gardent une taille voisine.
+    ...(region.text.maxSize ? { maxSize: Math.max(options.minSize, region.text.maxSize) } : {}),
     padding: textPadding(region, style),
   });
   options.cache?.set(region, layout);
@@ -153,17 +195,35 @@ export function awaitsTranslation(region: ScanRegion): boolean {
   return !region.translation.text.trim() && Boolean(region.reading.clean.trim());
 }
 
-export function drawMask(ctx: CanvasRenderingContext2D, region: ScanRegion): void {
+/**
+ * Forme du masque et retouches au pinceau. Avec `color`, tout est peint de
+ * cette seule couleur : c'est la silhouette du masque, celle qui délimite le
+ * fond à reconstruire.
+ */
+export function paintMask(ctx: CanvasRenderingContext2D, region: ScanRegion, color?: string): void {
   const { mask, outline } = region;
-  if (mask.kind === "none") return;
   ctx.save();
   if (outline.length >= 3) {
-    ctx.fillStyle = mask.color;
+    ctx.fillStyle = color ?? mask.color;
     traceMaskShape(ctx, mask, outline);
     ctx.fill();
   }
-  for (const stroke of mask.strokes) drawStroke(ctx, stroke);
+  for (const stroke of mask.strokes) drawStroke(ctx, color ? { ...stroke, color } : stroke);
   ctx.restore();
+}
+
+/**
+ * Masque d'une zone. En mode « inpaint », le fond reconstruit est posé s'il est
+ * prêt ; tant qu'il ne l'est pas, ou s'il n'a pas pu être calculé, la zone
+ * garde son aplat de couleur.
+ */
+export function drawMask(ctx: CanvasRenderingContext2D, region: ScanRegion, patch?: InpaintPatch | null): void {
+  if (region.mask.kind === "none") return;
+  if (region.mask.kind === "inpaint" && patch) {
+    ctx.drawImage(patch.image, patch.x, patch.y);
+    return;
+  }
+  paintMask(ctx, region);
 }
 
 // ─── Texte ───────────────────────────────────────────────────────
@@ -185,6 +245,15 @@ export function drawText(ctx: CanvasRenderingContext2D, region: ScanRegion, styl
   const top = -layout.height / 2;
   const baselines = layout.lines.map((_, index) => top + (index + 0.5) * layout.lineHeight);
 
+  // Lettres espacées ou étirées (onomatopées) : chaque ligne est posée lettre par lettre.
+  const spacing = letterSpacingOf(style, layout.size);
+  const stretch = stretchOf(style);
+  if (spacing !== 0 || stretch !== 1) {
+    drawSpacedLines(ctx, layout.lines, baselines, style, { anchor, spacing, stretch });
+    ctx.restore();
+    return;
+  }
+
   // Le contour passe entièrement sous le remplissage : une ligne ne mord pas sur la précédente.
   const strokeWidth = strokeWidthOf(style);
   if (style.stroke && strokeWidth > 0) {
@@ -197,6 +266,47 @@ export function drawText(ctx: CanvasRenderingContext2D, region: ScanRegion, styl
   ctx.fillStyle = style.color;
   layout.lines.forEach((line, index) => line && ctx.fillText(line, anchor, baselines[index]));
   ctx.restore();
+}
+
+/**
+ * Lignes dont les lettres sont espacées ou étirées. Le repère est élargi de
+ * `stretch` à l'horizontale ; les positions y sont donc divisées d'autant. Le
+ * contour suit l'étirement, comme les lettres.
+ */
+function drawSpacedLines(
+  ctx: CanvasRenderingContext2D,
+  lines: string[],
+  baselines: number[],
+  style: TextStyle,
+  options: { anchor: number; spacing: number; stretch: number },
+) {
+  const { anchor, spacing, stretch } = options;
+  ctx.scale(stretch, 1);
+  ctx.textAlign = "left";
+
+  const placed = lines.map((line) => {
+    const { characters, advances } = advancesOf(ctx, line);
+    const width = advances.reduce((sum, advance) => sum + advance, 0) + spacing * Math.max(0, advances.length - 1);
+    const start = anchor / stretch - (style.align === "center" ? width / 2 : style.align === "right" ? width : 0);
+    const positions: number[] = [];
+    let cursor = start;
+    for (const advance of advances) {
+      positions.push(cursor);
+      cursor += advance + spacing;
+    }
+    return { characters, positions };
+  });
+
+  // Le contour passe entièrement sous le remplissage, pour toutes les lettres de toutes les lignes.
+  if (style.stroke && strokeWidthOf(style) > 0) {
+    ctx.strokeStyle = style.stroke.color;
+    ctx.lineWidth = strokeWidthOf(style) * 2;
+    ctx.lineJoin = "round";
+    ctx.miterLimit = 2;
+    placed.forEach((line, index) => line.characters.forEach((character, at) => ctx.strokeText(character, line.positions[at], baselines[index])));
+  }
+  ctx.fillStyle = style.color;
+  placed.forEach((line, index) => line.characters.forEach((character, at) => ctx.fillText(character, line.positions[at], baselines[index])));
 }
 
 // ─── Page ────────────────────────────────────────────────────────
@@ -226,7 +336,7 @@ export function renderPage(
 
   if (options.showMasks !== false) {
     for (const region of regions) {
-      if (!awaitsTranslation(region)) drawMask(ctx, region);
+      if (!awaitsTranslation(region)) drawMask(ctx, region, options.resolveInpaint?.(region));
     }
   }
   if (options.showTexts !== false) {

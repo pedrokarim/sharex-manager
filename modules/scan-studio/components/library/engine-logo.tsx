@@ -10,19 +10,27 @@ import type { TranslationEngineId } from "../../lib/types";
  * qu'à désigner le service. Dessinés avec `currentColor`, pour rester lisibles
  * en thème sombre.
  */
-const MARKS: Record<TranslationEngineId, { title: string; path: string }> = {
+const MARKS: Record<Exclude<TranslationEngineId, "mymemory">, { title: string; path: string }> = {
   deepl: { title: siDeepl.title, path: siDeepl.path },
   libretranslate: { title: siLibretranslate.title, path: siLibretranslate.path },
 };
+
+/** MyMemory n'est pas dans simple-icons : son icône officielle, prise sur son site, est servie avec les autres logos. */
+const MYMEMORY_LOGO = "/logos/mymemory.png";
 
 /** Nom affiché d'un moteur, quand le serveur n'a pas encore répondu. */
 export const ENGINE_NAMES: Record<TranslationEngineId, string> = {
   deepl: "DeepL",
   libretranslate: "LibreTranslate",
+  mymemory: "MyMemory",
 };
 
 /** Logo d'un moteur. Décoratif : le nom est toujours écrit à côté. */
 export function EngineLogo({ engine, className }: { engine: TranslationEngineId; className?: string }) {
+  if (engine === "mymemory") {
+    // eslint-disable-next-line @next/next/no-img-element -- petit logo local, sans optimisation utile
+    return <img src={MYMEMORY_LOGO} alt="" aria-hidden className={cn("size-4 shrink-0 rounded-[3px] bg-white p-px", className)} />;
+  }
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={cn("size-4 shrink-0", className)}>
       <path d={MARKS[engine].path} />

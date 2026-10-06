@@ -9,6 +9,7 @@ import {
   MODULE_NAME,
   type AutomationLevel,
   type ChapterSettings,
+  type ChapterVisibility,
   type LinkImportJob,
   type LinkPreview,
   type PageStatus,
@@ -38,6 +39,9 @@ export const ENGINES_PATH = `${LIBRARY_PATH}/engines`;
 
 /** Page « Sources » : les sites dont un lien de chapitre peut être importé. */
 export const SOURCES_PATH = `${LIBRARY_PATH}/sources`;
+
+/** Page « Polices » : les polices de lettrage ajoutées. */
+export { FONTS_PATH } from "./font-paths";
 
 // ─── Sources ─────────────────────────────────────────────────────
 
@@ -105,6 +109,8 @@ export const ARCHIVE_EXTENSIONS = ["zip", "cbz"];
 export const MAX_IMAGE_BYTES = 40 * 1024 * 1024;
 /** Valeur de l'attribut `accept` du bouton d'import. */
 export const IMPORT_ACCEPT = ".png,.jpg,.jpeg,.webp,.zip,.cbz";
+/** Images rattachées à un chapitre en un appel : la borne du serveur (`MAX_IMPORT_FILES`). */
+export const IMPORT_BATCH_SIZE = 300;
 
 export function extensionOf(name: string): string {
   const dot = name.lastIndexOf(".");
@@ -140,6 +146,14 @@ export function moveItem<T>(list: T[], from: number, to: number): T[] {
   const [item] = next.splice(from, 1);
   next.splice(Math.max(0, Math.min(next.length, to)), 0, item);
   return next;
+}
+
+/** Découpe une liste en paquets d'au plus `size` éléments, sans changer l'ordre. */
+export function chunkList<T>(items: T[], size: number): T[][] {
+  const step = Math.max(1, Math.floor(size));
+  const chunks: T[][] = [];
+  for (let start = 0; start < items.length; start += step) chunks.push(items.slice(start, start + step));
+  return chunks;
 }
 
 export function sameOrder(left: string[], right: string[]): boolean {
@@ -192,6 +206,52 @@ export function suggestNextNumber(numbers: string[]): string {
     if (Number.isFinite(value)) highest = Math.max(highest, Math.floor(value));
   }
   return String(highest + 1);
+}
+
+// ─── Lecture publique ────────────────────────────────────────────
+
+/** Les trois visibilités d'un chapitre, avec les mots des albums. */
+export const VISIBILITY_OPTIONS: { value: ChapterVisibility; label: string; description: string }[] = [
+  { value: "private", label: "Privé", description: "Vous seul le voyez, connecté. Aucune adresse publique n’existe." },
+  {
+    value: "link",
+    label: "Public par son lien",
+    description: "Lisible sans compte par qui a l’adresse. Absent du catalogue, et non proposé aux moteurs de recherche.",
+  },
+  { value: "catalog", label: "Listé au catalogue", description: "Lisible sans compte, et visible dans la rubrique « Scans » du catalogue public." },
+];
+
+export function visibilityLabel(visibility: ChapterVisibility | undefined): string {
+  return VISIBILITY_OPTIONS.find((option) => option.value === (visibility ?? "private"))?.label ?? "Privé";
+}
+
+// ─── Archives .cbz ───────────────────────────────────────────────
+
+/** Nom d'une page dans une archive : `007.png`, assez de zéros pour que tous les lecteurs gardent l'ordre. */
+export function archivePageName(index: number, total: number, extension: string): string {
+  const width = Math.max(3, String(Math.max(total, 1)).length);
+  const clean = extension.toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+  return `${String(index + 1).padStart(width, "0")}.${clean === "jpeg" ? "jpg" : clean}`;
+}
+
+/** Morceau de nom de fichier sûr partout : ni séparateur, ni caractère réservé, ni point final. */
+function fileNamePart(value: string): string {
+  return value
+    .normalize("NFC")
+    .replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "")
+    .slice(0, 80);
+}
+
+/** « Série - Chapitre 012.cbz » : le numéro est complété de zéros pour que les archives se rangent dans l'ordre. */
+export function archiveFileName(folderName: string, chapter: { number: string; title?: string }): string {
+  const number = chapter.number.trim();
+  const padded = number.replace(/^\d+/, (digits) => digits.padStart(3, "0"));
+  const label = /^\d/.test(number) ? `Chapitre ${padded}` : number || "Chapitre";
+  const name = [fileNamePart(folderName), fileNamePart(label)].filter(Boolean).join(" - ");
+  return `${name || "Chapitre"}.cbz`;
 }
 
 // ─── Avancement ──────────────────────────────────────────────────

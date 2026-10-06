@@ -8,6 +8,7 @@ import {
   dropEchoes,
   groupGlyphs,
   mergeTiles,
+  readZone,
   sliceTiles,
   toPageWords,
   type Candidate,
@@ -472,5 +473,64 @@ describe("analyse d'une page", () => {
   it("ne rend rien pour une page sans texte", async () => {
     const { reader } = fakeReader(createPage(600, 800), () => []);
     expect(await analyzeWithReader(reader, DEFAULT_CHAPTER_SETTINGS, { createId })).toEqual([]);
+  });
+});
+
+// ─── Lecture d'une zone tracée à la main ─────────────────────────
+
+describe("lecture d'une zone tracée à la main", () => {
+  /** Deux lignes de mots, avec le rang de ligne que rend le moteur. */
+  const twoLines = (): WordBox[] => [
+    { text: "Plain", confidence: 0.9, x0: 20, y0: 20, x1: 140, y1: 60, line: 0 },
+    { text: "words", confidence: 0.9, x0: 160, y0: 20, x1: 300, y1: 60, line: 0, spaced: true },
+    { text: "here", confidence: 0.8, x0: 20, y0: 80, x1: 130, y1: 120, line: 1 },
+  ];
+
+  it("lit le rectangle désigné, seul et agrandi, et rend son texte ligne après ligne", async () => {
+    const { reader, calls } = fakeReader(createPage(600, 800), () => twoLines());
+    const found = await readZone(reader, { x: 100.4, y: 200.2, width: 199.2, height: 99.6 }, DEFAULT_CHAPTER_SETTINGS);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].rect).toEqual({ x: 100, y: 200, width: 200, height: 100 });
+    // Grand côté de 200 px : agrandi quatre fois au plus, en lignes, sans négatif sur un fond clair.
+    expect(calls[0].options).toMatchObject({ mode: "block", scale: 4, invert: false, rotate: 0 });
+    expect(found?.direction).toBe("horizontal");
+    expect(found?.reading.raw).toBe("Plain words\nhere");
+    expect(found?.reading.clean).toBe("Plain words here");
+    expect(found?.reading.edited).toBe(false);
+    expect(found?.reading.confidence).toBeGreaterThan(0.5);
+  });
+
+  it("lit en négatif un texte clair sur fond sombre", async () => {
+    const { reader, calls } = fakeReader(createPage(600, 800, 20), () => twoLines());
+    await readZone(reader, { x: 50, y: 50, width: 300, height: 120 }, DEFAULT_CHAPTER_SETTINGS);
+    expect(calls[0].options.invert).toBe(true);
+  });
+
+  it("ne garde pas les mots dont le moteur doute trop, et ne rend rien s'il ne reste rien", async () => {
+    const weak = fakeReader(createPage(600, 800), () => twoLines().map((word) => ({ ...word, confidence: 0.1 })));
+    expect(await readZone(weak.reader, { x: 50, y: 50, width: 300, height: 120 }, DEFAULT_CHAPTER_SETTINGS)).toBeNull();
+    const empty = fakeReader(createPage(600, 800), () => []);
+    expect(await readZone(empty.reader, { x: 50, y: 50, width: 300, height: 120 }, DEFAULT_CHAPTER_SETTINGS)).toBeNull();
+  });
+
+  it("borne le rectangle à la page et ne lit pas une zone minuscule", async () => {
+    const { reader, calls } = fakeReader(createPage(600, 800), () => twoLines());
+    await readZone(reader, { x: 500, y: 700, width: 400, height: 400 }, DEFAULT_CHAPTER_SETTINGS);
+    expect(calls[0].rect).toEqual({ x: 500, y: 700, width: 100, height: 100 });
+    expect(await readZone(reader, { x: 10, y: 10, width: 4, height: 30 }, DEFAULT_CHAPTER_SETTINGS)).toBeNull();
+    expect(calls).toHaveLength(1);
+  });
+
+  it("lit en colonnes une zone haute d'un chapitre japonais", async () => {
+    const column = (): WordBox[] => [{ text: "\u3042\u3044\u3046", confidence: 0.9, x0: 40, y0: 20, x1: 120, y1: 380, line: 0 }];
+    const { reader, calls } = fakeReader(createPage(600, 800), () => column());
+    const settings = { ...DEFAULT_CHAPTER_SETTINGS, sourceLanguage: "ja" as const };
+    const tall = await readZone(reader, { x: 100, y: 100, width: 60, height: 300 }, settings);
+    expect(calls[0].options.mode).toBe("vertical");
+    expect(tall?.direction).toBe("vertical");
+    expect(tall?.reading.clean).toBe("\u3042\u3044\u3046");
+    // La même langue, dans une zone large : en lignes.
+    await readZone(reader, { x: 100, y: 100, width: 300, height: 60 }, settings);
+    expect(calls[1].options.mode).toBe("block");
   });
 });

@@ -11,7 +11,17 @@
  * Fonctions pures, sans DOM.
  */
 
+import type { SourceLanguage } from "../types";
+import { cleanCjkReading } from "./clean-cjk";
+import { isCjkLanguage } from "./languages";
+
 export interface CleanOptions {
+  /**
+   * Langue du texte lu. Le japonais, le chinois et le coréen ont leurs propres
+   * règles (`clean-cjk.ts`) : celles de ce fichier valent pour l'anglais et
+   * les langues à lettres latines.
+   */
+  language?: SourceLanguage;
   /**
    * Termes à ne jamais toucher (glossaire du dossier) : ni correction de
    * lecture, ni changement de casse. Ils retrouvent la casse donnée ici.
@@ -20,7 +30,7 @@ export interface CleanOptions {
 }
 
 /** Caractères de contrôle et invisibles, hors tabulation et retour à la ligne. */
-const INVISIBLE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f​-‏‪-‮⁠-⁤﻿]/g;
+const INVISIBLE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/g;
 /** Signes qu'un bord de bulle fait lire en début ou en fin de ligne. */
 const EDGE_STROKES = /^(?:[|_~^`\\/]+\s+)+|(?:\s+[|_~^`\\/]+)+$/g;
 const LETTER = /\p{L}/u;
@@ -42,18 +52,18 @@ function normalizeCharacters(text: string): string {
       .replace(/\r\n?/g, "\n")
       .replace(/\t/g, " ")
       // Trait d'union conditionnel : une césure s'il termine la ligne, rien sinon.
-      .replace(/­(?=\s*\n)/g, "-")
-      .replace(/­/g, "")
+      .replace(/\u00ad(?=\s*\n)/g, "-")
+      .replace(/\u00ad/g, "")
       .replace(INVISIBLE, "")
-      .replace(/[‘’‚‛`´′]/g, "'")
-      .replace(/[“”„‟«»″]/g, '"')
-      .replace(/[「」『』]/g, '"')
-      .replace(/。/g, ".")
-      .replace(/、/g, ",")
-      .replace(/[・･]{2,}/g, "...")
-      .replace(/[‐‑‒–−]/g, "-")
-      .replace(/―/g, "—")
-      .replace(/-{2,}/g, "—")
+      .replace(/[\u2018\u2019\u201a\u201b`\u00b4\u2032]/g, "'")
+      .replace(/[\u201c\u201d\u201e\u201f\u00ab\u00bb\u2033]/g, '"')
+      .replace(/[\u300c\u300d\u300e\u300f]/g, '"')
+      .replace(/\u3002/g, ".")
+      .replace(/\u3001/g, ",")
+      .replace(/[\u30fb\uff65]{2,}/g, "...")
+      .replace(/[\u2010\u2011\u2012\u2013\u2212]/g, "-")
+      .replace(/\u2015/g, "\u2014")
+      .replace(/-{2,}/g, "\u2014")
   );
 }
 
@@ -175,6 +185,7 @@ function restoreTerms(text: string, terms: string[]): string {
 
 /** Texte lu d'une zone, nettoyé et prêt à traduire. */
 export function cleanReading(raw: string, options: CleanOptions = {}): string {
+  if (options.language && isCjkLanguage(options.language)) return cleanCjkReading(raw, options.language, options);
   const terms = (options.protectedTerms ?? []).map((term) => term.normalize("NFKC").trim()).filter(Boolean);
   const protectedWords = new Set(terms.flatMap((term) => term.toLowerCase().split(/\s+/)));
 

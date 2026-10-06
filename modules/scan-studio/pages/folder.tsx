@@ -4,17 +4,41 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, Reorder, useDragControls } from "framer-motion";
-import { ArrowDown, ArrowUp, BookA, BookOpenText, FileStack, FolderOpen, GripVertical, Pencil, Plus, RefreshCw, Settings2, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  BookA,
+  BookOpenText,
+  Eye,
+  FileArchive,
+  FileStack,
+  FolderOpen,
+  GripVertical,
+  Languages,
+  ListChecks,
+  Pencil,
+  Plus,
+  RefreshCw,
+  ScanText,
+  Settings2,
+  Trash2,
+  ImageDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
+import { buildChapterArchive, saveBlob } from "../components/library/archive-export";
+import { FolderBatchDialog, type FolderBatchAction } from "../components/library/folder-batch-dialog";
 import { GlossaryDialog } from "../components/library/glossary-dialog";
 import { ChapterDialog, ConfirmDeleteDialog } from "../components/library/library-dialogs";
 import { ChapterListSkeleton, LibraryNotice } from "../components/library/library-states";
 import { ObjectContextMenu, ObjectMenuButton, type MenuEntry } from "../components/library/object-menu";
 import { SettingsDialog } from "../components/library/settings-dialog";
 import { useDialogTarget } from "../components/library/use-dialog-target";
+import { VisibilityDialog } from "../components/library/visibility-dialog";
 import { ModuleShell } from "../components/module-shell";
+import { analysisBlocker, analyzePages } from "../lib/analysis";
 import { api } from "../lib/client";
 import {
   LIBRARY_PATH,
@@ -29,8 +53,9 @@ import {
   sameOrder,
   settingsSummary,
   suggestNextNumber,
+  visibilityLabel,
 } from "../lib/library-helpers";
-import { isId, type ChapterSettings, type ChapterSummary, type FolderView, type GlossaryEntry } from "../lib/types";
+import { isId, type ChapterSettings, type ChapterSummary, type ChapterVisibility, type FolderView, type GlossaryEntry } from "../lib/types";
 
 /** Dossiers déjà vus : on les réaffiche tout de suite, puis on les rafraîchit. */
 const snapshots = new Map<string, FolderView>();
@@ -61,6 +86,10 @@ function FolderChapters({ folderId }: { folderId: string }) {
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const editing = useDialogTarget<ChapterRequest>();
   const deleting = useDialogTarget<ChapterSummary>();
+  const sharing = useDialogTarget<ChapterSummary>();
+  // Un lot ne part que de sa fenêtre, ouverte d'un clic sur l'une des trois actions.
+  const [batch, setBatch] = useState<FolderBatchAction | null>(null);
+  const [defaultVisibilityOpen, setDefaultVisibilityOpen] = useState(false);
   /** Ordre connu du serveur : un glisser qui ne change rien n'envoie rien. */
   const savedOrder = useRef<string[]>([]);
   const viewRef = useRef(view);
@@ -157,8 +186,36 @@ function FolderChapters({ folderId }: { folderId: string }) {
     toast.success("Glossaire enregistré");
   };
 
+  const saveDefaultVisibility = async (defaultVisibility: ChapterVisibility) => {
+    await api.updateFolder(folderId, { defaultVisibility });
+    toast.success("Visibilité des nouveaux chapitres enregistrée");
+    await refresh();
+  };
+
+  const saveVisibility = async (chapter: ChapterSummary, visibility: ChapterVisibility) => {
+    const next = await api.setChapterVisibility(chapter.id, visibility);
+    toast.success(next.visibility === "private" ? "Chapitre repassé en privé" : `Chapitre publié : ${visibilityLabel(next.visibility).toLowerCase()}`);
+    await refresh();
+  };
+
+  /** Archive `.cbz` d'un chapitre : ses pages exportées, dans l'ordre de lecture. */
+  const exportArchive = async (chapter: ChapterSummary) => {
+    const label = chapterLabel(chapter);
+    const pending = toast.loading(`${label} : préparation de l’archive…`);
+    try {
+      const archive = await buildChapterArchive(await api.getChapter(chapter.id));
+      saveBlob(archive.blob, archive.fileName);
+      const missing = archive.plan.missing > 0 ? `, ${countLabel(archive.plan.missing, "page pas encore exportée", "pages pas encore exportées")}` : "";
+      toast.success(`${label} : ${countLabel(archive.plan.pages.length, "page", "pages")} dans l’archive${missing}`, { id: pending });
+    } catch (error) {
+      toast.error(errorMessage(error, "Export de l’archive impossible."), { id: pending });
+    }
+  };
+
   const chapters = view?.chapters ?? [];
   const pageCount = chapters.reduce((sum, chapter) => sum + chapter.pageCount, 0);
+  // La fenêtre de visibilité suit la liste : après un changement, elle montre l'adresse neuve.
+  const shared = sharing.target ? (chapters.find((chapter) => chapter.id === sharing.target?.id) ?? sharing.target) : null;
   const renaming = editing.target?.mode === "rename" ? editing.target.chapter : null;
   const doomed = deleting.target;
 
@@ -176,6 +233,37 @@ function FolderChapters({ folderId }: { folderId: string }) {
               <Settings2 className="h-4 w-4" />
               Réglages du dossier
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2" disabled={!view || chapters.length === 0}>
+                  <ListChecks className="h-4 w-4" />
+                  Tout le dossier
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuItem onClick={() => setBatch("analyze")}>
+                  <ScanText aria-hidden />
+                  Analyser tous les chapitres…
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setBatch("translate")}>
+                  <Languages aria-hidden />
+                  Traduire tous les chapitres…
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setBatch("render")}>
+                  <ImageDown aria-hidden />
+                  Rendre les pages traduites de tous les chapitres…
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setBatch("archive")}>
+                  <FileArchive aria-hidden />
+                  Exporter en .cbz, une archive par chapitre…
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setDefaultVisibilityOpen(true)}>
+                  <Eye aria-hidden />
+                  Visibilité des nouveaux chapitres…
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button className="gap-2" disabled={!view} onClick={() => editing.show({ mode: "create" })}>
               <Plus className="h-4 w-4" />
               Nouveau chapitre
@@ -227,6 +315,8 @@ function FolderChapters({ folderId }: { folderId: string }) {
                     onMove={(offset) => moveChapter(chapter.id, offset)}
                     onRename={() => editing.show({ mode: "rename", chapter })}
                     onDelete={() => deleting.show(chapter)}
+                    onShare={() => sharing.show(chapter)}
+                    onArchive={() => void exportArchive(chapter)}
                   />
                 ))}
               </AnimatePresence>
@@ -276,6 +366,37 @@ function FolderChapters({ folderId }: { folderId: string }) {
       {view && (
         <GlossaryDialog open={glossaryOpen} onOpenChange={setGlossaryOpen} folderName={view.folder.name} value={view.folder.glossary} onSave={saveGlossary} />
       )}
+
+      {view && (
+        <VisibilityDialog
+          open={defaultVisibilityOpen}
+          onOpenChange={setDefaultVisibilityOpen}
+          title="Visibilité des nouveaux chapitres"
+          description="La visibilité que reçoit chaque chapitre créé dans ce dossier. Privé par défaut."
+          value={view.folder.defaultVisibility ?? "private"}
+          onSave={saveDefaultVisibility}
+        />
+      )}
+
+      <VisibilityDialog
+        open={sharing.open}
+        onOpenChange={sharing.onOpenChange}
+        title={`Visibilité de ${shared ? chapterLabel(shared) : "ce chapitre"}`}
+        description="Qui peut lire ce chapitre. Rien ne devient public sans le bouton de cette fenêtre."
+        value={shared?.visibility ?? "private"}
+        publishablePages={shared?.publishablePages ?? 0}
+        publicPath={shared?.publicPath}
+        onSave={(visibility) => (shared ? saveVisibility(shared, visibility) : Promise.resolve())}
+      />
+
+      <FolderBatchDialog
+        action={batch}
+        onClose={() => setBatch(null)}
+        chapters={chapters}
+        analyze={analyzePages}
+        analysisBlocker={analysisBlocker}
+        onChanged={() => void refresh()}
+      />
     </MotionConfig>
   );
 }
@@ -289,9 +410,13 @@ interface ChapterRowProps {
   onMove: (offset: number) => void;
   onRename: () => void;
   onDelete: () => void;
+  /** Ouvre la fenêtre de visibilité du chapitre. */
+  onShare: () => void;
+  /** Télécharge l'archive `.cbz` du chapitre. */
+  onArchive: () => void;
 }
 
-function ChapterRow({ chapter, first, last, onDrop, onMove, onRename, onDelete }: ChapterRowProps) {
+function ChapterRow({ chapter, first, last, onDrop, onMove, onRename, onDelete, onShare, onArchive }: ChapterRowProps) {
   const controls = useDragControls();
   const href = chapterHref(chapter.id);
   const label = chapterLabel(chapter);
@@ -301,6 +426,8 @@ function ChapterRow({ chapter, first, last, onDrop, onMove, onRename, onDelete }
   const entries: MenuEntry[] = [
     { key: "open", label: "Ouvrir", icon: BookOpenText, href },
     { key: "rename", label: "Renommer", icon: Pencil, onSelect: onRename },
+    { key: "share", label: "Visibilité…", icon: Eye, onSelect: onShare, separatorBefore: true },
+    { key: "archive", label: "Exporter en .cbz", icon: FileArchive, onSelect: onArchive, disabled: chapter.progress.exported === 0 },
     { key: "up", label: "Monter", icon: ArrowUp, onSelect: () => onMove(-1), disabled: first, separatorBefore: true },
     { key: "down", label: "Descendre", icon: ArrowDown, onSelect: () => onMove(1), disabled: last },
     { key: "delete", label: "Supprimer", icon: Trash2, onSelect: onDelete, destructive: true, separatorBefore: true },
@@ -345,6 +472,7 @@ function ChapterRow({ chapter, first, last, onDrop, onMove, onRename, onDelete }
             </Link>
             <p className="truncate text-xs text-muted-foreground tabular-nums">
               {countLabel(chapter.pageCount, "page", "pages")}
+              {chapter.visibility && chapter.visibility !== "private" && ` · ${visibilityLabel(chapter.visibility).toLowerCase()}`}
               <span className="md:hidden"> · {summary}</span>
             </p>
           </div>

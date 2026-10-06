@@ -7,7 +7,10 @@
  * du DOM ni du moteur : il se teste avec des boîtes écrites à la main.
  */
 
+import type { SourceLanguage } from "../types";
+import { isCjkLanguage } from "./languages";
 import { plausibility } from "./plausibility";
+import { isCjkNoise } from "./plausibility-cjk";
 
 /** Un mot lu, avec sa boîte en pixels de la page. */
 export interface WordBox {
@@ -20,6 +23,14 @@ export interface WordBox {
   y1: number;
   /** Inclinaison de la ligne de base, en degrés, quand le moteur la donne. */
   angle?: number;
+  /**
+   * Rang de la ligne (ou de la colonne) dans l'ordre où le moteur l'a lue. Pour
+   * les signes pleins du japonais, du chinois et du coréen, c'est lui qui
+   * donne l'ordre du texte : les boîtes de mots du moteur y sont trop larges.
+   */
+  line?: number;
+  /** Le moteur met-il une espace avant ce mot, dans sa ligne ? Absent : on n'en sait rien. */
+  spaced?: boolean;
 }
 
 export interface Box {
@@ -114,6 +125,11 @@ export interface NoiseContext {
    * dessin, là où le moteur invente le plus ; on lui demande davantage.
    */
   enclosed?: boolean;
+  /**
+   * Langue source. Le japonais, le chinois et le coréen sont jugés sur leur
+   * écriture (`plausibility-cjk.ts`), pas sur la forme de leurs mots.
+   */
+  language?: SourceLanguage;
 }
 
 /** Sous cette confiance moyenne, un texte posé sur le dessin est rejeté. */
@@ -130,6 +146,7 @@ export const MIN_FREE_CONFIDENCE = 0.6;
  */
 export function isNoiseText(text: string, confidence: number, context: NoiseContext = {}): boolean {
   const enclosed = context.enclosed ?? true;
+  if (context.language && isCjkLanguage(context.language)) return isCjkNoise(text, confidence, context.language, { enclosed });
   const compact = text.replace(/\s+/g, "");
   if (!compact) return true;
   const letters = countLetters(compact);

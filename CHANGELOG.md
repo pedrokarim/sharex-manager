@@ -19,12 +19,35 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   - Analyse automatique des pages en anglais, dans le navigateur : les zones
     de texte sont repérées sur les pixels puis lues par Tesseract, sans rien
     envoyer nulle part. Les lectures douteuses sont signalées.
+  - Analyse du japonais, du chinois (simplifié, traditionnel) et du coréen,
+    en colonnes comme en lignes, toujours dans le navigateur : le sens
+    d’écriture est relevé bulle par bulle, les colonnes d’une bulle font une
+    seule zone, les furigana sont écartés et le texte est nettoyé selon sa
+    langue. Les données d’une langue ne sont téléchargées que pour un chapitre
+    de cette langue. Les bandes de webtoon sont analysées par tranches, avec
+    leur avancement ; choisir une langue d’origine propose le format qui va
+    avec elle (manga, manhua, webtoon).
   - Traduction par DeepL et LibreTranslate, l’un relayant l’autre : une
     requête par page, glossaire et mémoire de traduction par dossier, cache,
     plafond mensuel, mise à l’écart d’un moteur après trois échecs, et une
     estimation affichée avant chaque lot. Rien ne part sans un clic.
   - Page « Moteurs » (clés, ordre d’appel, consommation) et glossaire par
     dossier.
+  - Page « Polices » : ajoutez vos polices de lettrage (TTF, OTF, WOFF2), avec
+    une phrase d’essai, un nom modifiable et un retrait qui ne laisse aucune
+    page sans police ; une table des styles par dossier donne une police à
+    chaque registre (dialogue, cri, pensée et récitatif, onomatopée). Les
+    polices ajoutées se retrouvent dans l’atelier, à l’aperçu comme à l’export.
+  - Atelier : le masque peut reconstruire le fond sous le texte (aplat,
+    dégradé, trame), dans le navigateur et sans IA ; un outil « Onomatopée »
+    pose un bruit sur le dessin, avec l’espacement et l’étirement de ses
+    lettres ; la poignée de rotation ne fait plus sauter le bloc quand on la
+    saisit, et la pipette recolore aussi les retouches au pinceau.
+  - IA en dernier recours, pour les chapitres réglés au niveau 3 seulement :
+    relire une zone, traduire avec le contexte, ou traduire la page entière
+    en une version gardée à part et comparable. Un appel par clic, jamais
+    retenté, avec le modèle choisi dans la palette d’AI Image Gen, un plafond
+    mensuel d’appels et la trace de chaque appel sur la zone.
   - Import d’un chapitre par son lien : le site est reconnu d’après le lien,
     par un adaptateur ; MangaDex est le premier, par son API publique. Une
     seule page, « Import par lien » : le lien, son aperçu et le suivi en haut,
@@ -40,8 +63,90 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
     la traduction les ignorent, et l’analyse d’un chapitre propose d’écarter
     celles qui semblent n’avoir rien à traduire.
   - Les pages envoyées dans la galerie y entrent en privé.
+  - Lecture publique : un chapitre est privé, public par son lien (adresse
+    imprévisible, hors indexation) ou listé au catalogue ; un dossier donne
+    une visibilité à ses nouveaux chapitres. Seules les pages exportées sont
+    servies, jamais les images d’origine ni les données de travail ; un
+    chapitre sans page exportée ne se publie pas, et le repasser en privé
+    coupe l’accès tout de suite. Le lecteur suit le format (page par page de
+    droite à gauche ou de gauche à droite, ou en bande), au clavier et au
+    doigt, avec chapitre précédent et suivant, la source et le crédit notés à
+    l’import, et un lien pour signaler un problème.
+  - Lot sur un dossier : analyser ou traduire tous ses chapitres, un à la
+    fois, dans une file qu’on arrête quand on veut. La traduction passe par
+    le même chemin qu’un chapitre (une requête par page, mêmes écarts, même
+    plafond) et s’arrête dès qu’aucun moteur ne répond ; l’estimation du
+    dossier entier est montrée avant de partir.
+  - Export `.cbz` d’un chapitre, ou d’un dossier (une archive par chapitre) :
+    pages exportées dans l’ordre, numérotées avec des zéros.
+  - Rendu en lot : « Rendre toutes les pages traduites » d’un chapitre, ou
+    de tous les chapitres d’un dossier, par la même chaîne que le bouton
+    « Exporter » de l’atelier (polices, fonds reconstruits). Les pages sans
+    zone, sans traduction ou laissées telles quelles ne sont pas touchées.
+  - Atelier : une zone tracée à la main (rectangle ou contour libre) autour
+    d’un texte que l’analyse n’a pas vu est lue aussitôt, sur place, et son
+    texte d’origine se remplit ; « Lire le texte de la zone » relit n’importe
+    quelle zone. La page s’ouvre sur l’original tant que rien n’est traduit, et
+    la vue affichée est le seul segment en couleur.
+  - Atelier : l’enregistrement se voit. Le témoin dit « Enregistrement
+    automatique », puis l’heure du dernier enregistrement ; quitter la page
+    envoie d’abord ce qui reste et le confirme, ou retient le départ si
+    l’enregistrement échoue ; Ctrl+S enregistre tout de suite.
+  - Analyse : un détecteur de bulles et de texte, entraîné sur des pages de
+    manga, de webtoon et de manhua, repère désormais le texte à la place du
+    repérage par les pixels : il trouve les petites bulles et le texte hors
+    bulle, et donne à chaque texte sa bulle. Il tourne dans le navigateur
+    (ONNX Runtime Web), rien ne quitte la machine, et ce n’est pas une IA
+    générative. Deux variantes au choix dans « Moteurs », précise (44 Mo) ou
+    rapide (11 Mo) ; le modèle se télécharge une fois sur le serveur, vérifié
+    par son empreinte. Sans modèle, ou si le navigateur ne peut pas le faire
+    tourner, l’analyse garde son repérage par les pixels et le dit.
+  - Chapitre : l’analyse et la traduction se lancent sur les pages que l’on
+    coche, et tournent en arrière-plan. La fenêtre se ferme aussitôt ; la
+    planche montre l’état de chaque page (en attente et en cours en ambre,
+    traitée en vert, en échec en rouge) et une barre dit où en est le
+    traitement, avec de quoi l’arrêter. Il continue quand on ouvre une page
+    ou qu’on va ailleurs dans l’application, tant que l’onglet reste ouvert.
+  - Texte traduit : sa taille ne dépasse plus celle du lettrage d’origine,
+    relevée à l’analyse, si bien que les bulles d’une page gardent une taille
+    voisine au lieu de grossir chacune jusqu’à remplir sa bulle. Dans une
+    bulle ovale, le texte se cale sur un rectangle qui tient dans l’ovale et
+    ne mord plus sur le trait ; le masque couvre tout le texte repéré, même
+    quand la lecture en a perdu une ligne.
+  - Traduction : une réponse de MyMemory qui recopie la phrase d’origine, ou
+    qui traduit une autre phrase tirée de sa mémoire publique, n’est plus
+    prise pour une traduction. Relancer « Analyser » remplace aussi une zone
+    dont la traduction n’est qu’une proposition jamais retouchée.
+  - Atelier : un bouton « Traduire » à côté d’« Analyser » traduit les zones
+    de la page ouverte, et « Traduire cette zone », dans le panneau de droite,
+    une seule bulle. Jusque-là, la traduction ne se lançait que depuis la page
+    du chapitre. Le sélecteur de vue s’appelle désormais « Affichage »
+    (« Original », « Version traduite », « Côte à côte »), pour ne plus
+    passer pour un bouton qui traduit.
+  - Traduction : un troisième moteur, MyMemory, qui marche sans clé. Tant
+    que ni DeepL ni LibreTranslate ne sont réglés, c’est lui qui traduit : la
+    traduction fonctionne donc dès l’installation. Il ne prend qu’une phrase
+    par requête (une page part bulle après bulle, une seconde entre deux) et
+    s’arrête à son quota du jour, 5 000 caractères, ou 50 000 avec une adresse
+    de contact facultative.
+  - Moteurs : « Lire le quota » demande à DeepL ce que le compte a
+    consommé, en une requête et sans texte envoyé.
+  - L’estimation de traduction d’un long chapitre part par paquets au lieu
+    d’être refusée au-delà de 400 phrases ; une image déposée qui n’a pas pu
+    être rattachée à un chapitre est effacée du serveur ; supprimer une page
+    emporte ses versions traduites par IA ; la barre de l’atelier passe sur
+    deux lignes quand la place manque au lieu de couper un bouton.
+  - Envoi dans la galerie : les pages « laissées telles quelles » partent
+    aussi, telles qu’elles sont et à leur place, et les pages du chapitre sont
+    réunies dans un album privé. Une archive de plus de 300 images s’importe
+    désormais en plusieurs paquets au lieu d’être refusée d’un bloc.
   Dossier de conception : `docs/modules/06-scan-studio.md` ; banc d’essai de
   la lecture : `docs/modules/06-scan-studio-banc-essai.md`.
+- Catalogue public : un module peut y apporter une rubrique
+  (`catalogSections` dans son `module.json`), avec ses collections, ses
+  éléments et un lecteur d’images. Le catalogue ne connaît aucun module : la
+  rubrique n’apparaît que si le module est activé et a quelque chose de listé,
+  et disparaît avec lui (404). Première rubrique : « Scans », par Scan Studio.
 - Galerie : séparations par jour à l’intérieur de chaque mois (« Aujourd’hui »,
   « Hier », puis la date). En grille, les jours se suivent sans case perdue :
   plusieurs jours partagent une rangée, l’étiquette de chacun se pose au-dessus

@@ -13,7 +13,7 @@ import { MAX_ITEMS, MAX_TEXT_LENGTH, setRouter } from "@/modules/scan-studio/lib
 import type { TranslationEngine } from "@/modules/scan-studio/lib/server/translation/engines";
 import { TranslationRouter } from "@/modules/scan-studio/lib/server/translation/router";
 import { newPageId, setDataRoot, writePage } from "@/modules/scan-studio/lib/store";
-import { DEFAULT_MASK, type ScanRegion, type TranslationStatus } from "@/modules/scan-studio/lib/types";
+import { DEFAULT_MASK, type ScanRegion, type TranslationEngineId, type TranslationStatus } from "@/modules/scan-studio/lib/types";
 
 // Les fonctions du module, de bout en bout, avec de faux moteurs : aucun
 // service réel, et le compteur d'appels du faux moteur fait foi.
@@ -21,7 +21,7 @@ import { DEFAULT_MASK, type ScanRegion, type TranslationStatus } from "@/modules
 let root = "";
 let calls: { engine: string; texts: string[]; source: string; target: string }[] = [];
 
-function fakeEngine(id: "deepl" | "libretranslate"): TranslationEngine {
+function fakeEngine(id: TranslationEngineId): TranslationEngine {
   return {
     id,
     async translate(texts, source, target) {
@@ -219,11 +219,11 @@ describe("estimateTranslation, getEngines, réglages", () => {
 
   it("rend l'état des moteurs et applique les réglages", async () => {
     const before = await api.getEngines();
-    expect(before.order).toEqual(["deepl", "libretranslate"]);
-    expect(before.engines.map((engine) => engine.available)).toEqual([true, true]);
+    expect(before.order).toEqual(["deepl", "libretranslate", "mymemory"]);
+    expect(before.engines.map((engine) => engine.available)).toEqual([true, true, true]);
 
     const after = await api.saveEngineSettings({ order: ["libretranslate", "deepl"], monthlyLimits: { deepl: 1000 } });
-    expect(after.order).toEqual(["libretranslate", "deepl"]);
+    expect(after.order).toEqual(["libretranslate", "deepl", "mymemory"]);
     expect(after.engines[0]).toMatchObject({ id: "deepl", monthlyLimit: 1000 });
     await expect(api.saveEngineSettings({ order: ["nope"] } as never)).rejects.toThrow("Ordre des moteurs invalide.");
   });

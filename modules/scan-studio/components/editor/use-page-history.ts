@@ -44,6 +44,8 @@ function isRevisionConflict(message: string): boolean {
 export function usePageHistory(pageId: string, initial: PageDocument, initialRevision: number) {
   const [state, setState] = useState<HistoryState>({ present: initial, past: [], future: [] });
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  /** Heure du dernier enregistrement réussi de cette visite ; `null` : rien n'a encore été modifié. */
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const lastCommit = useRef<{ key: string | null; at: number }>({ key: null, at: 0 });
 
@@ -129,6 +131,7 @@ export function usePageHistory(pageId: string, initial: PageDocument, initialRev
       }
       setSaveError(null);
       setSaveState("saved");
+      setSavedAt(Date.now());
     };
     savingRef.current = run().finally(() => {
       savingRef.current = null;
@@ -165,9 +168,16 @@ export function usePageHistory(pageId: string, initial: PageDocument, initialRev
     return () => {
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("beforeunload", onBeforeUnload);
-      void flush();
+      // On quitte l'atelier avec des modifications pas encore envoyées : elles partent, et on le dit.
+      const pending = !blockedRef.current && presentRef.current !== savedRef.current;
+      void flush().then(() => {
+        if (pending && !blockedRef.current && presentRef.current === savedRef.current) toast.success("Modifications enregistrées");
+      });
     };
   }, [flush]);
+
+  /** Tout ce qui a été fait est-il sur le serveur ? */
+  const isSaved = useCallback(() => !blockedRef.current && presentRef.current === savedRef.current && !savingRef.current, []);
 
   /**
    * Prend acte d'un état décidé par le serveur (une page exportée devient
@@ -191,6 +201,8 @@ export function usePageHistory(pageId: string, initial: PageDocument, initialRev
     canUndo: state.past.length > 0,
     canRedo: state.future.length > 0,
     saveState,
+    savedAt,
+    isSaved,
     saveError,
     flush,
     adoptStatus,

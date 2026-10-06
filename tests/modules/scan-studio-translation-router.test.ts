@@ -77,6 +77,8 @@ function bench(configured: { deepl?: boolean; libre?: boolean } = {}, clock = ne
   const router = new TranslationRouter({
     clock,
     resolve: (id) => {
+      // Ces essais portent sur les deux moteurs à clé : le troisième y est tenu pour absent.
+      if (id === "mymemory") return { fingerprint: "empreinte-mymemory", reason: "non configuré" };
       const engine = id === "deepl" ? deepl : libre;
       const enabled = id === "deepl" ? configured.deepl !== false : configured.libre !== false;
       return enabled ? { engine, fingerprint: `empreinte-${id}` } : { fingerprint: `empreinte-${id}`, reason: "non configuré" };
@@ -416,7 +418,7 @@ describe("routeur : bascule sur le secours", () => {
     await router.translate(request(["Hi."]));
     expect(libre.calls).toHaveLength(1);
     expect(deepl.calls).toEqual([]);
-    expect(router.catalogue().order).toEqual(["libretranslate", "deepl"]);
+    expect(router.catalogue().order).toEqual(["libretranslate", "deepl", "mymemory"]);
   });
 
   it("prend pour une panne une réponse qui n'a pas le bon nombre de traductions", async () => {
@@ -534,7 +536,7 @@ describe("routeur : les deux moteurs indisponibles", () => {
     const batch = await router.translate(request(["Hi."]));
     expect(deepl.calls).toEqual([]);
     expect(libre.calls).toEqual([]);
-    expect(batch.failed).toEqual([{ id: "zone-0", error: "DeepL : non configuré ; LibreTranslate : non configuré" }]);
+    expect(batch.failed).toEqual([{ id: "zone-0", error: "DeepL : non configuré ; LibreTranslate : non configuré ; MyMemory : non configuré" }]);
   });
 
   it("garde ce que le principal a traduit avant de tomber au milieu d'un lot", async () => {
@@ -696,5 +698,40 @@ describe("routeur : file et essai", () => {
     const { router, libre } = bench({ libre: false });
     expect(await router.test("libretranslate")).toEqual({ ok: false, message: "LibreTranslate : non configuré." });
     expect(libre.calls).toEqual([]);
+  });
+});
+
+// ─── Un moteur qui ne prend qu'une phrase par requête, avec un quota par jour ───
+
+describe("routeur : un service à une phrase par requête", () => {
+  /** Un banc où seul le troisième moteur existe, comme sur une instance où rien n'est réglé. */
+  function single(dailyLimit: number, clock = new FakeClock()) {
+    const engine = new FakeEngine("mymemory");
+    (engine as unknown as { maxTextsPerRequest: number }).maxTextsPerRequest = 1;
+    const router = new TranslationRouter({
+      clock,
+      resolve: (id) => (id === "mymemory" ? { engine, fingerprint: "empreinte-mymemory", dailyLimit } : { fingerprint: `empreinte-${id}`, reason: "non configuré" }),
+    });
+    return { engine, router, clock };
+  }
+
+  it("envoie les phrases une à une, à la suite, avec le délai entre deux", async () => {
+    const { engine, router, clock } = single(5000);
+    const batch = await router.translate(request(["One.", "Two.", "Three."]));
+    expect(engine.calls).toEqual([["One."], ["Two."], ["Three."]]);
+    expect(batch.results.map((result) => result.engine)).toEqual(["mymemory", "mymemory", "mymemory"]);
+    expect(batch.failed).toEqual([]);
+    // Deux attentes d'au moins le délai minimal, entre la première et la deuxième puis la troisième.
+    expect(clock.sleeps.filter((duration) => duration >= TIMINGS.minDelayMs - 50)).toHaveLength(2);
+  });
+
+  it("s'arrête au quota du jour : ce qui dépasse n'est pas envoyé", async () => {
+    const { engine, router } = single(10);
+    const batch = await router.translate(request(["Hello.", "Again", "Too long for today"]));
+    expect(engine.calls).toEqual([["Hello."]]);
+    expect(batch.results).toHaveLength(1);
+    expect(batch.failed.map((entry) => entry.id)).toEqual(["zone-1", "zone-2"]);
+    expect(batch.failed[0].error).toContain("quota du jour");
+    expect(router.catalogue().engines.find((entry) => entry.id === "mymemory")).toMatchObject({ dailyLimit: 10 });
   });
 });

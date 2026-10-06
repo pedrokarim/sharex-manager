@@ -9,7 +9,7 @@
  */
 
 import type { SourceLanguage } from "../../types";
-import { EngineError, expectTranslations, postJson, type TranslationEngine } from "./engines";
+import { EngineError, expectTranslations, getJson, postJson, type TranslationEngine } from "./engines";
 
 const FREE_HOST = "https://api-free.deepl.com";
 const PRO_HOST = "https://api.deepl.com";
@@ -83,6 +83,16 @@ export function createDeeplEngine(key: string): TranslationEngine {
       const translations = (response.body as { translations?: unknown } | null)?.translations;
       const list = Array.isArray(translations) ? translations.map((entry) => (entry as { text?: unknown } | null)?.text) : null;
       return expectTranslations(list, texts.length);
+    },
+    // `GET /v2/usage` : caractères consommés et plafond de la période en cours.
+    async usage(signal) {
+      const response = await getJson(`${deeplHost(key)}/v2/usage`, { Authorization: `DeepL-Auth-Key ${key.trim()}` }, signal);
+      if (response.status !== 200) throw failure(response.status, response.retryAfterMs);
+      const body = response.body as { character_count?: unknown; character_limit?: unknown } | null;
+      const used = body?.character_count;
+      const limit = body?.character_limit;
+      if (typeof used !== "number" || !Number.isFinite(used) || used < 0) throw new EngineError("unavailable", "Réponse inattendue du service.");
+      return { used: Math.round(used), limit: typeof limit === "number" && Number.isFinite(limit) && limit > 0 ? Math.round(limit) : 0 };
     },
   };
 }

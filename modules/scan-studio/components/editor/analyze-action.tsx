@@ -15,8 +15,8 @@ import { Loader2, ScanText } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { analysisBlocker, analyzeSurface, mergeRegions, needsReview } from "../../lib/analysis";
-import { errorMessage } from "../../lib/library-helpers";
+import { analysisBlocker, analyzeSurface, mergeRegions, needsReview, lastDetectionReport } from "../../lib/analysis";
+import { errorMessage, ENGINES_PATH } from "../../lib/library-helpers";
 import type { ChapterSettings, ScanRegion } from "../../lib/types";
 import type { PageDocument } from "./use-page-history";
 
@@ -75,7 +75,11 @@ export function usePageAnalysis({ image, page, settings, commit, getRegions }: P
     })
       .then((found) => {
         if (!mountedRef.current) return;
-        const { added } = mergeRegions(getRegions(), found, { format: settings.format });
+        tellMissingDetector();
+        // Repérée par le détecteur, la page repart de ses zones : celles d'une analyse précédente sont remplacées,
+        // sauf celles qu'on a corrigées ou traduites, qui ne sont jamais retirées.
+        const replace = lastDetectionReport().used === "detector";
+        const { added } = mergeRegions(getRegions(), found, { format: settings.format, replace });
         if (added === 0) {
           toast.info(found.length === 0 ? "Aucun texte repéré sur cette page" : "Aucune nouvelle zone : celles de la page sont déjà en place", {
             description:
@@ -87,13 +91,13 @@ export function usePageAnalysis({ image, page, settings, commit, getRegions }: P
         }
         // La fusion est refaite sur l'état courant : la page a pu changer pendant la lecture.
         commit((current) => {
-          const merged = mergeRegions(current.regions, found, { format: settings.format });
-          if (merged.added === 0) return current;
+          const merged = mergeRegions(current.regions, found, { format: settings.format, replace });
+          if (merged.regions === current.regions) return current;
           return { regions: merged.regions, status: current.status === "imported" ? "analyzed" : current.status };
         });
         const doubtful = found.filter(needsReview).length;
         toast.success(`${plural(added, "zone")} ${added > 1 ? "trouvées" : "trouvée"}`, {
-          description: doubtful > 0 ? `${plural(doubtful, "lecture")} à vérifier. Ctrl+Z annule l’analyse.` : "Ctrl+Z annule l’analyse.",
+          description: `${doubtful > 0 ? `${plural(doubtful, "lecture")} à vérifier. ` : ""}${detectionNote()} Ctrl+Z annule l’analyse.`,
         });
       })
       .catch((error: unknown) => {
@@ -108,7 +112,31 @@ export function usePageAnalysis({ image, page, settings, commit, getRegions }: P
   return { running, progress, blocker, ready: image !== null, start };
 }
 
-/** Bouton « Analyser » de l'en-tête. Coupé, avec la raison en infobulle, quand le chapitre l'interdit. */
+/**
+ * Le détecteur de bulles est choisi mais son modèle manque : l'analyse vient de
+ * tourner avec l'ancien repérage, moins sûr. On le dit une fois par visite,
+ * avec le chemin pour l'installer.
+ */
+let missingDetectorTold = false;
+function tellMissingDetector() {
+  if (missingDetectorTold || !lastDetectionReport().missing) return;
+  missingDetectorTold = true;
+  toast.warning("Le détecteur de bulles n’est pas installé", {
+    description: "Cette page a été analysée par l’ancien repérage, qui manque les petites bulles et le texte hors bulle. Son modèle se télécharge une fois, dans « Moteurs ».",
+    action: { label: "Ouvrir « Moteurs »", onClick: () => window.location.assign(ENGINES_PATH) },
+    duration: 20_000,
+  });
+}
+
+/** Une phrase qui dit comment la page vient d'être repérée. */
+function detectionNote(): string {
+  const report = lastDetectionReport();
+  if (report.used === "detector") return "Repérage par le détecteur de bulles.";
+  if (report.missing) return "Repérage par les pixels : le détecteur de bulles n’est pas encore installé.";
+  return report.reason ? `Détecteur indisponible (${report.reason}) : repérage par les pixels.` : "Repérage par les pixels.";
+}
+
+/** Bouton « Analyser » de l'en-tête. Coupé, avec la raison en infobulle, quand le chapitre l'interdit. */
 export function AnalyzeButton({ analysis }: { analysis: PageAnalysis }) {
   const disabled = analysis.running || !analysis.ready || analysis.blocker !== null;
   return (
@@ -118,7 +146,7 @@ export function AnalyzeButton({ analysis }: { analysis: PageAnalysis }) {
         <span className="ml-2 inline-flex" tabIndex={analysis.blocker ? 0 : undefined}>
           <Button variant="outline" size="sm" className="h-8 gap-2" disabled={disabled} onClick={analysis.start}>
             {analysis.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanText className="h-4 w-4" />}
-            Analyser<span className="hidden 2xl:inline"> la page</span>
+            Analyser<span className="hidden min-[1800px]:inline"> la page</span>
           </Button>
         </span>
       </TooltipTrigger>

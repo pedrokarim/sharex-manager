@@ -1,14 +1,14 @@
 /**
- * Opérations sur les zones d'une page : création, copie, ordre, style.
+ * Opérations sur les zones d'une page : création, copie, ordre, style.
  *
- * Fonctions pures : elles rendent une nouvelle liste ou une nouvelle zone, sans
+ * Fonctions pures : elles rendent une nouvelle liste ou une nouvelle zone, sans
  * rien modifier, ce qui laisse l'historique d'annulation comparer par identité.
  */
 
 import { translatePoints } from "./geometry";
-import { DEFAULT_MASK, boundsOf, type Point, type RegionKind, type ScanRegion, type TextStyle } from "./types";
+import { DEFAULT_MASK, boundsOf, type AiTrace, type Point, type RegionKind, type ScanRegion, type TextStyle } from "./types";
 
-/** Zone tracée à la main : contour dessiné, masque par défaut, boîte de texte sur le contour. */
+/** Zone tracée à la main : contour dessiné, masque par défaut, boîte de texte sur le contour. */
 export function createRegion(id: string, outline: Point[], maskColor: string, kind: RegionKind = "dialogue"): ScanRegion {
   return {
     id,
@@ -22,11 +22,70 @@ export function createRegion(id: string, outline: Point[], maskColor: string, ki
   };
 }
 
+/**
+ * Onomatopée posée à la main : le texte se place sur le dessin, il ne remplace
+ * pas une bulle. Rien n'est donc masqué au départ ; le masque se règle ensuite,
+ * en aplat ou en reconstruction du fond, s'il y a un bruit d'origine à effacer.
+ */
+export function createSfxRegion(id: string, outline: Point[], maskColor: string): ScanRegion {
+  const region = createRegion(id, outline, maskColor, "sfx");
+  return { ...region, mask: { ...region.mask, kind: "none" } };
+}
+
+/**
+ * Change la couleur du masque. Les retouches au pinceau peintes dans
+ * l'ancienne couleur la suivent : sinon elles resteraient en tache sur le
+ * nouvel aplat. Un trait d'une autre couleur garde la sienne.
+ */
+export function setMaskColor(region: ScanRegion, color: string): ScanRegion {
+  const previous = region.mask.color;
+  const next = color.toLowerCase();
+  if (previous.toLowerCase() === next) return region;
+  return {
+    ...region,
+    mask: {
+      ...region.mask,
+      color: next,
+      strokes: region.mask.strokes.map((stroke) => (stroke.color.toLowerCase() === previous.toLowerCase() ? { ...stroke, color: next } : stroke)),
+    },
+  };
+}
+
+/** Ajoute la trace d'un appel à une IA à une zone : on garde les vingt dernières. */
+export function addAiTrace(region: ScanRegion, trace: AiTrace): ScanRegion {
+  return { ...region, ai: [...(region.ai ?? []), trace].slice(-20) };
+}
+
+/** Nom gardé comme « moteur » d'un texte venu d'une IA : on sait toujours d'où il vient. */
+export function aiEngineLabel(trace: Pick<AiTrace, "provider" | "model">): string {
+  return `ia:${trace.provider}/${trace.model}`.slice(0, 100);
+}
+
+/**
+ * Lecture proposée par une IA et acceptée. Elle vaut une lecture relue : une
+ * relance de l'analyse ne l'écrasera pas.
+ */
+export function acceptAiReading(region: ScanRegion, text: string, trace: AiTrace): ScanRegion {
+  return { ...region, reading: { raw: text, clean: text, confidence: 1, engine: aiEngineLabel(trace), edited: true } };
+}
+
+/**
+ * Traduction proposée par une IA et acceptée. C'est un geste explicite : elle
+ * remplace le texte en place, qui part dans l'historique, et reste une
+ * proposition à relire.
+ */
+export function acceptAiTranslation(region: ScanRegion, text: string, trace: AiTrace, now: number): ScanRegion {
+  const previous = region.translation;
+  const history =
+    previous.text && previous.text !== text ? [...previous.history, { text: previous.text, engine: previous.engine ?? "manual", at: now }] : previous.history;
+  return { ...region, translation: { text, status: "proposed", engine: aiEngineLabel(trace), history } };
+}
+
 export function findRegion(regions: ScanRegion[], id: string | null): ScanRegion | null {
   return id ? regions.find((region) => region.id === id) ?? null : null;
 }
 
-/** Remplace une zone par le résultat de `update` ; la liste est rendue telle quelle si rien ne change. */
+/** Remplace une zone par le résultat de `update` ; la liste est rendue telle quelle si rien ne change. */
 export function updateRegion(regions: ScanRegion[], id: string, update: (region: ScanRegion) => ScanRegion): ScanRegion[] {
   let changed = false;
   const next = regions.map((region) => {
@@ -48,7 +107,7 @@ export function duplicateRegion(regions: ScanRegion[], id: string, newRegionId: 
   if (index < 0) return regions;
   const source = regions[index];
   const bounds = boundsOf(source.outline);
-  // Le décalage s'inverse près du bord : la copie reste dans la page.
+  // Le décalage s'inverse près du bord : la copie reste dans la page.
   const dx = bounds.x + bounds.width + offset <= page.width ? offset : -offset;
   const dy = bounds.y + bounds.height + offset <= page.height ? offset : -offset;
   const copy: ScanRegion = {
@@ -74,7 +133,7 @@ export function shiftRegion(regions: ScanRegion[], id: string, delta: -1 | 1): S
   return next;
 }
 
-/** Zone voisine dans l'ordre de lecture, en bouclant ; la première (ou la dernière) si rien n'est sélectionné. */
+/** Zone voisine dans l'ordre de lecture, en bouclant ; la première (ou la dernière) si rien n'est sélectionné. */
 export function neighbourId(regions: ScanRegion[], id: string | null, delta: -1 | 1): string | null {
   if (regions.length === 0) return null;
   const index = regions.findIndex((region) => region.id === id);
@@ -82,7 +141,7 @@ export function neighbourId(regions: ScanRegion[], id: string | null, delta: -1 
   return regions[(index + delta + regions.length) % regions.length].id;
 }
 
-/** Saisie de la traduction : elle devient une correction à la main. */
+/** Saisie de la traduction : elle devient une correction à la main. */
 export function setTranslationText(region: ScanRegion, text: string): ScanRegion {
   return {
     ...region,
@@ -91,9 +150,9 @@ export function setTranslationText(region: ScanRegion, text: string): ScanRegion
 }
 
 /**
- * Saisie du texte d'origine : une relance de lecture ne l'écrasera pas.
+ * Saisie du texte d'origine : une relance de lecture ne l'écrasera pas.
  *
- * Sur une zone lue par un moteur, la correction porte sur le texte nettoyé :
+ * Sur une zone lue par un moteur, la correction porte sur le texte nettoyé :
  * ce que le moteur a lu (`raw`) et son nom restent, pour qu'on sache toujours
  * d'où vient le texte (§ 3 et § 6.3 du dossier).
  */
@@ -113,7 +172,7 @@ export function setReadingText(region: ScanRegion, text: string): ScanRegion {
 
 /**
  * Surcharge le style de la zone. Une clé à `undefined` retire la surcharge de
- * ce réglage (le contour du texte, par exemple) ; sans surcharge restante, la
+ * ce réglage (le contour du texte, par exemple) ; sans surcharge restante, la
  * zone revient à `null`, c'est-à-dire au style de son type.
  */
 export function patchStyle(region: ScanRegion, patch: Partial<TextStyle>): ScanRegion {

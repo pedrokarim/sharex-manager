@@ -16,6 +16,8 @@ const PUBLIC_ROUTES: Record<string, string> = {
   "src/app/api/contact/route.ts": "formulaire de la page vitrine, limité en débit",
   "src/app/api/public/albums/[slug]/route.ts": "albums publiés",
   "src/app/api/public/catalog/route.ts": "catalogue public",
+  "src/app/api/public/sections/[section]/media/[...path]/route.ts":
+    "images des sections de catalogue des modules : seul ce que le module déclare public, revérifié à chaque demande, limité en débit",
   "src/app/api/public/share/[token]/route.ts": "image prêtée à un service tiers par un jeton imprévisible et temporaire",
   "src/app/api/tools/provenance/route.ts": "outil public « Origine d'une image », borné en taille et en débit, rien n'est enregistré",
 };

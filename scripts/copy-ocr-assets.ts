@@ -1,7 +1,8 @@
 /**
  * Copie dans `public/scan-studio-ocr/` les fichiers dont le moteur de lecture
  * de Scan Studio a besoin dans le navigateur : son script de travail, son cœur
- * WebAssembly et les données de la langue anglaise.
+ * WebAssembly et les données de chaque langue lue (anglais, japonais, chinois,
+ * coréen).
  *
  * Sans cette copie, tesseract.js irait les chercher sur un CDN public au
  * premier usage. L'application les sert donc elle-même : rien ne sort de la
@@ -18,6 +19,17 @@ const root = join(import.meta.dir, "..");
 const modules = join(root, "node_modules");
 const output = join(root, "public", "scan-studio-ocr");
 
+/** Variante des données de langue : la même pour toutes, environ 2 Mo compressés par modèle. */
+const VARIANT = "4.0.0_best_int";
+
+/**
+ * Modèles de lecture, un fichier chacun. Le navigateur ne télécharge que ceux
+ * de la langue du chapitre analysé (`lib/analysis/languages.ts`) : les copier
+ * tous ici ne coûte que de la place sur le disque du serveur. Les modèles
+ * « _vert » lisent le texte écrit en colonnes, de haut en bas.
+ */
+const languages = ["eng", "jpn", "jpn_vert", "chi_sim", "chi_sim_vert", "chi_tra", "chi_tra_vert", "kor", "kor_vert"];
+
 /**
  * Le cœur existe en trois variantes, choisies par le navigateur selon ce que
  * son processeur sait faire. Seules les variantes « LSTM » servent : le module
@@ -29,7 +41,11 @@ const files: [from: string, to: string][] = [
   ["tesseract.js-core/tesseract-core-lstm.wasm.js", "core/tesseract-core-lstm.wasm.js"],
   ["tesseract.js-core/tesseract-core-simd-lstm.wasm.js", "core/tesseract-core-simd-lstm.wasm.js"],
   ["tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm.js", "core/tesseract-core-relaxedsimd-lstm.wasm.js"],
-  ["@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz", "lang/eng.traineddata.gz"],
+  ...languages.map((code): [string, string] => [`@tesseract.js-data/${code}/${VARIANT}/${code}.traineddata.gz`, `lang/${code}.traineddata.gz`]),
+  // ONNX Runtime Web, en WebAssembly seul : il fait tourner le détecteur de bulles et de texte.
+  ["onnxruntime-web/dist/ort.wasm.min.js", "ort/ort.wasm.min.js"],
+  ["onnxruntime-web/dist/ort-wasm-simd-threaded.mjs", "ort/ort-wasm-simd-threaded.mjs"],
+  ["onnxruntime-web/dist/ort-wasm-simd-threaded.wasm", "ort/ort-wasm-simd-threaded.wasm"],
 ];
 
 let copied = 0;

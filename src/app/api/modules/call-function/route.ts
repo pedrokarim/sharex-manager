@@ -103,6 +103,14 @@ export async function POST(request: NextRequest) {
     // cette liste, toute fonction exportée était ouverte à tout compte
     // connecté, y compris celles qui enregistrent des commandes à exécuter.
     const requiredAccess = loadedModule.config.functions?.[functionName] ?? "admin";
+    // Une fonction du catalogue public rend des chemins de fichiers au
+    // serveur : elle ne passe jamais par ici, quel que soit le compte.
+    if (requiredAccess === "public") {
+      return NextResponse.json(
+        { error: `Fonction ${functionName} non trouvée dans le module ${moduleName}` },
+        { status: 404 }
+      );
+    }
     if (!hasAccess(session, requiredAccess)) {
       logDb.createLog({
         level: "warning",

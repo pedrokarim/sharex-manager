@@ -13,6 +13,9 @@
 import {
   REGION_KINDS,
   isId,
+  type AiAction,
+  type AiSentKind,
+  type AiTrace,
   type BrushStroke,
   type MaskShape,
   type PageStatus,
@@ -39,6 +42,8 @@ export const PAGE_LIMITS = {
   history: 50,
   /** Nom de moteur ou de police. */
   label: 100,
+  /** Traces d'appels à une IA gardées par zone : les plus anciennes sont oubliées. */
+  aiTraces: 20,
 };
 
 export interface PageSize {
@@ -152,6 +157,13 @@ export function sanitizeTextStyle(value: unknown, where: string, mode: "full" | 
       width: asNumber(stroke.width, 0, 200, where, "épaisseur du contour"),
     };
   }
+  // Réglages des onomatopées, facultatifs partout : absents, les lettres gardent leur chasse.
+  if (input.letterSpacing !== undefined && input.letterSpacing !== null) {
+    style.letterSpacing = asNumber(input.letterSpacing, -0.2, 2, where, "espacement des lettres");
+  }
+  if (input.stretch !== undefined && input.stretch !== null) {
+    style.stretch = asNumber(input.stretch, 0.25, 4, where, "étirement des lettres");
+  }
   return style;
 }
 
@@ -207,7 +219,7 @@ function sanitizeStroke(value: unknown, size: PageSize, where: string): BrushStr
 function sanitizeMask(value: unknown, size: PageSize, where: string): RegionMask {
   const input = asObject(value, where, "masque");
   return {
-    kind: asChoice(input.kind, ["fill", "none"] as const, where, "type de masque"),
+    kind: asChoice(input.kind, ["fill", "none", "inpaint"] as const, where, "type de masque"),
     shape: asChoice(input.shape, MASK_SHAPES, where, "forme du masque"),
     color: asColor(input.color, where, "couleur du masque"),
     grow: asNumber(input.grow, -200, 200, where, "marge du masque"),
@@ -235,6 +247,27 @@ function sanitizeBox(value: unknown, size: PageSize, where: string): TextBox {
   };
 }
 
+const AI_ACTIONS: AiAction[] = ["reading", "translation", "page"];
+const AI_SENT_KINDS: AiSentKind[] = ["crop", "text", "page"];
+
+/** Traces des appels à une IA faits pour une zone : on garde les dernières. */
+function sanitizeAiTraces(value: unknown, where: string): AiTrace[] {
+  return asArray(value, where, "traces d'IA", 10_000)
+    .slice(-PAGE_LIMITS.aiTraces)
+    .map((entry) => {
+      const input = asObject(entry, where, "trace d'IA");
+      const trace: AiTrace = {
+        action: asChoice(input.action, AI_ACTIONS, where, "action d'IA"),
+        provider: asLabel(input.provider, where, "fournisseur d'IA"),
+        model: asLabel(input.model, where, "modèle d'IA"),
+        at: Math.round(asNumber(input.at, 0, Number.MAX_SAFE_INTEGER, where, "date de l'appel")),
+        sent: asChoice(input.sent, AI_SENT_KINDS, where, "contenu envoyé"),
+      };
+      if (input.cached === true) trace.cached = true;
+      return trace;
+    });
+}
+
 function sanitizeRegion(value: unknown, size: PageSize, where: string): ScanRegion {
   const input = asObject(value, where, "zone");
   if (!isId(input.id)) fail(where, "identifiant de zone invalide");
@@ -243,6 +276,7 @@ function sanitizeRegion(value: unknown, size: PageSize, where: string): ScanRegi
   if (outline.length < 3) fail(where, "le contour demande au moins trois points");
 
   const text = asObject(input.text, where, "bloc de texte");
+  const ai = input.ai === undefined || input.ai === null ? [] : sanitizeAiTraces(input.ai, where);
   return {
     id: input.id,
     kind: asChoice<RegionKind>(input.kind, REGION_KINDS, where, "type de zone"),
@@ -255,7 +289,9 @@ function sanitizeRegion(value: unknown, size: PageSize, where: string): ScanRegi
       box: sanitizeBox(text.box, size, where),
       style: text.style === null || text.style === undefined ? null : sanitizeTextStyle(text.style, where, "partial"),
       autoFit: asBoolean(text.autoFit, where, "ajustement automatique"),
+      ...(text.maxSize === undefined || text.maxSize === null ? {} : { maxSize: asNumber(text.maxSize, 4, 600, where, "taille maximale du texte") }),
     },
+    ...(ai.length > 0 ? { ai } : {}),
   };
 }
 

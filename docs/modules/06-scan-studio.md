@@ -15,6 +15,15 @@ sa place, dans un atelier où tout reste retouchable à la main.
   chapitre par son lien (§ 19) et les pages à laisser telles quelles. Restent
   le japonais, le chinois et le coréen (S4), l’IA en dernier recours (S5), les
   finitions (S6) et la lecture publique (S7).
+  Réalisés depuis : la lecture publique (S7, § 11.2) et, pour les finitions
+  (S6), le lot sur un dossier, l’export `.cbz` et l’envoi dans la galerie.
+  Réalisés aussi : la page « Polices » et la table des styles par dossier
+  (§ 8), l’IA en dernier recours (S5, § 7.6) et, pour les finitions (S6), le
+  fond reconstruit sans IA (§ 6.6) et les onomatopées (§ 6.7).
+  Réalisés enfin : le japonais, le chinois et le coréen (S4) : lecture en
+  lignes et en colonnes, furigana écartés, ordre de lecture par format et
+  bandes de webtoon par tranches
+  ([mesures](06-scan-studio-banc-essai.md), § 8).
 
 > Ce dossier part de la demande dictée par Karim le 06/10/2026. Le § 2 la
 > reprend point par point ; le § 17 liste ce qu’elle ne disait pas et que le
@@ -186,6 +195,7 @@ Un espace de travail plein écran, sur le modèle de l’éditeur de Clip Studio
 | Touche | Action |
 | --- | --- |
 | `V`, `R`, `P`, `B`, `I`, `H` | Sélection, rectangle, polygone, pinceau, pipette, main |
+| `S` | Onomatopée : une zone posée sur le dessin, sans masque |
 | `Tab` / `Maj+Tab` | Zone suivante / précédente dans l’ordre de lecture |
 | `Entrée` | Éditer la traduction de la zone sélectionnée |
 | `Ctrl+Z` / `Ctrl+Maj+Z` | Annuler / rétablir |
@@ -232,11 +242,36 @@ n’est jamais écrasée par une relance : elle est marquée comme telle.
 - Les onomatopées et le texte du décor sont repérés mais **non traités par
   défaut** : les effacer abîme le dessin. On les traite à la demande.
 
+**Réalisé (S2, S4).** Le repérage se fait sur les pixels, sans modèle :
+les lettres sont de petites taches d’encre dans une plage unie fermée par un
+trait, la bulle ou le cartouche. Pour le japonais, le chinois et le coréen,
+trois choses s’ajoutent :
+
+- les taches d’un même signe sont réunies avant tout : un kanji est fait de
+  plusieurs traits séparés ;
+- le **sens d’écriture** est relevé bulle par bulle, sur la disposition des
+  signes : en colonnes quand ils se serrent de haut en bas, en lignes quand
+  ils se serrent de gauche à droite. La langue ne tranche que lorsqu’il n’y a
+  rien à mesurer (japonais : colonnes ; chinois, coréen : lignes) ;
+- les colonnes d’une bulle font **une seule zone**, qui porte son sens
+  (`direction`), et le texte anglais garde ses règles propres.
+
+Le détecteur ONNX n’a pas été mesuré : il reste la piste pour le texte posé
+sur le dessin.
+
 ### 6.2 Lecture du texte
 
 Chaque zone est découpée, redressée, agrandie si elle est petite, puis lue par
 le moteur de la langue source (§ 7.2). La lecture rend le texte et une
 **confiance** ; sous un seuil, la zone est marquée « à vérifier ».
+
+**Réalisé (S4).** Une zone en colonnes est lue par le modèle des colonnes
+de sa langue, une zone en lignes par celui des lignes ; chaque modèle n’est
+téléchargé qu’à la première zone qui le demande. Autour d’un texte en signes
+pleins, tout ce qui dépasse sa boîte de plus d’un tiers de signe est recouvert
+avant la lecture : un arc de bulle y serait lu comme un signe. Une lecture
+dont la confiance est sous le seuil est refaite à une seconde échelle, et la
+plus sûre des deux est gardée.
 
 ### 6.3 Nettoyage du texte (« sanitize »)
 
@@ -257,6 +292,27 @@ Ce que la lecture rend n’est pas encore une phrase. Avant toute traduction :
 Le texte lu d’origine est conservé à côté du texte nettoyé : on peut toujours
 revenir en arrière.
 
+**Réalisé (S4), pour le japonais, le chinois et le coréen.** Les règles de
+l’anglais (casse, césures, `I`/`l`/`1`) n’y ont pas de sens ; celles-ci les
+remplacent :
+
+- les espaces que la lecture glisse entre deux signes sont retirées ; en
+  coréen, où les mots sont séparés, celles du moteur sont gardées ;
+- les formes de compatibilité sont ramenées à leur forme ordinaire (lettres
+  et chiffres pleine chasse, katakana demi-chasse), et la ponctuation à celle
+  de la langue : pleine chasse en japonais et en chinois, ordinaire en
+  coréen ; toute suite de points devient « … » ;
+- en japonais, la marque d’allongement lue comme un tiret ou comme le kanji
+  « un » est rétablie après un katakana, et un katakana est départagé du
+  kanji qui lui ressemble par ses voisins ;
+- un texte est tenu pour une réplique d’après son **écriture** : la part de
+  kana et de kanji, de hanzi ou de hangul, face aux lettres latines et aux
+  symboles égarés ;
+- les **furigana** sont écartés avant la lecture, sur leur position : une
+  petite tache posée hors de la bande d’une colonne, contre elle et à sa
+  droite (ou au-dessus d’une ligne), est recouverte dans l’image lue et
+  reste dans le contour de la zone, pour être masquée avec le texte.
+
 ### 6.4 Regroupement et ordre de lecture
 
 - Les lignes proches et alignées sont réunies en une zone par bulle.
@@ -273,6 +329,28 @@ revenir en arrière.
   portions. L’export rend la bande entière ou redécoupée.
 - L’ordre calculé n’est qu’une proposition : il se corrige en faisant glisser
   les zones dans la liste.
+
+**Réalisé (S4).**
+
+- Dans une zone en colonnes, le texte suit l’ordre du moteur : colonnes de
+  droite à gauche, chacune de haut en bas.
+- L’ordre des zones suit le format du chapitre : rangées lues de droite à
+  gauche en manga, de gauche à droite en manhua. Une bande de webtoon se lit
+  en descendant ; deux bulles n’y forment une rangée, lue de gauche à droite,
+  que si elles sont vraiment côte à côte.
+- Choisir une langue d’origine dans les réglages propose le format qui va
+  avec elle (japonais : manga ; chinois : manhua ; coréen : webtoon) ; il reste
+  modifiable.
+- Une bande est repérée par tranches de 3200 px qui se recouvrent de 480 px.
+  Une tache coupée par le bord d’une tranche est prise dans la voisine, une
+  tache vue deux fois n’est gardée qu’une fois, et les zones ne sont formées
+  qu’après ce recollage : une bulle à cheval sur un bord est trouvée une
+  fois, entière. Le repérage rend la main entre deux tranches et annonce son
+  avancement.
+- Le module refuse à l’import une image de plus de 20 000 px de côté : c’est
+  la plus haute bande analysée. L’image n’est jamais posée entière sur un
+  canevas. L’affichage d’une telle bande par portions dans l’atelier reste à
+  faire.
 
 ### 6.5 Traduction
 
@@ -302,6 +380,27 @@ Par zone, au choix :
 - **Aucun** : le texte traduit se pose sans rien cacher (légende ajoutée).
 
 Le masque est un calque : la page d’origine n’est jamais modifiée.
+**Fond reconstruit, tel que réalisé.** Le masque a trois modes : aplat, fond
+reconstruit, aucun. Le fond reconstruit est un calcul sur les pixels de la
+page, dans le navigateur, sans modèle et sans rien envoyer
+(`lib/inpaint.ts`) :
+
+- **diffusion** : les couleurs du pourtour se rejoignent en douceur à travers
+  la zone, résolues du plus grossier au plus fin ; un aplat ou un dégradé sont
+  prolongés sans tache ;
+- **grain** : la texture fine du pourtour (trame, papier) est reportée à
+  l’intérieur par symétrie autour du bord, pour que la zone ne paraisse pas
+  lissée au milieu d’une trame.
+
+Ses limites sont dites dans l’inspecteur : un trait ou un motif du dessin qui
+traversait la zone n’est pas prolongé, il s’arrête à son bord et s’y fond. Le
+calcul est borné (400 000 pixels masqués, une fenêtre de 1,6 mégapixel, quatre
+secondes), il attend la fin du geste en cours, s’annule dès que le masque
+change, et rend un refus motivé quand il renonce : la zone garde alors son
+aplat, dans sa couleur de repli. Le résultat ne dépend que des pixels : la
+scène et l’export posent la même image. Un moteur d’image, pour les cas où
+cela ne suffit pas, relèverait du niveau 3 et de ses règles (§ 7.6) : il
+n’est pas branché.
 
 ### 6.7 Composition du texte
 
@@ -316,6 +415,16 @@ Le masque est un calque : la page d’origine n’est jamais modifiée.
   (texte blanc cerné de noir sur un décor), interligne, alignement, rotation.
 - La langue cible s’écrit à l’horizontale même quand l’original était
   vertical ; la zone d’accueil reste celle de la bulle.
+
+**Onomatopées.** Elles se posent sur le dessin, pas dans une bulle. L’outil
+« Onomatopée » (`S`) trace une zone de type onomatopée sans masque ; son texte
+prend la police d’affichage de la table des styles du dossier (§ 8), avec son
+contour, et se règle comme les autres blocs (rotation à la poignée, boîte
+libre), plus deux réglages propres : l’**espacement des lettres** et
+l’**étirement** horizontal. Le texte est alors posé lettre par lettre, par la
+mesure comme par le dessin : l’aperçu et l’export restent identiques. S’il y a
+un bruit d’origine à effacer, le masque se règle ensuite, en aplat ou en fond
+reconstruit.
 
 ### 6.8 Traduction de la page entière par IA
 
@@ -333,11 +442,34 @@ lui demandant de traduire le texte sans rien changer d’autre.
   les visages et les trames peuvent bouger, la résolution de sortie du moteur
   peut être inférieure à celle de la page.
 
+Réalisé : la page d’origine part chez un moteur d’image de la palette qui sait
+retoucher une image, et ce qu’il rend est gardé dans les données du module
+comme une version de la page (`ScanPage.aiVersions`), quatre au plus, jamais
+effacées d’office. Ni les zones, ni l’export, ni la révision de la page ne
+bougent. La comparaison montre côte à côte la page composée par l’atelier et
+la version rendue, et peut colorer ce que le moteur a redessiné hors des zones
+de texte, avec la part de la page concernée. Le moteur est appelé directement,
+sans passer par la file d’AI Image Gen : une page de scan ne doit ni
+apparaître dans le fil du studio, ni partir dans la galerie publique si le
+studio y envoie ses rendus (§ 13).
+
 ### 6.9 Export
 
 - Formats : PNG, JPEG, WebP, à la résolution d’origine.
 - Par page, par chapitre en archive `.zip` ou `.cbz` (pages numérotées), ou
   envoi dans la galerie, dans un album **privé** créé pour le chapitre.
+- **Archive `.cbz`** (réalisé) : les pages exportées du chapitre, dans l’ordre
+  de lecture, nommées `001.png`, `002.png`… Une page « laissée telle quelle »
+  y entre telle qu’elle est, à sa place ; une page ni exportée ni laissée
+  telle quelle n’y est pas, et l’interface le dit. Pour un dossier, une
+  archive par chapitre. L’archive se construit dans le navigateur, page après
+  page, sans compression (ce sont déjà des images compressées) : une seule
+  page est en mémoire à la fois, et l’archive est fondue dans un `Blob` au fur
+  et à mesure.
+- **Envoi dans la galerie** (réalisé) : même ordre et mêmes règles que
+  l’archive. Les fichiers entrent dans la galerie en privé et sont réunis dans
+  un album privé, un par chapitre, au nom de la série et du chapitre ; un
+  second envoi ne recopie rien et complète le même album.
 - Le rendu se fait dans le navigateur, sur un canevas à la taille réelle de la
   page, avec les mêmes polices que l’aperçu : ce qu’on voit est ce qu’on
   exporte. C’est le choix déjà fait pour Clip Studio.
@@ -355,6 +487,10 @@ disponible, et un moteur indisponible affiché avec sa raison.
 | Tracé à la main | 0 | Toujours disponible |
 | Détecteur de texte de BD, au format ONNX | 1 | À valider au banc d’essai ; poids à télécharger au premier usage, comme les voix de Clip Studio |
 
+Après mesure (S0, S2, S4) : le **repérage par les pixels** est retenu
+pour les bulles et les cartouches, dans toutes les langues lues. Le détecteur
+ONNX n’a pas été mesuré.
+
 ### 7.2 Lecture
 
 | Langue source | Moteur pressenti | Remarques |
@@ -364,6 +500,17 @@ disponible, et un moteur indisponible affiché avec sa raison.
 | Chinois (simplifié, traditionnel), coréen | PaddleOCR, au format ONNX | Réputé solide sur les caractères CJK |
 | Toute langue | Lecture par un modèle de langage avec vision | Niveau 3, à la demande, sur une zone |
 
+Après mesure (S4, [banc d’essai](06-scan-studio-banc-essai.md), § 8) :
+**Tesseract lit aussi le japonais, le chinois et le coréen**, dans le
+navigateur, avec un modèle des lignes et un modèle des colonnes par langue
+(`jpn` et `jpn_vert`, `chi_sim` et `chi_sim_vert`, `chi_tra` et
+`chi_tra_vert`, `kor` et `kor_vert` ; 0,6 à 2 Mo chacun, servis par
+l’application). Sur des pages synthétiques, le japonais se lit bien dans les
+deux sens, le chinois et le coréen en lignes ; en colonnes, le chinois perd
+sa ponctuation et le coréen ses espaces. Le modèle spécialisé manga et
+PaddleOCR n’ont pas été mesurés : ils restent la piste pour le lettrage
+dessiné à la main.
+
 ### 7.3 Traduction
 
 | Moteur | Niveau | Remarques |
@@ -372,6 +519,7 @@ disponible, et un moteur indisponible affiché avec sa raison.
 | DeepL | 2 | Clé d’API ; moteur principal par défaut (§ 7.5) |
 | Google Traduction | 2 | Clé d’API |
 | LibreTranslate | 2 | Auto-hébergé, rien ne sort ; moteur de secours par défaut (§ 7.5) ; qualité inférieure sur le japonais, et mémoire à prévoir (§ 12) |
+| MyMemory | 2 | Service public de Translated, sans clé : il traduit tant qu’aucun autre moteur n’est réglé, en dernier sinon. Une phrase par requête, 5 000 caractères par jour (50 000 avec une adresse de contact) ; le texte des bulles lui est envoyé |
 | Modèle de langage | 3 | Traduction avec le contexte de la page, du chapitre et du glossaire |
 
 ### 7.4 Palette d’IA : ce qui existe déjà
@@ -460,6 +608,48 @@ pour qui veut que rien ne sorte de la machine tant que c’est possible.
 Les mêmes garde-fous (file, budget, disjoncteur, estimation) s’appliquent aux
 appels du niveau 3, où chaque requête coûte plus cher.
 
+### 7.6 IA en dernier recours : ce qui est réalisé
+
+Trois actions, chacune lancée d’un clic sur une chose précise, jamais par lot
+et jamais d’elle-même :
+
+| Action | Ce qui part | Ce qui revient |
+| --- | --- | --- |
+| Relire une zone | L’image de la zone, découpée sur le serveur | Une lecture proposée, à accepter ou écarter |
+| Traduire avec le contexte (une zone, ou les zones d’une page) | Le texte des zones, les lignes voisines, le type de chaque texte, les termes du glossaire que la page cite | Des traductions proposées, zone par zone |
+| Traduire la page entière | La page d’origine | Une version à part, comparable (§ 6.8) |
+
+- **Borné par le niveau du chapitre, sur le serveur** : sous le niveau 3, les
+  trois fonctions refusent, quoi que fasse l’interface, qui ne les montre pas.
+  Le niveau par défaut reste 2 : rien n’ouvre l’IA sans un réglage.
+- **Le modèle se choisit dans la palette**, par action, et peut être retenu
+  pour le chapitre (`ChapterSettings.aiModels`). Aucun n’est choisi d’office :
+  sans modèle, le serveur refuse.
+- **La palette est celle d’AI Image Gen** (§ 7.4) : ses clés OpenAI et Google
+  pour les modèles de langage, son Codex CLI pour traduire sans clé (il ne
+  lit pas d’image), ses moteurs d’image pour la page entière. Scan Studio n’a
+  aucune clé à lui. AI Image Gen coupé, chaque modèle porte la raison.
+- **Avant un envoi**, une phrase dit ce qui quitte la machine et chez qui,
+  avec le logo du fournisseur ; au premier envoi de ce genre vers ce
+  fournisseur, il faut la confirmer.
+- **Jamais de rafale** : un appel par clic, aucune nouvelle tentative (un
+  échec est rendu avec sa raison et s’arrête là), un seul appel à la fois
+  (bouton inactif, et refus du serveur), un délai minimal entre deux, une
+  demande identique servie du cache gardé sur le disque sans rien renvoyer ni
+  compter, un plafond mensuel en nombre d’appels tenu par le serveur (60 par
+  défaut, réglable par un administrateur), et trois échecs de suite mettent le
+  fournisseur de côté cinq minutes.
+- **Tout est tracé** : chaque zone garde les appels faits pour elle
+  (fournisseur, modèle, date, ce qui est parti, réponse du cache ou non),
+  qu’on ait accepté la proposition ou non ; chaque version de page porte sa
+  trace ; et le serveur tient un journal des derniers appels
+  (`data/ai/journal.json`). Un texte accepté garde le nom du modèle comme
+  moteur.
+- **Ce qu’un modèle rend est une donnée** : borné, sans caractère de
+  contrôle, contrôlé avant d’entrer au cache, jamais écrit dans une zone sans
+  un clic. Le texte d’une page part en JSON entre des balises qu’il ne peut
+  pas refermer.
+
 ## 8. Polices
 
 **Ce que font les équipes de scantrad.** Les deux polices de dialogue les plus
@@ -488,6 +678,40 @@ fiable, et rarement utile : une police japonaise n’a pas de glyphes latins.
 Le module reconnaît donc le **type** de texte (§ 6.1) et lui applique le
 style correspondant, réglable par dossier. C’est la pratique du métier : une
 police par registre, tenue sur toute la série.
+
+**Tel que réalisé.** La page « Polices » réunit la table des styles d’un
+dossier, les polices ajoutées et les polices fournies, chacune avec une phrase
+d’essai modifiable.
+
+- **Contrôle d’un fichier**, sur le serveur : 5 Mo au plus ; le type réel lu
+  sur les premiers octets (TrueType, OpenType, WOFF2), jamais l’extension ni
+  le type annoncé ; un répertoire de tables cohérent, avec les tables sans
+  lesquelles rien ne se dessine ; une table des noms lisible (pour un WOFF2,
+  après décompression bornée). Collections `.ttc` et WOFF de première version
+  sont refusés, avec ce qu’il faut déposer à la place. Le navigateur a le
+  dernier mot : une police qu’il ne sait pas charger n’est pas gardée.
+- **Rangement** : `data/fonts/`, sous un nom que la demande ne choisit pas.
+  Une police n’a pas d’adresse : son contenu ne sort que par une fonction du
+  module, donc avec une session, puis il est déclaré au navigateur par
+  `FontFace`. Ajouter, renommer et retirer sont réservés aux administrateurs.
+- **Nom** : les styles portent une famille stable (`sxf-<identifiant>`) ; le
+  nom affiché se change sans réécrire une seule page.
+- **Retrait** : une police encore utilisée ne disparaît pas en silence. Le
+  retrait dit ce qui la porte (pages, chapitres, dossiers) et demande la
+  police de remplacement ; tout y passe avant que le fichier soit effacé, et
+  les pages réécrites changent de révision, si bien qu’un atelier resté
+  ouvert est invité à recharger. Une police introuvable (données restaurées à
+  la main) est dessinée avec une police de repli, à l’écran comme à l’export,
+  et l’inspecteur le signale.
+- **Dans l’atelier** : les polices ajoutées figurent dans le choix de police.
+  Celles que la page dessine sont chargées avant que la scène s’en serve et
+  avant un export ; si l’une d’elles ne se charge pas, l’export s’arrête au
+  lieu de rendre une page différente de l’aperçu.
+- **Table des styles** : quatre registres (dialogue, cri ou emphase, pensée et
+  récitatif, onomatopée), une police chacun, par dossier. Elle est rangée
+  dans les styles par type de zone du dossier (`defaults.styles`), où le type
+  « cri » s’ajoute aux autres, et se reporte d’un clic sur les chapitres déjà
+  créés. Un bloc de texte prend à sa création le style du type de sa zone.
 
 ## 9. Modèle de données
 
@@ -603,6 +827,35 @@ Stockage : `modules/scan-studio/data/`, un répertoire par dossier, un par
 chapitre, un fichier JSON par page à côté de son image. Une page se
 sauvegarde sans réécrire le chapitre entier.
 
+La lecture publique (§ 11.2) ajoute quelques champs, tous absents par défaut :
+
+```ts
+type ChapterVisibility = "private" | "link" | "catalog";
+
+interface ScanFolder {
+  /** Visibilité donnée à chaque nouveau chapitre du dossier ; absente : privé. */
+  defaultVisibility?: ChapterVisibility;
+  /** Identifiant d'adresse publique de la série ; créé à la première publication. */
+  publicSlug?: string;
+}
+
+interface ScanChapter {
+  /** Absente : privé. */
+  visibility?: ChapterVisibility;
+  /** N'existe que tant que le chapitre est public ; effacé au retour en privé. */
+  publicSlug?: string;
+  /** Noté à l'import par lien : site, adresse du chapitre, équipe créditée. */
+  origin?: { source: string; url?: string; credit?: string };
+}
+```
+
+Une adresse publique (`publicSlug`) est l’identifiant de la fiche suivi de
+seize caractères tirés au hasard : l’identifiant retrouve la fiche sans rien
+parcourir, le hasard rend l’adresse imprévisible, et elle n’ouvre rien si la
+fiche ne porte pas exactement cette adresse. `data/gallery.json` retient les
+copies des pages « laissées telles quelles » déjà envoyées dans la galerie, et
+l’album de chaque chapitre.
+
 ## 10. Fonctions serveur
 
 | Fonction | Rôle |
@@ -615,10 +868,16 @@ sauvegarde sans réécrire le chapitre entier.
 | `getJobs`, `cancelJob` | Suivi de la file |
 | `translateRegions` | Traduction par le routeur (§ 7.5) : glossaire, mémoire, cache, moteur principal puis secours |
 | `estimateTranslation`, `getTranslationUsage` | Estimation d’un lot avant envoi ; caractères consommés et état de chaque moteur |
-| `askAiReading`, `askAiTranslation`, `enqueueAiPage` | Niveau 3 |
+| `getAiCatalogue`, `getAiUsage` | Niveau 3 : modèles de la palette proposés pour un chapitre, appels du mois et plafond ; n’appellent aucun fournisseur |
+| `askAiReading`, `askAiTranslation`, `askAiPage` | Niveau 3 : un appel par clic, refusé sous le niveau 3 du chapitre (§ 7.6) |
+| `listAiPageVersions`, `deleteAiPageVersion` | Versions d’une page traduites par IA (§ 6.8) |
+| `saveAiSettings` | Plafond mensuel d’appels à l’IA, réservé aux administrateurs |
 | `listEngines`, `saveEngineSettings`, `testEngine` | Page « Moteurs » |
-| `listFonts`, `addFont`, `removeFont` | Polices ajoutées |
+| `listFonts`, `getFontFile`, `getFontUsage` | Polices ajoutées : la liste, le contenu d’une police pour le navigateur d’un compte connecté, et ce qui la porte |
+| `addFont`, `renameFont`, `removeFont` | Polices ajoutées, réservées aux administrateurs (§ 8) |
 | `exportChapter`, `sendToGallery` | Export |
+| `setChapterVisibility` | Visibilité d’un chapitre : privé, public par son lien, listé au catalogue (§ 11.2) ; `updateFolder` porte la visibilité des nouveaux chapitres |
+| `listPublicSeries`, `getPublicSeries`, `getPublicChapter`, `openPublicMedia` | Lecture publique : audience `public`, appelées par le catalogue sans session, jamais par le navigateur (§ 11.2) |
 | `listGalleryItems`, `importGalleryItems` | Source pour la galerie (`gallerySources`) |
 | `listSources`, `previewLink` | Sites gérés et leur état ; ce qu’un lien désigne, sans rien télécharger (§ 19) |
 | `importFromLink`, `getLinkImport`, `cancelLinkImport` | Import des pages d’un lien dans un chapitre, son suivi, son annulation (§ 19) |
@@ -627,6 +886,13 @@ sauvegarde sans réécrire le chapitre entier.
 Toutes déclarées dans `functions` avec le rôle `user`, sauf la gestion des
 moteurs et des clés, réservée aux administrateurs. Les images passent par
 l’envoi direct de médias du module (`uploads`), pas par `call-function`.
+
+Les quatre fonctions de la lecture publique font exception : elles portent
+l’audience `public`. Le catalogue les appelle côté serveur, sans session ;
+`call-function` les refuse à tout le monde, parce que `openPublicMedia` rend
+un chemin de fichier au serveur. Elles ne font que lire, et ne rendent que des
+champs publics. L’export `.cbz` et le lot sur un dossier n’ont pas de fonction
+à eux : ils enchaînent, dans le navigateur, les fonctions d’un chapitre.
 
 La file reprend le modèle de `jobs.ts` d’AI Image Gen : en mémoire, recopiée
 sur le disque à chaque transition, un travail lourd à la fois.
@@ -680,6 +946,52 @@ depuis le catalogue public, **seulement si le module est activé**.
   immédiatement. Les pages publiques ne sont pas proposées à l’indexation par
   défaut (`noindex`), et n’entrent pas dans le plan du site.
 
+**Tel que réalisé (S7).**
+
+| Adresse | Sert | À qui |
+| --- | --- | --- |
+| `/catalog/scans` | Les séries qui ont au moins un chapitre listé, avec une couverture | Tout le monde ; 404 si rien n’est listé ou si le module est coupé |
+| `/catalog/scans/<série>` | Les chapitres **listés** de la série | Tout le monde ; 404 sans chapitre listé |
+| `/catalog/scans/<série>/<chapitre>` | Le lecteur d’un chapitre public | Qui a l’adresse ; `noindex` si le chapitre n’est que « public par son lien » |
+| `/api/public/sections/scans/media/<chapitre>/<jeton>` | Le rendu d’une page ; `…/thumb` pour sa vignette | Qui a l’adresse, tant que le chapitre est public |
+| `…/opengraph-image` sous la série et sous le chapitre | L’image d’aperçu du lien partagé | Comme la page |
+
+- **Le champ est générique.** `catalogSections` vit dans le socle
+  (`modules/README.md`) : le catalogue lit les sections des modules activés,
+  appelle leurs fonctions `public` et affiche le résultat dans ses propres
+  pages (`src/app/(catalog)/catalog/[section]/…`) et son propre lecteur. Il
+  n’importe rien de Scan Studio.
+- **Ce qui est servi** : le rendu des pages exportées, et lui seul. Une page
+  « laissée telle quelle » ou pas encore exportée n’apparaît pas ; un chapitre
+  sans page exportée ne se publie pas, et l’interface le dit. La couverture
+  d’une série est la vignette de sa première page lisible, pas la couverture
+  donnée par le site d’origine.
+- **Adresses** : celle d’une image est faite de l’adresse du chapitre et d’un
+  jeton tiré du rendu. Aucun nom de fichier n’y paraît, et un nouvel export
+  change l’adresse. Le jeton ne peut désigner qu’un rendu de ce chapitre.
+- **Immédiateté** : chaque demande relit la fiche du chapitre. Repasser en
+  privé efface son adresse : la demande suivante ne trouve plus rien, images
+  comprises, et une nouvelle publication donne une autre adresse.
+- **Cache** : les images sont servies en `Cache-Control: private, no-cache`.
+  `private` interdit à un cache partagé d’en garder une copie (la zone
+  Cloudflare du domaine sert d’autres projets et ne se purge pas) ; `no-cache`
+  fait revalider le navigateur à chaque affichage, par la route qui vérifie la
+  visibilité. Une image inchangée ne coûte qu’un `304`. Les pages sont rendues
+  à la demande, sans cache.
+- **Charge** : les fiches sont gardées en mémoire sous une forme réduite, et
+  revalidées par un `stat` (le disque reste la seule vérité, rien n’expire
+  plus tard). Les images et les aperçus sont bornés par adresse IP.
+- **Chapitres voisins** : depuis un chapitre listé, seuls les chapitres listés
+  de la série ; depuis un chapitre partagé par son lien, tous ses chapitres
+  publics. Une adresse non listée n’apparaît ainsi jamais sur une page du
+  catalogue.
+- **Indexation** : contrairement à la première intention, un chapitre listé
+  au catalogue est indexable, comme un album listé ; seul le partage par lien
+  est en `noindex`. Rien n’entre dans le plan du site.
+- **Mentions** : la source et le crédit notés à l’import par lien sont
+  affichés sous la lecture, avec un lien « Signaler un problème » vers le
+  contact officiel (`src/config/links.ts`).
+
 ## 12. Performances
 
 Le serveur de production a 4 cœurs et 7,8 Gio de mémoire, partagés avec
@@ -732,9 +1044,9 @@ Y charger des modèles de lecture en permanence n’est pas raisonnable.
 | S1 – Atelier manuel | Bibliothèque (dossiers, chapitres, pages), import d’images et d’archives, atelier : zones tracées à la main, masque en aplat avec couleur prélevée, bloc de texte libre, polices, historique, export PNG et archive | Un chapitre de 10 pages lettré entièrement à la main et exporté, sans aucun moteur |
 | S2 – Analyse de l’anglais | Repérage et lecture automatiques, nettoyage du texte, regroupement, ordre de lecture, file de travaux | Sur les pages du banc d’essai, les bulles de dialogue sont trouvées et lues sans retouche dans la grande majorité des cas (seuil fixé en S0) |
 | S3 – Traduction | Moteurs de traduction, glossaire, mémoire, statuts, ajustement automatique du texte | Un chapitre anglais traduit en français, relu et exporté sans quitter le module |
-| S4 – Japonais, chinois, coréen | Moteurs de lecture CJK, texte vertical, formats manga, manhua et webtoon, bandes hautes | Un chapitre de chaque langue traité de bout en bout |
-| S5 – IA en dernier recours | Relecture d’une zone, traduction avec contexte, traduction de la page entière en version comparable | Chaque appel est déclenché à la main, tracé sur la zone, et borné par le niveau du chapitre |
-| S6 – Finitions | Reconstruction du fond, onomatopées, lot sur un dossier, export `.cbz`, intégration à la galerie | À définir après S5 |
+| S4 – Japonais, chinois, coréen | Moteurs de lecture CJK, texte vertical, formats manga, manhua et webtoon, bandes hautes | Un chapitre de chaque langue traité de bout en bout. Réalisé : sur les pages synthétiques du banc, neuf bulles sur dix sont lues sans retouche en lignes dans les trois langues, et en colonnes pour le japonais ; aucun chapitre réel de ces langues n’a encore été traité de bout en bout |
+| S5 – IA en dernier recours | Relecture d’une zone, traduction avec contexte, traduction de la page entière en version comparable | Chaque appel est déclenché à la main, tracé sur la zone, et borné par le niveau du chapitre Réalisé (§ 7.6) : les trois actions, bornées par le niveau du chapitre sur le serveur, tracées sur la zone ou la version, sans nouvelle tentative, avec cache et plafond mensuel d’appels. Testé avec un faux fournisseur : aucun appel réel n’a été fait. |
+| S6 – Finitions | Reconstruction du fond, onomatopées, lot sur un dossier, export `.cbz`, intégration à la galerie | Lot sur un dossier : analyse ou traduction de tous les chapitres, un à la fois, arrêtable, avec l’estimation du dossier avant une traduction ; la traduction passe par le routeur et s’arrête dès qu’aucun moteur ne répond. Export `.cbz` d’un chapitre ou d’un dossier, relisible par l’import. Envoi dans la galerie : ordre de lecture, pages laissées telles quelles comprises, album privé. Le rendu en lot des pages (l’export de l’atelier, chapitre par chapitre) reste à faire Fond reconstruit : un mode de masque, calculé dans le navigateur sans IA, borné et annulable, avec repli sur l’aplat (§ 6.6). Onomatopées : outil dédié, espacement et étirement des lettres, police de la table des styles (§ 6.7). |
 | S7 – Lecture publique | Champ `catalogSections` des modules, section « Scans » du catalogue, visibilités, lecteur public | Un chapitre publié par lien se lit sans compte ; module coupé ou chapitre dépublié, son adresse ne répond plus |
 
 L’étape S1 livre déjà un outil utile, sans aucune IA : c’est elle qui valide
@@ -821,6 +1133,9 @@ Points absents de la dictée, que le dossier a tranchés (à contester) :
   que l’instance reste personnelle.
 - **Reconstruction du fond** : modèle local ou moteur d’image ? À décider
   après avoir vu combien de zones en ont réellement besoin.
+  Tranché pour S6 : un calcul local sans modèle (§ 6.6), qui prolonge aplats,
+  dégradés et trames. Reste ouvert : un moteur d’image pour les zones où le
+  dessin lui-même est à redessiner.
 
 ## 19. Sources : importer un chapitre par son lien
 

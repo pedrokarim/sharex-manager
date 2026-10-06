@@ -16,20 +16,25 @@ import { dataRoot, readJson, writeJson } from "../../store";
 import type { EngineSettingsPatch, TranslationEngineId } from "../../types";
 import { ENGINE_IDS, isEngineId } from "./engines";
 import { normalizeLibreUrl } from "./libretranslate";
+import { normalizeContactEmail } from "./mymemory";
 
 export const translationDir = () => path.join(dataRoot(), "translation");
 const settingsFile = () => path.join(translationDir(), "settings.json");
 const secretsFile = () => path.join(translationDir(), "secrets.json");
 
-/** DeepL d'abord, plus juste vers le français ; LibreTranslate en secours (§ 7.5). */
-export const DEFAULT_ORDER: TranslationEngineId[] = ["deepl", "libretranslate"];
+/**
+ * DeepL d'abord, plus juste vers le français ; LibreTranslate en secours (§ 7.5) ;
+ * MyMemory en dernier, parce qu'il marche sans rien régler mais avec un petit
+ * quota par jour.
+ */
+export const DEFAULT_ORDER: TranslationEngineId[] = ["deepl", "libretranslate", "mymemory"];
 
 /**
  * Plafonds mensuels par défaut, en caractères ; 0 : aucun. Celui de DeepL est
  * le quota de l'offre gratuite : avec une autre offre, il se règle dans la
  * page « Moteurs ».
  */
-export const DEFAULT_MONTHLY_LIMITS: Record<TranslationEngineId, number> = { deepl: 500_000, libretranslate: 0 };
+export const DEFAULT_MONTHLY_LIMITS: Record<TranslationEngineId, number> = { deepl: 500_000, libretranslate: 0, mymemory: 0 };
 
 const MAX_MONTHLY_LIMIT = 1_000_000_000;
 const MAX_KEY_LENGTH = 300;
@@ -43,12 +48,15 @@ export interface EngineCredentials {
   deeplKey?: string;
   libreTranslateUrl?: string;
   libreTranslateKey?: string;
+  /** Adresse de contact donnée à MyMemory : facultative, elle élève son quota du jour. */
+  myMemoryEmail?: string;
 }
 
 interface StoredSettings {
   order?: unknown;
   monthlyLimits?: unknown;
   libreTranslateUrl?: unknown;
+  myMemoryEmail?: unknown;
 }
 
 interface StoredSecrets {
@@ -76,6 +84,7 @@ export function readSettings(): EngineSettings {
     monthlyLimits: {
       deepl: cleanLimit(limits.deepl, DEFAULT_MONTHLY_LIMITS.deepl),
       libretranslate: cleanLimit(limits.libretranslate, DEFAULT_MONTHLY_LIMITS.libretranslate),
+      mymemory: cleanLimit(limits.mymemory, DEFAULT_MONTHLY_LIMITS.mymemory),
     },
   };
 }
@@ -100,6 +109,10 @@ export function readCredentials(): EngineCredentials {
     // Une adresse mal formée, même venue de l'environnement, vaut « non configuré ».
     libreTranslateUrl: url ? (normalizeLibreUrl(url) ?? undefined) : undefined,
     libreTranslateKey: fromEnv("libreTranslateKey") ?? text(secrets.libreTranslateKey),
+    myMemoryEmail: (() => {
+      const email = text(settings.myMemoryEmail);
+      return email ? (normalizeContactEmail(email) ?? undefined) : undefined;
+    })(),
   };
 }
 
@@ -114,7 +127,12 @@ export function keyHint(key: string | undefined): string | undefined {
  * change pas, le moteur n'est plus appelé.
  */
 export function credentialFingerprint(id: TranslationEngineId, credentials: EngineCredentials): string {
-  const parts = id === "deepl" ? [credentials.deeplKey ?? ""] : [credentials.libreTranslateUrl ?? "", credentials.libreTranslateKey ?? ""];
+  const parts =
+    id === "deepl"
+      ? [credentials.deeplKey ?? ""]
+      : id === "mymemory"
+        ? [credentials.myMemoryEmail ?? ""]
+        : [credentials.libreTranslateUrl ?? "", credentials.libreTranslateKey ?? ""];
   return createHash("sha256").update(`${id}\n${parts.join("\n")}`).digest("hex").slice(0, 32);
 }
 
@@ -177,6 +195,17 @@ export function applySettingsPatch(patch: unknown) {
     }
   }
 
+  let email: string | undefined;
+  if (input.myMemoryEmail !== undefined) {
+    if (typeof input.myMemoryEmail !== "string") throw new Error("Adresse de contact invalide.");
+    email = input.myMemoryEmail.trim();
+    if (email) {
+      const normalized = normalizeContactEmail(email);
+      if (!normalized) throw new Error("Adresse de contact invalide : une adresse e-mail simple, ou rien.");
+      email = normalized;
+    }
+  }
+
   let deeplKey: string | undefined;
   if (input.deeplKey !== undefined) {
     assertNotFromEnv("deeplKey", "La clé DeepL");
@@ -188,7 +217,7 @@ export function applySettingsPatch(patch: unknown) {
     libreKey = cleanKey(input.libreTranslateKey, "Clé LibreTranslate");
   }
 
-  if (order || limits || url !== undefined) {
+  if (order || limits || url !== undefined || email !== undefined) {
     const stored = readJson<StoredSettings>(settingsFile()) ?? {};
     const current = readSettings();
     const next: Record<string, unknown> = {
@@ -197,6 +226,8 @@ export function applySettingsPatch(patch: unknown) {
     };
     const keptUrl = url !== undefined ? url : text(stored.libreTranslateUrl);
     if (keptUrl) next.libreTranslateUrl = keptUrl;
+    const keptEmail = email !== undefined ? email : text(stored.myMemoryEmail);
+    if (keptEmail) next.myMemoryEmail = keptEmail;
     writeJson(settingsFile(), next);
   }
 

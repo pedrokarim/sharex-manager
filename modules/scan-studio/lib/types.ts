@@ -19,9 +19,9 @@ export type ReadingFormat = "manga" | "manhua" | "webtoon";
 /** 0 à la main, 1 moteurs locaux, 2 traduction automatique, 3 IA générative. */
 export type AutomationLevel = 0 | 1 | 2 | 3;
 
-export type RegionKind = "dialogue" | "thought" | "narration" | "sfx" | "background";
+export type RegionKind = "dialogue" | "shout" | "thought" | "narration" | "sfx" | "background";
 
-export const REGION_KINDS: RegionKind[] = ["dialogue", "thought", "narration", "sfx", "background"];
+export const REGION_KINDS: RegionKind[] = ["dialogue", "shout", "thought", "narration", "sfx", "background"];
 
 export interface TextStyle {
   /** Famille de police, telle que déclarée dans `lib/fonts.ts`. */
@@ -37,6 +37,10 @@ export interface TextStyle {
   /** Interligne, en multiple de la taille. */
   lineHeight: number;
   align: "left" | "center" | "right";
+  /** Espace ajouté entre les lettres, en fraction de la taille (0,05 : 5 % de la taille). Absent : aucun. */
+  letterSpacing?: number;
+  /** Étirement horizontal des lettres : 1 les laisse telles quelles, 1,5 les élargit de moitié. Absent : 1. */
+  stretch?: number;
 }
 
 export interface ChapterSettings {
@@ -47,6 +51,11 @@ export interface ChapterSettings {
   maxLevel: AutomationLevel;
   /** Style par type de zone ; une zone peut le surcharger. */
   styles: Record<RegionKind, TextStyle>;
+  /**
+   * Modèle d'IA proposé pour chaque action du niveau 3, sous la forme
+   * « fournisseur/modèle ». Ne déclenche rien : chaque action reste un clic.
+   */
+  aiModels?: Partial<Record<AiAction, string>>;
 }
 
 export interface GlossaryEntry {
@@ -73,8 +82,27 @@ export interface ScanFolder {
   glossary: GlossaryEntry[];
   /** Identifiants des chapitres, dans l'ordre d'affichage. */
   chapterIds: string[];
+  /** Visibilité donnée à chaque nouveau chapitre du dossier ; absente : privé. */
+  defaultVisibility?: ChapterVisibility;
+  /** Identifiant d'adresse publique de la série, imprévisible ; créé à la première publication. */
+  publicSlug?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+/** Visibilité d'un chapitre, avec les mots des albums : privé, public par son lien, listé au catalogue. */
+export type ChapterVisibility = "private" | "link" | "catalog";
+
+export const CHAPTER_VISIBILITIES: ChapterVisibility[] = ["private", "link", "catalog"];
+
+/** D'où vient un chapitre importé par lien : noté à l'import, montré avec sa lecture publique. */
+export interface ChapterOrigin {
+  /** Nom du site : « MangaDex ». */
+  source: string;
+  /** Adresse du chapitre chez le site. */
+  url?: string;
+  /** Équipe ou éditeur que le site crédite pour la traduction d'origine. */
+  credit?: string;
 }
 
 export interface ScanChapter {
@@ -86,6 +114,11 @@ export interface ScanChapter {
   settings: ChapterSettings;
   /** Identifiants des pages, dans l'ordre de lecture. */
   pageIds: string[];
+  /** Absente : privé. Seules les pages exportées d'un chapitre public sont servies sans compte. */
+  visibility?: ChapterVisibility;
+  /** Identifiant d'adresse publique, imprévisible ; n'existe que tant que le chapitre est public. */
+  publicSlug?: string;
+  origin?: ChapterOrigin;
   createdAt: number;
   updatedAt: number;
 }
@@ -108,6 +141,8 @@ export interface ScanPage {
   skipped?: boolean;
   /** Dernier export de la page, dans `data/assets/`. */
   exported?: { file: string; at: number };
+  /** Versions de la page traduites d'un bloc par une IA (§ 6.8) : gardées à côté du travail de l'atelier, jamais à sa place. */
+  aiVersions?: AiPageVersion[];
   status: PageStatus;
   /** Incrémenté à chaque enregistrement : détecte deux éditions concurrentes. */
   revision: number;
@@ -133,7 +168,8 @@ export type MaskShape = "rect" | "rounded" | "ellipse" | "outline";
 
 export interface RegionMask {
   /** `fill` : aplat ; `none` : rien n'est caché. */
-  kind: "fill" | "none";
+  // `inpaint` : le fond est reconstruit dans le navigateur d'après les pixels voisins (`lib/inpaint.ts`), sans IA.
+  kind: "fill" | "none" | "inpaint";
   shape: MaskShape;
   color: string;
   /** Marge ajoutée autour du contour, en pixels. Peut être négative. */
@@ -189,7 +225,15 @@ export interface ScanRegion {
     style: Partial<TextStyle> | null;
     /** La taille du texte s'ajuste à la boîte. */
     autoFit: boolean;
+    /**
+     * Taille que l'ajustement automatique ne dépasse pas : celle du lettrage
+     * d'origine, relevée à l'analyse. Sans elle, le texte grossirait jusqu'à
+     * remplir sa bulle, et chaque bulle aurait sa taille. Absente : pas de plafond.
+     */
+    maxSize?: number;
   };
+  /** Appels à une IA faits pour cette zone (niveau 3), du plus ancien au plus récent : on voit où l'IA est passée. */
+  ai?: AiTrace[];
 }
 
 // ─── Vues renvoyées par le serveur ───────────────────────────────
@@ -213,6 +257,12 @@ export interface ChapterSummary {
   /** Nombre de pages par état, pour l'avancement. */
   progress: Record<PageStatus, number>;
   cover?: string;
+  /** Absente : privé. */
+  visibility?: ChapterVisibility;
+  /** Pages qui peuvent être lues en public : exportées, et pas « laissées telles quelles ». */
+  publishablePages?: number;
+  /** Adresse de lecture publique, quand le chapitre est public. */
+  publicPath?: string;
   updatedAt: number;
 }
 
@@ -242,6 +292,17 @@ export interface ChapterView {
   chapter: ScanChapter;
   folder: { id: string; name: string };
   pages: PageSummary[];
+  /** Pages qui peuvent être lues en public : exportées, et pas « laissées telles quelles ». */
+  publishablePages?: number;
+  /** Adresse de lecture publique, quand le chapitre est public. */
+  publicPath?: string;
+}
+
+/** Ce que rend un changement de visibilité : l'état retenu et, s'il est public, l'adresse à partager. */
+export interface ChapterSharing {
+  visibility: ChapterVisibility;
+  publicPath?: string;
+  publishablePages: number;
 }
 
 export interface PageView {
@@ -342,7 +403,7 @@ export interface LinkImportJob {
 
 // ─── Traduction ──────────────────────────────────────────────────
 
-export type TranslationEngineId = "deepl" | "libretranslate";
+export type TranslationEngineId = "deepl" | "libretranslate" | "mymemory";
 
 /** D'où vient une traduction rendue par le routeur (§ 7.5 du dossier). */
 export type TranslationSource = "glossary" | "memory" | "cache" | "engine";
@@ -401,6 +462,10 @@ export interface EngineStatus {
   keyHint?: string;
   /** Adresse du service, pour un moteur auto-hébergé. */
   url?: string;
+  /** Quota du jour annoncé par le service, en caractères ; absent : pas de quota journalier. */
+  dailyLimit?: number;
+  /** Adresse de contact donnée au service (MyMemory) ; chaîne vide : aucune. */
+  contactEmail?: string;
 }
 
 export interface EngineCatalogue {
@@ -415,7 +480,143 @@ export interface EngineSettingsPatch {
   deeplKey?: string;
   libreTranslateUrl?: string;
   libreTranslateKey?: string;
+  /** Adresse de contact donnée à MyMemory ; chaîne vide : on la retire. */
+  myMemoryEmail?: string;
   monthlyLimits?: Partial<Record<TranslationEngineId, number>>;
+}
+
+// ─── Détecteur de bulles et de texte ─────────────────────────────
+
+export type DetectorVariantId = "precise" | "fast";
+/** La variante en service, ou « off » : le repérage par les pixels seulement. */
+export type DetectorChoice = DetectorVariantId | "off";
+
+export interface DetectorVariantStatus {
+  id: DetectorVariantId;
+  label: string;
+  description: string;
+  /** Poids du fichier du modèle, en octets. */
+  size: number;
+  installed: boolean;
+  downloading: boolean;
+}
+
+export interface DetectorStatus {
+  active: DetectorChoice;
+  variants: DetectorVariantStatus[];
+  /** Dépôt d'où vient le modèle, et sa licence. */
+  source: string;
+  license: string;
+  /** Adresse du modèle à charger ; absente tant que la variante choisie n'est pas installée. */
+  modelUrl?: string;
+  variant?: DetectorVariantId;
+}
+
+// ─── Polices ajoutées (§ 8 du dossier) ───────────────────────────
+
+/** Préfixe de la famille CSS d'une police ajoutée : `TextStyle.font` vaut « sxf-<identifiant> ». */
+export const CUSTOM_FONT_PREFIX = "sxf-";
+
+export type FontFormat = "ttf" | "otf" | "woff2";
+
+export interface CustomFont {
+  id: string;
+  /** Famille CSS, stable : c'est elle que portent les styles. Elle ne change pas quand on renomme la police. */
+  family: string;
+  /** Nom affiché, modifiable. */
+  name: string;
+  /** Nom de famille lu dans le fichier (table `name`). */
+  originalName: string;
+  format: FontFormat;
+  /** Poids du fichier, en octets. */
+  size: number;
+  addedAt: number;
+}
+
+/** Où une police est utilisée : ce qui changerait si elle disparaissait. */
+export interface FontUsage {
+  /** Pages dont au moins une zone porte cette police. */
+  pages: number;
+  /** Chapitres dont un style par type de texte la porte. */
+  chapters: number;
+  /** Dossiers dont un style par défaut la porte. */
+  folders: number;
+}
+
+// ─── IA en dernier recours (niveau 3, § 3 et § 6.8 du dossier) ───
+
+/** `reading` : relire une zone ; `translation` : traduire avec le contexte ; `page` : traduire la page entière. */
+export type AiAction = "reading" | "translation" | "page";
+
+/** Ce qui est parti chez le fournisseur : l'image d'une zone, du texte, ou la page entière. */
+export type AiSentKind = "crop" | "text" | "page";
+
+/** Trace d'un appel, gardée sur la zone ou sur la version de page qu'il a produite. */
+export interface AiTrace {
+  action: AiAction;
+  /** Identifiant du fournisseur dans la palette d'IA : « openai », « google », « codex »… */
+  provider: string;
+  model: string;
+  at: number;
+  sent: AiSentKind;
+  /** Réponse reprise du cache : rien n'est reparti chez le fournisseur. */
+  cached?: boolean;
+}
+
+export interface AiModelOption {
+  /** « fournisseur/modèle » : la valeur gardée dans `ChapterSettings.aiModels`. */
+  key: string;
+  provider: string;
+  providerLabel: string;
+  model: string;
+  label: string;
+  available: boolean;
+  /** Pourquoi le modèle ne peut pas être appelé : clé absente, agent non installé… */
+  reason?: string;
+}
+
+export interface AiCatalogue {
+  /** Le niveau du chapitre autorise l'IA (niveau 3). */
+  allowed: boolean;
+  /** Pourquoi rien n'est proposé : niveau du chapitre, AI Image Gen coupé… */
+  reason?: string;
+  models: Record<AiAction, AiModelOption[]>;
+  /** Modèle proposé par défaut pour chaque action, d'après le chapitre. */
+  defaults: Partial<Record<AiAction, string>>;
+  usage: { month: number; monthlyLimit: number };
+}
+
+export interface AiReadingProposal {
+  regionId: string;
+  /** Texte lu par le modèle, nettoyé comme une lecture locale. */
+  text: string;
+  trace: AiTrace;
+}
+
+export interface AiTranslationProposal {
+  results: { regionId: string; text: string }[];
+  /** Zones restées sans proposition, avec la raison. */
+  failed: { regionId: string; error: string }[];
+  trace: AiTrace;
+}
+
+export interface AiPageVersion {
+  id: string;
+  /** Image rendue par le moteur, dans `data/assets/`. */
+  file: string;
+  /** Adresse servie avec la session ; calculée à la lecture, jamais enregistrée. */
+  url?: string;
+  width: number;
+  height: number;
+  /** Version de la consigne, fixe, envoyée avec la page. */
+  promptVersion: number;
+  trace: AiTrace;
+}
+
+/** Réglages de l'IA, réservés aux administrateurs. */
+export interface AiSettingsPatch {
+  /** Plafond mensuel, en nombre d'appels ; 0 : aucun appel permis. */
+  monthlyLimit?: number;
 }
 
 // ─── Valeurs par défaut ──────────────────────────────────────────
@@ -433,6 +634,7 @@ const BASE_STYLE: TextStyle = {
 
 export const DEFAULT_STYLES: Record<RegionKind, TextStyle> = {
   dialogue: BASE_STYLE,
+  shout: { ...BASE_STYLE, font: "Bangers", weight: 400, size: 36 },
   thought: { ...BASE_STYLE, font: "Patrick Hand", weight: 400, italic: true, uppercase: false },
   narration: { ...BASE_STYLE, font: "Patrick Hand", weight: 400, uppercase: false, align: "left" },
   sfx: { ...BASE_STYLE, font: "Bangers", weight: 400, size: 48, color: "#ffffff", stroke: { color: "#111111", width: 4 } },

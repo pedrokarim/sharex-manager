@@ -29,7 +29,12 @@ import type {
   ScanFolder,
   ScanRegion,
   UploadedFile,
+  DetectorChoice,
+  DetectorStatus,
+  DetectorVariantId,
 } from "./types";
+import type { ChapterSharing, ChapterVisibility } from "./types";
+import type { AiCatalogue, AiPageVersion, AiReadingProposal, AiSettingsPatch, AiTranslationProposal, CustomFont, FontUsage } from "./types";
 import { MODULE_NAME } from "./types";
 
 export { MODULE_NAME };
@@ -54,8 +59,10 @@ export const api = {
   listFolders: () => callModule<FolderSummary[]>("listFolders"),
   getFolder: (folderId: string) => callModule<FolderView>("getFolder", folderId),
   createFolder: (input: { name: string }) => callModule<ScanFolder>("createFolder", input),
-  updateFolder: (folderId: string, patch: { name?: string; defaults?: ChapterSettings; glossary?: GlossaryEntry[] }) =>
-    callModule<ScanFolder>("updateFolder", folderId, patch),
+  updateFolder: (
+    folderId: string,
+    patch: { name?: string; defaults?: ChapterSettings; glossary?: GlossaryEntry[]; defaultVisibility?: ChapterVisibility }
+  ) => callModule<ScanFolder>("updateFolder", folderId, patch),
   deleteFolder: (folderId: string) => callModule<{ deleted: boolean }>("deleteFolder", folderId),
 
   // Chapitres
@@ -70,6 +77,7 @@ export const api = {
   // Pages
   /** Rattache des images déjà déposées (voir `uploadImage`) ; elles se rangent dans l'ordre naturel de leurs noms. */
   importPages: (chapterId: string, files: UploadedFile[]) => callModule<PageSummary[]>("importPages", chapterId, files),
+  discardUploads: (files: UploadedFile[]) => callModule<{ discarded: number }>("discardUploads", files),
   /** Copie des fichiers de la galerie dans le chapitre. */
   importGalleryFiles: (chapterId: string, fileNames: string[]) => callModule<PageSummary[]>("importGalleryFiles", chapterId, fileNames),
   reorderPages: (chapterId: string, pageIds: string[]) => callModule<ScanChapter>("reorderPages", chapterId, pageIds),
@@ -87,8 +95,13 @@ export const api = {
   // Export
   /** Déclare le rendu d'une page, déjà déposé par `uploadImage`. */
   registerExport: (pageId: string, file: string) => callModule<PageSummary>("registerExport", pageId, file),
-  /** Copie les pages exportées d'un chapitre dans la galerie, dans un album privé. */
+  /** Copie les pages d'un chapitre dans la galerie, dans l'ordre de lecture, réunies dans un album privé. */
   sendChapterToGallery: (chapterId: string) => callModule<{ saved: number; albumId?: number }>("sendChapterToGallery", chapterId),
+
+  // Lecture publique (§ 11.2 du dossier)
+  /** Change la visibilité d'un chapitre : privé, public par son lien, listé au catalogue. */
+  setChapterVisibility: (chapterId: string, visibility: ChapterVisibility) =>
+    callModule<ChapterSharing>("setChapterVisibility", chapterId, visibility),
 
   // Traduction (§ 7.5 du dossier). Le serveur ne touche pas aux pages : il rend
   // des textes, que l'interface pose dans les zones avant d'enregistrer la page.
@@ -107,6 +120,15 @@ export const api = {
   saveEngineSettings: (patch: EngineSettingsPatch) => callModule<EngineCatalogue>("saveEngineSettings", patch),
   /** Réservé aux administrateurs : une courte traduction d'essai. */
   testEngine: (engine: TranslationEngineId) => callModule<{ ok: boolean; message: string }>("testEngine", engine),
+  getDetector: () => callModule<DetectorStatus>("getDetector"),
+  /** Réservé aux administrateurs : la variante en service, ou « off ». */
+  setDetectorChoice: (choice: DetectorChoice) => callModule<DetectorStatus>("setDetectorChoice", choice),
+  /** Réservé aux administrateurs : télécharge le modèle d'une variante sur le serveur. */
+  downloadDetector: (variant: DetectorVariantId) => callModule<DetectorStatus>("downloadDetector", variant),
+  /** Réservé aux administrateurs : efface le modèle d'une variante. */
+  removeDetector: (variant: DetectorVariantId) => callModule<DetectorStatus>("removeDetector", variant),
+  /** Réservé aux administrateurs : la consommation du compte, lue chez le service en une requête. */
+  readEngineUsage: (engine: TranslationEngineId) => callModule<{ ok: boolean; message: string; used?: number; limit?: number }>("readEngineUsage", engine),
 
   // Sources : import d'un chapitre par son lien. Le site est reconnu d'après le
   // lien ; chaque site a son adaptateur.
@@ -128,6 +150,32 @@ export const api = {
     callModule<LinkImportJob & { folderId?: string; created?: { folder: boolean; chapter: boolean } }>("importLinkToLibrary", url),
   getLinkImport: (jobId: string) => callModule<LinkImportJob>("getLinkImport", jobId),
   cancelLinkImport: (jobId: string) => callModule<LinkImportJob>("cancelLinkImport", jobId),
+
+  // Polices ajoutées (§ 8 du dossier)
+  listFonts: () => callModule<CustomFont[]>("listFonts"),
+  /** Contenu d'une police, en base64 : elle n'a pas d'adresse, elle ne sort que par cette fonction. */
+  getFontFile: (fontId: string) => callModule<string>("getFontFile", fontId),
+  getFontUsage: (fontId: string) => callModule<FontUsage>("getFontUsage", fontId),
+  /** Réservé aux administrateurs. `data` est le contenu du fichier, en base64. */
+  addFont: (data: string, name?: string) => callModule<CustomFont>("addFont", { type: "buffer", data }, name),
+  /** Réservé aux administrateurs. */
+  renameFont: (fontId: string, name: string) => callModule<CustomFont>("renameFont", fontId, name),
+  /** Réservé aux administrateurs. `replaceWith` : la police que prendront les pages qui portaient celle-ci. */
+  removeFont: (fontId: string, options?: { replaceWith?: string }) =>
+    callModule<{ removed: boolean; replaced: FontUsage }>("removeFont", fontId, options),
+
+  // IA en dernier recours (niveau 3). Un appel par clic : le serveur ne retente rien et tient le plafond mensuel.
+  getAiCatalogue: (chapterId: string) => callModule<AiCatalogue>("getAiCatalogue", chapterId),
+  getAiUsage: () => callModule<{ month: number; monthlyLimit: number }>("getAiUsage"),
+  /** Réservé aux administrateurs. */
+  saveAiSettings: (patch: AiSettingsPatch) => callModule<{ month: number; monthlyLimit: number }>("saveAiSettings", patch),
+  askAiReading: (pageId: string, regionId: string, options?: { model?: string }) =>
+    callModule<AiReadingProposal>("askAiReading", pageId, regionId, options),
+  askAiTranslation: (pageId: string, regionIds: string[], options?: { model?: string }) =>
+    callModule<AiTranslationProposal>("askAiTranslation", pageId, regionIds, options),
+  askAiPage: (pageId: string, options?: { model?: string }) => callModule<AiPageVersion>("askAiPage", pageId, options),
+  listAiPageVersions: (pageId: string) => callModule<AiPageVersion[]>("listAiPageVersions", pageId),
+  deleteAiPageVersion: (pageId: string, versionId: string) => callModule<{ deleted: boolean }>("deleteAiPageVersion", pageId, versionId),
 };
 
 /** Dépose une image dans les données du module et rend son nom de fichier. */

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { BookOpenText, Cpu, Download, FolderOpen, FolderPlus, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { BookOpenText, Cpu, Download, FolderOpen, FolderPlus, Pencil, RefreshCw, Trash2, Type } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { GalleryImportDialog } from "../components/library/gallery-import-dialog";
@@ -14,7 +14,7 @@ import { useDialogTarget } from "../components/library/use-dialog-target";
 import { ObjectContextMenu, ObjectMenuButton, type MenuEntry } from "../components/library/object-menu";
 import { ModuleShell } from "../components/module-shell";
 import { api } from "../lib/client";
-import { ENGINES_PATH, LIBRARY_PATH, SOURCES_PATH, chapterHref, countLabel, errorMessage, folderHref } from "../lib/library-helpers";
+import { ENGINES_PATH, FONTS_PATH, LIBRARY_PATH, SOURCES_PATH, chapterHref, countLabel, errorMessage, folderHref } from "../lib/library-helpers";
 import type { FolderSummary } from "../lib/types";
 
 /** Dossiers gardés entre deux visites : le retour à la bibliothèque est instantané. */
@@ -93,6 +93,11 @@ export default function LibraryPage() {
             <Button asChild variant="outline" size="icon" aria-label="Moteurs" title="Moteurs de traduction">
               <Link href={ENGINES_PATH}>
                 <Cpu className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="icon" aria-label="Polices" title="Polices de lettrage">
+              <Link href={FONTS_PATH}>
+                <Type className="h-4 w-4" />
               </Link>
             </Button>
             <Button asChild variant="outline" className="gap-2">

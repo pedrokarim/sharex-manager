@@ -249,7 +249,10 @@ describe("page à laisser telle quelle", () => {
     expect(looksUntranslatable([sfx], page)).toBe(true);
     expect(looksUntranslatable([setReadingText(region(2, "x", 0.2), "")], page)).toBe(true);
     const foreign = region(3, "ROMAJI", 0.9);
-    expect(looksUntranslatable([{ ...foreign, reading: { ...foreign.reading, clean: "これは何ですか" } }], page)).toBe(true);
+    // Une écriture que le module ne lit pas (ici des lettres grecques) : rien à traduire.
+    expect(looksUntranslatable([{ ...foreign, reading: { ...foreign.reading, clean: "αβγδ εζηθ ικλμ" } }], page)).toBe(true);
+    // Depuis l'étape S4, le japonais, le chinois et le coréen se lisent : une phrase bien lue compte.
+    expect(looksUntranslatable([{ ...foreign, reading: { ...foreign.reading, clean: "これは何ですか" } }], page)).toBe(false);
     expect(looksUntranslatable([region(4, "Where did you find this map?", 0.95, { x0: 200, y0: 180, x1: 230, y1: 182 })], { width: 6000, height: 9000 })).toBe(true);
   });
 

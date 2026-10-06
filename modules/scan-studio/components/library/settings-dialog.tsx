@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { suggestedFormat } from "../../lib/analysis/languages";
 import { AUTOMATION_LEVELS, READING_FORMATS, SOURCE_LANGUAGES, TARGET_LANGUAGES, errorMessage } from "../../lib/library-helpers";
 import type { AutomationLevel, ChapterSettings, ReadingFormat, SourceLanguage } from "../../lib/types";
 
@@ -40,6 +41,12 @@ export function SettingsDialog({ open, onOpenChange, title, description, value, 
   );
   const format = READING_FORMATS.find((entry) => entry.value === draft.format);
 
+  // Choisir une langue d'origine propose le format qui va le plus souvent avec elle :
+  // manga pour le japonais, webtoon pour le coréen, manhua pour le chinois. Il reste modifiable.
+  const chooseSource = (sourceLanguage: SourceLanguage) => {
+    setDraft({ ...draft, sourceLanguage, format: suggestedFormat(sourceLanguage) ?? draft.format });
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (busy) return;
@@ -66,7 +73,7 @@ export function SettingsDialog({ open, onOpenChange, title, description, value, 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="scan-studio-source">Langue d’origine</Label>
-              <Select value={draft.sourceLanguage} onValueChange={(next) => setDraft({ ...draft, sourceLanguage: next as SourceLanguage })}>
+              <Select value={draft.sourceLanguage} onValueChange={(next) => chooseSource(next as SourceLanguage)}>
                 <SelectTrigger id="scan-studio-source" className="w-full">
                   <SelectValue />
                 </SelectTrigger>

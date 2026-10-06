@@ -23,6 +23,8 @@ export const MEDIA_TYPES: Record<string, string> = {
   ".opus": "audio/ogg",
   ".srt": "text/plain; charset=utf-8",
   ".vtt": "text/vtt; charset=utf-8",
+  // Modèle de détection qu'un module fait tourner dans le navigateur (Scan Studio).
+  ".onnx": "application/octet-stream",
 };
 
 export function mediaTypeOf(file: string): string {

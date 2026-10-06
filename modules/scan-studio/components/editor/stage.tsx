@@ -13,6 +13,7 @@ import {
   hitBoxHandle,
   nearestEdgeIndex,
   nearestVertexIndex,
+  normalizeAngle,
   pointInBox,
   pointInPolygon,
   rectFromCorners,
@@ -23,7 +24,7 @@ import {
   translatePoints,
   type ResizeHandle,
 } from "../../lib/geometry";
-import { renderPage } from "../../lib/render";
+import { renderPage, type InpaintPatch } from "../../lib/render";
 import type { TextLayout } from "../../lib/text-layout";
 import { boundsOf, type BrushStroke, type ChapterSettings, type Point, type ScanRegion, type TextBox } from "../../lib/types";
 import { TOOLS, type Tool, type ViewMode } from "./tools";
@@ -56,10 +57,13 @@ interface StageProps {
   brushWidth: number;
   /** Mises en lignes partagées avec l'inspecteur ; remplacé quand les polices arrivent, ce qui redessine la scène. */
   layoutCache: WeakMap<ScanRegion, TextLayout>;
+  /** Fond reconstruit d'une zone, s'il est prêt ; la fonction change quand un fond arrive, ce qui redessine la scène. */
+  resolveInpaint?: (region: ScanRegion) => InpaintPatch | null;
   onSelect: (regionId: string | null) => void;
   /** `key` regroupe tout un geste en une seule étape d'annulation. */
   onPatchRegion: (regionId: string, update: (region: ScanRegion) => ScanRegion, key: string) => void;
-  onCreateRegion: (outline: Point[]) => void;
+  /** `sfx` : la zone tracée est une onomatopée, posée sur le dessin. */
+  onCreateRegion: (outline: Point[], kind?: "sfx") => void;
   onPickColor: (point: Point) => void;
   /** Double-clic sur un texte : on veut le modifier. */
   onEditText: (regionId: string) => void;
@@ -79,10 +83,11 @@ type Gesture = { pane: number; moved: boolean } & (
   | { kind: "pinch"; startView: View; startDistance: number; startMiddle: Point }
   | { kind: "move-text"; id: string; key: string; start: TextBox; origin: Point }
   | { kind: "resize"; id: string; key: string; start: TextBox; handle: ResizeHandle }
-  | { kind: "rotate"; id: string; key: string; start: TextBox }
+  // `offset` : écart entre la rotation de la boîte et la direction du pointeur à la prise de la poignée.
+  | { kind: "rotate"; id: string; key: string; start: TextBox; offset: number }
   | { kind: "move-outline"; id: string; key: string; start: Point[]; origin: Point }
   | { kind: "vertex"; id: string; key: string; index: number }
-  | { kind: "rect"; origin: Point; current: Point }
+  | { kind: "rect"; origin: Point; current: Point; sfx: boolean }
   | { kind: "brush"; id: string; key: string; stroke: BrushStroke }
 );
 
@@ -233,6 +238,7 @@ export function Stage(props: StageProps) {
         showTexts: current.showTexts,
         resolveWeight: nearestWeight,
         layoutCache: current.layoutCache,
+        resolveInpaint: current.resolveInpaint,
       });
       ctx.restore();
 
@@ -382,7 +388,7 @@ export function Stage(props: StageProps) {
 
   useEffect(() => {
     requestDraw();
-  }, [requestDraw, regions, selectedId, view, tool, panning, props.image, props.settings, props.showMasks, props.showTexts, props.brushWidth, props.layoutCache]);
+  }, [requestDraw, regions, selectedId, view, tool, panning, props.image, props.settings, props.showMasks, props.showTexts, props.brushWidth, props.layoutCache, props.resolveInpaint]);
 
   // L'image annulée doit aussi être oubliée : sinon `requestDraw` croit qu'un
   // dessin est encore prévu et n'en programme plus jamais (le double montage de
@@ -560,8 +566,8 @@ export function Stage(props: StageProps) {
       return;
     }
 
-    if (current.tool === "rect") {
-      gestureRef.current = { kind: "rect", pane, moved: false, origin: inPage, current: inPage };
+    if (current.tool === "rect" || current.tool === "sfx") {
+      gestureRef.current = { kind: "rect", pane, moved: false, origin: inPage, current: inPage, sfx: current.tool === "sfx" };
       return;
     }
 
@@ -575,7 +581,10 @@ export function Stage(props: StageProps) {
     }
 
     if (current.tool === "eyedropper") {
-      current.onPickColor(inPage);
+      // Hors de la page il n'y a pas de couleur à prendre : on ne prélève pas celle du bord à la place.
+      const inside = point.x >= 0 && point.y >= 0 && point.x < current.page.width && point.y < current.page.height;
+      if (inside) current.onPickColor(point);
+      else toast.info("Cliquez dans la page pour y prélever une couleur");
       return;
     }
 
@@ -587,7 +596,7 @@ export function Stage(props: StageProps) {
       }
       if (region.id !== current.selectedId) current.onSelect(region.id);
       if (region.mask.kind === "none") {
-        toast.info("Le masque de cette zone est désactivé : réactivez-le dans l’inspecteur pour peindre");
+        toast.info("Cette zone n’a pas de masque : choisissez un aplat ou un fond reconstruit dans l’inspecteur pour peindre");
         return;
       }
       if (region.mask.strokes.length >= MAX_STROKES) {
@@ -634,7 +643,8 @@ export function Stage(props: StageProps) {
       const start = handle.region.text.box;
       gestureRef.current =
         handle.handle === "rotate"
-          ? { kind: "rotate", pane, moved: false, id: handle.region.id, key: nextKey(), start }
+          ? // La poignée est saisie à quelques pixels de son centre : sans cet écart, la boîte sauterait au premier mouvement.
+            { kind: "rotate", pane, moved: false, id: handle.region.id, key: nextKey(), start, offset: normalizeAngle(start.rotation - rotationToward(start, point)) }
           : { kind: "resize", pane, moved: false, id: handle.region.id, key: nextKey(), start, handle: handle.handle };
       return;
     }
@@ -729,7 +739,7 @@ export function Stage(props: StageProps) {
     }
     if (gesture.kind === "rotate") {
       // Maj : par crans de 15° ; sinon la boîte s'aimante seulement à l'horizontale et à la verticale.
-      const raw = rotationToward(gesture.start, point);
+      const raw = normalizeAngle(rotationToward(gesture.start, point) + gesture.offset);
       const rotation = Math.round((event.shiftKey ? snapAngle(raw, 15, 7.5) : snapAngle(raw, 90, 2)) * 10) / 10;
       const box = { ...gesture.start, rotation };
       current.onPatchRegion(gesture.id, (region) => ({ ...region, text: { ...region.text, box } }), gesture.key);
@@ -764,7 +774,7 @@ export function Stage(props: StageProps) {
     if (gesture.kind === "rect" && event.type !== "pointercancel") {
       const rect = rectFromCorners(gesture.origin, gesture.current);
       const scale = viewRef.current.scale;
-      if (rect.width * scale >= 6 && rect.height * scale >= 6) propsRef.current.onCreateRegion(rectToPolygon(rect));
+      if (rect.width * scale >= 6 && rect.height * scale >= 6) propsRef.current.onCreateRegion(rectToPolygon(rect), gesture.sfx ? "sfx" : undefined);
     }
     if (gesture.kind === "pan") setCursor(propsRef.current.tool === "hand" || propsRef.current.panning ? "grab" : "default");
     requestDraw();

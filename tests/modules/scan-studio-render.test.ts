@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { rectToPolygon } from "@/modules/scan-studio/lib/geometry";
+import { handlePosition, normalizeAngle, rectToPolygon, rotationToward } from "@/modules/scan-studio/lib/geometry";
 import {
+  acceptAiReading,
+  acceptAiTranslation,
+  addAiTrace,
   createRegion,
+  createSfxRegion,
   duplicateRegion,
   neighbourId,
   patchStyle,
@@ -11,7 +15,7 @@ import {
   shiftRegion,
   updateRegion,
 } from "@/modules/scan-studio/lib/region-edit";
-import { fontOf, layoutRegion, renderPage } from "@/modules/scan-studio/lib/render";
+import { createMeasure, drawMask, fontOf, layoutRegion, paintMask, renderPage } from "@/modules/scan-studio/lib/render";
 import { sanitizeRegions } from "@/modules/scan-studio/lib/sanitize-page";
 import type { TextLayout } from "@/modules/scan-studio/lib/text-layout";
 import { DEFAULT_CHAPTER_SETTINGS, DEFAULT_MASK, type ScanRegion } from "@/modules/scan-studio/lib/types";
@@ -28,7 +32,7 @@ function createFakeContext() {
   const stack: Record<string, unknown>[] = [];
   const methods = [
     "drawImage", "fillRect", "beginPath", "closePath", "moveTo", "lineTo", "rect", "arcTo", "arc", "ellipse",
-    "fill", "stroke", "translate", "rotate", "fillText", "strokeText",
+    "fill", "stroke", "translate", "rotate", "scale", "fillText", "strokeText",
   ];
   const target: Record<string, unknown> = {
     save: () => stack.push({ ...state }),
@@ -231,5 +235,162 @@ describe("opérations sur les zones", () => {
     expect(updateRegion(regions, "aaaaaaaaaaa1", (entry) => entry)).toBe(regions);
     expect(removeRegion(regions, "inconnue")).toBe(regions);
     expect(removeRegion(regions, "aaaaaaaaaaa1")).toHaveLength(2);
+  });
+});
+
+describe("onomatopées : lettres espacées et étirées", () => {
+  const sfx = (style: Record<string, unknown>, text: string) => ({
+    ...setTranslationText(region("a", { kind: "sfx" }), text),
+    text: { box: { x: 100, y: 100, width: 120, height: 80, rotation: 0 }, style: { size: 20, stroke: { color: "#111111", width: 0 }, ...style }, autoFit: false },
+  });
+
+  it("pose chaque lettre à sa place quand elles sont espacées", () => {
+    const fake = createFakeContext();
+    // Lettres de 10 px (la moitié de la taille), espacées de 10 % de la taille : 2 px.
+    renderPage(fake.ctx, page, image, [sfx({ letterSpacing: 0.1 }, "abc")], DEFAULT_CHAPTER_SETTINGS, { view: "translated" });
+    const letters = fake.calls.filter((call) => call.name === "fillText");
+    expect(letters.map((call) => call.args[0])).toEqual(["A", "B", "C"]);
+    // Largeur 34 px, centrée : la première lettre part de -17.
+    expect(letters.map((call) => call.args[1])).toEqual([-17, -5, 7]);
+    expect(letters.every((call) => call.state.textAlign === "left")).toBe(true);
+  });
+
+  it("étire les lettres sans déplacer le bloc", () => {
+    const fake = createFakeContext();
+    renderPage(fake.ctx, page, image, [sfx({ stretch: 2 }, "ab")], DEFAULT_CHAPTER_SETTINGS, { view: "translated" });
+    expect(fake.calls.find((call) => call.name === "scale")?.args).toEqual([2, 1]);
+    // Dans le repère élargi deux fois, 20 px de lettres centrées partent de -10.
+    expect(fake.calls.filter((call) => call.name === "fillText").map((call) => call.args[1])).toEqual([-10, 0]);
+  });
+
+  it("mesure une ligne comme elle sera dessinée, espacement et étirement compris", () => {
+    const fake = createFakeContext();
+    const measure = createMeasure(fake.ctx);
+    const style = { ...DEFAULT_CHAPTER_SETTINGS.styles.sfx, stroke: undefined };
+    expect(measure("ABC", style, 20)).toBe(30);
+    expect(measure("ABC", { ...style, letterSpacing: 0.1 }, 20)).toBe(34);
+    expect(measure("ABC", { ...style, stretch: 1.5 }, 20)).toBe(45);
+    expect(measure("ABC", { ...style, letterSpacing: 0.1, stretch: 2 }, 20)).toBe(68);
+    // Un espacement négatif resserre les lettres.
+    expect(measure("AB", { ...style, letterSpacing: -0.1 }, 20)).toBe(18);
+  });
+
+  it("passe le contour de toutes les lettres sous leur remplissage", () => {
+    const fake = createFakeContext();
+    renderPage(fake.ctx, page, image, [sfx({ letterSpacing: 0.1, stroke: { color: "#000000", width: 3 } }, "ab")], DEFAULT_CHAPTER_SETTINGS, { view: "translated" });
+    const order = fake.names().filter((name) => name === "strokeText" || name === "fillText");
+    expect(order).toEqual(["strokeText", "strokeText", "fillText", "fillText"]);
+    expect(fake.calls.find((call) => call.name === "strokeText")?.state.lineWidth).toBe(6);
+  });
+
+  it("garde les réglages des lettres à l'enregistrement, bornés", () => {
+    const [clean] = sanitizeRegions([{ ...sfx({ letterSpacing: 9, stretch: 0.01 }, "boum"), id: "abcdefghijkl" }], page);
+    expect(clean.text.style).toMatchObject({ letterSpacing: 2, stretch: 0.25 });
+    expect(sanitizeRegions([{ ...sfx({}, "boum"), id: "abcdefghijkl" }], page)[0].text.style).not.toHaveProperty("letterSpacing");
+  });
+
+  it("crée une onomatopée posée sur le dessin : rien n'est masqué au départ", () => {
+    const created = createSfxRegion("abcdefghijkl", outline, "#ffffff");
+    expect(created.kind).toBe("sfx");
+    expect(created.mask.kind).toBe("none");
+    expect(() => sanitizeRegions([created], page)).not.toThrow();
+  });
+});
+
+describe("masque : fond reconstruit", () => {
+  const patch = { image: { marker: "fond" } as unknown as CanvasImageSource, x: 90, y: 88 };
+  const inpainted = (id: string) => setTranslationText(region(id, { mask: { ...DEFAULT_MASK, kind: "inpaint", color: "#abcdef", strokes: [] } }), "Salut");
+
+  it("pose le fond reconstruit à sa place quand il est prêt, sans aplat", () => {
+    const fake = createFakeContext();
+    renderPage(fake.ctx, page, image, [inpainted("a")], DEFAULT_CHAPTER_SETTINGS, { view: "translated", showTexts: false, resolveInpaint: () => patch });
+    expect(fake.names()).toEqual(["drawImage", "drawImage"]);
+    expect(fake.calls[1].args).toEqual([patch.image, 90, 88]);
+  });
+
+  it("garde l'aplat de couleur tant que le fond n'est pas prêt, ou s'il n'a pas pu être calculé", () => {
+    for (const options of [{}, { resolveInpaint: () => null }]) {
+      const fake = createFakeContext();
+      renderPage(fake.ctx, page, image, [inpainted("a")], DEFAULT_CHAPTER_SETTINGS, { view: "translated", showTexts: false, ...options });
+      expect(fake.names().filter((name) => name === "drawImage")).toHaveLength(1);
+      expect(fake.calls.find((call) => call.name === "fill")?.state.fillStyle).toBe("#abcdef");
+    }
+  });
+
+  it("ne pose jamais de fond reconstruit sur une zone en aplat", () => {
+    const flat = createFakeContext();
+    drawMask(flat.ctx, setTranslationText(region("b"), "Toi"), patch);
+    expect(flat.names()).not.toContain("drawImage");
+    expect(flat.names()).toContain("fill");
+    const none = createFakeContext();
+    drawMask(none.ctx, region("c", { mask: { ...DEFAULT_MASK, kind: "none", strokes: [] } }), patch);
+    expect(none.names()).toEqual([]);
+  });
+
+  it("dessine la silhouette du masque d'une seule couleur, retouches comprises", () => {
+    const stroke = { points: [{ x: 10, y: 10 }, { x: 30, y: 12 }], width: 12, color: "#ff0000" };
+    const fake = createFakeContext();
+    paintMask(fake.ctx, region("a", { mask: { ...DEFAULT_MASK, color: "#00ff00", strokes: [stroke] } }), "#000000");
+    expect(fake.calls.find((call) => call.name === "fill")?.state.fillStyle).toBe("#000000");
+    expect(fake.calls.find((call) => call.name === "stroke")?.state.strokeStyle).toBe("#000000");
+    // Sans couleur imposée, chaque partie garde la sienne.
+    const plain = createFakeContext();
+    paintMask(plain.ctx, region("a", { mask: { ...DEFAULT_MASK, color: "#00ff00", strokes: [stroke] } }));
+    expect(plain.calls.find((call) => call.name === "fill")?.state.fillStyle).toBe("#00ff00");
+    expect(plain.calls.find((call) => call.name === "stroke")?.state.strokeStyle).toBe("#ff0000");
+  });
+
+  it("accepte le mode « fond reconstruit » à l'enregistrement", () => {
+    expect(sanitizeRegions([inpainted("abcdefghijkl")], page)[0].mask.kind).toBe("inpaint");
+  });
+});
+
+describe("poignée de rotation", () => {
+  const box = { x: 100, y: 100, width: 80, height: 40, rotation: 30 };
+
+  it("ne fait pas sauter la boîte quand la poignée est saisie à côté de son centre", () => {
+    // La poignée est prise à 7 px de son centre : sans l'écart retenu à la prise, la boîte tournerait d'un coup.
+    const handle = handlePosition(box, "rotate", 26);
+    const grab = { x: handle.x + 7, y: handle.y + 2 };
+    const naive = rotationToward(box, grab);
+    expect(Math.abs(normalizeAngle(naive - box.rotation))).toBeGreaterThan(5);
+
+    const offset = normalizeAngle(box.rotation - rotationToward(box, grab));
+    expect(normalizeAngle(rotationToward(box, grab) + offset)).toBeCloseTo(box.rotation, 6);
+    // Puis la boîte suit le pointeur, de l'angle dont il tourne autour du centre.
+    const moved = { x: grab.x + 20, y: grab.y + 20 };
+    const turned = normalizeAngle(rotationToward(box, moved) + offset);
+    expect(normalizeAngle(turned - box.rotation)).toBeCloseTo(normalizeAngle(rotationToward(box, moved) - rotationToward(box, grab)), 6);
+  });
+
+  it("place la poignée au-dessus du bord haut, dans le sens de la rotation", () => {
+    expect(rotationToward(box, handlePosition(box, "rotate", 26))).toBeCloseTo(30, 6);
+    expect(rotationToward({ ...box, rotation: -135 }, handlePosition({ ...box, rotation: -135 }, "rotate", 10))).toBeCloseTo(-135, 6);
+    expect(rotationToward({ ...box, rotation: 0 }, { x: 140, y: 0 })).toBeCloseTo(0, 6);
+    expect(rotationToward({ ...box, rotation: 0 }, { x: 300, y: 120 })).toBeCloseTo(90, 6);
+  });
+});
+
+describe("propositions d'une IA", () => {
+  const trace = { action: "reading" as const, provider: "fake", model: "vision-1", at: 42, sent: "crop" as const };
+
+  it("accepte une lecture : elle vaut une lecture relue, et dit d'où elle vient", () => {
+    const accepted = acceptAiReading(region("a"), "Bonjour", trace);
+    expect(accepted.reading).toEqual({ raw: "Bonjour", clean: "Bonjour", confidence: 1, engine: "ia:fake/vision-1", edited: true });
+  });
+
+  it("accepte une traduction : l'ancienne part dans l'historique", () => {
+    const before = setTranslationText(region("a"), "Salut");
+    const accepted = acceptAiTranslation(before, "Bonjour", { ...trace, action: "translation", sent: "text" }, 99);
+    expect(accepted.translation).toEqual({ text: "Bonjour", status: "proposed", engine: "ia:fake/vision-1", history: [{ text: "Salut", engine: "manual", at: 99 }] });
+    expect(acceptAiTranslation(accepted, "Bonjour", trace, 100).translation.history).toHaveLength(1);
+  });
+
+  it("garde la trace des appels sur la zone, les vingt derniers", () => {
+    let traced = region("a");
+    for (let index = 0; index < 25; index++) traced = addAiTrace(traced, { ...trace, at: index });
+    expect(traced.ai).toHaveLength(20);
+    expect(traced.ai![0].at).toBe(5);
+    expect(region("a").ai).toBeUndefined();
   });
 });

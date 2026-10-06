@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { AlignCenter, AlignLeft, AlignRight, MoreHorizontal, Pipette, ScanEye, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { AlignCenter, AlignLeft, AlignRight, MoreHorizontal, Pipette, ScanEye, TriangleAlert, Languages } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,15 +10,18 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { needsReview } from "../../lib/analysis/merge";
-import { FONTS, nearestWeight } from "../../lib/fonts";
+import { fontLabel, isMissingFont } from "../../lib/custom-fonts";
+import { FONTS, nearestWeight, type FontLoadFailure } from "../../lib/fonts";
+import { FONTS_PATH } from "../../lib/font-paths";
 import { PAGE_STATUS_LABELS, PAGE_STATUS_ORDER } from "../../lib/library-helpers";
-import { patchStyle, setReadingText, setTranslationText } from "../../lib/region-edit";
+import { patchStyle, setMaskColor, setReadingText, setTranslationText } from "../../lib/region-edit";
 import type { TextLayout } from "../../lib/text-layout";
 import {
   REGION_KINDS,
   boundsOf,
   resolveStyle,
   type ChapterSettings,
+  type CustomFont,
   type MaskShape,
   type PageStatus,
   type RegionKind,
@@ -26,8 +30,24 @@ import {
   type ScanRegion,
   type TextStyle,
 } from "../../lib/types";
+import { PageAi } from "../ai/page-ai";
+import { RegionAi } from "../ai/region-ai";
+import type { ManualRenderer } from "../ai/version-compare";
 import { RegionMenuItems, type RegionActions } from "./region-menu";
-import { KIND_LABELS, MASK_SHAPE_LABELS, type Tool } from "./tools";
+import { KIND_LABELS, MASK_KIND_LABELS, MASK_KIND_ORDER, MASK_SHAPE_LABELS, type Tool } from "./tools";
+import type { InpaintStatus } from "./use-inpaint";
+
+/** Ce dont les commandes d'IA ont besoin. Absent quand le niveau du chapitre est sous 3 : elles ne sont alors pas montrées. */
+export interface InspectorAi {
+  chapterId: string;
+  /** Image d'origine de la page, pour la vue des écarts. */
+  image: HTMLImageElement | null;
+  renderManual: ManualRenderer;
+  /** Enregistre la page avant un appel : le serveur lit les zones telles qu'elles sont enregistrées. */
+  flush: () => Promise<void>;
+  onPatchRegion: (regionId: string, update: (region: ScanRegion) => ScanRegion, key: string) => void;
+  onSelectRegion: (regionId: string) => void;
+}
 
 /** Attribut qui désigne le champ de traduction : Tab y passe d'une zone à l'autre. */
 export const TRANSLATION_FIELD = "data-translation-field";
@@ -53,6 +73,21 @@ interface InspectorProps {
   /** Reprend la couleur du masque sur le fond de la bulle. */
   onAutoColor: () => void;
   actions: RegionActions;
+  /** Polices ajoutées dans la page « Polices », proposées à côté des polices fournies. */
+  customFonts: CustomFont[];
+  /** Polices ajoutées que le navigateur n'a pas pu charger, avec la raison. */
+  fontFailures: FontLoadFailure[];
+  /** Où en est le fond reconstruit de la zone sélectionnée, quand son masque le demande. */
+  inpaintStatus: InpaintStatus | null;
+  ai: InspectorAi | null;
+  /** Traduit cette zone seule par les moteurs réglés ; absent : la traduction automatique n'est pas permise ici. */
+  onTranslateZone?: () => void;
+  /** Une traduction est en cours. */
+  translatingZone?: boolean;
+  /** Lit le texte de la zone sur la page, avec le moteur de l'analyse ; absent : la lecture n'est pas possible ici. */
+  onReadZone?: () => void;
+  /** Une lecture de zone est en cours. */
+  readingZone?: boolean;
 }
 
 export function Inspector(props: InspectorProps) {
@@ -80,7 +115,11 @@ export function Inspector(props: InspectorProps) {
         )}
       </div>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
-        {region ? <RegionFields {...props} region={region} servedFocusRef={servedFocusRef} /> : <PageFields page={page} regions={regions} status={props.status} onStatusChange={props.onStatusChange} />}
+        {region ? (
+          <RegionFields {...props} region={region} servedFocusRef={servedFocusRef} />
+        ) : (
+          <PageFields page={page} regions={regions} status={props.status} onStatusChange={props.onStatusChange} ai={props.ai} />
+        )}
       </div>
     </div>
   );
@@ -93,7 +132,8 @@ function PageFields({
   regions,
   status,
   onStatusChange,
-}: Pick<InspectorProps, "page" | "regions" | "status" | "onStatusChange">) {
+  ai,
+}: Pick<InspectorProps, "page" | "regions" | "status" | "onStatusChange" | "ai">) {
   const pending = regions.filter((region) => !region.translation.text.trim()).length;
   return (
     <>
@@ -114,6 +154,21 @@ function PageFields({
         </Row>
         <Choice label="État" value={status} options={PAGE_STATUS_LABELS} order={PAGE_STATUS_ORDER} onChange={onStatusChange} />
       </Section>
+      {ai && (
+        <Section title="IA, en dernier recours">
+          <PageAi
+            pageId={page.id}
+            chapterId={ai.chapterId}
+            regions={regions}
+            page={page.source}
+            image={ai.image}
+            renderManual={ai.renderManual}
+            flush={ai.flush}
+            onPatchRegion={ai.onPatchRegion}
+            onSelectRegion={ai.onSelectRegion}
+          />
+        </Section>
+      )}
       <p className="text-xs leading-relaxed text-muted-foreground">
         Tracez une zone autour d’un texte avec le rectangle (R) ou le contour libre (P), puis tapez sa traduction. Tab passe à la zone suivante.
       </p>
@@ -143,11 +198,16 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
   const setMask = (patch: Partial<RegionMask>, field: string) => onPatch((current) => ({ ...current, mask: { ...current.mask, ...patch } }), key(field));
 
   const font = FONTS.find((entry) => entry.family === style.font);
+  const fontMissing = isMissingFont(style.font, props.customFonts);
+  const fontFailure = props.fontFailures.find((failure) => failure.family === style.font);
   const fontOptions = Object.fromEntries([
     ...FONTS.map((entry) => [entry.family, entry.family] as const),
+    ...props.customFonts.map((entry) => [entry.family, entry.name] as const),
     // Police du chapitre absente de la liste : on la garde proposée plutôt que de la remplacer en silence.
-    ...(font ? [] : [[style.font, style.font] as const]),
+    ...(font || props.customFonts.some((entry) => entry.family === style.font) ? [] : [[style.font, fontLabel(style.font, props.customFonts)] as const]),
   ]);
+  const usesMask = region.mask.kind !== "none";
+  const lettering = region.kind === "sfx" || region.kind === "shout" || Boolean(style.letterSpacing) || (style.stretch !== undefined && style.stretch !== 1);
   const overflows = layout !== null && !layout.fits;
 
   return (
@@ -171,6 +231,19 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
           aria-label="Texte d’origine"
           className="resize-none text-sm"
         />
+        {props.onReadZone && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            disabled={props.readingZone}
+            onClick={props.onReadZone}
+            title="Lit le texte qui se trouve dans le contour de la zone, sur cette machine, sans rien envoyer"
+          >
+            <ScanEye className={cn("h-3.5 w-3.5", props.readingZone && "animate-pulse")} />
+            {props.readingZone ? "Lecture…" : region.reading.clean.trim() ? "Relire le texte de la zone" : "Lire le texte de la zone"}
+          </Button>
+        )}
         {needsReview(region) && (
           <div className="space-y-1.5 text-xs text-amber-600 dark:text-amber-400">
             <p className="flex items-start gap-1.5">
@@ -192,6 +265,32 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
       </Section>
 
       <Section title="Traduction">
+
+        {props.onTranslateZone && (
+
+          <Button
+
+            variant="outline"
+
+            size="sm"
+
+            className="h-7 gap-1.5 self-start text-xs"
+
+            disabled={props.translatingZone || region.reading.clean.trim() === ""}
+
+            onClick={props.onTranslateZone}
+
+            title={region.reading.clean.trim() === "" ? "Cette zone n’a pas de texte d’origine" : "Traduit le texte d’origine de cette zone par les moteurs de la page « Moteurs »"}
+
+          >
+
+            <Languages className={cn("h-3.5 w-3.5", props.translatingZone && "animate-pulse")} />
+
+            {props.translatingZone ? "Traduction…" : region.translation.text.trim() ? "Retraduire cette zone" : "Traduire cette zone"}
+
+          </Button>
+
+        )}
         <Textarea
           ref={translationRef}
           {...{ [TRANSLATION_FIELD]: "" }}
@@ -215,10 +314,15 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
       </Section>
 
       <Section title="Masque">
-        <Row label="Masquer l’original">
-          <Switch checked={region.mask.kind === "fill"} onCheckedChange={(checked) => setMask({ kind: checked ? "fill" : "none" }, "mask-kind")} />
-        </Row>
-        {region.mask.kind === "fill" && (
+        <Choice
+          label="Masquer l’original"
+          value={region.mask.kind}
+          options={MASK_KIND_LABELS}
+          order={MASK_KIND_ORDER}
+          onChange={(kind: RegionMask["kind"]) => setMask({ kind }, "mask-kind")}
+        />
+        {region.mask.kind === "inpaint" && <InpaintNote status={props.inpaintStatus} />}
+        {usesMask && (
           <>
             <Choice
               label="Forme"
@@ -226,7 +330,11 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
               options={MASK_SHAPE_LABELS}
               onChange={(shape: MaskShape) => setMask({ shape }, "mask-shape")}
             />
-            <ColorField label="Couleur" value={region.mask.color} onChange={(color) => setMask({ color }, "mask-color")} />
+            <ColorField
+              label={region.mask.kind === "inpaint" ? "Couleur de repli" : "Couleur"}
+              value={region.mask.color}
+              onChange={(color) => onPatch((current) => setMaskColor(current, color), key("mask-color"))}
+            />
             <div className="grid grid-cols-2 gap-1.5">
               <Button
                 variant={props.tool === "eyedropper" ? "secondary" : "outline"}
@@ -263,14 +371,29 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Object.keys(fontOptions).map((family) => (
+              {Object.entries(fontOptions).map(([family, label]) => (
                 <SelectItem key={family} value={family} className="text-sm" style={{ fontFamily: `"${family.replace(/["\\;]/g, "")}", sans-serif` }}>
-                  {family}
+                  {label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </Row>
+        {(fontMissing || fontFailure) && (
+          <p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              {fontMissing
+                ? "Cette police a été retirée du module : le texte est dessiné avec une police de repli, à l’écran comme à l’export. Choisissez-en une autre."
+                : `Cette police n’a pas pu être chargée (${fontFailure?.reason ?? "raison inconnue"}) : le texte est dessiné avec une police de repli.`}
+            </span>
+          </p>
+        )}
+        <p className="text-right text-[11px]">
+          <Link href={FONTS_PATH} className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+            Ajouter une police
+          </Link>
+        </p>
         {font && font.weights.length > 1 && (
           <Choice
             label="Graisse"
@@ -356,6 +479,28 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
             />
           </>
         )}
+        {lettering && (
+          <>
+            <Slider
+              label="Espacement des lettres"
+              unit="%"
+              min={-10}
+              max={60}
+              step={1}
+              value={Math.round((style.letterSpacing ?? 0) * 100)}
+              onChange={(percent) => setStyle({ letterSpacing: percent === 0 ? undefined : percent / 100 }, "letter-spacing")}
+            />
+            <Slider
+              label="Étirement"
+              unit="%"
+              min={40}
+              max={300}
+              step={5}
+              value={Math.round((style.stretch ?? 1) * 100)}
+              onChange={(percent) => setStyle({ stretch: percent === 100 ? undefined : percent / 100 }, "stretch")}
+            />
+          </>
+        )}
         <Slider
           label="Rotation"
           unit="°"
@@ -385,7 +530,33 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
           </Button>
         </div>
       </Section>
+
+      {props.ai && (
+        <Section title="IA, en dernier recours">
+          <RegionAi pageId={props.page.id} chapterId={props.ai.chapterId} region={region} flush={props.ai.flush} onPatch={onPatch} />
+        </Section>
+      )}
     </>
+  );
+}
+
+/** Où en est le fond reconstruit, et ce que la méthode sait faire. */
+function InpaintNote({ status }: { status: InpaintStatus | null }) {
+  if (status?.state === "failed") {
+    return (
+      <p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>{status.message}</span>
+      </p>
+    );
+  }
+  return (
+    <p className="text-xs leading-snug text-muted-foreground">
+      {status?.state === "ready"
+        ? `Fond reconstruit d’après les pixels voisins${status.grain ? ", trame comprise" : ""}, dans le navigateur et sans IA.`
+        : "Reconstruction du fond en cours…"}{" "}
+      Elle prolonge un aplat, un dégradé ou une trame ; un trait du dessin qui traversait la zone s’arrête à son bord.
+    </p>
   );
 }
 

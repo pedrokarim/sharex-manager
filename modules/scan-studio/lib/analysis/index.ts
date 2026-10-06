@@ -2,8 +2,9 @@
 
 /**
  * Analyse automatique d'une page, dans le navigateur : premier niveau de
- * l'échelle de recours (§ 3 du dossier). Texte source anglais, lu localement,
- * sans IA générative et sans rien envoyer à un service.
+ * l'échelle de recours (§ 3 du dossier). Texte source anglais, japonais,
+ * chinois ou coréen, lu localement, sans IA générative et sans rien envoyer à
+ * un service.
  *
  * Ce fichier fait le lien entre le navigateur (canevas, moteur de lecture,
  * fonctions serveur) et la chaîne d'analyse de `pipeline.ts`, qui ne connaît
@@ -14,108 +15,29 @@ import { api, newId } from "../client";
 import type { Rect } from "../geometry";
 import type { ChapterSettings, ScanRegion } from "../types";
 import type { AnalyzeImage, AnalyzePages, AnalyzePagesResult, AnalysisProgress } from "./contract";
-import { recognize } from "./engine";
+import { createBrowserReader, sizeOf, type Surface } from "./browser-reader";
 import { mergeRegions } from "./merge";
-import { analyzeWithReader, type PageReader, type ReadOptions } from "./pipeline";
+import { detectTexts } from "./detector";
+import { analyzeWithBoxes, analyzeWithReader, readZone, type ZoneReading } from "./pipeline";
 import type { PageSize } from "./words";
 
 export type * from "./contract";
+export type { ZoneReading } from "./pipeline";
 export { REVIEW_CONFIDENCE } from "./words";
 export { isProtectedRegion, mergeRegions, needsReview } from "./merge";
 export { READING_ENGINE } from "./regions";
 export { releaseEngine } from "./engine";
+export { suggestedFormat } from "./languages";
 import { looksUntranslatable } from "./untranslatable";
 
 export { isTranslatableRegion, looksUntranslatable } from "./untranslatable";
-
-type Surface = ImageBitmap | HTMLImageElement | HTMLCanvasElement;
-
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-
-function sizeOf(image: Surface): PageSize {
-  if (typeof HTMLImageElement !== "undefined" && image instanceof HTMLImageElement) {
-    return { width: image.naturalWidth, height: image.naturalHeight };
-  }
-  return { width: image.width, height: image.height };
-}
 
 /** Pourquoi ce chapitre ne peut pas être analysé automatiquement ; `null` s'il le peut. */
 export function analysisBlocker(settings: ChapterSettings): string | null {
   if (settings.maxLevel < 1) {
     return "Ce chapitre est réglé sur le niveau 0 (tout à la main) : l’analyse automatique y est coupée. Le niveau se change dans les réglages du chapitre.";
   }
-  if (settings.sourceLanguage !== "en" && settings.sourceLanguage !== "auto") {
-    return "L’analyse automatique ne sait lire que l’anglais pour l’instant. Les autres langues se tracent et se saisissent à la main.";
-  }
   return null;
-}
-
-/**
- * Lecteur de page du navigateur : découpe l'image sur un canevas, la donne au
- * moteur. `size` est la taille de la page ; l'image peut en avoir une autre.
- */
-function createBrowserReader(image: Surface, size: PageSize): PageReader {
-  const natural = sizeOf(image);
-  const scaleX = natural.width / size.width;
-  const scaleY = natural.height / size.height;
-
-  /** Canevas neuf, prêt à recevoir un rectangle de la page. */
-  const createCanvas = (width: number, height: number): CanvasRenderingContext2D => {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) throw new Error("Cette page est trop grande pour être lue par le navigateur");
-    ctx.imageSmoothingQuality = "high";
-    return ctx;
-  };
-
-  return {
-    size,
-    async read(rect: Rect, options: ReadOptions, onProgress) {
-      const width = Math.max(1, Math.round(rect.width * options.scale));
-      const height = Math.max(1, Math.round(rect.height * options.scale));
-      // Une image tournée déborde de son rectangle : le canevas prend sa boîte englobante.
-      const angle = (options.rotate * Math.PI) / 180;
-      const cos = Math.abs(Math.cos(angle));
-      const sin = Math.abs(Math.sin(angle));
-      const canvasWidth = Math.ceil(width * cos + height * sin);
-      const canvasHeight = Math.ceil(width * sin + height * cos);
-      const ctx = createCanvas(canvasWidth, canvasHeight);
-      // Le fond du canevas prend la teinte du papier : blanc, ou noir pour un texte clair.
-      ctx.fillStyle = options.invert ? "#000000" : "#ffffff";
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-      ctx.translate(canvasWidth / 2, canvasHeight / 2);
-      ctx.rotate(angle);
-      ctx.drawImage(image, rect.x * scaleX, rect.y * scaleY, rect.width * scaleX, rect.height * scaleY, -width / 2, -height / 2, width, height);
-      // Le texte voisin qui dépasse dans le rectangle est recouvert de la teinte du papier.
-      for (const patch of options.erase ?? []) {
-        ctx.fillRect(-width / 2 + (patch.x - rect.x) * options.scale, -height / 2 + (patch.y - rect.y) * options.scale, patch.width * options.scale, patch.height * options.scale);
-      }
-      if (options.invert) {
-        // « Différence » avec du blanc : le négatif, sans dépendre des filtres du canevas.
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.globalCompositeOperation = "difference";
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-      }
-      return recognize(ctx.canvas, options.mode, onProgress);
-    },
-    pixels(rect: Rect) {
-      const x = clamp(Math.floor(rect.x), 0, size.width - 1);
-      const y = clamp(Math.floor(rect.y), 0, size.height - 1);
-      const width = clamp(Math.ceil(rect.x + rect.width) - x, 1, size.width - x);
-      const height = clamp(Math.ceil(rect.y + rect.height) - y, 1, size.height - y);
-      try {
-        const ctx = createCanvas(width, height);
-        ctx.drawImage(image, x * scaleX, y * scaleY, width * scaleX, height * scaleY, 0, 0, width, height);
-        return { pixels: ctx.getImageData(0, 0, width, height), offset: { x, y } };
-      } catch {
-        // Rectangle trop grand pour un canevas, ou image d'une autre origine.
-        return null;
-      }
-    },
-  };
 }
 
 interface RunOptions {
@@ -130,11 +52,69 @@ async function run(image: Surface, settings: ChapterSettings, options: RunOption
   if (blocker) throw new Error(blocker);
   const size = options.size ?? sizeOf(image);
   if (!(size.width > 0 && size.height > 0)) throw new Error("L’image de cette page n’est pas encore chargée");
-  return analyzeWithReader(createBrowserReader(image, size), settings, {
+  const reader = createBrowserReader(image, size, settings.sourceLanguage);
+
+  // Le détecteur de bulles et de texte d'abord, s'il est installé et choisi.
+  const detector = await detectorChoice();
+  const modelUrl = detector.url;
+  if (modelUrl) {
+    try {
+      // Le repérage compte pour un cinquième de l'avancement, la lecture pour le reste.
+      const texts = await detectTexts(image, size, modelUrl, { signal: options.signal, onProgress: (value) => options.onProgress?.(value * 0.2) });
+      const regions = await analyzeWithBoxes(reader, texts, settings, {
+        createId: newId,
+        onProgress: (value) => options.onProgress?.(0.2 + value * 0.8),
+        signal: options.signal,
+      });
+      lastDetection = { used: "detector", found: texts.length };
+      return regions;
+    } catch (error) {
+      if (isAbort(error)) throw error;
+      // Le détecteur n'a pas pu tourner sur ce navigateur : l'analyse continue par les pixels, et on le dit.
+      lastDetection = { used: "pixels", reason: error instanceof Error && error.message ? error.message : "le détecteur n’a pas pu démarrer" };
+      console.info(`[scan-studio] détecteur indisponible, repérage par les pixels : ${lastDetection.reason}`);
+    }
+  } else {
+    // Choisi mais pas encore téléchargé sur le serveur : on le dit, l'atelier propose de l'installer.
+    lastDetection = detector.missing ? { used: "pixels", missing: true, reason: "son modèle n’est pas encore installé sur le serveur" } : { used: "pixels" };
+  }
+  return analyzeWithReader(reader, settings, {
     createId: newId,
     onProgress: options.onProgress,
     signal: options.signal,
   });
+}
+
+/** Comment la dernière page a été repérée : par le détecteur, ou par les pixels (et pourquoi). */
+export interface DetectionReport {
+  used: "detector" | "pixels";
+  /** Textes repérés par le détecteur, avant lecture. */
+  found?: number;
+  /** Pourquoi le détecteur n'a pas servi alors qu'il était choisi. */
+  reason?: string;
+  /** Le détecteur est choisi, mais son modèle n'est pas sur le serveur : il reste à le télécharger dans « Moteurs ». */
+  missing?: boolean;
+}
+
+let lastDetection: DetectionReport = { used: "pixels" };
+export const lastDetectionReport = (): DetectionReport => lastDetection;
+
+/** Adresse du modèle choisi, gardée une minute : une analyse de chapitre ne la redemande pas à chaque page. */
+let detectorCache: { at: number; url: string | null; missing: boolean } | null = null;
+async function detectorChoice(): Promise<{ url: string | null; missing: boolean }> {
+  if (detectorCache && Date.now() - detectorCache.at < 60_000) return detectorCache;
+  try {
+    const status = await api.getDetector();
+    detectorCache = { at: Date.now(), url: status.modelUrl ?? null, missing: status.active !== "off" && !status.modelUrl };
+  } catch {
+    detectorCache = { at: Date.now(), url: null, missing: false };
+  }
+  return detectorCache;
+}
+
+/** À appeler quand le réglage du détecteur change : la prochaine analyse relit le choix. */
+export function forgetDetectorChoice() {
+  detectorCache = null;
 }
 
 /** Zones lues sur une image, dans l'ordre de lecture du format du chapitre. */
@@ -143,6 +123,15 @@ export const analyzeImage: AnalyzeImage = (image, settings, onProgress) => run(i
 /** Même analyse, pour une image dont la taille diffère de celle que la page déclare. */
 export function analyzeSurface(image: Surface, size: PageSize, settings: ChapterSettings, onProgress?: (progress: number) => void): Promise<ScanRegion[]> {
   return run(image, settings, { size, onProgress });
+}
+
+/**
+ * Lit le texte d'un rectangle tracé à la main sur la page ouverte dans
+ * l'atelier : même moteur que l'analyse, dans le navigateur, rien ne sort de
+ * la machine. `null` : rien n'a pu être lu à cet endroit.
+ */
+export async function readZoneOnSurface(image: Surface, size: PageSize, zone: Rect, settings: ChapterSettings): Promise<ZoneReading | null> {
+  return readZone(createBrowserReader(image, size, settings.sourceLanguage), zone, settings);
 }
 
 async function loadImage(url: string): Promise<HTMLImageElement> {

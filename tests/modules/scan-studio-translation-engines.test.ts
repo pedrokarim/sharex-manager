@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDeeplEngine, deeplHost, deeplSourceLanguage, deeplTargetLanguage } from "@/modules/scan-studio/lib/server/translation/deepl";
+import { MYMEMORY_MAX_BYTES, createMyMemoryEngine, isUntranslated, normalizeContactEmail, pickMyMemoryTranslation } from "@/modules/scan-studio/lib/server/translation/mymemory";
 import { EngineError, parseRetryAfter, type EngineErrorKind } from "@/modules/scan-studio/lib/server/translation/engines";
 import {
   createLibreTranslateEngine,
@@ -28,7 +29,8 @@ let sent: Sent[] = [];
 /** Remplace `fetch` par une réponse fixe (ou une panne de réseau) et note chaque requête. */
 function stubFetch(reply: { status?: number; body?: unknown; headers?: Record<string, string> } | Error) {
   vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
-    sent.push({ url, init, body: JSON.parse(String(init.body)) });
+    // Une lecture (`GET`) n'a pas de corps.
+    sent.push({ url, init, body: init.body ? JSON.parse(String(init.body)) : {} });
     if (reply instanceof Error) throw reply;
     const body = typeof reply.body === "string" ? reply.body : JSON.stringify(reply.body ?? {});
     return new Response(body, { status: reply.status ?? 200, headers: reply.headers });
@@ -137,6 +139,25 @@ describe("DeepL", () => {
     expect(error).toMatchObject({ kind: "rate-limited", retryAfterMs: 7000 });
   });
 
+  it("lit la consommation du compte par une requête de lecture, sans rien envoyer d'autre que la clé", async () => {
+    stubFetch({ body: { character_count: 180_118, character_limit: 500_000 } });
+    expect(await createDeeplEngine("secret-key:fx").usage!(signal())).toEqual({ used: 180_118, limit: 500_000 });
+    expect(sent).toHaveLength(1);
+    expect(sent[0].url).toBe("https://api-free.deepl.com/v2/usage");
+    expect(sent[0].init.method).toBe("GET");
+    expect(sent[0].init.body).toBeUndefined();
+    expect(sent[0].url).not.toContain("secret-key");
+    expect((sent[0].init.headers as Record<string, string>).Authorization).toBe("DeepL-Auth-Key secret-key:fx");
+
+    // Un compte sans plafond annoncé, puis une réponse d'une autre forme et une clé refusée.
+    stubFetch({ body: { character_count: 12 } });
+    expect(await createDeeplEngine("k").usage!(signal())).toEqual({ used: 12, limit: 0 });
+    stubFetch({ body: { translations: [] } });
+    expect(await kindOf(createDeeplEngine("k").usage!(signal()))).toBe("unavailable");
+    stubFetch({ status: 403 });
+    expect(await kindOf(createDeeplEngine("k").usage!(signal()))).toBe("unauthorized");
+  });
+
   it("prend pour une panne un réseau coupé ou une réponse qui n'est pas celle attendue", async () => {
     stubFetch(new TypeError("fetch failed"));
     expect(await kindOf(createDeeplEngine("k").translate(["Hello"], "en", "fr", signal()))).toBe("unavailable");
@@ -218,13 +239,16 @@ describe("réglages et clés", () => {
   const DEEPL_KEY = "0123abcd-4567-89ef-0123-456789abWXYZ:fx";
 
   it("part de DeepL puis LibreTranslate, rien de configuré", () => {
-    expect(readSettings().order).toEqual(["deepl", "libretranslate"]);
+    expect(readSettings().order).toEqual(["deepl", "libretranslate", "mymemory"]);
     const catalogue = new TranslationRouter().catalogue();
-    expect(catalogue.order).toEqual(["deepl", "libretranslate"]);
+    expect(catalogue.order).toEqual(["deepl", "libretranslate", "mymemory"]);
+    // Le troisième marche sans rien régler : c'est lui qui traduit sur une instance neuve.
     expect(catalogue.engines.map((engine) => [engine.id, engine.configured, engine.available])).toEqual([
       ["deepl", false, false],
       ["libretranslate", false, false],
+      ["mymemory", true, true],
     ]);
+    expect(catalogue.engines[2]).toMatchObject({ dailyLimit: 5000, contactEmail: "" });
     expect(catalogue.engines[0].reason).toContain("aucune clé");
     expect(catalogue.engines[1].reason).toContain("aucune adresse");
   });
@@ -258,11 +282,11 @@ describe("réglages et clés", () => {
     applySettingsPatch({ monthlyLimits: { libretranslate: 1000 }, order: ["libretranslate", "deepl"] });
     expect(readCredentials().deeplKey).toBe(DEEPL_KEY);
     expect(readCredentials().libreTranslateUrl).toBe("http://localhost:5000");
-    expect(readSettings()).toEqual({ order: ["libretranslate", "deepl"], monthlyLimits: { deepl: 500_000, libretranslate: 1000 } });
+    expect(readSettings()).toEqual({ order: ["libretranslate", "deepl", "mymemory"], monthlyLimits: { deepl: 500_000, libretranslate: 1000, mymemory: 0 } });
 
     applySettingsPatch({ deeplKey: "", libreTranslateUrl: "" });
-    expect(readCredentials()).toEqual({ deeplKey: undefined, libreTranslateUrl: undefined, libreTranslateKey: undefined });
-    expect(readSettings().order).toEqual(["libretranslate", "deepl"]);
+    expect(readCredentials()).toEqual({ deeplKey: undefined, libreTranslateUrl: undefined, libreTranslateKey: undefined, myMemoryEmail: undefined });
+    expect(readSettings().order).toEqual(["libretranslate", "deepl", "mymemory"]);
   });
 
   it("refuse des réglages mal formés sans rien écrire", () => {
@@ -288,5 +312,99 @@ describe("réglages et clés", () => {
     expect(keyHint("abcd")).toBeUndefined();
     expect(keyHint(undefined)).toBeUndefined();
     expect(keyHint("abcdefghijkl")).toBe("ijkl");
+  });
+});
+
+describe("MyMemory", () => {
+  it("envoie une phrase par requête de lecture, sans clé, avec la paire de langues", async () => {
+    stubFetch({ body: { responseStatus: 200, responseData: { translatedText: "Bonjour." } } });
+    expect(await createMyMemoryEngine().translate(["Hello."], "en", "fr", signal())).toEqual(["Bonjour."]);
+    expect(sent).toHaveLength(1);
+    const url = new URL(sent[0].url);
+    expect(`${url.origin}${url.pathname}`).toBe("https://api.mymemory.translated.net/get");
+    expect(url.searchParams.get("q")).toBe("Hello.");
+    expect(url.searchParams.get("langpair")).toBe("en|fr");
+    expect(url.searchParams.has("de")).toBe(false);
+    expect(sent[0].init.method).toBe("GET");
+    expect(sent[0].init.body).toBeUndefined();
+  });
+
+  it("joint l'adresse de contact quand il y en a une, et convertit les langues", async () => {
+    stubFetch({ body: { responseStatus: 200, responseData: { translatedText: "Bonjour." } } });
+    await createMyMemoryEngine("contact@example.org").translate(["Hello."], "zh-Hant", "pt-BR", signal());
+    const url = new URL(sent[0].url);
+    expect(url.searchParams.get("de")).toBe("contact@example.org");
+    expect(url.searchParams.get("langpair")).toBe("zh-TW|pt-BR");
+    expect(normalizeContactEmail(" contact@example.org ")).toBe("contact@example.org");
+    for (const refused of ["", "pas une adresse", "a@b", "a b@example.org", "<x>@example.org"]) expect(normalizeContactEmail(refused), refused).toBeNull();
+  });
+
+  it("refuse plus d'une phrase, une phrase trop longue et une langue d'origine inconnue, sans rien envoyer", async () => {
+    stubFetch({ body: { responseStatus: 200, responseData: { translatedText: "x" } } });
+    const engine = createMyMemoryEngine();
+    expect(engine.maxTextsPerRequest).toBe(1);
+    expect(await kindOf(engine.translate(["A.", "B."], "en", "fr", signal()))).toBe("invalid-request");
+    expect(await kindOf(engine.translate(["x".repeat(MYMEMORY_MAX_BYTES + 1)], "en", "fr", signal()))).toBe("invalid-request");
+    expect(await kindOf(engine.translate(["Hello."], "auto", "fr", signal()))).toBe("invalid-request");
+    expect(sent).toEqual([]);
+  });
+
+  it("reconnaît le quota épuisé sous toutes ses formes, et ne rend jamais un avertissement comme traduction", async () => {
+    const quota: Parameters<typeof stubFetch>[0][] = [
+      { status: 429 },
+      { body: { responseStatus: 429, responseDetails: "DAILY QUOTA", responseData: { translatedText: "" } } },
+      { body: { responseStatus: 200, quotaFinished: true, responseData: { translatedText: "Bonjour." } } },
+      { body: { responseStatus: 200, responseData: { translatedText: "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY." } } },
+    ];
+    for (const reply of quota) {
+      stubFetch(reply);
+      expect(await kindOf(createMyMemoryEngine().translate(["Hello."], "en", "fr", signal()))).toBe("quota-exceeded");
+    }
+    stubFetch({ body: { responseStatus: 403, responseDetails: "INVALID LANGUAGE PAIR SPECIFIED", responseData: { translatedText: "INVALID LANGUAGE PAIR SPECIFIED" } } });
+    expect(await kindOf(createMyMemoryEngine().translate(["Hello."], "en", "fr", signal()))).toBe("unauthorized");
+    stubFetch({ body: { responseStatus: 200, responseData: { translatedText: "" } } });
+    expect(await kindOf(createMyMemoryEngine().translate(["Hello."], "en", "fr", signal()))).toBe("unavailable");
+    stubFetch({ status: 503 });
+    expect(await kindOf(createMyMemoryEngine().translate(["Hello."], "en", "fr", signal()))).toBe("unavailable");
+  });
+
+  it("ne garde que ce qui traduit vraiment la phrase demandée", async () => {
+    const source = "The old bridge is closed tonight, okay";
+    // La mémoire publique arrive en tête avec la phrase d'origine recopiée ; la traduction automatique est derrière.
+    stubFetch({
+      body: {
+        responseStatus: 200,
+        responseData: { translatedText: source, match: 0.97 },
+        matches: [
+          { translation: source, match: 0.97, "created-by": "Public_Corpora" },
+          { translation: "Le vieux pont est fermé ce soir, d’accord", match: 0.85, "created-by": "MT!" },
+        ],
+      },
+    });
+    expect(await createMyMemoryEngine().translate([source], "en", "fr", signal())).toEqual(["Le vieux pont est fermé ce soir, d’accord"]);
+
+    // Seulement la traduction d'une autre phrase, approchante : rien de sûr, la zone reste sans traduction.
+    stubFetch({
+      body: { responseStatus: 200, responseData: { translatedText: "Le pont est fermé.", match: 0.73 }, matches: [{ translation: "Le pont est fermé.", match: 0.73, "created-by": "Public_Corpora" }] },
+    });
+    expect(await kindOf(createMyMemoryEngine().translate([source], "en", "fr", signal()))).toBe("invalid-request");
+
+    // La phrase d'origine rendue telle quelle, même par la traduction automatique : refusée.
+    stubFetch({ body: { responseStatus: 200, responseData: { translatedText: source, match: 1 }, matches: [{ translation: "the old bridge is closed tonight okay.", match: 1, "created-by": "MT!" }] } });
+    expect(await kindOf(createMyMemoryEngine().translate([source], "en", "fr", signal()))).toBe("invalid-request");
+
+    expect(pickMyMemoryTranslation(source, "x", 0.5, [{ translation: "Exacte.", match: 1, "created-by": "Public_Corpora" }])).toBe("Exacte.");
+    // Un nom propre peut rester tel quel : on ne tranche que pour une vraie phrase.
+    expect(isUntranslated("Tokyo", "Tokyo")).toBe(false);
+    expect(isUntranslated("We leave before noon", "WE LEAVE, BEFORE NOON!")).toBe(true);
+  });
+
+  it("garde l'adresse de contact dans les réglages et élève le quota du jour", () => {
+    applySettingsPatch({ myMemoryEmail: "contact@example.org" });
+    expect(readCredentials().myMemoryEmail).toBe("contact@example.org");
+    expect(new TranslationRouter().catalogue().engines.find((engine) => engine.id === "mymemory")).toMatchObject({ dailyLimit: 50_000, contactEmail: "contact@example.org" });
+    expect(() => applySettingsPatch({ myMemoryEmail: "pas une adresse" })).toThrow("Adresse de contact invalide");
+    applySettingsPatch({ myMemoryEmail: "" });
+    expect(readCredentials().myMemoryEmail).toBeUndefined();
   });
 });

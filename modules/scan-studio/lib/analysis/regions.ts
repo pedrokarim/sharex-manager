@@ -10,6 +10,7 @@ import { DEFAULT_MASK, type Point, type RegionKind, type ScanRegion } from "../t
 import { cleanReading, type CleanOptions } from "./clean-text";
 import { insetAround } from "./containers";
 import type { TextGroup } from "./grouping";
+import type { WritingDirection } from "./languages";
 import type { Box, PageSize } from "./words";
 
 /** Identifiant du moteur de lecture, porté par chaque zone qu'il a lue. */
@@ -107,7 +108,7 @@ const toPoints = (box: Box): Point[] => [
  *  - la boîte du texte traduit prend la place libre de la bulle, moins une
  *    marge : elle est plus grande que le texte d'origine.
  */
-export function buildRegion(id: string, group: TextGroup, options: BuildOptions): ScanRegion {
+export function buildRegion(id: string, group: TextGroup & { direction?: WritingDirection }, options: BuildOptions): ScanRegion {
   const kind = guessKind(group, options);
   const padding = outlinePadding(group.lineHeight);
   const room = options.room;
@@ -128,8 +129,11 @@ export function buildRegion(id: string, group: TextGroup, options: BuildOptions)
     box = insetAround(room, roomMargin(group.lineHeight), fitted);
   }
   const region = createRegion(id, outline, options.background, kind);
+  const maxSize = referenceTextSize(group.lineHeight, options.medianLineHeight);
   return {
     ...region,
+    // Sens d'écriture du texte d'origine : en colonnes pour un texte lu de haut en bas.
+    direction: group.direction ?? region.direction,
     reading: {
       raw: group.raw,
       clean: cleanReading(group.raw, options),
@@ -143,6 +147,25 @@ export function buildRegion(id: string, group: TextGroup, options: BuildOptions)
       kind: kind === "sfx" || kind === "background" ? "none" : "fill",
       ...(grow === null ? {} : { grow }),
     },
-    text: box ? { ...region.text, box: { x: box.x0, y: box.y0, width: box.x1 - box.x0, height: box.y1 - box.y0, rotation: 0 } } : region.text,
+    text: {
+      ...(box ? { ...region.text, box: { x: box.x0, y: box.y0, width: box.x1 - box.x0, height: box.y1 - box.y0, rotation: 0 } } : region.text),
+      ...(maxSize ? { maxSize } : {}),
+    },
   };
+}
+
+/** Part de la taille d'une police que prend la hauteur d'une ligne de capitales, à peu près. */
+const CAPITALS_SHARE = 0.72;
+
+/**
+ * Taille que le texte traduit ne dépassera pas : celle du lettrage d'origine.
+ * La hauteur des lignes d'une zone est ramenée près de celle de la page (un cri
+ * reste plus gros, une note plus petite, mais sans écart démesuré), puis
+ * convertie en taille de police. `undefined` quand rien n'a été mesuré.
+ */
+export function referenceTextSize(lineHeight: number, medianLineHeight: number): number | undefined {
+  const median = medianLineHeight > 0 ? medianLineHeight : lineHeight;
+  if (!(median > 0)) return undefined;
+  const own = lineHeight > 0 ? lineHeight : median;
+  return Math.round((clamp(own, median * 0.8, median * 1.5) / CAPITALS_SHARE) * 10) / 10;
 }

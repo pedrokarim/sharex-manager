@@ -215,6 +215,8 @@ export function referencedAssets(ignoredPageIds: ReadonlySet<string> = new Set()
     if (ignoredPageIds.has(page.id)) continue;
     if (page.source?.file) files.add(page.source.file);
     if (page.exported?.file) files.add(page.exported.file);
+    // Versions traduites par IA (§ 6.8) : elles tiennent leur fichier tant que la page existe.
+    for (const version of page.aiVersions ?? []) if (version?.file) files.add(version.file);
   }
   for (const id of listIds("folders")) {
     const cover = readEntity<ScanFolder>("folders", id)?.cover?.file;

@@ -7,7 +7,9 @@
 
 import { sanitizeTextStyle } from "../sanitize-page";
 import {
+  DEFAULT_STYLES,
   REGION_KINDS,
+  type AiAction,
   type AutomationLevel,
   type ChapterSettings,
   type GlossaryEntry,
@@ -72,7 +74,11 @@ export function sanitizeSettings(value: unknown): ChapterSettings {
 
   const given = input.styles as Record<string, unknown>;
   const styles = {} as Record<RegionKind, TextStyle>;
-  for (const kind of REGION_KINDS) styles[kind] = sanitizeTextStyle(given[kind], `Style « ${kind} »`, "full");
+  for (const kind of REGION_KINDS) {
+    // Un type de zone ajouté après la création du dossier (le cri) n'a pas encore de style : il prend celui par défaut.
+    styles[kind] = given[kind] === undefined ? DEFAULT_STYLES[kind] : sanitizeTextStyle(given[kind], `Style « ${kind} »`, "full");
+  }
+  const aiModels = sanitizeAiModels(input.aiModels);
 
   return {
     sourceLanguage: input.sourceLanguage as SourceLanguage,
@@ -80,7 +86,27 @@ export function sanitizeSettings(value: unknown): ChapterSettings {
     format: input.format as ReadingFormat,
     maxLevel: input.maxLevel as AutomationLevel,
     styles,
+    ...(aiModels ? { aiModels } : {}),
   };
+}
+
+const AI_ACTIONS: AiAction[] = ["reading", "translation", "page"];
+/** « fournisseur/modèle » : des identifiants, jamais du texte libre. */
+const AI_MODEL_KEY = /^[a-z0-9][a-z0-9._-]{0,39}\/[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$/;
+
+/** Modèles d'IA proposés par défaut, par action. Absent ou vide : le chapitre n'en retient aucun. */
+function sanitizeAiModels(value: unknown): Partial<Record<AiAction, string>> | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) throw new Error("Modèles d'IA par défaut invalides.");
+  const given = value as Record<string, unknown>;
+  const models: Partial<Record<AiAction, string>> = {};
+  for (const action of AI_ACTIONS) {
+    const key = given[action];
+    if (key === undefined || key === null || key === "") continue;
+    if (typeof key !== "string" || !AI_MODEL_KEY.test(key)) throw new Error("Modèle d'IA par défaut invalide.");
+    models[action] = key;
+  }
+  return Object.keys(models).length > 0 ? models : undefined;
 }
 
 export function sanitizeGlossary(value: unknown): GlossaryEntry[] {

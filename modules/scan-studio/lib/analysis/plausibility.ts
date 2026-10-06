@@ -101,6 +101,8 @@ export function plausibility(text: string): Plausibility {
   };
 }
 
+import { isCjkCreditsText } from "./plausibility-cjk";
+
 /** Adresse de site, de serveur ou de messagerie : jamais une réplique. */
 const LINK = /(?:https?:\/\/|www\.|\b[\w-]+\.(?:com|net|org|gg|io|me|co|to|xyz)\b|\b[\w.-]+@[\w-]+\.\w+)/i;
 /** Vocabulaire d'une page de crédits d'équipe de traduction. */
@@ -109,5 +111,5 @@ const CREDIT_WORDS =
 
 /** Le texte est-il celui d'une page de crédits : une adresse, un rôle d'équipe ? */
 export function isCreditsText(text: string): boolean {
-  return LINK.test(text) || CREDIT_WORDS.test(text);
+  return LINK.test(text) || CREDIT_WORDS.test(text) || isCjkCreditsText(text);
 }

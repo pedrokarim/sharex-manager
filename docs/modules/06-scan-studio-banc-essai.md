@@ -7,7 +7,7 @@ avant de construire l’étape S2. Complète le [dossier du module](06-scan-stud
 - **Date** : 06/10/2026.
 - **Périmètre** : anglais seulement, niveau 1 de l’échelle de recours (rien
   n’est envoyé, rien n’est généré). Le japonais, le chinois et le coréen
-  restent à mesurer avant S4.
+  ont été mesurés à l’étape S4 : § 8.
 - **Moteur** : `tesseract.js` 7.0.0 (cœur WebAssembly 7.0.0, moteur LSTM seul),
   données `@tesseract.js-data/eng` 1.0.0, variante `4.0.0_best_int` (2,9 Mo
   compressés).
@@ -279,3 +279,209 @@ après ; bande de 800 × 7000 : 2,0 s avant, 2,9 s après.
 - **Rien n’a été rejoué dans un navigateur** après ce changement : le lecteur
   du canevas (dont le recouvrement du texte voisin avant lecture) et les
   durées dans Chrome restent à vérifier.
+
+## 8. Japonais, chinois, coréen et bandes hautes (étape S4)
+
+- **Date** : 06/10/2026.
+- **Périmètre** : lecture du japonais, du chinois simplifié et traditionnel et
+  du coréen, en lignes et en colonnes, et bandes de webtoon. Toujours le
+  niveau 1 de l’échelle de recours : rien n’est envoyé, rien n’est généré.
+- **Moteur** : le même, `tesseract.js` 7.0.0. Données `@tesseract.js-data`
+  1.0.0, variante `4.0.0_best_int` comme pour l’anglais : `jpn`, `jpn_vert`,
+  `chi_sim`, `chi_sim_vert`, `chi_tra`, `chi_tra_vert`, `kor`, `kor_vert`. Les
+  modèles « _vert » lisent le texte écrit en colonnes ; il en existe un pour
+  chacune des quatre langues.
+- **Où** : tout ce qui suit a été mesuré **dans Chrome**, avec le lecteur du
+  navigateur et la chaîne du module, sur une page statique jetable servie à
+  part (les fichiers du moteur venant de `public/scan-studio-ocr/`).
+
+### 8.1 Ce qui a été mesuré
+
+Quinze pages **dessinées pour l’occasion** par un script : des cases, des
+formes géométriques, des trames de points et de hachures, des bulles et des
+cartouches. Les phrases sont **inventées** dans chaque langue et composées
+avec les polices du poste (Yu Gothic et MS Gothic, Microsoft YaHei et SimSun,
+Microsoft JhengHei, Malgun Gothic), de 22 à 30 px. Aucune page, aucun
+personnage, aucune réplique d’une œuvre existante. Position, texte et sens
+d’écriture de chaque bulle sont connus d’avance.
+
+| Pages | Ce qu’elles mettent à l’épreuve |
+| --- | --- |
+| 2 pages japonaises en colonnes, 1 en lignes | Colonnes lues de droite à gauche, bulle d’une seule colonne, 4 bulles à furigana, cartouche noir |
+| Chinois simplifié : 1 en lignes, 1 en colonnes | Deux polices (bâton, à empattements), cartouche noir, cartouche de couleur |
+| Chinois traditionnel : 1 en lignes, 1 en colonnes | Idem |
+| Coréen : 1 en lignes, 1 en colonnes | Mots séparés par des espaces ; les colonnes sont rares en coréen |
+| 3 bandes de webtoon : 800 × 9000, 800 × 12000, 800 × 20000 | Bulles posées exprès sur le bord d’une tranche, fonds de couleur, cartouches noirs |
+| 2 couvertures, 1 bannière de crédits | Proposition « rien à traduire » |
+
+Chaque page fait 1200 × 1700 et porte 11 textes (6 pour le coréen en
+colonnes). Une bulle compte comme **trouvée** si une zone tombe dedans,
+**entière** s’il n’y en a qu’une, **sans faute** si son texte nettoyé est
+celui attendu, à la forme pleine chasse ou non de la ponctuation près.
+
+### 8.2 Résultats par langue
+
+| Langue et sens | Textes | Trouvés | Entiers | Sens reconnu | Sans faute | Caractères faux |
+| --- | --- | --- | --- | --- | --- | --- |
+| Japonais, colonnes | 22 | 22 | 22 | 22 | **20** | 3 sur 252 |
+| Japonais, lignes | 11 | 11 | 11 | 11 | **11** | 0 sur 132 |
+| Chinois simplifié, lignes | 11 | 11 | 11 | 11 | **11** | 0 sur 110 |
+| Chinois simplifié, colonnes | 11 | 10 | 10 | 10 | 7 | 4 sur 97 |
+| Chinois traditionnel, lignes | 11 | 11 | 11 | 11 | **10** | 1 sur 110 |
+| Chinois traditionnel, colonnes | 11 | 11 | 11 | 11 | 4 | 9 sur 107 |
+| Coréen, lignes | 11 | 11 | 11 | 11 | **10** | 1 sur 161 |
+| Coréen, colonnes | 6 | 6 | 6 | 6 | 0 | 17 sur 72 |
+
+Autres relevés sur ces neuf pages :
+
+- **Zones inventées** : 0.
+- **Durée** : 1,1 à 2,5 s par page, moteur déjà chargé.
+- **Furigana** : les 4 bulles qui en portent sont trouvées, et aucune de
+  leurs lectures ne contient un furigana ; 3 sont lues sans faute, la
+  quatrième se trompe sur un kanji de 22 px (confiance 0,57, signalée).
+- **Fautes signalées** (confiance sous 0,80) : 9 des 20 textes mal lus. En
+  japonais, 2 sur 2 ; en chinois en colonnes, 5 sur 10 ; en coréen en
+  colonnes, 1 sur 6.
+- **Lectures justes signalées à tort** : 8 sur 73, dont 5 sur la seule page
+  de chinois simplifié en lignes. Le seuil de 0,80 fixé pour l’anglais est
+  plus sévère pour ces écritures.
+- **Cartouches noirs** : 7 trouvés sur 8.
+
+### 8.3 Bandes de webtoon
+
+| Bande | Tranches | Textes | Trouvés, entiers | Sans faute | Bulles sur un bord de tranche | Durée |
+| --- | --- | --- | --- | --- | --- | --- |
+| 800 × 9000, chinois simplifié | 4 | 17 | **17** | 16 | 3, toutes entières et sans faute | 3,1 s |
+| 800 × 12000, coréen | 5 | 23 | **23** | 21 | 2, toutes entières et sans faute | 3,9 s |
+| 800 × 20000, coréen | 8 | 38 | **38** | 32 | 7, toutes entières et sans faute | 7,2 s |
+
+- Aucune zone inventée, aucune bulle trouvée deux fois.
+- L’avancement est annoncé de 26 à 50 fois par bande et ne recule jamais :
+  une fois par tranche pendant le repérage, puis une fois par zone lue.
+- L’ordre rendu suit la bande de haut en bas ; deux bulles vraiment côte à
+  côte sont lues de gauche à droite.
+- **Limites de taille** : le module refuse à l’import une image de plus de
+  20 000 px de côté ou de 150 mégapixels ; la bande de 800 × 20000 est donc
+  la plus haute qu’il accepte, et elle passe. L’image n’est jamais posée
+  entière sur un canevas : le repérage en dessine une tranche de 3200 px à la
+  fois, la lecture une zone à la fois. La limite de canevas du navigateur
+  n’est donc pas en jeu, et n’a pas été cherchée ; seule l’image décodée
+  reste en mémoire, soit 64 Mo pour cette bande (calculé, non relevé).
+
+### 8.4 Pages sans rien à traduire
+
+| Page | Zones rendues | Proposée « rien à traduire » |
+| --- | --- | --- |
+| Couverture : un grand titre dessiné, cerné et penché | 0 | **oui** |
+| La même, avec une mention de chapitre de trois signes | 1 (la mention, lue juste) | non |
+| Bannière de crédits : trois rôles et trois pseudonymes, une adresse | 2 (deux pseudonymes) | **non** |
+
+La mention de chapitre est un vrai texte : ne pas proposer de passer la page
+se défend. La bannière, elle, est manquée : les mots de deux signes posés
+sans cartouche ne sont pas gardés, si bien qu’aucune zone ne porte un rôle
+suivi de deux-points, et un pseudonyme en kana passe pour une réplique.
+
+### 8.5 Ce qui marche
+
+- **Le repérage** tient pour les trois écritures : 93 bulles et cartouches
+  trouvés sur 94 sur les pages, 78 sur 78 sur les bandes, chacun dans une
+  seule zone.
+- **Le sens d’écriture** est reconnu pour toutes les zones trouvées, bulle par
+  bulle, y compris une colonne seule.
+- **Les colonnes d’une bulle font une seule zone**, lue de droite à gauche
+  par le modèle des colonnes.
+- **Le japonais** se lit bien dans les deux sens : 31 textes sur 33 sans
+  faute, les deux fautes signalées.
+- **Le chinois et le coréen en lignes** se lisent bien : 31 sur 33.
+- **Les furigana** sont écartés avant la lecture.
+- **Les bandes** : une bulle coupée par le bord d’une tranche est trouvée une
+  fois, entière.
+- **Un modèle n’est téléchargé que s’il sert** : une première analyse en
+  japonais a demandé le script du moteur, son script de travail, son cœur,
+  puis `jpn_vert` et `jpn`, et rien d’autre ; une seconde analyse n’a
+  redemandé aucune donnée de langue.
+- **L’anglais n’a pas bougé** : les dix pages du § 1, rejouées dans Chrome
+  avant et après ce changement, donnent page pour page les mêmes nombres
+  (47 textes trouvés sur 58, 44 sans faute, aucune zone inventée).
+
+### 8.6 Ce qui ne marche pas
+
+- **Le chinois en colonnes se lit mal** : 11 textes sans faute sur 22. La
+  ponctuation tombe (points de suspension, virgules, points finals, 8 des 13
+  caractères faux) et quelques signes sont confondus. La moitié de ces fautes
+  passe au-dessus du seuil.
+- **Le coréen en colonnes perd ses espaces** : les syllabes sont lues, mais
+  le modèle met une espace après chacune. Le module n’en garde aucune, ce qui
+  se corrige plus vite à la main ; aucune des 6 bulles n’est donc juste.
+- **Le modèle lit une même zone juste à une échelle et de travers à une
+  autre**, sans qu’une échelle gagne toujours. Une zone lue avec une confiance
+  sous 0,80 est donc relue à une seconde échelle (signes de 44 px, puis de
+  36 px), et la plus sûre des deux lectures est gardée. Avec une seule
+  lecture à 36 px, le japonais en colonnes donnait 18 textes sans faute sur
+  22 ; il en donne 20.
+- **La confiance ne suffit toujours pas** : 11 fautes sur 20 ne sont pas
+  signalées, et la répétition d’un petit kana, un kanji pris pour un autre ou
+  une syllabe voisine sortent avec 0,72 à 0,95.
+- **Un cartouche noir collé à une forme noire du dessin** n’est pas une plage
+  fermée : son texte est alors traité comme un texte posé sur le dessin. Sur
+  une première version des pages, où les trois cartouches noirs touchaient une
+  trame de hachures ou un disque noir, aucun n’était lu.
+- **Les signes blancs et gras d’un cartouche sombre se soudent** au seuil
+  ordinaire de l’encre claire : pour ces écritures, le seuil est relevé.
+- **Un texte de deux signes hors bulle** n’est pas gardé, et **un signe seul**
+  n’est jamais lu, même dans une bulle.
+- **Des furigana plus petits qu’une lettre repérable** (moins de 7 px sur une
+  page de 1200 px de large) ne sont pas vus, donc pas écartés. Non mesuré.
+- **Le texte posé sur le dessin et les onomatopées** : non mesurés pour ces
+  langues ; les limites relevées pour l’anglais (§ 4) valent a fortiori.
+
+### 8.7 Ce que charge le navigateur
+
+| Fichier | Poids | Quand |
+| --- | --- | --- |
+| Script du moteur, script de travail | 0,06 et 0,11 Mo | À la première analyse |
+| Cœur WebAssembly | 3,9 Mo | À la première analyse |
+| Anglais | 2,95 Mo | Chapitre en anglais |
+| Japonais : lignes, colonnes | 2,03 et 2,02 Mo | Chapitre en japonais, chaque modèle à sa première zone |
+| Chinois simplifié : lignes, colonnes | 1,72 et 1,71 Mo | Chapitre en chinois simplifié |
+| Chinois traditionnel : lignes, colonnes | 1,66 et 1,65 Mo | Chapitre en chinois traditionnel |
+| Coréen : lignes, colonnes | 1,57 et 0,62 Mo | Chapitre en coréen |
+
+Une première analyse en japonais charge donc 8,1 Mo, dont 4,05 Mo de données
+de langue. Les huit nouveaux fichiers pèsent 13 Mo dans
+`public/scan-studio-ocr/lang/` ; les paquets, qui portent aussi une variante
+plus lourde dont le module ne se sert pas, 89 Mo dans `node_modules`.
+
+Chaque modèle a son fil de travail, et deux au plus vivent en même temps.
+Sur la page de mesure, servie sans cache, le script de travail et le cœur ont
+été redemandés pour le second fil ; ce que fait l’application, qui sert ces
+fichiers avec ses propres en-têtes, n’a pas été vérifié.
+
+### 8.8 Décisions
+
+| Sujet | Pressenti dans le dossier | Décision après mesure |
+| --- | --- | --- |
+| Lecture du japonais (§ 7.2) | Modèle spécialisé manga | **Tesseract**, avec `jpn` et `jpn_vert`, dans le navigateur : 31 sur 33 sur le banc. Le modèle spécialisé n’a pas été mesuré ; il reste la piste pour le lettrage dessiné à la main. |
+| Lecture du chinois et du coréen (§ 7.2) | PaddleOCR, au format ONNX | **Tesseract** en lignes. En colonnes, il lit mais demande une relecture ; PaddleOCR n’a pas été mesuré. |
+| Variante des données | – | `4.0.0_best_int`, comme l’anglais : 0,6 à 2 Mo par modèle. |
+| Sens d’écriture | Rendu par le détecteur | Relevé **bulle par bulle** sur la disposition des signes ; la langue ne tranche que pour un signe seul. |
+| Ordre du texte dans une zone | – | Celui du moteur : ses boîtes de mots sont trop larges pour ces écritures. |
+| Seuil « lecture à vérifier » | 0,80 | **Gardé**, faute de mieux : il signale 9 fautes sur 20 et 8 lectures justes sur 73. |
+| Critère d’acceptation de S4 (§ 14) | Un chapitre de chaque langue traité de bout en bout | Sur le banc : **neuf bulles sur dix lues sans retouche en lignes** (42 sur 44 mesuré), et **en colonnes pour le japonais** (20 sur 22). Le chinois et le coréen en colonnes sont livrés comme une aide à relire. |
+
+### 8.9 Limites de ce banc
+
+- Des pages synthétiques, là encore : des polices du système, nettes, sans
+  grain ni compression, de 22 à 30 px. Pas de lettrage de manga dessiné à la
+  main, pas de police de lettrage du métier, pas de scan. Sur de vraies
+  pages, les nombres seront moins bons.
+- Une page par langue et par sens, deux pour le japonais en colonnes : 11 à
+  22 textes par ligne du tableau. Un écart d’un texte y pèse 5 à 9 points.
+- Aucun chapitre réel de ces langues n’a été traité de bout en bout : le
+  critère du § 14 reste à constater sur les pages du propriétaire.
+- Une seule machine, un seul navigateur (Chrome), une seule largeur de bande
+  (800 px). Ni Firefox, ni Safari, ni téléphone ; la mémoire de l’onglet n’a
+  pas été relevée.
+- L’atelier n’a pas été ouvert sur une bande haute : ce banc ne mesure que
+  l’analyse.
+- Les pages et les scripts du banc ne sont pas dans le dépôt.

@@ -283,14 +283,22 @@ export function splitBlocks(lines: TextLine[]): TextLine[][] {
 }
 
 /**
- * Des lettres aux blocs de texte : lignes, blocs, puis séparation des blocs
- * qui réunissent deux textes voisins.
+ * Des lignes aux blocs de texte : blocs, puis séparation des blocs qui
+ * réunissent deux textes voisins.
  */
-export function clusterGlyphs(glyphs: WordBox[]): TextGroup[] {
-  return groupLines(buildLines(glyphs))
+export function clusterLines(lines: TextLine[]): TextGroup[] {
+  return groupLines(lines)
     .flatMap((group) => {
       const blocks = splitBlocks(group.lines);
       return blocks.length > 1 ? blocks.map(toGroup) : [group];
     })
     .sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0);
+}
+
+/**
+ * Des lettres aux blocs de texte : lignes, blocs, puis séparation des blocs
+ * qui réunissent deux textes voisins.
+ */
+export function clusterGlyphs(glyphs: WordBox[]): TextGroup[] {
+  return clusterLines(buildLines(glyphs));
 }

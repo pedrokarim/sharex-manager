@@ -11,11 +11,12 @@
 
 import type { SourceLanguage, TranslationEngineId } from "../../types";
 
-export const ENGINE_IDS: TranslationEngineId[] = ["deepl", "libretranslate"];
+export const ENGINE_IDS: TranslationEngineId[] = ["deepl", "libretranslate", "mymemory"];
 
 export const ENGINE_LABELS: Record<TranslationEngineId, string> = {
   deepl: "DeepL",
   libretranslate: "LibreTranslate",
+  mymemory: "MyMemory",
 };
 
 export function isEngineId(value: unknown): value is TranslationEngineId {
@@ -52,12 +53,26 @@ export function toEngineError(error: unknown): EngineError {
 
 export interface TranslationEngine {
   id: TranslationEngineId;
+  /** Phrases qu'une requête peut emporter, quand le service en prend moins que le routeur n'en envoie d'ordinaire. */
+  maxTextsPerRequest?: number;
   /**
    * Traduit `texts` en une seule requête et rend autant de traductions, dans
    * le même ordre. Lève une `EngineError` sinon. `target` est le code de langue
    * du chapitre (« fr », « pt-BR »…) : chaque moteur le convertit.
    */
   translate(texts: string[], source: SourceLanguage, target: string, signal: AbortSignal): Promise<string[]>;
+  /**
+   * Ce que le compte a consommé chez le service, quand il le publie : une
+   * requête de lecture, sans texte envoyé. Absent : le service ne le dit pas.
+   */
+  usage?(signal: AbortSignal): Promise<RemoteUsage>;
+}
+
+/** Consommation lue chez le service, en caractères sur la période de facturation. */
+export interface RemoteUsage {
+  used: number;
+  /** Plafond du compte ; 0 quand le service n'en annonce pas. */
+  limit: number;
 }
 
 // ─── Requête HTTP commune ────────────────────────────────────────
@@ -107,6 +122,24 @@ export async function postJson(
     throw new EngineError("unavailable", signal.aborted ? "Le service n'a pas répondu à temps." : "Service injoignable.");
   }
 
+  let body: unknown = null;
+  try {
+    const raw = await response.text();
+    if (raw.length <= MAX_RESPONSE_BYTES) body = JSON.parse(raw);
+  } catch {
+    body = null;
+  }
+  return { status: response.status, body, retryAfterMs: parseRetryAfter(response.headers.get("retry-after")) };
+}
+
+/** `GET` qui rend du JSON, avec les mêmes garde-fous que `postJson`. */
+export async function getJson(url: string, headers: Record<string, string>, signal: AbortSignal): Promise<JsonResponse> {
+  let response: Response;
+  try {
+    response = await fetch(url, { method: "GET", headers: { Accept: "application/json", ...headers }, signal, redirect: "error" });
+  } catch {
+    throw new EngineError("unavailable", signal.aborted ? "Le service n'a pas répondu à temps." : "Service injoignable.");
+  }
   let body: unknown = null;
   try {
     const raw = await response.text();

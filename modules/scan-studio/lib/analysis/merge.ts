@@ -18,9 +18,14 @@ function boxOf(region: ScanRegion): Box {
   return { x0: bounds.x, y0: bounds.y, x1: bounds.x + bounds.width, y1: bounds.y + bounds.height };
 }
 
-/** Zone à laquelle une relance ne touche pas : texte lu corrigé à la main, ou traduction commencée. */
+/**
+ * Zone à laquelle une relance ne touche pas : texte lu corrigé à la main, ou
+ * traduction saisie, corrigée ou validée. Une traduction seulement proposée par
+ * un moteur, jamais retouchée, ne protège pas la zone : elle se redemande sans
+ * rien perdre, et la zone peut alors être repérée de nouveau.
+ */
 export function isProtectedRegion(region: ScanRegion): boolean {
-  return region.reading.edited || region.translation.text.trim() !== "";
+  return region.reading.edited || (region.translation.text.trim() !== "" && region.translation.status !== "proposed");
 }
 
 /** Lecture automatique trop peu sûre : la zone est marquée « lecture à vérifier ». */

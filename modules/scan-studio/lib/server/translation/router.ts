@@ -43,6 +43,7 @@ import { createDeeplEngine } from "./deepl";
 import { ENGINE_IDS, ENGINE_LABELS, EngineError, toEngineError, type TranslationEngine } from "./engines";
 import { exactGlossaryMatch, isOnlyTerms, prepareGlossary, protectTerms, restoreTerms } from "./glossary";
 import { createLibreTranslateEngine } from "./libretranslate";
+import { MYMEMORY_DAILY_LIMIT, MYMEMORY_DAILY_LIMIT_WITH_EMAIL, createMyMemoryEngine } from "./mymemory";
 import { memoryKey, openMemory } from "./memory";
 import { credentialFingerprint, keyHint, readCredentials, readSettings } from "./settings";
 import { addUsage, clearBlocks, countCharacters, markQuotaExceeded, markRejected, nextDay, readUsage } from "./usage";
@@ -95,6 +96,8 @@ export interface ResolvedEngine {
   fingerprint: string;
   keyHint?: string;
   url?: string;
+  /** Quota du jour annoncé par le service, en caractères ; absent : pas de quota journalier. */
+  dailyLimit?: number;
 }
 
 export type EngineResolver = (id: TranslationEngineId) => ResolvedEngine;
@@ -106,6 +109,14 @@ export const resolveConfiguredEngine: EngineResolver = (id) => {
   if (id === "deepl") {
     if (!credentials.deeplKey) return { fingerprint, reason: "aucune clé d'API enregistrée" };
     return { fingerprint, engine: createDeeplEngine(credentials.deeplKey), keyHint: keyHint(credentials.deeplKey) };
+  }
+  // MyMemory marche sans rien régler : il est toujours là, avec son quota du jour.
+  if (id === "mymemory") {
+    return {
+      fingerprint,
+      engine: createMyMemoryEngine(credentials.myMemoryEmail),
+      dailyLimit: credentials.myMemoryEmail ? MYMEMORY_DAILY_LIMIT_WITH_EMAIL : MYMEMORY_DAILY_LIMIT,
+    };
   }
   if (!credentials.libreTranslateUrl) return { fingerprint, reason: "aucune adresse de service enregistrée" };
   return {
@@ -199,7 +210,10 @@ export class TranslationRouter {
     const now = this.clock.now();
     const usage = readUsage(id, now);
     const limit = readSettings().monthlyLimits[id];
-    const budget = limit > 0 ? Math.max(0, limit - usage.month) : Infinity;
+    const monthly = limit > 0 ? Math.max(0, limit - usage.month) : Infinity;
+    // Un service au quota journalier : ce qui reste aujourd'hui borne aussi ce qui peut partir.
+    const daily = resolved.dailyLimit ? Math.max(0, resolved.dailyLimit - usage.day) : Infinity;
+    const budget = Math.min(monthly, daily);
     const base = { configured: true, engine: resolved.engine, budget };
 
     if (usage.rejected === resolved.fingerprint) {
@@ -207,6 +221,9 @@ export class TranslationRouter {
     }
     if (usage.quotaUntil !== undefined) {
       return { ...base, available: false, reason: "quota épuisé chez le service, nouvel essai demain" };
+    }
+    if (daily <= 0 && resolved.dailyLimit) {
+      return { ...base, available: false, reason: `quota du jour atteint (${resolved.dailyLimit.toLocaleString("fr-FR")} caractères), il repart demain` };
     }
     if (budget <= 0) {
       return { ...base, available: false, reason: `plafond mensuel atteint (${limit.toLocaleString("fr-FR")} caractères)` };
@@ -237,6 +254,8 @@ export class TranslationRouter {
     if (availability.pausedUntil) status.pausedUntil = availability.pausedUntil;
     if (resolved.keyHint) status.keyHint = resolved.keyHint;
     if (resolved.url) status.url = resolved.url;
+    if (resolved.dailyLimit) status.dailyLimit = resolved.dailyLimit;
+    if (id === "mymemory") status.contactEmail = readCredentials().myMemoryEmail ?? "";
     return status;
   }
 
@@ -277,6 +296,44 @@ export class TranslationRouter {
     } finally {
       clearTimeout(timer);
       this.lastRequestAt.set(engine.id, this.clock.now());
+    }
+  }
+
+  /**
+   * Lit chez le service ce que le compte a consommé : une requête, à la suite
+   * des autres et après le délai minimal, jamais relancée. Aucun texte ne part.
+   */
+  async remoteUsage(id: TranslationEngineId): Promise<{ ok: boolean; message: string; used?: number; limit?: number }> {
+    const label = ENGINE_LABELS[id];
+    const resolved = this.resolve(id);
+    const engine = resolved.engine;
+    if (!engine) return { ok: false, message: `${label} : ${resolved.reason ?? "non configuré"}.` };
+    const read = engine.usage?.bind(engine);
+    if (!read) return { ok: false, message: `${label} ne publie pas la consommation du compte.` };
+
+    try {
+      const usage = await this.enqueue(id, async () => {
+        const last = this.lastRequestAt.get(id);
+        if (last !== undefined) {
+          const wait = last + TIMINGS.minDelayMs - this.clock.now();
+          if (wait > 0) await this.clock.sleep(wait);
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), TIMINGS.requestTimeoutMs);
+        try {
+          return await read(controller.signal);
+        } finally {
+          clearTimeout(timer);
+          this.lastRequestAt.set(id, this.clock.now());
+        }
+      });
+      const count = (value: number) => value.toLocaleString("fr-FR");
+      const message = usage.limit > 0 ? `${count(usage.used)} caractères consommés sur ${count(usage.limit)} chez ${label}.` : `${count(usage.used)} caractères consommés chez ${label}.`;
+      return { ok: true, message, used: usage.used, limit: usage.limit };
+    } catch (error) {
+      const failure = toEngineError(error);
+      if (failure.kind === "unauthorized") markRejected(id, resolved.fingerprint, this.clock.now());
+      return { ok: false, message: failure.message };
     }
   }
 
@@ -445,10 +502,11 @@ export class TranslationRouter {
         budget -= entry.characters;
         texts.push(sent);
       }
-      if (texts.length < pending.size) note("plafond mensuel atteint");
+      if (texts.length < pending.size) note(this.resolve(id).dailyLimit ? "quota du jour atteint" : "plafond mensuel atteint");
 
       let translatedHere = 0;
-      for (const chunk of chunksOf(texts, pending)) {
+      // Un service qui ne prend qu'une phrase par requête les reçoit une à une, avec le délai entre deux.
+      for (const chunk of chunksOf(texts, pending, availability.engine.maxTextsPerRequest ?? TIMINGS.maxTextsPerRequest)) {
         // Au tour de ce lot : ce qu'un lot voisin a mis au cache entre-temps ne repart pas.
         const prepare = () => {
           if (request.force) return chunk;
@@ -570,13 +628,13 @@ function cleanTranslation(text: string): string {
 }
 
 /** Découpe un lot en requêtes, dans l'ordre, sans dépasser ce qu'une requête emporte. */
-function chunksOf(texts: string[], pending: Map<string, PendingText>): string[][] {
+function chunksOf(texts: string[], pending: Map<string, PendingText>, maxTexts: number = TIMINGS.maxTextsPerRequest): string[][] {
   const chunks: string[][] = [];
   let chunk: string[] = [];
   let characters = 0;
   for (const text of texts) {
     const size = pending.get(text)?.characters ?? 0;
-    if (chunk.length > 0 && (chunk.length >= TIMINGS.maxTextsPerRequest || characters + size > TIMINGS.maxCharactersPerRequest)) {
+    if (chunk.length > 0 && (chunk.length >= maxTexts || characters + size > TIMINGS.maxCharactersPerRequest)) {
       chunks.push(chunk);
       chunk = [];
       characters = 0;

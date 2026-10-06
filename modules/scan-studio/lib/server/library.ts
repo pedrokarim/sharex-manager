@@ -50,7 +50,9 @@ import {
 import {
   DEFAULT_CHAPTER_SETTINGS,
   isId,
+  type ChapterOrigin,
   type ChapterSettings,
+  type ChapterSharing,
   type ChapterSummary,
   type ChapterView,
   type FolderSummary,
@@ -66,6 +68,7 @@ import {
   type UploadedFile,
 } from "../types";
 import { probeImage, writeThumbnail, type ImageInfo } from "./images";
+import { isChapterVisibility, isPublishablePage, newPublicSlug, publicChapterPath, visibilityOf } from "./visibility";
 import { approvedPairs, forgetMemory, recordMemory } from "./translation/memory";
 import {
   sanitizeChapterNumber,
@@ -139,7 +142,18 @@ function pagesOf(chapter: ScanChapter): ScanPage[] {
   return chapter.pageIds.flatMap((id) => readPage(id) ?? []);
 }
 
-function summarizeChapter(chapter: ScanChapter, pages = pagesOf(chapter)): ChapterSummary {
+/** Pages d'un chapitre qui peuvent être lues en public : exportées, rendu présent, pas « laissées telles quelles ». */
+function countPublishable(pages: ScanPage[]): number {
+  return pages.filter((page) => isPublishablePage(page) && assetExists(page.exported!.file)).length;
+}
+
+/** Adresse de lecture publique d'un chapitre ; absente tant qu'il est privé. */
+function publicPathOf(chapter: ScanChapter, folder: ScanFolder | null): string | undefined {
+  if (visibilityOf(chapter) === "private" || !chapter.publicSlug || !folder?.publicSlug) return undefined;
+  return publicChapterPath(folder.publicSlug, chapter.publicSlug);
+}
+
+function summarizeChapter(chapter: ScanChapter, pages = pagesOf(chapter), folder: ScanFolder | null = readFolder(chapter.folderId)): ChapterSummary {
   const progress: Record<PageStatus, number> = { imported: 0, analyzed: 0, translated: 0, reviewed: 0, exported: 0 };
   let updatedAt = chapter.updatedAt;
   for (const page of pages) {
@@ -155,6 +169,9 @@ function summarizeChapter(chapter: ScanChapter, pages = pagesOf(chapter)): Chapt
     pageCount: pages.length,
     progress,
     cover: pages[0] ? thumbUrl(pageThumbName(pages[0].id)) : undefined,
+    visibility: visibilityOf(chapter),
+    publishablePages: countPublishable(pages),
+    publicPath: publicPathOf(chapter, folder),
     updatedAt,
   };
 }
@@ -189,7 +206,7 @@ export function listFolders(): FolderSummary[] {
 
 export function getFolder(folderId: unknown): FolderView {
   const folder = requireFolder(folderId);
-  return { folder, chapters: chaptersOf(folder).map((chapter) => summarizeChapter(chapter)) };
+  return { folder, chapters: chaptersOf(folder).map((chapter) => summarizeChapter(chapter, undefined, folder)) };
 }
 
 export function createFolder(input: unknown): ScanFolder {
@@ -214,11 +231,17 @@ export function updateFolder(folderId: unknown, patch: unknown): ScanFolder {
   const name = changes.name === undefined ? undefined : sanitizeFolderName(changes.name);
   const defaults: ChapterSettings | undefined = changes.defaults === undefined ? undefined : sanitizeSettings(changes.defaults);
   const glossary: GlossaryEntry[] | undefined = changes.glossary === undefined ? undefined : sanitizeGlossary(changes.glossary);
+  if (changes.defaultVisibility !== undefined && !isChapterVisibility(changes.defaultVisibility)) throw new Error("Visibilité inconnue.");
 
   const folder = requireFolder(folderId);
   if (name !== undefined) folder.name = name;
   if (defaults) folder.defaults = defaults;
   if (glossary) folder.glossary = glossary;
+  if (changes.defaultVisibility !== undefined) {
+    // Ne vaut que pour les chapitres créés ensuite : les chapitres existants gardent la leur.
+    if (changes.defaultVisibility === "private") delete folder.defaultVisibility;
+    else folder.defaultVisibility = changes.defaultVisibility;
+  }
   folder.updatedAt = Date.now();
   writeFolder(folder);
   return folder;
@@ -267,10 +290,13 @@ export function reorderChapters(folderId: unknown, chapterIds: unknown): ScanFol
 export function getChapter(chapterId: unknown): ChapterView {
   const chapter = requireChapter(chapterId);
   const folder = requireFolder(chapter.folderId);
+  const pages = pagesOf(chapter);
   return {
     chapter,
     folder: { id: folder.id, name: folder.name },
-    pages: pagesOf(chapter).map(summarizePage),
+    pages: pages.map(summarizePage),
+    publishablePages: countPublishable(pages),
+    publicPath: publicPathOf(chapter, folder),
   };
 }
 
@@ -284,16 +310,22 @@ export function createChapter(folderId: unknown, input: unknown): ScanChapter {
     throw new Error(`Ce dossier a atteint ${MAX_FOLDER_CHAPTERS} chapitres.`);
   }
   const now = Date.now();
+  const id = newChapterId();
+  // Le dossier a pu demander que ses nouveaux chapitres naissent publics : le
+  // chapitre reçoit alors son adresse, mais n'a rien à montrer avant son premier export.
+  const visibility = visibilityOf({ visibility: folder.defaultVisibility });
   const chapter: ScanChapter = {
-    id: newChapterId(),
+    id,
     folderId: folder.id,
     number,
     ...(title ? { title } : {}),
     settings: structuredClone(folder.defaults),
     pageIds: [],
+    ...(visibility === "private" ? {} : { visibility, publicSlug: newPublicSlug(id) }),
     createdAt: now,
     updatedAt: now,
   };
+  if (visibility !== "private") folder.publicSlug ??= newPublicSlug(folder.id);
   // Le chapitre avant le dossier : le dossier ne cite jamais un chapitre qui n'existe pas.
   writeChapter(chapter);
   folder.chapterIds.push(chapter.id);
@@ -334,6 +366,83 @@ export function deleteChapter(chapterId: unknown): { deleted: boolean } {
   return { deleted: true };
 }
 
+// ─── Lecture publique ────────────────────────────────────────────
+
+/**
+ * Change la visibilité d'un chapitre (§ 11.2 du dossier) : privé, public par
+ * son lien, listé au catalogue. C'est le seul geste qui rend un chapitre
+ * existant public.
+ *
+ * - Un chapitre sans page exportée ne se publie pas : il n'aurait rien à
+ *   montrer, et seules les pages exportées sont servies.
+ * - Repasser en privé efface l'adresse publique : les anciens liens ne mènent
+ *   plus à rien, et une nouvelle publication donnera une autre adresse. Les
+ *   lectures publiques relisent la fiche à chaque demande : l'effet est
+ *   immédiat.
+ */
+export function setChapterVisibility(chapterId: unknown, visibility: unknown): ChapterSharing {
+  if (!isChapterVisibility(visibility)) throw new Error("Visibilité inconnue.");
+
+  const chapter = requireChapter(chapterId);
+  const folder = requireFolder(chapter.folderId);
+  const publishablePages = countPublishable(pagesOf(chapter));
+  if (visibility !== "private" && publishablePages === 0) {
+    throw new Error("Ce chapitre n'a aucune page exportée : exportez au moins une page depuis l'atelier avant de le publier.");
+  }
+
+  const now = Date.now();
+  if (visibility === "private") {
+    delete chapter.visibility;
+    delete chapter.publicSlug;
+  } else {
+    chapter.visibility = visibility;
+    chapter.publicSlug ??= newPublicSlug(chapter.id);
+    if (!folder.publicSlug) {
+      // Le dossier d'abord : un chapitre public ne cite jamais une série sans adresse.
+      folder.publicSlug = newPublicSlug(folder.id);
+      folder.updatedAt = now;
+      writeFolder(folder);
+    }
+  }
+  chapter.updatedAt = now;
+  writeChapter(chapter);
+  return { visibility: visibilityOf(chapter), publicPath: publicPathOf(chapter, folder), publishablePages };
+}
+
+/** Texte court sur une ligne, sans caractère de contrôle ; `undefined` s'il est vide ou mal formé. */
+function shortLine(value: unknown, max: number): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const line = value
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+  return line || undefined;
+}
+
+/**
+ * Note d'où vient un chapitre importé par lien : le site, l'adresse du
+ * chapitre chez lui et l'équipe qu'il crédite. Ni le titre ni le numéro du
+ * chapitre ne sont touchés. Appelé par l'import, jamais par le navigateur.
+ */
+export function recordChapterOrigin(chapterId: unknown, origin: { source?: unknown; url?: unknown; credit?: unknown }): void {
+  const source = shortLine(origin?.source, 80);
+  if (!source) return;
+  const credit = shortLine(origin.credit, 200);
+  let url: string | undefined;
+  try {
+    const parsed = new URL(String(origin.url ?? ""));
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") url = parsed.href.slice(0, 500);
+  } catch {
+    // Pas d'adresse lisible : la source reste nommée, sans lien.
+  }
+  const chapter = readChapter(chapterId);
+  if (!chapter) return;
+  const next: ChapterOrigin = { source, ...(url ? { url } : {}), ...(credit ? { credit } : {}) };
+  chapter.origin = next;
+  writeChapter(chapter);
+}
+
 export function reorderPages(chapterId: unknown, pageIds: unknown): ScanChapter {
   const chapter = requireChapter(chapterId);
   assertSameIds(pageIds, chapter.pageIds, "L'ordre envoyé ne correspond pas aux pages du chapitre.");
@@ -346,8 +455,8 @@ export function reorderPages(chapterId: unknown, pageIds: unknown): ScanChapter 
 // ─── Suppression de pages ────────────────────────────────────────
 
 /**
- * Efface des pages et tout ce qui leur appartient : fiche, vignettes, image
- * d'origine, rendu. Un fichier de `assets/` n'est effacé que si aucune page
+ * Efface des pages et tout ce qui leur appartient : fiche, vignettes, image
+ * d'origine, rendu, versions traduites par IA. Un fichier de `assets/` n'est effacé que si aucune page
  * restante ne s'en sert (la même image peut avoir été rattachée deux fois).
  */
 function removePages(pageIds: string[]) {
@@ -361,6 +470,8 @@ function removePages(pageIds: string[]) {
     removeThumb(pageThumbName(page.id));
     if (!stillUsed.has(page.source.file)) removeAsset(page.source.file);
     if (page.exported && !stillUsed.has(page.exported.file)) dropExportFiles(page.exported.file);
+    // Les versions traduites par IA n'appartiennent qu'à leur page.
+    for (const version of page.aiVersions ?? []) if (version?.file && !stillUsed.has(version.file)) removeAsset(version.file);
   }
 
   const exports = readExports();
@@ -507,7 +618,30 @@ export async function importPages(chapterId: unknown, files: unknown): Promise<P
   return attachPages(chapterId, pending);
 }
 
-/** Nom simple d'un fichier de la galerie : ni chemin, ni remontée, ni fichier caché, image seulement. */
+/**
+ * Efface des images déposées par la route d'envoi qui n'ont pas pu être
+ * rattachées : sans cela, elles resteraient dans `assets/` sans page. Seul
+ * un fichier dont plus rien ne se sert est effacé ; les autres sont laissés.
+ */
+export function discardUploads(files: unknown): { discarded: number } {
+  if (!Array.isArray(files) || files.length > MAX_IMPORT_FILES) throw new Error("Liste de fichiers invalide.");
+  const names = new Set<string>();
+  for (const entry of files) {
+    const file = entry && typeof entry === "object" ? (entry as Record<string, unknown>).file : entry;
+    if (!isAssetName(file)) throw new Error("Fichier déposé invalide.");
+    names.add(file);
+  }
+  const used = referencedAssets();
+  let discarded = 0;
+  for (const file of names) {
+    if (used.has(file) || !assetExists(file)) continue;
+    removeAsset(file);
+    discarded++;
+  }
+  return { discarded };
+}
+
+/** Nom simple d'un fichier de la galerie : ni chemin, ni remontée, ni fichier caché, image seulement. */
 function assertGalleryName(value: unknown): asserts value is string {
   if (
     typeof value !== "string" ||

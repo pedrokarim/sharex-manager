@@ -82,7 +82,7 @@ describe("scan studio : contrôle des zones", () => {
       (draft) => (draft.kind = "bulle"),
       (draft) => (draft.direction = "diagonal"),
       (draft) => (draft.translation.status = "done"),
-      (draft) => (draft.mask.kind = "inpaint"),
+      (draft) => (draft.mask.kind = "flou"),
       (draft) => (draft.mask.shape = "star"),
       (draft) => (draft.text.style = { align: "justify" }),
     ];

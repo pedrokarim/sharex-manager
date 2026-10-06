@@ -38,6 +38,7 @@ const MODULE_PAGES: Record<string, Record<string, PageLoader>> = {
     edit: () => import("@/modules/scan-studio/pages/editor"),
     engines: () => import("@/modules/scan-studio/pages/engines"),
     sources: () => import("@/modules/scan-studio/pages/sources"),
+    fonts: () => import("@/modules/scan-studio/pages/fonts"),
   },
 };
 

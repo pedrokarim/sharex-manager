@@ -14,12 +14,27 @@
  */
 
 import type { GallerySourceImport, GallerySourcePage, GallerySourceQuery, ModuleHooks } from "@/types/modules";
+import type { CatalogSectionCollection, CatalogSectionItem, CatalogSectionListing, CatalogSectionMedia } from "@/types/modules";
+import type { ChapterSharing, ChapterVisibility, DetectorChoice, DetectorStatus, DetectorVariantId } from "./lib/types";
+import * as ai from "./lib/server/ai";
+import * as fonts from "./lib/server/fonts";
 import * as gallery from "./lib/server/gallery";
 import * as library from "./lib/server/library";
+import * as publicReading from "./lib/server/public";
 import * as sources from "./lib/server/sources";
 import * as translation from "./lib/server/translation";
+import * as detector from "./lib/server/detector";
 import { ensureDirs } from "./lib/store";
 import type { LinkImportReport } from "./lib/library-helpers";
+import type {
+  AiCatalogue,
+  AiPageVersion,
+  AiReadingProposal,
+  AiSettingsPatch,
+  AiTranslationProposal,
+  CustomFont,
+  FontUsage,
+} from "./lib/types";
 import type {
   ChapterSettings,
   ChapterView,
@@ -59,7 +74,7 @@ export async function createFolder(input: { name: string }): Promise<ScanFolder>
 
 export async function updateFolder(
   folderId: string,
-  patch: { name?: string; defaults?: ChapterSettings; glossary?: GlossaryEntry[] }
+  patch: { name?: string; defaults?: ChapterSettings; glossary?: GlossaryEntry[]; defaultVisibility?: ChapterVisibility }
 ): Promise<ScanFolder> {
   return library.updateFolder(folderId, patch);
 }
@@ -102,6 +117,11 @@ export async function importPages(chapterId: string, files: UploadedFile[]): Pro
   return library.importPages(chapterId, files);
 }
 
+/** Efface des images déposées qui n'ont pas pu être rattachées à un chapitre. */
+export async function discardUploads(files: UploadedFile[]): Promise<{ discarded: number }> {
+  return library.discardUploads(files);
+}
+
 /** Copie des images de la galerie dans le chapitre. */
 export async function importGalleryFiles(chapterId: string, fileNames: string[]): Promise<PageSummary[]> {
   return library.importGalleryFiles(chapterId, fileNames);
@@ -139,12 +159,49 @@ export async function registerExport(pageId: string, file: string): Promise<Page
 }
 
 /**
- * Copie les pages exportées d'un chapitre dans la galerie. Aucun album n'est
- * créé : une fonction de module ne reçoit pas la session, et un album a un
- * propriétaire. `albumId` n'est donc jamais rendu.
+ * Copie les pages d'un chapitre dans la galerie, dans l'ordre de lecture : le
+ * rendu des pages exportées, et telles quelles les pages « laissées telles
+ * quelles ». Elles sont réunies dans un album privé, un par chapitre ;
+ * `albumId` manque si l'album n'a pas pu être créé.
  */
 export async function sendChapterToGallery(chapterId: string): Promise<{ saved: number; albumId?: number }> {
   return gallery.sendChapterToGallery(chapterId);
+}
+
+// ─── Lecture publique (§ 11.2 du dossier) ────────────────────────
+
+/**
+ * Change la visibilité d'un chapitre : privé, public par son lien, listé au
+ * catalogue. Refusé tant qu'aucune page n'est exportée. Repasser en privé
+ * efface l'adresse publique, tout de suite.
+ */
+export async function setChapterVisibility(chapterId: string, visibility: ChapterVisibility): Promise<ChapterSharing> {
+  return library.setChapterVisibility(chapterId, visibility);
+}
+
+// Les quatre fonctions qui suivent servent le catalogue public
+// (`catalogSections`), sans compte : audience `public` dans `module.json`,
+// jamais appelables par le navigateur. Elles ne font que lire, et ne rendent
+// que des champs publics.
+
+/** Les séries qui ont au moins un chapitre listé au catalogue. */
+export async function listPublicSeries(): Promise<CatalogSectionListing> {
+  return publicReading.listPublicSeries();
+}
+
+/** Une série et ses chapitres listés ; `null` si elle n'en a aucun. */
+export async function getPublicSeries(seriesSlug: string): Promise<CatalogSectionCollection | null> {
+  return publicReading.getPublicSeries(seriesSlug);
+}
+
+/** Un chapitre public et les adresses de ses pages exportées ; `null` s'il est privé ou inconnu. */
+export async function getPublicChapter(seriesSlug: string, chapterSlug: string): Promise<CatalogSectionItem | null> {
+  return publicReading.getPublicChapter(seriesSlug, chapterSlug);
+}
+
+/** Le rendu, ou sa vignette, que désigne une adresse d'image publique ; `null` pour tout le reste. */
+export async function openPublicMedia(parts: string[]): Promise<CatalogSectionMedia | null> {
+  return publicReading.openPublicMedia(parts);
 }
 
 // ─── Traduction ──────────────────────────────────────────────────
@@ -181,6 +238,33 @@ export async function saveEngineSettings(patch: EngineSettingsPatch): Promise<En
 /** Réservé aux administrateurs : une courte traduction d'essai, une seule requête. */
 export async function testEngine(engineId: TranslationEngineId): Promise<{ ok: boolean; message: string }> {
   return translation.testEngine(engineId);
+}
+
+// ─── Détecteur de bulles et de texte ─────────────────────────────
+
+/** La variante choisie, ce qui est installé, et l'adresse du modèle pour le navigateur. */
+export async function getDetector(): Promise<DetectorStatus> {
+  return detector.getDetector();
+}
+
+/** Réservé aux administrateurs (absent de `module.json`) : choisit la variante en service, ou coupe le détecteur. */
+export async function setDetectorChoice(choice: DetectorChoice): Promise<DetectorStatus> {
+  return detector.setDetectorChoice(choice);
+}
+
+/** Réservé aux administrateurs (absent de `module.json`) : télécharge le modèle d'une variante, vérifié à l'arrivée. */
+export async function downloadDetector(variant: DetectorVariantId): Promise<DetectorStatus> {
+  return detector.downloadDetector(variant);
+}
+
+/** Réservé aux administrateurs (absent de `module.json`) : efface le modèle d'une variante. */
+export async function removeDetector(variant: DetectorVariantId): Promise<DetectorStatus> {
+  return detector.removeDetector(variant);
+}
+
+/** Réservé aux administrateurs (absent de `module.json`) : la consommation du compte, lue chez le service. */
+export async function readEngineUsage(engineId: TranslationEngineId): Promise<{ ok: boolean; message: string; used?: number; limit?: number }> {
+  return translation.readEngineUsage(engineId);
 }
 
 // ─── Sources : import d'un chapitre par son lien ─────────────────
@@ -233,6 +317,86 @@ export async function getLinkImport(jobId: string): Promise<LinkImportReport> {
 /** Arrête un import ; ce qui a été téléchargé sans devenir une page est effacé. */
 export async function cancelLinkImport(jobId: string): Promise<LinkImportReport> {
   return sources.cancelLinkImport(jobId);
+}
+
+// ─── Polices ajoutées (§ 8 du dossier) ───────────────────────────
+
+/** Les polices ajoutées par le propriétaire de l'instance. */
+export async function listFonts(): Promise<CustomFont[]> {
+  return fonts.listFonts();
+}
+
+/**
+ * Contenu d'une police, pour le navigateur d'un compte connecté : une police
+ * ajoutée n'a pas d'adresse, elle ne sort que par cette fonction.
+ */
+export async function getFontFile(fontId: string): Promise<Buffer> {
+  return fonts.readFontFile(fontId);
+}
+
+/** Pages, chapitres et dossiers qui portent une police : ce qui changerait si elle était retirée. */
+export async function getFontUsage(fontId: string): Promise<FontUsage> {
+  return fonts.getFontUsage(fontId);
+}
+
+/** Réservé aux administrateurs : absente de `functions` dans `module.json`. Le fichier est contrôlé avant d'être gardé. */
+export async function addFont(data: Uint8Array, name?: string): Promise<CustomFont> {
+  return fonts.addFont({ data, name });
+}
+
+/** Réservé aux administrateurs : change le nom affiché, sans toucher aux pages. */
+export async function renameFont(fontId: string, name: string): Promise<CustomFont> {
+  return fonts.renameFont(fontId, name);
+}
+
+/**
+ * Réservé aux administrateurs. Une police encore utilisée n'est retirée qu'avec
+ * `replaceWith`, la police que prendront les pages qui la portaient.
+ */
+export async function removeFont(fontId: string, options?: { replaceWith?: string }): Promise<{ removed: boolean; replaced: FontUsage }> {
+  return fonts.removeFont(fontId, options);
+}
+
+// ─── IA en dernier recours (niveau 3, § 3 et § 6.8 du dossier) ───
+// Chaque appel part d'un clic sur une zone ou une page ; le serveur refuse tout
+// si le niveau du chapitre est sous 3, et tient le plafond mensuel d'appels.
+
+/** Modèles de la palette d'IA proposés pour ce chapitre, et appels du mois. N'appelle aucun fournisseur. */
+export async function getAiCatalogue(chapterId: string): Promise<AiCatalogue> {
+  return ai.getAiCatalogue(chapterId);
+}
+
+/** Appels à l'IA du mois, et plafond. */
+export async function getAiUsage(): Promise<{ month: number; monthlyLimit: number }> {
+  return ai.getAiUsage();
+}
+
+/** Réservé aux administrateurs : le plafond mensuel d'appels à l'IA. */
+export async function saveAiSettings(patch: AiSettingsPatch): Promise<{ month: number; monthlyLimit: number }> {
+  return ai.saveAiSettings(patch);
+}
+
+/** Relit une zone : son image part chez un modèle, la lecture revient comme une proposition. */
+export async function askAiReading(pageId: string, regionId: string, options?: { model?: string }): Promise<AiReadingProposal> {
+  return ai.askAiReading(pageId, regionId, options);
+}
+
+/** Traduit une zone, ou les zones d'une page, avec le contexte, en un seul appel. Rend des propositions. */
+export async function askAiTranslation(pageId: string, regionIds: string[], options?: { model?: string }): Promise<AiTranslationProposal> {
+  return ai.askAiTranslation(pageId, regionIds, options);
+}
+
+/** Traduit la page entière par un moteur d'image, en une version gardée à côté du travail de l'atelier. */
+export async function askAiPage(pageId: string, options?: { model?: string }): Promise<AiPageVersion> {
+  return ai.askAiPage(pageId, options);
+}
+
+export async function listAiPageVersions(pageId: string): Promise<AiPageVersion[]> {
+  return ai.listAiPageVersions(pageId);
+}
+
+export async function deleteAiPageVersion(pageId: string, versionId: string): Promise<{ deleted: boolean }> {
+  return ai.deleteAiPageVersion(pageId, versionId);
 }
 
 // ─── Source pour la galerie ──────────────────────────────────────

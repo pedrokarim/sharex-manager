@@ -33,7 +33,7 @@ import type { LinkImportReport } from "../../library-helpers";
 import { assetPath, ensureDirs, newAssetName, readJson, referencedAssets, removeAsset, writeJson, type AssetExtension } from "../../store";
 import type { LinkImportState, LinkPreview, SourceErrorKind, UploadedFile } from "../../types";
 import { probeImage } from "../images";
-import { MAX_IMPORT_FILES, importPages, requireChapter, requireFolder, setFolderCover } from "../library";
+import { MAX_IMPORT_FILES, importPages, recordChapterOrigin, requireChapter, requireFolder, setFolderCover } from "../library";
 import { AbortedError, SourceError, type ChapterInfo, type SourceAdapter, type SourceContext } from "./adapter";
 import type { PoliteFetcher } from "./fetcher";
 import { detect } from "./registry";
@@ -283,6 +283,12 @@ export class ImportManager {
       stopIfCancelled();
       this.touch(job, { state: "importing" });
       const pages = await importPages(job.chapterId, files);
+      // D'où vient le chapitre : le site, son adresse et l'équipe créditée, montrés avec sa lecture publique.
+      try {
+        recordChapterOrigin(job.chapterId, { source: adapter.name, url: job.url, credit: chapter.info.credit });
+      } catch (failure) {
+        console.error("[scan-studio] origine du chapitre non enregistrée :", failure);
+      }
       // La couverture de la série, si le site en donne une et que le dossier n'en a pas.
       await this.fetchSeriesCover(job.chapterId, chapter.info.seriesCoverUrl, fetcher, controller.signal);
       this.touch(job, { state: "done", imported: pages.length });

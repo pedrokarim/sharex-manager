@@ -4,7 +4,14 @@ import path from "node:path";
 import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const shared = vi.hoisted(() => ({ uploads: "", announced: [] as string[], secured: [] as string[] }));
+const shared = vi.hoisted(() => ({
+  uploads: "",
+  announced: [] as string[],
+  secured: [] as string[],
+  /** Une fausse base d'albums, en mémoire : la vraie s'ouvre avec `bun:sqlite`, absent sous Node. */
+  albums: [] as { id: number; name: string; description?: string; userId?: string; isPublic?: boolean; files: string[] }[],
+  userId: "compte-test" as string | undefined,
+}));
 
 // La galerie de test vit dans un répertoire temporaire, et rien n'est diffusé.
 vi.mock("@/lib/config", () => ({ getAbsoluteUploadPath: () => shared.uploads }));
@@ -12,6 +19,25 @@ vi.mock("@/lib/secure-files", () => ({
   setFileSecure: async (fileName: string, secure: boolean) => {
     if (secure) shared.secured.push(fileName);
   },
+}));
+vi.mock("@/lib/utils/albums-db", () => ({
+  albumsDb: {
+    getAlbum: (id: number) => shared.albums.find((album) => album.id === id) ?? null,
+    createAlbum: (options: { name: string; description?: string; userId?: string }) => {
+      const album = { id: shared.albums.length + 1, ...options, files: [] as string[] };
+      shared.albums.push(album);
+      return album;
+    },
+    addFilesToAlbum: (id: number, fileNames: string[]) => {
+      const album = shared.albums.find((entry) => entry.id === id)!;
+      for (const fileName of fileNames) if (!album.files.includes(fileName)) album.files.push(fileName);
+      return [];
+    },
+  },
+}));
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
+vi.mock("@/lib/auth", () => ({
+  auth: { api: { getSession: async () => (shared.userId ? { user: { id: shared.userId } } : null) } },
 }));
 vi.mock("@/lib/gallery-events", () => ({
   announceNewUpload: async (fileName: string) => {
@@ -69,6 +95,8 @@ beforeEach(() => {
   shared.uploads = path.join(root, "uploads");
   shared.announced.length = 0;
   shared.secured.length = 0;
+  shared.albums.length = 0;
+  shared.userId = "compte-test";
   fs.mkdirSync(shared.uploads, { recursive: true });
   setDataRoot(path.join(root, "data"));
 });
@@ -85,15 +113,21 @@ describe("scan studio : contrat du module", () => {
     const entry = fs.readFileSync(path.join(moduleDir, "index.process.ts"), "utf8");
     const client = fs.readFileSync(path.join(moduleDir, "lib/client.ts"), "utf8");
 
+    // Les fonctions du catalogue public (`catalogSections`) se servent sans
+    // compte, et jamais par le navigateur : elles sont les seules à ne pas
+    // être « user ».
+    const publicFunctions = new Set<string>(
+      (config.catalogSections ?? []).flatMap((section: Record<string, string>) => [section.list, section.collection, section.item, section.media])
+    );
     for (const name of Object.keys(config.functions)) {
-      expect(config.functions[name]).toBe("user");
+      expect(config.functions[name]).toBe(publicFunctions.has(name) ? "public" : "user");
       expect(entry).toMatch(new RegExp(`export async function ${name}\\b`));
       expect(typeof (api as Record<string, unknown>)[name]).toBe("function");
     }
     // Tout ce que l'interface appelle existe côté serveur. Les réglages des
     // moteurs sont réservés aux administrateurs : absents de la table des
     // fonctions, exprès.
-    const adminOnly = new Set(["saveEngineSettings", "testEngine", "setSourceEnabled", "refreshSourceIcon"]);
+    const adminOnly = new Set(["saveEngineSettings", "testEngine", "readEngineUsage", "setDetectorChoice", "downloadDetector", "removeDetector", "setSourceEnabled", "refreshSourceIcon", "addFont", "renameFont", "removeFont", "saveAiSettings"]);
     for (const [, name] of client.matchAll(/callModule<[^>]*>\("(\w+)"/g)) {
       expect(entry).toMatch(new RegExp(`export async function ${name}\\b`));
       if (adminOnly.has(name)) expect(config.functions[name]).toBeUndefined();
@@ -223,6 +257,14 @@ describe("scan studio : import de pages", () => {
     expect((await api.getChapter(chapter.id)).pages).toEqual([]);
     expect(fs.readdirSync(thumbsDir())).toEqual([]);
     expect(fs.readdirSync(path.join(root, "data", "pages"))).toEqual([]);
+
+    // Une image déposée qui n'est devenue la page de rien s'efface à la demande ; une page garde la sienne.
+    const kept = await upload();
+    await api.importPages(chapter.id, [{ file: kept, name: "page.png" }]);
+    expect(await api.discardUploads([{ file: good, name: "1.png" }, { file: kept, name: "page.png" }, { file: "1760000000000-0000000fff.png", name: "absent.png" }])).toEqual({ discarded: 1 });
+    expect(exists("assets", good)).toBe(false);
+    expect(exists("assets", kept)).toBe(true);
+    await expect(api.discardUploads([{ file: "../secret.png", name: "x" }])).rejects.toThrow("Fichier déposé invalide.");
   });
 
   it("refuse une image démesurée et un lot trop gros", async () => {
@@ -397,7 +439,7 @@ describe("scan studio : export et galerie", () => {
     await api.registerExport(pages[0].id, await upload());
     await api.registerExport(pages[2].id, await upload());
 
-    expect(await api.sendChapterToGallery(chapter.id)).toEqual({ saved: 2 });
+    expect(await api.sendChapterToGallery(chapter.id)).toEqual({ saved: 2, albumId: 1 });
     const copies = fs.readdirSync(shared.uploads);
     expect(copies).toHaveLength(2);
     for (const copy of copies) expect(copy).toMatch(/^[A-Za-z0-9_-]{12}\.png$/);
@@ -406,10 +448,75 @@ describe("scan studio : export et galerie", () => {
     expect([...shared.secured].sort()).toEqual([...copies].sort());
 
     // Rien n'est recopié tant que les copies existent ; une copie effacée est refaite.
-    expect(await api.sendChapterToGallery(chapter.id)).toEqual({ saved: 0 });
+    expect(await api.sendChapterToGallery(chapter.id)).toEqual({ saved: 0, albumId: 1 });
     fs.rmSync(path.join(shared.uploads, copies[0]));
-    expect(await api.sendChapterToGallery(chapter.id)).toEqual({ saved: 1 });
+    expect(await api.sendChapterToGallery(chapter.id)).toEqual({ saved: 1, albumId: 1 });
     expect(fs.readdirSync(shared.uploads)).toHaveLength(2);
+  });
+
+  it("envoie le chapitre dans l'ordre de lecture, pages laissées telles quelles comprises, dans un album privé", async () => {
+    const { chapter, pages, files } = await chapterWithPages(5);
+    // Couverture et bannière laissées telles quelles, deux pages traduites, une page pas encore exportée.
+    await api.setPageSkipped(pages[0].id, true);
+    await api.setPageSkipped(pages[3].id, true);
+    const renders = [await upload(70, 100), await upload(70, 100)];
+    await api.registerExport(pages[1].id, renders[0]);
+    await api.registerExport(pages[2].id, renders[1]);
+
+    const sent = await api.sendChapterToGallery(chapter.id);
+    expect(sent).toEqual({ saved: 4, albumId: 1 });
+
+    // L'album : privé, au nom de la série et du chapitre, à qui a lancé l'envoi.
+    expect(shared.albums).toHaveLength(1);
+    const album = shared.albums[0];
+    expect(album).toMatchObject({ name: "Série test – chapitre 1", description: "Début", userId: "compte-test" });
+    expect(album.isPublic).toBeUndefined();
+
+    // Quatre fichiers, dans l'ordre de lecture : chacun est la copie exacte de ce qui était attendu.
+    const expected = [files[0].file, renders[0], renders[1], files[3].file];
+    expect(album.files).toHaveLength(4);
+    expect(shared.announced).toEqual(album.files);
+    album.files.forEach((copy, index) => {
+      expect(fs.readFileSync(path.join(shared.uploads, copy)).equals(fs.readFileSync(path.join(assetsDir(), expected[index])))).toBe(true);
+    });
+    // Tout entre dans la galerie en privé, pages laissées telles quelles comprises.
+    expect([...shared.secured].sort()).toEqual([...album.files].sort());
+    // Les images d'origine ne bougent pas.
+    for (const file of files) expect(exists("assets", file.file)).toBe(true);
+
+    // Rien n'est recopié au second envoi ; la page exportée entre-temps s'ajoute à sa place dans la liste.
+    await api.registerExport(pages[4].id, await upload(70, 100));
+    expect(await api.sendChapterToGallery(chapter.id)).toEqual({ saved: 1, albumId: 1 });
+    expect(shared.albums[0].files).toHaveLength(5);
+    expect(fs.readdirSync(shared.uploads)).toHaveLength(5);
+
+    // Une page remise à traduire n'est plus envoyée telle quelle ; une copie effacée est refaite.
+    await api.setPageSkipped(pages[3].id, false);
+    fs.rmSync(path.join(shared.uploads, album.files[0]));
+    expect(await api.sendChapterToGallery(chapter.id)).toEqual({ saved: 1, albumId: 1 });
+
+    // L'album supprimé entre-temps est recréé, toujours privé.
+    shared.albums.length = 0;
+    const again = await api.sendChapterToGallery(chapter.id);
+    expect(again.saved).toBe(0);
+    expect(shared.albums).toHaveLength(1);
+    expect(again.albumId).toBe(shared.albums[0].id);
+    expect(shared.albums[0].files).toHaveLength(4);
+  });
+
+  it("n'envoie pas un chapitre fait seulement de pages laissées telles quelles, et survit à un album impossible", async () => {
+    const { chapter, pages } = await chapterWithPages(2);
+    await api.setPageSkipped(pages[0].id, true);
+    await expect(api.sendChapterToGallery(chapter.id)).rejects.toThrow("Aucune page exportée dans ce chapitre.");
+    expect(fs.readdirSync(shared.uploads)).toEqual([]);
+    expect(shared.albums).toEqual([]);
+
+    // Sans session, l'album n'a pas de propriétaire ; il reste privé.
+    shared.userId = undefined;
+    await api.registerExport(pages[1].id, await upload());
+    expect(await api.sendChapterToGallery(chapter.id)).toEqual({ saved: 2, albumId: 1 });
+    expect(shared.albums[0].userId).toBeUndefined();
+    expect(shared.albums[0].isPublic).toBeUndefined();
   });
 
   it("propose les pages exportées à la galerie, de la plus récente à la plus ancienne", async () => {

@@ -32,6 +32,7 @@
     "deleteChapter": "user",
     "reorderChapters": "user",
     "importPages": "user",
+    "discardUploads": "user",
     "importGalleryFiles": "user",
     "reorderPages": "user",
     "deletePage": "user",
@@ -39,18 +40,34 @@
     "savePage": "user",
     "registerExport": "user",
     "sendChapterToGallery": "user",
+    "setChapterVisibility": "user",
+    "listPublicSeries": "public",
+    "getPublicSeries": "public",
+    "getPublicChapter": "public",
+    "openPublicMedia": "public",
     "listGalleryItems": "user",
     "importGalleryItems": "user",
     "translateTexts": "user",
     "estimateTranslation": "user",
     "getEngines": "user",
+    "getDetector": "user",
     "setPageSkipped": "user",
     "listSources": "user",
     "previewLink": "user",
     "importFromLink": "user",
     "getLinkImport": "user",
     "cancelLinkImport": "user",
-    "importLinkToLibrary": "user"
+    "importLinkToLibrary": "user",
+    "listFonts": "user",
+    "getFontFile": "user",
+    "getFontUsage": "user",
+    "getAiCatalogue": "user",
+    "getAiUsage": "user",
+    "askAiReading": "user",
+    "askAiTranslation": "user",
+    "askAiPage": "user",
+    "listAiPageVersions": "user",
+    "deleteAiPageVersion": "user"
   },
   "pages": [
     {
@@ -82,6 +99,11 @@
       "path": "sources",
       "title": "Sources",
       "component": "pages/sources.tsx"
+    },
+    {
+      "path": "fonts",
+      "title": "Polices",
+      "component": "pages/fonts.tsx"
     }
   ],
   "navItems": [
@@ -116,6 +138,19 @@
       ],
       "list": "listGalleryItems",
       "import": "importGalleryItems"
+    }
+  ],
+  "catalogSections": [
+    {
+      "id": "scans",
+      "label": "Scans",
+      "description": "Chapitres traduits, à lire en ligne",
+      "icon": "BookOpenText",
+      "kind": "reader",
+      "list": "listPublicSeries",
+      "collection": "getPublicSeries",
+      "item": "getPublicChapter",
+      "media": "openPublicMedia"
     }
   ]
 }

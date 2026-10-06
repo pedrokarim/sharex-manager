@@ -41,8 +41,24 @@ const ModuleGallerySourceSchema = z.object({
   import: z.string(),
 });
 
-/** Accès aux fonctions serveur d'un module via `call-function`. */
-const FunctionAccessSchema = z.record(z.string(), z.enum(["user", "admin"]));
+/** Section publique du catalogue. L'identifiant devient un segment d'adresse : `/catalog/<id>`. */
+const ModuleCatalogSectionSchema = z.object({
+  id: z.string().regex(/^[a-z][a-z0-9-]{1,31}$/, "Identifiant de section invalide"),
+  label: z.string(),
+  description: z.string().optional(),
+  icon: z.string().optional(),
+  kind: z.enum(["reader"]),
+  list: z.string(),
+  collection: z.string(),
+  item: z.string(),
+  media: z.string(),
+});
+
+/**
+ * Accès aux fonctions serveur d'un module via `call-function`. `public` : une
+ * fonction du catalogue public, appelée par le serveur sans session.
+ */
+const FunctionAccessSchema = z.record(z.string(), z.enum(["user", "admin", "public"]));
 
 const ModuleConfigSchema = z.object({
   // Le nom devient un dossier sous `modules/` : ni séparateur ni `..`.
@@ -71,6 +87,7 @@ const ModuleConfigSchema = z.object({
   navItems: z.array(ModuleNavItemSchema).optional(),
   fileActions: z.array(ModuleFileActionSchema).optional(),
   gallerySources: z.array(ModuleGallerySourceSchema).optional(),
+  catalogSections: z.array(ModuleCatalogSectionSchema).optional(),
   functions: FunctionAccessSchema.optional(),
   uploads: z
     .object({

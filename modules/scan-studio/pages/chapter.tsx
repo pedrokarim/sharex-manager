@@ -17,24 +17,32 @@ import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, useS
 import { CSS } from "@dnd-kit/utilities";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
+  Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Clock3,
+  Eye,
+  FileArchive,
   FileImage,
   FileStack,
   HardDrive,
   ImageDown,
+  ImageOff,
   ImageUp,
   Images,
-  ImageOff,
   Languages,
   Link2,
+  Loader2,
+  PackageOpen,
   PenLine,
   RefreshCw,
   ScanText,
   Settings2,
   Trash2,
+  TriangleAlert,
   Upload,
   type LucideIcon,
 } from "lucide-react";
@@ -44,7 +52,11 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 import { AnalyzeDialog } from "../components/library/analyze-dialog";
+import { dismissChapterJob, jobProgress, stopChapterJob, useChapterJob, type ChapterJob, type ChapterJobKind, type PageJob } from "../lib/chapter-jobs";
+import { buildChapterArchive, saveBlob } from "../components/library/archive-export";
+import { describeChapterExport, exportChapterPages, renderPageExport } from "../lib/page-export";
 import { ConfirmDeleteDialog } from "../components/library/library-dialogs";
 import { LibraryNotice, PAGE_GRID, PageBoardSkeleton } from "../components/library/library-states";
 import { ObjectContextMenu, ObjectMenuButton, type MenuEntry } from "../components/library/object-menu";
@@ -52,16 +64,19 @@ import { SettingsDialog } from "../components/library/settings-dialog";
 import { TranslateDialog } from "../components/library/translate-dialog";
 import { UploadQueue, type UploadItem } from "../components/library/upload-queue";
 import { useDialogTarget } from "../components/library/use-dialog-target";
+import { VisibilityDialog } from "../components/library/visibility-dialog";
 import { ModuleShell } from "../components/module-shell";
 import { analyzePages } from "../lib/analysis";
 import { api, uploadImage } from "../lib/client";
 import { extractArchiveImages, type ImportSource } from "../lib/library-archive";
 import {
   IMPORT_ACCEPT,
+  IMPORT_BATCH_SIZE,
   LIBRARY_PATH,
   MAX_IMAGE_BYTES,
   PAGE_STATUS_LABELS,
   chapterLabel,
+  chunkList,
   countLabel,
   editorHref,
   errorMessage,
@@ -74,8 +89,9 @@ import {
   runPool,
   settingsSummary,
   SOURCES_PATH,
+  visibilityLabel,
 } from "../lib/library-helpers";
-import { isId, type ChapterSettings, type ChapterView, type PageSummary, type UploadedFile } from "../lib/types";
+import { isId, type ChapterSettings, type ChapterView, type ChapterVisibility, type PageSummary, type UploadedFile } from "../lib/types";
 
 /** Chapitres déjà vus : on les réaffiche tout de suite, puis on les rafraîchit. */
 const snapshots = new Map<string, ChapterView>();
@@ -137,6 +153,9 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
   // Analyse et traduction ne partent que de ces deux fenêtres, ouvertes d'un clic.
   const [analyzeOpen, setAnalyzeOpen] = useState(false);
   const [translateOpen, setTranslateOpen] = useState(false);
+  const [visibilityOpen, setVisibilityOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [rendering, setRendering] = useState(false);
   const deleting = useDialogTarget<{ page: PageSummary; number: number }>();
   const fileInput = useRef<HTMLInputElement>(null);
   const importLock = useRef(false);
@@ -190,13 +209,25 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
       const failures = sources.length - ready.length;
       let attached = true;
       if (ready.length > 0) {
+        // Le serveur rattache 300 images au plus par appel : une grosse archive
+        // part en plusieurs paquets, dans l'ordre, pour ne pas être refusée d'un bloc.
+        let added = 0;
+        const batches = chunkList(ready, IMPORT_BATCH_SIZE);
+        let done = 0;
         try {
-          const pages = await api.importPages(chapterId, ready);
-          toast.success(pages.length < 2 ? "Page ajoutée au chapitre" : `${pages.length} pages ajoutées au chapitre`);
-          await refresh();
+          for (const batch of batches) {
+            added += (await api.importPages(chapterId, batch)).length;
+            done++;
+          }
         } catch (error) {
           attached = false;
           toast.error(errorMessage(error, "Les images envoyées n’ont pas pu être rattachées au chapitre."));
+          // Ce qui n'est devenu la page de rien ne reste pas sur le serveur.
+          for (const batch of batches.slice(done)) void api.discardUploads(batch).catch(() => undefined);
+        }
+        if (added > 0) {
+          toast.success(added < 2 ? "Page ajoutée au chapitre" : `${added} pages ajoutées au chapitre`);
+          await refresh();
         }
       }
       if (failures > 0) toast.error(failures < 2 ? "Une image n’a pas pu être envoyée." : `${failures} images n’ont pas pu être envoyées.`);
@@ -252,7 +283,12 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
         const extension = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : blob.type === "image/jpeg" ? "jpg" : null;
         if (!extension) throw new Error("Ce lien ne mène pas à une image png, jpg ou webp.");
         const file = await uploadImage(blob, `image-${Date.now()}.${extension}`);
-        await api.importPages(chapterId, [file]);
+        try {
+          await api.importPages(chapterId, [file]);
+        } catch (error) {
+          void api.discardUploads([file]).catch(() => undefined);
+          throw error;
+        }
       }
       toast.success("Page ajoutée au chapitre");
       await refresh();
@@ -266,8 +302,8 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
   const dialogOpenRef = useRef(false);
   useEffect(() => {
     importFilesRef.current = importFiles;
-    dialogOpenRef.current = pickerOpen || settingsOpen || analyzeOpen || translateOpen;
-  }, [importFiles, pickerOpen, settingsOpen, analyzeOpen, translateOpen]);
+    dialogOpenRef.current = pickerOpen || settingsOpen || analyzeOpen || translateOpen || visibilityOpen;
+  }, [importFiles, pickerOpen, settingsOpen, analyzeOpen, translateOpen, visibilityOpen]);
 
   useEffect(() => {
     let depth = 0;
@@ -310,9 +346,35 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
   // ─── Pages ─────────────────────────────────────────────────────
 
   const pages = view?.pages ?? [];
-  // Les pages laissées telles quelles (couvertures, bannières) ne partent ni à
-  // l'analyse ni à la traduction.
-  const workPages = pages.filter((page) => !page.skipped);
+
+  // ─── Traitement en arrière-plan (analyse ou traduction) ─────────
+  const job = useChapterJob(chapterId);
+  const settledPages = job ? jobProgress(job).settled : 0;
+  const jobRunning = job?.running ?? false;
+  // Chaque page traitée met la planche à jour : son état et son nombre de zones changent.
+  useEffect(() => {
+    if (job) void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- à chaque page réglée, et à la fin
+  }, [settledPages, jobRunning]);
+  // Le traitement vit dans cet onglet : le fermer l'arrêterait.
+  useEffect(() => {
+    if (!jobRunning) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [jobRunning]);
+
+  /** Écarte les pages que l'analyse dit sans texte à traduire (couvertures, bannières). */
+  const skipUntranslatable = async (ids: string[]) => {
+    try {
+      for (const id of ids) await api.setPageSkipped(id, true);
+      toast.success(ids.length === 1 ? "Page laissée telle quelle" : "Pages laissées telles quelles");
+      dismissChapterJob(chapterId);
+      await refresh();
+    } catch (error) {
+      toast.error(errorMessage(error, "Réglage des pages impossible."));
+    }
+  };
   const pageIds = pages.map((page) => page.id);
 
   const applyOrder = async (ids: string[]) => {
@@ -370,7 +432,10 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
     setSending(true);
     try {
       const { saved, albumId } = await api.sendChapterToGallery(chapterId);
-      toast.success(saved < 2 ? "Page envoyée dans la galerie, dans un album privé" : `${saved} pages envoyées dans la galerie, dans un album privé`, {
+      // Les pages entrent dans la galerie en privé ; l'album, privé lui aussi, les réunit quand il a pu être créé.
+      const where = albumId === undefined ? "en privé" : "dans un album privé";
+      const what = saved === 0 ? "Les pages sont déjà dans la galerie" : saved < 2 ? "Page envoyée dans la galerie" : `${saved} pages envoyées dans la galerie`;
+      toast.success(`${what}, ${where}`, {
         action: albumId === undefined ? undefined : { label: "Ouvrir l’album", onClick: () => router.push(`/albums/${albumId}`) },
       });
     } catch (error) {
@@ -378,6 +443,55 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
     } finally {
       setSending(false);
     }
+  };
+
+  /** Rend toutes les pages traduites du chapitre, comme le bouton « Exporter » de l'atelier, l'une après l'autre. */
+  const renderAllPages = async () => {
+    if (rendering || !view) return;
+    setRendering(true);
+    const controller = new AbortController();
+    const pending = toast.loading("Rendu des pages…", { action: { label: "Arrêter", onClick: () => controller.abort() } });
+    try {
+      const result = await exportChapterPages(
+        view.pages.map((page) => page.id),
+        { getPage: api.getPage, render: renderPageExport, upload: uploadImage, register: api.registerExport },
+        { signal: controller.signal, onProgress: (done, total) => toast.loading(`Rendu : page ${Math.min(done + 1, total)} sur ${total}…`, { id: pending }) }
+      );
+      const summary = describeChapterExport(result);
+      if (result.aborted) toast.message(`Rendu arrêté : ${summary}`, { id: pending });
+      else if (result.exported === 0 && result.failed > 0) toast.error(summary, { id: pending });
+      else toast.success(summary, { id: pending });
+      await refresh();
+    } catch (error) {
+      toast.error(errorMessage(error, "Rendu des pages impossible."), { id: pending });
+    } finally {
+      setRendering(false);
+    }
+  };
+
+  /** Archive `.cbz` du chapitre : ses pages exportées, dans l'ordre de lecture, et telles quelles les pages laissées telles quelles. */
+  const exportArchive = async () => {
+    if (archiving || !view) return;
+    setArchiving(true);
+    const pending = toast.loading("Préparation de l’archive…");
+    try {
+      const archive = await buildChapterArchive(view, {
+        onPage: (done, total) => toast.loading(`Archive : page ${done} sur ${total}…`, { id: pending }),
+      });
+      saveBlob(archive.blob, archive.fileName);
+      const missing = archive.plan.missing > 0 ? `, ${countLabel(archive.plan.missing, "page pas encore exportée", "pages pas encore exportées")}` : "";
+      toast.success(`${countLabel(archive.plan.pages.length, "page", "pages")} dans l’archive${missing}`, { id: pending });
+    } catch (error) {
+      toast.error(errorMessage(error, "Export de l’archive impossible."), { id: pending });
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const saveVisibility = async (visibility: ChapterVisibility) => {
+    const next = await api.setChapterVisibility(chapterId, visibility);
+    toast.success(next.visibility === "private" ? "Chapitre repassé en privé" : `Chapitre publié : ${visibilityLabel(next.visibility).toLowerCase()}`);
+    await refresh();
   };
 
   const saveSettings = async (settings: ChapterSettings) => {
@@ -401,14 +515,19 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
 
   // Le niveau maximal du chapitre borne ce qui peut tourner (§ 3 du dossier).
   const maxLevel = view?.chapter.settings.maxLevel ?? 0;
-  const analyzeBlocked = !view
+  const busy = job?.running ? "Un traitement tourne déjà sur ce chapitre : attendez sa fin, ou arrêtez-le." : null;
+  const analyzeBlocked = busy
+    ? busy
+    : !view
     ? "Chapitre en cours de chargement."
     : pages.length === 0
       ? "Déposez d’abord les pages du chapitre."
       : maxLevel < 1
         ? "Ce chapitre est réglé sur « À la main » : l’analyse automatique demande le niveau 1, à changer dans les réglages du chapitre."
         : null;
-  const translateBlocked = !view
+  const translateBlocked = busy
+    ? busy
+    : !view
     ? "Chapitre en cours de chargement."
     : pages.length === 0
       ? "Déposez d’abord les pages du chapitre."
@@ -454,14 +573,40 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
             <GatedAction label="Traduire" icon={Languages} blocked={translateBlocked} onClick={() => setTranslateOpen(true)} />
             <Button
               variant="outline"
-              className="gap-2"
-              disabled={exportedCount === 0 || sending}
-              onClick={() => void sendToGallery()}
-              title={exportedCount === 0 ? "Exportez d’abord une page depuis l’atelier" : undefined}
+              size="icon"
+              disabled={!view}
+              onClick={() => setVisibilityOpen(true)}
+              aria-label={`Visibilité du chapitre : ${visibilityLabel(view?.chapter.visibility).toLowerCase()}`}
+              title={`Visibilité : ${visibilityLabel(view?.chapter.visibility).toLowerCase()}`}
             >
-              <ImageUp className="h-4 w-4" />
-              {sending ? "Envoi…" : "Envoyer dans la galerie"}
+              <Eye className="h-4 w-4" />
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  disabled={!view || view.pages.length === 0 || sending || archiving || rendering}
+                >
+                  <PackageOpen className="h-4 w-4" />
+                  {sending ? "Envoi…" : archiving ? "Archive…" : rendering ? "Rendu…" : "Exporter"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem onClick={() => void renderAllPages()}>
+                  <ImageDown aria-hidden />
+                  Rendre toutes les pages traduites
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={exportedCount === 0} onClick={() => void exportArchive()}>
+                  <FileArchive aria-hidden />
+                  Archive .cbz du chapitre
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={exportedCount === 0} onClick={() => void sendToGallery()}>
+                  <ImageUp aria-hidden />
+                  Envoyer dans la galerie
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {importButton}
           </>
         }
@@ -510,6 +655,19 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
           </LibraryNotice>
         ) : (
           <div className="flex flex-col gap-3">
+            <AnimatePresence initial={false}>
+              {job && (
+                <motion.div key="job" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                  <ChapterJobBar
+                    job={job}
+                    pageNumbers={new Map(pages.map((page, index) => [page.id, index + 1]))}
+                    onStop={() => stopChapterJob(chapterId)}
+                    onDismiss={() => dismissChapterJob(chapterId)}
+                    onSkip={(ids) => void skipUntranslatable(ids)}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
             <p className="text-sm text-muted-foreground tabular-nums">
               {countLabel(pages.length, "page", "pages")} · {settingsSummary(view.chapter.settings)}
               {pages.length > 1 && " · glissez une vignette pour changer l’ordre"}
@@ -542,6 +700,8 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
                         index={index}
                         total={pages.length}
                         sorting={sorting}
+                        job={job?.pages[page.id]}
+                        jobKind={job?.kind}
                         onOpen={() => router.push(editorHref(page.id))}
                         onMove={(to) => movePage(page.id, to)}
                         onDelete={() => deleting.show({ page, number: index + 1 })}
@@ -596,9 +756,20 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
         />
       )}
 
-      <AnalyzeDialog open={analyzeOpen} onOpenChange={setAnalyzeOpen} pages={workPages} analyze={analyzePages} onPagesChanged={() => void refresh()} />
+      <AnalyzeDialog open={analyzeOpen} onOpenChange={setAnalyzeOpen} chapterId={chapterId} pages={pages} analyze={analyzePages} />
 
-      <TranslateDialog open={translateOpen} onOpenChange={setTranslateOpen} chapterId={chapterId} pages={workPages} onPagesChanged={() => void refresh()} />
+      <TranslateDialog open={translateOpen} onOpenChange={setTranslateOpen} chapterId={chapterId} pages={pages} />
+
+      <VisibilityDialog
+        open={visibilityOpen}
+        onOpenChange={setVisibilityOpen}
+        title="Visibilité du chapitre"
+        description="Qui peut lire ce chapitre. Rien ne devient public sans le bouton de cette fenêtre."
+        value={view?.chapter.visibility ?? "private"}
+        publishablePages={view?.publishablePages ?? 0}
+        publicPath={view?.publicPath}
+        onSave={saveVisibility}
+      />
 
 
       <ImagePickerDialog
@@ -639,12 +810,113 @@ function GatedAction({ label, icon: Icon, blocked, onClick }: { label: string; i
   );
 }
 
+/** Contour d'une vignette selon l'état de sa page dans le traitement. */
+const JOB_RINGS: Record<PageJob["state"], string> = {
+  queued: "ring-2 ring-amber-400/70",
+  running: "ring-2 ring-amber-500 ring-offset-2 ring-offset-background",
+  done: "ring-2 ring-emerald-500",
+  skipped: "",
+  error: "ring-2 ring-destructive",
+};
+
+const JOB_CHIPS: Record<PageJob["state"], string> = {
+  queued: "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100",
+  running: "bg-amber-500 text-white",
+  done: "bg-emerald-600 text-white",
+  skipped: "",
+  error: "bg-destructive text-white",
+};
+
+/** Ce que la vignette écrit sous la page pendant et après le traitement. */
+function jobLabel(job: PageJob, kind: ChapterJobKind): string {
+  // Des mots courts : la vignette est étroite, et sa pastille dit déjà l'essentiel.
+  if (job.state === "queued") return "En attente";
+  if (job.state === "running") return kind === "analyze" ? "Analyse…" : "Traduction…";
+  if (job.state === "error") return job.detail ?? "Échec";
+  return job.detail ?? (kind === "analyze" ? "Analysée" : "Traduite");
+}
+
+interface ChapterJobBarProps {
+  job: ChapterJob;
+  /** Numéro de chaque page dans le chapitre. */
+  pageNumbers: Map<string, number>;
+  onStop: () => void;
+  onDismiss: () => void;
+  /** Écarte les pages que l'analyse dit sans texte à traduire. */
+  onSkip: (pageIds: string[]) => void;
+}
+
+/**
+ * Ce qui tourne sur le chapitre, ou ce qui vient de finir : l'avancement, de
+ * quoi arrêter, puis le compte rendu. Le détail par page est sur les vignettes.
+ */
+function ChapterJobBar({ job, pageNumbers, onStop, onDismiss, onSkip }: ChapterJobBarProps) {
+  const { settled, total } = jobProgress(job);
+  const name = job.kind === "analyze" ? "Analyse" : "Traduction";
+  const candidates = (job.untranslatable ?? []).filter((id) => pageNumbers.has(id));
+  const numbers = candidates.map((id) => pageNumbers.get(id)).join(", ");
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 px-4 py-3" role="status" aria-live="polite">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {job.running ? (
+          <Loader2 aria-hidden className="h-4 w-4 shrink-0 animate-spin text-amber-600 dark:text-amber-400" />
+        ) : job.failure ? (
+          <TriangleAlert aria-hidden className="h-4 w-4 shrink-0 text-destructive" />
+        ) : (
+          <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        )}
+        <p className="min-w-0 flex-1 text-sm">
+          {job.running ? (
+            <>
+              <span className="font-medium">{job.stopping ? `${name} : arrêt après la page en cours…` : `${name} en cours, en arrière-plan`}</span>
+              <span className="tabular-nums text-muted-foreground">
+                {" "}
+                · {settled} sur {total}
+              </span>
+            </>
+          ) : (
+            <span className="font-medium">{job.summary}</span>
+          )}
+        </p>
+        {job.running ? (
+          <Button type="button" variant="outline" size="sm" disabled={job.stopping} onClick={onStop}>
+            {job.stopping ? "Arrêt…" : "Arrêter"}
+          </Button>
+        ) : (
+          <Button type="button" variant="ghost" size="sm" onClick={onDismiss}>
+            Masquer
+          </Button>
+        )}
+      </div>
+      {job.running && <Progress value={total === 0 ? 0 : Math.round((settled / total) * 100)} aria-label={`Avancement de ${job.kind === "analyze" ? "l’analyse" : "la traduction"}`} className="h-1.5" />}
+      {!job.running && job.failure && <p className="text-sm text-destructive">{job.failure}</p>}
+      {!job.running && candidates.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+            {candidates.length === 1
+              ? `La page ${numbers} semble n’avoir rien à traduire (couverture, bannière).`
+              : `Les pages ${numbers} semblent n’avoir rien à traduire (couvertures, bannières).`}
+          </p>
+          <Button type="button" size="sm" variant="outline" className="gap-2" onClick={() => onSkip(candidates)}>
+            <ImageOff className="h-4 w-4" />
+            {candidates.length === 1 ? "La laisser telle quelle" : "Les laisser telles quelles"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface PageTileProps {
   page: PageSummary;
   index: number;
   total: number;
-  /** Un glisser est en cours : la mise en page animée lui laisse la main. */
+  /** Un glisser est en cours : la mise en page animée lui laisse la main. */
   sorting: boolean;
+  /** Où en est la page dans le traitement en cours du chapitre ; absent : elle n'en fait pas partie. */
+  job?: PageJob;
+  jobKind?: ChapterJobKind;
   onOpen: () => void;
   /** Déplace la page à la place donnée (à partir de zéro). */
   onMove: (to: number) => void;
@@ -653,7 +925,7 @@ interface PageTileProps {
   onSkip: (skipped: boolean) => void;
 }
 
-function PageTile({ page, index, total, sorting, onOpen, onMove, onDelete, onSkip }: PageTileProps) {
+function PageTile({ page, index, total, sorting, job, jobKind, onOpen, onMove, onDelete, onSkip }: PageTileProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: page.id });
   const number = index + 1;
 
@@ -691,7 +963,9 @@ function PageTile({ page, index, total, sorting, onOpen, onMove, onDelete, onSki
             onClick={onOpen}
             className={cn(
               "relative block aspect-[3/4] w-full cursor-pointer overflow-hidden rounded-lg border bg-muted transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              isDragging && "cursor-grabbing shadow-xl"
+              isDragging && "cursor-grabbing shadow-xl",
+              // L'état de la page dans le traitement en cours : en attente ou en cours en ambre, traitée en vert, en échec en rouge.
+              job && JOB_RINGS[job.state]
             )}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- vignette servie par le module, avec la session */}
@@ -705,14 +979,31 @@ function PageTile({ page, index, total, sorting, onOpen, onMove, onDelete, onSki
                 page.skipped && "opacity-60"
               )}
             />
+            {job && job.state !== "skipped" && (
+              <span className={cn("absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full shadow-sm", JOB_CHIPS[job.state])} aria-hidden>
+                {job.state === "queued" ? (
+                  <Clock3 className="size-3.5" />
+                ) : job.state === "running" ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : job.state === "done" ? (
+                  <Check className="size-3.5" />
+                ) : (
+                  <TriangleAlert className="size-3.5" />
+                )}
+              </span>
+            )}
           </button>
           <div className="flex items-start gap-1 px-0.5">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium tabular-nums" title={page.name}>
                 Page {number}
               </p>
-              <p className="truncate text-xs text-muted-foreground tabular-nums">
-                {page.skipped ? "Laissée telle quelle" : `${PAGE_STATUS_LABELS[page.status]} · ${countLabel(page.regionCount, "zone", "zones")}`}
+              <p className="truncate text-xs text-muted-foreground tabular-nums" title={job?.detail}>
+                {job && jobKind && job.state !== "skipped"
+                  ? jobLabel(job, jobKind)
+                  : page.skipped
+                    ? "Laissée telle quelle"
+                    : `${PAGE_STATUS_LABELS[page.status]} · ${countLabel(page.regionCount, "zone", "zones")}`}
               </p>
             </div>
             <ObjectMenuButton

@@ -14,6 +14,7 @@ import type { ScanRegion } from "../types";
 import { boundsOf } from "../types";
 import { isProtectedRegion } from "./merge";
 import { isCreditsText, plausibility } from "./plausibility";
+import { isMostlyCjk, isTranslatableCjk } from "./plausibility-cjk";
 import { minTextHeight, type PageSize } from "./words";
 
 /** Confiance à partir de laquelle une lecture de plusieurs mots compte comme du texte à traduire. */
@@ -24,9 +25,10 @@ const MIN_SINGLE_CONFIDENCE = 0.8;
 const MIN_WORD_LIKE = 0.6;
 
 /**
- * La zone porte-t-elle un texte à traduire : une lecture assez sûre, en
- * lettres latines, faite de mots ? Une zone corrigée à la main ou déjà
- * traduite compte toujours : quelqu'un a décidé qu'elle en valait la peine.
+ * La zone porte-t-elle un texte à traduire : une lecture assez sûre, faite
+ * de mots en lettres latines ou de signes japonais, chinois ou coréens ? Une
+ * zone corrigée à la main ou déjà traduite compte toujours : quelqu'un a
+ * décidé qu'elle en valait la peine.
  */
 export function isTranslatableRegion(region: ScanRegion, page: PageSize): boolean {
   if (isProtectedRegion(region)) return region.reading.clean.trim() !== "" || region.translation.text.trim() !== "";
@@ -35,6 +37,8 @@ export function isTranslatableRegion(region: ScanRegion, page: PageSize): boolea
   const text = region.reading.clean.trim() || region.reading.raw.trim();
   if (!text || isCreditsText(text)) return false;
   if (boundsOf(region.outline).height < minTextHeight(page)) return false;
+  // Un texte en signes pleins (japonais, chinois, coréen) se juge sur son écriture, pas sur ses mots.
+  if (isMostlyCjk(text)) return isTranslatableCjk(text, region.reading.engine === "manual" ? 1 : region.reading.confidence);
   const shape = plausibility(text);
   if (shape.letters < 2 || shape.foreign > 0.3 || shape.wordLike < MIN_WORD_LIKE) return false;
   const confidence = region.reading.engine === "manual" ? 1 : region.reading.confidence;
@@ -43,7 +47,7 @@ export function isTranslatableRegion(region: ScanRegion, page: PageSize): boolea
 
 /**
  * Vrai si la page semble n'avoir rien à traduire : aucune de ses zones ne
- * porte de texte latin assez sûr, ou tout ce qu'elle porte tient d'une page de
+ * porte de texte assez sûr, ou tout ce qu'elle porte tient d'une page de
  * crédits (adresses, rôles d'une équipe).
  *
  * À n'appeler qu'après l'analyse de la page : une page jamais analysée n'a pas

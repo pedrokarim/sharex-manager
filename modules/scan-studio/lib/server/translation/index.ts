@@ -38,13 +38,22 @@ const CONTROL_IN_ID = /[\u0000-\u001f\u007f-\u009f]/;
 
 // Un seul routeur par processus : c'est lui qui tient les files et les
 // disjoncteurs. Rangé sur `globalThis` pour survivre au rechargement à chaud.
-const holder = globalThis as typeof globalThis & { __scanStudioTranslationRouter?: TranslationRouter };
+//
+// Le numéro de version change quand le routeur ou ses moteurs changent : en
+// développement, un routeur construit avant le rechargement garderait sinon
+// son ancienne liste de moteurs (il a ainsi ignoré MyMemory tant que le
+// serveur n'avait pas redémarré).
+const ROUTER_VERSION = 2;
+const holder = globalThis as typeof globalThis & { __scanStudioTranslationRouter?: TranslationRouter | { version: number; router: TranslationRouter } };
 let override: TranslationRouter | null = null;
 
 function router(): TranslationRouter {
   if (override) return override;
-  holder.__scanStudioTranslationRouter ??= new TranslationRouter();
-  return holder.__scanStudioTranslationRouter;
+  const kept = holder.__scanStudioTranslationRouter;
+  if (kept && "version" in kept && kept.version === ROUTER_VERSION) return kept.router;
+  const created = new TranslationRouter();
+  holder.__scanStudioTranslationRouter = { version: ROUTER_VERSION, router: created };
+  return created;
 }
 
 /** Remplace le routeur, pour les tests : de faux moteurs, une fausse horloge. `null` rétablit le vrai. */
@@ -135,8 +144,14 @@ export async function saveEngineSettings(patch: EngineSettingsPatch): Promise<En
   return router().catalogue();
 }
 
-/** Réservé aux administrateurs : une requête d'essai, une seule. */
+/** Réservé aux administrateurs : une requête d'essai, une seule. */
 export async function testEngine(engineId: unknown): Promise<{ ok: boolean; message: string }> {
   if (!isEngineId(engineId)) throw new Error("Moteur de traduction inconnu.");
   return router().test(engineId);
+}
+
+/** Réservé aux administrateurs : lit chez le service la consommation du compte, d'une seule requête. */
+export async function readEngineUsage(engineId: unknown): Promise<{ ok: boolean; message: string; used?: number; limit?: number }> {
+  if (!isEngineId(engineId)) throw new Error("Moteur de traduction inconnu.");
+  return router().remoteUsage(engineId);
 }

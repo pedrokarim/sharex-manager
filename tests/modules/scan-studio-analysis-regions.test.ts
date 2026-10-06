@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TextGroup } from "@/modules/scan-studio/lib/analysis/grouping";
 import { MAX_PAGE_REGIONS, isProtectedRegion, mergeRegions, needsReview } from "@/modules/scan-studio/lib/analysis/merge";
-import { READING_ENGINE, buildRegion, guessKind, isDarkBackground, outlinePadding, paddedOutline } from "@/modules/scan-studio/lib/analysis/regions";
+import { READING_ENGINE, buildRegion, guessKind, isDarkBackground, outlinePadding, paddedOutline, referenceTextSize } from "@/modules/scan-studio/lib/analysis/regions";
 import { REVIEW_CONFIDENCE } from "@/modules/scan-studio/lib/analysis/words";
 import { createRegion, setReadingText } from "@/modules/scan-studio/lib/region-edit";
 import { sanitizeRegions } from "@/modules/scan-studio/lib/sanitize-page";
@@ -37,9 +37,22 @@ describe("zones produites par l'analyse", () => {
     expect(region.kind).toBe("dialogue");
     expect(region.direction).toBe("horizontal");
     expect(region.mask).toMatchObject({ kind: "fill", color: "#ffffff", strokes: [] });
-    expect(region.text).toEqual({ box: { ...boundsOf(region.outline), rotation: 0 }, style: null, autoFit: true });
+    // La taille de référence vient du lettrage d'origine : le texte traduit ne la dépassera pas.
+    expect(region.text).toEqual({ box: { ...boundsOf(region.outline), rotation: 0 }, style: null, autoFit: true, maxSize: referenceTextSize(group().lineHeight, options.medianLineHeight) });
+    expect(region.text.maxSize).toBeGreaterThan(0);
     // Ce que le serveur accepte à l'enregistrement, sans rien y changer.
     expect(sanitizeRegions([region], page)).toEqual([region]);
+  });
+
+  it("donne au texte traduit une taille de référence proche d'une zone à l'autre", () => {
+    // Lettrage de 20 px sur une page dont la médiane est 20 px : la police fait un peu plus que la hauteur des capitales.
+    expect(referenceTextSize(20, 20)).toBeCloseTo(27.8, 1);
+    // Un cri reste plus gros et une note plus petite, mais sans écart démesuré avec le reste de la page.
+    expect(referenceTextSize(80, 20)).toBeCloseTo(referenceTextSize(30, 20)!, 5);
+    expect(referenceTextSize(5, 20)).toBeCloseTo(referenceTextSize(16, 20)!, 5);
+    // Sans médiane connue, la zone se réfère à elle-même ; sans rien de mesuré, pas de plafond.
+    expect(referenceTextSize(18, 0)).toBeCloseTo(25, 1);
+    expect(referenceTextSize(0, 0)).toBeUndefined();
   });
 
   it("a la même forme qu'une zone tracée à la main", () => {
@@ -140,6 +153,10 @@ describe("fusion avec les zones de la page", () => {
     expect(isProtectedRegion({ ...automatic, reading: { ...automatic.reading, edited: true } })).toBe(true);
     expect(isProtectedRegion({ ...automatic, translation: { ...automatic.translation, text: "Bonjour" } })).toBe(true);
     expect(isProtectedRegion({ ...automatic, translation: { ...automatic.translation, text: "   " } })).toBe(false);
+    // Une proposition de moteur jamais retouchée ne protège pas la zone ; une traduction corrigée ou validée, si.
+    expect(isProtectedRegion({ ...automatic, translation: { ...automatic.translation, text: "Bonjour", status: "proposed" } })).toBe(false);
+    expect(isProtectedRegion({ ...automatic, translation: { ...automatic.translation, text: "Bonjour", status: "edited" } })).toBe(true);
+    expect(isProtectedRegion({ ...automatic, translation: { ...automatic.translation, text: "Bonjour", status: "approved" } })).toBe(true);
   });
 
   it("sans remplacement : garde tout, ajoute ce qui est nouveau", () => {

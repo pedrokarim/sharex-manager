@@ -16,14 +16,15 @@ const NAV_ITEMS = [
  * propres rubriques. Toutes les pages du catalogue s'ouvrent sur une photo ou
  * une mosaïque, sur laquelle elle se pose en clair.
  */
-export function CatalogNavbar() {
+export function CatalogNavbar({ sections = [] }: { sections?: { href: string; label: string }[] }) {
   const pathname = usePathname();
   const { data: session } = useSession();
 
   return (
     <FrontNav
       brand={{ href: "/catalog", logo: "/images/logo-sxm-catalog.png", name: "SXM Catalog" }}
-      links={NAV_ITEMS.map((item) => ({
+      // Les rubriques des modules suivent celles du catalogue.
+      links={[...NAV_ITEMS, ...sections].map((item) => ({
         ...item,
         // Un album ouvert reste dans la rubrique « Albums ».
         active: item.href === "/catalog" ? pathname === item.href : pathname.startsWith(item.href),

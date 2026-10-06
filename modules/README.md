@@ -76,8 +76,9 @@ fenêtre de réglage. Il n’y a pas d’autre point d’entrée.
 | `manualOnly` | Le traitement demande un choix à la main (zone à recadrer) : il ne peut pas s’appliquer à chaque envoi |
 | `fileActions` | Actions de la galerie vers les pages du module (voir plus bas) |
 | `gallerySources` | Fichiers du module proposés dans la fenêtre « Ajouter » de la galerie (voir plus bas) |
+| `catalogSections` | Rubriques que le module apporte au catalogue public (voir plus bas) |
 | `pages`, `navItems` | Pages sous `/m/<module>` et entrée du menu |
-| `functions` | Fonctions serveur appelables par un compte connecté (`"user"`) ; les autres sont réservées aux admins |
+| `functions` | Fonctions serveur appelables par un compte connecté (`"user"`) ; les autres sont réservées aux admins. `"public"` désigne une fonction du catalogue public, appelée par le serveur sans session et jamais par le navigateur |
 | `uploads` | Autorise l’envoi direct de médias dans `data/assets/` du module |
 | `npmDependencies` | Pour un module tiers seulement (voir [Dépendances](#dépendances)) |
 
@@ -213,6 +214,80 @@ La page reçoit les fichiers dans l’adresse :
 Les modules de traitement (`supportedFileTypes`) apparaissent aussi dans ce
 menu : sans interface, ils s’appliquent à toute la sélection ; avec interface,
 ils ouvrent leur fenêtre de réglages pour une image.
+
+## Rubriques du catalogue public (`catalogSections`)
+
+Un module peut apporter une rubrique au catalogue public, lisible sans compte.
+Le catalogue ne connaît pas le module : il lit la déclaration, ajoute la
+rubrique à sa navigation et sert trois pages, dans le dessin commun des pages
+publiques :
+
+- `/catalog/<id>` : les collections de la rubrique (les séries) ;
+- `/catalog/<id>/<collection>` : les éléments d’une collection (les chapitres) ;
+- `/catalog/<id>/<collection>/<élément>` : la lecture, dans un lecteur
+  d’images (page par page dans un sens ou dans l’autre, ou en bande).
+
+```json
+"functions": {
+  "listPublicSeries": "public",
+  "getPublicSeries": "public",
+  "getPublicChapter": "public",
+  "openPublicMedia": "public"
+},
+"catalogSections": [
+  {
+    "id": "scans",
+    "label": "Scans",
+    "description": "Chapitres traduits, à lire en ligne",
+    "icon": "BookOpenText",
+    "kind": "reader",
+    "list": "listPublicSeries",
+    "collection": "getPublicSeries",
+    "item": "getPublicChapter",
+    "media": "openPublicMedia"
+  }
+]
+```
+
+Les quatre fonctions vivent dans `index.process.ts` et suivent les types de
+`@/types/modules` :
+
+```ts
+export async function listPublicSeries(): Promise<CatalogSectionListing>;
+export async function getPublicSeries(collection: string): Promise<CatalogSectionCollection | null>;
+export async function getPublicChapter(collection: string, item: string): Promise<CatalogSectionItem | null>;
+export async function openPublicMedia(path: string[]): Promise<CatalogSectionMedia | null>;
+```
+
+- **Audience `public`, obligatoire.** Une section dont une fonction n’est pas
+  déclarée `"public"` n’est pas servie : on ne branche pas par mégarde le
+  catalogue sur une fonction réservée aux comptes connectés. À l’inverse,
+  `call-function` refuse toute fonction `public`, quel que soit le compte.
+- **Ces fonctions ne rendent que ce qui peut être montré à tout le monde**, et
+  relisent la visibilité à chaque appel : c’est le module qui dit, à chaque
+  demande, ce qui est encore public. `null` (ou une liste vide) donne un 404.
+- **Les images** passent par `/api/public/sections/<id>/media/<chemin…>`. Le
+  module fabrique ses adresses avec `catalogSectionMediaUrl` et la route
+  appelle `media` avec les segments du chemin. `media` rend un chemin
+  **relatif au répertoire `data/` du module** ; la route le borne à ce
+  répertoire et ne sert que des images. Aucun nom de fichier n’a à paraître
+  dans une adresse : un jeton suffit.
+- **Rien n’est gardé par un cache partagé** : les images sont servies en
+  `Cache-Control: private, no-cache`, donc revalidées à chaque affichage par
+  la route, qui repasse par `media`. Ce qui cesse d’être public cesse d’être
+  servi à la demande suivante, sans purge.
+- `listed: false` sur un élément le sort de l’indexation (`noindex`) : c’est
+  l’équivalent d’un album « public par son lien ».
+- L’identifiant de la section est un segment d’adresse : minuscules, chiffres
+  et tirets, et ni `albums` ni `gallery`, qui sont les rubriques du catalogue
+  lui-même. `catalogSectionPath` (`@/lib/catalog-section-paths`) écrit les
+  adresses ; un module s’en sert pour donner à son propriétaire le lien public
+  d’un élément.
+- Module désactivé, ou rien de listé : la rubrique, ses pages et ses images
+  répondent 404, sans autre réglage.
+
+`kind` vaut `reader` (des suites d’images à lire dans l’ordre) ; c’est le seul
+lecteur que le catalogue sait afficher pour l’instant.
 
 ## Sources pour la galerie (`gallerySources`)
 

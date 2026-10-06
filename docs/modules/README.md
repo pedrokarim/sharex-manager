@@ -80,6 +80,11 @@ Ces règles valent pour chaque dossier ; elles ne sont pas répétées ensuite
 - **Intégration à la galerie par `fileActions`.** Un module s’ouvre depuis le
   menu contextuel de la galerie avec la sélection ; il n’apparaît que s’il est
   activé et s’il accepte chaque fichier.
+- **Présence au catalogue public par `catalogSections`.** Un module qui a
+  quelque chose à faire lire sans compte le déclare (voir
+  [`modules/README.md`](../../modules/README.md)) ; le catalogue affiche la
+  rubrique sans connaître le module, et elle disparaît avec lui. Privé par
+  défaut : rien n’y entre sans un geste explicite du propriétaire.
 - **Toute écriture dans les uploads est annoncée** par
   `announceNewUpload(fileName)` (`lib/gallery-events.ts`), sinon le fichier
   n’apparaît qu’au rechargement de la galerie.
