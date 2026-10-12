@@ -21,6 +21,7 @@ l’avancement dans son dossier) ; les autres le seront un par un.
 | [04 – Mockups](04-mockups.md) | Poser une capture dans un cadre de navigateur, de téléphone ou sur un fond soigné | Socle images, rendu SVG |
 | [05 – Tutoriels pas à pas](05-tutoriels-pas-a-pas.md) | Transformer une série de captures annotées en guide partageable | Socle images, rendu SVG, pages publiques |
 | [06 – Scan Studio](06-scan-studio.md) | Traduire les pages d’un scan de manga : repérer le texte, le lire, le traduire, masquer l’original et relettrer, dans un atelier retouchable | Moteurs d’AI Image Gen et Codex CLI, facultatifs |
+| [07 – Image de marque](07-image-de-marque.md) | Enregistrer des images de marque (palette, polices, logos, filigrane, mascotte, ton) que Clip Studio applique aux vidéos et le module Filigrane aux captures, et publier les clips sur les comptes connectés (YouTube d’abord) | Clip Studio, AI Image Gen, comptes connectés du cœur |
 
 ## Ordre de réalisation recommandé
 
