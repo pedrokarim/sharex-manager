@@ -104,13 +104,18 @@ function summarize(project: ClipProject): ProjectSummary {
   let end = 0;
   let itemCount = 0;
   let cover: string | undefined;
+  let brandCover: string | undefined;
   for (const track of project.tracks) {
     for (const item of track.items) {
       end = Math.max(end, item.start + item.duration);
       itemCount++;
-      if (!cover && item.type === "image") cover = item.source.url;
+      if (item.type !== "image") continue;
+      // Filigrane et carton de fin de la marque : une miniature seulement à défaut d'image du clip.
+      if (item.origin === "brand" || track.origin === "brand") brandCover ??= item.source.url;
+      else cover ??= item.source.url;
     }
   }
+  cover ??= brandCover;
   return {
     id: project.id,
     name: project.name,

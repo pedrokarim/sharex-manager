@@ -588,7 +588,7 @@ function ExportDetail({ id }: { id: string }) {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="texts" className="grid min-w-0 gap-4">
+          <TabsContent value="texts" className="grid min-w-0 content-start gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" className="gap-2" onClick={() => void fromBrand()} disabled={brandBusy || saving}>
                 {brandBusy ? <Loader2 className="size-4 animate-spin" /> : <History className="size-4" />}
@@ -657,7 +657,7 @@ function ExportDetail({ id }: { id: string }) {
             </AnimatePresence>
           </TabsContent>
 
-          <TabsContent value="publications" className="grid min-w-0 gap-4">
+          <TabsContent value="publications" className="grid min-w-0 content-start gap-4">
             {!isAdmin ? (
               <p className="text-sm text-muted-foreground">Les publications sont réservées aux administrateurs.</p>
             ) : jobs === null ? (
@@ -699,7 +699,7 @@ function ExportDetail({ id }: { id: string }) {
             )}
           </TabsContent>
 
-          <TabsContent value="credits" className="grid min-w-0 gap-3">
+          <TabsContent value="credits" className="grid min-w-0 content-start gap-3">
             {credits.length === 0 ? (
               <p className="text-sm text-muted-foreground">Aucune mention relevée au rendu : le clip n’utilise que vos médias.</p>
             ) : (
