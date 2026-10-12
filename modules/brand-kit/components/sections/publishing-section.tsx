@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ExternalLink, Globe, Link2, Lock } from "lucide-react";
 import { BrandLogo, isBrand } from "@/components/brand-logo";
@@ -12,13 +12,11 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { TagInput } from "@/components/ui/tag-input";
-import { TemplateInput, type TemplateVariable } from "@/components/ui/template-input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { renderTemplate } from "@/lib/connections/templates";
 import { api, type PublishAccount } from "../../lib/client";
-import { KIT_LIMITS, type Privacy } from "../../lib/types";
+import type { Privacy } from "../../lib/types";
 import { ConfirmDialog, Field, FieldGroup, SectionHeading } from "../fields";
+import { HashtagsLinksGroup, PostTemplatesGroup } from "./publishing-texts";
 import type { SectionProps } from "./types";
 
 const CATEGORIES = [
@@ -37,9 +35,6 @@ const PRIVACIES: { value: Privacy; label: string; icon: typeof Lock }[] = [
   { value: "unlisted", label: "Non répertoriée", icon: Link2 },
   { value: "public", label: "Publique", icon: Globe },
 ];
-
-const SAMPLE_TITLE = "Top 5 des sorties de la semaine";
-const SAMPLE_HOOK = "Trois annonces que personne n’attendait";
 
 /** Avatar du compte, avec le logo du service en pastille : on reconnaît d'un coup d'œil où l'on publie. */
 export function AccountAvatar({ account, size = "default" }: { account: PublishAccount; size?: "sm" | "default" }) {
@@ -91,29 +86,6 @@ export function PublishingSection({ kit, update }: SectionProps) {
     setPublishing({ accountIds: on ? [...publishing.accountIds.filter((entry) => entry !== id), id] : publishing.accountIds.filter((entry) => entry !== id) });
 
   const missing = accounts ? publishing.accountIds.filter((id) => !accounts.some((account) => account.id === id)) : [];
-
-  // L'aperçu est rempli par la même fonction que la publication : ce qu'on lit est ce qui partira.
-  const variables: TemplateVariable[] = useMemo(
-    () => [
-      { name: "title", label: "Titre du clip", sample: SAMPLE_TITLE },
-      { name: "hook", label: "Accroche", sample: kit.tagline || SAMPLE_HOOK },
-      { name: "tags", label: "Tags en mots-dièse", sample: publishing.tags.map((tag) => `#${tag.replace(/[#\s]+/g, "")}`).join(" ") || "#anime" },
-      { name: "date", label: "Date du jour", sample: new Date().toLocaleDateString(kit.language || "fr") },
-      { name: "brand", label: "Nom de la marque", sample: kit.name },
-    ],
-    [kit.tagline, kit.name, kit.language, publishing.tags]
-  );
-  const render = useCallback(
-    (template: string) =>
-      renderTemplate(template, {
-        title: SAMPLE_TITLE,
-        hook: kit.tagline || SAMPLE_HOOK,
-        tags: publishing.tags.length > 0 ? publishing.tags : ["anime"],
-        brand: kit.name,
-        language: kit.language,
-      }),
-    [kit.tagline, kit.name, kit.language, publishing.tags]
-  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -191,42 +163,9 @@ export function PublishingSection({ kit, update }: SectionProps) {
         )}
       </FieldGroup>
 
-      <FieldGroup title="Métadonnées" text="Cliquez une variable pour l’insérer au curseur ; l’aperçu montre le texte tel qu’il partira, avec un titre d’exemple.">
-        <Field label="Modèle de titre" htmlFor="kit-title-template">
-          <TemplateInput
-            id="kit-title-template"
-            value={publishing.titleTemplate}
-            onChange={(titleTemplate) => setPublishing({ titleTemplate })}
-            variables={variables}
-            render={render}
-            maxLength={KIT_LIMITS.titleTemplate}
-            placeholder="{title}"
-          />
-        </Field>
-        <Field label="Modèle de description" htmlFor="kit-description-template">
-          <TemplateInput
-            id="kit-description-template"
-            multiline
-            rows={5}
-            value={publishing.descriptionTemplate}
-            onChange={(descriptionTemplate) => setPublishing({ descriptionTemplate })}
-            variables={variables}
-            render={render}
-            maxLength={KIT_LIMITS.descriptionTemplate}
-          />
-        </Field>
-        <Field label="Tags" htmlFor="kit-tags" hint="Entrée ou virgule pour ajouter ; un collage « a, b, c » ajoute tout d’un coup.">
-          <TagInput
-            id="kit-tags"
-            value={publishing.tags}
-            onChange={(tags) => setPublishing({ tags })}
-            max={KIT_LIMITS.tags}
-            maxTagLength={KIT_LIMITS.tag}
-            showCount
-            placeholder="anime, jeu vidéo…"
-          />
-        </Field>
-      </FieldGroup>
+      <PostTemplatesGroup kit={kit} setPublishing={setPublishing} />
+
+      <HashtagsLinksGroup kit={kit} setPublishing={setPublishing} />
 
       <FieldGroup title="Réglages par défaut">
         <div className="grid gap-4">

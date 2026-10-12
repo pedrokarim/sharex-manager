@@ -62,7 +62,7 @@ export default async function RootLayout({
       {/* L'encart garde sa hauteur et rogne ce qui dépasse : c'est lui qui
           définit la boîte, l'en-tête y reste fixe. */}
       <SidebarInset className="min-h-0 overflow-hidden">
-        <SidebarHeader />
+        <SidebarHeader modules={moduleNavItems} />
         {/* Le défilement a lieu ici, à l'intérieur de la boîte. Une page qui
             veut occuper toute la hauteur prend `min-h-full shrink-0` : avec `h-full`,
             son contenu déborderait et perdrait la marge du bas. */}

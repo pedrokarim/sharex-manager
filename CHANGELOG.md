@@ -7,6 +7,62 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Clip Studio : l’assistant vérifie les faits de ses scripts. La consigne
+  porte la date du jour ; quand la demande parle de faits réels (jeux à
+  venir, classement, quiz, noms propres, dates…) et que « Chercher aussi sur
+  le web » est cochée, le script s’écrit en cherchant sur le web. Une étape
+  « Vérification des faits » relit ensuite chaque segment avec Codex :
+  corrigé, remplacé par un élément qui répond vraiment à la demande, retiré
+  ou signalé douteux dans le suivi, avec ses sources, rangées dans le projet
+  pour la description. Si elle échoue, le clip continue et l’étape le dit.
+- Clip Studio : chaque export garde ses textes de publication (titre,
+  description, légende, premier commentaire, hashtags, tags), un texte commun
+  et des variantes par service, préremplis par l’image de marque. À la
+  publication, le serveur calcule lui-même les textes de chaque compte
+  (variante du service, règle des hashtags, limites), l’écran pouvant encore
+  les ajuster, et joint premier commentaire, sous-titres et couverture.
+- Clip Studio : un export range aussi ses crédits complets (musiques, voix,
+  images trouvées, images générées), le volume mesuré, la marque du projet,
+  un fichier de sous-titres `.srt` tiré des sous-titres animés ou des mots de
+  la voix off, et une couverture (image du clip ou de la galerie, réencodée
+  au cadre de la vidéo).
+- Clip Studio : l’assistant rédige tout le jeu de textes d’un export d’après
+  la demande et le script du clip, le ton et les liens de la marque, avec une
+  variante courte pour chaque service dont les limites l’exigent (un texte
+  Threads tient toujours en 500 caractères) ; rien n’est enregistré sans
+  relecture.
+- Clip Studio : l’export a son écran pleine largeur (`/m/clip-studio/export`)
+  à la place de la fenêtre. L’aperçu du clip à gauche ; à droite le rendu par
+  étapes (préparation, son, images, finalisation, envoi) avec le temps
+  restant et « Annuler », des vérifications faites avant de lancer (polices,
+  médias introuvables, images aux droits à vérifier, durée et format
+  comparés aux comptes liés à la marque), le volume normalisé avec son vrai
+  libellé (−14 LUFS, crête à −1 dB), une plage de l’entrée à la sortie, les
+  sous-titres `.srt` et les crédits. Quitter l’onglet pendant le rendu
+  demande confirmation ; fini, l’écran passe à la fiche du nouvel export.
+- Clip Studio : chaque export a sa fiche (`/m/clip-studio/exports?id=…`) –
+  lecteur et caractéristiques, projet d’origine (« le projet a changé
+  depuis », « Exporter à nouveau »), couverture prise au curseur ou choisie
+  dans la galerie, textes de publication par onglet (texte commun et
+  variantes par service, compteurs, « Reprendre la marque », « Rédiger avec
+  l’assistant » avec les champs « à relire »), crédits copiables, et ses
+  publications retrouvées dans la file avec leur état et leurs suites. La
+  liste de tous les exports se filtre par projet, marque et publication.
+- Clip Studio : la publication devient un écran (`/m/clip-studio/publish`) :
+  comptes groupés par service avec leur quota, textes par service dont les
+  variantes sont rangées dans l’export, aperçu à la manière du service avec
+  le premier commentaire, « Quand » (maintenant, même date, date par compte,
+  décalage de quelques minutes), puis le suivi. Un compte qui n’a pas encore
+  autorisé les commentaires propose « Autoriser… ». Sur téléphone, trois
+  étapes et l’aperçu dans un tiroir.
+- Fil d’Ariane : les pages d’un module portent le nom du module et de la page
+  (« Clip Studio / Exports ») au lieu de « m / clip-studio / exports ».
+- Image de marque : la section Publication a des modèles de légende et de
+  premier commentaire, des modèles propres à chaque service avec l’aperçu tel
+  qu’il partira, la règle des hashtags par service, des hashtags distincts
+  des tags (une marque existante recopie ses tags) et une liste de liens. Les
+  modèles gagnent les variables `{summary}`, `{cta}`, `{hashtags}`, `{links}`
+  et `{credits}` ; une variable vide emporte sa ligne.
 - Image de marque : l’interface est refaite autour des gestes. Liste avec
   recherche, vue en tableau et aperçu des formats au survol ; palette
   `Ctrl K` ; création dans un tiroir latéral, l’assistant suivi étape par
@@ -68,6 +124,23 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   fichier pour les services qui vont le chercher eux-mêmes. Un compte dont
   l’accès est refusé pendant un envoi passe « à reconnecter » et son envoi
   attend.
+- Comptes connectés : une publication peut emporter des suites, faites une
+  fois qu’elle est en ligne : premier commentaire (YouTube, Facebook,
+  Instagram, et réponse à sa propre publication sur Threads), sous-titres
+  (YouTube, Facebook) et couverture (miniature YouTube et Facebook ; pour
+  Instagram, envoyée avec le Reel). Sur YouTube, le commentaire attend que la
+  vidéo soit publique ou non répertoriée, et une vidéo programmée le reçoit à
+  sa mise en ligne ; l’API ne sachant pas épingler, son lien est donné. Une
+  suite se réessaie après une coupure, survit à un redémarrage et son échec
+  ne fait jamais échouer la publication, qui garde un avertissement.
+- Comptes connectés : ajouter une autorisation à un compte déjà relié
+  (« Autoriser les commentaires ») relance sa connexion avec cette seule
+  permission en plus ; la première connexion n’en demande jamais davantage.
+  Facebook passe pour cela par une seconde configuration de connexion.
+- Comptes connectés : les publications se retrouvent par leur source (toutes
+  celles d’un export), et chaque service dit quels textes il attend :
+  légende, premier commentaire, hashtags visibles distincts des tags cachés,
+  couverture, sous-titres.
 - Clip Studio : « Publier » sur un export, vers un ou plusieurs comptes
   connectés, avec les champs de chaque service préremplis par l’image de
   marque du projet.
@@ -82,6 +155,17 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   l’autorise, par le web avec Codex. Chaque image trouvée est téléchargée par
   le serveur, contrôlée et réencodée, et garde sa mention ; celles du web
   sont marquées « droits à vérifier ».
+- Clip Studio : l’assistant pose, à côté du nom d’un jeu, d’un film, d’une
+  appli ou d’une marque, son icône ou son logo officiel, cherché sur le web en
+  plus de l’illustration et reconnu par Codex sur une planche contact ; une
+  icône dont il n’est pas sûr est écartée. Les modèles classement, quiz (à la
+  révélation), diaporama et libre lui réservent un emplacement aux coins
+  arrondis, avec une petite ombre et une apparition animée, qui suit l’image
+  de marque et ne change rien sans icône.
+- Clip Studio : onglet « Trouver » du panneau Médias, pour chercher à la main
+  dans la banque libre Openverse, sur le web ou parmi les icônes officielles ;
+  licence, auteur et page source sont visibles, et un clic importe l’image
+  dans les médias du projet avec sa mention et l’état de ses droits.
 - Clip Studio : un nouveau moteur d’animation, à pistes d’images clés, avec
   une bibliothèque de courbes complète (familles classiques, Bézier, ressorts,
   marches), la rotation, l’échelle par axe, le flou, la luminosité, la couleur
@@ -92,6 +176,52 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   avant, boucles) et 78 animations de texte (lettre par lettre, mot par mot,
   masques, flous et lumières, titres, mises en avant, boucles), chacune
   vérifiée image par image.
+- Clip Studio : les animations gagnent des effets et des calques. Un texte
+  peut se décoder lettre par lettre, se taper avec un curseur qui clignote,
+  compter jusqu’à son nombre au format français (« 0 → 1 250 »), se
+  surligner, se souligner, se barrer, ou arriver sur un bandeau qui se
+  déroule ; un élément peut s’ouvrir par un masque (iris, losange, biais,
+  tache d’encre, stores, horloge, mosaïque), briller, s’entourer d’un halo,
+  laisser une traîne, se dédoubler en rouge et cyan ou glitcher en tranches.
+  Les lettres peuvent s’espacer une à une et tourner autour d’un point choisi.
+  Cinquante animations de plus, et neuf animations existantes reçoivent
+  enfin leur halo, leur lueur, leur reflet ou leur traîne. Un décodage tire
+  les mêmes caractères à l’aperçu et à l’export.
+- Clip Studio : vingt mises en avant, boucles et grilles de plus (tada,
+  élastique, balancement, battement de cœur, clignotant, rebond, lettres
+  nerveuses, apesanteur ; image ou liste qui se reconstitue en carreaux, en
+  spirale, en diagonale, en lamelles). Une boucle s’arrête net avec la sortie
+  de l’élément.
+- Clip Studio : transitions, mouvements de caméra et effets d’impact passent
+  aux pistes d’images clés : 29 transitions de plus (poussées, recouvrement,
+  balayages, iris, portes, horloge, stores, pixels, encre, flou croisé, zoom
+  traversant, fouetté, flash, fuite de lumière, tourbillon, retournement,
+  chute…), 12 mouvements de caméra (Ken Burns, plan grue, zoom coup de
+  poing, secousse, tremblement d’impact, caméra à l’épaule, mise au point…)
+  et 8 effets de plan posés sur une piste (flash, secousse du cadre, impact,
+  aberration, surexposition). Les cinq transitions et les sept mouvements
+  d’origine rendent à l’identique.
+- Clip Studio : toute la bibliothèque d’animations se choisit dans
+  l’éditeur. Dans l’inspecteur, un sélecteur par phase (entrée, sortie, mise
+  en avant) range les animations par catégorie, avec une recherche, des
+  favoris et des vignettes qui jouent l’animation au survol, dessinées par le
+  moteur de la vidéo ; seules celles qui conviennent à l’élément sont
+  proposées. Les réglages de chaque animation (intensité, direction…) et la
+  mise en avant (début, passages, boucle) se règlent sous le sélecteur. Le
+  clic droit de la timeline propose le même catalogue, et la durée de
+  l’entrée et de la sortie se voit au bord de chaque élément et se règle en
+  tirant sa poignée.
+- Clip Studio : les 34 transitions, les 19 mouvements de caméra et les 8
+  effets de plan du moteur se choisissent dans l’éditeur. L’inspecteur et le
+  clic droit de la timeline les rangent par catégorie, avec une recherche,
+  des favoris et des vignettes dessinées par le moteur (passage d’un aplat
+  à l’autre, image témoin qui bouge ou qui encaisse l’impact). Un effet de
+  plan se pose au clic droit sur une piste (« Ajouter un effet de plan
+  ici »), se voit comme une marque en haut de la piste, se déplace en la
+  tirant ou aux flèches, et s’ouvre d’un clic pour régler son instant et sa
+  durée, le changer ou le retirer ; tout s’annule par Ctrl Z. Sur un
+  téléphone, ces choix s’ouvrent en tiroir. Les anciens identifiants gardent
+  leur nom, un identifiant inconnu s’affiche « Inconnue (…) ».
 - Clip Studio : une « Zone de sécurité » grise sur l’aperçu d’un short
   ce que cachent les boutons et la légende des plateformes.
 - Filigrane : le module sait poser le logo d’une image de marque, à son
@@ -413,6 +543,12 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Clip Studio : la recherche d’images vise le titre exact et les visuels
+  officiels (key art, captures des stores et des kits presse) ; un produit
+  commercial récent (jeu, film, série, appli) est cherché directement sur le
+  web, Openverse ne le connaissant pas. Le suivi de l’assistant dit combien
+  d’illustrations ont été trouvées, sur le web ou sur Openverse, combien ont
+  été créées, et combien d’icônes officielles ont été posées.
 - Clip Studio : le volume d’un export est réglé sur une vraie mesure
   d’intensité (ITU-R BS.1770, −14 LUFS, celle des plateformes de vidéos
   courtes) au lieu d’un niveau moyen à −16 dB ; une crête déjà au-dessus de
@@ -500,6 +636,27 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Clip Studio : « Exporter » et « Publier » n’apparaissent plus dans le menu
+  latéral (le champ `menu` des pages d’un module était perdu au chargement),
+  et le fil d’Ariane continue de les nommer.
+- Clip Studio, fiche d’un export et écran Publier : les onglets des services
+  qui passent à la ligne ne recouvrent plus les champs, les boutons de la
+  couverture restent dans leur colonne, et les longs noms se coupent avec
+  leur texte complet en infobulle.
+- Clip Studio, écran Exporter : « Annuler » rend la main tout de suite, même
+  pendant la préparation des médias, et le temps écoulé avance chaque
+  seconde. Une limite de taille d’un seul côté ne s’affiche plus
+  « 1920 × ? px ».
+- Clip Studio, éditeur sur téléphone : le panneau des médias et l’inspecteur
+  passent par-dessus l’aperçu au lieu de sortir de l’écran, l’en-tête et la
+  barre de la timeline tiennent dans la largeur, et les animations du clic
+  droit s’ouvrent dans le tiroir du sélecteur.
+- Clip Studio : la page des projets ne montre plus que les douze derniers
+  exports, avec un lien vers tous ; les catégories du sélecteur
+  d’animations passent à la ligne sur grand écran, et « Mise en avant » tient
+  en entier dans son onglet.
+- Clip Studio : un top des « prochains » jeux ne contient plus un jeu déjà
+  sorti, et la bonne réponse d’un quiz est contrôlée avant le montage.
 - Le bouton de fermeture des fenêtres et des tiroirs s’annonce « Fermer »
   aux lecteurs d’écran, et non plus « Close ».
 - Fenêtres et listes déroulantes : un nom ou un texte long ne les élargit

@@ -16,6 +16,7 @@ import fs from "fs";
 import path from "path";
 import { randomBytes } from "crypto";
 import { MODULE_NAME, isKitId, type BrandKit } from "../types";
+import { upgradeKit } from "../defaults";
 
 let dataRootOverride: string | null = null;
 
@@ -84,7 +85,8 @@ const kitFile = (id: string) => path.join(kitDir(id), "brand.json");
 export function readKit(id: unknown): BrandKit | null {
   if (!isKitId(id)) return null;
   const kit = readJson<BrandKit>(kitFile(id));
-  return kit && kit.version === 1 && kit.id === id ? kit : null;
+  // Une fiche écrite par une version précédente est complétée à la lecture.
+  return kit && kit.version === 1 && kit.id === id ? upgradeKit(kit) : null;
 }
 
 export function writeKit(kit: BrandKit) {

@@ -14,13 +14,35 @@ import { Fragment } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { SlashIcon } from "lucide-react";
 
-export function BreadcrumbNav() {
+/** Ce que le fil d'Ariane sait des modules : leur nom et le titre de leurs pages (`module.json`). */
+export interface BreadcrumbModule {
+  moduleName: string;
+  title: string;
+  subItems: { title: string; url: string }[];
+  /** Toutes les pages, celles absentes du menu latéral comprises (Exporter, Publier…). */
+  pages?: { title: string; url: string }[];
+}
+
+export function BreadcrumbNav({ modules = [] }: { modules?: BreadcrumbModule[] }) {
   const { t } = useTranslation();
   const pathname = usePathname();
-  const paths = pathname.split("/").filter(Boolean);
+  const allPaths = pathname.split("/").filter(Boolean);
+  // Page d'un module (`/m/<module>/<page>`) : « m » n'est pas une page, on ne le montre pas.
+  const inModule = allPaths[0] === "m" && allPaths.length > 1;
+  const offset = inModule ? 1 : 0;
+  const paths = allPaths.slice(offset);
+  const moduleEntry = inModule ? modules.find((entry) => entry.moduleName === allPaths[1]) : undefined;
 
   // Fonction pour obtenir le nom traduit d'une route
-  const getRouteName = (path: string) => {
+  const getRouteName = (path: string, index: number) => {
+    if (inModule) {
+      // Le module, puis ses pages, nommés comme dans sa barre latérale.
+      if (index === 0) return moduleEntry?.title ?? path;
+      const url = `/m/${paths.slice(0, index + 1).join("/")}`;
+      const page = (moduleEntry?.pages ?? moduleEntry?.subItems)?.find((item) => item.url === url);
+      if (page) return page.title;
+    }
+
     const routeMap: Record<string, string> = {
       "": t("navigation.home"),
       gallery: t("navigation.gallery"),
@@ -61,7 +83,7 @@ export function BreadcrumbNav() {
 
   // Construire le chemin complet pour chaque niveau
   const buildPath = (index: number) => {
-    return "/" + paths.slice(0, index + 1).join("/");
+    return "/" + allPaths.slice(0, index + offset + 1).join("/");
   };
 
   return (
@@ -83,10 +105,10 @@ export function BreadcrumbNav() {
               </BreadcrumbSeparator>
               <BreadcrumbItem>
                 {isLast ? (
-                  <BreadcrumbPage>{getRouteName(path)}</BreadcrumbPage>
+                  <BreadcrumbPage>{getRouteName(path, index)}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link href={href}>{getRouteName(path)}</Link>
+                    <Link href={href}>{getRouteName(path, index)}</Link>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>

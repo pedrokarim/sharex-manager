@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   addItem,
   changeAspect,
@@ -65,7 +66,6 @@ import {
 import { applyBrandTheme } from "../engine/brand";
 import { callModule, fetchBrandTheme, useBrandFonts, useBrandKits } from "../lib/client";
 import { brandFontsOf, ensureBrandFonts, ensureProjectFonts } from "../lib/fonts";
-import { ExportDialog } from "../components/export-dialog";
 import { Inspector, ProjectInspector } from "../components/inspector";
 import { MediaPanel } from "../components/media-panel";
 import { PreviewStage } from "../components/preview-stage";
@@ -127,7 +127,13 @@ function Editor({ initial }: { initial: ClipProject }) {
   const [playing, setPlaying] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel | null>("media");
-  const [exportOpen, setExportOpen] = useState(false);
+  // Téléphone : les panneaux et l'inspecteur passent par-dessus l'aperçu au lieu de le pousser hors de l'écran.
+  const narrow = useIsMobile();
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 767px)").matches) setPanel(null);
+  }, []);
+  const router = useRouter();
+  const [exporting, setExporting] = useState(false);
 
   // ─── Lecteur ───────────────────────────────────────────────────
   useEffect(() => {
@@ -348,12 +354,13 @@ function Editor({ initial }: { initial: ClipProject }) {
 
   const selected = selectedId ? findItem(project, selectedId)?.item ?? null : null;
   // Sans sélection, l'inspecteur montre le projet, tant que le module des marques est là.
-  const projectInspector = !selected && Array.isArray(brandKits);
+  // Sur un téléphone, il ne s'ouvre pas tout seul : il couvrirait l'aperçu.
+  const projectInspector = !selected && Array.isArray(brandKits) && !narrow;
 
   return (
     <div className="-mx-4 -mb-4 flex h-[calc(100svh-var(--header-height)-1rem)] min-h-[560px] flex-col overflow-hidden border-t">
       {/* ─── En-tête ─────────────────────────────────────────────── */}
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+      <header className="flex h-12 min-w-0 shrink-0 items-center gap-2 border-b px-3">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button asChild variant="ghost" size="icon" className="h-8 w-8">
@@ -367,45 +374,60 @@ function Editor({ initial }: { initial: ClipProject }) {
         <Input
           value={project.name}
           onChange={(event) => commit((current) => ({ ...current, name: event.target.value }), "name")}
-          className="h-8 w-56 border-transparent bg-transparent px-2 text-sm font-semibold shadow-none hover:border-border focus-visible:border-border"
+          className="h-8 w-56 min-w-0 shrink border-transparent bg-transparent px-2 text-sm font-semibold shadow-none hover:border-border focus-visible:border-border"
           aria-label="Nom du clip"
         />
         <Select
           value={project.aspect}
           onValueChange={(aspect) => commit((current) => changeAspect(current, aspect as AspectPreset))}
         >
-          <SelectTrigger size="sm" className="h-8 w-auto gap-2 text-xs">
+          <SelectTrigger size="sm" className="h-8 w-auto shrink-0 gap-2 text-xs max-sm:[&_[data-aspect-label]]:hidden">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {(Object.keys(ASPECTS) as AspectPreset[]).map((aspect) => (
               <SelectItem key={aspect} value={aspect} className="text-xs">
-                {aspect} · {ASPECTS[aspect].label}
+                {aspect}
+                {/* Sur un téléphone, le bouton ne garde que le rapport : la place va au nom du clip. */}
+                <span data-aspect-label>· {ASPECTS[aspect].label}</span>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <SaveIndicator state={saveState} />
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           <IconButton label="Annuler (Ctrl Z)" disabled={!canUndo} onClick={undo}>
             <Undo2 className="h-4 w-4" />
           </IconButton>
           <IconButton label="Rétablir (Ctrl Maj Z)" disabled={!canRedo} onClick={redo}>
             <Redo2 className="h-4 w-4" />
           </IconButton>
-          <Button size="sm" className="ml-2 h-8 gap-2" onClick={() => {
-            playerRef.current?.pause();
-            setExportOpen(true);
-          }}>
-            <Film className="h-4 w-4" />
-            Exporter
+          <Button
+            size="sm"
+            className="ml-2 h-8 gap-2"
+            disabled={exporting}
+            onClick={async () => {
+              // L'écran Exporter relit le projet : il est enregistré d'abord, tel qu'on le voit.
+              playerRef.current?.pause();
+              setExporting(true);
+              try {
+                await callModule("saveProject", projectRef.current);
+                router.push(`/m/clip-studio/export?project=${encodeURIComponent(projectRef.current.id)}`);
+              } catch (error) {
+                setExporting(false);
+                toast.error(error instanceof Error ? error.message : "Enregistrement impossible avant l’export");
+              }
+            }}
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Film className="h-4 w-4" />}
+            <span className="max-sm:sr-only">Exporter</span>
           </Button>
         </div>
       </header>
 
       {/* ─── Espace de travail ──────────────────────────────────── */}
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
         <nav className="flex w-14 shrink-0 flex-col items-center gap-1 border-r py-2" aria-label="Panneaux">
           <RailButton label="Médias" shortcut="M" active={panel === "media"} onClick={() => setPanel(panel === "media" ? null : "media")}>
             <FolderOpen className="h-5 w-5" />
@@ -429,9 +451,9 @@ function Editor({ initial }: { initial: ClipProject }) {
               animate={{ width: 300, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="shrink-0 overflow-hidden border-r"
+              className={cn("shrink-0 overflow-hidden border-r", narrow && "absolute inset-y-0 left-14 z-20 bg-background shadow-lg")}
             >
-              <div className="h-full w-[300px]">
+              <div className="h-full w-[300px] max-w-[calc(100vw-3.5rem)]">
                 {panel === "media" && <MediaPanel onAdd={(source) => addSource(source)} />}
                 {panel === "text" && <TextPanel onAddText={addText} onAddShape={addShape} />}
                 {panel === "music" && <MusicPanel onAdd={addMusic} />}
@@ -470,9 +492,9 @@ function Editor({ initial }: { initial: ClipProject }) {
               animate={{ width: 300, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="shrink-0 overflow-hidden border-l"
+              className={cn("shrink-0 overflow-hidden border-l", narrow && "absolute inset-y-0 right-0 z-20 bg-background shadow-lg")}
             >
-              <div className="h-full w-[300px]">
+              <div className="h-full w-[300px] max-w-[100vw]">
                 {selected ? (
                   <Inspector
                     project={project}
@@ -517,7 +539,7 @@ function Editor({ initial }: { initial: ClipProject }) {
           onDuplicate={duplicate}
           onDelete={deleteSelected}
           onItemPatch={(itemId, patch) => commit((current) => updateItem(current, itemId, patch))}
-          onTrackPatch={(trackId, patch) => commit((current) => updateTrack(current, trackId, patch))}
+          onTrackPatch={(trackId, patch, key) => commit((current) => updateTrack(current, trackId, patch), key)}
           onDropMedia={(payload, trackId, at) => {
             try {
               addSource(JSON.parse(payload) as MediaSource, { trackId, frame: at });
@@ -528,7 +550,6 @@ function Editor({ initial }: { initial: ClipProject }) {
         />
       </div>
 
-      <ExportDialog project={project} open={exportOpen} onOpenChange={setExportOpen} />
     </div>
   );
 }
@@ -546,11 +567,11 @@ function warnMissingFonts(missing: string[], warned: Set<string>) {
 
 function SaveIndicator({ state }: { state: SaveState }) {
   return (
-    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+    <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
       {state === "saved" && <Check className="h-3.5 w-3.5 text-emerald-500" />}
       {(state === "saving" || state === "pending") && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
       {state === "error" && <CloudOff className="h-3.5 w-3.5 text-destructive" />}
-      <span className={cn(state === "error" && "text-destructive")}>
+      <span className={cn("max-sm:sr-only", state === "error" && "text-destructive")}>
         {state === "saved" ? "Enregistré" : state === "error" ? "Enregistrement impossible" : "Enregistrement…"}
       </span>
     </span>

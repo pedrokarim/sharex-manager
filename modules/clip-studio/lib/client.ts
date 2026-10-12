@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import type { BrandPalette, BrandTheme } from "../engine/brand";
 import type { ClipAsset, ClipExport, ClipProject, MediaSource } from "../engine/types";
+import type { PublishJobSummary } from "@/lib/connections/types";
+import type { ExportDetails, ExportPost, PublishTarget } from "./post-types";
+import type { DraftRequest, DraftResult } from "./post-draft";
 
 export const MODULE_NAME = "clip-studio";
 
@@ -73,8 +76,16 @@ export function assetToSource(asset: ClipAsset): MediaSource {
     height: asset.height,
     durationMs: asset.durationMs,
     credit: asset.credit,
+    // Une image trouvée garde l'état de ses droits jusqu'à la publication (étape 9).
+    ...(rightsOf(asset) ? { rights: rightsOf(asset) } : {}),
     words: asset.words,
   };
+}
+
+/** État des droits d'un média trouvé, rangé dans sa fiche par `importFoundImage`. */
+function rightsOf(asset: ClipAsset): MediaSource["rights"] {
+  const rights = (asset as ClipAsset & { rights?: unknown }).rights;
+  return rights === "free" || rights === "unverified" ? rights : undefined;
 }
 
 // ─── Lecture des médias dans le navigateur ───────────────────────
@@ -237,11 +248,26 @@ export function sendExportToGallery(id: string): Promise<{ fileName: string }> {
   return callModule<{ fileName: string }>("sendExportToGallery", id);
 }
 
+/** Ce qui suit un export en plus de la vidéo (dossier 01 ter, § 5). */
+export interface ExportExtras {
+  /** Crédits relevés dans le projet (`projectCredits`) ; absents : relevés par le serveur. */
+  credits?: string[];
+  /** Volume mesuré du fichier rendu. */
+  loudness?: { lufs: number; peakDb: number };
+  /** Sous-titres SubRip (`projectToSrt`) et leur langue (BCP 47). */
+  subtitles?: { srt: string; language?: string };
+  /** Marque du projet au moment du rendu. */
+  brandKitId?: string;
+  /** `updatedAt` du projet rendu, pour « le projet a changé depuis cet export ». */
+  projectUpdatedAt?: number;
+}
+
 export async function saveExport(
   project: ClipProject,
   blob: Blob,
   durationMs: number,
-  onProgress?: (ratio: number) => void
+  onProgress?: (ratio: number) => void,
+  extras: ExportExtras = {}
 ): Promise<ClipExport> {
   const safeName = project.name.replace(/[^a-z0-9-_]+/gi, "-").slice(0, 60) || "clip";
   const uploaded = await uploadFile(blob, `${safeName}.mp4`, onProgress);
@@ -252,7 +278,59 @@ export async function saveExport(
     width: project.width,
     height: project.height,
     durationMs,
+    brandKitId: project.brandKitId,
+    projectUpdatedAt: project.updatedAt,
+    ...extras,
+    // Des sous-titres vides ne font pas un fichier.
+    subtitles: extras.subtitles?.srt.trim() ? extras.subtitles : undefined,
   });
+}
+
+// ─── Fiche d'un export et publication ────────────────────────────
+
+/** Un export, son projet d'origine et sa marque. */
+export function getExport(id: string): Promise<ExportDetails> {
+  return callModule<ExportDetails>("getExport", id);
+}
+
+/** Enregistre le jeu de textes ; avec `expectedUpdatedAt`, refuse un jeu modifié ailleurs entre-temps. */
+export function updateExportPost(id: string, post: ExportPost, expectedUpdatedAt?: number): Promise<ExportPost> {
+  return callModule<ExportPost>("updateExportPost", id, post, expectedUpdatedAt);
+}
+
+/** Le jeu de textes tiré de la marque, non enregistré (« Reprendre la marque »). */
+export function defaultPostTexts(id: string): Promise<ExportPost> {
+  return callModule<ExportPost>("defaultPostTexts", id);
+}
+
+/** Propositions de l'assistant, non enregistrées : `result.unreviewed` liste les champs à relire. */
+export function draftPostTexts(id: string, request: DraftRequest): Promise<DraftResult> {
+  return callModule<DraftResult>("draftPostTexts", id, request);
+}
+
+/** Couverture prise au curseur : l'image rendue par le navigateur (PNG, JPEG ou WebP) est envoyée puis réencodée. */
+export async function setExportCoverFromImage(id: string, image: Blob, atMs?: number): Promise<ClipExport> {
+  const uploaded = await uploadFile(image, "couverture.png");
+  return callModule<ClipExport>("setExportCover", id, { file: uploaded.file, atMs });
+}
+
+/** Couverture prise dans la galerie (nom du fichier, choisi par `ImagePickerDialog`). */
+export function setExportCoverFromGallery(id: string, galleryFile: string): Promise<ClipExport> {
+  return callModule<ClipExport>("setExportCover", id, { galleryFile });
+}
+
+export function removeExportCover(id: string): Promise<ClipExport> {
+  return callModule<ClipExport>("setExportCover", id, null);
+}
+
+/** Travaux de la file pour cet export (administrateurs). */
+export function listExportPublications(id: string): Promise<PublishJobSummary[]> {
+  return callModule<PublishJobSummary[]>("listExportPublications", id);
+}
+
+/** Mise en file (administrateurs) : textes calculés par le serveur, surchargés par `options`. */
+export function publishExport(input: { exportId: string; targets: PublishTarget[] }): Promise<{ jobs: PublishJobSummary[]; failed: { accountId: string; error: string }[] }> {
+  return callModule("publishExport", input);
 }
 
 // ─── Images de marque (module brand-kit, facultatif) ─────────────

@@ -2,12 +2,13 @@
  * Modèle d'un projet Clip Studio.
  *
  * Tout est exprimé en images (frames) à la cadence du projet, et les
- * positions sont relatives au canevas (0 à 1) : un projet se redimensionne
+ * positions sont relatives au canevas (0 à 1) : un projet se redimensionne
  * sans recalcul, et l'aperçu comme l'export lisent exactement les mêmes
  * nombres.
  */
 
 import type { MotionParamValues } from "./motion/types";
+import type { ExportCover, ExportPost } from "../lib/post-types";
 
 export type AspectPreset = "9:16" | "16:9" | "1:1" | "4:5";
 
@@ -27,10 +28,20 @@ export interface ClipProject {
   height: number;
   fps: number;
   background: string;
-  /** Image de marque appliquée (module `brand-kit`) ; absente pour un projet libre. */
+  /** Image de marque appliquée (module `brand-kit`) ; absente pour un projet libre. */
   brandKitId?: string;
+  /** Demande et script quand le clip vient de l'assistant, pour rédiger ses textes de publication. */
+  brief?: {
+    prompt: string;
+    title?: string;
+    script?: string[];
+    /** Sources de la vérification des faits ; `segment` est l'index de la ligne dans `script`. */
+    sources?: { segment: number; url: string; title: string }[];
+    /** Date de la vérification des faits (ms), absente si elle n'a pas eu lieu. */
+    checkedAt?: number;
+  };
   /**
-   * Pistes de haut en bas, comme dans la timeline : la première piste
+   * Pistes de haut en bas, comme dans la timeline : la première piste
    * visuelle est dessinée par-dessus les suivantes.
    */
   tracks: Track[];
@@ -48,12 +59,25 @@ export interface Track {
   /** Piste ajoutée par une image de marque (filigrane, carton de fin), retirée avec elle. */
   origin?: "brand";
   items: ClipItem[];
+  /** Effets de plan (impact) posés sur toute la piste, à un instant donné. */
+  effects?: ShotEffect[];
+}
+
+/**
+ * Effet de plan : secousse du cadre, flash, zoom de frappe, aberration de
+ * couleur, joué sur toute la piste de l'image `at` pendant `frames` images.
+ */
+export interface ShotEffect {
+  /** Identifiant d'un effet de `motion/scenes.ts` (« impact-hit », « impact-flash »…). */
+  kind: string;
+  at: number;
+  frames: number;
 }
 
 export interface MediaSource {
   /** Adresse de lecture, de même origine que l'application. */
   url: string;
-  /** Référence stable : « upload:… » ou « module:… ». */
+  /** Référence stable : « upload:… » ou « module:… ». */
   ref: string;
   name: string;
   kind: "image" | "video" | "audio";
@@ -63,16 +87,16 @@ export interface MediaSource {
   /** Mention d'auteur et de licence, à reprendre à la publication. */
   credit?: string;
   /**
-   * Droits d'une image trouvée : `free` (licence libre vérifiée, Openverse),
-   * `unverified` (trouvée sur le web, à vérifier avant de publier). Absent :
+   * Droits d'une image trouvée : `free` (licence libre vérifiée, Openverse),
+   * `unverified` (trouvée sur le web, à vérifier avant de publier). Absent :
    * un média de l'utilisateur ou généré.
    */
   rights?: "free" | "unverified";
-  /** Voix de synthèse : instants de chaque mot, pour les sous-titres. */
+  /** Voix de synthèse : instants de chaque mot, pour les sous-titres. */
   words?: TimedWord[];
 }
 
-/** Position et taille relatives au canevas ; x et y désignent le centre. */
+/** Position et taille relatives au canevas ; x et y désignent le centre. */
 export interface Transform {
   x: number;
   y: number;
@@ -120,8 +144,8 @@ export interface AnimEmphasis extends Anim {
   repeat?: number;
 }
 
-/** Mouvement de caméra lent sur une image (effet Ken Burns). */
-export type Motion =
+/** Les sept mouvements de caméra d'origine, et « none ». */
+export type LegacyMotion =
   | "none"
   | "zoom-in"
   | "zoom-out"
@@ -131,11 +155,25 @@ export type Motion =
   | "pan-down";
 
 /**
+ * Mouvement de caméra sur une image : un identifiant de `motion/scenes.ts`
+ * (Ken Burns, secousse, caméra à l'épaule…). Un identifiant inconnu vaut
+ * « none » au rendu.
+ */
+export type Motion = LegacyMotion | (string & {});
+
+/**
  * Passage d'un plan au suivant sur une même piste. La transition appartient
- * au plan qui arrive : pendant ses premières images, le plan précédent reste
+ * au plan qui arrive : pendant ses premières images, le plan précédent reste
  * affiché, figé sur sa dernière image. Aucune durée ne change.
  */
-export type TransitionKind = "fade" | "fade-black" | "slide" | "wipe" | "zoom";
+export type LegacyTransitionKind = "fade" | "fade-black" | "slide" | "wipe" | "zoom";
+
+/**
+ * Identifiant d'une transition de `motion/scenes.ts` ; les cinq d'origine
+ * restent proposées à la saisie. Une transition inconnue est jouée comme un
+ * fondu enchaîné.
+ */
+export type TransitionKind = LegacyTransitionKind | (string & {});
 
 export interface Transition {
   kind: TransitionKind;
@@ -146,15 +184,15 @@ export interface Transition {
 export type TextRole = "title" | "subtitle" | "caption" | "label" | "body";
 
 /**
- * Indication posée par un modèle : d'où l'élément tire son style ou sa
- * couleur. C'est elle qui permet d'appliquer une image de marque après coup :
+ * Indication posée par un modèle : d'où l'élément tire son style ou sa
+ * couleur. C'est elle qui permet d'appliquer une image de marque après coup :
  * on sait quel texte est un titre et quel cadre porte la teinte du segment.
  */
 export interface ThemeHint {
-  /** Texte : rôle dont il prend le style. */
+  /** Texte : rôle dont il prend le style. */
   role?: TextRole;
   /**
-   * Couleur : teinte du segment, aplat d'un plan sans image, voile sur une
+   * Couleur : teinte du segment, aplat d'un plan sans image, voile sur une
    * image, carte, mise en avant, ou vert d'une bonne réponse (qui ne suit pas la marque).
    */
   paint?: "accent" | "plate" | "veil" | "surface" | "highlight" | "success";
@@ -200,10 +238,12 @@ export interface VideoItem extends VisualBase {
   volume: number;
   radius: number;
   /**
-   * Vitesse de lecture (1 par défaut) : à 2, une seconde de timeline lit deux
+   * Vitesse de lecture (1 par défaut) : à 2, une seconde de timeline lit deux
    * secondes de source. `trimStart` reste compté en images de la source.
    */
   speed?: number;
+  /** Mouvement de caméra sur la vidéo (secousse, zoom de frappe…) ; aucun par défaut. */
+  motion?: Motion;
 }
 
 export interface TextStyle {
@@ -230,12 +270,12 @@ export interface TimedWord {
 }
 
 /**
- * Sous-titres animés : le texte suit une voix mot à mot. On montre un groupe
+ * Sous-titres animés : le texte suit une voix mot à mot. On montre un groupe
  * de quelques mots à la fois et le mot prononcé ressort.
  */
 export interface Karaoke {
   words: TimedWord[];
-  /** Décalage dans la voix, en images : avance quand on rogne le début ou qu'on scinde. */
+  /** Décalage dans la voix, en images : avance quand on rogne le début ou qu'on scinde. */
   offset: number;
   /** Couleur du mot prononcé. */
   highlight: string;
@@ -251,9 +291,9 @@ export interface TextItem extends VisualBase {
   style: TextStyle;
   karaoke?: Karaoke;
   /**
-   * « shrink » : la police rétrécit jusqu'à ce que le texte tienne dans son
+   * « shrink » : la police rétrécit jusqu'à ce que le texte tienne dans son
    * cadre, en largeur comme en hauteur. Sert aux textes que l'on ne maîtrise
-   * pas (nom de marque, accroche) : un nom long ne déborde plus du carton.
+   * pas (nom de marque, accroche) : un nom long ne déborde plus du carton.
    */
   fit?: "shrink";
 }
@@ -263,7 +303,7 @@ export interface ShapeItem extends VisualBase {
   shape: "rect" | "ellipse" | "progress";
   fill: string;
   radius: number;
-  /** Barre de progression : couleur du fond et sens du remplissage. */
+  /** Barre de progression : couleur du fond et sens du remplissage. */
   progress?: { track: string; reverse: boolean };
 }
 
@@ -283,7 +323,7 @@ export function isVisual(item: ClipItem): item is VisualItem {
   return item.type !== "audio";
 }
 
-/** Élément qui porte du son : pistes audio et vidéos. */
+/** Élément qui porte du son : pistes audio et vidéos. */
 export function hasAudio(item: ClipItem): item is AudioItem | VideoItem {
   return item.type === "audio" || item.type === "video";
 }
@@ -300,6 +340,19 @@ export interface ClipExport {
   createdAt: number;
   /** Nom du fichier dans la galerie, une fois le clip envoyé. */
   galleryFile?: string;
+  /** Textes de publication (dossier 01 ter, § 4). */
+  post?: ExportPost;
+  cover?: ExportCover;
+  /** Volume mesuré du fichier rendu. */
+  loudness?: { lufs: number; peakDb: number };
+  /** Crédits relevés dans le projet au moment du rendu. */
+  credits?: string[];
+  /** Sous-titres rendus à côté de la vidéo (`.srt`). */
+  subtitles?: { file: string; language: string };
+  /** Marque du projet au moment du rendu. */
+  brandKitId?: string;
+  /** `updatedAt` du projet rendu : le projet a changé depuis quand il est plus récent. */
+  projectUpdatedAt?: number;
 }
 
 export interface ClipAsset {
@@ -312,7 +365,7 @@ export interface ClipAsset {
   durationMs?: number;
   /** Mention d'auteur et de licence (voix de synthèse…). */
   credit?: string;
-  /** Voix de synthèse : instants de chaque mot, pour les sous-titres. */
+  /** Voix de synthèse : instants de chaque mot, pour les sous-titres. */
   words?: TimedWord[];
   createdAt: number;
 }

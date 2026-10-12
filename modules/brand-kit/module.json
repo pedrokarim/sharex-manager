@@ -40,6 +40,7 @@
     "cancelKitAssistantJob": "user",
     "regenerateAsset": "user",
     "listPublishAccounts": "user",
+    "listPublishServices": "user",
     "getWatermarkImage": "public"
   },
   "pages": [

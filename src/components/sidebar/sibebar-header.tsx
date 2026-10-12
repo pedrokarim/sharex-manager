@@ -3,7 +3,7 @@
 import { SidebarTrigger } from "../ui/sidebar";
 import { Separator } from "../ui/separator";
 import { SearchForm } from "./search-form";
-import { BreadcrumbNav } from "../breadcrumb";
+import { BreadcrumbNav, type BreadcrumbModule } from "../breadcrumb";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -16,11 +16,14 @@ interface SidebarHeaderProps {
   title?: string;
   /** Description personnalisée (optionnel) */
   description?: string;
+  /** Modules chargés, pour nommer leurs pages dans le fil d'Ariane. */
+  modules?: BreadcrumbModule[];
 }
 
 export function SidebarHeader({
   showSearch,
   showBreadcrumbs = true,
+  modules,
 }: SidebarHeaderProps) {
   const pathname = usePathname();
 
@@ -47,7 +50,7 @@ export function SidebarHeader({
         <div className="flex flex-1 items-center gap-2 sm:gap-4 min-w-0">
           {showBreadcrumbs && (
             <div className={shouldShowSearch ? "hidden sm:block" : "block"}>
-              <BreadcrumbNav />
+              <BreadcrumbNav modules={modules} />
             </div>
           )}
 

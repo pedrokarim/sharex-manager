@@ -11,6 +11,8 @@ export interface ModuleNavEntry {
   /** Logo du module, s'il en a un : il remplace l'icône. */
   logo?: string;
   subItems: { title: string; url: string }[];
+  /** Toutes les pages du module, celles hors du menu comprises : le fil d'Ariane les nomme. */
+  pages: { title: string; url: string }[];
 }
 
 /**
@@ -31,8 +33,11 @@ export async function readModuleNavEntries(): Promise<ModuleNavEntry[]> {
         url: navItem.url || `/m/${module.name}`,
         icon: navItem.icon || "Puzzle",
         logo: moduleLogoUrl(module.config, "small"),
-        // Une sous-entrée par page du module, hors page racine.
+        // Une sous-entrée par page du module, hors page racine et pages ouvertes depuis une autre.
         subItems: (module.config.pages || [])
+          .filter((page) => page.path !== "" && page.menu !== false)
+          .map((page) => ({ title: page.title, url: `/m/${module.name}/${page.path}` })),
+        pages: (module.config.pages || [])
           .filter((page) => page.path !== "")
           .map((page) => ({ title: page.title, url: `/m/${module.name}/${page.path}` })),
       })),

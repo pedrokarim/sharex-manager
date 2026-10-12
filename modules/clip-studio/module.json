@@ -27,6 +27,11 @@
     "listExports": "user",
     "registerExport": "user",
     "deleteExport": "user",
+    "getExport": "user",
+    "updateExportPost": "user",
+    "setExportCover": "user",
+    "defaultPostTexts": "user",
+    "draftPostTexts": "user",
     "sendExportToGallery": "user",
     "listGalleryItems": "user",
     "importGalleryItems": "user",
@@ -49,7 +54,10 @@
   "pages": [
     { "path": "", "title": "Projets", "component": "pages/projects.tsx" },
     { "path": "edit", "title": "Éditeur", "component": "pages/editor.tsx" },
-    { "path": "voices", "title": "Voix en ligne", "component": "pages/voices.tsx" }
+    { "path": "voices", "title": "Voix en ligne", "component": "pages/voices.tsx" },
+    { "path": "export", "title": "Exporter", "component": "pages/export.tsx", "menu": false },
+    { "path": "exports", "title": "Exports", "component": "pages/exports.tsx" },
+    { "path": "publish", "title": "Publier", "component": "pages/publish.tsx", "menu": false }
   ],
   "navItems": [
     { "title": "Clip Studio", "icon": "Clapperboard" }

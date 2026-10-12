@@ -1,26 +1,54 @@
 /**
- * Modèles de titre et de description, communs à tous les services (fonctions
+ * Modèles des textes de publication, communs à tous les services (fonctions
  * pures, utilisables dans le navigateur). Chaque connecteur applique ensuite
  * ses propres limites.
  *
  * Variables reconnues : {title} (nom du projet), {hook} (accroche de la
- * marque), {tags} (tags en mots-dièse), {date} (date du jour), {brand} (nom
- * de la marque). Une variable inconnue reste telle quelle.
+ * marque), {summary} (résumé du clip), {cta} (appel à l'action du carton de
+ * fin), {tags} (tags en mots-dièse), {hashtags} (mots-dièse visibles),
+ * {links} (liens de la marque, un par ligne), {credits} (bloc des crédits),
+ * {date} (date du jour), {brand} (nom de la marque). Une variable inconnue
+ * reste telle quelle ; une variable vide emporte la ligne qu'elle laisserait
+ * vide.
  */
+
+/** Un lien de la marque : libellé facultatif et adresse http(s). */
+export interface TemplateLink {
+  label?: string;
+  url: string;
+}
 
 export interface TemplateVariables {
   title?: string;
   hook?: string;
+  summary?: string;
+  cta?: string;
   tags?: string[];
+  hashtags?: string[];
+  links?: TemplateLink[];
+  credits?: string[];
   date?: Date | number;
   brand?: string;
-  /** Langue de la date (BCP 47), « fr » par défaut. */
+  /** Langue de la date et des libellés (BCP 47), « fr » par défaut. */
   language?: string;
+}
+
+/** Noms des variables, dans l'ordre où l'interface les propose. */
+export const TEMPLATE_VARIABLE_NAMES = ["title", "hook", "summary", "cta", "hashtags", "tags", "links", "credits", "date", "brand"] as const;
+export type TemplateVariableName = (typeof TEMPLATE_VARIABLE_NAMES)[number];
+
+const VARIABLE = new RegExp(`\\{(${TEMPLATE_VARIABLE_NAMES.join("|")})\\}`, "g");
+
+const isFrench = (language?: string) => !language || /^fr\b/i.test(language);
+
+/** Mot-dièse réduit à son mot : sans « # » ni espace. */
+export function hashtagWord(tag: string): string {
+  return String(tag ?? "").replace(/[#\s]+/g, "");
 }
 
 export function hashtags(tags: string[]): string {
   return tags
-    .map((tag) => tag.replace(/[#\s]+/g, ""))
+    .map(hashtagWord)
     .filter(Boolean)
     .map((tag) => `#${tag}`)
     .join(" ");
@@ -35,20 +63,66 @@ export function formatTemplateDate(date: Date | number, language = "fr"): string
   }
 }
 
-export function renderTemplate(template: string, variables: TemplateVariables): string {
-  const values: Record<string, string> = {
+/** Liens, un par ligne : « Libellé : adresse », ou l'adresse seule. */
+export function formatLinks(links: TemplateLink[] | undefined, language?: string): string {
+  const separator = isFrench(language) ? " : " : ": ";
+  return (links ?? [])
+    .filter((link) => link && typeof link.url === "string" && link.url.trim())
+    .map((link) => (link.label?.trim() ? `${link.label.trim()}${separator}${link.url.trim()}` : link.url.trim()))
+    .join("\n");
+}
+
+/** Bloc des crédits, une mention par ligne ; vide sans crédit. */
+export function creditsBlock(credits: string[] | undefined, language?: string): string {
+  const list = (credits ?? []).map((credit) => String(credit ?? "").trim()).filter(Boolean);
+  if (list.length === 0) return "";
+  const heading = isFrench(language) ? "Crédits :" : "Credits:";
+  return `${heading}\n${list.map((credit) => `– ${credit}`).join("\n")}`;
+}
+
+/** Valeurs des variables, telles qu'elles s'insèrent dans un modèle. */
+export function templateValues(variables: TemplateVariables): Record<TemplateVariableName, string> {
+  return {
     title: variables.title ?? "",
     hook: variables.hook ?? "",
+    summary: variables.summary ?? "",
+    cta: variables.cta ?? "",
     tags: hashtags(variables.tags ?? []),
+    hashtags: hashtags(variables.hashtags ?? []),
+    links: formatLinks(variables.links, variables.language),
+    credits: creditsBlock(variables.credits, variables.language),
     date: formatTemplateDate(variables.date ?? Date.now(), variables.language),
     brand: variables.brand ?? "",
   };
-  return String(template ?? "")
-    .replace(/\{(title|hook|tags|date|brand)\}/g, (_, name: string) => values[name])
-    // Une variable vide ne laisse ni espaces doublés ni lignes blanches en trop.
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+}
+
+/** Le modèle cite-t-il cette variable ? */
+export function usesVariable(template: string, name: TemplateVariableName): boolean {
+  return String(template ?? "").includes(`{${name}}`);
+}
+
+export function renderTemplate(template: string, variables: TemplateVariables): string {
+  const values = templateValues(variables);
+  const kept: string[] = [];
+  for (const line of String(template ?? "").replace(/\r\n?/g, "\n").split("\n")) {
+    let used = false;
+    const filled = line.replace(VARIABLE, (_, name: TemplateVariableName) => {
+      used = true;
+      return values[name];
+    });
+    // Une variable vide ne laisse pas derrière elle une ligne blanche.
+    if (used && !filled.trim()) continue;
+    kept.push(filled);
+  }
+  return (
+    kept
+      .join("\n")
+      // Ni espaces doublés ni lignes blanches en trop.
+      .replace(/[ \t]{2,}/g, " ")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
 }
 
 /** Retire les chevrons, refusés par plusieurs services (YouTube) dans les titres et descriptions. */

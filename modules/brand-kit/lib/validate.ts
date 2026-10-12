@@ -9,11 +9,15 @@
 
 import { isCatalogFamily } from "@/modules/clip-studio/lib/font-catalog";
 import { TEXT_ROLES } from "@/modules/clip-studio/engine/brand";
-import { DEFAULT_PALETTE, defaultTextStyles } from "./defaults";
+import { HASHTAG_RULES } from "@/modules/clip-studio/lib/post-types";
+import { DEFAULT_PALETTE, defaultTextStyles, upgradePublishing } from "./defaults";
 import {
   KIT_LIMITS,
   type BrandAsset,
   type BrandKit,
+  type BrandLink,
+  type BrandServiceTemplates,
+  type HashtagRule,
   type BrandPalette,
   type BrandWatermark,
   type Privacy,
@@ -109,6 +113,75 @@ function sanitizeWatermark(input: unknown, assets: BrandAsset[], fallback?: Bran
   };
 }
 
+// ─── Publication ─────────────────────────────────────────────────
+
+/** Identifiant de connecteur (`youtube`, `instagram`…) : la liste des services connus est côté serveur. */
+const CONNECTOR_ID = /^[a-z][a-z0-9-]{1,30}$/;
+
+/** Mots-dièse sans « # » ni espace, sans doublon (casse ignorée), bornés. */
+export function sanitizeHashtags(value: unknown): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entry of Array.isArray(value) ? value : []) {
+    if (typeof entry !== "string") continue;
+    const word = entry.replace(/^#+/, "").replace(/[\s#]+/g, "").replace(/[^\p{L}\p{N}_]/gu, "").slice(0, KIT_LIMITS.tag);
+    const key = word.toLowerCase();
+    if (!word || seen.has(key)) continue;
+    seen.add(key);
+    out.push(word);
+    if (out.length >= KIT_LIMITS.hashtags) break;
+  }
+  return out;
+}
+
+/** Adresse web absolue en http(s), sans identifiants ; `null` sinon. */
+export function cleanLinkUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw || raw.length > KIT_LIMITS.linkUrl || /\s/.test(raw)) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (url.username || url.password || !url.hostname.includes(".")) return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+/** Liens de la marque : adresses http(s) seulement, libellés sur une ligne, bornés. */
+export function sanitizeLinks(value: unknown): BrandLink[] {
+  const out: BrandLink[] = [];
+  for (const entry of Array.isArray(value) ? value : []) {
+    if (!entry || typeof entry !== "object") continue;
+    const url = cleanLinkUrl((entry as Record<string, unknown>).url);
+    if (!url) continue;
+    out.push({ label: line((entry as Record<string, unknown>).label, KIT_LIMITS.linkLabel), url });
+    if (out.length >= KIT_LIMITS.links) break;
+  }
+  return out;
+}
+
+/** Modèles par service : seulement ce qui est rempli, pour des services au nom plausible. */
+export function sanitizeServiceTemplates(value: unknown): Record<string, BrandServiceTemplates> {
+  const out: Record<string, BrandServiceTemplates> = {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return out;
+  for (const [connector, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (Object.keys(out).length >= KIT_LIMITS.serviceTemplates) break;
+    if (!CONNECTOR_ID.test(connector) || !raw || typeof raw !== "object") continue;
+    const input = raw as Record<string, unknown>;
+    const entry: BrandServiceTemplates = {};
+    // Une chaîne vide est un choix (« pas de premier commentaire pour ce service ») : elle est gardée.
+    if (typeof input.titleTemplate === "string") entry.titleTemplate = line(input.titleTemplate, KIT_LIMITS.titleTemplate);
+    if (typeof input.descriptionTemplate === "string") entry.descriptionTemplate = text(input.descriptionTemplate, KIT_LIMITS.descriptionTemplate);
+    if (typeof input.captionTemplate === "string") entry.captionTemplate = text(input.captionTemplate, KIT_LIMITS.captionTemplate);
+    if (typeof input.firstCommentTemplate === "string") entry.firstCommentTemplate = text(input.firstCommentTemplate, KIT_LIMITS.firstCommentTemplate);
+    if (HASHTAG_RULES.includes(input.hashtagRule as HashtagRule)) entry.hashtagRule = input.hashtagRule as HashtagRule;
+    if (Object.keys(entry).length > 0) out[connector] = entry;
+  }
+  return out;
+}
+
 const assetIdOrUndefined = (value: unknown, assets: BrandAsset[]) =>
   typeof value === "string" && assets.some((asset) => asset.id === value) ? value : undefined;
 
@@ -156,7 +229,8 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
 
   const endCard = kit.endCard && typeof kit.endCard === "object" ? kit.endCard : stored.endCard;
   const ai = kit.ai && typeof kit.ai === "object" ? kit.ai : stored.ai;
-  const publishing = kit.publishing && typeof kit.publishing === "object" ? kit.publishing : stored.publishing;
+  // Une fiche d'avant les textes de publication (archive importée) est d'abord complétée.
+  const publishing = upgradePublishing(kit.publishing && typeof kit.publishing === "object" ? kit.publishing : stored.publishing);
   const rules = kit.rules && typeof kit.rules === "object" ? kit.rules : stored.rules;
 
   return {
@@ -192,7 +266,12 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
         .slice(0, 20),
       titleTemplate: line(publishing.titleTemplate, KIT_LIMITS.titleTemplate) || "{title}",
       descriptionTemplate: text(publishing.descriptionTemplate, KIT_LIMITS.descriptionTemplate),
+      captionTemplate: text(publishing.captionTemplate, KIT_LIMITS.captionTemplate),
+      firstCommentTemplate: text(publishing.firstCommentTemplate, KIT_LIMITS.firstCommentTemplate),
+      serviceTemplates: sanitizeServiceTemplates(publishing.serviceTemplates),
+      hashtags: sanitizeHashtags(publishing.hashtags),
       tags: list(publishing.tags, KIT_LIMITS.tags, KIT_LIMITS.tag),
+      links: sanitizeLinks(publishing.links),
       categoryId: typeof publishing.categoryId === "string" && /^\d{1,3}$/.test(publishing.categoryId) ? publishing.categoryId : stored.publishing.categoryId,
       defaultPrivacy: PRIVACIES.includes(publishing.defaultPrivacy) ? publishing.defaultPrivacy : stored.publishing.defaultPrivacy,
       containsSyntheticMedia: typeof publishing.containsSyntheticMedia === "boolean" ? publishing.containsSyntheticMedia : stored.publishing.containsSyntheticMedia,

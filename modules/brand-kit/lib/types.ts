@@ -11,6 +11,8 @@ import type { TextRole, TextStyle } from "@/modules/clip-studio/engine/types";
 
 export type { BrandPalette, BrandTheme, WatermarkAnchor } from "@/modules/clip-studio/engine/brand";
 export type { TextRole, TextStyle } from "@/modules/clip-studio/engine/types";
+import type { HashtagRule } from "@/modules/clip-studio/lib/post-types";
+export type { HashtagRule } from "@/modules/clip-studio/lib/post-types";
 
 export type FontFormat = "ttf" | "otf" | "woff2";
 
@@ -72,13 +74,47 @@ export interface BrandEndCard {
 
 export type Privacy = "private" | "unlisted" | "public";
 
+/** Un lien de la marque, écrit une fois et repris par `{links}`. */
+export interface BrandLink {
+  label: string;
+  /** Adresse http(s) seulement. */
+  url: string;
+}
+
+/**
+ * Modèles propres à un service : seulement ce qui diffère des modèles
+ * communs. Un modèle absent reprend le modèle commun.
+ */
+export interface BrandServiceTemplates {
+  titleTemplate?: string;
+  descriptionTemplate?: string;
+  captionTemplate?: string;
+  firstCommentTemplate?: string;
+  /** Où vont les hashtags pour ce service ; absent : la règle du service. */
+  hashtagRule?: HashtagRule;
+}
+
 export interface BrandPublishing {
   /** Comptes connectés où publier par défaut (cœur), de n'importe quel service. */
   accountIds: string[];
-  /** Modèles avec variables : {title}, {hook}, {tags}, {date}, {brand}. */
+  /**
+   * Modèles avec variables : {title}, {hook}, {summary}, {cta}, {tags},
+   * {hashtags}, {links}, {credits}, {date}, {brand}
+   * (`src/lib/connections/templates.ts`).
+   */
   titleTemplate: string;
   descriptionTemplate: string;
+  /** Texte court affiché avec le média dans un fil (légende Instagram, texte Threads). */
+  captionTemplate: string;
+  /** Premier commentaire posé après la publication ; vide : aucun. */
+  firstCommentTemplate: string;
+  /** Par identifiant de connecteur (`youtube`, `instagram`…). */
+  serviceTemplates: Record<string, BrandServiceTemplates>;
+  /** Mots-dièse visibles, sans « # ». */
+  hashtags: string[];
+  /** Mots-clés cachés (YouTube). */
   tags: string[];
+  links: BrandLink[];
   categoryId: string;
   defaultPrivacy: Privacy;
   containsSyntheticMedia: boolean;
@@ -147,6 +183,13 @@ export const KIT_LIMITS = {
   tag: 60,
   titleTemplate: 200,
   descriptionTemplate: 4000,
+  captionTemplate: 2200,
+  firstCommentTemplate: 2200,
+  serviceTemplates: 12,
+  hashtags: 30,
+  links: 10,
+  linkLabel: 60,
+  linkUrl: 500,
   callToAction: 60,
   label: 120,
   note: 500,

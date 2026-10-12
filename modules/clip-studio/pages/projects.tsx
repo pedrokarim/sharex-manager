@@ -1,33 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
+  ArrowRight,
   AudioLines,
   Copy,
-  Download,
   Film,
-  ImageUp,
   MoreHorizontal,
   Plus,
-  Send,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import logo from "../branding/logo-96.png";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -44,16 +34,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatTimecode } from "../engine/timeline";
 import type { ClipExport } from "../engine/types";
-import { callModule, exportUrl, formatMegabytes, sendExportToGallery, type ProjectSummary } from "../lib/client";
+import { callModule, type ProjectSummary } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
 import { AssistantProgress, CreateDialog } from "../components/create-dialog";
-import { SendToGalleryButton } from "../components/gallery-button";
-import { PublishDialog, type PublishTargets } from "../components/publish-dialog";
-import { useConnectionReturn, type ConnectFlowStart } from "@/components/connections/connect-account-sheet";
+import { ExportCard, publishHref } from "../components/export-card";
 import { useSession } from "@/lib/auth-client";
 
 /** Données gardées entre deux visites : le retour à la liste est instantané. */
 let snapshot: { projects: ProjectSummary[]; exports: ClipExport[] } | null = null;
+
+/** Exports montrés sous les projets, les plus récents : tous les autres sont sur la page Exports. */
+const RECENT_EXPORTS = 12;
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -62,27 +53,9 @@ export default function ProjectsPage() {
   const [exports, setExports] = useState<ClipExport[]>(snapshot?.exports ?? []);
   const [creating, setCreating] = useState<{ files: string[] } | null>(null);
   const [assistantJobs, setAssistantJobs] = useState<AssistantJob[]>([]);
-  // Publication : réservée aux administrateurs, et seulement si un compte
-  // connecté sait publier une vidéo (comptes connectés du cœur).
+  // Publication : réservée aux administrateurs (comptes connectés du cœur).
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
-  const [publishTargets, setPublishTargets] = useState<PublishTargets | null>(null);
-  const [publishing, setPublishing] = useState<ClipExport | null>(null);
-  // L'entrée « Publier » apparaît dès que les cibles sont connues, même sans compte :
-  // la publication mène alors au parcours de connexion.
-  const canPublish = isAdmin && publishTargets !== null;
-  // Retour par redirection du parcours de connexion lancé depuis la publication.
-  const { start: connectReturn } = useConnectionReturn();
-  const [connectStart, setConnectStart] = useState<ConnectFlowStart | null>(null);
-  const reopenPublish = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    void callModule<PublishTargets>("listPublishTargets")
-      .then(setPublishTargets)
-      .catch(() => setPublishTargets(null));
-  }, [isAdmin]);
-
 
   const refresh = useCallback(async () => {
     const [nextProjects, nextExports] = await Promise.all([
@@ -125,22 +98,17 @@ export default function ProjectsPage() {
     };
   }, [refreshJobs, refresh]);
 
-  // Retour du parcours de connexion (fenêtre surgissante bloquée) : on rouvre la publication de l'export.
+  // Ancienne adresse de publication (`?publish=<id>`, retour d'un parcours de
+  // connexion lancé avant l'écran Publier) : on passe à l'écran Publier, en
+  // gardant les paramètres du retour pour que le parcours reprenne.
   useEffect(() => {
     const id = params.get("publish");
     if (!id) return;
-    reopenPublish.current = id;
-    setConnectStart(connectReturn);
-    router.replace("/m/clip-studio", { scroll: false });
-  }, [params, connectReturn, router]);
-
-  useEffect(() => {
-    const id = reopenPublish.current;
-    if (!id || !canPublish || projects === null) return;
-    reopenPublish.current = null;
-    const found = exports.find((item) => item.id === id);
-    if (found) setPublishing(found);
-  }, [canPublish, projects, exports]);
+    const rest = new URLSearchParams(params.toString());
+    rest.delete("publish");
+    const suffix = rest.toString();
+    router.replace(`${publishHref(id)}${suffix ? `&${suffix}` : ""}`, { scroll: false });
+  }, [params, router]);
 
   // Arrivée depuis la galerie : « Créer un clip avec la sélection ».
   useEffect(() => {
@@ -223,7 +191,7 @@ export default function ProjectsPage() {
               </span>
             </button>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-4 sm:grid-cols-[repeat(3,minmax(0,1fr))] lg:grid-cols-[repeat(4,minmax(0,1fr))] xl:grid-cols-[repeat(5,minmax(0,1fr))]">
               <AnimatePresence initial={false}>
                 {projects.map((project) => (
                   <motion.div
@@ -232,6 +200,7 @@ export default function ProjectsPage() {
                     initial={{ opacity: 0, scale: 0.96 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.94 }}
+                    className="min-w-0"
                   >
                     <ProjectCard project={project} onChanged={refresh} />
                   </motion.div>
@@ -243,14 +212,20 @@ export default function ProjectsPage() {
 
         {exports.length > 0 && (
           <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold">Exports</h2>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            <div className="flex min-w-0 items-baseline justify-between gap-2">
+              <h2 className="text-sm font-semibold">Exports</h2>
+              <Link href="/m/clip-studio/exports" className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+                {exports.length > RECENT_EXPORTS ? `Tous les exports (${exports.length.toLocaleString("fr-FR")})` : "Tous les exports"}
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-4 sm:grid-cols-[repeat(3,minmax(0,1fr))] lg:grid-cols-[repeat(4,minmax(0,1fr))] xl:grid-cols-[repeat(6,minmax(0,1fr))]">
               <AnimatePresence initial={false}>
-                {exports.map((entry) => (
+                {exports.slice(0, RECENT_EXPORTS).map((entry) => (
                   // min-w-0 : sans lui, un nom long (tronqué sur une ligne) élargit la
                   // cellule à sa pleine longueur et la carte déborde sur sa voisine.
                   <motion.div key={entry.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0">
-                    <ExportCard entry={entry} onChanged={refresh} onPublish={canPublish ? () => setPublishing(entry) : undefined} />
+                    <ExportCard entry={entry} canPublish={isAdmin} onChanged={() => void refresh()} />
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -258,18 +233,6 @@ export default function ProjectsPage() {
           </section>
         )}
       </div>
-
-      <PublishDialog
-        entry={publishing}
-        targets={publishTargets}
-        onTargetsChange={setPublishTargets}
-        connectStart={connectStart}
-        onOpenChange={(open) => {
-          if (open) return;
-          setPublishing(null);
-          setConnectStart(null);
-        }}
-      />
 
       <CreateDialog
         request={creating}
@@ -303,7 +266,7 @@ function ProjectCard({ project, onChanged }: { project: ProjectSummary; onChange
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="group flex flex-col gap-2">
+        <div className="group flex min-w-0 flex-col gap-2">
           <Link
             href={href}
             className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border bg-[linear-gradient(135deg,color-mix(in_oklch,var(--primary)_22%,transparent),transparent)]"
@@ -323,9 +286,9 @@ function ProjectCard({ project, onChanged }: { project: ProjectSummary; onChange
               {project.aspect}
             </span>
           </Link>
-          <div className="flex items-start gap-1 px-0.5">
+          <div className="flex min-w-0 items-start gap-1 px-0.5">
             <div className="min-w-0 flex-1">
-              <Link href={href} className="block truncate text-sm font-medium hover:underline">
+              <Link href={href} className="block truncate text-sm font-medium hover:underline" title={project.name}>
                 {project.name}
               </Link>
               <p className="text-[11px] text-muted-foreground tabular-nums">
@@ -373,132 +336,5 @@ function ProjectCard({ project, onChanged }: { project: ProjectSummary; onChange
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  );
-}
-
-function ExportCard({ entry, onChanged, onPublish }: { entry: ClipExport; onChanged: () => void; onPublish?: () => void }) {
-  const url = exportUrl(entry.file);
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            aria-label={`Lire ${entry.projectName}`}
-            className="flex w-full min-w-0 flex-col gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <video
-              src={url}
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              onMouseEnter={(event) => void event.currentTarget.play().catch(() => undefined)}
-              onMouseLeave={(event) => {
-                event.currentTarget.pause();
-                event.currentTarget.currentTime = 0;
-              }}
-              className="aspect-video w-full rounded-lg bg-black object-contain"
-            />
-            <p className="truncate px-0.5 text-xs font-medium">{entry.projectName}</p>
-            <p className="px-0.5 text-[11px] text-muted-foreground tabular-nums">
-              {Math.round(entry.durationMs / 1000)} s · {formatMegabytes(entry.sizeBytes)}
-            </p>
-          </button>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-48">
-          <ContextMenuItem asChild>
-            <a href={url} download={`${entry.projectName}.mp4`}>
-              <Download className="mr-2 h-4 w-4" />
-              Télécharger
-            </a>
-          </ContextMenuItem>
-          <ContextMenuItem asChild>
-            <Link href={`/m/clip-studio/edit?id=${entry.projectId}`}>Ouvrir le projet</Link>
-          </ContextMenuItem>
-          {onPublish ? (
-            <ContextMenuItem onClick={onPublish}>
-              <Send className="mr-2 h-4 w-4" />
-              Publier
-            </ContextMenuItem>
-          ) : null}
-          {entry.galleryFile ? (
-            <ContextMenuItem asChild>
-              <Link href="/gallery">
-                <ImageUp className="mr-2 h-4 w-4" />
-                Voir dans la galerie
-              </Link>
-            </ContextMenuItem>
-          ) : (
-            <ContextMenuItem
-              onClick={async () => {
-                try {
-                  await sendExportToGallery(entry.id);
-                  toast.success("Clip ajouté à la galerie");
-                  onChanged();
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "Envoi impossible");
-                }
-              }}
-            >
-              <ImageUp className="mr-2 h-4 w-4" />
-              Envoyer dans la galerie
-            </ContextMenuItem>
-          )}
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            variant="destructive"
-            onClick={async () => {
-              await callModule("deleteExport", entry.id);
-              onChanged();
-            }}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Supprimer l&apos;export
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="truncate">{entry.projectName}</DialogTitle>
-            <DialogDescription>
-              {Math.round(entry.durationMs / 1000)} s · {entry.width}×{entry.height} · {formatMegabytes(entry.sizeBytes)}
-            </DialogDescription>
-          </DialogHeader>
-          <video src={url} controls autoPlay playsInline className="max-h-[65vh] w-full rounded-lg bg-black" />
-          <DialogFooter className="gap-2 sm:justify-between">
-            <Button asChild variant="ghost">
-              <Link href={`/m/clip-studio/edit?id=${entry.projectId}`}>Ouvrir le projet</Link>
-            </Button>
-            <div className="flex flex-wrap gap-2">
-              {onPublish ? (
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => {
-                    setOpen(false);
-                    onPublish();
-                  }}
-                >
-                  <Send className="h-4 w-4" />
-                  Publier
-                </Button>
-              ) : null}
-              <SendToGalleryButton entry={entry} onSent={onChanged} />
-              <Button asChild className="gap-2">
-                <a href={url} download={`${entry.projectName}.mp4`}>
-                  <Download className="h-4 w-4" />
-                  Télécharger
-                </a>
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }

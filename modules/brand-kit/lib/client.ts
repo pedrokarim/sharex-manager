@@ -1,6 +1,7 @@
 "use client";
 
-import type { BrandKit, BrandTheme, KitSummary } from "./types";
+import type { PublishField, TextCount } from "@/lib/connections/types";
+import type { BrandKit, BrandTheme, HashtagRule, KitSummary } from "./types";
 import { MODULE_NAME, MODULE_PATH } from "./types";
 
 export { MODULE_NAME, MODULE_PATH };
@@ -33,6 +34,18 @@ export interface PublishAccount {
   label?: string;
   avatarUrl?: string;
   status: "connected" | "needs-reconnect";
+}
+
+/** Un service où publier une vidéo, avec ses champs (onglets « par service » de la section Publication). */
+export interface PublishService {
+  id: string;
+  label: string;
+  logo: string;
+  fields: PublishField[];
+  /** Où vont les hashtags si la marque ne choisit pas. */
+  defaultHashtagRule: HashtagRule;
+  /** Premier commentaire possible (suite de publication), et sa limite. */
+  comment?: { maxLength: number; count?: TextCount };
 }
 
 export async function callAnyModule<T = unknown>(moduleName: string, functionName: string, ...args: unknown[]): Promise<T> {
@@ -90,6 +103,7 @@ export const api = {
   cancelKitAssistantJob: (id: string) => call<{ success: boolean }>("cancelKitAssistantJob", id),
   regenerateAsset: (kitId: string, assetId: string, note?: string) => call<BrandKit>("regenerateAsset", kitId, assetId, note),
   listPublishAccounts: () => call<PublishAccount[]>("listPublishAccounts"),
+  listPublishServices: () => call<PublishService[]>("listPublishServices"),
 };
 
 /** Dépose une image dans le dépôt du module (route d'upload des modules), avant de la ranger dans une marque. */

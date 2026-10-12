@@ -4,7 +4,7 @@
  */
 
 import { defaultRoleStyles } from "@/modules/clip-studio/engine/brand";
-import type { BrandKit, BrandPalette, TextRole, TextStyle } from "./types";
+import type { BrandKit, BrandPalette, BrandPublishing, TextRole, TextStyle } from "./types";
 
 export const DEFAULT_PALETTE: BrandPalette = {
   background: "#14141c",
@@ -49,19 +49,58 @@ export function createDefaultKit(name: string, now = Date.now()): BrandKit {
     assets: [],
     endCard: { enabled: true, seconds: 2.5, callToAction: "Abonne-toi" },
     ai: { styleNotes: "", scriptTone: "" },
-    publishing: {
-      accountIds: [],
-      titleTemplate: "{title}",
-      descriptionTemplate: "{hook}\n\n{tags}",
-      tags: [],
-      categoryId: "24",
-      // Rien ne part en public sans un choix explicite.
-      defaultPrivacy: "private",
-      containsSyntheticMedia: true,
-      madeForKids: false,
-    },
+    publishing: defaultPublishing(),
     isDefault: false,
     createdAt: now,
     updatedAt: now,
   };
+}
+
+/** Réglages de publication d'une marque neuve. */
+export function defaultPublishing(): BrandPublishing {
+  return {
+    accountIds: [],
+    titleTemplate: "{title}",
+    descriptionTemplate: "{summary}\n\n{links}\n\n{credits}",
+    captionTemplate: "{title}\n\n{cta}",
+    firstCommentTemplate: "",
+    serviceTemplates: {},
+    hashtags: [],
+    tags: [],
+    links: [],
+    categoryId: "24",
+    // Rien ne part en public sans un choix explicite.
+    defaultPrivacy: "private",
+    containsSyntheticMedia: true,
+    madeForKids: false,
+  };
+}
+
+/**
+ * Complète les réglages de publication d'une fiche écrite avant les textes
+ * de publication (dossier 01 ter, § 4.3). Migration douce, faite à la
+ * lecture : une marque sans `hashtags` recopie ses tags, qui servaient
+ * jusque-là de mots-dièse ; les modèles absents prennent ceux d'une marque
+ * neuve, sauf le premier commentaire, qui reste vide.
+ */
+export function upgradePublishing(input: unknown): BrandPublishing {
+  const fresh = defaultPublishing();
+  const publishing = (input && typeof input === "object" ? input : {}) as Partial<BrandPublishing>;
+  const tags = Array.isArray(publishing.tags) ? publishing.tags : fresh.tags;
+  const services = publishing.serviceTemplates;
+  return {
+    ...fresh,
+    ...publishing,
+    tags,
+    hashtags: Array.isArray(publishing.hashtags) ? publishing.hashtags : [...tags],
+    captionTemplate: typeof publishing.captionTemplate === "string" ? publishing.captionTemplate : fresh.captionTemplate,
+    firstCommentTemplate: typeof publishing.firstCommentTemplate === "string" ? publishing.firstCommentTemplate : "",
+    serviceTemplates: services && typeof services === "object" && !Array.isArray(services) ? services : {},
+    links: Array.isArray(publishing.links) ? publishing.links : [],
+  };
+}
+
+/** Fiche lue sur le disque, mise à la forme actuelle. */
+export function upgradeKit(kit: BrandKit): BrandKit {
+  return { ...kit, publishing: upgradePublishing(kit.publishing) };
 }

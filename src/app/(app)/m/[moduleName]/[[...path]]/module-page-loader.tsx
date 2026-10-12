@@ -29,6 +29,9 @@ const MODULE_PAGES: Record<string, Record<string, PageLoader>> = {
     "": () => import("@/modules/clip-studio/pages/projects"),
     edit: () => import("@/modules/clip-studio/pages/editor"),
     voices: () => import("@/modules/clip-studio/pages/voices"),
+    export: () => import("@/modules/clip-studio/pages/export"),
+    exports: () => import("@/modules/clip-studio/pages/exports"),
+    publish: () => import("@/modules/clip-studio/pages/publish"),
   },
   "reverse-search": {
     "": () => import("@/modules/reverse-search/pages/search"),

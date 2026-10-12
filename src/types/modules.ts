@@ -2,6 +2,8 @@ export interface ModulePageConfig {
   path: string;        // segment route: "" = racine, "settings" = /m/<name>/settings
   title: string;
   component: string;   // chemin relatif au module: "pages/generate.tsx"
+  /** `false` : page ouverte depuis une autre (elle attend un paramètre), absente du menu latéral. */
+  menu?: boolean;
 }
 
 export interface ModuleNavItem {

@@ -12,6 +12,8 @@ const ModulePageConfigSchema = z.object({
   path: z.string(),
   title: z.string(),
   component: z.string(),
+  /** `false` : page ouverte depuis une autre, absente du menu latéral (sans ce champ, zod le retirerait). */
+  menu: z.boolean().optional(),
 });
 
 const ModuleNavItemSchema = z.object({

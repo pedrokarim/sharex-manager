@@ -146,7 +146,8 @@ function applySheet(kit: BrandKit, raw: RawSheet): BrandKit {
     textStyles: styles,
     endCard: { ...kit.endCard, callToAction: cut(raw.callToAction, 60) || kit.endCard.callToAction },
     ai: { ...kit.ai, styleNotes: cut(raw.styleNotes, 2000), scriptTone: cut(raw.scriptTone, 600) },
-    publishing: { ...kit.publishing, tags: raw.tags ?? [], categoryId: String(raw.categoryId ?? kit.publishing.categoryId) },
+    // Les tags proposés servent aussi de premiers mots-dièse visibles : on les retouche ensuite à part.
+    publishing: { ...kit.publishing, tags: raw.tags ?? [], hashtags: raw.tags ?? [], categoryId: String(raw.categoryId ?? kit.publishing.categoryId) },
     mascot: raw.mascot?.identityPrompt
       ? { name: cut(raw.mascot.name, 80) || undefined, identityPrompt: cut(raw.mascot.identityPrompt, 1500), sheetAssetIds: [], poseAssetIds: [] }
       : undefined,

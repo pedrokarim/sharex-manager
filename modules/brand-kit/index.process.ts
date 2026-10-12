@@ -8,7 +8,10 @@
 import fs from "fs";
 import path from "path";
 import { ModuleHooks } from "@/types/modules";
-import { listAccounts, setProfileImage, type WatermarkTiming } from "@/lib/connections";
+import { listAccounts, listConnectors, setProfileImage, type PublishField, type WatermarkTiming } from "@/lib/connections";
+import type { TextCount } from "@/lib/connections/types";
+import { defaultHashtagRule } from "@/modules/clip-studio/lib/post-texts";
+import type { HashtagRule } from "@/modules/clip-studio/lib/post-types";
 import type { BrandKit, BrandTheme, KitSummary } from "./lib/types";
 import { ensureDirs, kitArea } from "./lib/server/store";
 import {
@@ -176,6 +179,37 @@ export async function listPublishAccounts(): Promise<PublishAccount[]> {
     avatarUrl: account.avatarUrl,
     status: account.status,
   }));
+}
+
+export interface PublishService {
+  id: string;
+  label: string;
+  logo: string;
+  fields: PublishField[];
+  defaultHashtagRule: HashtagRule;
+  comment?: { maxLength: number; count?: TextCount };
+}
+
+/**
+ * Services prêts à publier une vidéo, avec leurs champs : les onglets « par
+ * service » des textes de publication. Un service prévu mais pas encore
+ * branché n'y figure pas.
+ */
+export async function listPublishServices(): Promise<PublishService[]> {
+  return listConnectors()
+    .filter((connector) => connector.status === "ready" && connector.capabilities.includes("publish.video"))
+    .map((connector) => {
+      const fields = connector.publishFields.filter((field) => !field.sourceKinds || field.sourceKinds.includes("video"));
+      const comment = connector.followUps?.comment;
+      return {
+        id: connector.id,
+        label: connector.label,
+        logo: connector.logo,
+        fields,
+        defaultHashtagRule: defaultHashtagRule(fields),
+        ...(comment ? { comment: { maxLength: comment.maxLength, ...(comment.count ? { count: comment.count } : {}) } } : {}),
+      };
+    });
 }
 
 /**
