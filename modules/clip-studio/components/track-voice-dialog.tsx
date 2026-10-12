@@ -10,13 +10,7 @@ import { cn } from "@/lib/utils";
 import type { AudioItem, ClipAsset, ClipProject } from "../engine/types";
 import { voiceItemsOf, type VoiceReplacement } from "../engine/revoice";
 import { assetToSource, callModule } from "../lib/client";
-import { ToneControl, useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
-
-const SPEEDS = [
-  { value: 0.85, label: "Posée" },
-  { value: 1, label: "Normale" },
-  { value: 1.15, label: "Rapide" },
-];
+import { SpeedControl, ToneControl, useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
 
 type ItemStatus = { state: "pending" | "running" | "done" } | { state: "error"; message: string };
 
@@ -149,23 +143,7 @@ export function TrackVoiceDialog({
           <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <div className="flex min-w-0 flex-col gap-1.5">
               <span className="text-[11px] font-medium text-muted-foreground">Débit</span>
-              <div className="inline-flex rounded-lg bg-muted p-1" role="group" aria-label="Débit">
-                {SPEEDS.map((entry) => (
-                  <button
-                    key={entry.value}
-                    type="button"
-                    aria-pressed={speed === entry.value}
-                    onClick={() => setSpeed(entry.value)}
-                    className={
-                      speed === entry.value
-                        ? "flex-1 rounded-md bg-background px-2 py-1 text-xs font-medium shadow-sm"
-                        : "flex-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-                    }
-                  >
-                    {entry.label}
-                  </button>
-                ))}
-              </div>
+              <SpeedControl value={speed} onChange={setSpeed} />
             </div>
             {selected?.provider === "piper" && (
               <div className="flex min-w-0 flex-col gap-1.5">

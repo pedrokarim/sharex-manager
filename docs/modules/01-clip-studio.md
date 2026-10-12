@@ -84,6 +84,7 @@ Ajoutés pour ce module et réutilisables par tous :
 | 10 | Bibliothèque d’animations : un modèle à pistes d’images clés, le texte animé lettre par lettre et mot par mot, 250 à 300 préréglages (éléments, texte, transitions, caméra, impacts), un sélecteur à vignettes animées, le mouvement des marques. Voir [01 bis – la bibliothèque d’animations](01-clip-studio-animations.md) | En cours (A0 à A3 faites) |
 | 11 | Vérification des faits : la date du jour dans les consignes ; le web pour écrire le script quand la demande porte sur des faits réels et que la case « Chercher aussi sur le web » est cochée ; une seconde passe de Codex qui contrôle chaque segment (corrigé, remplacé, retiré ou douteux, avec ses sources), les doutes dits dans le suivi, les sources rangées dans le projet (`lib/fact-check.ts`). Voir « Vérification des faits » ci-dessous | Réalisée |
 | 12 | Voix gratuites et naturelles : sélecteur de source (locales, Edge, Azure, OpenAI, Google, ElevenLabs), voix de la lecture à voix haute d’Edge sans clé, Microsoft Azure avec son offre gratuite suivie, bouton « Écouter » mis en cache, intonation des voix locales, « Changer la voix de la piste… ». Voir « Voix : sources, écoute et changement de voix » ci-dessous | Réalisée |
+| 13 | Voix de l’assistant : débit et intonation dans « Créer », voix de la marque préremplie (et prise d’office quand la demande n’en précise aucune, avec repli sur la voix locale si elle manque), calage de la voix sur une durée visée par format (accélération de 10 % au plus, sinon script raccourci par Codex). Voir « Voix de l’assistant, voix de la marque et calage » ci-dessous | Réalisée |
 
 ### Trouver avant de générer (étape 9)
 
@@ -402,6 +403,63 @@ extrait en échec garde l’ancienne voix et reste signalé ; relancer avec les
 mêmes réglages ne refait que les échecs. Un extrait devenu plus long que
 l’écart avant le suivant est signalé.
 
+### Voix de l’assistant, voix de la marque et calage (étape 13)
+
+**Débit et intonation dans « Créer ».** À côté du choix de la voix, la
+fenêtre « Créer » de l’assistant propose le débit (Posée, Normale, Rapide :
+les paliers de l’éditeur, `VOICE_SPEEDS` dans `lib/voice-settings.ts`) et,
+pour une voix locale, l’intonation. « Écouter » joue la voix à ce débit et à
+cette intonation. Débit et intonation sont gardés dans ce navigateur
+(`clip-studio:assistant-voice`), comme la dernière voix choisie. La demande
+les transmet (`voiceSpeed`, `voiceTone`), bornés par `cleanRequest` : débit de
+0,7 à 1,6, intonation parmi les trois connues, ignorée par une voix en ligne.
+`speakLine` les passe à `synthesize`.
+
+**Voix de la marque.** Une image de marque peut fixer sa voix (dossier 07,
+section « Assistant IA ») : source et voix, débit, intonation. Quand la
+fenêtre « Créer » choisit une marque qui a une voix, ces réglages sont
+préremplis et une ligne l’indique (« Voix de la marque « Nom » »). Changer
+la voix, le débit ou l’intonation ne vaut que pour ce clip (« Voix changée
+pour ce clip », avec « Reprendre la voix de la marque »). Côté serveur,
+`resolveNarrationVoice` prend la voix de la demande, sinon celle de la
+marque ; `narration: false` garde le clip muet, même quand la marque a une
+voix. Une voix indisponible – clé Azure absente, source coupée – est
+remplacée par la voix locale par défaut (Siwis) avant le premier mot ; une
+voix en ligne qui ne répond pas dès la première ligne (Edge en panne) aussi.
+Le suivi le dit (« Voix de la marque indisponible (…) : voix locale Siwis à
+la place ») et le clip se fait. La fenêtre « Créer » prévient de même quand
+la voix de la marque n’est pas proposée sur ce serveur.
+
+**Calage sur la durée visée.** La fenêtre « Créer » règle une durée parlée
+visée, bornée par format : 60 s au plus pour un short 9:16, 90 s en 1:1 et
+4:5, 180 s en 16:9. Par défaut : 45 s (libre, top), 60 s (quiz), 40 s
+(diaporama), dans la limite du format. Le script la reçoit dans sa consigne.
+Après l’enregistrement de toutes les voix, si la durée parlée totale (la
+somme des voix, sans les pauses du montage ni le carton de fin) dépasse la
+cible :
+
+- jusqu’à 10 % au-delà, la voix est réenregistrée un peu plus vite, jamais
+  au-delà de ×1,10 du débit choisi (un débit « Rapide » à ×1,15 monte au plus
+  à ×1,265 ; jamais au-delà de ×1,6) ;
+- au-delà, ou quand le débit est déjà au plus haut, Codex raccourcit le
+  script : les mêmes éléments, dans le même ordre, le script passé comme
+  données entre balises (`asData`, comme la marque et la vérification des
+  faits). Seuls les textes lus changent (légendes, textes, questions et
+  explications, détails) ; jamais le titre, les choix d’un quiz ni la bonne
+  réponse, ni les images déjà trouvées. Une réponse qui change le nombre
+  d’éléments, ou qui ne fait rien gagner, est écartée. Le script raccourci
+  est réenregistré.
+
+Deux tentatives au plus. Le détail de l’étape « Enregistrement de la voix »
+dit ce qui a été fait (« Voix accélérée de 6 % pour tenir en 60 s »,
+« Script raccourci de 18 s ») ; si rien n’y fait, le clip se fait quand même
+et le suivi le signale (« Durée visée encore dépassée : 64 s de voix pour
+60 s »). Les voix remplacées sont effacées des médias : les mots horodatés et
+les sous-titres karaoké viennent de la voix finale. Le travail garde ce suivi
+dans `narration` (voix retenue et son origine, repli, durée mesurée,
+accélération, secondes gagnées, tentatives). Le script raccourci n’est pas
+revérifié : la consigne interdit d’ajouter ou de changer un fait.
+
 ## 1. Pourquoi ce module
 
 Les rendus d’AI Image Gen, les captures d’un projet ou les enregistrements
@@ -703,6 +761,7 @@ dès qu’il est prêt, sans que l’utilisateur ait à le savoir.
 | `speak({ text, voice, speed, tone })` | Lit un texte et range le son parmi les médias |
 | `previewVoice({ voice, speed, tone })` | Extrait d’écoute, mis en cache |
 | `respeakVoice({ ref, text, voice, speed, tone })` | Relit une voix de la timeline avec une autre voix |
+| `startAssistant(request)` | Lance l’assistant ; `voice`, `voiceSpeed`, `voiceTone`, `narration` et `targetSeconds` règlent la voix et la durée visée (étape 13) |
 | `getTtsProviders()`, `saveTtsKey({ provider, key, region, enabled })` | Clés, région d’Azure, interrupteur d’Edge (admins seulement) |
 
 ## 7. Intégration

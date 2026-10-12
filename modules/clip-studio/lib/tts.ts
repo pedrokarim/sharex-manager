@@ -27,6 +27,7 @@ import {
   type SourceAvailability,
 } from "./cloud-tts";
 import { toPcmWav } from "@/lib/media/ffmpeg";
+import { cleanSpeed } from "./voice-settings";
 
 import { childEnv } from "@/lib/child-env";
 const PIPER_RELEASE = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2";
@@ -336,9 +337,8 @@ function cleanText(value: unknown): string {
   return text;
 }
 
-function cleanSpeed(value: unknown): number {
-  return Math.min(1.6, Math.max(0.7, Number(value) || 1));
-}
+/** Débit borné, commun aux moteurs (voir `voice-settings.ts`). */
+export { cleanSpeed };
 
 /** Durée, alignement et rangement parmi les médias : communs à tous les moteurs. */
 function registerSpeech(file: string, label: string, credit: string, speech: SpeechInfo, providedWords?: TimedWord[]): SpeechResult {

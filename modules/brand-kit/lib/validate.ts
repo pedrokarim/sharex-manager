@@ -10,6 +10,7 @@
 import { isCatalogFamily } from "@/modules/clip-studio/lib/font-catalog";
 import { TEXT_ROLES } from "@/modules/clip-studio/engine/brand";
 import { HASHTAG_RULES } from "@/modules/clip-studio/lib/post-types";
+import { cleanVoiceSettings } from "@/modules/clip-studio/lib/voice-settings";
 import { DEFAULT_PALETTE, defaultTextStyles, upgradePublishing } from "./defaults";
 import {
   FORMAT_IDS,
@@ -282,6 +283,8 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
   // Une fiche d'avant les textes de publication (archive importée) est d'abord complétée.
   const publishing = upgradePublishing(kit.publishing && typeof kit.publishing === "object" ? kit.publishing : stored.publishing);
   const rules = kit.rules && typeof kit.rules === "object" ? kit.rules : stored.rules;
+  // Comme le filigrane : une voix absente de ce qu'envoie l'éditeur a été retirée.
+  const voice = cleanVoiceSettings(kit.voice);
 
   return {
     version: 1,
@@ -312,6 +315,7 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
       collectionId: typeof ai.collectionId === "string" && /^col-[A-Za-z0-9-]{1,60}$/.test(ai.collectionId) ? ai.collectionId : undefined,
       scriptTone: text(ai.scriptTone, KIT_LIMITS.scriptTone),
     },
+    ...(voice ? { voice } : {}),
     publishing: {
       accountIds: (Array.isArray(publishing.accountIds) ? publishing.accountIds : [])
         .filter((id: unknown) => typeof id === "string" && /^acc-[a-z0-9]{4,40}$/.test(id))

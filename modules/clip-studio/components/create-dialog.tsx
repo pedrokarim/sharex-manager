@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  AlertTriangle,
   Check,
   FileVideo,
   Images,
@@ -10,6 +11,7 @@ import {
   ListOrdered,
   Loader2,
   PenLine,
+  RotateCcw,
   Plus,
   Sparkles,
   SquareSplitHorizontal,
@@ -49,7 +51,16 @@ import { ASPECTS, type AspectPreset, type MediaSource } from "../engine/types";
 import { callModule, fetchBrandTheme, probeMedia, useBrandKits, type BrandKitChoice } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
 import { IMAGE_SOURCE_MODES, type ImageSourceMode } from "../lib/image-search-types";
-import { lastPickedVoice, useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
+import {
+  MIN_TARGET_SECONDS,
+  brandVoicePrefill,
+  cleanSpeed,
+  defaultTargetSeconds,
+  isToneId,
+  maxTargetSeconds,
+  voiceSourceOf,
+} from "../lib/voice-settings";
+import { lastPickedVoice, SpeedControl, ToneControl, useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
 import { MOOD_LABELS } from "./music-panel";
 import { BrandKitMark } from "./inspector";
 
@@ -137,6 +148,29 @@ function writeImagePrefs(prefs: { source: ImageSourceMode; web: boolean }) {
   }
 }
 
+const VOICE_PREFS_KEY = "clip-studio:assistant-voice";
+
+/** Dernier débit et dernière intonation choisis pour l'assistant, gardés dans ce navigateur. */
+function readVoicePrefs(): { speed: number; tone: string } {
+  try {
+    const stored = JSON.parse(localStorage.getItem(VOICE_PREFS_KEY) ?? "null");
+    if (stored && typeof stored === "object") {
+      return { speed: cleanSpeed(stored.speed), tone: isToneId(stored.tone) ? stored.tone : "balanced" };
+    }
+  } catch {
+    // Stockage indisponible ou valeur illisible : réglages par défaut.
+  }
+  return { speed: 1, tone: "balanced" };
+}
+
+function writeVoicePrefs(prefs: { speed: number; tone: string }) {
+  try {
+    localStorage.setItem(VOICE_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // Rien à faire : le choix vaut pour cette fenêtre seulement.
+  }
+}
+
 export function CreateDialog({
   request,
   onClose,
@@ -169,11 +203,20 @@ export function CreateDialog({
   };
   const [withVoice, setWithVoice] = useState(true);
   const [voice, setVoice] = useState("siwis");
-  // Voix choisie la dernière fois sur ce navigateur (préférence locale).
-  useEffect(() => {
-    const remembered = lastPickedVoice();
-    if (remembered) setVoice(remembered);
-  }, []);
+  const [speed, setSpeed] = useState(() => readVoicePrefs().speed);
+  const [tone, setTone] = useState(() => readVoicePrefs().tone);
+  const chooseSpeed = (next: number) => {
+    setSpeed(next);
+    writeVoicePrefs({ speed: next, tone });
+  };
+  const chooseTone = (next: string) => {
+    setTone(next);
+    writeVoicePrefs({ speed, tone: next });
+  };
+  // Durée parlée visée ; `null` : la valeur par défaut du modèle, bornée au format.
+  const [targetChoice, setTargetChoice] = useState<number | null>(null);
+  const maxTarget = maxTargetSeconds(aspect);
+  const targetSeconds = Math.min(maxTarget, Math.max(MIN_TARGET_SECONDS, targetChoice ?? defaultTargetSeconds(template, aspect)));
   const [music, setMusic] = useState<string>("auto");
   const { info: voices, prepare: prepareVoice } = useVoices();
   // Une voix retenue mais plus proposée (clé retirée, source coupée) : retour à la voix locale.
@@ -205,6 +248,41 @@ export function CreateDialog({
   const brandable = mode !== "blank" || fromGallery;
   const showBrands = brandable && Boolean(brandKits?.length);
   const chosenKitId = showBrands ? brandKitId : null;
+  const chosenKit = chosenKitId ? brandKits?.find((kit) => kit.id === chosenKitId) : undefined;
+  const brandVoice = chosenKit?.voice;
+  const brandVoiceKey = brandVoice ? `${chosenKitId}|${brandVoice.voice}|${brandVoice.speed}|${brandVoice.tone ?? ""}` : "";
+
+  // Voix préremplie : celle de la marque choisie, sinon la dernière choisie sur ce navigateur.
+  useEffect(() => {
+    if (!request) return;
+    if (brandVoice) {
+      setVoice(brandVoice.voice);
+      setSpeed(brandVoice.speed);
+      setTone(brandVoice.tone ?? "balanced");
+      return;
+    }
+    const prefs = readVoicePrefs();
+    setVoice(lastPickedVoice() ?? "siwis");
+    setSpeed(prefs.speed);
+    setTone(prefs.tone);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- la clé résume la voix de la marque
+  }, [request, brandVoiceKey]);
+
+  const localVoice = voiceSourceOf(voice) === "piper";
+  const brandPrefill = brandVoice ? brandVoicePrefill(brandVoice, voices ? voices.voices.map((entry) => entry.id) : null) : null;
+  const brandVoiceState = !brandVoice
+    ? null
+    : brandPrefill?.unavailable
+      ? "unavailable"
+      : voice === brandVoice.voice && speed === brandVoice.speed && (!localVoice || tone === (brandVoice.tone ?? "balanced"))
+        ? "same"
+        : "changed";
+  const restoreBrandVoice = () => {
+    if (!brandVoice) return;
+    setVoice(brandVoice.voice);
+    setSpeed(brandVoice.speed);
+    setTone(brandVoice.tone ?? "balanced");
+  };
 
   // Suivi de l'assistant tant que la fenêtre est ouverte.
   useEffect(() => {
@@ -263,7 +341,11 @@ export function CreateDialog({
         images: imageSource !== "none",
         imageSource,
         webSearch,
+        narration: withVoice,
         voice: withVoice ? voice : undefined,
+        voiceSpeed: withVoice ? speed : undefined,
+        voiceTone: withVoice && localVoice ? tone : undefined,
+        targetSeconds,
         music: music === "none" ? undefined : music,
         brandKitId: chosenKitId ?? undefined,
       });
@@ -356,13 +438,35 @@ export function CreateDialog({
                       </div>
                     </div>
                     <TemplatePicker value={template} onChange={setTemplate} only={ASSISTANT_TEMPLATE_IDS} />
-                    <label className="block space-y-1.5">
-                      <span className="flex items-center justify-between text-sm">
-                        <span>{COUNT_LABELS[template] ?? "Séquences"}</span>
-                        <span className="font-mono text-xs tabular-nums">{count}</span>
-                      </span>
-                      <input type="range" min={2} max={10} value={count} onChange={(event) => setCount(Number(event.target.value))} className="w-full accent-primary" />
-                    </label>
+                    <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                      <label className="block min-w-0 space-y-1.5">
+                        <span className="flex items-center justify-between text-sm">
+                          <span>{COUNT_LABELS[template] ?? "Séquences"}</span>
+                          <span className="font-mono text-xs tabular-nums">{count}</span>
+                        </span>
+                        <input type="range" min={2} max={10} value={count} onChange={(event) => setCount(Number(event.target.value))} className="w-full accent-primary" />
+                      </label>
+                      <label className="block min-w-0 space-y-1.5">
+                        <span className="flex items-center justify-between gap-2 text-sm">
+                          <span>Durée visée</span>
+                          <span className="font-mono text-xs tabular-nums">{targetSeconds}&nbsp;s</span>
+                        </span>
+                        <input
+                          type="range"
+                          min={MIN_TARGET_SECONDS}
+                          max={maxTarget}
+                          step={5}
+                          value={targetSeconds}
+                          onChange={(event) => setTargetChoice(Number(event.target.value))}
+                          aria-label="Durée parlée visée, en secondes"
+                          className="w-full accent-primary"
+                        />
+                        <span className="block text-xs text-muted-foreground">
+                          {aspect === "9:16" ? "60\u00a0s au plus pour un short. " : ""}
+                          Voix trop longue&nbsp;: accélérée de 10&nbsp;% au plus, sinon script raccourci.
+                        </span>
+                      </label>
+                    </div>
                     <div className="space-y-3 rounded-lg border p-3">
                       <div className="space-y-2">
                         <span className="block text-sm">
@@ -410,8 +514,43 @@ export function CreateDialog({
                       </label>
                       <AnimatePresence initial={false}>
                         {withVoice && (
-                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="space-y-2 overflow-hidden">
-                            <VoicePicker value={voice} onChange={setVoice} voices={voices} onPrepare={prepareVoice} />
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="min-w-0 space-y-3 overflow-hidden">
+                            {brandVoiceState && chosenKit && (
+                              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs" aria-live="polite">
+                                {brandVoiceState === "unavailable" ? (
+                                  <span className="flex min-w-0 items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                                    <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+                                    <span className="min-w-0 break-words">{brandPrefill?.unavailable}</span>
+                                  </span>
+                                ) : (
+                                  <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+                                    <BrandKitMark kit={chosenKit} />
+                                    <span className="min-w-0 truncate" title={chosenKit.name}>
+                                      {brandVoiceState === "same" ? `Voix de la marque «\u00a0${chosenKit.name}\u00a0»` : "Voix changée pour ce clip"}
+                                    </span>
+                                  </span>
+                                )}
+                                {brandVoiceState === "changed" && (
+                                  <button type="button" onClick={restoreBrandVoice} className="inline-flex items-center gap-1 text-primary hover:underline">
+                                    <RotateCcw className="h-3 w-3" />
+                                    Reprendre la voix de la marque
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            <VoicePicker value={voice} onChange={setVoice} voices={voices} onPrepare={prepareVoice} speed={speed} tone={tone} />
+                            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                              <div className="flex min-w-0 flex-col gap-1.5">
+                                <span className="text-[11px] font-medium text-muted-foreground">Débit</span>
+                                <SpeedControl value={speed} onChange={chooseSpeed} />
+                              </div>
+                              {localVoice && (
+                                <div className="flex min-w-0 flex-col gap-1.5">
+                                  <span className="text-[11px] font-medium text-muted-foreground">Intonation</span>
+                                  <ToneControl value={tone} onChange={chooseTone} />
+                                </div>
+                              )}
+                            </div>
                             <VoiceCredit voice={voices?.voices.find((entry) => entry.id === voice)} />
                           </motion.div>
                         )}

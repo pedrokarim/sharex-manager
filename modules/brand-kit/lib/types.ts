@@ -13,6 +13,16 @@ export type { BrandPalette, BrandTheme, WatermarkAnchor } from "@/modules/clip-s
 export type { TextRole, TextStyle } from "@/modules/clip-studio/engine/types";
 import type { HashtagRule } from "@/modules/clip-studio/lib/post-types";
 export type { HashtagRule } from "@/modules/clip-studio/lib/post-types";
+import type { VoiceSettings } from "@/modules/clip-studio/lib/voice-settings";
+
+/**
+ * Voix de la marque : la voix (sa source se lit dans son identifiant,
+ * « azure:fr-FR-DeniseNeural » ou « siwis » pour une voix locale), son débit
+ * et, pour une voix locale, son intonation. Préremplie dans la fenêtre
+ * « Créer » de Clip Studio, prise d'office par l'assistant quand la demande
+ * n'en précise aucune.
+ */
+export type BrandVoice = VoiceSettings;
 
 export type FontFormat = "ttf" | "otf" | "woff2";
 
@@ -197,6 +207,8 @@ export interface BrandKit {
   /** Croix de repérage d'imprimeur aux coins de la bannière et du carton de fin mis en scène. */
   registrationMarks?: boolean;
   ai: { styleNotes: string; collectionId?: string; scriptTone: string };
+  /** Voix off de la marque ; absente : chaque clip choisit la sienne. */
+  voice?: BrandVoice;
   publishing: BrandPublishing;
   isDefault: boolean;
   createdAt: number;
@@ -212,6 +224,8 @@ export interface KitSummary {
   logoUrl?: string;
   bannerUrl?: string;
   accountIds: string[];
+  /** Voix de la marque, que la fenêtre « Créer » de Clip Studio préremplit. */
+  voice?: BrandVoice;
   isDefault: boolean;
   updatedAt: number;
 }

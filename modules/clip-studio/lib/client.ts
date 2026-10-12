@@ -6,6 +6,7 @@ import type { ClipAsset, ClipExport, ClipProject, MediaSource } from "../engine/
 import type { PublishJobSummary } from "@/lib/connections/types";
 import type { ExportDetails, ExportPost, PublishTarget } from "./post-types";
 import type { DraftRequest, DraftResult } from "./post-draft";
+import type { VoiceSettings } from "./voice-settings";
 
 export const MODULE_NAME = "clip-studio";
 
@@ -343,6 +344,8 @@ export interface BrandKitChoice {
   tagline?: string;
   palette: BrandPalette;
   logoUrl?: string;
+  /** Voix de la marque, préremplie dans la fenêtre « Créer ». */
+  voice?: VoiceSettings;
   isDefault: boolean;
 }
 

@@ -114,7 +114,9 @@ du dossier de la marque).
 - **Assistant de Clip Studio** : la fenêtre « Créer » gagne un sélecteur
   « Image de marque ». La vidéo produite suit la marque sans autre geste : le
   script prend le ton de la marque, les illustrations son style, le montage
-  ses couleurs, ses polices, son filigrane et son carton de fin.
+  ses couleurs, ses polices, son filigrane et son carton de fin. Si la marque
+  a une voix, la fenêtre la préremplit (voix, débit, intonation) ; on peut en
+  changer pour ce clip.
 - **Modèles remplis à la main et recettes depuis la galerie** (Diaporama,
   Rythmé, Avant / Après) : même sélecteur.
 - **Projet existant** : inspecteur sans sélection, section « Image de marque »
@@ -214,7 +216,7 @@ deux enregistrements, l’éditeur le dit au lieu d’écraser.
 | Logos | Logo principal, marque réduite (initiale, tampon) |
 | Mascotte | Nom, bloc d’identité texte, feuille de modèle et poses détourées ; tout est joint aux générations |
 | Vidéo | Filigrane (image, coin, taille, opacité, marge, apparition), carton de fin (durée, accroche, appel à l’action, pose de la mascotte) |
-| Assistant IA | Notes de style des illustrations, collection AI Image Gen liée, ton du script |
+| Assistant IA | Notes de style des illustrations, ton du script, voix off de la marque (source et voix avec écoute, débit, intonation d’une voix locale), collection AI Image Gen liée |
 | Publication | Comptes liés (un ou plusieurs, tous services confondus, choisis parmi les comptes connectés), modèles de titre et de description, tags, catégorie, visibilité par défaut, déclaration de contenu synthétique, public enfant |
 
 ### 4.3 Aperçu des formats
@@ -467,6 +469,8 @@ interface BrandKit {
   /** Croix de repérage sur la bannière et le carton de fin mis en scène. */
   registrationMarks?: boolean;
   ai: { styleNotes: string; collectionId?: string; scriptTone: string };
+  /** Voix off (6.4) : « siwis » ou « azure:fr-FR-DeniseNeural », débit de 0,7 à 1,6, intonation d'une voix locale. */
+  voice?: { voice: string; speed: number; tone?: "steady" | "balanced" | "expressive" };
   publishing: BrandPublishing;
   isDefault: boolean;
   createdAt: number;
@@ -764,6 +768,17 @@ reprend le modèle de Scan Studio :
   change.
 - Le montage passe le thème à `buildFromTemplate` ; la musique est posée après
   le carton de fin, pour le couvrir.
+- **Voix de la marque** (`voice`, section « Assistant IA » de l’éditeur) :
+  source et voix, choisies avec le sélecteur de Clip Studio et son bouton
+  « Écouter », débit (Posée, Normale, Rapide) et, pour une voix locale,
+  intonation. Lue avec tolérance (`cleanVoiceSettings`) : une marque d’avant
+  la voix, ou une voix abîmée, n’en a simplement pas ; le débit est borné, une
+  voix en ligne ne garde pas d’intonation. La liste des marques la donne
+  (`listKits`) : la fenêtre « Créer » la préremplit quand la marque est
+  choisie, et l’assistant la prend d’office quand une demande ne précise
+  aucune voix. Si elle n’est pas disponible (clé Azure absente, Edge en
+  panne), la voix locale par défaut la remplace et le suivi le dit, sans
+  échec du clip (dossier 01, étape 13).
 
 ### 6.5 Contrôle de cohérence des images
 

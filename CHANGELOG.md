@@ -7,6 +7,22 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Clip Studio, assistant : le débit et, pour une voix locale, l’intonation se
+  choisissent dans la fenêtre « Créer », à côté de la voix ; « Écouter » joue
+  la voix ainsi réglée, et ces choix sont gardés dans le navigateur.
+- Image de marque : une marque peut avoir sa voix off (source et voix, débit,
+  intonation), réglée dans la section « Assistant IA ». La fenêtre « Créer »
+  de Clip Studio la préremplit quand la marque est choisie, modifiable pour
+  le clip ; l’assistant la prend quand une demande ne précise aucune voix.
+  Voix indisponible (clé Azure absente, Edge en panne) : repli sur la voix
+  locale par défaut, signalé dans le suivi, sans échec du clip.
+- Clip Studio, assistant : calage de la voix sur une durée visée, réglable
+  dans « Créer » (60 s au plus pour un short 9:16). Une voix un peu trop
+  longue est relue plus vite (10 % au plus) ; bien trop longue, le script est
+  raccourci par Codex, mêmes éléments dans le même ordre, puis relu. Deux
+  tentatives au plus, chacune dite dans le suivi ; les sous-titres karaoké
+  suivent la voix finale.
+
 - Clip Studio, voix : les voix de la lecture à voix haute de Microsoft Edge,
   gratuites et sans clé, avec les instants des mots donnés par Microsoft pour
   les sous-titres. Accès non officiel, signalé comme tel ; en cas de

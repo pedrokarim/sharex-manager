@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { callModule } from "../lib/client";
 import type { VoiceSource, VoiceStatus } from "../lib/tts";
 import type { ResourceState } from "../lib/resources";
+import { VOICE_SPEEDS } from "../lib/voice-settings";
 
 export interface VoicesInfo {
   engine: ResourceState;
@@ -23,10 +24,13 @@ type SourceId = VoiceStatus["provider"];
 /** Voix et état de leur téléchargement, relus tant qu'un téléchargement avance. */
 export function useVoices() {
   const [info, setInfo] = useState<VoicesInfo | null>(null);
+  /** La liste n'a pas pu être lue (Clip Studio absent ou désactivé). */
+  const [failed, setFailed] = useState(false);
 
   const refresh = useCallback(async () => {
     const next = await callModule<VoicesInfo>("getVoices").catch(() => null);
     if (next) setInfo(next);
+    setFailed(!next);
   }, []);
 
   useEffect(() => {
@@ -49,7 +53,7 @@ export function useVoices() {
     [refresh]
   );
 
-  return { info, refresh, prepare };
+  return { info, failed, refresh, prepare };
 }
 
 function progress(state: ResourceState) {
@@ -258,6 +262,7 @@ export function VoicePicker({
   compact,
   speed,
   tone,
+  remember = true,
 }: {
   value: string;
   onChange: (id: string) => void;
@@ -267,6 +272,8 @@ export function VoicePicker({
   /** Réglages appliqués à l'écoute, pour entendre la voix telle qu'elle sera lue. */
   speed?: number;
   tone?: string;
+  /** Garder la voix choisie comme dernière voix de ce navigateur ; non pour la voix d'une marque. */
+  remember?: boolean;
 }) {
   const [source, setSource] = useState<SourceId>(() => sourceOf(value));
   const [language, setLanguage] = useState("fr");
@@ -460,7 +467,7 @@ export function VoicePicker({
                       title={voice.license ? `${voice.description}. ${voice.credit}, ${voice.license}.` : `${voice.description}. Voix en ligne ${voice.credit}.`}
                       onClick={() => {
                         onChange(voice.id);
-                        writePreference({ voice: voice.id });
+                        if (remember) writePreference({ voice: voice.id });
                         if (state.status === "missing" || state.status === "error") onPrepare(voice.id);
                       }}
                       className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-1 text-left"
@@ -545,6 +552,30 @@ export const PIPER_TONE_OPTIONS = [
   { value: "balanced", label: "Équilibrée", hint: "Le bon compromis, par défaut" },
   { value: "expressive", label: "Expressive", hint: "Réglage d’origine du modèle, plus vivant mais plus irrégulier" },
 ] as const;
+
+/** Débit d'une voix : les paliers de l'éditeur (Posée, Normale, Rapide). */
+export function SpeedControl({ value, onChange }: { value: number; onChange: (speed: number) => void }) {
+  return (
+    <div className="inline-flex w-full rounded-lg bg-muted p-1" role="group" aria-label="Débit">
+      {VOICE_SPEEDS.map((entry) => (
+        <button
+          key={entry.value}
+          type="button"
+          aria-pressed={value === entry.value}
+          title={`Débit ×${entry.value.toLocaleString("fr-FR")}`}
+          onClick={() => onChange(entry.value)}
+          className={
+            value === entry.value
+              ? "flex-1 rounded-md bg-background px-2 py-1 text-xs font-medium shadow-sm"
+              : "flex-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+          }
+        >
+          {entry.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function ToneControl({ value, onChange }: { value: string; onChange: (tone: string) => void }) {
   return (

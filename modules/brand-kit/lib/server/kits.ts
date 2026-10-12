@@ -69,6 +69,7 @@ function summarize(kit: BrandKit): KitSummary {
     logoUrl: logo ? kitAssetUrl(kit.id, logo.file) : undefined,
     bannerUrl: banner?.url,
     accountIds: kit.publishing.accountIds,
+    ...(kit.voice ? { voice: kit.voice } : {}),
     isDefault: kit.isDefault,
     updatedAt: kit.updatedAt,
   };

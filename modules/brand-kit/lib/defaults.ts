@@ -4,6 +4,7 @@
  */
 
 import { defaultRoleStyles } from "@/modules/clip-studio/engine/brand";
+import { cleanVoiceSettings } from "@/modules/clip-studio/lib/voice-settings";
 import type { BrandKit, BrandPalette, BrandPublishing, TextRole, TextStyle } from "./types";
 
 export const DEFAULT_PALETTE: BrandPalette = {
@@ -110,7 +111,12 @@ export function upgradePublishing(input: unknown): BrandPublishing {
   };
 }
 
-/** Fiche lue sur le disque, mise à la forme actuelle. */
+/**
+ * Fiche lue sur le disque, mise à la forme actuelle. La voix est lue avec
+ * tolérance : une marque d'avant la voix, ou une voix abîmée, n'en a pas.
+ */
 export function upgradeKit(kit: BrandKit): BrandKit {
-  return { ...kit, publishing: upgradePublishing(kit.publishing) };
+  const { voice: stored, ...rest } = kit;
+  const voice = cleanVoiceSettings(stored);
+  return { ...rest, ...(voice ? { voice } : {}), publishing: upgradePublishing(kit.publishing) };
 }
