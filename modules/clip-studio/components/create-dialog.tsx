@@ -44,11 +44,13 @@ import {
   buildSequence,
   type TemplateId,
 } from "../engine/templates";
+import { applyBrandTheme } from "../engine/brand";
 import { ASPECTS, type AspectPreset, type MediaSource } from "../engine/types";
-import { callModule, probeMedia } from "../lib/client";
+import { callModule, fetchBrandTheme, probeMedia, useBrandKits, type BrandKitChoice } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
 import { useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
 import { MOOD_LABELS } from "./music-panel";
+import { BrandKitMark } from "./inspector";
 
 type Mode = "blank" | "template" | "assistant";
 
@@ -126,6 +128,10 @@ export function CreateDialog({
   const { info: voices, prepare: prepareVoice } = useVoices();
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<AssistantJob | null>(null);
+  // Module des marques absent (`null`) ou sans marque : le sélecteur ne s'affiche pas.
+  const brandKits = useBrandKits();
+  const defaultKitId = brandKits?.find((kit) => kit.isDefault)?.id ?? null;
+  const [brandKitId, setBrandKitId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!request) return;
@@ -135,6 +141,16 @@ export function CreateDialog({
     setBusy(false);
     setJob(null);
   }, [request]);
+
+  // La marque par défaut est présélectionnée à chaque ouverture.
+  useEffect(() => {
+    if (request) setBrandKitId(defaultKitId);
+  }, [request, defaultKitId]);
+
+  // Un projet vide n'a rien à habiller : la marque vaut pour l'assistant, les modèles et les recettes.
+  const brandable = mode !== "blank" || fromGallery;
+  const showBrands = brandable && Boolean(brandKits?.length);
+  const chosenKitId = showBrands ? brandKitId : null;
 
   // Suivi de l'assistant tant que la fenêtre est ouverte.
   useEffect(() => {
@@ -153,9 +169,10 @@ export function CreateDialog({
     setBusy(true);
     try {
       const title = name.trim() || "Nouveau clip";
+      const theme = chosenKitId ? await fetchBrandTheme(chosenKitId) : null;
       let project;
       if (mode === "template") {
-        project = buildFromTemplate(template, title, aspect, SAMPLES[template]);
+        project = buildFromTemplate(template, title, aspect, SAMPLES[template], theme);
       } else if (request.files.length && recipe === "before-after") {
         // Images prises deux par deux, dans l'ordre de la sélection.
         const sources = await Promise.all(request.files.filter((file) => !isVideoFile(file)).map((file) => gallerySource(file)));
@@ -163,11 +180,12 @@ export function CreateDialog({
         for (let index = 0; index + 1 < sources.length; index += 2) {
           pairs.push({ before: sources[index], after: sources[index + 1] });
         }
-        project = buildBeforeAfter(title, aspect, { pairs });
+        const built = buildBeforeAfter(title, aspect, { pairs });
+        project = theme ? applyBrandTheme(built, theme) : built;
       } else {
         if (request.files.length) {
           const sources = await Promise.all(request.files.map((file) => gallerySource(file)));
-          project = buildSequence(title, aspect, sources, recipe === "rhythm" ? "rhythm" : "slideshow");
+          project = buildSequence(title, aspect, sources, recipe === "rhythm" ? "rhythm" : "slideshow", theme);
         } else {
           project = createProject(title, aspect);
         }
@@ -191,6 +209,7 @@ export function CreateDialog({
         images: withImages,
         voice: withVoice ? voice : undefined,
         music: music === "none" ? undefined : music,
+        brandKitId: chosenKitId ?? undefined,
       });
       setJob(started);
       onAssistantStarted();
@@ -242,6 +261,22 @@ export function CreateDialog({
                 })}
               </div>
             )}
+
+            {/* La marque oriente tout le clip (ton, images, couleurs) : on la choisit d'abord. */}
+            <AnimatePresence initial={false}>
+              {showBrands && (
+                <motion.div
+                  key="brand"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="overflow-hidden"
+                >
+                  <BrandPicker kits={brandKits!} value={brandKitId} onChange={setBrandKitId} />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={mode} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-5">
@@ -407,6 +442,46 @@ async function gallerySource(file: string): Promise<MediaSource> {
   const kind = isVideoFile(file) ? "video" : "image";
   const probe = await probeMedia(url, kind);
   return { url, ref: `upload:${file}`, name: file, kind, ...probe };
+}
+
+/** Image de marque du clip : couleurs, polices, filigrane et carton de fin, et pour l'assistant le ton et le style des images. */
+function BrandPicker({
+  kits,
+  value,
+  onChange,
+}: {
+  kits: BrandKitChoice[];
+  value: string | null;
+  onChange: (value: string | null) => void;
+}) {
+  const chip = (selected: boolean) =>
+    cn(
+      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
+      selected ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:text-foreground"
+    );
+  return (
+    <div className="space-y-2">
+      <span className="text-sm">Image de marque</span>
+      <div className="flex flex-wrap gap-1.5">
+        <button type="button" onClick={() => onChange(null)} className={chip(value === null)} aria-pressed={value === null}>
+          Aucune
+        </button>
+        {kits.map((kit) => (
+          <button
+            key={kit.id}
+            type="button"
+            onClick={() => onChange(kit.id)}
+            className={chip(value === kit.id)}
+            aria-pressed={value === kit.id}
+            title={kit.tagline}
+          >
+            <BrandKitMark kit={kit} />
+            <span className="max-w-40 truncate">{kit.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function RecipePicker({ value, onChange, files }: { value: Recipe; onChange: (value: Recipe) => void; files: string[] }) {

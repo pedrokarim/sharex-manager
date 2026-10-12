@@ -55,6 +55,9 @@ data/*.db*
 /data/backups/
 # Binaires téléchargés au démarrage (ffmpeg pour les vidéos de la galerie).
 /data/tools/
+# Comptes connectés : jetons chiffrés, secrets des applications, liens publics
+# temporaires et envois en file. Rien de cela ne doit quitter l’instance.
+/data/connections/
 
 # Données runtime des modules : images générées, historiques et surtout
 # `secrets.json` (clés API). `module.json` reste versionné, lui, car c'est le

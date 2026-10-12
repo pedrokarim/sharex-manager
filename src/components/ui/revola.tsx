@@ -185,7 +185,7 @@ const ResponsiveDialogClose = ({
 
   return (
     <ResponsiveDialogClose
-      aria-label="Close"
+      aria-label="Fermer"
       {...(shouldPreventClose && { disabled: true })}
       {...(shouldPreventClose && { "aria-disabled": true })}
       {...(shouldPreventClose && { onClick: (e) => e.preventDefault() })}

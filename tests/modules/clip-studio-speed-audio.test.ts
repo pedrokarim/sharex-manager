@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createProject, createVideoItem, addItem, setVideoSpeed, splitItem } from "@/modules/clip-studio/engine/edit";
 import { sourceTimeAt, speedOf } from "@/modules/clip-studio/engine/timeline";
-import { normalizeLoudness } from "@/modules/clip-studio/engine/export";
+import { integratedLoudness, normalizeLoudness } from "@/modules/clip-studio/engine/export";
 import type { ClipProject, VideoItem } from "@/modules/clip-studio/engine/types";
 
 const source = { url: "/api/files/clip.mp4", ref: "upload:clip.mp4", name: "clip.mp4", kind: "video" as const, durationMs: 20_000 };
@@ -59,8 +59,8 @@ describe("vitesse d'une vidéo", () => {
   });
 });
 
-/** Faux AudioBuffer, suffisant pour la normalisation. */
-function fakeBuffer(samples: number[][], sampleRate = 1000) {
+/** Faux AudioBuffer, suffisant pour la mesure et la normalisation. */
+function fakeBuffer(samples: number[][], sampleRate = 48_000) {
   const data = samples.map((channel) => Float32Array.from(channel));
   return {
     numberOfChannels: data.length,
@@ -70,19 +70,38 @@ function fakeBuffer(samples: number[][], sampleRate = 1000) {
   } as unknown as AudioBuffer;
 }
 
+/** Sinusoïde de `seconds` secondes à 48 kHz. */
+const sine = (frequency: number, amplitude: number, seconds = 2) =>
+  Array.from({ length: Math.round(48_000 * seconds) }, (_, index) => amplitude * Math.sin((2 * Math.PI * frequency * index) / 48_000));
+
 describe("normalisation du volume", () => {
-  it("remonte un mixage trop faible vers −16 dB", () => {
-    const quiet = Array.from({ length: 2000 }, (_, index) => 0.02 * Math.sin(index / 3));
-    const buffer = fakeBuffer([quiet]);
+  it("mesure comme la norme : un sinus à 1 kHz à −20 dBFS en stéréo vaut −20 LUFS", () => {
+    // Valeur de référence de l'EBU (Tech 3341) : à 1 kHz, la pondération K est quasi neutre.
+    const amplitude = Math.pow(10, -20 / 20);
+    const loudness = integratedLoudness(fakeBuffer([sine(1000, amplitude), sine(1000, amplitude)]));
+    expect(loudness).toBeGreaterThan(-20.3);
+    expect(loudness).toBeLessThan(-19.7);
+  });
+
+  it("remonte un mixage trop faible vers −14 LUFS", () => {
+    // −26 LUFS : 12 dB à remonter, sous le gain maximal.
+    const quiet = sine(1000, 0.05);
+    const buffer = fakeBuffer([quiet, quiet]);
     const gain = normalizeLoudness(buffer);
-    expect(gain).toBeGreaterThan(5);
-    const data = buffer.getChannelData(0);
-    const rms = Math.sqrt(data.reduce((sum, value) => sum + value * value, 0) / data.length);
-    expect(20 * Math.log10(rms)).toBeGreaterThan(-20);
+    expect(gain).toBeGreaterThan(3);
+    expect(integratedLoudness(buffer)).toBeCloseTo(-14, 0);
+  });
+
+  it("ignore les silences dans la mesure", () => {
+    const amplitude = Math.pow(10, -20 / 20);
+    const tone = sine(1000, amplitude, 1);
+    const withSilence = [...tone, ...new Array(48_000 * 3).fill(0)];
+    // Sans les portes, trois secondes de silence sur quatre donneraient −26 LUFS.
+    expect(integratedLoudness(fakeBuffer([withSilence, withSilence]))).toBeGreaterThan(-21);
   });
 
   it("ne fait jamais saturer : la crête reste sous −1 dB", () => {
-    const spiky = Array.from({ length: 2000 }, (_, index) => (index === 500 ? 0.5 : 0.01));
+    const spiky = Array.from({ length: 96_000 }, (_, index) => (index === 500 ? 0.9 : 0.01 * Math.sin(index / 5)));
     const buffer = fakeBuffer([spiky]);
     normalizeLoudness(buffer);
     const peak = Math.max(...buffer.getChannelData(0).map(Math.abs));
@@ -90,7 +109,7 @@ describe("normalisation du volume", () => {
   });
 
   it("laisse le silence tel quel", () => {
-    const buffer = fakeBuffer([new Array(1000).fill(0)]);
+    const buffer = fakeBuffer([new Array(48_000).fill(0)]);
     expect(normalizeLoudness(buffer)).toBe(1);
   });
 });

@@ -18,7 +18,7 @@ import { canExportInBrowser, exportProject, type ExportProgress } from "../engin
 import { formatTimecode, projectDuration } from "../engine/timeline";
 import type { ClipExport, ClipProject } from "../engine/types";
 import { exportUrl, formatMegabytes, saveExport } from "../lib/client";
-import { ensureFonts } from "../lib/fonts";
+import { ensureProjectFonts } from "../lib/fonts";
 import { SendToGalleryButton } from "./gallery-button";
 
 type Stage =
@@ -108,7 +108,14 @@ export function ExportDialog({
     const startedAt = Date.now();
     setStage({ kind: "rendering", progress: { phase: "prepare", ratio: 0 }, startedAt });
     try {
-      await ensureFonts();
+      // Polices du catalogue et de la marque : aucune image ne sort avec la police de repli sans le dire.
+      const missing = await ensureProjectFonts(project);
+      if (missing.length) {
+        toast.warning(
+          missing.length > 1 ? `${missing.length} polices de la marque n’ont pas pu être chargées` : "Une police de la marque n’a pas pu être chargée",
+          { description: "Le clip est exporté avec une police de repli." }
+        );
+      }
       const { blob, durationMs } = await exportProject(project, {
         signal: controller.current.signal,
         normalize,

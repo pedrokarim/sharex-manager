@@ -37,5 +37,14 @@ export async function register() {
     import("@/lib/modules/module-manager.api")
       .then(({ apiModuleManager }) => apiModuleManager.ensureInitialized())
       .catch((error) => console.error("[modules] échec du chargement au démarrage :", error));
+    // File de publication des comptes connectés : reprise des envois
+    // interrompus par l'arrêt du serveur, et du suivi des traitements.
+    import("@/lib/connections/publish-queue")
+      .then(({ startPublishQueue }) => startPublishQueue())
+      .catch((error) => console.error("[connections] échec de la reprise de la file :", error));
+    // Prolongation des jetons même sans publication, ménage des liens publics.
+    import("@/lib/connections/maintenance")
+      .then(({ startConnectionMaintenance }) => startConnectionMaintenance())
+      .catch((error) => console.error("[connections] échec du démarrage de la tâche de fond :", error));
   }, 2000);
 }

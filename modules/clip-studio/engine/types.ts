@@ -7,6 +7,8 @@
  * nombres.
  */
 
+import type { MotionParamValues } from "./motion/types";
+
 export type AspectPreset = "9:16" | "16:9" | "1:1" | "4:5";
 
 export const ASPECTS: Record<AspectPreset, { width: number; height: number; label: string }> = {
@@ -25,6 +27,8 @@ export interface ClipProject {
   height: number;
   fps: number;
   background: string;
+  /** Image de marque appliquée (module `brand-kit`) ; absente pour un projet libre. */
+  brandKitId?: string;
   /**
    * Pistes de haut en bas, comme dans la timeline : la première piste
    * visuelle est dessinée par-dessus les suivantes.
@@ -41,6 +45,8 @@ export interface Track {
   hidden?: boolean;
   muted?: boolean;
   locked?: boolean;
+  /** Piste ajoutée par une image de marque (filigrane, carton de fin), retirée avec elle. */
+  origin?: "brand";
   items: ClipItem[];
 }
 
@@ -56,6 +62,12 @@ export interface MediaSource {
   durationMs?: number;
   /** Mention d'auteur et de licence, à reprendre à la publication. */
   credit?: string;
+  /**
+   * Droits d'une image trouvée : `free` (licence libre vérifiée, Openverse),
+   * `unverified` (trouvée sur le web, à vérifier avant de publier). Absent :
+   * un média de l'utilisateur ou généré.
+   */
+  rights?: "free" | "unverified";
   /** Voix de synthèse : instants de chaque mot, pour les sous-titres. */
   words?: TimedWord[];
 }
@@ -70,7 +82,8 @@ export interface Transform {
   opacity: number;
 }
 
-export type AnimKind =
+/** Les neuf animations d'origine, et « none ». */
+export type LegacyAnimKind =
   | "none"
   | "fade"
   | "slide-up"
@@ -82,9 +95,29 @@ export type AnimKind =
   | "typewriter"
   | "wipe";
 
+/**
+ * Identifiant d'un préréglage du registre (`engine/motion/registry.ts`).
+ * Les noms d'origine restent proposés à la saisie ; tout autre identifiant
+ * est accepté, et un identifiant inconnu vaut « none » au rendu.
+ */
+export type AnimKind = LegacyAnimKind | (string & {});
+
 export interface Anim {
   kind: AnimKind;
   frames: number;
+  /** Réglages exposés du préréglage (intensité, direction…), par identifiant. */
+  params?: MotionParamValues;
+}
+
+/**
+ * Mise en avant : une animation jouée pendant que l'élément est à l'écran,
+ * entre la fin de son entrée et le début de sa sortie.
+ */
+export interface AnimEmphasis extends Anim {
+  /** Première image jouée, comptée depuis le début de l'élément. */
+  at: number;
+  /** Nombre de passages (1 par défaut) ; 0 : en boucle jusqu'à la sortie. */
+  repeat?: number;
 }
 
 /** Mouvement de caméra lent sur une image (effet Ken Burns). */
@@ -109,6 +142,26 @@ export interface Transition {
   frames: number;
 }
 
+/** Rôles de texte que posent les modèles, et dont une image de marque fixe le style. */
+export type TextRole = "title" | "subtitle" | "caption" | "label" | "body";
+
+/**
+ * Indication posée par un modèle : d'où l'élément tire son style ou sa
+ * couleur. C'est elle qui permet d'appliquer une image de marque après coup :
+ * on sait quel texte est un titre et quel cadre porte la teinte du segment.
+ */
+export interface ThemeHint {
+  /** Texte : rôle dont il prend le style. */
+  role?: TextRole;
+  /**
+   * Couleur : teinte du segment, aplat d'un plan sans image, voile sur une
+   * image, carte, mise en avant, ou vert d'une bonne réponse (qui ne suit pas la marque).
+   */
+  paint?: "accent" | "plate" | "veil" | "surface" | "highlight" | "success";
+  /** Rang du segment, pour la teinte tournante. */
+  accent?: number;
+}
+
 interface ItemBase {
   id: string;
   /** Première image où l'élément est visible. */
@@ -116,12 +169,16 @@ interface ItemBase {
   /** Nombre d'images. */
   duration: number;
   label?: string;
+  /** Élément ajouté par une image de marque, retiré ou remplacé avec elle. */
+  origin?: "brand";
+  theme?: ThemeHint;
 }
 
 interface VisualBase extends ItemBase {
   transform: Transform;
   animIn: Anim;
   animOut: Anim;
+  animEmphasis?: AnimEmphasis;
   /** Transition depuis le plan qui précède, sur la même piste. */
   transition?: Transition;
 }
@@ -193,6 +250,12 @@ export interface TextItem extends VisualBase {
   text: string;
   style: TextStyle;
   karaoke?: Karaoke;
+  /**
+   * « shrink » : la police rétrécit jusqu'à ce que le texte tienne dans son
+   * cadre, en largeur comme en hauteur. Sert aux textes que l'on ne maîtrise
+   * pas (nom de marque, accroche) : un nom long ne déborde plus du carton.
+   */
+  fit?: "shrink";
 }
 
 export interface ShapeItem extends VisualBase {

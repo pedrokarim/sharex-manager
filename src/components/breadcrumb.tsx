@@ -41,7 +41,12 @@ export function BreadcrumbNav() {
       albums: t("albums.title"),
       preferences: t("sidebar.secondary.preferences"),
       account: t("account.my_account"),
+      // Libellé en dur, comme l'entrée de la barre latérale.
+      connections: "Comptes connectés",
     };
+
+    // Fiche d'un compte : son identifiant interne ne dit rien à personne.
+    if (/^\/admin\/connections\/[^/]+/.test(pathname) && path.startsWith("acc-")) return "Compte";
 
     // Gestion des cas spéciaux comme [id]
     if (path.startsWith("[") && path.endsWith("]")) {

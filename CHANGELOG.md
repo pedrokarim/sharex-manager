@@ -7,6 +7,104 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Image de marque : l’interface est refaite autour des gestes. Liste avec
+  recherche, vue en tableau et aperçu des formats au survol ; palette
+  `Ctrl K` ; création dans un tiroir latéral, l’assistant suivi étape par
+  étape ; éditeur en trois panneaux redimensionnables, où l’aperçu montre de
+  lui-même le format concerné par la section ouverte ; couleurs réglées par
+  paires avec leur contraste, polices choisies en les voyant, coin du
+  filigrane cliqué sur un cadre, carton de fin joué à sa durée réelle,
+  modèles de titre à variables avec leur aperçu. De nouveaux contrôles communs
+  servent aux autres modules : sélecteur de couleur, sélecteur de position
+  sur un cadre, champ de tags, champ à variables, compteur de caractères,
+  sélecteur de police, frise d’étapes, zone de dépôt.
+- Image de marque : nouveau module à pages, pour donner à toutes les vidéos et
+  à toutes les captures la même direction artistique.
+  - Des images de marque nommées : palette par rôles (fond, encre, surface,
+    accent…) avec contrôle de contraste, polices importées (TTF, OTF, WOFF2),
+    styles de texte par rôle (titre, sous-titre, légende, étiquette, texte sur
+    carte), logos, mascotte, filigrane, carton de fin, ton et règles
+    d’écriture. Une marque neuve s’ouvre déjà remplie d’une maquette.
+  - Aperçu des formats d’une chaîne dessinés par le moteur de Clip Studio
+    (bannière YouTube avec sa zone sûre, avatar, filigrane, en-tête X, carton
+    de fin, couverture de short), exportés en PNG ou envoyés dans la galerie.
+  - Assistant de création : une phrase et quelques références suffisent ;
+    Codex rédige la fiche, AI Image Gen crée logo, fond de bannière et
+    mascotte dans une collection dédiée, et la pose de la mascotte est
+    comparée à sa feuille de modèle avant d’entrer dans la marque.
+  - Export et import d’une marque en archive ZIP, d’une instance à l’autre.
+- Comptes connectés : une page d’administration où relier autant de comptes
+  de publication que l’on veut, service par service. YouTube est le premier
+  connecteur (connexion OAuth, jetons chiffrés, envoi reprenable après une
+  coupure ou un redémarrage, programmation, gestion des vidéos, bannière et
+  filigrane de la chaîne depuis une image de marque, suivi des quotas) ;
+  Facebook, Instagram, Threads et X sont annoncés. Les modules demandent
+  « qui sait publier une vidéo » et s’adaptent aux comptes reliés.
+- Comptes connectés : connecter un compte devient un parcours en six étapes
+  dans un tiroir (service, configuration au besoin, niveau d’accès,
+  autorisation dans une fenêtre surgissante, choix des comptes trouvés,
+  suites), ouvrable depuis la page des comptes, depuis « Publier » et depuis
+  la section « Publication » d’une marque, avec des erreurs qui disent quoi
+  faire. La page des comptes met en tête ceux à reconnecter ; la fiche d’un
+  compte montre ses publications en tableau, ses quotas en graphique et sa
+  file d’envoi en frise. « Publier » devient un tiroir avec un volet par
+  compte, une liste de contrôle des limites du service, le coût quand il y en
+  a un, et la programmation par calendrier, tenue par la file quand le service
+  ne programme pas lui-même.
+- Comptes connectés : Facebook, Instagram et Threads rejoignent YouTube.
+  Facebook publie sur les pages (Reel, vidéo, photo, message, tout de suite ou
+  programmé), Instagram sur un compte professionnel (Reels et images, sans
+  page Facebook), Threads des messages, images et vidéos ; aucun ne demande
+  de revue de l’application pour ses propres comptes. Les jetons longue durée
+  se prolongent seuls, une publication dont la réponse s’est perdue n’est
+  jamais doublée, et les images sont converties au format attendu. X reste
+  annoncé.
+- Comptes connectés : le cœur accepte désormais plusieurs comptes par
+  connexion (avec le choix de ceux à garder), des jetons longue durée
+  prolongés automatiquement, l’autorisation dans une fenêtre surgissante, la
+  publication d’un texte seul ou de plusieurs images, la publication
+  programmée tenue par la file, les limites et le coût propres à chaque
+  service (avec un budget mensuel), et des liens publics temporaires vers un
+  fichier pour les services qui vont le chercher eux-mêmes. Un compte dont
+  l’accès est refusé pendant un envoi passe « à reconnecter » et son envoi
+  attend.
+- Clip Studio : « Publier » sur un export, vers un ou plusieurs comptes
+  connectés, avec les champs de chaque service préremplis par l’image de
+  marque du projet.
+- Clip Studio : l’assistant écrit trois accroches, les note et garde la
+  meilleure, suit des règles de rythme (accroche dite en trois secondes,
+  phrases courtes, relance à mi-parcours) et évite les tournures qui
+  trahissent une IA. La durée parlée du script est estimée.
+- Clip Studio : l’assistant cherche une image qui existe avant d’en générer
+  une. Le script dit, segment par segment, s’il faut trouver (un jeu, un lieu,
+  une espèce réelle) ou générer (une idée, la mascotte) ; la recherche passe
+  par Openverse (licences CC0, domaine public et CC BY seulement), puis, si on
+  l’autorise, par le web avec Codex. Chaque image trouvée est téléchargée par
+  le serveur, contrôlée et réencodée, et garde sa mention ; celles du web
+  sont marquées « droits à vérifier ».
+- Clip Studio : un nouveau moteur d’animation, à pistes d’images clés, avec
+  une bibliothèque de courbes complète (familles classiques, Bézier, ressorts,
+  marches), la rotation, l’échelle par axe, le flou, la luminosité, la couleur
+  et une phase de mise en avant ; les animations existantes rendent à
+  l’identique. Les textes s’animent lettre par lettre, mot par mot ou ligne
+  par ligne (accents, émojis et typographie française gardés entiers). La
+  bibliothèque compte 77 animations d’éléments (entrées, sorties, mises en
+  avant, boucles) et 78 animations de texte (lettre par lettre, mot par mot,
+  masques, flous et lumières, titres, mises en avant, boucles), chacune
+  vérifiée image par image.
+- Clip Studio : une « Zone de sécurité » grise sur l’aperçu d’un short
+  ce que cachent les boutons et la légende des plateformes.
+- Filigrane : le module sait poser le logo d’une image de marque, à son
+  coin, à sa taille et à son opacité, à la main sur une image de la galerie ou
+  à chaque envoi (« Utiliser pour chaque envoi », pour un administrateur).
+  Il charge désormais son logo depuis l’application et non depuis un site
+  tiers.
+- Clip Studio : les modèles (quiz, classement, diaporama, libre, avant /
+  après) et les recettes suivent l’image de marque choisie (couleurs, polices,
+  styles, filigrane, carton de fin), à la création comme après coup depuis
+  l’inspecteur, et une annulation la retire. L’assistant écrit dans le ton de
+  la marque et illustre dans son style. Sans marque, le rendu ne change pas.
+
 - Scan Studio : nouveau module à pages, pour traduire les pages d’un scan.
   - Bibliothèque à trois étages (dossiers, chapitres, pages) ; import d’images,
     d’archives `.zip` ou `.cbz` et de fichiers de la galerie.
@@ -315,6 +413,12 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Clip Studio : le volume d’un export est réglé sur une vraie mesure
+  d’intensité (ITU-R BS.1770, −14 LUFS, celle des plateformes de vidéos
+  courtes) au lieu d’un niveau moyen à −16 dB ; une crête déjà au-dessus de
+  −1 dB est toujours ramenée sous ce plafond.
+- Scan Studio : le contrôle des polices ajoutées est partagé avec Image de
+  marque, sans changement visible.
 - Pages publiques : catalogue, albums publics, connexion, inscription, mot de
   passe oublié, outils, contact, pages légales et pages d’information suivent
   le dessin de la page d’accueil (photos de nature, titres en Fraunces,
@@ -396,6 +500,19 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Le bouton de fermeture des fenêtres et des tiroirs s’annonce « Fermer »
+  aux lecteurs d’écran, et non plus « Close ».
+- Fenêtres et listes déroulantes : un nom ou un texte long ne les élargit
+  plus hors de l’écran ; leur hauteur reste dans l’écran, avec défilement
+  interne sur un téléphone, et la croix de fermeture ne recouvre plus le
+  titre.
+- Clip Studio : les cartes des exports ne se chevauchent plus quand un nom
+  est long ; le bouton « Zone de sécurité » ne cache plus le haut de
+  l’aperçu.
+- Boutons « Supprimer » et « Déconnecter » des confirmations à nouveau
+  rouges et lisibles en thème sombre.
+- Clip Studio : un texte ne se coupe plus sur une espace insécable : un
+  « ! » ou un « : » ne part plus seul à la ligne.
 - Liens officiels : la page Contact renvoyait vers un compte GitHub homonyme
   qui n’est pas celui du projet, et les pages Support et Feedback vers l’ancien
   nom du dépôt. Toutes les adresses (dépôt, tickets, wiki, Discord de support,

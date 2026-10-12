@@ -1,12 +1,16 @@
 {
   "name": "Watermark",
   "version": "1.0.0",
-  "description": "Ajoute un watermark aux screenshots",
+  "description": "Ajoute un filigrane aux captures : un texte ou le logo d’une image de marque",
   "author": "ShareX Manager",
   "enabled": true,
   "entry": "index.process.ts",
-  "icon": "https://cdn-icons-png.flaticon.com/512/5610/5610944.png",
-  "category": "Marque",
+  "branding": {
+    "logo": "branding/logo.png",
+    "logoSmall": "branding/logo-96.png",
+    "accent": "#e11d48"
+  },
+  "category": "Édition",
   "hasUI": true,
   "supportedFileTypes": [
     "jpg",
@@ -16,8 +20,7 @@
     "webp"
   ],
   "settings": {
-    "position": "bottom-right",
-    "opacity": 0.7,
+    "source": "text",
     "text": "© ShareX Manager"
   }
 }

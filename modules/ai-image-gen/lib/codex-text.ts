@@ -22,6 +22,14 @@ export interface CodexOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
   onLog?: (line: string) => void;
+  /** Images jointes à la demande (chemins de fichiers), pour une lecture visuelle. */
+  images?: string[];
+  /**
+   * Recherche web en direct (`--search`) : l'outil de recherche du modèle est
+   * ouvert, sans rien autoriser d'autre. Les adresses qu'il rend restent des
+   * données à contrôler par l'appelant.
+   */
+  search?: boolean;
 }
 
 function codexSettings(): { binaryPath?: string; sandbox?: string } {
@@ -38,7 +46,7 @@ export function findCodex(): string | null {
 }
 
 export async function askCodex(prompt: string, options: CodexOptions = {}): Promise<string> {
-  const { timeoutMs = 4 * 60 * 1000, signal, onLog } = options;
+  const { timeoutMs = 4 * 60 * 1000, signal, onLog, images = [], search = false } = options;
   const binary = findCodex();
   if (!binary) {
     throw new Error("Codex CLI est introuvable sur ce serveur : l'assistant d'écriture en a besoin.");
@@ -50,6 +58,8 @@ export async function askCodex(prompt: string, options: CodexOptions = {}): Prom
   // sable désactivé sauf si le serveur l'autorise (hôte sans espaces de noms).
   const sandbox = resolveSandbox(codexSettings().sandbox) === "off" ? "off" : "read-only";
   const args = [
+    // Option globale de Codex : elle se place avant la sous-commande, `exec` la refuserait.
+    ...(search ? ["--search"] : []),
     "exec",
     "--skip-git-repo-check",
     "--ignore-user-config",
@@ -58,6 +68,8 @@ export async function askCodex(prompt: string, options: CodexOptions = {}): Prom
     "--output-last-message",
     output,
     ...(sandbox === "off" ? ["--dangerously-bypass-approvals-and-sandbox"] : ["--sandbox", sandbox]),
+    // Une option par image. Le prompt part par l'entrée standard : en argument, `--image` l'avalerait.
+    ...images.flatMap((image) => ["--image", image]),
   ];
 
   try {

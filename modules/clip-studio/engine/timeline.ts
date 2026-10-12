@@ -5,8 +5,14 @@
  * deux passent par ces fonctions.
  */
 
+import { EASINGS } from "./motion/easing";
+import { naturalFrames, restState, sampleTracks } from "./motion/interpret";
+import { getPreset } from "./motion/registry";
+import { countUnits, type TextSplit } from "./motion/text-layout";
+import type { MotionParamValues, MotionPhase, MotionPreset, MotionState } from "./motion/types";
 import type {
   Anim,
+  AnimEmphasis,
   ClipItem,
   ClipProject,
   Motion,
@@ -47,78 +53,160 @@ export function formatTimecode(frame: number, fps: number): string {
 
 // ─── Courbes ─────────────────────────────────────────────────────
 
-export const ease = {
-  outCubic: (t: number) => 1 - Math.pow(1 - t, 3),
-  inCubic: (t: number) => t * t * t,
-  inOutSine: (t: number) => -(Math.cos(Math.PI * t) - 1) / 2,
-  /** Léger dépassement, pour l'apparition « pop ». */
-  outBack: (t: number) => {
-    const c1 = 1.70158;
-    const c3 = c1 + 1;
-    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-  },
-};
+/**
+ * Courbes nommées (`outCubic`, `inOutSine`, `outBack`…). La bibliothèque
+ * complète, Bézier et ressorts compris, est dans `motion/easing.ts`.
+ */
+export const ease = EASINGS;
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
-// ─── Animations d'entrée et de sortie ────────────────────────────
+// ─── Animations d'entrée, de mise en avant et de sortie ──────────
 
-export interface AnimState {
-  opacity: number;
-  /** Décalage relatif au canevas. */
-  dx: number;
-  dy: number;
-  scale: number;
-  /** Part révélée (texte « machine à écrire », balayage). */
-  reveal: number;
-  /** Balayage : révèle de gauche à droite. */
-  wipe: number;
+/**
+ * État d'un élément à une image : opacité, décalages, échelles, rotation,
+ * flou, luminosité, révélation, balayage, découpe, couleur. Voir
+ * `MotionState` ; un état au repos ne change rien au dessin.
+ */
+export type AnimState = MotionState;
+
+/** Préréglage d'une animation pour une phase ; un identifiant inconnu vaut « none ». */
+function presetOf(anim: Anim | undefined, phase: MotionPhase): MotionPreset | undefined {
+  if (!anim || anim.kind === "none" || !(anim.frames > 0)) return undefined;
+  if (phase === "emphasis") return getPreset(anim.kind, "emphasis") ?? getPreset(anim.kind, "loop");
+  return getPreset(anim.kind, phase);
 }
 
-const IDLE: AnimState = { opacity: 1, dx: 0, dy: 0, scale: 1, reveal: 1, wipe: 1 };
+/** Couleur propre de l'élément, que les pistes de couleur désignent par `currentColor`. */
+function baseColorOf(item: VisualItem): string | undefined {
+  if (item.type === "text") return item.style.color;
+  if (item.type === "shape") return item.fill;
+  return undefined;
+}
 
-function applyAnim(anim: Anim, t: number, entering: boolean): Partial<AnimState> {
-  // t va de 0 (début de l'animation) à 1 (état de repos) à l'entrée, et de 1
-  // (repos) à 0 (disparu) à la sortie : la même formule sert aux deux sens.
-  const k = entering ? ease.outCubic(t) : ease.inCubic(t);
-  const offset = 1 - k;
-  switch (anim.kind) {
-    case "fade":
-      return { opacity: k };
-    case "slide-up":
-      return { opacity: k, dy: 0.08 * offset };
-    case "slide-down":
-      return { opacity: k, dy: -0.08 * offset };
-    case "slide-left":
-      return { opacity: k, dx: 0.12 * offset };
-    case "slide-right":
-      return { opacity: k, dx: -0.12 * offset };
-    case "pop":
-      return { opacity: clamp01(t * 2), scale: entering ? 0.4 + 0.6 * ease.outBack(t) : 0.6 + 0.4 * k };
-    case "zoom":
-      return { opacity: k, scale: 1.25 - 0.25 * k };
-    case "typewriter":
-      return { reveal: t };
-    case "wipe":
-      return { wipe: t };
-    default:
-      return {};
+/**
+ * Avancement d'une mise en avant à l'image `local` (comptée depuis le début
+ * de l'élément), ou `null` hors de ses passages. Elle commence au plus tôt à
+ * la fin de l'entrée et s'arrête net au début de la sortie, boucle comprise.
+ */
+export function emphasisProgress(
+  emphasis: AnimEmphasis,
+  local: number,
+  inFrames: number,
+  outStart: number
+): number | null {
+  const frames = Math.max(1, Math.round(emphasis.frames));
+  const start = Math.max(inFrames, Math.round(Number(emphasis.at) || 0));
+  if (local < start || local >= outStart) return null;
+  const elapsed = local - start;
+  const repeat = Math.max(0, Math.round(emphasis.repeat ?? 1));
+  if (repeat > 0 && elapsed >= repeat * frames) return null;
+  return ((elapsed % frames) + 1) / frames;
+}
+
+/** Phase jouée par un élément à une image donnée. */
+export interface ActivePhase {
+  phase: "in" | "out" | "emphasis";
+  preset: MotionPreset;
+  params?: MotionParamValues;
+  /** Image dans la phase, de 0 à `frames - 1`. */
+  local: number;
+  /** Durée de la phase, en images (un passage, pour une mise en avant). */
+  frames: number;
+  /** Avancement : `(local + 1) / frames`, 1 sur la dernière image. */
+  progress: number;
+}
+
+/** Phase d'animation en cours à l'image `frame`, ou `null` au repos. */
+export function activePhaseAt(item: VisualItem, frame: number): ActivePhase | null {
+  const local = frame - item.start;
+  const animIn = presetOf(item.animIn, "in");
+  const animOut = presetOf(item.animOut, "out");
+  const inFrames = animIn ? Math.min(item.animIn.frames, item.duration) : 0;
+  const outFrames = animOut ? Math.min(item.animOut.frames, item.duration - inFrames) : 0;
+
+  // L'avancement va de 0 à 1 dans chaque phase, et vaut 1 sur sa dernière
+  // image : l'entrée finit au repos, la sortie finit disparue.
+  if (animIn && inFrames > 0 && local < inFrames) {
+    const progress = clamp01((local + 1) / inFrames);
+    return { phase: "in", preset: animIn, params: item.animIn.params, local, frames: inFrames, progress };
   }
+  if (animOut && outFrames > 0 && local >= item.duration - outFrames) {
+    const remaining = item.duration - local - 1;
+    const progress = 1 - clamp01(remaining / outFrames);
+    const start = item.duration - outFrames;
+    return { phase: "out", preset: animOut, params: item.animOut.params, local: local - start, frames: outFrames, progress };
+  }
+  const emphasis = item.animEmphasis;
+  const emphasisPreset = presetOf(emphasis, "emphasis");
+  if (emphasis && emphasisPreset) {
+    const progress = emphasisProgress(emphasis, local, inFrames, item.duration - outFrames);
+    if (progress !== null) {
+      const frames = Math.max(1, Math.round(emphasis.frames));
+      const start = Math.max(inFrames, Math.round(Number(emphasis.at) || 0));
+      return {
+        phase: "emphasis",
+        preset: emphasisPreset,
+        params: emphasis.params,
+        local: (local - start) % frames,
+        frames,
+        progress,
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * Vrai si la phase anime le texte par unités (lignes, mots, lettres) : son
+ * dessin est alors fait unité par unité (`render.ts`), et l'élément, lui,
+ * reste au repos. Sur une image ou une forme, un tel préréglage s'applique
+ * au bloc entier.
+ */
+export function isSplitText(item: VisualItem, preset: MotionPreset): boolean {
+  return item.type === "text" && preset.split !== undefined && preset.split !== "whole";
+}
+
+/** Phase d'un texte découpé, avec son unité. */
+export type SplitPhase = ActivePhase & { split: TextSplit };
+
+/** Phase d'un texte découpé en cours à l'image `frame`, ou `null`. */
+export function splitPhaseAt(item: VisualItem, frame: number): SplitPhase | null {
+  if (item.type !== "text") return null;
+  const active = activePhaseAt(item, frame);
+  if (!active || !isSplitText(item, active.preset)) return null;
+  return { ...active, split: active.preset.split as TextSplit };
 }
 
 export function animStateAt(item: VisualItem, frame: number): AnimState {
-  const local = frame - item.start;
-  const state = { ...IDLE };
-  const inFrames = item.animIn.kind === "none" ? 0 : Math.min(item.animIn.frames, item.duration);
-  const outFrames = item.animOut.kind === "none" ? 0 : Math.min(item.animOut.frames, item.duration - inFrames);
+  const active = activePhaseAt(item, frame);
+  // Texte découpé : chaque unité porte son propre état, le bloc ne bouge pas.
+  if (!active || isSplitText(item, active.preset)) return restState();
+  return sampleTracks(active.preset, active.progress, active.params, { baseColor: baseColorOf(item) });
+}
 
-  if (inFrames > 0 && local < inFrames) {
-    Object.assign(state, applyAnim(item.animIn, clamp01((local + 1) / inFrames), true));
-  } else if (outFrames > 0 && local >= item.duration - outFrames) {
-    const remaining = item.duration - local - 1;
-    Object.assign(state, applyAnim(item.animOut, clamp01(remaining / outFrames), false));
-  }
-  return state;
+/**
+ * Durée naturelle, en images, d'une animation posée sur un élément : pour un
+ * texte découpé, assez pour que chaque unité joue avec son décalage
+ * (`naturalFrames`). L'inspecteur s'en sert pour proposer une durée ; une
+ * durée plus courte reste valable, le décalage se resserre pour tenir.
+ * `lineCount` donne le nombre de lignes réel quand on le connaît (sinon, un
+ * paragraphe compte pour une ligne).
+ */
+export function suggestedAnimFrames(
+  item: VisualItem,
+  kind: string,
+  phase: MotionPhase,
+  fps: number,
+  lineCount?: number
+): number {
+  const preset = presetOf({ kind, frames: 1 }, phase);
+  if (!preset) return 0;
+  const split = item.type === "text" ? preset.split ?? "whole" : "whole";
+  if (split === "whole" || item.type !== "text") return naturalFrames(preset, 1, fps);
+  const text = item.style.uppercase ? item.text.toUpperCase() : item.text;
+  const count = split === "line" && lineCount !== undefined ? lineCount : countUnits(text, split);
+  return naturalFrames(preset, count, fps);
 }
 
 // ─── Transitions ─────────────────────────────────────────────────

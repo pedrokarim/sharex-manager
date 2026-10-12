@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,6 +13,7 @@ import {
   ImageUp,
   MoreHorizontal,
   Plus,
+  Send,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -47,6 +48,9 @@ import { callModule, exportUrl, formatMegabytes, sendExportToGallery, type Proje
 import type { AssistantJob } from "../lib/assistant";
 import { AssistantProgress, CreateDialog } from "../components/create-dialog";
 import { SendToGalleryButton } from "../components/gallery-button";
+import { PublishDialog, type PublishTargets } from "../components/publish-dialog";
+import { useConnectionReturn, type ConnectFlowStart } from "@/components/connections/connect-account-sheet";
+import { useSession } from "@/lib/auth-client";
 
 /** Données gardées entre deux visites : le retour à la liste est instantané. */
 let snapshot: { projects: ProjectSummary[]; exports: ClipExport[] } | null = null;
@@ -58,6 +62,26 @@ export default function ProjectsPage() {
   const [exports, setExports] = useState<ClipExport[]>(snapshot?.exports ?? []);
   const [creating, setCreating] = useState<{ files: string[] } | null>(null);
   const [assistantJobs, setAssistantJobs] = useState<AssistantJob[]>([]);
+  // Publication : réservée aux administrateurs, et seulement si un compte
+  // connecté sait publier une vidéo (comptes connectés du cœur).
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "admin";
+  const [publishTargets, setPublishTargets] = useState<PublishTargets | null>(null);
+  const [publishing, setPublishing] = useState<ClipExport | null>(null);
+  // L'entrée « Publier » apparaît dès que les cibles sont connues, même sans compte :
+  // la publication mène alors au parcours de connexion.
+  const canPublish = isAdmin && publishTargets !== null;
+  // Retour par redirection du parcours de connexion lancé depuis la publication.
+  const { start: connectReturn } = useConnectionReturn();
+  const [connectStart, setConnectStart] = useState<ConnectFlowStart | null>(null);
+  const reopenPublish = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    void callModule<PublishTargets>("listPublishTargets")
+      .then(setPublishTargets)
+      .catch(() => setPublishTargets(null));
+  }, [isAdmin]);
 
 
   const refresh = useCallback(async () => {
@@ -100,6 +124,23 @@ export default function ProjectsPage() {
       clearTimeout(timer);
     };
   }, [refreshJobs, refresh]);
+
+  // Retour du parcours de connexion (fenêtre surgissante bloquée) : on rouvre la publication de l'export.
+  useEffect(() => {
+    const id = params.get("publish");
+    if (!id) return;
+    reopenPublish.current = id;
+    setConnectStart(connectReturn);
+    router.replace("/m/clip-studio", { scroll: false });
+  }, [params, connectReturn, router]);
+
+  useEffect(() => {
+    const id = reopenPublish.current;
+    if (!id || !canPublish || projects === null) return;
+    reopenPublish.current = null;
+    const found = exports.find((item) => item.id === id);
+    if (found) setPublishing(found);
+  }, [canPublish, projects, exports]);
 
   // Arrivée depuis la galerie : « Créer un clip avec la sélection ».
   useEffect(() => {
@@ -206,8 +247,10 @@ export default function ProjectsPage() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
               <AnimatePresence initial={false}>
                 {exports.map((entry) => (
-                  <motion.div key={entry.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <ExportCard entry={entry} onChanged={refresh} />
+                  // min-w-0 : sans lui, un nom long (tronqué sur une ligne) élargit la
+                  // cellule à sa pleine longueur et la carte déborde sur sa voisine.
+                  <motion.div key={entry.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0">
+                    <ExportCard entry={entry} onChanged={refresh} onPublish={canPublish ? () => setPublishing(entry) : undefined} />
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -215,6 +258,18 @@ export default function ProjectsPage() {
           </section>
         )}
       </div>
+
+      <PublishDialog
+        entry={publishing}
+        targets={publishTargets}
+        onTargetsChange={setPublishTargets}
+        connectStart={connectStart}
+        onOpenChange={(open) => {
+          if (open) return;
+          setPublishing(null);
+          setConnectStart(null);
+        }}
+      />
 
       <CreateDialog
         request={creating}
@@ -321,7 +376,7 @@ function ProjectCard({ project, onChanged }: { project: ProjectSummary; onChange
   );
 }
 
-function ExportCard({ entry, onChanged }: { entry: ClipExport; onChanged: () => void }) {
+function ExportCard({ entry, onChanged, onPublish }: { entry: ClipExport; onChanged: () => void; onPublish?: () => void }) {
   const url = exportUrl(entry.file);
   const [open, setOpen] = useState(false);
   return (
@@ -332,7 +387,7 @@ function ExportCard({ entry, onChanged }: { entry: ClipExport; onChanged: () => 
             type="button"
             onClick={() => setOpen(true)}
             aria-label={`Lire ${entry.projectName}`}
-            className="flex flex-col gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex w-full min-w-0 flex-col gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <video
               src={url}
@@ -363,6 +418,12 @@ function ExportCard({ entry, onChanged }: { entry: ClipExport; onChanged: () => 
           <ContextMenuItem asChild>
             <Link href={`/m/clip-studio/edit?id=${entry.projectId}`}>Ouvrir le projet</Link>
           </ContextMenuItem>
+          {onPublish ? (
+            <ContextMenuItem onClick={onPublish}>
+              <Send className="mr-2 h-4 w-4" />
+              Publier
+            </ContextMenuItem>
+          ) : null}
           {entry.galleryFile ? (
             <ContextMenuItem asChild>
               <Link href="/gallery">
@@ -414,6 +475,19 @@ function ExportCard({ entry, onChanged }: { entry: ClipExport; onChanged: () => 
               <Link href={`/m/clip-studio/edit?id=${entry.projectId}`}>Ouvrir le projet</Link>
             </Button>
             <div className="flex flex-wrap gap-2">
+              {onPublish ? (
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => {
+                    setOpen(false);
+                    onPublish();
+                  }}
+                >
+                  <Send className="h-4 w-4" />
+                  Publier
+                </Button>
+              ) : null}
               <SendToGalleryButton entry={entry} onSent={onChanged} />
               <Button asChild className="gap-2">
                 <a href={url} download={`${entry.projectName}.mp4`}>

@@ -80,6 +80,101 @@ Ajoutés pour ce module et réutilisables par tous :
 | 6 | Banque de musique libre de droits : sélection de base versionnée (`music/library.json`, morceaux Jamendo sous CC0 ou CC BY via Openverse), téléchargée au démarrage dans les données du module ; recherche et ajout depuis l’éditeur (onglet Découvrir) ; musique de fond choisie par l’assistant selon l’ambiance ; crédits rappelés à l’export | Réalisée |
 | 7 | Compléments du cahier des charges : transitions entre plans (fondu enchaîné, fondu au noir, glissement, balayage, zoom), le plan précédent figé sur sa dernière image sans changer les durées ; recettes « Diaporama » (fondus de 0,6 s), « Rythmé » (1,2 s par image, coupes franches) et « Avant / Après » depuis la galerie, vidéos comprises ; raccourcis J, K, L, + et -, M ; lecture d’un export au clic | Réalisée |
 | 8 | Vitesse d’un plan vidéo (×0,25 à ×4, le son suit) ; forme d’onde des pistes son ; normalisation du volume à l’export (−16 dB en moyenne, crête sous −1 dB) ; « Créer un clip » depuis une série d’AI Image Gen | Réalisée |
+| 9 | Trouver avant de générer : l’assistant cherche une image qui existe (banque libre Openverse, puis le web par Codex si on l’autorise) et ne génère que ce qui n’existe pas ; onglet « Trouver » dans le panneau Médias ; droits suivis jusqu’à la publication. Voir « Trouver avant de générer » ci-dessous | En cours |
+| 10 | Bibliothèque d’animations : un modèle à pistes d’images clés, le texte animé lettre par lettre et mot par mot, 250 à 300 préréglages (éléments, texte, transitions, caméra, impacts), un sélecteur à vignettes animées, le mouvement des marques. Voir [01 bis – la bibliothèque d’animations](01-clip-studio-animations.md) | En cours (A0 à A3 faites) |
+
+### Trouver avant de générer (étape 9)
+
+Jusqu’à l’étape 8, l’assistant générait **toutes** ses illustrations. C’est
+lent, cela coûte, et c’est souvent faux : un short sur un jeu, un
+personnage, un lieu ou une espèce animale veut **la vraie image**, pas une
+illustration qui lui ressemble. Désormais l’assistant cherche d’abord, et ne
+génère que ce qui ne peut pas se trouver.
+
+**Le script dit, segment par segment, ce qu’il faut.** Chaque segment porte
+un champ `image` :
+
+```ts
+interface ScriptImage {
+  /** « find » : un sujet réel et précis ; « generate » : une illustration, une idée, la mascotte. */
+  mode: "find" | "generate";
+  /** Requête de recherche, en anglais, 2 à 6 mots (le nom exact du jeu, du lieu, de l’espèce…). */
+  query?: string;
+  /** Consigne de génération, toujours fournie : elle sert aussi de secours. */
+  prompt: string;
+}
+```
+
+Un segment qui met en scène la mascotte de la marque est toujours en
+`generate` : on ne trouve pas sa mascotte sur Internet.
+
+**L’échelle des sources**, pour un segment en `find`, s’arrête à la
+première qui donne une image retenue :
+
+1. **Openverse** (`api.openverse.org/v1/images`), sans clé : seulement les
+   licences qui permettent un usage commercial et une modification, CC0,
+   domaine public et CC BY, comme pour la musique (§ 8). Les licences NC, ND
+   et SA sont écartées. Auteur, titre, licence et page source deviennent la
+   mention du média.
+2. **Le web, par Codex** (`codex --search exec`, l’option étant globale), seulement si la demande
+   l’autorise (case « Chercher aussi sur le web »). Codex reçoit le sujet du
+   segment et rend jusqu’à trois adresses **directes** d’images, avec la page
+   d’où elles viennent, en privilégiant les visuels officiels (kits presse,
+   sites des éditeurs) et Wikimedia. Ces images sont marquées **« droits à
+   vérifier »**.
+3. **La génération** par AI Image Gen, comme avant, si rien ne convient et
+   que le mode le permet.
+
+**Chaque candidate est contrôlée** avant d’être montrée ou utilisée :
+téléchargement par le serveur avec les garde-fous du cœur
+(`fetchRemoteImage` : HTTP(S) seulement, aucune adresse interne, redirections
+revérifiées, 20 Mo), type réel et dimensions lus par sharp, petit côté d’au
+moins 640 px. Une image retenue est copiée dans les médias du module : le
+projet ne dépend jamais d’un site extérieur.
+
+**Le choix entre plusieurs candidates** se fait sur une planche contact
+(sharp, vignettes numérotées) montrée à Codex avec le texte du segment : il
+rend le numéro de l’image qui illustre le mieux, ou 0 si aucune ne convient.
+Sans Codex, la première candidate qui passe les contrôles est retenue.
+
+**Les modes**, dans la fenêtre « Créer » de l’assistant :
+
+| Mode | Comportement |
+| --- | --- |
+| Trouver, sinon générer | par défaut ; chaque segment `find` cherche d’abord, les autres sont générés |
+| Trouver seulement | rien n’est généré ; un segment sans image trouvée garde un aplat |
+| Générer | le fonctionnement d’avant |
+| Aucune | pas d’illustration |
+
+La case « Chercher aussi sur le web (droits à vérifier) » est retenue par
+le navigateur d’une fois sur l’autre.
+
+**À la main**, dans l’éditeur : le panneau Médias gagne un onglet
+« Trouver ». On y cherche dans Openverse (vignettes, licence, auteur) et, à
+la demande, sur le web par Codex ; un clic importe l’image dans les médias du
+projet, avec sa mention.
+
+**Les droits suivent l’image** jusqu’à la publication. `MediaSource` porte la
+mention (`credit`) et un état `rights` : `"free"` (licence libre vérifiée) ou
+`"unverified"` (trouvée sur le web). La fenêtre de publication liste les
+images aux droits non vérifiés d’un projet et demande de le confirmer avant
+d’envoyer ; les mentions des images libres rejoignent celles de la musique
+dans la description.
+
+**Limites et sécurité**
+
+- Une recherche web lance Codex : elle prend de vingt à soixante secondes, et
+  elle est bornée à une recherche par segment, cinq segments en parallèle au
+  plus.
+- Les adresses rendues par Codex sont des données : elles passent toutes par
+  `fetchRemoteImage`, jamais par le navigateur ; un SVG ou un fichier qui
+  n’est pas une image est refusé.
+- Les candidates téléchargées pour l’onglet « Trouver » vivent dans
+  `data/found/` et sont effacées après vingt-quatre heures si elles n’ont pas
+  été importées.
+- Les visuels d’anime et de jeu restent des œuvres protégées : « droits à
+  vérifier » n’est pas une formalité, c’est la raison pour laquelle la case
+  du web n’est jamais cochée sans un geste de l’utilisateur.
 
 ## 1. Pourquoi ce module
 

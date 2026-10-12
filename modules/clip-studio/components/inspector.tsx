@@ -1,6 +1,9 @@
 "use client";
 
-import { AlignCenter, AlignLeft, AlignRight, X } from "lucide-react";
+import { useState } from "react";
+import Link from "next/link";
+import { AlignCenter, AlignLeft, AlignRight, Check, Loader2, Palette, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +32,7 @@ import type {
   VisualItem,
 } from "../engine/types";
 import { FONTS } from "../lib/fonts";
+import type { BrandFontChoice, BrandKitChoice } from "../lib/client";
 import { ANIM_LABELS, DEFAULT_TRANSITION_SECONDS, MOTION_LABELS, TRANSITION_LABELS } from "./timeline";
 
 interface InspectorProps {
@@ -39,9 +43,11 @@ interface InspectorProps {
   onClose: () => void;
   /** Ajoute les sous-titres animés d'une voix. */
   onCaption?: (itemId: string) => void;
+  /** Polices importées de la marque du projet, proposées après celles du catalogue. */
+  brandFonts?: BrandFontChoice[];
 }
 
-export function Inspector({ project, item, onPatch, onClose, onCaption }: InspectorProps) {
+export function Inspector({ project, item, onPatch, onClose, onCaption, brandFonts = [] }: InspectorProps) {
   const fps = project.fps;
   const title =
     item.type === "text" ? "Texte" : item.type === "image" ? "Image" : item.type === "video" ? "Vidéo" : item.type === "shape" ? "Forme" : "Son";
@@ -55,7 +61,7 @@ export function Inspector({ project, item, onPatch, onClose, onCaption }: Inspec
         </Button>
       </div>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
-        {item.type === "text" && <TextFields item={item} onPatch={onPatch} />}
+        {item.type === "text" && <TextFields item={item} onPatch={onPatch} brandFonts={brandFonts} />}
         {item.type === "image" && <ImageFields item={item} onPatch={onPatch} />}
         {item.type === "video" && <VideoFields item={item} project={project} onPatch={onPatch} />}
         {item.type === "shape" && <ShapeFields item={item} onPatch={onPatch} />}
@@ -290,11 +296,26 @@ function VisualFields({
 
 // ─── Par type ────────────────────────────────────────────────────
 
-function TextFields({ item, onPatch }: { item: TextItem; onPatch: InspectorProps["onPatch"] }) {
+function TextFields({
+  item,
+  onPatch,
+  brandFonts,
+}: {
+  item: TextItem;
+  onPatch: InspectorProps["onPatch"];
+  brandFonts: BrandFontChoice[];
+}) {
   const style = item.style;
   const setStyle = (patch: Partial<TextStyle>, key: string) =>
     onPatch({ style: { ...style, ...patch } } as Partial<ClipItem>, key);
-  const font = FONTS.find((entry) => entry.family === style.font) ?? FONTS[0];
+  // Une police de marque est un seul fichier, valable pour toutes les graisses : pas de choix de graisse.
+  const catalogFont = FONTS.find((entry) => entry.family === style.font);
+  const fontOptions: Record<string, string> = {
+    ...Object.fromEntries(FONTS.map((entry) => [entry.family, entry.label])),
+    ...Object.fromEntries(brandFonts.map((entry) => [entry.family, `${entry.label} · marque`])),
+  };
+  // Police d'une marque retirée, d'une autre marque ou pas encore listée : elle reste affichée, pour ne pas paraître vide.
+  if (!(style.font in fontOptions)) fontOptions[style.font] = style.font.startsWith("bk-") ? "Police de marque" : style.font;
 
   return (
     <>
@@ -323,17 +344,21 @@ function TextFields({ item, onPatch }: { item: TextItem; onPatch: InspectorProps
         <Choice
           label="Police"
           value={style.font}
-          options={Object.fromEntries(FONTS.map((entry) => [entry.family, entry.label]))}
+          options={fontOptions}
           onChange={(family) => {
-            const next = FONTS.find((entry) => entry.family === family) ?? FONTS[0];
+            const next = FONTS.find((entry) => entry.family === family);
+            if (!next) {
+              setStyle({ font: family }, "font");
+              return;
+            }
             setStyle({ font: family, weight: next.weights.includes(style.weight) ? style.weight : next.weights.at(-1)! }, "font");
           }}
         />
-        {font.weights.length > 1 && (
+        {catalogFont && catalogFont.weights.length > 1 && (
           <Choice
             label="Graisse"
             value={String(style.weight)}
-            options={Object.fromEntries(font.weights.map((weight) => [String(weight), String(weight)]))}
+            options={Object.fromEntries(catalogFont.weights.map((weight) => [String(weight), String(weight)]))}
             onChange={(weight) => setStyle({ weight: Number(weight) }, "weight")}
           />
         )}
@@ -471,5 +496,140 @@ function AudioFields({ item, fps, onPatch }: { item: AudioItem; fps: number; onP
       <Slider label="Fondu d'entrée" unit="s" min={0} max={5} step={0.1} value={item.fadeIn / fps} onChange={(value) => onPatch({ fadeIn: Math.round(value * fps) } as Partial<ClipItem>, "fade-in")} />
       <Slider label="Fondu de sortie" unit="s" min={0} max={5} step={0.1} value={item.fadeOut / fps} onChange={(value) => onPatch({ fadeOut: Math.round(value * fps) } as Partial<ClipItem>, "fade-out")} />
     </Section>
+  );
+}
+
+// ─── Sans sélection : le projet ──────────────────────────────────
+
+/** Logo de la marque, s'il y en a un, et pastilles de sa palette. */
+export function BrandKitMark({ kit }: { kit: Pick<BrandKitChoice, "logoUrl" | "palette"> }) {
+  const { background, accent, accentSecondary, extras } = kit.palette;
+  const swatches = [background, accent, ...(accentSecondary ? [accentSecondary] : []), ...extras].slice(0, 4);
+  return (
+    <span className="flex shrink-0 items-center gap-1.5">
+      {kit.logoUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={kit.logoUrl} alt="" loading="lazy" className="h-5 w-5 rounded object-contain" />
+      )}
+      <span className="flex -space-x-1">
+        {swatches.map((color, index) => (
+          <span key={`${color}-${index}`} className="h-3 w-3 rounded-full ring-1 ring-background" style={{ background: color }} />
+        ))}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Inspecteur quand rien n'est sélectionné : l'image de marque du projet.
+ * L'application passe par l'historique de l'éditeur (`onApplyBrand`) : une
+ * annulation la défait.
+ */
+export function ProjectInspector({
+  project,
+  kits,
+  onApplyBrand,
+}: {
+  project: ClipProject;
+  kits: BrandKitChoice[];
+  /** Applique une marque, ou la retire (`null`). */
+  onApplyBrand: (kitId: string | null) => Promise<void>;
+}) {
+  const [pending, setPending] = useState<string | null>(null);
+  const current = project.brandKitId;
+  const known = kits.some((kit) => kit.id === current);
+
+  const apply = async (kitId: string | null) => {
+    setPending(kitId ?? "none");
+    try {
+      await onApplyBrand(kitId);
+    } catch (error: any) {
+      toast.error(error?.message ?? "Image de marque impossible à appliquer");
+    } finally {
+      setPending(null);
+    }
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex h-11 shrink-0 items-center border-b px-3">
+        <span className="text-sm font-semibold">Projet</span>
+      </div>
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
+        <Section title="Image de marque">
+          {kits.length === 0 && !current ? (
+            <p className="text-xs leading-5 text-muted-foreground">
+              Aucune image de marque pour l’instant.{" "}
+              <Link href="/m/brand-kit" className="inline-flex items-center gap-1 text-foreground underline-offset-2 hover:underline">
+                <Palette className="h-3.5 w-3.5" />
+                En créer une
+              </Link>
+            </p>
+          ) : (
+            <>
+              <p className="text-[11px] leading-4 text-muted-foreground">
+                Couleurs, polices, filigrane et carton de fin suivent la marque. Ctrl Z annule.
+              </p>
+              <div className="space-y-1">
+                {kits.map((kit) => {
+                  const active = kit.id === current;
+                  return (
+                    <button
+                      key={kit.id}
+                      type="button"
+                      disabled={pending !== null}
+                      onClick={() => !active && void apply(kit.id)}
+                      aria-pressed={active}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left text-sm transition-colors disabled:cursor-default",
+                        active ? "border-primary bg-primary/10" : "hover:bg-muted"
+                      )}
+                    >
+                      <BrandKitMark kit={kit} />
+                      <span className="min-w-0 flex-1 truncate">{kit.name}</span>
+                      {pending === kit.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                      ) : (
+                        active && <Check className="h-3.5 w-3.5 text-primary" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {current && !known && (
+                <p className="text-[11px] leading-4 text-muted-foreground">
+                  La marque de ce projet est introuvable&nbsp;: elle a peut-être été supprimée.
+                </p>
+              )}
+              {current && (
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 text-[11px]"
+                    disabled={!known || pending !== null}
+                    onClick={() => void apply(current)}
+                    title="Reprend les dernières modifications de la marque"
+                  >
+                    {pending === current && <Loader2 className="h-3 w-3 animate-spin" />}
+                    Actualiser
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 text-[11px]"
+                    disabled={pending !== null}
+                    onClick={() => void apply(null)}
+                  >
+                    {pending === "none" && <Loader2 className="h-3 w-3 animate-spin" />}
+                    Retirer
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </Section>
+      </div>
+    </div>
   );
 }

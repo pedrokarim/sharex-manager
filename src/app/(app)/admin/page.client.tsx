@@ -2,6 +2,7 @@
 
 import {
   Database,
+  Link2,
   Package,
   Palette,
   Server,
@@ -22,12 +23,23 @@ export function AdminPageClient() {
     icon: typeof Users;
     accent: NavCardAccent;
     tag?: string;
+    /** Libellés écrits ici plutôt que traduits. */
+    title?: string;
+    description?: string;
   }> = [
     { key: "users", href: "/admin/users", icon: Users, accent: "blue" },
     { key: "logs", href: "/admin/logs", icon: Database, accent: "emerald" },
     { key: "theme", href: "/admin/theme", icon: Palette, accent: "cyan" },
     { key: "system", href: "/admin/system", icon: Server, accent: "amber" },
     { key: "modules", href: "/admin/modules", icon: Package, accent: "violet" },
+    {
+      key: "connections",
+      href: "/admin/connections",
+      icon: Link2,
+      accent: "rose",
+      title: "Comptes connectés",
+      description: "Chaînes YouTube et autres comptes où publier les clips, communs à tous les modules.",
+    },
     {
       key: "security",
       href: "/admin/security",
@@ -49,8 +61,8 @@ export function AdminPageClient() {
             icon={section.icon}
             accent={section.accent}
             tag={section.tag}
-            title={t(`admin.sections.${section.key}.title`)}
-            description={t(`admin.sections.${section.key}.description`)}
+            title={section.title ?? t(`admin.sections.${section.key}.title`)}
+            description={section.description ?? t(`admin.sections.${section.key}.description`)}
             action={t("common.open")}
           />
         ))}

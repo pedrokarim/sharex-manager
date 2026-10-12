@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ScanLine } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isActive } from "../engine/timeline";
 import type { ClipProject, Transform, VisualItem } from "../engine/types";
@@ -17,6 +19,42 @@ interface PreviewStageProps {
 
 /** Distance, en fraction du canevas, sous laquelle on s'aimante au centre. */
 const SNAP = 0.012;
+
+/**
+ * Zone de sécurité d'un short 9:16, en fractions du cadre 1080 × 1920 : en
+ * haut, le nom du compte ; en bas, la légende et la barre de lecture ; à
+ * droite sous la moitié, les boutons (j'aime, commentaires, partage) : y de
+ * 230 à 1440, x sous 850 dès y = 900.
+ */
+const SHORT_SAFE = { top: 230 / 1920, bottom: 1440 / 1920, buttonsTop: 900 / 1920, buttonsLeft: 850 / 1080 };
+const SAFE_ZONE_KEY = "clip-studio:safe-zone";
+
+function readSafeZonePreference(): boolean {
+  try {
+    return window.localStorage.getItem(SAFE_ZONE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+const percent = (fraction: number) => `${fraction * 100}%`;
+
+/** Zones masquées par l'interface des plateformes, grisées par-dessus l'aperçu. */
+function SafeZoneOverlay() {
+  const shade = "absolute bg-black/45";
+  const { top, bottom, buttonsTop, buttonsLeft } = SHORT_SAFE;
+  return (
+    <div className="pointer-events-none absolute inset-0" aria-hidden>
+      <div className={shade} style={{ left: 0, right: 0, top: 0, height: percent(top) }} />
+      <div className={shade} style={{ left: 0, right: 0, top: percent(bottom), bottom: 0 }} />
+      <div className={shade} style={{ left: percent(buttonsLeft), right: 0, top: percent(buttonsTop), height: percent(bottom - buttonsTop) }} />
+      <div
+        className="absolute border border-dashed border-white/80"
+        style={{ left: 0, right: 0, top: percent(top), height: percent(bottom - top) }}
+      />
+    </div>
+  );
+}
 
 type Gesture =
   | { kind: "move"; id: string; start: Transform; pointer: { x: number; y: number } }
@@ -39,17 +77,45 @@ export function PreviewStage({
   canvasRef,
 }: PreviewStageProps) {
   const area = useRef<HTMLDivElement>(null);
+  const safeZoneButton = useRef<HTMLButtonElement>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [guides, setGuides] = useState<{ x: boolean; y: boolean }>({ x: false, y: false });
+  const [safeZone, setSafeZone] = useState(false);
+  const vertical = project.aspect === "9:16";
+
+  useEffect(() => {
+    setSafeZone(readSafeZonePreference());
+  }, []);
+
+  const toggleSafeZone = () => {
+    setSafeZone((value) => {
+      try {
+        window.localStorage.setItem(SAFE_ZONE_KEY, value ? "0" : "1");
+      } catch {
+        // Stockage indisponible : le choix vaut pour cette page seulement.
+      }
+      return !value;
+    });
+  };
 
   // Le canevas garde les proportions du projet et occupe toute la place disponible.
   useLayoutEffect(() => {
     const node = area.current;
     if (!node) return;
     const fit = () => {
-      const available = { width: node.clientWidth - 32, height: node.clientHeight - 32 };
-      const scale = Math.min(available.width / project.width, available.height / project.height);
+      const scaleFor = (marginY: number) =>
+        Math.min((node.clientWidth - 32) / project.width, (node.clientHeight - marginY * 2) / project.height);
+      let scale = scaleFor(16);
+      // Le bouton « Zone de sécurité » est posé en haut à droite : si le canevas
+      // passerait dessous, on lui laisse une bande libre en haut (et en bas, pour rester centré).
+      const button = safeZoneButton.current;
+      if (button) {
+        const right = (node.clientWidth + project.width * scale) / 2;
+        const top = (node.clientHeight - project.height * scale) / 2;
+        const clearance = button.offsetTop + button.offsetHeight + 8;
+        if (right > button.offsetLeft - 8 && top < clearance) scale = scaleFor(clearance);
+      }
       setBox({
         width: Math.max(0, Math.floor(project.width * scale)),
         height: Math.max(0, Math.floor(project.height * scale)),
@@ -59,7 +125,7 @@ export function PreviewStage({
     const observer = new ResizeObserver(fit);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [project.width, project.height]);
+  }, [project.width, project.height, vertical]);
 
   const visibleItems: VisualItem[] = [];
   for (const track of project.tracks) {
@@ -151,11 +217,28 @@ export function PreviewStage({
   return (
     <div
       ref={area}
-      className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-[repeating-conic-gradient(color-mix(in_oklch,var(--foreground)_4%,transparent)_0_25%,transparent_0_50%)] bg-[length:24px_24px]"
+      className="@container relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-[repeating-conic-gradient(color-mix(in_oklch,var(--foreground)_4%,transparent)_0_25%,transparent_0_50%)] bg-[length:24px_24px]"
       onPointerDown={(event) => {
         if (event.target === area.current) onSelect(null);
       }}
     >
+      {vertical && (
+        <Button
+          ref={safeZoneButton}
+          type="button"
+          variant={safeZone ? "secondary" : "ghost"}
+          size="sm"
+          className="absolute right-3 top-3 z-10 gap-1.5"
+          aria-pressed={safeZone}
+          aria-label="Zone de sécurité"
+          title="Griser ce que cachent les boutons et la légende des plateformes"
+          onClick={toggleSafeZone}
+        >
+          <ScanLine className="h-4 w-4" />
+          {/* Scène étroite (panneaux ouverts sur un petit écran) : l'icône seule, le libellé ne serait plus qu'à moitié visible. */}
+          <span className="hidden @sm:inline">Zone de sécurité</span>
+        </Button>
+      )}
       <div className="relative shadow-2xl shadow-black/30" style={{ width: box.width, height: box.height }}>
         <canvas
           ref={canvasRef}
@@ -172,6 +255,7 @@ export function PreviewStage({
           onPointerUp={endGesture}
           onPointerCancel={endGesture}
         >
+          {vertical && safeZone && <SafeZoneOverlay />}
           {guides.x && <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-fuchsia-500" />}
           {guides.y && <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-fuchsia-500" />}
 

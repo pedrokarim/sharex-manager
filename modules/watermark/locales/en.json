@@ -1,6 +1,11 @@
 {
   "title": "Watermark",
   "description": "Add a watermark to your image",
+  "source": {
+    "label": "Watermark source",
+    "text": "Text",
+    "brand": "Brand kit"
+  },
   "text": "Watermark text",
   "position": "Position",
   "positions": {
@@ -42,5 +47,24 @@
     "background": "Background",
     "rotation": "Rotation",
     "scale": "Scale"
+  },
+  "brand": {
+    "kit": "Brand kit",
+    "choose_kit": "Choose a brand kit",
+    "default_kit": "{name} (default)",
+    "no_kits": "No brand kit yet. Create one on the \"Brand kit\" page.",
+    "no_logo": "This brand kit has no watermark logo: add one in its editor.",
+    "loading": "Loading brand kit…",
+    "load_error": "Brand kit could not be read",
+    "size": "Logo size (short side)",
+    "margin": "Margin (short side)",
+    "reset": "Use the brand kit settings",
+    "hint": "The logo uses the corner, size and opacity saved in the brand kit. Changes made here only apply to this image."
+  },
+  "defaults": {
+    "save": "Use for every upload",
+    "hint": "Saves these settings for upload processing (\"Apply to every upload\" in module management).",
+    "saved": "Settings saved: they apply to uploaded captures when \"Apply to every upload\" is on.",
+    "error": "Settings could not be saved"
   }
 }
