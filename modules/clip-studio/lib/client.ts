@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import type { BrandPalette, BrandTheme } from "../engine/brand";
 import type { ClipAsset, ClipExport, ClipProject, MediaSource } from "../engine/types";
 
 export const MODULE_NAME = "clip-studio";
@@ -252,3 +254,81 @@ export async function saveExport(
     durationMs,
   });
 }
+
+// ─── Images de marque (module brand-kit, facultatif) ─────────────
+
+/** Ce que montre le sélecteur d'une marque. */
+export interface BrandKitChoice {
+  id: string;
+  name: string;
+  tagline?: string;
+  palette: BrandPalette;
+  logoUrl?: string;
+  isDefault: boolean;
+}
+
+/** Police importée d'une marque, proposée dans l'inspecteur. */
+export interface BrandFontChoice {
+  family: string;
+  label: string;
+}
+
+/** Marques disponibles ; `null` quand le module n'est pas installé ou pas activé. */
+export async function fetchBrandKits(): Promise<BrandKitChoice[] | null> {
+  try {
+    const kits = await callAnyModule<BrandKitChoice[] | null>("brand-kit", "listKits");
+    return Array.isArray(kits) ? kits : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Thème résolu d'une marque, prêt pour `applyBrandTheme`. */
+export async function fetchBrandTheme(kitId: string): Promise<BrandTheme> {
+  const theme = await callAnyModule<BrandTheme | null>("brand-kit", "getBrandTheme", kitId);
+  if (!theme) throw new Error("Image de marque introuvable");
+  return theme;
+}
+
+/** Polices importées d'une marque, avec le nom qu'elles portent dans sa fiche. */
+export async function fetchBrandFonts(kitId: string): Promise<BrandFontChoice[]> {
+  const [theme, details] = await Promise.all([
+    fetchBrandTheme(kitId),
+    callAnyModule<{ kit?: { fonts?: { family: string; name: string }[] } } | null>("brand-kit", "getKit", kitId).catch(() => null),
+  ]);
+  return theme.fonts.map((font) => ({
+    family: font.family,
+    label: details?.kit?.fonts?.find((entry) => entry.family === font.family)?.name || "Police de la marque",
+  }));
+}
+
+/** Liste des marques, chargée une fois ; `undefined` tant qu'elle arrive. */
+export function useBrandKits(): BrandKitChoice[] | null | undefined {
+  const [kits, setKits] = useState<BrandKitChoice[] | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    void fetchBrandKits().then((next) => alive && setKits(next));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return kits;
+}
+
+/** Polices de la marque d'un projet ; vide sans marque ou si elle est introuvable. */
+export function useBrandFonts(kitId: string | undefined): BrandFontChoice[] {
+  const [fonts, setFonts] = useState<{ kitId: string; list: BrandFontChoice[] } | null>(null);
+  useEffect(() => {
+    if (!kitId) return;
+    let alive = true;
+    void fetchBrandFonts(kitId)
+      .catch(() => [])
+      .then((list) => alive && setFonts({ kitId, list }));
+    return () => {
+      alive = false;
+    };
+  }, [kitId]);
+  return kitId && fonts?.kitId === kitId ? fonts.list : NO_FONTS;
+}
+
+const NO_FONTS: BrandFontChoice[] = [];

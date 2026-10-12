@@ -62,10 +62,11 @@ import {
   type MediaSource,
   type ShapeItem,
 } from "../engine/types";
-import { callModule } from "../lib/client";
-import { ensureFonts } from "../lib/fonts";
+import { applyBrandTheme } from "../engine/brand";
+import { callModule, fetchBrandTheme, useBrandFonts, useBrandKits } from "../lib/client";
+import { brandFontsOf, ensureBrandFonts, ensureProjectFonts } from "../lib/fonts";
 import { ExportDialog } from "../components/export-dialog";
-import { Inspector } from "../components/inspector";
+import { Inspector, ProjectInspector } from "../components/inspector";
 import { MediaPanel } from "../components/media-panel";
 import { PreviewStage } from "../components/preview-stage";
 import { TextPanel } from "../components/text-panel";
@@ -140,13 +141,45 @@ function Editor({ initial }: { initial: ClipProject }) {
     playerRef.current = player;
     player.prefetchAudio();
     player.render();
-    // Les polices arrivent après le premier rendu : on redessine une fois prêtes.
-    void ensureFonts().then(() => player.render());
     return () => {
       player.dispose();
       void audioContext.close();
     };
   }, []);
+
+  // ─── Polices ───────────────────────────────────────────────────
+  // Elles arrivent après le premier rendu : on redessine une fois prêtes, et
+  // de nouveau quand la marque du projet ou ses polices changent.
+  const fontKey = `${project.brandKitId ?? ""}|${brandFontsOf(project)
+    .map((font) => font.family)
+    .sort()
+    .join(",")}`;
+  const warnedFonts = useRef(new Set<string>());
+  useEffect(() => {
+    let alive = true;
+    void ensureProjectFonts(projectRef.current).then((missing) => {
+      if (!alive) return;
+      if (!playerRef.current?.playing) playerRef.current?.render();
+      warnMissingFonts(missing, warnedFonts.current);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [fontKey]);
+
+  const brandKits = useBrandKits();
+  const brandFonts = useBrandFonts(project.brandKitId);
+
+  /** Applique, change ou retire la marque, en une étape d'annulation. */
+  const applyBrand = useCallback(
+    async (kitId: string | null) => {
+      const theme = kitId ? await fetchBrandTheme(kitId) : null;
+      // Polices chargées avant le changement : le premier rendu de la marque est le bon.
+      if (theme) warnMissingFonts(await ensureBrandFonts(theme.fonts), warnedFonts.current);
+      commit((current) => applyBrandTheme(current, theme));
+    },
+    [commit]
+  );
 
   useEffect(() => {
     const player = playerRef.current;
@@ -314,6 +347,8 @@ function Editor({ initial }: { initial: ClipProject }) {
   }, [selectedId, togglePlay, undo, redo, duplicate, deleteSelected, split, seek]);
 
   const selected = selectedId ? findItem(project, selectedId)?.item ?? null : null;
+  // Sans sélection, l'inspecteur montre le projet, tant que le module des marques est là.
+  const projectInspector = !selected && Array.isArray(brandKits);
 
   return (
     <div className="-mx-4 -mb-4 flex h-[calc(100svh-var(--header-height)-1rem)] min-h-[560px] flex-col overflow-hidden border-t">
@@ -428,7 +463,7 @@ function Editor({ initial }: { initial: ClipProject }) {
         />
 
         <AnimatePresence initial={false}>
-          {selected && (
+          {(selected || projectInspector) && (
             <motion.aside
               key="inspector"
               initial={{ width: 0, opacity: 0 }}
@@ -438,22 +473,27 @@ function Editor({ initial }: { initial: ClipProject }) {
               className="shrink-0 overflow-hidden border-l"
             >
               <div className="h-full w-[300px]">
-                <Inspector
-                  project={project}
-                  item={selected}
-                  onClose={() => setSelectedId(null)}
-                  onCaption={(itemId) => {
-                    const found = findItem(projectRef.current, itemId);
-                    if (found?.item.type !== "audio") return;
-                    const caption = captionForVoice(projectRef.current, found.item);
-                    if (!caption) return;
-                    commit((current) => addItem(current, caption, undefined, "Sous-titres"));
-                    setSelectedId(caption.id);
-                  }}
-                  onPatch={(patch, key) =>
-                    commit((current) => updateItem(current, selected.id, patch), `inspect-${selected.id}-${key}`)
-                  }
-                />
+                {selected ? (
+                  <Inspector
+                    project={project}
+                    item={selected}
+                    brandFonts={brandFonts}
+                    onClose={() => setSelectedId(null)}
+                    onCaption={(itemId) => {
+                      const found = findItem(projectRef.current, itemId);
+                      if (found?.item.type !== "audio") return;
+                      const caption = captionForVoice(projectRef.current, found.item);
+                      if (!caption) return;
+                      commit((current) => addItem(current, caption, undefined, "Sous-titres"));
+                      setSelectedId(caption.id);
+                    }}
+                    onPatch={(patch, key) =>
+                      commit((current) => updateItem(current, selected.id, patch), `inspect-${selected.id}-${key}`)
+                    }
+                  />
+                ) : (
+                  <ProjectInspector project={project} kits={brandKits ?? []} onApplyBrand={applyBrand} />
+                )}
               </div>
             </motion.aside>
           )}
@@ -490,6 +530,17 @@ function Editor({ initial }: { initial: ClipProject }) {
 
       <ExportDialog project={project} open={exportOpen} onOpenChange={setExportOpen} />
     </div>
+  );
+}
+
+/** Signale, une fois chacune, les polices de marque qui n'ont pas pu être chargées. */
+function warnMissingFonts(missing: string[], warned: Set<string>) {
+  const fresh = missing.filter((family) => !warned.has(family));
+  if (fresh.length === 0) return;
+  for (const family of fresh) warned.add(family);
+  toast.warning(
+    fresh.length > 1 ? `${fresh.length} polices de la marque n’ont pas pu être chargées` : "Une police de la marque n’a pas pu être chargée",
+    { description: "Le texte s’affiche avec une police de repli." }
   );
 }
 

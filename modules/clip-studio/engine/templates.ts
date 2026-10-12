@@ -6,8 +6,8 @@
  * canevas : un même modèle fonctionne en 9:16, 16:9, 1:1 ou 4:5.
  */
 
+import { accentOf, applyBrandTheme, paintFill, shade, themedTextStyle, type BrandTheme } from "./brand";
 import {
-  TEXT_PRESETS,
   appendSequence,
   createImageItem,
   createProject,
@@ -23,7 +23,9 @@ import type {
   MediaSource,
   ShapeItem,
   TextItem,
+  TextRole,
   TextStyle,
+  ThemeHint,
   Track,
   VideoItem,
 } from "./types";
@@ -105,8 +107,6 @@ export interface BeforeAfterData {
   outro?: string;
 }
 
-/** Couleurs d'accent, une par segment : chaque question a sa teinte. */
-const ACCENTS = ["#8b5cf6", "#0ea5e9", "#f97316", "#10b981", "#ec4899", "#eab308"];
 
 // ─── Pistes nommées ──────────────────────────────────────────────
 
@@ -200,29 +200,37 @@ class Builder {
 
 // ─── Éléments de base ────────────────────────────────────────────
 
-function styleOf(presetId: string, patch: Partial<TextStyle> = {}): TextStyle {
-  const preset = TEXT_PRESETS.find((entry) => entry.id === presetId) ?? TEXT_PRESETS[0];
-  return { ...structuredClone(preset.style), ...patch };
-}
-
+/**
+ * Texte d'un modèle. Il porte son rôle (titre, légende, étiquette…) : le
+ * style vient du thème par défaut ici, et d'une image de marque quand on en
+ * applique une (`applyBrandTheme`).
+ */
 function text(
   b: Builder,
   content: string,
   start: number,
   duration: number,
   options: {
-    preset?: string;
-    style?: Partial<TextStyle>;
+    role: TextRole;
+    size: number;
+    align?: TextStyle["align"];
+    paint?: ThemeHint["paint"];
+    /** Rang du segment : teinte d'une étiquette. */
+    accent?: number;
     y?: number;
     height?: number;
     width?: number;
     animIn?: TextItem["animIn"]["kind"];
     animOut?: TextItem["animOut"]["kind"];
-  } = {}
+  }
 ): TextItem {
-  const item = createTextItem(options.preset ?? "impact", start, b.fps, content);
+  const hint: ThemeHint = { role: options.role };
+  if (options.paint) hint.paint = options.paint;
+  if (options.accent !== undefined) hint.accent = options.accent;
+  const item = createTextItem("impact", start, b.fps, content);
   item.duration = duration;
-  item.style = styleOf(options.preset ?? "impact", options.style);
+  item.theme = hint;
+  item.style = themedTextStyle(null, hint, { size: options.size, align: options.align ?? "center" });
   item.transform = {
     x: 0.5,
     y: options.y ?? 0.5,
@@ -236,21 +244,27 @@ function text(
   return item;
 }
 
+/**
+ * Rectangle. Avec une peinture (`hint`), sa couleur vient du thème et suit
+ * une image de marque ; sans, elle reste celle donnée.
+ */
 function box(
   b: Builder,
   start: number,
   duration: number,
   geometry: { y: number; height: number; width?: number },
-  fill: string,
+  fill: string | ThemeHint,
   options: { opacity?: number; radius?: number; animIn?: ShapeItem["animIn"]["kind"] } = {}
 ): ShapeItem {
+  const hint = typeof fill === "string" ? undefined : fill;
   return {
     id: uid("s-"),
     type: "shape",
     shape: "rect",
     start,
     duration,
-    fill,
+    fill: hint ? paintFill(null, hint) ?? "#000000" : (fill as string),
+    ...(hint ? { theme: hint } : {}),
     radius: options.radius ?? 0.3,
     transform: {
       x: 0.5,
@@ -265,8 +279,8 @@ function box(
   };
 }
 
-/** Fond d'un segment : l'image fournie, sinon un aplat coloré. */
-function background(b: Builder, start: number, duration: number, image: MediaSource | undefined, accent: string, motionIndex: number) {
+/** Fond d'un segment : l'image fournie sous un voile, sinon un aplat de la teinte du segment. */
+function background(b: Builder, start: number, duration: number, image: MediaSource | undefined, accent: number, motionIndex: number) {
   if (image) {
     const item: ImageItem = {
       id: uid("i-"),
@@ -282,22 +296,11 @@ function background(b: Builder, start: number, duration: number, image: MediaSou
       animOut: { kind: "none", frames: 10 },
     };
     b.add("Principale", item);
-    // Voile sombre : le texte reste lisible sur n'importe quelle image.
-    b.add("Voile", box(b, start, duration, { y: 0.5, height: 1, width: 1 }, "#000000", { opacity: 0.42, radius: 0, animIn: "none" }));
+    // Voile : le texte reste lisible sur n'importe quelle image.
+    b.add("Voile", box(b, start, duration, { y: 0.5, height: 1, width: 1 }, { paint: "veil" }, { opacity: 0.42, radius: 0, animIn: "none" }));
   } else {
-    b.add("Principale", box(b, start, duration, { y: 0.5, height: 1, width: 1 }, shade(accent, -0.55), { radius: 0, animIn: "fade" }));
+    b.add("Principale", box(b, start, duration, { y: 0.5, height: 1, width: 1 }, { paint: "plate", accent }, { radius: 0, animIn: "fade" }));
   }
-}
-
-/** Assombrit (valeur négative) ou éclaircit une couleur hexadécimale. */
-function shade(hex: string, amount: number): string {
-  const value = Number.parseInt(hex.slice(1), 16);
-  const channel = (shift: number) => {
-    const c = (value >> shift) & 255;
-    const target = amount < 0 ? 0 : 255;
-    return Math.round(c + (target - c) * Math.abs(amount));
-  };
-  return `#${[16, 8, 0].map((shift) => channel(shift).toString(16).padStart(2, "0")).join("")}`;
 }
 
 // ─── Quiz ────────────────────────────────────────────────────────
@@ -323,19 +326,19 @@ export function buildQuiz(
 
   // Intro
   const intro = b.fit(timing.intro, data.voice?.intro, 0.5);
-  background(b, cursor, intro, data.questions[0]?.image, ACCENTS[0], 0);
+  background(b, cursor, intro, data.questions[0]?.image, 0, 0);
   b.narrate(data.voice?.intro, cursor + 4);
-  b.add("Textes", text(b, data.title, cursor, intro, { preset: "impact", y: vertical ? 0.42 : 0.4, height: 0.24, style: { size: vertical ? 0.07 : 0.1 } }));
+  b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: vertical ? 0.42 : 0.4, height: 0.24, size: vertical ? 0.07 : 0.1 }));
   b.add("Textes", text(b, data.subtitle ?? "Réponds avant la fin du compte à rebours !", cursor + 6, intro - 6, {
-    preset: "caption",
+    role: "caption",
     y: vertical ? 0.58 : 0.62,
-    style: { size: vertical ? 0.032 : 0.045 },
+    size: vertical ? 0.032 : 0.045,
     animIn: "slide-up",
   }));
   cursor += intro;
 
   data.questions.forEach((question, index) => {
-    const accent = ACCENTS[index % ACCENTS.length];
+    const accent = index;
     // Avec une narration, on laisse le temps de l'écouter puis de réfléchir.
     const think = b.fit(timing.think, question.voice?.question, 3);
     const reveal = b.fit(timing.reveal, question.voice?.reveal, 0.5);
@@ -346,20 +349,21 @@ export function buildQuiz(
 
     // Numéro de la question
     b.add("Textes", text(b, `Question ${index + 1}/${data.questions.length}`, cursor, total, {
-      preset: "boxed",
+      role: "label",
       y: vertical ? 0.1 : 0.1,
       width: 0.6,
       height: 0.07,
-      style: { size: vertical ? 0.028 : 0.042, background: { color: accent, padding: 0.4, radius: 0.35 }, color: "#ffffff" },
+      size: vertical ? 0.028 : 0.042,
+      accent,
       animIn: "slide-down",
     }));
 
     // Question
     b.add("Textes", text(b, question.question, cursor + 4, total - 4, {
-      preset: "caption",
+      role: "caption",
       y: vertical ? 0.27 : 0.27,
       height: vertical ? 0.2 : 0.22,
-      style: { size: vertical ? 0.042 : 0.06 },
+      size: vertical ? 0.042 : 0.06,
     }));
 
     // Choix
@@ -370,13 +374,14 @@ export function buildQuiz(
     choices.forEach((choice, choiceIndex) => {
       const y = firstY + choiceIndex * (rowHeight + gap);
       const delay = 10 + choiceIndex * 4;
-      b.add("Cadres", box(b, cursor + delay, total - delay, { y, height: rowHeight, width: vertical ? 0.86 : 0.7 }, "#ffffff", { opacity: 0.94 }));
+      b.add("Cadres", box(b, cursor + delay, total - delay, { y, height: rowHeight, width: vertical ? 0.86 : 0.7 }, { paint: "surface" }, { opacity: 0.94 }));
       b.add("Textes", text(b, `${String.fromCharCode(65 + choiceIndex)}. ${choice}`, cursor + delay, total - delay, {
-        preset: "clean",
+        role: "body",
         y,
         width: vertical ? 0.8 : 0.64,
         height: rowHeight,
-        style: { font: "Poppins", weight: 700, color: "#111111", size: vertical ? 0.03 : 0.042, align: "left", shadow: null },
+        size: vertical ? 0.03 : 0.042,
+        align: "left",
         animIn: "slide-left",
       }));
       // Révélation : la bonne réponse passe au vert.
@@ -395,7 +400,8 @@ export function buildQuiz(
       shape: "progress",
       start: cursor + countdownDelay,
       duration: think - countdownDelay,
-      fill: accent,
+      fill: accentOf(null, accent),
+      theme: { paint: "accent", accent },
       radius: 0.5,
       progress: { track: "rgba(255,255,255,0.25)", reverse: true },
       transform: { x: 0.5, y: vertical ? 0.93 : 0.92, width: 0.8, height: vertical ? 0.014 : 0.02, rotation: 0, opacity: 1 },
@@ -407,10 +413,11 @@ export function buildQuiz(
     // Explication, pendant la révélation
     const answerText = choices[question.answer] ?? "";
     b.add("Textes", text(b, question.explanation || `Réponse : ${answerText}`, cursor + think, reveal, {
-      preset: "caption",
+      role: "caption",
       y: vertical ? 0.88 : 0.9,
       height: 0.12,
-      style: { size: vertical ? 0.028 : 0.04, color: "#bbf7d0" },
+      size: vertical ? 0.028 : 0.04,
+      paint: "success",
       animIn: "slide-up",
     }));
 
@@ -419,10 +426,10 @@ export function buildQuiz(
 
   // Conclusion
   const outro = b.fit(timing.outro, data.voice?.outro, 0.8);
-  background(b, cursor, outro, undefined, ACCENTS[data.questions.length % ACCENTS.length], 0);
+  background(b, cursor, outro, undefined, data.questions.length, 0);
   b.narrate(data.voice?.outro, cursor + 4);
-  b.add("Textes", text(b, data.outro ?? "Combien de bonnes réponses ?", cursor, outro, { preset: "impact", y: 0.44, height: 0.24, style: { size: vertical ? 0.06 : 0.09 } }));
-  b.add("Textes", text(b, "Dis-le en commentaire", cursor + 8, outro - 8, { preset: "caption", y: 0.58, style: { size: vertical ? 0.032 : 0.045 }, animIn: "slide-up" }));
+  b.add("Textes", text(b, data.outro ?? "Combien de bonnes réponses ?", cursor, outro, { role: "title", y: 0.44, height: 0.24, size: vertical ? 0.06 : 0.09 }));
+  b.add("Textes", text(b, "Dis-le en commentaire", cursor + 8, outro - 8, { role: "subtitle", y: 0.58, size: vertical ? 0.032 : 0.045, animIn: "slide-up" }));
 
   return b.build();
 }
@@ -435,37 +442,38 @@ export function buildTop(name: string, aspect: AspectPreset, data: TopData): Cli
   let cursor = 0;
 
   const intro = b.fit(2.5, data.voice?.intro, 0.5);
-  background(b, cursor, intro, data.entries[0]?.image, ACCENTS[0], 0);
+  background(b, cursor, intro, data.entries[0]?.image, 0, 0);
   b.narrate(data.voice?.intro, cursor + 4);
-  b.add("Textes", text(b, data.title, cursor, intro, { preset: "impact", y: 0.45, height: 0.26, style: { size: vertical ? 0.07 : 0.1 } }));
+  b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: 0.45, height: 0.26, size: vertical ? 0.07 : 0.1 }));
   cursor += intro;
 
   const count = data.entries.length;
   data.entries.forEach((entry, index) => {
     const rank = count - index;
-    const accent = ACCENTS[index % ACCENTS.length];
+    const accent = index;
     const duration = b.fit(rank === 1 ? 4.5 : 3.5, entry.voice, 0.6);
     background(b, cursor, duration, entry.image, accent, index + 1);
     b.narrate(entry.voice, cursor + 4);
     b.add("Textes", text(b, `#${rank}`, cursor, duration, {
-      preset: "impact",
+      role: "title",
       y: vertical ? 0.2 : 0.22,
       height: 0.2,
-      style: { size: vertical ? 0.12 : 0.18, color: rank === 1 ? "#facc15" : "#ffffff" },
+      size: vertical ? 0.12 : 0.18,
+      ...(rank === 1 ? { paint: "highlight" as const } : {}),
       animIn: "zoom",
     }));
-    b.add("Textes", text(b, entry.title, cursor + 6, duration - 6, { preset: "impact", y: vertical ? 0.72 : 0.7, height: 0.16, style: { size: vertical ? 0.055 : 0.08 }, animIn: "slide-up" }));
+    b.add("Textes", text(b, entry.title, cursor + 6, duration - 6, { role: "title", y: vertical ? 0.72 : 0.7, height: 0.16, size: vertical ? 0.055 : 0.08, animIn: "slide-up" }));
     if (entry.detail) {
-      b.add("Textes", text(b, entry.detail, cursor + 12, duration - 12, { preset: "caption", y: vertical ? 0.82 : 0.84, height: 0.12, style: { size: vertical ? 0.03 : 0.042 }, animIn: "fade" }));
+      b.add("Textes", text(b, entry.detail, cursor + 12, duration - 12, { role: "caption", y: vertical ? 0.82 : 0.84, height: 0.12, size: vertical ? 0.03 : 0.042, animIn: "fade" }));
     }
     cursor += duration;
   });
 
   if (data.outro) {
     const outro = b.fit(2.5, data.voice?.outro, 0.8);
-    background(b, cursor, outro, undefined, ACCENTS[count % ACCENTS.length], 0);
+    background(b, cursor, outro, undefined, count, 0);
     b.narrate(data.voice?.outro, cursor + 4);
-    b.add("Textes", text(b, data.outro, cursor, outro, { preset: "impact", y: 0.46, height: 0.24, style: { size: vertical ? 0.06 : 0.09 } }));
+    b.add("Textes", text(b, data.outro, cursor, outro, { role: "title", y: 0.46, height: 0.24, size: vertical ? 0.06 : 0.09 }));
   }
   return b.build();
 }
@@ -478,25 +486,25 @@ export function buildSlideshow(name: string, aspect: AspectPreset, data: Slidesh
   let cursor = 0;
   if (data.title) {
     const intro = b.fit(2.5, data.voice?.intro, 0.5);
-    background(b, cursor, intro, data.slides[0]?.image, ACCENTS[0], 0);
+    background(b, cursor, intro, data.slides[0]?.image, 0, 0);
     b.narrate(data.voice?.intro, cursor + 4);
-    b.add("Textes", text(b, data.title, cursor, intro, { preset: "impact", y: 0.46, height: 0.26, style: { size: vertical ? 0.065 : 0.09 } }));
+    b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: 0.46, height: 0.26, size: vertical ? 0.065 : 0.09 }));
     cursor += intro;
   }
   data.slides.forEach((slide, index) => {
     const duration = b.fit(3.5, slide.voice, 0.6);
-    background(b, cursor, duration, slide.image, ACCENTS[index % ACCENTS.length], index + 1);
+    background(b, cursor, duration, slide.image, index, index + 1);
     b.narrate(slide.voice, cursor + 4);
     if (slide.caption) {
-      b.add("Textes", text(b, slide.caption, cursor + 6, duration - 6, { preset: "caption", y: vertical ? 0.8 : 0.84, height: 0.16, style: { size: vertical ? 0.038 : 0.05 }, animIn: "slide-up" }));
+      b.add("Textes", text(b, slide.caption, cursor + 6, duration - 6, { role: "caption", y: vertical ? 0.8 : 0.84, height: 0.16, size: vertical ? 0.038 : 0.05, animIn: "slide-up" }));
     }
     cursor += duration;
   });
   if (data.outro) {
     const outro = b.fit(2.5, data.voice?.outro, 0.8);
-    background(b, cursor, outro, undefined, ACCENTS[data.slides.length % ACCENTS.length], 0);
+    background(b, cursor, outro, undefined, data.slides.length, 0);
     b.narrate(data.voice?.outro, cursor + 4);
-    b.add("Textes", text(b, data.outro, cursor, outro, { preset: "impact", y: 0.46, height: 0.24, style: { size: vertical ? 0.06 : 0.09 } }));
+    b.add("Textes", text(b, data.outro, cursor, outro, { role: "title", y: 0.46, height: 0.24, size: vertical ? 0.06 : 0.09 }));
   }
   return b.build();
 }
@@ -514,35 +522,35 @@ export function buildFree(name: string, aspect: AspectPreset, data: FreeData): C
 
   if (data.title) {
     const intro = b.fit(2.5, data.voice?.intro, 0.5);
-    background(b, cursor, intro, data.scenes[0]?.image, ACCENTS[0], 0);
+    background(b, cursor, intro, data.scenes[0]?.image, 0, 0);
     b.narrate(data.voice?.intro, cursor + 4);
-    b.add("Textes", text(b, data.title, cursor, intro, { preset: "impact", y: vertical ? 0.44 : 0.42, height: 0.26, style: { size: vertical ? 0.065 : 0.09 } }));
+    b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: vertical ? 0.44 : 0.42, height: 0.26, size: vertical ? 0.065 : 0.09 }));
     if (data.subtitle) {
-      b.add("Textes", text(b, data.subtitle, cursor + 6, intro - 6, { preset: "caption", y: vertical ? 0.58 : 0.62, style: { size: vertical ? 0.032 : 0.045 }, animIn: "slide-up" }));
+      b.add("Textes", text(b, data.subtitle, cursor + 6, intro - 6, { role: "subtitle", y: vertical ? 0.58 : 0.62, size: vertical ? 0.032 : 0.045, animIn: "slide-up" }));
     }
     cursor += intro;
   }
 
   data.scenes.forEach((scene, index) => {
-    const accent = ACCENTS[index % ACCENTS.length];
+    const accent = index;
     const duration = b.fit(scene.text ? 4 : 3, scene.voice, 0.6);
     background(b, cursor, duration, scene.image, accent, index + 1);
     b.narrate(scene.voice, cursor + 4);
     if (scene.heading) {
       b.add("Textes", text(b, scene.heading, cursor, duration, {
-        preset: "impact",
+        role: "title",
         y: scene.text ? (vertical ? 0.2 : 0.22) : 0.46,
         height: 0.18,
-        style: { size: vertical ? 0.055 : 0.08 },
+        size: vertical ? 0.055 : 0.08,
         animIn: "slide-down",
       }));
     }
     if (scene.text) {
       b.add("Textes", text(b, scene.text, cursor + 6, duration - 6, {
-        preset: "caption",
+        role: "caption",
         y: scene.heading ? (vertical ? 0.74 : 0.76) : 0.5,
         height: vertical ? 0.24 : 0.2,
-        style: { size: vertical ? 0.038 : 0.05 },
+        size: vertical ? 0.038 : 0.05,
         animIn: "slide-up",
       }));
     }
@@ -551,9 +559,9 @@ export function buildFree(name: string, aspect: AspectPreset, data: FreeData): C
 
   if (data.outro) {
     const outro = b.fit(2.5, data.voice?.outro, 0.8);
-    background(b, cursor, outro, undefined, ACCENTS[data.scenes.length % ACCENTS.length], 0);
+    background(b, cursor, outro, undefined, data.scenes.length, 0);
     b.narrate(data.voice?.outro, cursor + 4);
-    b.add("Textes", text(b, data.outro, cursor, outro, { preset: "impact", y: 0.46, height: 0.24, style: { size: vertical ? 0.06 : 0.09 } }));
+    b.add("Textes", text(b, data.outro, cursor, outro, { role: "title", y: 0.46, height: 0.24, size: vertical ? 0.06 : 0.09 }));
   }
   return b.build();
 }
@@ -605,21 +613,23 @@ export function buildBeforeAfter(
 
   if (data.title) {
     const intro = b.seconds(2.5);
-    background(b, cursor, intro, data.pairs[0]?.before, ACCENTS[0], 0);
-    b.add("Textes", text(b, data.title, cursor, intro, { preset: "impact", y: 0.46, height: 0.26, style: { size: vertical ? 0.065 : 0.09 } }));
+    background(b, cursor, intro, data.pairs[0]?.before, 0, 0);
+    b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: 0.46, height: 0.26, size: vertical ? 0.065 : 0.09 }));
     cursor += intro;
   }
 
   const hold = b.seconds(timing.before);
   const wipe = b.seconds(timing.wipe);
   const total = hold + wipe + b.seconds(timing.after);
-  const label = (content: string, start: number, duration: number, x: number, color: string) => {
+  /** Étiquette « Avant » (neutre, sans rang) ou « Après » (teinte du segment). */
+  const label = (content: string, start: number, duration: number, x: number, accent?: number) => {
     const item = text(b, content, start, duration, {
-      preset: "boxed",
+      role: "label",
       y: vertical ? 0.08 : 0.1,
       width: 0.34,
       height: vertical ? 0.06 : 0.08,
-      style: { size: vertical ? 0.028 : 0.04, color: "#ffffff", background: { color, padding: 0.4, radius: 0.35 } },
+      size: vertical ? 0.028 : 0.04,
+      accent,
       animIn: "pop",
     });
     item.transform.x = x;
@@ -627,7 +637,7 @@ export function buildBeforeAfter(
   };
 
   data.pairs.forEach((pair, index) => {
-    const accent = ACCENTS[index % ACCENTS.length];
+    const accent = index;
     const swap = cursor + hold;
 
     if (pair.before) b.add("Principale", still(cursor, total, pair.before, { kind: "fade", frames: 8 }));
@@ -636,19 +646,19 @@ export function buildBeforeAfter(
       b.add("Après", still(swap, total - hold, pair.after, { kind: "wipe", frames: wipe }));
     } else {
       // Sans image, un aplat coloré montre tout de même le balayage.
-      const plate = box(b, swap, total - hold, { y: 0.5, height: 1, width: 1 }, shade(accent, -0.35), { radius: 0 });
+      const plate = box(b, swap, total - hold, { y: 0.5, height: 1, width: 1 }, shade(accentOf(null, accent), -0.35), { radius: 0 });
       plate.animIn = { kind: "wipe", frames: wipe };
       b.add("Après", plate);
     }
 
-    b.add("Textes", label("Avant", cursor, hold + wipe, 0.24, "#27272a"));
+    b.add("Textes", label("Avant", cursor, hold + wipe, 0.24));
     b.add("Textes", label("Après", swap + wipe, total - hold - wipe, 0.76, accent));
     if (pair.caption) {
       b.add("Textes", text(b, pair.caption, cursor + 6, total - 6, {
-        preset: "caption",
+        role: "caption",
         y: vertical ? 0.86 : 0.88,
         height: 0.14,
-        style: { size: vertical ? 0.036 : 0.048 },
+        size: vertical ? 0.036 : 0.048,
         animIn: "slide-up",
       }));
     }
@@ -657,8 +667,8 @@ export function buildBeforeAfter(
 
   if (data.outro) {
     const outro = b.seconds(2.5);
-    background(b, cursor, outro, undefined, ACCENTS[data.pairs.length % ACCENTS.length], 0);
-    b.add("Textes", text(b, data.outro, cursor, outro, { preset: "impact", y: 0.46, height: 0.24, style: { size: vertical ? 0.06 : 0.09 } }));
+    background(b, cursor, outro, undefined, data.pairs.length, 0);
+    b.add("Textes", text(b, data.outro, cursor, outro, { role: "title", y: 0.46, height: 0.24, size: vertical ? 0.06 : 0.09 }));
   }
   return b.build();
 }
@@ -676,7 +686,13 @@ export type SequenceRecipe = "slideshow" | "rhythm";
 const SLOW_MOTIONS = ["zoom-in", "pan-right", "zoom-out", "pan-left"] as const;
 const PUNCHY_MOTIONS = ["zoom-in", "zoom-out"] as const;
 
-export function buildSequence(name: string, aspect: AspectPreset, sources: MediaSource[], recipe: SequenceRecipe): ClipProject {
+export function buildSequence(
+  name: string,
+  aspect: AspectPreset,
+  sources: MediaSource[],
+  recipe: SequenceRecipe,
+  theme: BrandTheme | null = null
+): ClipProject {
   const project = createProject(name, aspect);
   const fps = project.fps;
   const rhythm = recipe === "rhythm";
@@ -701,7 +717,8 @@ export function buildSequence(name: string, aspect: AspectPreset, sources: Media
     start += item.duration;
     return item;
   });
-  return appendSequence(project, items);
+  const built = appendSequence(project, items);
+  return theme ? applyBrandTheme(built, theme) : built;
 }
 
 // ─── Exemples, pour un modèle rempli à la main ───────────────────
@@ -747,15 +764,27 @@ export const SAMPLE_BEFORE_AFTER: BeforeAfterData = {
   outro: "Laquelle préfères-tu ?",
 };
 
+/**
+ * Construit un projet depuis un modèle. Avec une image de marque, le projet
+ * est monté avec le thème par défaut puis habillé par `applyBrandTheme` :
+ * une seule façon d'appliquer une marque, au montage comme après coup.
+ */
 export function buildFromTemplate(
   template: TemplateId,
   name: string,
   aspect: AspectPreset,
-  data: FreeData | QuizData | TopData | SlideshowData | BeforeAfterData
+  data: FreeData | QuizData | TopData | SlideshowData | BeforeAfterData,
+  theme: BrandTheme | null = null
 ): ClipProject {
-  if (template === "free") return buildFree(name, aspect, data as FreeData);
-  if (template === "quiz") return buildQuiz(name, aspect, data as QuizData);
-  if (template === "top") return buildTop(name, aspect, data as TopData);
-  if (template === "before-after") return buildBeforeAfter(name, aspect, data as BeforeAfterData);
-  return buildSlideshow(name, aspect, data as SlideshowData);
+  const project =
+    template === "free"
+      ? buildFree(name, aspect, data as FreeData)
+      : template === "quiz"
+        ? buildQuiz(name, aspect, data as QuizData)
+        : template === "top"
+          ? buildTop(name, aspect, data as TopData)
+          : template === "before-after"
+            ? buildBeforeAfter(name, aspect, data as BeforeAfterData)
+            : buildSlideshow(name, aspect, data as SlideshowData);
+  return theme ? applyBrandTheme(project, theme) : project;
 }

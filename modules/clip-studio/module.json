@@ -40,7 +40,11 @@
     "getMusic": "user",
     "prepareMusic": "user",
     "searchMusic": "user",
-    "addMusicToLibrary": "user"
+    "addMusicToLibrary": "user",
+    "searchImages": "user",
+    "importFoundImage": "user",
+    "listPublishTargets": "user",
+    "resolveExportFile": "public"
   },
   "pages": [
     { "path": "", "title": "Projets", "component": "pages/projects.tsx" },

@@ -50,6 +50,17 @@ import {
   type AssistantJob,
   type AssistantRequest,
 } from "./lib/assistant";
+import { cleanFoundImages, importFoundImageById, searchFoundImages } from "./lib/image-search";
+import type { FoundImage, ImportedImage } from "./lib/image-search-types";
+import {
+  enqueuePublish,
+  listAccounts,
+  listConnectors,
+  listJobs,
+  type AccountSummary,
+  type ConnectorInfo,
+  type PublishJobSummary,
+} from "@/lib/connections";
 
 export interface ProjectSummary {
   id: string;
@@ -330,6 +341,104 @@ export async function sendExportToGallery(id: string): Promise<{ fileName: strin
   return { fileName };
 }
 
+// ─── Publication (comptes connectés du cœur) ─────────────────────
+
+export interface ExportFile {
+  path: string;
+  file: string;
+  bytes: number;
+  name: string;
+  width: number;
+  height: number;
+  durationMs: number;
+}
+
+/**
+ * Chemin contrôlé d'un export, pour la file de publication du cœur. Déclarée
+ * `public` dans module.json : la route `call-function` la refuse toujours,
+ * seul le serveur l'atteint. Aucun chemin ne vient du navigateur.
+ */
+export async function resolveExportFile(id: string): Promise<ExportFile> {
+  assertId(id, "Identifiant d'export");
+  const entry = readExports().find((item) => item.id === id);
+  if (!entry) throw new Error("Export introuvable");
+  assertFileName(entry.file);
+  const full = path.join(EXPORTS_DIR, entry.file);
+  if (path.dirname(full) !== EXPORTS_DIR || !fs.existsSync(full)) throw new Error("Fichier exporté introuvable");
+  return {
+    path: full,
+    file: entry.file,
+    bytes: fs.statSync(full).size,
+    name: entry.projectName,
+    width: entry.width,
+    height: entry.height,
+    durationMs: entry.durationMs,
+  };
+}
+
+/**
+ * Comptes capables de publier une vidéo (sans jeton) et descriptions
+ * publiques de leurs services, avec les champs de publication à dessiner.
+ */
+export async function listPublishTargets(): Promise<{ accounts: AccountSummary[]; connectors: ConnectorInfo[]; queueScheduling: boolean }> {
+  const accounts = listAccounts({ capability: "publish.video" });
+  const used = new Set(accounts.map((account) => account.connector));
+  // La file tient elle-même une date de publication, pour les services qui ne
+  // programment pas : la fenêtre peut la proposer à tous.
+  return { accounts, connectors: listConnectors().filter((connector) => used.has(connector.id)), queueScheduling: true };
+}
+
+/**
+ * Met un export en file de publication, un travail par compte. Absente de
+ * `functions` dans module.json : réservée aux administrateurs.
+ */
+export async function publishExport(input: {
+  exportId: string;
+  targets: { accountId: string; options?: Record<string, unknown>; publishAt?: number }[];
+}): Promise<{ jobs: PublishJobSummary[]; failed: { accountId: string; error: string }[] }> {
+  const file = await resolveExportFile(String(input?.exportId ?? ""));
+  const targets = Array.isArray(input?.targets) ? input.targets.slice(0, 20) : [];
+  if (targets.length === 0) throw new Error("Choisissez au moins un compte.");
+  const seen = new Set<string>();
+  const jobs: PublishJobSummary[] = [];
+  const failed: { accountId: string; error: string }[] = [];
+  for (const target of targets) {
+    const accountId = String(target?.accountId ?? "");
+    if (seen.has(accountId)) continue;
+    seen.add(accountId);
+    try {
+      jobs.push(
+        enqueuePublish({
+          accountId,
+          source: {
+            module: "clip-studio",
+            id: String(input.exportId),
+            file: file.file,
+            bytes: file.bytes,
+            kind: "video",
+            name: file.name,
+            width: file.width,
+            height: file.height,
+            durationMs: file.durationMs,
+          },
+          options: target?.options ?? {},
+          // Date tenue par la file ; elle borne et contrôle la valeur reçue.
+          publishAt: typeof target?.publishAt === "number" ? target.publishAt : undefined,
+        })
+      );
+    } catch (error) {
+      failed.push({ accountId, error: error instanceof Error ? error.message : "Publication impossible" });
+    }
+  }
+  return { jobs, failed };
+}
+
+/** Suivi des travaux de publication lancés depuis Clip Studio (réservé aux administrateurs). */
+export async function getPublishJobs(ids: string[]): Promise<PublishJobSummary[]> {
+  const wanted = Array.isArray(ids) ? ids.slice(0, 50).map(String) : [];
+  return listJobs({ ids: wanted }).filter((job) => job.source.module === "clip-studio");
+}
+
 // ─── Source pour la galerie ──────────────────────────────────────
 
 /** Les clips exportés, proposés dans la fenêtre « Ajouter » de la galerie. */
@@ -450,6 +559,26 @@ export async function removeMusicFromLibrary(id: string): Promise<{ success: boo
   return { success: true };
 }
 
+// ─── Images trouvées (onglet « Trouver ») ────────────────────────
+
+/**
+ * Cherche des images libres dans Openverse (par page), ou sur le web par
+ * Codex (droits à vérifier, de vingt à soixante secondes). Les candidates du
+ * web sont déjà téléchargées et contrôlées par le serveur.
+ */
+export async function searchImages(input: { query: string; provider: "openverse" | "web"; page?: number }): Promise<FoundImage[]> {
+  return searchFoundImages({ query: String(input?.query ?? ""), provider: input?.provider, page: input?.page });
+}
+
+/**
+ * Importe une candidate dans les médias du module, avec sa mention et
+ * l'état de ses droits. Seul l'identifiant vient du navigateur, jamais une
+ * adresse.
+ */
+export async function importFoundImage(input: { id: string }): Promise<ImportedImage> {
+  return importFoundImageById(String(input?.id ?? ""));
+}
+
 // ─── Cycle de vie ────────────────────────────────────────────────
 
 const moduleHooks: ModuleHooks = {
@@ -463,6 +592,12 @@ export function initModule() {
   prefetchTts();
   // Banque de musique : les morceaux manquants arrivent un par un.
   prefetchMusic();
+  // Candidates du web plus vieilles que vingt-quatre heures, jamais importées.
+  try {
+    cleanFoundImages();
+  } catch {
+    // Un dossier illisible ne doit pas empêcher le module de démarrer.
+  }
   return moduleHooks;
 }
 
