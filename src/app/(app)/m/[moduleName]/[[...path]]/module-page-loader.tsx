@@ -21,6 +21,10 @@ const MODULE_PAGES: Record<string, Record<string, PageLoader>> = {
     pipelines: () => import("@/modules/ai-image-gen/pages/pipelines"),
     settings: () => import("@/modules/ai-image-gen/pages/settings"),
   },
+  "brand-kit": {
+    "": () => import("@/modules/brand-kit/pages/kits"),
+    edit: () => import("@/modules/brand-kit/pages/editor"),
+  },
   "clip-studio": {
     "": () => import("@/modules/clip-studio/pages/projects"),
     edit: () => import("@/modules/clip-studio/pages/editor"),

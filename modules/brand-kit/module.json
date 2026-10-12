@@ -1,0 +1,64 @@
+{
+  "name": "brand-kit",
+  "version": "0.1.0",
+  "description": "Images de marque (palette, polices, logos, filigrane, mascotte) appliquées aux vidéos de Clip Studio et aux captures",
+  "author": "ShareX Manager",
+  "enabled": true,
+  "entry": "index.process.ts",
+  "category": "Vidéo",
+  "branding": {
+    "logo": "branding/logo.png",
+    "logoSmall": "branding/logo-96.png",
+    "accent": "#db2777"
+  },
+  "hasUI": false,
+  "supportedFileTypes": [],
+  "settings": {},
+  "uploads": { "maxMb": 20, "kinds": ["image"] },
+  "functions": {
+    "listKits": "user",
+    "getKit": "user",
+    "createKit": "user",
+    "saveKit": "user",
+    "deleteKit": "user",
+    "setDefaultKit": "user",
+    "getBrandTheme": "user",
+    "registerKitAsset": "user",
+    "importGalleryAsset": "user",
+    "importSvgAsset": "user",
+    "removeKitAsset": "user",
+    "importFont": "user",
+    "readFontFile": "user",
+    "removeFont": "user",
+    "saveFormatExport": "user",
+    "sendFormatToGallery": "user",
+    "exportKit": "user",
+    "importKit": "user",
+    "startKitAssistant": "user",
+    "getKitAssistantJob": "user",
+    "listAssistantJobs": "user",
+    "cancelKitAssistantJob": "user",
+    "regenerateAsset": "user",
+    "listPublishAccounts": "user",
+    "getWatermarkImage": "public"
+  },
+  "pages": [
+    { "path": "", "title": "Images de marque", "component": "pages/kits.tsx" },
+    { "path": "edit", "title": "Éditeur", "component": "pages/editor.tsx" }
+  ],
+  "navItems": [
+    { "title": "Image de marque", "icon": "Palette" }
+  ],
+  "fileActions": [
+    {
+      "id": "add-to-kit",
+      "label": "Ajouter à une image de marque",
+      "description": "Copie les images choisies dans une image de marque (logo, mascotte, référence)",
+      "icon": "Palette",
+      "fileTypes": ["png", "jpg", "jpeg", "webp"],
+      "maxFiles": 20,
+      "page": "",
+      "params": { "action": "add-assets" }
+    }
+  ]
+}
