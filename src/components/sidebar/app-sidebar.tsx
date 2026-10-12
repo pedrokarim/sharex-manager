@@ -33,6 +33,7 @@ import {
   ScrollText,
   Server,
   Package,
+  Link2,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -221,6 +222,11 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
         title: t("sidebar.admin.modules"),
         url: "/admin/modules",
         icon: Package,
+      },
+      {
+        title: "Comptes connectés",
+        url: "/admin/connections",
+        icon: Link2,
       },
       {
         title: t("sidebar.admin.security"),

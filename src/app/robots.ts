@@ -11,7 +11,10 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: "/",
+        // Seule exception sous /api/ : les liens publics temporaires des comptes
+        // connectés, que les robots des services (Meta…) viennent lire pour
+        // publier. Chaque lien porte un jeton secret et `X-Robots-Tag: noindex`.
+        allow: ["/", "/api/connections/media/"],
         disallow: [
           "/api/",
           "/admin/",
