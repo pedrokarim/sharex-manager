@@ -164,7 +164,7 @@ export function StyleTable({ fonts, sample }: StyleTableProps) {
         <p className="text-sm text-muted-foreground">Aucun dossier pour l’instant : créez-en un dans la bibliothèque, ses styles se régleront ici.</p>
       ) : (
         <>
-          <ItemGroup className="grid gap-3 xl:grid-cols-2">
+          <ItemGroup className="grid grid-cols-[minmax(0,1fr)] gap-3 xl:grid-cols-2">
             {STYLE_ROWS.map((row) => {
               const family = choices[row.id];
               const missing = isMissingFont(family, fonts);

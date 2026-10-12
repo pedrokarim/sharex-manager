@@ -138,7 +138,7 @@ export function ImageViewer({
           <DialogDescription>{item.prompt}</DialogDescription>
         </VisuallyHidden>
 
-        <div className="grid max-h-[90vh] grid-rows-[1fr_auto] md:grid-cols-[minmax(0,1fr)_320px] md:grid-rows-1">
+        <div className="grid max-h-[min(90vh,calc(100dvh-2rem))] grid-rows-[1fr_auto] md:grid-cols-[minmax(0,1fr)_320px] md:grid-rows-1">
           {/* Visuel */}
           <div className="relative flex min-h-0 items-center justify-center bg-muted/40 p-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}

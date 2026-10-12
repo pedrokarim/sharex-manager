@@ -193,7 +193,8 @@ function FileViewerBody({
       <div
         className={cn(
           "relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background/95",
-          presentation === "fullscreen" ? "h-screen w-screen" : "h-[90vh]",
+          // En fenêtre, jamais plus haut que la fenêtre elle-même (bornée à l'écran moins 2 rem) : rien n'est rogné.
+          presentation === "fullscreen" ? "h-screen w-screen" : "h-[min(90vh,calc(100dvh-2rem))]",
         )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-background/90 px-4 py-3 backdrop-blur">

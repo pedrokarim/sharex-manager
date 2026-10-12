@@ -166,7 +166,7 @@ export default function SourcesPage() {
               {sources.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Aucun adaptateur n’est installé.</p>
               ) : (
-                <ItemGroup className="grid gap-3 min-[1900px]:grid-cols-2">
+                <ItemGroup className="grid grid-cols-[minmax(0,1fr)] gap-3 min-[1900px]:grid-cols-2">
                   <AnimatePresence initial={false}>
                     {sources.map((source) => (
                       <motion.div key={source.id} layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>

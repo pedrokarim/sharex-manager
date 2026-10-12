@@ -187,7 +187,7 @@ export function CustomFontList({ fonts, sample, isAdmin, onChange: report }: Fon
           {isAdmin ? "Les polices fournies, plus bas, suffisent à lettrer un chapitre." : "Un administrateur peut en ajouter depuis cette page."}
         </p>
       ) : (
-        <ItemGroup className="grid gap-3 xl:grid-cols-2">
+        <ItemGroup className="grid grid-cols-[minmax(0,1fr)] gap-3 xl:grid-cols-2">
           <AnimatePresence initial={false}>
             {fonts.map((font) => {
               const failure = failures.find((entry) => entry.family === font.family);
@@ -426,7 +426,7 @@ export function BundledFontList({ sample }: { sample: string }) {
         </h3>
         <p className="max-w-3xl text-sm text-muted-foreground">Sous licence libre, embarquées avec l’application : elles sont toujours là, à l’aperçu comme à l’export.</p>
       </div>
-      <ItemGroup className="grid gap-3 xl:grid-cols-2">
+      <ItemGroup className="grid grid-cols-[minmax(0,1fr)] gap-3 xl:grid-cols-2">
         {BUNDLED_FONTS.map((font) => (
           <Item key={font.family} variant="outline" className="items-start">
             <ItemMedia className="size-12 text-2xl" style={familyStyle(font.family)} aria-hidden>

@@ -9,6 +9,26 @@ interface SliderWithStopsProps
   min?: number;
   max?: number;
   stopInterval?: number;
+  /** Paliers marqués, à la place de ceux calculés depuis `stopInterval`. */
+  stops?: number[];
+  /** Libellé d'un palier : « 40 % », « Grasse »… */
+  formatStop?: (value: number) => string;
+}
+
+/** Diamètre du curseur : Radix le garde dans la piste, son centre va de 8 px à la largeur moins 8 px. */
+const THUMB = 16;
+
+/**
+ * Paliers sans erreur d'arrondi : 0,1 + 0,2 ne doit pas s'afficher
+ * « 0.30000000000000004 ». On compte les paliers, puis on arrondit chacun.
+ */
+function computeStops(min: number, max: number, interval: number): number[] {
+  if (!(interval > 0) || max <= min) return [min];
+  const decimals = Math.max(0, ...[min, interval].map((value) => (String(value).split(".")[1] ?? "").length));
+  const count = Math.floor((max - min) / interval + 1e-9);
+  const stops = Array.from({ length: count + 1 }, (_, index) => Number((min + index * interval).toFixed(decimals)));
+  if (stops[stops.length - 1] < max - 1e-9) stops.push(max);
+  return stops;
 }
 
 const SliderWithStops = React.forwardRef<
@@ -23,44 +43,46 @@ const SliderWithStops = React.forwardRef<
       max = 100,
       step = 1,
       stopInterval = step,
+      stops: customStops,
+      formatStop = (value) => String(value),
       ...props
     },
     ref
   ) => {
     const stops = React.useMemo(() => {
       if (!showStops) return [];
-      const stops = [];
-      for (let i = min; i <= max; i += stopInterval) {
-        stops.push(i);
-      }
-      return stops;
-    }, [min, max, stopInterval, showStops]);
+      return customStops ?? computeStops(min, max, stopInterval);
+    }, [min, max, stopInterval, showStops, customStops]);
 
     return (
-      <div className="relative pt-6">
+      <div data-slot="slider-with-stops" className={cn("relative", showStops && "pt-6")}>
         {showStops && (
-          <div
-            className="absolute w-full flex justify-between px-2 -top-1"
-            style={{
-              transform: "translateY(-100%)",
-            }}
-          >
-            {stops.map((stop) => (
-              <div
-                key={stop}
-                className="flex flex-col items-center"
-                style={{
-                  width: "20px",
-                  marginLeft: stop === min ? "-10px" : 0,
-                  marginRight: stop === max ? "-10px" : 0,
-                }}
-              >
-                <span className="text-xs text-muted-foreground mb-2">
-                  {stop}
+          <div aria-hidden className="absolute inset-x-0 top-0 h-6">
+            {stops.map((stop, index) => {
+              const ratio = max > min ? (stop - min) / (max - min) : 0;
+              const first = index === 0;
+              const last = index === stops.length - 1;
+              return (
+                <span
+                  key={stop}
+                  className={cn(
+                    "absolute top-0 flex flex-col text-[11px] leading-none text-muted-foreground tabular-nums whitespace-nowrap",
+                    // Les libellés des bouts s'alignent sur le bord : ils ne sortent jamais du champ.
+                    first ? "items-start" : last ? "items-end" : "-translate-x-1/2 items-center"
+                  )}
+                  style={
+                    first
+                      ? { left: 0 }
+                      : last
+                        ? { right: 0 }
+                        : { left: `calc(${THUMB / 2}px + ${ratio} * (100% - ${THUMB}px))` }
+                  }
+                >
+                  {formatStop(stop)}
+                  <span className={cn("mt-1 h-1.5 w-px bg-muted-foreground/50", first && "ml-2", last && "mr-2")} />
                 </span>
-                <div className="w-0.5 h-1.5 bg-muted-foreground/50" />
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <SliderPrimitive.Root
@@ -69,15 +91,15 @@ const SliderWithStops = React.forwardRef<
           max={max}
           step={step}
           className={cn(
-            "relative flex w-full touch-none select-none items-center",
+            "relative flex w-full touch-none select-none items-center py-1 data-[disabled]:opacity-50",
             className
           )}
           {...props}
         >
-          <SliderPrimitive.Track className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-secondary">
+          <SliderPrimitive.Track className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-muted">
             <SliderPrimitive.Range className="absolute h-full bg-primary" />
           </SliderPrimitive.Track>
-          <SliderPrimitive.Thumb className="block h-4 w-4 rounded-full border border-primary/50 bg-background shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50" />
+          <SliderPrimitive.Thumb aria-label={props["aria-label"]} className="block size-4 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50" />
         </SliderPrimitive.Root>
       </div>
     );
