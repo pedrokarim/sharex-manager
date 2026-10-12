@@ -12,10 +12,13 @@ import { mixColors } from "./color";
 import { resolveEase } from "./easing";
 import type {
   ClipInsets,
+  EaseSpec,
   Keyframe,
   KeyframeValue,
   MotionDirection,
   MotionEffect,
+  MotionGrid,
+  MotionLayer,
   MotionParamValues,
   MotionPreset,
   MotionProperty,
@@ -44,6 +47,7 @@ const REST_VALUES: Record<NumericProperty, number> = {
   reveal: 1,
   wipe: 1,
   tracking: 0,
+  mask: 1,
 };
 
 const REST_KEYS = Object.keys(REST_VALUES) as NumericProperty[];
@@ -65,6 +69,8 @@ function resetState(state: MotionState, unit: MotionUnit): MotionState {
   const clip = state.clip;
   if (!clip || clip[0] || clip[1] || clip[2] || clip[3]) state.clip = [0, 0, 0, 0];
   state.color = undefined;
+  state.maskShape = undefined;
+  state.origin = undefined;
   state.unit = unit;
   return state;
 }
@@ -106,6 +112,10 @@ function restValue(property: MotionProperty): KeyframeValue {
 }
 
 function normalizeTrack(property: MotionProperty, keyframes: Keyframe[]): Keyframe[] {
+  return normalizeKeyframes(keyframes, restValue(property));
+}
+
+function normalizeKeyframes(keyframes: Keyframe[], rest: KeyframeValue): Keyframe[] {
   const cached = normalized.get(keyframes);
   if (cached) return cached;
   const sorted = keyframes
@@ -113,11 +123,33 @@ function normalizeTrack(property: MotionProperty, keyframes: Keyframe[]): Keyfra
     .map((frame) => ({ ...frame, at: clamp01(frame.at) }))
     .sort((a, b) => a.at - b.at);
   if (sorted.length > 0) {
-    if (sorted[0].at > 0) sorted.unshift({ at: 0, value: restValue(property) });
-    if (sorted[sorted.length - 1].at < 1) sorted.push({ at: 1, value: restValue(property) });
+    if (sorted[0].at > 0) sorted.unshift({ at: 0, value: rest });
+    if (sorted[sorted.length - 1].at < 1) sorted.push({ at: 1, value: rest });
   }
   normalized.set(keyframes, sorted);
   return sorted;
+}
+
+/**
+ * Valeur d'une piste numérique hors d'un préréglage d'élément : caméra,
+ * transitions, effets de plan. Même lecture que les pistes d'un élément
+ * (images clés implicites au repos, courbe par segment, dépassement gardé).
+ */
+export function sampleKeyframes(
+  keyframes: Keyframe[] | undefined,
+  progress: number,
+  rest: number,
+  defaultEase?: EaseSpec
+): number {
+  if (!keyframes || keyframes.length === 0) return rest;
+  const track = normalizeKeyframes(keyframes, rest);
+  if (track.length === 1) return asNumber(track[0].value, rest);
+  const p = Number.isFinite(progress) ? clamp01(progress) : 1;
+  const { from, to, eased } = locate(track, p, defaultEase);
+  const a = asNumber(from.value, rest);
+  const b = asNumber(to.value, rest);
+  const value = eased === 0 ? a : eased === 1 ? b : a + (b - a) * eased;
+  return Number.isFinite(value) ? value : rest;
 }
 
 /** Segment de la piste qui contient `progress`, et l'avancement adouci dans ce segment. */
@@ -273,6 +305,8 @@ function sampleForward(
     if (keyframes) sampleInto(state, property, keyframes, p, preset, context);
   }
   applyParams(state, preset, params);
+  if (preset.mask) state.maskShape = preset.mask;
+  if (preset.origin) state.origin = preset.origin;
   return state;
 }
 
@@ -439,13 +473,30 @@ export function stateForUnit(
   seed: string,
   options: UnitOptions = {}
 ): MotionState {
+  const progress = unitProgress(preset, index, count, localFrame, frames, seed);
+  return sampleForward(preset, progress, options.params, options.context ?? NO_CONTEXT, options.into);
+}
+
+/**
+ * Avancement propre d'une unité ou d'un carreau, dans le sens des pistes
+ * (0 au départ de l'animation écrite, 1 à son arrivée), à l'image
+ * `localFrame` d'une phase. Le brouillage d'une lettre, par exemple, cesse
+ * quand son avancement atteint le seuil de l'effet.
+ */
+export function unitProgress(
+  preset: MotionPreset,
+  index: number,
+  count: number,
+  localFrame: number,
+  frames: number,
+  seed: string
+): number {
   const phase = clamp01((localFrame + 1) / Math.max(1, frames));
   // À rebours, c'est la phase entière qui se rejoue à l'envers : la dernière
   // unité entrée part la première.
   const forward = preset.reversed ? 1 - phase : phase;
-  const { delay, span } = unitTiming(preset, index, count, seed);
-  const progress = clamp01((forward - delay) / span);
-  return sampleForward(preset, progress, options.params, options.context ?? NO_CONTEXT, options.into);
+  const { delay, span } = preset.grid ? tileTiming(preset, preset.grid, index, seed) : unitTiming(preset, index, count, seed);
+  return clamp01((forward - delay) / span);
 }
 
 /**
@@ -455,4 +506,167 @@ export function stateForUnit(
 export function naturalFrames(preset: MotionPreset, count: number, fps: number): number {
   const stagger = preset.stagger && count > 1 ? preset.stagger.eachMs * (count - 1) : 0;
   return Math.max(1, Math.round(((preset.durationMs + stagger) / 1000) * fps));
+}
+
+// ─── Grilles ─────────────────────────────────────────────────────
+
+/** Rangs de départ déjà calculés, par grille. */
+const gridRankCache = new Map<string, number[]>();
+
+/**
+ * Rang de départ de chaque carreau d'une grille, de 0 (le premier parti) à
+ * 1 (le dernier), selon l'ordre demandé. Les carreaux sont numérotés ligne
+ * après ligne, de gauche à droite.
+ */
+export function gridRanks(grid: MotionGrid, seed: string): number[] {
+  const columns = Math.max(1, Math.round(grid.columns));
+  const rows = Math.max(1, Math.round(grid.rows));
+  const key = `${columns}x${rows}:${grid.order}:${grid.order === "random" ? seed : ""}`;
+  const cached = gridRankCache.get(key);
+  if (cached) return cached;
+  const count = columns * rows;
+  const cx = (columns - 1) / 2;
+  const cy = (rows - 1) / 2;
+  const column = (i: number) => i % columns;
+  const row = (i: number) => Math.floor(i / columns);
+  let raw: number[];
+  switch (grid.order) {
+    case "columns":
+      // Colonne après colonne, un léger décalage de haut en bas dans chacune.
+      raw = Array.from({ length: count }, (_, i) => column(i) + (row(i) / rows) * 0.25);
+      break;
+    case "diagonal":
+      raw = Array.from({ length: count }, (_, i) => column(i) + row(i));
+      break;
+    case "center":
+      // Anneaux carrés : le centre, puis le carré qui l'entoure, et ainsi de suite.
+      raw = Array.from({ length: count }, (_, i) => Math.max(Math.abs(column(i) - cx), Math.abs(row(i) - cy)));
+      break;
+    case "spiral":
+      raw = spiralOrder(columns, rows);
+      break;
+    case "random":
+      raw = shuffledRanks(`${seed}#grid`, count).slice();
+      break;
+    default:
+      // Lignes de haut en bas, un léger décalage de gauche à droite dans chacune.
+      raw = Array.from({ length: count }, (_, i) => row(i) + (column(i) / columns) * 0.25);
+  }
+  const min = Math.min(...raw);
+  const max = Math.max(...raw);
+  const ranks = raw.map((value) => (max > min ? (value - min) / (max - min) : 0));
+  if (gridRankCache.size >= MAX_SHUFFLES) gridRankCache.delete(gridRankCache.keys().next().value!);
+  gridRankCache.set(key, ranks);
+  return ranks;
+}
+
+/** Ordre d'une spirale qui part du centre et tourne vers l'extérieur. */
+function spiralOrder(columns: number, rows: number): number[] {
+  const order = new Array<number>(columns * rows).fill(-1);
+  const directions: [number, number][] = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+  let x = Math.floor((columns - 1) / 2);
+  let y = Math.floor((rows - 1) / 2);
+  let rank = 0;
+  const visit = () => {
+    if (x >= 0 && x < columns && y >= 0 && y < rows && order[y * columns + x] < 0) order[y * columns + x] = rank++;
+  };
+  visit();
+  for (let step = 1, turn = 0; rank < columns * rows && step <= 2 * (columns + rows); step++) {
+    for (let repeat = 0; repeat < 2; repeat++, turn++) {
+      const [dx, dy] = directions[turn % 4];
+      for (let i = 0; i < step; i++) {
+        x += dx;
+        y += dy;
+        visit();
+      }
+    }
+  }
+  return order;
+}
+
+/** Nombre d'intervalles entre le premier et le dernier départ : rangs distincts, moins un. */
+function distinctSteps(ranks: number[]): number {
+  return Math.max(1, new Set(ranks.map((rank) => Math.round(rank * 1e6))).size - 1);
+}
+
+/**
+ * Départ et durée d'un carreau : comme `unitTiming`, avec le rang que donne
+ * l'ordre de la grille. Le dernier carreau finit avec la phase.
+ */
+export function tileTiming(preset: MotionPreset, grid: MotionGrid, index: number, seed: string): UnitTiming {
+  const count = Math.max(1, Math.round(grid.columns)) * Math.max(1, Math.round(grid.rows));
+  const stagger = preset.stagger;
+  if (!stagger || count <= 1 || stagger.eachMs <= 0) return { delay: 0, span: 1 };
+  const ranks = gridRanks(grid, seed);
+  const unitMs = Math.max(1, preset.durationMs);
+  const total = unitMs + stagger.eachMs * distinctSteps(ranks);
+  const span = unitMs / total;
+  const rank = ranks[Math.min(count - 1, Math.max(0, index))] ?? 0;
+  const spread = clamp01(resolveEase(stagger.ease)(rank));
+  return { delay: spread * (1 - span), span };
+}
+
+/** Nombre de carreaux d'une grille. */
+export function tileCount(grid: MotionGrid): number {
+  return Math.max(1, Math.round(grid.columns)) * Math.max(1, Math.round(grid.rows));
+}
+
+/** Durée naturelle d'une phase en grille, en images : un carreau plus les décalages. */
+export function naturalGridFrames(preset: MotionPreset, fps: number): number {
+  if (!preset.grid || !preset.stagger) return naturalFrames(preset, 1, fps);
+  const steps = distinctSteps(gridRanks(preset.grid, ""));
+  return Math.max(1, Math.round(((preset.durationMs + preset.stagger.eachMs * steps) / 1000) * fps));
+}
+
+// ─── Calques secondaires ─────────────────────────────────────────
+
+/** Préréglage taillé pour chaque calque, gardé : un calque est figé. */
+const layerPresets = new WeakMap<MotionLayer, MotionPreset>();
+
+function layerPreset(preset: MotionPreset, layer: MotionLayer): MotionPreset {
+  let cached = layerPresets.get(layer);
+  if (!cached) {
+    cached = {
+      id: `${preset.id}#${layer.kind}`,
+      label: preset.label,
+      category: preset.category,
+      phase: preset.phase,
+      target: preset.target,
+      durationMs: preset.durationMs,
+      ease: preset.ease,
+      units: "frame",
+      tracks: layer.tracks,
+      origin: layer.origin,
+    };
+    layerPresets.set(layer, cached);
+  }
+  return cached;
+}
+
+/**
+ * État d'un calque à l'avancement `progress` de la phase, le même que celui
+ * de l'élément : un préréglage joué à rebours rejoue aussi ses calques à
+ * rebours. Les réglages d'intensité ne s'y appliquent pas, un calque garde
+ * sa forme.
+ */
+export function sampleLayer(
+  preset: MotionPreset,
+  layer: MotionLayer,
+  progress: number,
+  context: MotionContext = NO_CONTEXT
+): MotionState {
+  const p = Number.isFinite(progress) ? clamp01(progress) : 1;
+  return sampleForward(layerPreset(preset, layer), preset.reversed ? 1 - p : p, undefined, context);
+}
+
+/**
+ * Avancement d'une copie en retard dans une traîne : la copie de rang
+ * `rank` (à partir de 1) part `rank × delay` après l'élément et le rejoint à
+ * la fin de la phase, pour qu'aucune copie ne reste en arrière quand la phase
+ * s'arrête.
+ */
+export function echoProgress(progress: number, rank: number, delay: number): number {
+  const lag = Math.min(0.95, Math.max(0, rank * delay));
+  if (lag <= 0) return progress;
+  return clamp01((progress - lag) / (1 - lag));
 }

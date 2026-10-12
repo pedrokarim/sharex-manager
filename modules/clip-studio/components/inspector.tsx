@@ -18,22 +18,21 @@ import { cn } from "@/lib/utils";
 import { TEXT_PRESETS, videoSpeedPatch } from "../engine/edit";
 import { MAX_SPEED, MIN_SPEED, speedOf } from "../engine/timeline";
 import type {
-  AnimKind,
   AudioItem,
   ClipItem,
   ClipProject,
   ImageItem,
-  Motion,
   ShapeItem,
   TextItem,
   TextStyle,
-  TransitionKind,
   VideoItem,
   VisualItem,
 } from "../engine/types";
 import { FONTS } from "../lib/fonts";
 import type { BrandFontChoice, BrandKitChoice } from "../lib/client";
-import { ANIM_LABELS, DEFAULT_TRANSITION_SECONDS, MOTION_LABELS, TRANSITION_LABELS } from "./timeline";
+import { cameraPatch, transitionPatch } from "../lib/scene-catalog";
+import { AnimationFields } from "./motion-fields";
+import { SceneField } from "./scene-picker";
 
 interface InspectorProps {
   project: ClipProject;
@@ -120,9 +119,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <div className="flex items-center gap-2">{children}</div>
+    <div className="flex min-w-0 items-center justify-between gap-3">
+      <span className="min-w-0 text-xs text-muted-foreground">{label}</span>
+      <div className="flex shrink-0 items-center gap-2">{children}</div>
     </div>
   );
 }
@@ -195,7 +194,7 @@ function Choice<T extends string>({
   return (
     <Row label={label}>
       <Select value={value} onValueChange={(next) => onChange(next as T)}>
-        <SelectTrigger size="sm" className="w-40 text-xs">
+        <SelectTrigger size="sm" className="w-48 max-w-full px-2 text-xs">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -207,6 +206,29 @@ function Choice<T extends string>({
         </SelectContent>
       </Select>
     </Row>
+  );
+}
+
+/** Libellé au-dessus d'un champ qui prend toute la largeur (sélecteur à vignette). */
+function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <span className="block text-xs text-muted-foreground">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+/** Mouvement de caméra d'une image ou d'une vidéo, choisi dans tout le catalogue du moteur. */
+function CameraField({ item, onPatch }: { item: ImageItem | VideoItem; onPatch: InspectorProps["onPatch"] }) {
+  return (
+    <FieldLabel label="Mouvement de caméra">
+      <SceneField
+        kind="camera"
+        value={item.motion ?? "none"}
+        onChange={(id) => onPatch(cameraPatch(item.type, id) as Partial<ClipItem>, "motion")}
+      />
+    </FieldLabel>
   );
 }
 
@@ -246,22 +268,13 @@ function VisualFields({
       </Section>
 
       <Section title="Transition">
-        <Choice
-          label="Depuis le plan précédent"
-          value={item.transition?.kind ?? "none"}
-          options={TRANSITION_LABELS}
-          onChange={(kind: TransitionKind | "none") =>
-            onPatch(
-              {
-                transition:
-                  kind === "none"
-                    ? undefined
-                    : { kind, frames: item.transition?.frames ?? Math.round(DEFAULT_TRANSITION_SECONDS * fps) },
-              } as Partial<ClipItem>,
-              "transition"
-            )
-          }
-        />
+        <FieldLabel label="Depuis le plan précédent">
+          <SceneField
+            kind="transition"
+            value={item.transition?.kind ?? "none"}
+            onChange={(kind) => onPatch(transitionPatch(item, kind, fps) as Partial<ClipItem>, "transition")}
+          />
+        </FieldLabel>
         {item.transition && (
           <Slider label="Durée" unit="s" min={0.2} max={2} step={0.1} value={item.transition.frames / fps}
             onChange={(value) => onPatch({ transition: { ...item.transition!, frames: Math.max(1, Math.round(value * fps)) } } as Partial<ClipItem>, "transition-d")} />
@@ -269,26 +282,7 @@ function VisualFields({
       </Section>
 
       <Section title="Animations">
-        <Choice
-          label="Entrée"
-          value={item.animIn.kind}
-          options={ANIM_LABELS}
-          onChange={(kind: AnimKind) => onPatch({ animIn: { ...item.animIn, kind } } as Partial<ClipItem>, "anim-in")}
-        />
-        {item.animIn.kind !== "none" && (
-          <Slider label="Durée d'entrée" unit="s" min={0.1} max={2} step={0.05} value={item.animIn.frames / fps}
-            onChange={(value) => onPatch({ animIn: { ...item.animIn, frames: Math.max(1, Math.round(value * fps)) } } as Partial<ClipItem>, "anim-in-d")} />
-        )}
-        <Choice
-          label="Sortie"
-          value={item.animOut.kind}
-          options={ANIM_LABELS}
-          onChange={(kind: AnimKind) => onPatch({ animOut: { ...item.animOut, kind } } as Partial<ClipItem>, "anim-out")}
-        />
-        {item.animOut.kind !== "none" && (
-          <Slider label="Durée de sortie" unit="s" min={0.1} max={2} step={0.05} value={item.animOut.frames / fps}
-            onChange={(value) => onPatch({ animOut: { ...item.animOut, frames: Math.max(1, Math.round(value * fps)) } } as Partial<ClipItem>, "anim-out-d")} />
-        )}
+        <AnimationFields item={item} fps={fps} onPatch={onPatch} />
       </Section>
     </>
   );
@@ -422,7 +416,7 @@ function ImageFields({ item, onPatch }: { item: ImageItem; onPatch: InspectorPro
   return (
     <Section title="Image">
       <Choice label="Cadrage" value={item.fit} options={{ cover: "Remplir", contain: "Contenir" }} onChange={(fit) => onPatch({ fit } as Partial<ClipItem>, "fit")} />
-      <Choice label="Mouvement" value={item.motion} options={MOTION_LABELS} onChange={(motion: Motion) => onPatch({ motion } as Partial<ClipItem>, "motion")} />
+      <CameraField item={item} onPatch={onPatch} />
       <Slider label="Coins arrondis" min={0} max={200} step={1} value={item.radius} onChange={(radius) => onPatch({ radius } as Partial<ClipItem>, "radius")} />
     </Section>
   );
@@ -436,6 +430,7 @@ function VideoFields({ item, project, onPatch }: { item: VideoItem; project: Cli
   return (
     <Section title="Vidéo">
       <Choice label="Cadrage" value={item.fit} options={{ cover: "Remplir", contain: "Contenir" }} onChange={(fit) => onPatch({ fit } as Partial<ClipItem>, "fit")} />
+      <CameraField item={item} onPatch={onPatch} />
       <Slider label="Vitesse" unit="×" min={MIN_SPEED} max={MAX_SPEED} step={0.05} value={speedOf(item)} onChange={setSpeed} />
       <div className="grid grid-cols-5 gap-1">
         {[0.5, 1, 1.5, 2, 3].map((speed) => (
@@ -586,7 +581,9 @@ export function ProjectInspector({
                       )}
                     >
                       <BrandKitMark kit={kit} />
-                      <span className="min-w-0 flex-1 truncate">{kit.name}</span>
+                      <span className="min-w-0 flex-1 truncate" title={kit.name}>
+                        {kit.name}
+                      </span>
                       {pending === kit.id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
                       ) : (

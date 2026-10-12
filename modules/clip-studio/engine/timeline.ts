@@ -1,15 +1,24 @@
 /**
  * Calculs de chronologie, purs et partagés entre l'aperçu et l'export.
  *
- * Un élément ne peut pas durer 3 s dans l'aperçu et 3,2 s à l'export : les
+ * Un élément ne peut pas durer 3 s dans l'aperçu et 3,2 s à l'export : les
  * deux passent par ces fonctions.
  */
 
 import { EASINGS } from "./motion/easing";
-import { naturalFrames, restState, sampleTracks } from "./motion/interpret";
+import {
+  effectsAt,
+  naturalFrames,
+  naturalGridFrames,
+  restState,
+  sampleLayer,
+  sampleTracks,
+  type ActiveEffect,
+} from "./motion/interpret";
 import { getPreset } from "./motion/registry";
+import { cameraValues, getCameraMove, getTransition, transitionProgress } from "./motion/scenes";
 import { countUnits, type TextSplit } from "./motion/text-layout";
-import type { MotionParamValues, MotionPhase, MotionPreset, MotionState } from "./motion/types";
+import type { MotionLayer, MotionParamValues, MotionPhase, MotionPreset, MotionState } from "./motion/types";
 import type {
   Anim,
   AnimEmphasis,
@@ -179,10 +188,95 @@ export function splitPhaseAt(item: VisualItem, frame: number): SplitPhase | null
 }
 
 export function animStateAt(item: VisualItem, frame: number): AnimState {
-  const active = activePhaseAt(item, frame);
-  // Texte découpé : chaque unité porte son propre état, le bloc ne bouge pas.
-  if (!active || isSplitText(item, active.preset)) return restState();
+  return stateOfPhase(item, activePhaseAt(item, frame));
+}
+
+function stateOfPhase(item: VisualItem, active: ActivePhase | null): AnimState {
+  // Texte découpé ou grille : chaque unité (ou carreau) porte son propre
+  // état, le bloc ne bouge pas.
+  if (!active || isSplitText(item, active.preset) || active.preset.grid) return restState();
   return sampleTracks(active.preset, active.progress, active.params, { baseColor: baseColorOf(item) });
+}
+
+// ─── Calques et effets ───────────────────────────────────────────
+
+/** Calque à dessiner à une image, avec son état. */
+export interface LayerSample {
+  layer: MotionLayer;
+  state: MotionState;
+  preset: MotionPreset;
+  /** Avancement de la phase qui le porte (1 pour un calque resté après son entrée). */
+  progress: number;
+  params?: MotionParamValues;
+}
+
+/** Tout ce qu'il faut pour dessiner un élément à une image. */
+export interface ItemMotion {
+  /** État du bloc (au repos pour un texte découpé ou une grille). */
+  state: AnimState;
+  /** Phase en cours, ou `null` au repos. */
+  active: ActivePhase | null;
+  /** Calques secondaires, dans leur ordre de déclaration. */
+  layers: LayerSample[];
+  /** Effets actifs de la phase en cours (brouillage, compteur, curseur…). */
+  effects: ActiveEffect[];
+}
+
+const NO_LAYERS: LayerSample[] = [];
+const NO_EFFECTS: ActiveEffect[] = [];
+
+function samplesOf(
+  item: VisualItem,
+  preset: MotionPreset,
+  progress: number,
+  params: MotionParamValues | undefined,
+  only?: (layer: MotionLayer) => boolean
+): LayerSample[] {
+  const samples: LayerSample[] = [];
+  for (const layer of preset.layers ?? []) {
+    if (only && !only(layer)) continue;
+    samples.push({ layer, preset, progress, params, state: sampleLayer(preset, layer, progress, { baseColor: baseColorOf(item) }) });
+  }
+  return samples;
+}
+
+const persists = (layer: MotionLayer) => layer.persist === true;
+
+/**
+ * Calques restés en place hors de leur phase : ceux d'une entrée, à leur
+ * état final, une fois l'entrée finie ; ceux d'une sortie, à leur état de
+ * départ, avant qu'elle commence. Une entrée l'emporte sur une sortie (un
+ * bandeau entré reste jusqu'à ce que sa sortie le reprenne).
+ */
+function standingLayers(item: VisualItem, active: ActivePhase | null): LayerSample[] {
+  const animIn = presetOf(item.animIn, "in");
+  const animOut = presetOf(item.animOut, "out");
+  const fromIn = animIn?.layers?.some(persists) ?? false;
+  const fromOut = animOut?.layers?.some(persists) ?? false;
+  if (!fromIn && !fromOut) return NO_LAYERS;
+  const phase = active?.phase;
+  if (phase === "in") return NO_LAYERS;
+  if (phase === "out") {
+    // La sortie dessine ses propres calques ; sinon, ceux de l'entrée restent.
+    if (animOut?.layers?.length) return NO_LAYERS;
+    return fromIn ? samplesOf(item, animIn!, 1, item.animIn.params, persists) : NO_LAYERS;
+  }
+  if (fromIn) return samplesOf(item, animIn!, 1, item.animIn.params, persists);
+  return samplesOf(item, animOut!, 0, item.animOut.params, persists);
+}
+
+/**
+ * État, calques et effets d'un élément à une image. Un élément sans calque
+ * ni effet rend exactement `animStateAt`, avec des listes vides.
+ */
+export function motionAt(item: VisualItem, frame: number): ItemMotion {
+  const active = activePhaseAt(item, frame);
+  const state = stateOfPhase(item, active);
+  const own = active?.preset.layers?.length ? samplesOf(item, active.preset, active.progress, active.params) : NO_LAYERS;
+  const standing = standingLayers(item, active);
+  const layers = standing.length ? (own.length ? [...standing, ...own] : standing) : own;
+  const effects = active?.preset.effects?.length ? effectsAt(active.preset, active.progress) : NO_EFFECTS;
+  return { state, active, layers, effects };
 }
 
 /**
@@ -202,6 +296,7 @@ export function suggestedAnimFrames(
 ): number {
   const preset = presetOf({ kind, frames: 1 }, phase);
   if (!preset) return 0;
+  if (preset.grid) return naturalGridFrames(preset, fps);
   const split = item.type === "text" ? preset.split ?? "whole" : "whole";
   if (split === "whole" || item.type !== "text") return naturalFrames(preset, 1, fps);
   const text = item.style.uppercase ? item.text.toUpperCase() : item.text;
@@ -215,13 +310,13 @@ export interface TransitionState {
   kind: TransitionKind;
   /** 0 au début de la transition, 1 à la fin (adouci). */
   progress: number;
-  /** Plan qui précède, collé au plan qui arrive ; absent en début de piste. */
+  /** Plan qui précède, collé au plan qui arrive ; absent en début de piste. */
   from: VisualItem | null;
 }
 
 /**
  * Transition en cours pour un plan à l'image donnée, s'il en a une. Le plan
- * précédent doit toucher le plan qui arrive ; sinon on transite depuis le fond.
+ * précédent doit toucher le plan qui arrive ; sinon on transite depuis le fond.
  */
 export function transitionAt(items: VisualItem[], item: VisualItem, frame: number): TransitionState | null {
   const transition = item.transition;
@@ -230,7 +325,9 @@ export function transitionAt(items: VisualItem[], item: VisualItem, frame: numbe
   const local = frame - item.start;
   if (local < 0 || local >= frames) return null;
   const from = items.find((other) => other.id !== item.id && other.start + other.duration === item.start) ?? null;
-  return { kind: transition.kind, progress: ease.inOutSine(clamp01((local + 1) / frames)), from };
+  // Chaque transition adoucit l'avancement par sa courbe ; les cinq d'origine
+  // gardent l'entrée-sortie en sinus de toujours.
+  return { kind: transition.kind, progress: transitionProgress(getTransition(transition.kind), (local + 1) / frames), from };
 }
 
 // ─── Mouvement de caméra ─────────────────────────────────────────
@@ -241,26 +338,32 @@ export interface CameraState {
   /** Décalage du cadrage, en fraction de la marge disponible (-1 à 1). */
   panX: number;
   panY: number;
+  /** Rotation de l'image dans son cadre, en degrés (absente : aucune). */
+  rotate?: number;
+  /** Petit décalage de l'image (secousse), en part de la boîte. */
+  shiftX?: number;
+  shiftY?: number;
+  /** Flou, en part du petit côté de la boîte. */
+  blur?: number;
+  /** Luminosité (1 : inchangée). */
+  brightness?: number;
 }
 
-export function cameraAt(motion: Motion, progress: number): CameraState {
-  const p = ease.inOutSine(clamp01(progress));
-  switch (motion) {
-    case "zoom-in":
-      return { zoom: 1 + 0.15 * p, panX: 0, panY: 0 };
-    case "zoom-out":
-      return { zoom: 1.15 - 0.15 * p, panX: 0, panY: 0 };
-    case "pan-left":
-      return { zoom: 1.12, panX: 1 - 2 * p, panY: 0 };
-    case "pan-right":
-      return { zoom: 1.12, panX: -1 + 2 * p, panY: 0 };
-    case "pan-up":
-      return { zoom: 1.12, panX: 0, panY: 1 - 2 * p };
-    case "pan-down":
-      return { zoom: 1.12, panX: 0, panY: -1 + 2 * p };
-    default:
-      return { zoom: 1, panX: 0, panY: 0 };
-  }
+/**
+ * Cadrage d'une image : `progress` est l'avancement dans le plan (de 0 à 1),
+ * `elapsedMs` le temps écoulé depuis son début (secousse au début du plan,
+ * caméra à l'épaule en boucle). Les mouvements sont dans `motion/scenes.ts` ;
+ * les sept d'origine rendent les mêmes valeurs qu'avant.
+ */
+export function cameraAt(motion: Motion | undefined, progress: number, elapsedMs = 0): CameraState {
+  const values = cameraValues(getCameraMove(motion), progress, elapsedMs);
+  const state: CameraState = { zoom: values.zoom, panX: values.panX, panY: values.panY };
+  if (values.rotate) state.rotate = values.rotate;
+  if (values.shiftX) state.shiftX = values.shiftX;
+  if (values.shiftY) state.shiftY = values.shiftY;
+  if (values.blur > 0) state.blur = values.blur;
+  if (values.brightness !== 1) state.brightness = values.brightness;
+  return state;
 }
 
 /** Vitesses proposées pour une vidéo. */

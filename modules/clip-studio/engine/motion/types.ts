@@ -80,7 +80,12 @@ export type MotionProperty =
   /** Espacement ajouté entre les lettres, en « em ». */
   | "tracking"
   /** Couleur du texte ou du remplissage, interpolée en OKLab. */
-  | "color";
+  | "color"
+  /**
+   * Part montrée par le masque de forme du préréglage (`MotionPreset.mask`),
+   * de 0 (rien) à 1 (tout) : cercle qui s'ouvre, biais, taches, stores.
+   */
+  | "mask";
 
 /**
  * Découpe : part retirée de chaque bord de l'élément, dans l'ordre haut,
@@ -170,6 +175,121 @@ export interface MotionEffect {
 
 export type MotionDirection = "up" | "down" | "left" | "right";
 
+// ─── Masques de forme ────────────────────────────────────────────
+
+/**
+ * Forme du masque qui révèle l'élément, pilotée par la piste `mask` :
+ *
+ * - `circle` : un cercle qui s'ouvre depuis `center` jusqu'au coin le plus loin ;
+ * - `diamond` : la même chose en losange ;
+ * - `diagonal` : un bord droit qui traverse la boîte, incliné de `angle` ;
+ * - `blob` : quelques taches qui s'étendent et se rejoignent, comme de l'encre ;
+ * - `blinds` : des lames horizontales qui s'ouvrent l'une après l'autre ;
+ * - `bars` : des bandes verticales qui s'ouvrent depuis leur milieu ;
+ * - `clock` : un secteur qui tourne comme une aiguille ;
+ * - `tiles` : des carreaux qui apparaissent dans un ordre mélangé.
+ */
+export type MotionMaskShape = "circle" | "diamond" | "diagonal" | "blob" | "blinds" | "bars" | "clock" | "tiles";
+
+export interface MotionMask {
+  shape: MotionMaskShape;
+  /** Centre du cercle, du losange ou de l'horloge, en part de la boîte (0,5 ; 0,5 au milieu). */
+  center?: [number, number];
+  /** Inclinaison du biais, en degrés : 0 balaie de gauche à droite, 90 de haut en bas. */
+  angle?: number;
+  /** Nombre de lames, de bandes, de taches ou de carreaux par côté. */
+  count?: number;
+}
+
+// ─── Calques secondaires ─────────────────────────────────────────
+
+/**
+ * Calque dessiné avec l'élément, derrière ou devant lui :
+ *
+ * - `copy` : une copie de la silhouette, teinte (`color`), floutée ou décalée
+ *   par ses pistes ; c'est la lueur, l'aberration chromatique, l'ombre portée ;
+ * - `echo` : des copies de l'élément lui-même, en retard sur son animation
+ *   (traîne, suiveurs), qui le rejoignent à la fin ;
+ * - `ring` : le contour de la boîte, qui s'élargit (halo, onde, anneau) ;
+ * - `shine` : un reflet, bande de lumière qui traverse la silhouette ;
+ * - `veil` : un voile de couleur posé sur la silhouette (éclair, teinte) ;
+ * - `shadow` : une ombre au sol, sous l'élément ;
+ * - `plate` : un fond (bandeau, étiquette) ; sur un texte qui a un fond, c'est
+ *   ce fond même qui prend la piste du calque ;
+ * - `highlight`, `underline`, `strike` : surligneur, soulignement et trait
+ *   barré qui se tracent ligne après ligne (piste `wipe`).
+ */
+export type MotionLayerKind =
+  | "copy"
+  | "echo"
+  | "ring"
+  | "shine"
+  | "veil"
+  | "shadow"
+  | "plate"
+  | "highlight"
+  | "underline"
+  | "strike";
+
+export interface MotionLayer {
+  kind: MotionLayerKind;
+  /**
+   * Devant ou derrière l'élément. Par défaut, le reflet, le voile, le
+   * soulignement et le trait barré sont devant, le reste derrière.
+   */
+  place?: "behind" | "front";
+  /**
+   * Le calque suit l'état animé de l'élément (position, rotation, échelle) ;
+   * `false` le laisse à la place de repos de l'élément (une ombre au sol ne
+   * monte pas avec lui).
+   */
+  follow?: boolean;
+  /**
+   * Le calque reste, à son état final, une fois la phase finie : un bandeau
+   * posé par une entrée reste sous le titre jusqu'à sa sortie.
+   */
+  persist?: boolean;
+  /**
+   * Pistes du calque. `x` et `y` y sont des parts de la boîte de l'élément,
+   * `scale` agrandit le calque autour de son ancrage, `opacity` multiplie
+   * celle de l'élément (sauf pour l'anneau et l'ombre, qui ont la leur).
+   */
+  tracks: MotionTracks;
+  /** Couleur du calque ; `currentColor` : celle de l'élément. */
+  color?: string;
+  /** Ancrage des échelles du calque, en part de sa boîte (0,5 ; 0,5 : le centre). */
+  origin?: [number, number];
+  /** Réglages propres à chaque sorte de calque (épaisseur, nombre de copies…). */
+  options?: Record<string, number | string | boolean>;
+}
+
+// ─── Grilles ─────────────────────────────────────────────────────
+
+/**
+ * Ordre de départ des carreaux d'une grille : lignes (de haut en bas, un
+ * peu décalées d'une colonne à l'autre), colonnes, diagonale, du centre vers
+ * les bords, en spirale depuis le centre, ou au hasard (reproductible).
+ */
+export type MotionGridOrder = "rows" | "columns" | "diagonal" | "center" | "spiral" | "random";
+
+/**
+ * Élément découpé en carreaux, chacun animé avec un décalage : une image qui
+ * se reconstitue, une liste dont les rangées montent tour à tour. Chaque
+ * carreau suit les pistes du préréglage autour de son propre centre ; le
+ * décalage entre deux carreaux est `stagger.eachMs`.
+ */
+export interface MotionGrid {
+  columns: number;
+  rows: number;
+  order: MotionGridOrder;
+  /**
+   * Une rangée (ou une colonne) sur deux part du côté opposé : les
+   * déplacements horizontaux (`rows`) ou verticaux (`columns`) des carreaux
+   * impairs sont inversés.
+   */
+  alternate?: "rows" | "columns";
+}
+
 /**
  * Réglage exposé dans l'inspecteur.
  *
@@ -230,6 +350,18 @@ export interface MotionPreset {
   /** Réglages exposés : intensité, direction. */
   params?: MotionParam[];
   /**
+   * Point d'ancrage des rotations, échelles et inclinaisons, en part de la
+   * boîte de l'élément (ou de l'unité de texte) : `[0, 1]` est le coin bas
+   * gauche. Absent : le centre.
+   */
+  origin?: [number, number];
+  /** Masque de forme, piloté par la piste `mask`. */
+  mask?: MotionMask;
+  /** Calques secondaires : halo, anneau, reflet, voile, traîne, copies, fond. */
+  layers?: MotionLayer[];
+  /** Élément découpé en carreaux (image, forme, texte en bloc). */
+  grid?: MotionGrid;
+  /**
    * Joué à rebours. Le registre s'en sert pour servir une entrée comme
    * sortie (et l'inverse) quand aucune variante n'est déclarée : le dernier
    * élément entré sort le premier.
@@ -271,6 +403,12 @@ export interface MotionState {
   tracking: number;
   /** Couleur imposée au texte ou au remplissage ; absente : celle de l'élément. */
   color?: string;
+  /** Part montrée par le masque de forme (`maskShape`). */
+  mask: number;
+  /** Masque de forme du préréglage, s'il en a un. */
+  maskShape?: MotionMask;
+  /** Ancrage des transformations, en part de la boîte ; absent : le centre. */
+  origin?: [number, number];
   /** Unité de `x`, `y` et `blur`. */
   unit: MotionUnit;
 }

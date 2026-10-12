@@ -26,19 +26,23 @@ modèle de Clip Studio.
 | A1 | Faite : moteur à pistes (`engine/motion/`), 31 courbes nommées, Bézier, ressorts, marches ; rotation, échelles par axe, inclinaison, flou, luminosité, découpe, couleur ; phase de mise en avant (`animEmphasis`) ; les neuf animations d’origine rendent à l’identique (plus de 10 000 valeurs comparées) |
 | A2 | Faite : 77 préréglages d’éléments (`presets/elements.ts`), qui couvrent 82 fiches ; 81 comparaisons visuelles sur 82 dans les seuils |
 | A3 | Faite : texte découpé par lettre, mot ou ligne (`text-layout.ts`), 7 premiers préréglages (`presets/text.ts`) puis 71 de la bibliothèque (`presets/text-library/`), qui couvrent 78 fiches |
-| A4 à A9 | À faire |
+| A4 | Faite : effets (brouillage et décodage, compteur au format français, curseur de frappe, glitch en tranches), calques secondaires (copie teinte pour la lueur et l’aberration chromatique, traîne, anneau, reflet, voile, ombre au sol, fond, surligneur, soulignement, trait barré), masques de forme (cercle, losange, biais, taches, stores, barres, horloge, mosaïque), ancrage des transformations, espacement par lettre, piste propre du fond du texte (`motion/effects.ts`, `presets/effects.ts`) ; 50 préréglages et la finition de 9 préréglages livrés (traîne de `dash-out` et `spring-in`, lueur de `bloom-in` et `neon-on`, anneaux de `flash-pulse`, `beat` et `refuse`, reflets de `lift` et `star-land`) ; aucun autre projet ne change de rendu (1,4 million d’appels de dessin comparés) |
+| A5 | Faite : transitions, caméra et effets de plan en pistes (`motion/scenes.ts`) ; les cinq transitions et les sept mouvements d’origine rendent les mêmes valeurs (plus de 60 000 comparées), 29 transitions, 12 mouvements de caméra et 8 effets de plan (impact) de plus ; dans l’éditeur depuis le 12/10/2026 : tout le catalogue, rangé par catégorie, dans l’inspecteur et au clic droit de la timeline, avec recherche, favoris et vignettes dessinées par `drawFrame` ; effets de plan posés au clic droit d’une piste, montrés en marques, déplacés en les tirant et réglés dans leur inspecteur (§ 7) |
+| A6 | Faite : 5 mises en avant, 7 boucles (plus 5 boucles lumineuses d’A4) et 8 grilles (`presets/attention.ts`) ; une boucle s’arrête net avec la sortie, calques compris. Les grilles découpent un élément en carreaux décalés ; un décalage entre plusieurs éléments reste celui de leurs débuts sur la timeline |
+| A7 | Faite, sauf la passe d’intégrité visuelle : sélecteur par phase dans l’inspecteur (onglets Entrée, Sortie, Mise en avant), catalogue rangé par catégorie avec recherche sans accents, favoris gardés dans le navigateur, filtre selon le type d’élément ; vignettes dessinées par `drawFrame`, jouées au survol ou au clavier sur une seule horloge, figées au milieu de l’animation si le système réduit les animations ; réglages déclarés dessinés d’après leur forme ; clic droit de la timeline rangé par catégorie avec « Plus d’animations… » ; entrée et sortie teintées aux bords du bloc et réglables en tirant leur poignée (`components/motion-*.tsx`, `lib/motion-catalog.ts`) |
+| A8, A9 | À faire |
 
 Le convertisseur a lu 439 fiches : 108 brouillons prêts, 109 partiels, 222 à reprendre à la main. Ce qui reste attend surtout des capacités du moteur, par ordre de fiches débloquées :
 
 | Besoin | Fiches | Étape |
 | --- | --- | --- |
-| Calques secondaires (halo, anneau, reflet, voile, traîne, copies) | 18 éléments, et la finition de 8 préréglages livrés | A4 |
-| Groupes et grilles (décalage entre plusieurs éléments) | 15 | A6 |
+| Calques secondaires (halo, anneau, reflet, voile, traîne, copies) | 18 éléments, et la finition de 8 préréglages livrés | fait (A4) ; restent les particules et les étincelles |
+| Groupes et grilles (décalage entre plusieurs éléments) | 15 | fait pour les grilles (A6) ; les fiches de tuiles en 3D attendent `rotateY` |
 | 3D (`rotateX`, `rotateY`, perspective) | 5 éléments, 14 textes | plus tard |
-| Brouillage et décodage, compteur, surlignage, soulignement, curseur, lueur, chromatisme | 26 textes | A4 |
-| Espacement par lettre, ancrage de transformation, piste propre du fond | 13 textes, 2 éléments | A4 |
-| Masques de forme (cercle, biais, tache) | 5 éléments, 3 textes | A4 |
-| Réglages « ordre » et « unité de découpe » (`MotionParam`) | évite des doublons de préréglages | A7 |
+| Brouillage et décodage, compteur, surlignage, soulignement, curseur, lueur, chromatisme | 26 textes | fait (A4) ; restent la frappe « humaine » (décalage irrégulier), les afficheurs à segments et le cercle griffonné (tracé) |
+| Espacement par lettre, ancrage de transformation, piste propre du fond | 13 textes, 2 éléments | fait (A4) |
+| Masques de forme (cercle, biais, tache) | 5 éléments, 3 textes | fait (A4), avec losange, stores, barres, horloge et mosaïque ; restent les masques flous |
+| Réglages « ordre » et « unité de découpe » (`MotionParam`) | évite des doublons de préréglages | moteur : à déclarer (l’inspecteur les affiche déjà, A7) |
 | Particules, effets de pixels, police variable, texte sur un chemin | 14 éléments, 25 textes | plus tard |
 
 ## 2. Ce que l’on reprend, et comment
@@ -217,6 +221,46 @@ C’est l’ajout qui change le plus les vidéos.
   aberration de couleur légère. Ils s’appliquent à une piste entière à un
   instant donné ; c’est la catégorie qui manque le plus aux shorts d’action.
 
+### Dans l’éditeur
+
+- **Catalogue** (`lib/scene-catalog.ts`) : les listes du moteur
+  (`listTransitions`, `listCameraMoves`, `listShotFx`), rangées par
+  catégories lisibles (transitions : Fondus, Glissements et poussées,
+  Balayages et formes, Zooms et rotations, Mouvements vifs, Flashs et
+  lumière ; caméra : Zooms, Panoramiques et travellings, Impacts, Mise au
+  point et ambiance ; effets : Flashs et lumière, Secousses et zooms,
+  Couleur). Un préréglage que le moteur ajouterait sans catégorie va dans
+  « Autres » ; un test vérifie qu’il n’y en a aucun aujourd’hui. Les noms
+  sont ceux du moteur ; les cinq transitions et les sept mouvements
+  d’origine gardent le leur. Un identifiant inconnu (projet plus récent)
+  s’affiche « Inconnue (…) » pour une transition, « Inconnu (…) » pour
+  un mouvement ou un effet, sans planter : le moteur le joue comme un
+  fondu, une image fixe ou rien.
+- **Sélecteur** (`components/scene-picker.tsx`) : dans l’inspecteur
+  (« Transition », « Mouvement de caméra » d’une image ou d’une vidéo),
+  dans une fenêtre ouverte depuis la timeline, ou en tiroir sur un
+  téléphone : recherche sans accents, filtres par catégorie, favoris propres
+  à chaque famille (séparés de ceux des animations, dont les identifiants se
+  recoupent), vignettes dessinées par `drawFrame` (`lib/scene-preview.ts`,
+  `components/scene-thumbnail.tsx`) : une transition passe d’un aplat
+  « A » à un aplat « B », un mouvement anime un paysage témoin, un effet
+  le frappe. Choisir une transition pose sa durée conseillée, sauf si la
+  durée a été réglée à la main.
+- **Clic droit de la timeline** : « Transition d’entrée », « Mouvement
+  de caméra » et « Effet de plan ici » sur un plan, « Ajouter un effet
+  de plan ici » sur une piste visuelle, à l’instant visé ; chaque
+  sous-menu range par catégorie, favoris en tête, et finit par le catalogue
+  à vignettes. Sur un téléphone, une seule entrée ouvre le catalogue en
+  tiroir.
+- **Effets de plan** (`components/scene-fx.tsx`) : une marque en haut de
+  la piste, à l’instant de l’effet, prolongée sur sa durée. Un clic ouvre son
+  inspecteur (aperçu, instant, durée de 0,1 à 3 s, « Changer », « À la
+  tête de lecture », « Retirer l’effet ») ; un glissement la déplace
+  (aimantée comme un plan), les flèches la décalent d’une image (d’une
+  seconde avec Maj), Suppr la retire. Une piste verrouillée garde ses effets
+  sans les laisser modifier. Chaque geste est une étape d’annulation ; les
+  curseurs d’un même réglage se regroupent en une seule.
+
 ## 8. Récupérer tout le catalogue, étape par étape
 
 1. **Inventaire** (fait) : les données publiques du catalogue sont chargées
@@ -289,9 +333,37 @@ C’est l’ajout qui change le plus les vidéos.
 | A4 | Effets : flou, lumière, couleur, brouillage, frappe avec curseur, compteur, surlignage | Un compteur « 0 → 1 250 » s’affiche au format français ; un décodage est identique entre l’aperçu et l’export |
 | A5 | Transitions et caméra à pistes, effets de plan (impact) | Les cinq transitions et sept mouvements actuels sont inchangés ; 30 nouveaux |
 | A6 | Mise en avant et boucles (`animEmphasis`) | Une pulsation en boucle s’arrête avec la sortie de l’élément |
-| A7 | Sélecteur avec vignettes animées, recherche, favoris | Passe d’intégrité visuelle réussie |
+| A7 | Sélecteur avec vignettes animées, recherche, favoris | Passe d’intégrité visuelle réussie. Interface faite le 12/10/2026 ; la passe reste à faire |
 | A8 | Mouvement de la marque, préréglages des modèles et de l’assistant | Deux clips d’une même marque ont les mêmes animations de titre |
 | A9 | Texte à adapter : défilement converti en temps, texte sur un chemin, polices variables | Selon ce que les polices du catalogue de Clip Studio permettent |
+
+Ce qui reste après A7 :
+
+- la passe d’intégrité visuelle du sélecteur, de son tiroir mobile et des
+  zones de la timeline (clair et sombre, cinq largeurs, noms longs)
+  avant de déclarer l’étape réussie ;
+- les réglages « ordre » et « unité de découpe » sont à déclarer dans
+  le moteur (`MotionParam`) : l’inspecteur dessine déjà tout réglage à
+  options (`options`) ou à plage (`min`, `max`), sans code nouveau ;
+- la mise en avant se voit sur le bloc de la timeline (trait sous le bloc)
+  mais ne se règle qu’à l’inspecteur ;
+- la question des « essentiels » en tête du sélecteur (§ 13) reste
+  ouverte : les favoris en tiennent lieu pour l’instant.
+
+Ce qui reste après A4 à A6 :
+
+- la comparaison visuelle des nouveaux préréglages s’est faite sur les
+  valeurs relevées dans les fiches (échelles des anneaux, écarts de
+  l’aberration, décalages, durées, courbes : 29 mesures, aucun écart au-delà
+  des seuils), et par planches dessinées avec `drawFrame` ; la capture des
+  démos de référence (§ 8.5) reste à faire pour ces lots ;
+- les nouvelles transitions, la caméra (images et vidéos) et les effets de plan
+  (`Track.effects`) se choisissent dans l’éditeur depuis le 12/10/2026 (§ 7,
+  « Dans l’éditeur ») ;
+- un compteur reprend l’écriture du nombre : « 1 250 » écrit avec une
+  espace fine insécable compte avec elle, « 1250 » sans séparateur ;
+- la dernière image de l’ancien « Zoom » appelait une mise à l’échelle de
+  1,0000000000000002 que la piste ne fait plus : même image au pixel près.
 
 ## 12. Tests
 

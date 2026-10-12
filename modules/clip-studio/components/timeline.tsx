@@ -29,16 +29,28 @@ import {
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatTimecode, projectDuration } from "../engine/timeline";
 import { Waveform } from "./waveform";
-import type { AnimKind, ClipItem, ClipProject, Motion, Track, TransitionKind } from "../engine/types";
+import { MotionPickerDialog, useMotionFavorites } from "./motion-picker";
+import { MotionSubmenu } from "./motion-menu";
+import { pickPatch, presetLabel, resolvePreset, type PickerPhase } from "../lib/motion-catalog";
+import {
+  acceptsShotEffects,
+  addShotEffect,
+  cameraPatch,
+  removeShotEffect,
+  shotEffectFrames,
+  transitionLabel,
+  transitionPatch,
+  updateShotEffect,
+} from "../lib/scene-catalog";
+import { ScenePickerDialog, SceneSubmenu, useSceneFavorites } from "./scene-picker";
+import { ShotFxMarker } from "./scene-fx";
+import type { ClipItem, ClipProject, ShotEffect, Track, VisualItem } from "../engine/types";
 
 export const MEDIA_DRAG_TYPE = "application/x-clip-media";
 
@@ -48,41 +60,16 @@ const ROW_HEIGHT: Record<Track["kind"], number> = { visual: 52, audio: 40 };
 /** Distance d'aimantation, en pixels à l'écran. */
 const SNAP_PX = 8;
 
-export const ANIM_LABELS: Record<AnimKind, string> = {
-  none: "Aucune",
-  fade: "Fondu",
-  "slide-up": "Glisser vers le haut",
-  "slide-down": "Glisser vers le bas",
-  "slide-left": "Glisser vers la gauche",
-  "slide-right": "Glisser vers la droite",
-  pop: "Apparition",
-  zoom: "Zoom",
-  typewriter: "Machine à écrire",
-  wipe: "Balayage",
-};
+/**
+ * Transitions, mouvements de caméra et effets de plan : le catalogue complet
+ * du moteur, rangé par catégorie (`lib/scene-catalog.ts`), proposé au clic
+ * droit et dans l'inspecteur (`components/scene-picker.tsx`).
+ */
 
-/** « none » retire la transition : le plan arrive en coupe franche. */
-export const TRANSITION_LABELS: Record<TransitionKind | "none", string> = {
-  none: "Coupe franche",
-  fade: "Fondu enchaîné",
-  "fade-black": "Fondu au noir",
-  slide: "Glissement",
-  wipe: "Balayage",
-  zoom: "Zoom",
-};
-
-/** Durée par défaut d'une transition, en secondes. */
-export const DEFAULT_TRANSITION_SECONDS = 0.6;
-
-export const MOTION_LABELS: Record<Motion, string> = {
-  none: "Fixe",
-  "zoom-in": "Zoom avant",
-  "zoom-out": "Zoom arrière",
-  "pan-left": "Panoramique vers la gauche",
-  "pan-right": "Panoramique vers la droite",
-  "pan-up": "Panoramique vers le haut",
-  "pan-down": "Panoramique vers le bas",
-};
+/** Ce que la fenêtre du catalogue ouverte depuis la timeline va modifier. */
+type SceneTarget =
+  | { kind: "transition" | "camera"; itemId: string }
+  | { kind: "shotfx"; trackId: string; frame: number };
 
 interface TimelineProps {
   project: ClipProject;
@@ -99,14 +86,49 @@ interface TimelineProps {
   onDuplicate: (itemId: string) => void;
   onDelete: (itemId: string) => void;
   onItemPatch: (itemId: string, patch: Partial<ClipItem>) => void;
-  onTrackPatch: (trackId: string, patch: Partial<Track>) => void;
+  /** `key` regroupe les réglages successifs (curseur d'un effet de plan) en une étape d'annulation. */
+  onTrackPatch: (trackId: string, patch: Partial<Track>, key?: string) => void;
   onDropMedia: (payload: string, trackId: string, frame: number) => void;
 }
 
 type Drag =
   | { kind: "move"; itemId: string; offsetFrames: number; start: number; trackId: string; valid: boolean }
   | { kind: "trim"; itemId: string; edge: "start" | "end" }
+  | { kind: "anim"; itemId: string; phase: "in" | "out"; frames: number }
+  | { kind: "fx"; trackId: string; index: number; at: number; offsetFrames: number; startX: number; moved: boolean }
   | { kind: "scrub" };
+
+/** Durée d'une phase en cours de réglage, montrée sur le bloc avant d'être enregistrée. */
+type AnimOverride = { phase: "in" | "out"; frames: number };
+
+/**
+ * Étendue des phases d'un élément sur la timeline, en images : entrée au
+ * début, sortie à la fin, mise en avant entre les deux. Mêmes bornes que le
+ * moteur (`activePhaseAt`) : l'entrée passe d'abord, la sortie prend ce
+ * qui reste.
+ */
+function phaseSpans(item: VisualItem, override?: AnimOverride | null) {
+  const framesOf = (phase: "in" | "out") => {
+    const anim = phase === "in" ? item.animIn : item.animOut;
+    if (!resolvePreset(anim.kind, phase)) return 0;
+    return override?.phase === phase ? override.frames : anim.frames;
+  };
+  const inFrames = Math.min(Math.max(0, framesOf("in")), item.duration);
+  const outFrames = Math.min(Math.max(0, framesOf("out")), item.duration - inFrames);
+  let emphasis: { start: number; end: number } | null = null;
+  const anim = item.animEmphasis;
+  if (anim && resolvePreset(anim.kind, "emphasis") && anim.frames > 0) {
+    const start = Math.max(inFrames, Math.round(Number(anim.at) || 0));
+    const stop = item.duration - outFrames;
+    const repeat = Math.max(0, Math.round(anim.repeat ?? 1));
+    const end = repeat === 0 ? stop : Math.min(stop, start + repeat * Math.max(1, Math.round(anim.frames)));
+    if (end > start) emphasis = { start, end };
+  }
+  return { inFrames, outFrames, emphasis };
+}
+
+const secondsLabel = (frames: number, fps: number) =>
+  `${(frames / fps).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}\u00a0s`;
 
 /**
  * Timeline multipiste.
@@ -119,6 +141,20 @@ export function Timeline(props: TimelineProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const [ppf, setPpfState] = useState(4); // pixels par image
   const [drag, setDrag] = useState<Drag | null>(null);
+  /** Élément et phase dont le sélecteur complet est ouvert depuis le clic droit. */
+  const [pickerTarget, setPickerTarget] = useState<{ itemId: string; phase: PickerPhase } | null>(null);
+  const { favorites } = useMotionFavorites();
+  /** Transition, mouvement ou effet de plan dont le catalogue complet est ouvert depuis la timeline. */
+  const [sceneTarget, setSceneTarget] = useState<SceneTarget | null>(null);
+  /** Effet de plan dont l'inspecteur est ouvert. */
+  const [openFx, setOpenFx] = useState<{ trackId: string; index: number } | null>(null);
+  /** Image sous le pointeur au dernier clic droit : là où « ici » pose un effet. */
+  const [contextFrame, setContextFrame] = useState(0);
+  /** Vrai quand un glissement de marque vient de finir : le clic qui suit n'ouvre rien. */
+  const fxDragged = useRef(false);
+  const transitionFavorites = useSceneFavorites("transition").favorites;
+  const cameraFavorites = useSceneFavorites("camera").favorites;
+  const shotFxFavorites = useSceneFavorites("shotfx").favorites;
   /** Tant que l'utilisateur n'a pas zoomé lui-même, la timeline suit la durée du clip. */
   const userZoomed = useRef(false);
   const setPpf = (value: number | ((current: number) => number)) => {
@@ -226,7 +262,13 @@ export function Timeline(props: TimelineProps) {
     props.onSelect(item.id);
     if (track.locked) return;
     const edge = (event.target as HTMLElement).dataset.edge as "start" | "end" | undefined;
+    const animEdge = (event.target as HTMLElement).dataset.animEdge as "in" | "out" | undefined;
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    if (animEdge && item.type !== "audio") {
+      const spans = phaseSpans(item);
+      setDrag({ kind: "anim", itemId: item.id, phase: animEdge, frames: animEdge === "in" ? spans.inFrames : spans.outFrames });
+      return;
+    }
     if (edge) {
       setDrag({ kind: "trim", itemId: item.id, edge });
       return;
@@ -252,8 +294,25 @@ export function Timeline(props: TimelineProps) {
       props.onTrim(drag.itemId, drag.edge, Math.round(snap(pointerFrame)));
       return;
     }
+    if (drag.kind === "fx") {
+      // Un effet se cale sur les bords des plans et la tête de lecture, comme un élément.
+      const moved = drag.moved || Math.abs(event.clientX - drag.startX) > 3;
+      const at = Math.max(0, Math.round(snap(pointerFrame - drag.offsetFrames)));
+      if (moved !== drag.moved || at !== drag.at) setDrag({ ...drag, moved, at });
+      return;
+    }
     const item = trackOf(drag.itemId)?.items.find((entry) => entry.id === drag.itemId);
     if (!item) return;
+    if (drag.kind === "anim") {
+      if (item.type === "audio") return;
+      // L'entrée et la sortie se partagent l'élément : chacune garde au moins une image, sans empiéter sur l'autre.
+      const spans = phaseSpans(item);
+      const other = drag.phase === "in" ? spans.outFrames : spans.inFrames;
+      const raw = drag.phase === "in" ? pointerFrame - item.start : item.start + item.duration - pointerFrame;
+      const frames = Math.min(Math.max(1, item.duration - other), Math.max(1, Math.round(raw)));
+      if (frames !== drag.frames) setDrag({ ...drag, frames });
+      return;
+    }
     const kind = item.type === "audio" ? "audio" : "visual";
     const lane = laneAt(event.clientX, event.clientY);
     const laneTrack = project.tracks.find((track) => track.id === lane);
@@ -271,10 +330,74 @@ export function Timeline(props: TimelineProps) {
   };
 
   const onPointerUp = () => {
+    if (drag?.kind === "fx" && drag.moved) {
+      // Une seule modification au lâcher : une seule étape d'annulation.
+      fxDragged.current = true;
+      const track = project.tracks.find((entry) => entry.id === drag.trackId);
+      if (track && Math.round(track.effects?.[drag.index]?.at ?? -1) !== drag.at) {
+        props.onTrackPatch(track.id, { effects: updateShotEffect(track.effects, drag.index, { at: drag.at }, project.fps) });
+      }
+    }
     if (drag?.kind === "move" && drag.valid) props.onMove(drag.itemId, drag.start, drag.trackId);
     if (drag?.kind === "trim") props.onTrimEnd();
+    if (drag?.kind === "anim") {
+      // Une seule modification au lâcher : une seule étape d'annulation.
+      const item = trackOf(drag.itemId)?.items.find((entry) => entry.id === drag.itemId);
+      if (item && item.type !== "audio") {
+        const key = drag.phase === "in" ? "animIn" : "animOut";
+        if (item[key].frames !== drag.frames) {
+          props.onItemPatch(item.id, { [key]: { ...item[key], frames: drag.frames } } as Partial<ClipItem>);
+        }
+      }
+    }
     setDrag(null);
   };
+
+  const pickerItem = pickerTarget
+    ? project.tracks.flatMap((track) => track.items).find((item) => item.id === pickerTarget.itemId)
+    : undefined;
+
+  // ─── Effets de plan ────────────────────────────────────────────
+  const trackById = (trackId: string) => project.tracks.find((track) => track.id === trackId);
+
+  /** Pose un effet sur une piste à l'image `at`, puis ouvre son inspecteur pour le régler. */
+  const addEffect = (trackId: string, kind: string, at: number) => {
+    const track = trackById(trackId);
+    if (!track || !acceptsShotEffects(track)) return;
+    const { effects, index } = addShotEffect(track.effects, kind, at, project.fps);
+    props.onTrackPatch(trackId, { effects });
+    // Le menu se ferme d'abord : sinon le focus qui lui revient refermerait aussitôt l'inspecteur.
+    window.setTimeout(() => setOpenFx({ trackId, index }), 0);
+  };
+
+  const patchEffect = (trackId: string, index: number, patch: Partial<ShotEffect>, key?: string) => {
+    const track = trackById(trackId);
+    if (!track || track.locked) return;
+    props.onTrackPatch(
+      trackId,
+      { effects: updateShotEffect(track.effects, index, patch, project.fps) },
+      key ? `shot-fx-${trackId}-${index}-${key}` : undefined
+    );
+  };
+
+  const removeEffect = (trackId: string, index: number) => {
+    const track = trackById(trackId);
+    if (!track || track.locked) return;
+    setOpenFx(null);
+    props.onTrackPatch(trackId, { effects: removeShotEffect(track.effects, index) });
+  };
+
+  // Un effet ouvert qui disparaît (annulation, piste retirée) referme son inspecteur.
+  const openFxExists = openFx ? Boolean(trackById(openFx.trackId)?.effects?.[openFx.index]) : true;
+  useEffect(() => {
+    if (!openFxExists) setOpenFx(null);
+  }, [openFxExists]);
+
+  const sceneItem =
+    sceneTarget && sceneTarget.kind !== "shotfx"
+      ? project.tracks.flatMap((track) => track.items).find((item) => item.id === sceneTarget.itemId)
+      : undefined;
+  const sceneFavorites = { transition: transitionFavorites, camera: cameraFavorites, shotfx: shotFxFavorites };
 
   // ─── Règle ─────────────────────────────────────────────────────
   const ticks = useMemo(() => {
@@ -298,14 +421,14 @@ export function Timeline(props: TimelineProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* ─── Barre d'outils ────────────────────────────────────── */}
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b px-2">
+      <div className="flex h-11 min-w-0 shrink-0 items-center gap-1 border-b px-2">
         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={props.onTogglePlay} aria-label={playing ? "Pause" : "Lecture"}>
           {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </Button>
-        <span className="min-w-36 px-1 font-mono text-xs tabular-nums text-muted-foreground">
+        <span className="shrink-0 px-1 font-mono text-xs tabular-nums text-muted-foreground sm:min-w-36">
           <span className="text-foreground">{formatTimecode(frame, project.fps)}</span> / {formatTimecode(duration, project.fps)}
         </span>
-        <span aria-hidden className="mx-1 h-5 w-px bg-border" />
+        <span aria-hidden className="mx-1 h-5 w-px bg-border max-sm:hidden" />
         <ToolButton label="Scinder à la tête de lecture (S)" disabled={!selectedItem} onClick={() => selectedItem && props.onSplit(selectedItem.id)}>
           <Scissors className="h-4 w-4" />
         </ToolButton>
@@ -315,22 +438,25 @@ export function Timeline(props: TimelineProps) {
         <ToolButton label="Supprimer (Suppr)" disabled={!selectedItem} onClick={() => selectedItem && props.onDelete(selectedItem.id)}>
           <Trash2 className="h-4 w-4" />
         </ToolButton>
-        <div className="ml-auto flex items-center gap-1">
-          <ToolButton label="Dézoomer (-)" onClick={() => setPpf((value) => Math.max(0.3, value / 1.4))}>
-            <Minus className="h-4 w-4" />
-          </ToolButton>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={Math.round((Math.log(ppf / 0.3) / Math.log(20 / 0.3)) * 100)}
-            onChange={(event) => setPpf(0.3 * Math.pow(20 / 0.3, Number(event.target.value) / 100))}
-            className="w-28 accent-primary"
-            aria-label="Zoom de la timeline"
-          />
-          <ToolButton label="Zoomer (+)" onClick={() => setPpf((value) => Math.min(20, value * 1.4))}>
-            <Plus className="h-4 w-4" />
-          </ToolButton>
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          {/* Téléphone : pas la place pour la glissière ; « Ajuster » cadre toute la timeline. */}
+          <span className="flex items-center gap-1 max-sm:hidden">
+            <ToolButton label="Dézoomer (-)" onClick={() => setPpf((value) => Math.max(0.3, value / 1.4))}>
+              <Minus className="h-4 w-4" />
+            </ToolButton>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round((Math.log(ppf / 0.3) / Math.log(20 / 0.3)) * 100)}
+              onChange={(event) => setPpf(0.3 * Math.pow(20 / 0.3, Number(event.target.value) / 100))}
+              className="w-28 accent-primary"
+              aria-label="Zoom de la timeline"
+            />
+            <ToolButton label="Zoomer (+)" onClick={() => setPpf((value) => Math.min(20, value * 1.4))}>
+              <Plus className="h-4 w-4" />
+            </ToolButton>
+          </span>
           <Button
             variant="ghost"
             size="sm"
@@ -377,44 +503,119 @@ export function Timeline(props: TimelineProps) {
           {project.tracks.map((track) => (
             <div key={track.id} className="flex border-b" style={{ height: ROW_HEIGHT[track.kind] }}>
               <TrackHeader track={track} onPatch={(patch) => props.onTrackPatch(track.id, patch)} />
-              <div
-                data-lane-id={track.id}
-                className={cn("relative flex-1", track.kind === "audio" ? "bg-emerald-500/[0.03]" : "bg-transparent")}
-                onPointerDown={(event) => {
-                  if (event.target === event.currentTarget) {
-                    props.onSelect(null);
-                    props.onSeek(Math.round(frameAtClientX(event.clientX)));
-                  }
-                }}
-                onDragOver={(event) => {
-                  if (event.dataTransfer.types.includes(MEDIA_DRAG_TYPE)) {
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "copy";
-                  }
-                }}
-                onDrop={(event) => {
-                  const payload = event.dataTransfer.getData(MEDIA_DRAG_TYPE);
-                  if (!payload) return;
-                  event.preventDefault();
-                  props.onDropMedia(payload, track.id, Math.round(snap(frameAtClientX(event.clientX))));
-                }}
-              >
-                {track.items.map((item) => {
-                  const ghost = drag?.kind === "move" && drag.itemId === item.id ? drag : null;
-                  return (
-                    <TimelineItem
-                      key={item.id}
-                      item={item}
-                      track={track}
-                      ppf={ppf}
-                      selected={item.id === selectedId}
-                      dimmed={Boolean(ghost)}
-                      onPointerDown={(event) => onItemPointerDown(event, item, track)}
-                      {...props}
+              <ContextMenu>
+                <ContextMenuTrigger asChild disabled={track.kind !== "visual"}>
+                  <div
+                    data-lane-id={track.id}
+                    className={cn("relative flex-1", track.kind === "audio" ? "bg-emerald-500/[0.03]" : "bg-transparent")}
+                    // Le clic droit (ou l'appui long) retient l'instant visé, que l'on soit sur la piste ou sur un plan.
+                    onContextMenu={(event) => setContextFrame(Math.round(frameAtClientX(event.clientX)))}
+                    onPointerDown={(event) => {
+                      if (event.target === event.currentTarget) {
+                        props.onSelect(null);
+                        props.onSeek(Math.round(frameAtClientX(event.clientX)));
+                      }
+                    }}
+                    onDragOver={(event) => {
+                      if (event.dataTransfer.types.includes(MEDIA_DRAG_TYPE)) {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "copy";
+                      }
+                    }}
+                    onDrop={(event) => {
+                      const payload = event.dataTransfer.getData(MEDIA_DRAG_TYPE);
+                      if (!payload) return;
+                      event.preventDefault();
+                      props.onDropMedia(payload, track.id, Math.round(snap(frameAtClientX(event.clientX))));
+                    }}
+                  >
+                    {track.items.map((item) => {
+                      const ghost = drag?.kind === "move" && drag.itemId === item.id ? drag : null;
+                      return (
+                        <TimelineItem
+                          key={item.id}
+                          item={item}
+                          track={track}
+                          ppf={ppf}
+                          selected={item.id === selectedId}
+                          dimmed={Boolean(ghost)}
+                          animOverride={drag?.kind === "anim" && drag.itemId === item.id ? drag : null}
+                          favorites={favorites}
+                          sceneFavorites={sceneFavorites}
+                          contextFrame={contextFrame}
+                          onOpenPicker={(phase) => setPickerTarget({ itemId: item.id, phase })}
+                          onOpenScene={(target) => window.setTimeout(() => setSceneTarget(target), 0)}
+                          onAddEffect={(kind, at) => addEffect(track.id, kind, at)}
+                          onPointerDown={(event) => onItemPointerDown(event, item, track)}
+                          {...props}
+                        />
+                      );
+                    })}
+                    {track.kind === "visual" &&
+                      track.effects?.map((effect, index) => {
+                        const dragging = drag?.kind === "fx" && drag.trackId === track.id && drag.index === index ? drag : null;
+                        const at = dragging ? dragging.at : Math.round(effect.at);
+                        return (
+                          <ShotFxMarker
+                            key={index}
+                            effect={dragging ? { ...effect, at } : effect}
+                            fps={project.fps}
+                            maxFrame={Math.max(duration - 1, 0)}
+                            playhead={frame}
+                            locked={Boolean(track.locked)}
+                            left={at * ppf}
+                            width={shotEffectFrames(effect, project.fps) * ppf}
+                            open={!dragging && openFx?.trackId === track.id && openFx.index === index}
+                            onOpenChange={(open) => setOpenFx(open ? { trackId: track.id, index } : null)}
+                            onPointerDown={(event) => {
+                              if (event.button !== 0) return;
+                              event.stopPropagation();
+                              fxDragged.current = false;
+                              if (track.locked) return;
+                              event.currentTarget.setPointerCapture(event.pointerId);
+                              setDrag({
+                                kind: "fx",
+                                trackId: track.id,
+                                index,
+                                at,
+                                offsetFrames: frameAtClientX(event.clientX) - at,
+                                startX: event.clientX,
+                                moved: false,
+                              });
+                            }}
+                            consumeDrag={() => {
+                              const dragged = fxDragged.current;
+                              fxDragged.current = false;
+                              return dragged;
+                            }}
+                            onNudge={(delta) => patchEffect(track.id, index, { at: at + delta }, "nudge")}
+                            onChange={(patch, key) => patchEffect(track.id, index, patch, key)}
+                            onRemove={() => removeEffect(track.id, index)}
+                          />
+                        );
+                      })}
+                  </div>
+                </ContextMenuTrigger>
+                {track.kind === "visual" && (
+                  <ContextMenuContent className="w-72">
+                    <ContextMenuLabel className="truncate text-[11px] font-normal text-muted-foreground" title={track.name}>
+                      {track.name} · {formatTimecode(contextFrame, project.fps)}
+                    </ContextMenuLabel>
+                    <SceneSubmenu
+                      kind="shotfx"
+                      label="Ajouter un effet de plan ici"
+                      hint=""
+                      disabled={!acceptsShotEffects(track)}
+                      favorites={shotFxFavorites}
+                      onPick={(kind) => addEffect(track.id, kind, contextFrame)}
+                      onMore={() => window.setTimeout(() => setSceneTarget({ kind: "shotfx", trackId: track.id, frame: contextFrame }), 0)}
                     />
-                  );
-                })}
-              </div>
+                    {track.locked && (
+                      <p className="px-2 py-1 text-[11px] leading-4 text-muted-foreground">Piste verrouillée&nbsp;: déverrouillez-la pour y poser un effet.</p>
+                    )}
+                  </ContextMenuContent>
+                )}
+              </ContextMenu>
             </div>
           ))}
 
@@ -451,6 +652,49 @@ export function Timeline(props: TimelineProps) {
           </div>
         </div>
       </div>
+
+      {sceneTarget?.kind === "shotfx" && (
+        <ScenePickerDialog
+          open
+          onOpenChange={(open) => !open && setSceneTarget(null)}
+          kind="shotfx"
+          title={`Effet de plan à ${formatTimecode(sceneTarget.frame, project.fps)}`}
+          value={undefined}
+          onPick={(kind) => addEffect(sceneTarget.trackId, kind, sceneTarget.frame)}
+        />
+      )}
+      {sceneTarget && sceneTarget.kind !== "shotfx" && sceneItem && sceneItem.type !== "audio" && (
+        <ScenePickerDialog
+          open
+          onOpenChange={(open) => !open && setSceneTarget(null)}
+          kind={sceneTarget.kind}
+          value={sceneTarget.kind === "transition" ? sceneItem.transition?.kind : "motion" in sceneItem ? sceneItem.motion : undefined}
+          onPick={(id) => {
+            if (sceneTarget.kind === "transition") {
+              props.onItemPatch(sceneItem.id, transitionPatch(sceneItem, id, project.fps) as Partial<ClipItem>);
+            } else if (sceneItem.type === "image" || sceneItem.type === "video") {
+              props.onItemPatch(sceneItem.id, cameraPatch(sceneItem.type, id) as Partial<ClipItem>);
+            }
+          }}
+        />
+      )}
+
+      {pickerTarget && pickerItem && pickerItem.type !== "audio" && (
+        <MotionPickerDialog
+          open
+          onOpenChange={(open) => !open && setPickerTarget(null)}
+          phase={pickerTarget.phase}
+          itemType={pickerItem.type}
+          value={
+            pickerTarget.phase === "in"
+              ? pickerItem.animIn.kind
+              : pickerTarget.phase === "out"
+                ? pickerItem.animOut.kind
+                : pickerItem.animEmphasis?.kind
+          }
+          onPick={(kind) => props.onItemPatch(pickerItem.id, pickPatch(pickerItem, pickerTarget.phase, kind, project.fps) as Partial<ClipItem>)}
+        />
+      )}
     </div>
   );
 }
@@ -491,7 +735,9 @@ function TrackHeader({ track, onPatch }: { track: Track; onPatch: (patch: Partia
       ) : (
         <Film className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       )}
-      <span className="min-w-0 flex-1 truncate text-xs font-medium">{track.name}</span>
+      <span className="min-w-0 flex-1 truncate text-xs font-medium" title={track.name}>
+        {track.name}
+      </span>
       {track.kind === "visual" ? (
         <HeaderToggle label={track.hidden ? "Afficher la piste" : "Masquer la piste"} active={Boolean(track.hidden)} onClick={() => onPatch({ hidden: !track.hidden })}>
           {track.hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -564,6 +810,13 @@ function TimelineItem({
   ppf,
   selected,
   dimmed,
+  animOverride,
+  favorites,
+  sceneFavorites,
+  contextFrame,
+  onOpenPicker,
+  onOpenScene,
+  onAddEffect,
   onPointerDown,
   ...props
 }: {
@@ -572,11 +825,34 @@ function TimelineItem({
   ppf: number;
   selected: boolean;
   dimmed: boolean;
+  /** Durée d'entrée ou de sortie en cours de réglage au bord du bloc. */
+  animOverride: AnimOverride | null;
+  favorites: string[];
+  sceneFavorites: Record<"transition" | "camera" | "shotfx", string[]>;
+  /** Image visée par le dernier clic droit. */
+  contextFrame: number;
+  onOpenPicker: (phase: PickerPhase) => void;
+  onOpenScene: (target: SceneTarget) => void;
+  onAddEffect: (kind: string, at: number) => void;
   onPointerDown: (event: React.PointerEvent) => void;
 } & TimelineProps) {
   const Icon = ITEM_ICON[item.type];
   const width = Math.max(4, item.duration * ppf);
   const thumbnail = item.type === "image" ? item.source.url : null;
+  const fps = props.project.fps;
+  const spans = item.type === "audio" ? null : phaseSpans(item, animOverride);
+  const inWidth = spans ? Math.min(width, spans.inFrames * ppf) : 0;
+  const outWidth = spans ? Math.min(width - inWidth, spans.outFrames * ppf) : 0;
+  // Les poignées de durée ne paraissent que sur l'élément sélectionné, assez large pour les distinguer des bords.
+  const showAnimHandles = selected && !track.locked && width >= 48;
+  /** Poignée tenue loin des bords de l'élément, que gardent les poignées de rognage. */
+  const handleLeft = (x: number) => Math.min(width - 12, Math.max(12, x));
+  const pickAnim = (phase: PickerPhase) => (kind: string) => {
+    if (item.type === "audio") return;
+    props.onItemPatch(item.id, pickPatch(item, phase, kind, fps) as Partial<ClipItem>);
+  };
+  // Le menu se ferme avant que la fenêtre s'ouvre : sinon le focus rendu au menu la referme aussitôt.
+  const openPicker = (phase: PickerPhase) => () => window.setTimeout(() => onOpenPicker(phase), 0);
 
   return (
     <ContextMenu>
@@ -606,13 +882,60 @@ function TimelineItem({
             // Étendue de la transition d'entrée, au début du plan.
             <span
               aria-hidden
-              title={TRANSITION_LABELS[item.transition.kind]}
+              title={`Transition : ${transitionLabel(item.transition.kind)}`}
               className="absolute inset-y-0 left-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.28),transparent)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.22),transparent)]"
               style={{ width: Math.min(width, item.transition.frames * ppf) }}
             />
           )}
+          {item.type !== "audio" && spans && (
+            <>
+              {/* Phases d'animation : zones légèrement teintées aux bords, mise en avant soulignée. */}
+              {inWidth > 0 && (
+                <span
+                  title={`Entrée : ${presetLabel(item.animIn.kind, "in")} · ${secondsLabel(spans.inFrames, fps)}`}
+                  className="absolute inset-y-0 left-0 bg-foreground/[0.09] dark:bg-foreground/[0.11]"
+                  style={{ width: inWidth }}
+                />
+              )}
+              {outWidth > 0 && (
+                <span
+                  title={`Sortie : ${presetLabel(item.animOut.kind, "out")} · ${secondsLabel(spans.outFrames, fps)}`}
+                  className="absolute inset-y-0 right-0 bg-foreground/[0.09] dark:bg-foreground/[0.11]"
+                  style={{ width: outWidth }}
+                />
+              )}
+              {spans.emphasis && (
+                <span
+                  title={`Mise en avant : ${presetLabel(item.animEmphasis?.kind, "emphasis")}`}
+                  className="absolute bottom-0.5 h-0.5 rounded-full bg-foreground/35"
+                  style={{
+                    left: Math.min(width, spans.emphasis.start * ppf),
+                    width: Math.max(2, Math.min(width, spans.emphasis.end * ppf) - Math.min(width, spans.emphasis.start * ppf)),
+                  }}
+                />
+              )}
+            </>
+          )}
           <Icon className="relative h-3.5 w-3.5 shrink-0" />
-          <span className="relative truncate font-medium">{itemLabel(item)}</span>
+          <span className="relative min-w-0 truncate font-medium" title={itemLabel(item)}>
+            {itemLabel(item)}
+          </span>
+          {showAnimHandles && inWidth > 0 && (
+            <span
+              data-anim-edge="in"
+              title="Durée de l’entrée : tirer pour la régler"
+              className="absolute inset-y-1.5 z-[1] w-1.5 -translate-x-1/2 cursor-col-resize rounded-full bg-foreground/30 transition-colors hover:bg-foreground/60"
+              style={{ left: handleLeft(inWidth) }}
+            />
+          )}
+          {showAnimHandles && outWidth > 0 && (
+            <span
+              data-anim-edge="out"
+              title="Durée de la sortie : tirer pour la régler"
+              className="absolute inset-y-1.5 z-[1] w-1.5 -translate-x-1/2 cursor-col-resize rounded-full bg-foreground/30 transition-colors hover:bg-foreground/60"
+              style={{ left: handleLeft(width - outWidth) }}
+            />
+          )}
           {!track.locked && (
             <>
               <span data-edge="start" className="absolute inset-y-0 left-0 w-2 cursor-ew-resize bg-foreground/0 transition-colors hover:bg-foreground/25" />
@@ -621,7 +944,7 @@ function TimelineItem({
           )}
         </motion.div>
       </ContextMenuTrigger>
-      <ContextMenuContent className="w-60">
+      <ContextMenuContent className="w-72">
         <ContextMenuItem onClick={() => props.onSplit(item.id)}>
           <Scissors className="mr-2 h-4 w-4" />
           Scinder à la tête de lecture
@@ -633,43 +956,63 @@ function TimelineItem({
         {item.type !== "audio" && (
           <>
             <ContextMenuSeparator />
-            <AnimSubmenu label="Animation d'entrée" value={item.animIn.kind} onPick={(kind) => props.onItemPatch(item.id, { animIn: { ...item.animIn, kind } } as Partial<ClipItem>)} />
-            <AnimSubmenu label="Animation de sortie" value={item.animOut.kind} onPick={(kind) => props.onItemPatch(item.id, { animOut: { ...item.animOut, kind } } as Partial<ClipItem>)} />
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>Transition d&apos;entrée</ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-56">
-                {(Object.keys(TRANSITION_LABELS) as (TransitionKind | "none")[]).map((kind) => (
-                  <ContextMenuItem
-                    key={kind}
-                    onClick={() =>
-                      props.onItemPatch(item.id, {
-                        transition:
-                          kind === "none"
-                            ? undefined
-                            : { kind, frames: item.transition?.frames ?? Math.round(DEFAULT_TRANSITION_SECONDS * props.project.fps) },
-                      } as Partial<ClipItem>)
-                    }
-                  >
-                    <span className="flex-1">{TRANSITION_LABELS[kind]}</span>
-                    {(item.transition?.kind ?? "none") === kind && <span className="text-primary">•</span>}
-                  </ContextMenuItem>
-                ))}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
+            <MotionSubmenu
+              label="Animation d’entrée"
+              phase="in"
+              itemType={item.type}
+              value={item.animIn.kind}
+              favorites={favorites}
+              onPick={pickAnim("in")}
+              onMore={openPicker("in")}
+            />
+            <MotionSubmenu
+              label="Animation de sortie"
+              phase="out"
+              itemType={item.type}
+              value={item.animOut.kind}
+              favorites={favorites}
+              onPick={pickAnim("out")}
+              onMore={openPicker("out")}
+            />
+            <MotionSubmenu
+              label="Mise en avant"
+              phase="emphasis"
+              itemType={item.type}
+              value={item.animEmphasis?.kind}
+              favorites={favorites}
+              onPick={pickAnim("emphasis")}
+              onMore={openPicker("emphasis")}
+            />
+            <SceneSubmenu
+              kind="transition"
+              label="Transition d’entrée"
+              value={item.transition?.kind ?? "none"}
+              favorites={sceneFavorites.transition}
+              onPick={(kind) => props.onItemPatch(item.id, transitionPatch(item, kind, fps) as Partial<ClipItem>)}
+              onMore={() => onOpenScene({ kind: "transition", itemId: item.id })}
+            />
           </>
         )}
-        {item.type === "image" && (
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>Mouvement de caméra</ContextMenuSubTrigger>
-            <ContextMenuSubContent className="w-56">
-              {(Object.keys(MOTION_LABELS) as Motion[]).map((motionKind) => (
-                <ContextMenuItem key={motionKind} onClick={() => props.onItemPatch(item.id, { motion: motionKind } as Partial<ClipItem>)}>
-                  <span className="flex-1">{MOTION_LABELS[motionKind]}</span>
-                  {item.motion === motionKind && <span className="text-primary">•</span>}
-                </ContextMenuItem>
-              ))}
-            </ContextMenuSubContent>
-          </ContextMenuSub>
+        {(item.type === "image" || item.type === "video") && (
+          <SceneSubmenu
+            kind="camera"
+            label="Mouvement de caméra"
+            value={item.motion ?? "none"}
+            favorites={sceneFavorites.camera}
+            onPick={(id) => props.onItemPatch(item.id, cameraPatch(item.type as "image" | "video", id) as Partial<ClipItem>)}
+            onMore={() => onOpenScene({ kind: "camera", itemId: item.id })}
+          />
+        )}
+        {track.kind === "visual" && (
+          <SceneSubmenu
+            kind="shotfx"
+            label="Effet de plan ici"
+            hint={formatTimecode(contextFrame, fps)}
+            disabled={!acceptsShotEffects(track)}
+            favorites={sceneFavorites.shotfx}
+            onPick={(kind) => onAddEffect(kind, contextFrame)}
+            onMore={() => onOpenScene({ kind: "shotfx", trackId: track.id, frame: contextFrame })}
+          />
         )}
         <ContextMenuSeparator />
         <ContextMenuItem variant="destructive" onClick={() => props.onDelete(item.id)}>
@@ -678,30 +1021,5 @@ function TimelineItem({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  );
-}
-
-function AnimSubmenu({
-  label,
-  value,
-  onPick,
-}: {
-  label: string;
-  value: AnimKind;
-  onPick: (kind: AnimKind) => void;
-}) {
-  return (
-    <ContextMenuSub>
-      <ContextMenuSubTrigger>{label}</ContextMenuSubTrigger>
-      <ContextMenuSubContent className="w-56">
-        <ContextMenuLabel className="text-[11px] font-normal text-muted-foreground">{label}</ContextMenuLabel>
-        {(Object.keys(ANIM_LABELS) as AnimKind[]).map((kind) => (
-          <ContextMenuItem key={kind} onClick={() => onPick(kind)}>
-            <span className="flex-1">{ANIM_LABELS[kind]}</span>
-            {value === kind && <span className="text-primary">•</span>}
-          </ContextMenuItem>
-        ))}
-      </ContextMenuSubContent>
-    </ContextMenuSub>
   );
 }

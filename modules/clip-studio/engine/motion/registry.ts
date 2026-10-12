@@ -14,6 +14,8 @@ import { LEGACY_PRESETS } from "./presets/legacy";
 import { TEXT_PRESETS } from "./presets/text";
 import { ELEMENT_PRESETS } from "./presets/elements";
 import { TEXT_LIBRARY_PRESETS } from "./presets/text-library";
+import { EFFECT_PRESETS } from "./presets/effects";
+import { ATTENTION_PRESETS } from "./presets/attention";
 import type { MotionCategory, MotionPhase, MotionPreset, MotionTarget } from "./types";
 
 const presets = new Map<string, MotionPreset>();
@@ -38,6 +40,8 @@ registerPresets(LEGACY_PRESETS);
 registerPresets(TEXT_PRESETS);
 registerPresets(ELEMENT_PRESETS);
 registerPresets(TEXT_LIBRARY_PRESETS);
+registerPresets(EFFECT_PRESETS);
+registerPresets(ATTENTION_PRESETS);
 
 const OPPOSITE: Partial<Record<MotionPhase, MotionPhase>> = { in: "out", out: "in" };
 

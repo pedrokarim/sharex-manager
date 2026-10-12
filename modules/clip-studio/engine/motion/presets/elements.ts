@@ -1,18 +1,18 @@
 /**
- * Préréglages d'éléments : images, vidéos, formes et textes en bloc.
+ * Préréglages d'éléments : images, vidéos, formes et textes en bloc.
  *
  * Entrées, sorties, mises en avant et boucles d'un élément entier. Les
- * longueurs sont des fractions du petit côté du cadre (`units: "frame"`) :
- * une entrée « depuis la gauche » parcourt la même part de l'image en 9:16
- * comme en 16:9. Les durées sont celles d'une lecture confortable ; la durée
+ * longueurs sont des fractions du petit côté du cadre (`units: "frame"`) :
+ * une entrée « depuis la gauche » parcourt la même part de l'image en 9:16
+ * comme en 16:9. Les durées sont celles d'une lecture confortable ; la durée
  * choisie dans l'inspecteur étire ou resserre l'animation sans la changer.
  *
  * Les mouvements qui ne se décrivent pas en deux ou trois images clés
  * (ressorts, oscillations amorties, étirement selon la vitesse) sont
- * échantillonnés une fois, au chargement : le préréglage reste une donnée
+ * échantillonnés une fois, au chargement : le préréglage reste une donnée
  * figée, lue par l'interpréteur comme les autres.
  *
- * Tous les éléments pivotent et changent d'échelle autour de leur centre :
+ * Tous les éléments pivotent et changent d'échelle autour de leur centre :
  * le moteur n'a pas de point de pivot réglable.
  */
 
@@ -24,6 +24,7 @@ import type {
   KeyframeValue,
   MotionCategory,
   MotionDirection,
+  MotionLayer,
   MotionParam,
   MotionPhase,
   MotionPreset,
@@ -33,7 +34,7 @@ import type {
 
 // ─── Courbes ─────────────────────────────────────────────────────
 
-/** Entrée-sortie appuyée : démarre et s'arrête en douceur, très vive au milieu. */
+/** Entrée-sortie appuyée : démarre et s'arrête en douceur, très vive au milieu. */
 const SMOOTH: EaseSpec = { bezier: [0.65, 0, 0.35, 1] };
 /** Départ très vif, arrivée qui n'en finit pas de se poser. */
 const SNAP: EaseSpec = { bezier: [0.16, 1, 0.3, 1] };
@@ -43,7 +44,7 @@ const OVERSHOOT: EaseSpec = { bezier: [0.34, 1.56, 0.64, 1] };
 const PULLBACK: EaseSpec = { bezier: [0.36, 0, 0.66, -0.56] };
 /** Recul au départ, dépassement à l'arrivée. */
 const ANTICIPATE: EaseSpec = { bezier: [0.68, -0.6, 0.32, 1.6] };
-/** Freinage d'une toupie : vite tout de suite, puis un long ralenti. */
+/** Freinage d'une toupie : vite tout de suite, puis un long ralenti. */
 const BRAKE: EaseSpec = { bezier: [0.3, 0.45, 0.15, 1] };
 
 const smooth = cubicBezier(0.65, 0, 0.35, 1);
@@ -52,7 +53,7 @@ const pullback = cubicBezier(0.36, 0, 0.66, -0.56);
 
 // ─── Outils ──────────────────────────────────────────────────────
 
-/** Arrondi à 1e-5 ; « || 0 » chasse le zéro négatif. */
+/** Arrondi à 1e-5 ; « || 0 » chasse le zéro négatif. */
 const round = (value: number) => Math.round(value * 1e5) / 1e5 || 0;
 
 /** Image clé. */
@@ -70,7 +71,7 @@ function sampled(fn: (p: number) => number, count: number, from = 0, to = 1): Ke
   });
 }
 
-/** Ressort amorti de masse 1 : courbe, durée de stabilisation et position à un instant. */
+/** Ressort amorti de masse 1 : courbe, durée de stabilisation et position à un instant. */
 function spring(stiffness: number, damping: number) {
   const options = { mass: 1, stiffness, damping };
   const seconds = springSettleSeconds(options);
@@ -83,7 +84,7 @@ function spring(stiffness: number, damping: number) {
   };
 }
 
-/** Une période de sinus : repos, sommet, repos, creux, repos (pour les boucles). */
+/** Une période de sinus : repos, sommet, repos, creux, repos (pour les boucles). */
 function wave(amplitude: number, rest = 0): Keyframe[] {
   return [
     k(0, rest),
@@ -96,7 +97,7 @@ function wave(amplitude: number, rest = 0): Keyframe[] {
 
 /**
  * Oscillation amortie `amplitude·e^(−decay·t)·sin(2πt/period)` sur `total`
- * secondes, en images clés aux quarts de période : un sinus entre deux, ce
+ * secondes, en images clés aux quarts de période : un sinus entre deux, ce
  * qui suffit à l'œil.
  */
 function dampedSine(amplitude: number, decay: number, period: number, total: number): Keyframe[] {
@@ -146,9 +147,37 @@ interface Definition {
   ease?: EaseSpec;
   tracks: MotionTracks;
   params?: MotionParam[];
+  /** Calques secondaires (étape A4) : halo, anneau, reflet, traîne. */
+  layers?: MotionLayer[];
 }
 
-/** Un préréglage d'élément : toute cible, longueurs en part du cadre. */
+/**
+ * Calques secondaires des préréglages d'origine. Chacun est éteint à la fin
+ * de sa phase : l'élément retrouve exactement son dessin de repos.
+ */
+const glow = (color: string, blur: Keyframe[], opacity: Keyframe[]): MotionLayer => ({ kind: "copy", color, tracks: { blur, opacity } });
+const ring = (color: string, scale: Keyframe[], opacity: Keyframe[], width = 0.03): MotionLayer => ({
+  kind: "ring",
+  color,
+  options: { width },
+  tracks: { scale, opacity },
+});
+const shine = (from: number, to: number): MotionLayer => ({
+  kind: "shine",
+  options: { width: 0.3, angle: 18 },
+  tracks: {
+    x: [k(0, -0.9), k(from, -0.9), k(to, 0.9, "inOutSine"), k(1, 0.9)],
+    opacity: [k(0, 0), k(from, 0), k(from + 0.05, 0.8, "linear"), k(to - 0.05, 0.8), k(to, 0, "linear"), k(1, 0)],
+  },
+});
+/** Copies en retard ; éteintes aux deux bouts de la phase, quand elles se confondent avec l'élément. */
+const echo = (count: number, delay: number, falloff: number): MotionLayer => ({
+  kind: "echo",
+  options: { count, delay, falloff },
+  tracks: { opacity: [k(0, 0), k(0.1, 1, "linear"), k(0.9, 1), k(1, 0, "linear")] },
+});
+
+/** Un préréglage d'élément : toute cible, longueurs en part du cadre. */
 const element = (definition: Definition): MotionPreset => ({
   target: "any",
   units: "frame",
@@ -241,10 +270,12 @@ const BLUR_AND_LIGHT: MotionPreset[] = [
       brightness: [k(0, 3), k(1, 1)],
       blur: [k(0, 0.02), k(1, 0)],
     },
+    // La lueur blanche du départ se resserre puis s'éteint (rayon 38 puis 8, puis rien).
+    layers: [glow("#ffffff", [k(0, 0.12), k(0.69, 0.025, "outQuart"), k(1, 0.01)], [k(0, 0.9), k(0.69, 0.4, "outQuart"), k(1, 0, "linear")])],
     params: [intensity(["scale", "brightness", "blur"])],
   }),
   element({
-    // Allumage d'un tube : quatre ratés de plus en plus brefs, puis la pleine lumière.
+    // Allumage d'un tube : quatre ratés de plus en plus brefs, puis la pleine lumière.
     id: "neon-on",
     label: "Néon qui s'allume",
     category: "blur-light",
@@ -267,9 +298,11 @@ const BLUR_AND_LIGHT: MotionPreset[] = [
         k(1, 1),
       ],
     },
+    // La lueur du tube suit les ratés, puis s'estompe une fois l'enseigne allumée.
+    layers: [glow("currentColor", [k(0, 0.04), k(1, 0.04)], [k(0, 0.85), k(0.45, 0.85), k(1, 0, "inQuad")])],
   }),
   element({
-    // Éclat bref : la luminosité monte et redescend, l'élément tressaille au début.
+    // Éclat bref : la luminosité monte et redescend, l'élément tressaille au début.
     id: "flash-pulse",
     label: "Éclat",
     category: "blur-light",
@@ -288,6 +321,8 @@ const BLUR_AND_LIGHT: MotionPreset[] = [
         k(1, 1),
       ],
     },
+    // L'anneau : il part du cœur et s'élargit en s'effaçant (échelle 20 à 230 %).
+    layers: [ring("#ffffff", [k(0, 0.2), k(1, 2.3, "outCubic")], [k(0, 0.9), k(1, 0, "outQuad")], 0.025)],
     params: [intensity(["brightness", "scale"])],
   }),
 ];
@@ -302,7 +337,7 @@ const SLING_STRETCH = spring(420, 12);
 const RUBBER = spring(300, 11);
 const RUBBER_PULL = 0.38;
 
-/** Zigzag : trois segments droits, parcourus à vitesse adoucie. */
+/** Zigzag : trois segments droits, parcourus à vitesse adoucie. */
 const ZIGZAG: [number, number][] = [
   [0, 0],
   [0.3134, -0.16],
@@ -318,7 +353,7 @@ function zigzagY(u: number): number {
   return 0;
 }
 
-/** Sauts de puce : trois bonds de 0,25 s séparés d'un appui de 0,05 s. */
+/** Sauts de puce : trois bonds de 0,25 s séparés d'un appui de 0,05 s. */
 function hopTracks(): MotionTracks {
   const total = 0.97;
   const stops = [-1, -0.665, -0.335, 0];
@@ -378,7 +413,7 @@ const SLIDES: MotionPreset[] = [
     params: [intensity(["x"]), direction("right")],
   }),
   element({
-    // Trajectoire en cloche : avance régulière, montée puis descente paraboliques.
+    // Trajectoire en cloche : avance régulière, montée puis descente paraboliques.
     id: "arc-in",
     label: "Arrivée en arc",
     category: "slide",
@@ -412,7 +447,7 @@ const SLIDES: MotionPreset[] = [
     params: [intensity(["x", "y"]), direction("right")],
   }),
   element({
-    // Recul pour prendre de l'élan, puis départ franc ; l'élément s'étire avec la vitesse.
+    // Recul pour prendre de l'élan, puis départ franc ; l'élément s'étire avec la vitesse.
     id: "wind-up-in",
     label: "Élan",
     category: "slide",
@@ -452,7 +487,7 @@ const SLIDES: MotionPreset[] = [
     params: [intensity(["x"]), direction("right")],
   }),
   element({
-    // Lancé lourd : dépasse un peu sa place, s'écrase à l'arrêt et vibre.
+    // Lancé lourd : dépasse un peu sa place, s'écrase à l'arrêt et vibre.
     id: "weighted-stop",
     label: "Arrêt lourd",
     category: "slide",
@@ -518,7 +553,7 @@ const SLIDES: MotionPreset[] = [
     params: [intensity(["x"]), direction("right")],
   }),
   element({
-    // Arrive trop loin, rebondit en arrière puis se cale ; écrasé à l'impact.
+    // Arrive trop loin, rebondit en arrière puis se cale ; écrasé à l'impact.
     id: "recoil-in",
     label: "Recul",
     category: "slide",
@@ -538,6 +573,8 @@ const SLIDES: MotionPreset[] = [
     phase: "in",
     durationMs: SPRING_LOOSE.seconds * 1000,
     tracks: { x: [k(0, -0.9), k(1, 0, SPRING_LOOSE.ease)] },
+    // Les suiveurs : trois copies pâles en retard, qui rejoignent l'élément.
+    layers: [echo(3, 0.06, 0.5)],
     params: [intensity(["x"]), direction("right")],
   }),
   element({
@@ -559,7 +596,7 @@ const SLIDES: MotionPreset[] = [
     params: [intensity(["y"]), direction("up")],
   }),
   element({
-    // Lâché comme une fronde : la position se pose vite, l'étirement vibre plus longtemps.
+    // Lâché comme une fronde : la position se pose vite, l'étirement vibre plus longtemps.
     id: "slingshot-in",
     label: "Fronde",
     category: "slide",
@@ -573,7 +610,7 @@ const SLIDES: MotionPreset[] = [
     params: [intensity(["x"]), direction("left")],
   }),
   element({
-    // Tiré en s'étirant, puis relâché : il revient en vibrant jusqu'à sa place.
+    // Tiré en s'étirant, puis relâché : il revient en vibrant jusqu'à sa place.
     id: "rubber-in",
     label: "Élastique",
     category: "slide",
@@ -600,6 +637,8 @@ const SLIDES: MotionPreset[] = [
     durationMs: 520,
     ease: "inQuart",
     tracks: { x: [k(0, 0), k(1, 1.05)], opacity: [k(0, 1), k(1, 0)] },
+    // Trois copies partent 32 ms l'une après l'autre : la traîne.
+    layers: [echo(3, 0.0615, 0.55)],
     params: [intensity(["x"]), direction("right")],
   }),
   element({
@@ -692,7 +731,7 @@ const STAR_SETTLE = spring(400, 14);
 const COMPRESS_SETTLE = spring(260, 14);
 
 /**
- * Écrasement bref autour de chaque contact : `[instant, creux]`, demi-largeur
+ * Écrasement bref autour de chaque contact : `[instant, creux]`, demi-largeur
  * `width`. Deux contacts rapprochés se partagent l'intervalle sans se chevaucher.
  */
 function squashes(contacts: [at: number, depth: number][], width: number): Keyframe[] {
@@ -826,7 +865,7 @@ const SCALES: MotionPreset[] = [
     params: [intensity(["y"]), direction("down")],
   }),
   element({
-    // Lâché de haut : deux rebonds paraboliques, écrasé à chaque contact.
+    // Lâché de haut : deux rebonds paraboliques, écrasé à chaque contact.
     id: "drop-bounce",
     label: "Chute rebondissante",
     category: "scale",
@@ -976,6 +1015,11 @@ const IMPACTS: MotionPreset[] = [
         opacity: [k(0, 0), k(0.08 / total, 1, SMOOTH)],
       };
     })(),
+    // À l'impact, une lueur blanche qui s'éteint et un reflet qui balaie l'étoile.
+    layers: (() => {
+      const hit = 0.18 / (0.18 + STAR_SETTLE.seconds);
+      return [glow("#ffffff", [k(0, 0.05), k(1, 0.01)], [k(0, 0), k(hit, 0), k(hit + 0.02, 0.8, "linear"), k(1, 0, "outQuad")]), shine(hit, Math.min(0.95, hit + 0.5))];
+    })(),
     params: [intensity(["rotate"])],
   }),
   element({
@@ -998,7 +1042,7 @@ const IMPACTS: MotionPreset[] = [
 
 // ─── Rotations ───────────────────────────────────────────────────
 
-/** Amplitude d'un balancier : 0,7 radian, soit 40°. */
+/** Amplitude d'un balancier : 0,7 radian, soit 40°. */
 const SWING = 0.7;
 
 const ROTATIONS: MotionPreset[] = [
@@ -1046,7 +1090,7 @@ const ROTATIONS: MotionPreset[] = [
     params: [intensity(["x", "rotate"]), direction("right")],
   }),
   element({
-    // Remise en place : déplacé, penché et réduit, l'élément revient dans sa case.
+    // Remise en place : déplacé, penché et réduit, l'élément revient dans sa case.
     id: "settle-in",
     label: "Remise en place",
     category: "rotate",
@@ -1068,11 +1112,11 @@ const ROTATIONS: MotionPreset[] = [
     phase: "emphasis",
     durationMs: 1000,
     ease: "inOutSine",
-    // Un tour entier revient à l'angle de départ : la dernière image se pose à 0°.
+    // Un tour entier revient à l'angle de départ : la dernière image se pose à 0°.
     tracks: { rotate: [k(0, 0), k(0.9999, -360), k(1, 0, { steps: 1 })] },
   }),
   element({
-    // Trois tours d'une pièce posée sur la tranche, vus de face : la largeur bat.
+    // Trois tours d'une pièce posée sur la tranche, vus de face : la largeur bat.
     id: "coin-flip",
     label: "Pièce qui tourne",
     category: "rotate",
@@ -1086,7 +1130,7 @@ const ROTATIONS: MotionPreset[] = [
     category: "rotate",
     phase: "emphasis",
     durationMs: 800,
-    // Demi-tour vu de face, avec la perspective : le bord qui avance grandit un peu.
+    // Demi-tour vu de face, avec la perspective : le bord qui avance grandit un peu.
     tracks: {
       scaleX: sampled((p) => Math.abs(Math.cos(Math.PI * smooth(smooth(p)))), 48),
       scaleY: sampled((p) => 1 / (1 - 0.2 * Math.abs(Math.sin(Math.PI * smooth(smooth(p))))), 48),
@@ -1138,6 +1182,8 @@ const ATTENTION: MotionPreset[] = [
     durationMs: 540,
     ease: "inOutSine",
     tracks: { x: [k(0, 0), k(0.1667, -0.06), k(0.3704, 0.05), k(0.5741, -0.03), k(0.7778, 0.02), k(1, 0)] },
+    // Le contour rouge de l'erreur s'allume avec la secousse et s'éteint après.
+    layers: [ring("#ef4444", [k(0, 1), k(1, 1)], [k(0, 0), k(0.15, 1, "outQuad"), k(0.8, 1), k(1, 0, "inQuad")], 0.025)],
     params: [intensity(["x"]), direction("right")],
   }),
   element({
@@ -1150,7 +1196,7 @@ const ATTENTION: MotionPreset[] = [
     params: [intensity(["x"]), direction("right")],
   }),
   element({
-    // Petit saut sur place : tassement avant de partir, écrasement à l'atterrissage.
+    // Petit saut sur place : tassement avant de partir, écrasement à l'atterrissage.
     id: "bell-hop",
     label: "Sautillement",
     category: "attention",
@@ -1198,6 +1244,8 @@ const ATTENTION: MotionPreset[] = [
     phase: "emphasis",
     durationMs: 240,
     tracks: { scale: [k(0, 1), k(0.5, 1.06, "outSine"), k(1, 1, "inSine")] },
+    // Un halo s'échappe à chaque battement.
+    layers: [ring("currentColor", [k(0, 1), k(1, 1.6, "outCubic")], [k(0, 0.6), k(1, 0, "outQuad")])],
     params: [intensity(["scale"], 3)],
   }),
   element({
@@ -1210,7 +1258,7 @@ const ATTENTION: MotionPreset[] = [
     params: [intensity(["scale"], 3)],
   }),
   element({
-    // Tiré vers la droite en s'étirant, puis lâché : il revient en ressort à sa place.
+    // Tiré vers la droite en s'étirant, puis lâché : il revient en ressort à sa place.
     id: "pull-release",
     label: "Tirer-lâcher",
     category: "attention",
@@ -1291,6 +1339,8 @@ const ATTENTION: MotionPreset[] = [
         y: [k(0, 0), k(LIFT_UP.seconds / total, -0.07, LIFT_UP.ease), k(LIFT_HOLD / total, -0.07), k(1, 0, LIFT_DOWN.ease)],
       };
     })(),
+    // Pendant qu'il est en l'air, un reflet parcourt l'élément.
+    layers: [shine(0.15, 0.7)],
     params: [intensity(["y"]), direction("up")],
   }),
 ];
@@ -1298,7 +1348,7 @@ const ATTENTION: MotionPreset[] = [
 // ─── Boucles ─────────────────────────────────────────────────────
 
 /**
- * Tremblement lent : trois sommes de sinus de périodes différentes, toutes
+ * Tremblement lent : trois sommes de sinus de périodes différentes, toutes
  * multiples de la boucle, donc refermées. Amplitudes ramenées à leur maximum.
  */
 function wobble(harmonics: [cycles: number, weight: number, phase: number][], amplitude: number): Keyframe[] {
@@ -1311,7 +1361,7 @@ function wobble(harmonics: [cycles: number, weight: number, phase: number][], am
 
 const LOOPS: MotionPreset[] = [
   element({
-    // Balancier accroché au-dessus de l'élément : il décrit un arc en s'inclinant.
+    // Balancier accroché au-dessus de l'élément : il décrit un arc en s'inclinant.
     id: "pendulum",
     label: "Balancier",
     category: "loop",
@@ -1342,7 +1392,7 @@ const LOOPS: MotionPreset[] = [
     tracks: { rotate: [k(0, 0), k(0.9999, 359.964, "linear"), k(1, 0, { steps: 1 })] },
   }),
   element({
-    // Orbite vue de biais : l'élément grossit quand il passe devant.
+    // Orbite vue de biais : l'élément grossit quand il passe devant.
     id: "orbit-loop",
     label: "Orbite",
     category: "loop",
