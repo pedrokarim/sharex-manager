@@ -35,16 +35,39 @@ miniatures et renvoie un lien public prêt à partager.
   générée pour ShareX (et Flameshot via `fu`).
 - **Historique et statistiques** des envois, par jour, par méthode et par clé.
 - **Modules** qui s’activent à la demande, chacun avec son logo :
-  - traitements automatiques à l’envoi : filigrane, redimensionnement,
-    recadrage ;
+  - traitements automatiques à l’envoi : filigrane (un texte, ou le logo
+    d’une image de marque), redimensionnement, recadrage ;
   - **AI Image Gen**, un studio de génération et de retouche d’images (agents
     CLI connectés comme Codex, ou clés API) ;
-  - **Clip Studio**, un éditeur de clips vidéo avec timeline, modèles (quiz,
-    top, diaporama), assistant IA, voix de synthèse locales, banque de
-    musique libre de droits et sous-titres animés, export MP4 dans le
-    navigateur ;
+  - **Clip Studio**, un éditeur de clips vidéo : timeline, modèles (quiz,
+    classement, diaporama, avant / après), voix de synthèse locales, banque
+    de musique libre de droits, sous-titres animés et rendu MP4 dans le
+    navigateur. Une bibliothèque d’animations (entrées, sorties, mises en
+    avant et boucles ; textes lettre par lettre, mot par mot ou ligne par
+    ligne), 34 transitions, 19 mouvements de caméra et 8 effets de plan se
+    choisissent dans l’éditeur, avec un aperçu animé. L’onglet « Trouver »
+    cherche des images libres (Openverse), sur le web ou parmi les icônes
+    officielles, licence et auteur à l’appui ;
+  - l’**assistant** de Clip Studio (avec Codex) écrit le script, cherche une
+    image qui existe avant d’en générer une, pose le logo officiel d’un jeu
+    ou d’une marque, et vérifie les faits du script avec leurs sources ;
+  - **Image de marque**, la direction artistique d’une chaîne : palette,
+    polices, styles de texte, logos, mascotte, filigrane, carton de fin, ton
+    et modèles de publication. Les modèles de Clip Studio et le filigrane
+    des captures la suivent ; les formats d’une chaîne (bannière YouTube,
+    avatar, en-tête X, couverture de short…) s’exportent en PNG ;
   - **Recherche inversée**, qui interroge plusieurs moteurs d’un coup
     (trace.moe, IQDB, SauceNAO, Google Lens, Yandex) et garde un historique.
+- **Exports et publication** : chaque clip rendu a sa fiche (couverture,
+  sous-titres `.srt`, crédits, volume mesuré) et ses textes de publication,
+  communs ou propres à chaque service, préremplis par l’image de marque. Il
+  part vers un ou plusieurs **comptes connectés** : YouTube, Facebook
+  (pages), Instagram (compte professionnel) et Threads ; X est annoncé.
+  Envoi repris après une coupure, programmation, quotas, premier
+  commentaire, sous-titres et couverture posés après la mise en ligne.
+  Chaque service demande de créer sa propre application (Google Cloud,
+  Meta for Developers) : la marche à suivre est dans
+  [le wiki](https://github.com/pedrokarim/sharex-manager/wiki/Comptes-connect%C3%A9s).
 - **Outils publics**, ouverts sans compte : « Origine d’une image » lit ce
   qu’un fichier déclare (manifeste C2PA, EXIF, XMP, paramètres de
   génération) sans rien enregistrer.
@@ -64,15 +87,31 @@ miniatures et renvoie un lien public prêt à partager.
 | ![Albums](docs/images/albums.webp) | ![Catalogue public](docs/images/catalogue-public.webp) |
 | **Statistiques** | **Clés API et configuration ShareX** |
 | ![Statistiques](docs/images/statistiques.webp) | ![Configuration ShareX](docs/images/configuration-sharex.webp) |
-| **Clip Studio** | **AI Image Gen** |
-| ![Éditeur Clip Studio](docs/images/clip-studio-editeur.webp) | ![AI Image Gen](docs/images/ai-image-gen.webp) |
+| **Clip Studio** | **Bibliothèque d’animations** |
+| ![Éditeur Clip Studio](docs/images/clip-studio-editeur.webp) | ![Sélecteur d’animations de Clip Studio](docs/images/clip-studio-animations.webp) |
+| **Trouver une image** | **Exporter** |
+| ![Onglet Trouver du panneau Médias](docs/images/clip-studio-trouver.webp) | ![Écran Exporter de Clip Studio](docs/images/clip-studio-exporter.webp) |
+| **Fiche d’un export** | **Publier** |
+| ![Fiche d’un export et ses textes de publication](docs/images/clip-studio-export-fiche.webp) | ![Écran Publier de Clip Studio](docs/images/clip-studio-publier.webp) |
+| **Image de marque** | **Éditeur d’une image de marque** |
+| ![Images de marque](docs/images/image-de-marque.webp) | ![Éditeur d’une image de marque](docs/images/image-de-marque-video.webp) |
+| **Comptes connectés** | **Connecter un compte** |
+| ![Comptes connectés](docs/images/comptes-connectes.webp) | ![Connecter un compte](docs/images/connecter-un-compte.webp) |
+| **Filigrane de la marque** | **AI Image Gen** |
+| ![Filigrane posé avec le logo d’une image de marque](docs/images/filigrane-marque.webp) | ![AI Image Gen](docs/images/ai-image-gen.webp) |
 | **Recherche inversée** | **Origine d’une image** |
 | ![Recherche inversée](docs/images/recherche-inversee.webp) | ![Origine d’une image](docs/images/origine-image.webp) |
 | **Modules** | **Thème global** |
 | ![Modules](docs/images/modules.webp) | ![Thème global](docs/images/theme-global.webp) |
 
+Un clip rendu par Clip Studio, avec l’image de marque inventée « Altitude
+Claire » de l’instance de test :
+
+![Cinq images d’un clip rendu : titre, classement et carton de fin](docs/images/clip-studio-rendu.webp)
+
 D’autres captures (thème clair, mobile, historique, préférences, connexion,
-administration) sont dans [`docs/images/`](docs/images/).
+administration, Publier et fiche d’un export sur téléphone) sont dans
+[`docs/images/`](docs/images/).
 
 ## Installation
 

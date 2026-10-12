@@ -128,6 +128,7 @@
 
     /* Le flux : le texte d'un côté, la capture de l'autre. */
     .split { display: grid; gap: 48px; align-items: center; }
+    .split > * { min-width: 0; }
     .split h2 { font-size: clamp(2.25rem, 4.6vw, 3.5rem); }
     .split .lead { margin-top: 20px; }
     .points { list-style: none; margin: 32px 0 0; padding: 0; display: grid; gap: 14px; }
@@ -215,6 +216,7 @@
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></symbol>
     <symbol id="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></symbol>
+    <symbol id="send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></symbol>
     <symbol id="seal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" /><path d="m9 12 2 2 4-4" /></symbol>
   </svg>
 
@@ -224,6 +226,7 @@
       <nav class="links" aria-label="Sections">
         <a href="#flux">Le flux</a>
         <a href="#modules">Modules</a>
+        <a href="#video">Vidéo</a>
         <a href="#apercu">Aperçu</a>
         <a href="#demarrer">Mise en route</a>
         <a href="#documentation">Documentation</a>
@@ -313,7 +316,7 @@
           <article class="tile side" data-reveal>
             <img src="img/module-clip-studio.png" alt="" width="72" height="72" loading="lazy" />
             <h3>Clip Studio</h3>
-            <p>Un éditeur de clips dans le navigateur&nbsp;: images, vidéos, textes animés, voix et musique.</p>
+            <p>Un éditeur de clips dans le navigateur&nbsp;: images, vidéos, textes animés, voix, musique, et une bibliothèque d’animations, de transitions et de mouvements de caméra.</p>
             <div class="tags">Timeline multipiste · Voix de synthèse · Export MP4</div>
           </article>
           <article class="tile half" data-reveal>
@@ -328,11 +331,64 @@
             <p>Lisez ce qu’un fichier déclare de lui-même&nbsp;: généré par IA ou non, signature, métadonnées. Ouvert sans compte.</p>
             <div class="tags">Manifeste C2PA · EXIF et XMP · Version sans métadonnées</div>
           </article>
+          <article class="tile half" data-reveal>
+            <img src="img/module-brand-kit.png" alt="" width="72" height="72" loading="lazy" />
+            <h3>Image de marque</h3>
+            <p>La direction artistique d’une chaîne en une fiche&nbsp;: palette, polices, logos, mascotte, filigrane, carton de fin et ton. Les clips et les captures la suivent.</p>
+            <div class="tags">Formats d’une chaîne en PNG · Assistant de création · Export ZIP</div>
+          </article>
+          <article class="tile half" data-reveal>
+            <svg class="glyph"><use href="#send" /></svg>
+            <h3>Comptes connectés</h3>
+            <p>Reliez vos comptes de publication, autant que vous voulez, et publiez un clip vers plusieurs d’entre eux d’un seul geste.</p>
+            <div class="tags">YouTube · Facebook · Instagram · Threads · X annoncé</div>
+          </article>
         </div>
       </div>
     </section>
 
-    <section id="apercu" style="padding-top:0">
+    <section id="video" style="padding-top:0">
+      <div class="container split">
+        <div data-reveal>
+          <p class="kicker">Clip Studio</p>
+          <h2 class="display">De l’idée au clip publié</h2>
+          <p class="lead">Un modèle ou l’assistant pose le montage, l’image de marque l’habille, et l’éditeur laisse tout reprendre&nbsp;: textes, animations, voix, musique. Le rendu se fait dans le navigateur.</p>
+          <ul class="points">
+            <li><svg><use href="#check" /></svg> <span>Animations d’entrée, de sortie et de mise en avant, textes lettre par lettre ou mot par mot, aperçu au survol</span></li>
+            <li><svg><use href="#check" /></svg> <span>34 transitions, 19 mouvements de caméra et 8 effets de plan</span></li>
+            <li><svg><use href="#check" /></svg> <span>Des images qui existent d’abord&nbsp;: banque libre, web et icônes officielles, avec leur licence</span></li>
+            <li><svg><use href="#check" /></svg> <span>Un script dont les faits sont vérifiés, sources rangées avec le projet</span></li>
+          </ul>
+        </div>
+        <div class="shot" data-reveal>
+          <img src="img/clip-studio-animations.webp" alt="Le sélecteur d’animations de Clip Studio, rangé par catégorie" width="1440" height="900" loading="lazy" />
+        </div>
+      </div>
+      <div class="container shot" style="margin-top:56px" data-reveal>
+        <img src="img/clip-studio-rendu.webp" alt="Cinq images d’un clip rendu avec une image de marque&nbsp;: titre, classement et carton de fin" width="1440" height="510" loading="lazy" />
+      </div>
+    </section>
+
+    <section class="band" id="publication">
+      <div class="container split">
+        <div data-reveal>
+          <p class="kicker">Publication</p>
+          <h2 class="display">Un export, tous vos comptes</h2>
+          <p class="lead">Chaque clip rendu garde sa fiche&nbsp;: couverture, sous-titres, crédits et textes de publication, communs ou propres à chaque service. Il part ensuite vers YouTube, Facebook, Instagram ou Threads, tout de suite ou à l’heure choisie.</p>
+          <ul class="points">
+            <li><svg><use href="#check" /></svg> <span>Textes préremplis par l’image de marque, aperçu à la manière du service</span></li>
+            <li><svg><use href="#check" /></svg> <span>Envoi repris après une coupure, quotas suivis, premier commentaire posé après la mise en ligne</span></li>
+            <li><svg><use href="#check" /></svg> <span>Vos propres applications Google et Meta, configurées une fois</span></li>
+          </ul>
+          <a class="pill on-photo" href="https://github.com/pedrokarim/sharex-manager/wiki/Comptes-connect%C3%A9s">Configurer les comptes <svg><use href="#arrow" /></svg></a>
+        </div>
+        <div class="shot" data-reveal>
+          <img src="img/clip-studio-publier.webp" alt="L’écran Publier de Clip Studio&nbsp;: comptes, textes par service et aperçu" width="1440" height="900" loading="lazy" />
+        </div>
+      </div>
+    </section>
+
+    <section id="apercu">
       <div class="wide">
         <div class="container head" style="padding-inline:0" data-reveal>
           <div>
@@ -347,6 +403,12 @@
           <figure data-reveal><img src="img/statistiques.webp" alt="Statistiques des envois" width="1440" height="900" loading="lazy" /><figcaption><strong>Statistiques.</strong> Envois par jour, par méthode et par clé.</figcaption></figure>
           <figure data-reveal><img src="img/cles-api.webp" alt="Gestion des clés d’API" width="1440" height="900" loading="lazy" /><figcaption><strong>Clés d’API.</strong> Une clé par machine, révocable.</figcaption></figure>
           <figure data-reveal><img src="img/clip-studio-editeur.webp" alt="Éditeur de Clip Studio" width="1440" height="900" loading="lazy" /><figcaption><strong>Clip Studio.</strong> Timeline, voix, musique, export MP4.</figcaption></figure>
+          <figure data-reveal><img src="img/clip-studio-trouver.webp" alt="Onglet Trouver du panneau Médias de Clip Studio" width="1440" height="900" loading="lazy" /><figcaption><strong>Trouver une image.</strong> Banque libre, web ou icône officielle, licence visible.</figcaption></figure>
+          <figure data-reveal><img src="img/clip-studio-exporter.webp" alt="Écran Exporter de Clip Studio" width="1440" height="900" loading="lazy" /><figcaption><strong>Exporter.</strong> Vérifications avant le rendu, volume normalisé, sous-titres.</figcaption></figure>
+          <figure data-reveal><img src="img/clip-studio-export-fiche.webp" alt="Fiche d’un export et ses textes de publication" width="1440" height="900" loading="lazy" /><figcaption><strong>Fiche d’un export.</strong> Textes communs et variantes par service.</figcaption></figure>
+          <figure data-reveal><img src="img/image-de-marque-video.webp" alt="Éditeur d’une image de marque, section Vidéo" width="1440" height="900" loading="lazy" /><figcaption><strong>Image de marque.</strong> Filigrane, carton de fin et formats de la chaîne.</figcaption></figure>
+          <figure data-reveal><img src="img/comptes-connectes.webp" alt="Page des comptes connectés" width="1440" height="900" loading="lazy" /><figcaption><strong>Comptes connectés.</strong> Plusieurs comptes par service, état de chacun.</figcaption></figure>
+          <figure data-reveal><img src="img/filigrane-marque.webp" alt="Filigrane posé avec le logo d’une image de marque" width="1440" height="900" loading="lazy" /><figcaption><strong>Filigrane.</strong> Le logo de la marque sur une capture, ou sur chaque envoi.</figcaption></figure>
           <figure data-reveal><img src="img/ai-image-gen.webp" alt="Studio AI Image Gen" width="1440" height="900" loading="lazy" /><figcaption><strong>AI Image Gen.</strong> Générer ou retoucher depuis une description.</figcaption></figure>
           <figure data-reveal><img src="img/recherche-inversee.webp" alt="Recherche inversée" width="1440" height="900" loading="lazy" /><figcaption><strong>Recherche inversée.</strong> Plusieurs moteurs, une seule image.</figcaption></figure>
           <figure data-reveal><img src="img/theme-global.webp" alt="Réglage du thème global" width="1440" height="900" loading="lazy" /><figcaption><strong>Thème global.</strong> Les couleurs du site, à partir de 42 palettes.</figcaption></figure>
@@ -385,7 +447,7 @@ docker compose up -d --build</pre>
             <p class="kicker">Documentation</p>
             <h2 class="display">Le guide complet vit dans le wiki</h2>
           </div>
-          <p class="lead">Installation, réglages, clients d’envoi, API et modules, pas à pas.</p>
+          <p class="lead">Installation, réglages, clients d’envoi, API, modules et publication, pas à pas.</p>
         </div>
         <div class="docs" data-reveal>
           <a href="https://github.com/pedrokarim/sharex-manager/wiki/Installation"><strong>Installation</strong><span>Bun, Docker, premier compte</span><svg><use href="#arrow" /></svg></a>
@@ -396,6 +458,9 @@ docker compose up -d --build</pre>
           <a href="https://github.com/pedrokarim/sharex-manager/wiki/Configuration-Linux"><strong>Linux</strong><span>Flameshot et fu</span><svg><use href="#arrow" /></svg></a>
           <a href="https://github.com/pedrokarim/sharex-manager/wiki/Application-mobile"><strong>Application mobile</strong><span>Android, configurée par QR code</span><svg><use href="#arrow" /></svg></a>
           <a href="https://github.com/pedrokarim/sharex-manager/wiki/Modules"><strong>Modules</strong><span>Studio IA, clips, recherche inversée</span><svg><use href="#arrow" /></svg></a>
+          <a href="https://github.com/pedrokarim/sharex-manager/wiki/Clip-Studio"><strong>Clip Studio</strong><span>Montage, animations, exports</span><svg><use href="#arrow" /></svg></a>
+          <a href="https://github.com/pedrokarim/sharex-manager/wiki/Image-de-marque"><strong>Image de marque</strong><span>Palette, logos, filigrane, publication</span><svg><use href="#arrow" /></svg></a>
+          <a href="https://github.com/pedrokarim/sharex-manager/wiki/Comptes-connect%C3%A9s"><strong>Comptes connectés</strong><span>Applications Google et Meta, publication</span><svg><use href="#arrow" /></svg></a>
           <a href="https://github.com/pedrokarim/sharex-manager/wiki/R%C3%A9f%C3%A9rence-API"><strong>Référence de l’API</strong><span>Envoi, fichiers, albums</span><svg><use href="#arrow" /></svg></a>
           <a href="https://github.com/pedrokarim/sharex-manager/wiki/D%C3%A9ploiement"><strong>Déploiement</strong><span>Docker, proxy, sauvegardes</span><svg><use href="#arrow" /></svg></a>
           <a href="https://github.com/pedrokarim/sharex-manager/wiki/Architecture"><strong>Architecture</strong><span>Comment le code est rangé</span><svg><use href="#arrow" /></svg></a>
