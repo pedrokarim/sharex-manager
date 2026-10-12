@@ -794,9 +794,28 @@ function AuthorizeStep({
                 </p>
                 {phase === "waiting" ? (
                   <>
+                    {/* `closed` est aussi vrai quand le service coupe le lien avec sa fenêtre (Google le fait) : on ne conclut rien. */}
                     {popupGone ? (
-                      <p className="text-xs text-muted-foreground">La fenêtre semble fermée. Si vous n’avez pas terminé chez {connector.label}, rouvrez-la.</p>
+                      <p className="text-xs text-pretty text-muted-foreground">
+                        Cette page ne voit plus la fenêtre de {connector.label}. Si vous l’avez fermée sans terminer, rouvrez-la ; si elle affiche une erreur, voyez ci-dessous.
+                      </p>
                     ) : null}
+                    <details className="group text-xs text-pretty text-muted-foreground">
+                      <summary className="cursor-pointer select-none font-medium text-foreground/80 hover:text-foreground">
+                        {connector.label} affiche « Accès bloqué » ou une erreur ?
+                      </summary>
+                      <div className="mt-2 grid gap-1.5">
+                        <p>
+                          Tant que l’application déclarée chez {connector.label} est en mode test (ou développement), seuls les comptes ajoutés comme
+                          testeurs peuvent se connecter. Ajoutez celui que vous utilisez dans la console du service :
+                        </p>
+                        <ul className="list-disc space-y-1 pl-4">
+                          <li>Google (YouTube) : Google Auth Platform › Audience › Utilisateurs test ;</li>
+                          <li>Meta (Facebook, Instagram, Threads) : Rôles de l’application › Testeurs, puis accepter l’invitation depuis le compte.</li>
+                        </ul>
+                        <p>Fermez ensuite la fenêtre d’erreur et cliquez sur « Rouvrir la fenêtre ».</p>
+                      </div>
+                    </details>
                     <div className="flex flex-wrap gap-2">
                       <Button variant="outline" size="sm" className="gap-1.5" onClick={openPopup}>
                         <SquareArrowOutUpRight className="size-4" />
