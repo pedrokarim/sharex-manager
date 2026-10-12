@@ -272,9 +272,13 @@ absent.
 `instagram_business_basic` est exigée pour tout appel et pour le
 renouvellement [3][7] ; `instagram_business_content_publish` pour les
 conteneurs, la publication et la lecture des limites [12][16][17].
-`instagram_business_manage_comments` ne permet que d’activer ou couper les
-commentaires d’une publication [18] et `instagram_business_manage_messages`
-la messagerie [1] : ni l’une ni l’autre n’est demandée.
+`instagram_business_manage_comments` active ou coupe les commentaires
+d’une publication [18] et permet aussi de **commenter** (`POST
+/<IG_MEDIA_ID>/comments`, référence « IG Media Comments », vérifiée le
+12/10/2026) : elle n’est jamais demandée à la connexion, seulement ajoutée
+à la demande pour le premier commentaire (dossier 07, § 8.9 ; dossier
+01 ter, § 6). `instagram_business_manage_messages` (la messagerie [1])
+n’est pas demandée.
 
 Deux jeux proposés à la connexion :
 
@@ -439,10 +443,10 @@ plus, sans légende ni autocollants [14]. Possible plus tard comme simple choix
 
 | Clé | Type | Libellé | Rôle | Limites et effet |
 | --- | --- | --- | --- | --- |
-| `caption` | `textarea` | Légende | `description` | 2 200 caractères, 30 hashtags, 20 mentions [14][19] ; reçoit le modèle de description de la marque, crédits musicaux compris |
-| `hashtags` | `tags` | Hashtags | `tags` | ajoutés en fin de légende sous la forme `#mot`, comptés dans les 2 200 caractères et les 30 hashtags |
+| `caption` | `textarea` | Légende | `caption` | 2 200 caractères, 30 hashtags, 20 mentions [14][19] ; reçoit le modèle de description de la marque, crédits musicaux compris |
+| `hashtags` | `tags` | Hashtags | `hashtags` | ajoutés en fin de légende sous la forme `#mot`, comptés dans les 2 200 caractères et les 30 hashtags |
 | `shareToFeed` | `toggle` | Afficher aussi dans le fil | – | Reels seulement ; vrai par défaut |
-| `cover` | `select` | Couverture | – | Reels : « Première image » (`thumb_offset=0`), « Image du milieu », « Image à 1 s de la fin », et « Couverture du clip » quand Clip Studio fournit une image (→ `cover_url`) |
+| `cover` | `select` | Couverture | `cover` | Reels : « Première image » (`thumb_offset=0`), « Image du milieu », « Image à 1 s de la fin », et « Couverture du clip » quand Clip Studio fournit une image (→ `cover_url`) |
 | `trial` | `select` | Diffusion | – | Reels : « Normale », « Essai, validation à la main » (`MANUAL`), « Essai, validation automatique » (`SS_PERFORMANCE`) [12] |
 | `altText` | `text` | Texte alternatif | – | images seulement, 1 000 caractères [14] |
 | `aiGenerated` | `toggle` | Contenu généré par IA | `syntheticMedia` | `is_ai_generated` ; même règle de précochage que pour YouTube |

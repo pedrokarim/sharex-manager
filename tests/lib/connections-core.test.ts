@@ -101,7 +101,9 @@ describe("registre des connecteurs", () => {
       const offered = new Set(connector.oauth.scopeSets.flatMap((set) => set.scopes));
       for (const entry of connector.capabilities) {
         expect(entry.scopes.length, `${connector.id} ${entry.capability}`).toBeGreaterThan(0);
-        expect(entry.scopes.some((scope) => offered.has(scope)), `${connector.id} ${entry.capability}`).toBe(true);
+        // Les capacités des suites de publication ne viennent qu'à la demande (connexion incrémentale).
+        const onDemand = ["comment.create", "captions.upload", "cover.set"].includes(entry.capability);
+        expect(onDemand || entry.scopes.some((scope) => offered.has(scope)), `${connector.id} ${entry.capability}`).toBe(true);
       }
       for (const set of connector.oauth.scopeSets) expect(capabilitiesForScopes(connector, set.scopes).length).toBeGreaterThan(0);
       expect(connector.oauth.authorizeUrl).toMatch(/^https:\/\//);
@@ -113,7 +115,7 @@ describe("registre des connecteurs", () => {
     const youtube = getConnector("youtube")!;
     const [all, upload] = youtube.oauth.scopeSets;
     expect(capabilitiesForScopes(youtube, all.scopes).sort()).toEqual(
-      ["posts.list", "posts.manage", "profile.banner", "profile.watermark", "publish.video"].sort()
+      ["cover.set", "posts.list", "posts.manage", "profile.banner", "profile.watermark", "publish.video"].sort()
     );
     const limited = capabilitiesForScopes(youtube, upload.scopes);
     expect(limited).toContain("publish.video");

@@ -15,7 +15,7 @@ import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { TOKEN_NEVER_EXPIRES, type Connector, type TokenResponseFields, type TokenSet } from "./types";
 import { OAuthError } from "./errors";
 import { sign, verifySignature } from "./crypto";
-import { authorizeSettingParams, getAppCredentials, missingAppSettings, redirectUri, type AppCredentials } from "./apps";
+import { authorizeSettingParams, getAppCredentials, getAppSettings, missingAppSettings, redirectUri, type AppCredentials } from "./apps";
 import { parseJsonKeepingIds } from "./json";
 import { requireReadyConnector } from "./registry";
 
@@ -33,6 +33,11 @@ export interface Transaction {
   mode?: "popup" | "redirect";
   /** Chemin interne où revenir ensuite (validé par `safeReturnPath`). */
   returnTo?: string;
+  /**
+   * Connexion incrémentale : portées demandées (celles du compte, plus
+   * celles ajoutées), à la place de celles du jeu `scopeSet`.
+   */
+  scopes?: string[];
 }
 
 /**
@@ -54,8 +59,8 @@ export function safeReturnPath(value: unknown): string | undefined {
 
 /** L'application du service n'est pas configurée : la page ouvre sa configuration. */
 export class AppNotConfiguredError extends Error {
-  constructor(label: string) {
-    super(`L’application ${label} n’est pas configurée.`);
+  constructor(label: string, message?: string) {
+    super(message ?? `L’application ${label} n’est pas configurée.`);
     this.name = "AppNotConfiguredError";
   }
 }
@@ -85,7 +90,16 @@ export function startAuthorization(
   connectorId: string,
   scopeSetId: string | null,
   now = Date.now(),
-  options: { mode?: "popup" | "redirect"; returnTo?: string } = {}
+  options: {
+    mode?: "popup" | "redirect";
+    returnTo?: string;
+    /**
+     * Connexion incrémentale : liste complète des portées à demander (celles
+     * du compte et celles ajoutées, voir `incrementalScopes`). Jamais à la
+     * première connexion, qui reste limitée au jeu choisi.
+     */
+    scopes?: string[];
+  } = {}
 ): { url: string; cookie: string } {
   const connector = requireReadyConnector(connectorId);
   const app = requireApp(connector);
@@ -99,7 +113,8 @@ export function startAuthorization(
   url.searchParams.set("response_type", "code");
   url.searchParams.set("client_id", app.clientId);
   url.searchParams.set("redirect_uri", redirectUri(connector.id));
-  url.searchParams.set("scope", scopeSet.scopes.join(connector.oauth.scopeSeparator ?? " "));
+  const incremental = Array.isArray(options.scopes) && options.scopes.length > 0 ? [...new Set(options.scopes.filter((scope) => typeof scope === "string" && scope))].slice(0, 50) : undefined;
+  url.searchParams.set("scope", (incremental ?? scopeSet.scopes).join(connector.oauth.scopeSeparator ?? " "));
   url.searchParams.set("state", state);
   if (verifier) {
     url.searchParams.set("code_challenge", pkceChallenge(verifier));
@@ -107,6 +122,18 @@ export function startAuthorization(
   }
   for (const [key, value] of Object.entries(connector.oauth.extraParams ?? {})) url.searchParams.set(key, value);
   for (const [key, value] of Object.entries(authorizeSettingParams(connector))) url.searchParams.set(key, value);
+  if (incremental) {
+    // Certains services fixent les autorisations par un réglage (configuration Meta) : les portées en plus en demandent un autre.
+    const settings = getAppSettings(connector);
+    for (const [param, settingKey] of Object.entries(connector.oauth.incremental?.settingParams ?? {})) {
+      const value = settings[settingKey];
+      if (!value) {
+        const label = connector.app.settings?.find((setting) => setting.key === settingKey)?.label ?? settingKey;
+        throw new AppNotConfiguredError(connector.label, `Pour ajouter cette autorisation, renseignez d’abord « ${label} » dans la configuration de l’application ${connector.label}.`);
+      }
+      url.searchParams.set(param, value);
+    }
+  }
 
   const returnTo = safeReturnPath(options.returnTo);
   const cookie = encodeTransaction({
@@ -117,6 +144,7 @@ export function startAuthorization(
     expiresAt: now + TRANSACTION_TTL_SECONDS * 1000,
     ...(options.mode === "popup" ? { mode: "popup" as const } : {}),
     ...(returnTo ? { returnTo } : {}),
+    ...(incremental ? { scopes: incremental } : {}),
   });
   return { url: url.toString(), cookie };
 }
@@ -137,6 +165,7 @@ export function readTransaction(cookie: string | undefined, connectorId: string,
   // Le cookie est signé, mais on ne fait jamais confiance à un chemin sans le revalider.
   transaction.returnTo = safeReturnPath(transaction.returnTo);
   if (transaction.mode !== "popup") delete transaction.mode;
+  if (transaction.scopes !== undefined && (!Array.isArray(transaction.scopes) || !transaction.scopes.every((scope) => typeof scope === "string"))) delete transaction.scopes;
   const expected = Buffer.from(String(transaction.state));
   const received = Buffer.from(state);
   if (expected.length !== received.length || !timingSafeEqual(expected, received)) throw invalid();

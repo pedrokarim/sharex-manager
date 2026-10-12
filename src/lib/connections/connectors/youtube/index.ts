@@ -10,10 +10,26 @@ import { deleteVideo, fetchChannelProfile, listUploads, setChannelBanner, setCha
 import { YOUTUBE_PUBLISH_FIELDS, normalizeYoutubeOptions, type YoutubeOptions } from "./metadata";
 import { youtubeQuota } from "./quota";
 import { uploadVideo } from "./upload";
+import {
+  CAPTION_FORMATS,
+  CAPTION_MAX_BYTES,
+  COMMENT_MAX_CHARS,
+  THUMBNAIL_MAX_BYTES,
+  THUMBNAIL_TYPES,
+  postYoutubeComment,
+  setYoutubeThumbnail,
+  uploadYoutubeSubtitles,
+} from "./follow-ups";
 
 export const SCOPE_UPLOAD = "https://www.googleapis.com/auth/youtube.upload";
 export const SCOPE_MANAGE = "https://www.googleapis.com/auth/youtube";
 export const SCOPE_READONLY = "https://www.googleapis.com/auth/youtube.readonly";
+/**
+ * Commentaires et sous-titres (`commentThreads.insert`, `captions.insert`).
+ * Jamais demandée à la première connexion : seulement ajoutée à la demande
+ * (connexion incrémentale, `include_granted_scopes=true`).
+ */
+export const SCOPE_FORCE_SSL = "https://www.googleapis.com/auth/youtube.force-ssl";
 
 export const youtubeConnector: Connector = {
   id: "youtube",
@@ -30,6 +46,10 @@ export const youtubeConnector: Connector = {
     { capability: "profile.banner", scopes: [SCOPE_MANAGE] },
     { capability: "posts.list", scopes: [SCOPE_MANAGE, SCOPE_READONLY] },
     { capability: "posts.manage", scopes: [SCOPE_MANAGE] },
+    // Suites de publication. La miniature passe avec la portée d'envoi déjà accordée.
+    { capability: "comment.create", scopes: [SCOPE_FORCE_SSL] },
+    { capability: "captions.upload", scopes: [SCOPE_FORCE_SSL] },
+    { capability: "cover.set", scopes: [SCOPE_UPLOAD, SCOPE_MANAGE, SCOPE_FORCE_SSL] },
   ],
   app: {
     envPrefix: "YOUTUBE",
@@ -77,6 +97,24 @@ export const youtubeConnector: Connector = {
   normalizeOptions: (options, source) => ({ ...normalizeYoutubeOptions(options, source) }),
   publish: (context) => uploadVideo(context, normalizeYoutubeOptions(context.options, context.source, 0) as YoutubeOptions),
   checkProcessing: videoProcessing,
+  followUps: {
+    comment: {
+      maxLength: COMMENT_MAX_CHARS,
+      documented: false,
+      sourceKinds: ["video"],
+      help: "Posté une fois la vidéo publique ou non répertoriée. L’API ne sait pas l’épingler : le lien du commentaire permet de le faire à la main.",
+    },
+    subtitles: { formats: CAPTION_FORMATS, maxBytes: CAPTION_MAX_BYTES, sourceKinds: ["video"] },
+    cover: {
+      mode: "after",
+      limits: { mimeTypes: THUMBNAIL_TYPES, maxBytes: THUMBNAIL_MAX_BYTES },
+      sourceKinds: ["video"],
+      help: "Miniature personnalisée : la chaîne doit être validée par téléphone (youtube.com/verify).",
+    },
+  },
+  postComment: postYoutubeComment,
+  uploadSubtitles: uploadYoutubeSubtitles,
+  setCover: setYoutubeThumbnail,
   posts: {
     list: (context) => listUploads(context),
     update: updateVideo,

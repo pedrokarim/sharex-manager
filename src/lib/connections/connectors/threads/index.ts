@@ -22,12 +22,15 @@ import {
   listThreadsPosts,
   refreshLongLived,
 } from "./api";
-import { THREADS_LIMITS, THREADS_PUBLISH_FIELDS, normalizeThreadsOptions } from "./options";
+import { TEXT_MAX, THREADS_LIMITS, THREADS_PUBLISH_FIELDS, normalizeThreadsOptions } from "./options";
 import { findExistingThreadsPost, publishToThreads } from "./publish";
+import { REPLY_QUOTA_METHOD, postThreadsReply } from "./follow-ups";
 
 export const SCOPE_BASIC = "threads_basic";
 export const SCOPE_PUBLISH = "threads_content_publish";
 export const SCOPE_DELETE = "threads_delete";
+/** Réponses (premier commentaire) : jamais demandée à la première connexion, seulement ajoutée à la demande. */
+export const SCOPE_MANAGE_REPLIES = "threads_manage_replies";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -41,9 +44,11 @@ export const threadsAccountQuota: AccountQuota = {
   buckets: [
     { id: "posts", label: "Publications", limit: 250 },
     { id: "deletes", label: "Suppressions", limit: 100 },
+    { id: "replies", label: "Réponses", limit: 1000 },
   ],
   cost: (method) => {
     if (method === "threads_publish") return { bucket: "posts", units: 1 };
+    if (method === REPLY_QUOTA_METHOD) return { bucket: "replies", units: 1 };
     if (method === "threads.delete") return { bucket: "deletes", units: 1 };
     return null;
   },
@@ -62,6 +67,8 @@ export const threadsConnector: Connector = {
     { capability: "posts.list", scopes: [SCOPE_BASIC] },
     // La gestion se réduit à la suppression : l'API ne modifie pas une publication.
     { capability: "posts.manage", scopes: [SCOPE_DELETE] },
+    // Premier commentaire : réponse du profil à sa propre publication.
+    { capability: "comment.create", scopes: [SCOPE_MANAGE_REPLIES], allOf: [SCOPE_PUBLISH] },
   ],
   app: {
     envPrefix: "THREADS",
@@ -71,6 +78,7 @@ export const threadsConnector: Connector = {
       "Use cases › Customize : ajouter « threads_content_publish » et « threads_delete » (« threads_basic » est déjà là).",
       "Settings du cas d’usage : recopier ici le « Threads App ID » et le « Threads App secret » (pas l’identifiant de l’application Meta), et coller l’URI de redirection ci-dessus dans « Valid OAuth Redirect URIs », identique au caractère près.",
       "App roles › Roles › Add People › Threads Tester : inviter chaque profil Threads à connecter, puis accepter l’invitation dans Threads (Paramètres › Compte › Autorisations des sites web).",
+      "Facultatif, pour le premier commentaire (réponse à sa propre publication) : ajouter aussi « threads_manage_replies » au cas d’usage. Elle n’est demandée qu’au moment où vous l’ajoutez à un profil déjà connecté.",
       "Laisser l’application en développement : sans revue de Meta, elle publie pour les profils invités, ce qui suffit à une instance personnelle.",
       "Le site doit être joignable depuis Internet en HTTPS : Threads vient chercher images et vidéos sous /api/connections/media/. Derrière Cloudflare, exempter ce seul chemin des défis anti-robots.",
     ],
@@ -121,6 +129,15 @@ export const threadsConnector: Connector = {
     return Object.fromEntries(Object.entries(normalized).filter(([, value]) => value !== undefined));
   },
   publish: publishToThreads,
+  followUps: {
+    comment: {
+      maxLength: TEXT_MAX,
+      count: "emoji-bytes",
+      documented: true,
+      help: "Publié comme une réponse du profil à sa propre publication ; 500 caractères au plus, un émoji comptant pour plusieurs.",
+    },
+  },
+  postComment: postThreadsReply,
   findExisting: findExistingThreadsPost,
   posts: {
     list: (context) => listThreadsPosts(context),

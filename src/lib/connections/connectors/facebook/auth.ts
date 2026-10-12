@@ -8,7 +8,7 @@
  * de gestion se font avec le jeton de Page.
  */
 
-import type { AccessToken, AccountProfile, AccountReadContext, ConnectionCapability, DiscoveredAccount, TokenHookContext, TokenSet } from "../../types";
+import { CAPABILITIES, type AccessToken, type AccountProfile, type AccountReadContext, type ConnectionCapability, type DiscoveredAccount, type TokenHookContext, type TokenSet } from "../../types";
 import { OAuthError } from "../../errors";
 import { readJsonKeepingIds } from "../../json";
 import { FACEBOOK_WEB, GRAPH_API, cleanMessage, graphRequest, proofFor } from "./graph";
@@ -68,10 +68,16 @@ export async function fetchGrantedFacebookScopes(token: AccessToken, context: To
   return Array.isArray(data.scopes) ? data.scopes.filter((scope): scope is string => typeof scope === "string") : null;
 }
 
-/** Une Page sans la tâche `CREATE_CONTENT` ne peut que lister ses publications. */
+/**
+ * Une Page sans la tâche `CREATE_CONTENT` ne peut que lister ses
+ * publications ; sans `MODERATE`, elle ne peut pas commenter.
+ */
 function pageCapabilities(tasks: string[] | undefined): ConnectionCapability[] | undefined {
   if (!Array.isArray(tasks)) return undefined;
-  return tasks.includes("CREATE_CONTENT") ? undefined : ["posts.list"];
+  if (!tasks.includes("CREATE_CONTENT")) return ["posts.list"];
+  // Commenter au nom de la Page exige la tâche MODERATE (référence de `/{object-id}/comments`).
+  if (!tasks.includes("MODERATE")) return CAPABILITIES.filter((capability) => capability !== "comment.create");
+  return undefined;
 }
 
 const pageUrl = (page: { id: string; link?: string }) => (page.link?.startsWith("https://") ? page.link : `${FACEBOOK_WEB}/${encodeURIComponent(page.id)}`);

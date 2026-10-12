@@ -28,13 +28,31 @@
  *   la reconnexion.
  */
 
-import { isPublishPending, type Connector, type PublishContext, type PublishJob, type PublishJobSummary, type PublishOutcome, type PublishSource } from "./types";
-import { CreditsExhaustedError, QuotaExceededError, ReconnectRequiredError, errorMessage } from "./errors";
+import path from "path";
+import {
+  FOLLOW_UP_CAPABILITY,
+  isFollowUpPending,
+  isFollowUpSkipped,
+  isPublishPending,
+  type AccountSummary,
+  type Connector,
+  type FollowUpContext,
+  type FollowUpOutcome,
+  type PublishContext,
+  type PublishFollowUp,
+  type PublishFollowUpKind,
+  type PublishFollowUpsInput,
+  type PublishJob,
+  type PublishJobSummary,
+  type PublishOutcome,
+  type PublishSource,
+} from "./types";
+import { CreditsExhaustedError, QuotaExceededError, ReconnectRequiredError, errorMessage, isTransientError } from "./errors";
 import { newId, readStore, updateStore } from "./store";
 import { accountContext, getAccountSummary, noteReconnectRequired, requireCapability } from "./accounts";
 import { getConnector } from "./registry";
 import { accountQuotaPausedUntil, clearAccountQuotaPause, clearQuotaPause, markAccountQuotaExhausted, markQuotaExhausted, quotaPausedUntil } from "./quota";
-import { checkPublishLimits, estimatePublishCost, mimeTypeOfName, TEXT_HARD_LIMIT } from "./limits";
+import { checkPublishLimits, countText, estimatePublishCost, mimeTypeOfName, TEXT_HARD_LIMIT } from "./limits";
 import { assertBudget, clearCreditsExhausted, creditsExhausted, markCreditsExhausted, recordSpend } from "./billing";
 import { createPublicLink, isInTempDir, linkAccesses, newTempFilePath, removeTempFiles, revokeLinksForJob } from "./public-media";
 
@@ -47,6 +65,12 @@ export interface PublishFileRef {
   module: string;
   id: string;
   file?: string;
+  /**
+   * Fichier d'une suite de publication : sous-titres, ou couverture posée
+   * après coup. Le module reçoit alors `resolveExportFile(id, { file,
+   * purpose })` et doit rendre ce fichier-là (vérifié par son nom).
+   */
+  purpose?: "subtitles" | "cover";
 }
 
 /** Rend le chemin absolu d'un fichier à publier ; le module propriétaire contrôle le nom. */
@@ -82,6 +106,8 @@ interface QueueState {
   processingIntervalMs: number;
   /** Faux dans les tests : la file ne démarre que sur appel explicite. */
   autoRun: boolean;
+  /** Passage en cours sur les suites de publication. */
+  followUpPromise: Promise<void> | null;
 }
 
 /**
@@ -90,6 +116,15 @@ interface QueueState {
  */
 const defaultResolver: SourceResolver = async (ref) => {
   const { apiModuleManager } = await import("@/lib/modules/module-manager.api");
+  if (ref.purpose) {
+    const resolved = (await apiModuleManager.callModuleFunction(ref.module, "resolveExportFile", ref.id, { file: ref.file, purpose: ref.purpose })) as { path?: string; file?: string } | null;
+    if (!resolved?.path) throw new Error("Fichier introuvable : l’export a peut-être été supprimé.");
+    // Un module qui ne sait pas encore résoudre ce fichier rendrait la vidéo : on ne l'envoie jamais à sa place.
+    if (ref.file && resolved.file !== ref.file && path.basename(resolved.path) !== ref.file) {
+      throw new Error("Le module n’a pas rendu le fichier demandé (sous-titres ou couverture).");
+    }
+    return resolved.path;
+  }
   const resolved = (await apiModuleManager.callModuleFunction(ref.module, "resolveExportFile", ref.id)) as { path?: string } | null;
   if (!resolved?.path) throw new Error("Fichier à publier introuvable : l’export a peut-être été supprimé.");
   return resolved.path;
@@ -115,10 +150,12 @@ const state: QueueState = (holder.__sxmPublishQueue ??= {
   sleep: defaultSleep,
   processingIntervalMs: 30_000,
   autoRun: true,
+  followUpPromise: null,
 });
 // File créée par une version précédente de ce fichier (rechargement à chaud).
 state.continuing ??= new Map();
 state.processingTimerAt ??= 0;
+state.followUpPromise ??= null;
 
 /** Réglages des tests : résolution des fichiers, attentes, démarrage automatique. */
 export function configurePublishQueue(options: {
@@ -166,16 +203,37 @@ function patchJob(id: string, patch: Partial<PublishJob>): PublishJob | null {
   return updated;
 }
 
+/** Libellé d'une suite en échec, en tête de l'avertissement du travail. */
+const FOLLOW_UP_FAILURES: Record<PublishFollowUpKind, string> = {
+  comment: "Premier commentaire non posé",
+  subtitles: "Sous-titres non ajoutés",
+  cover: "Couverture non changée",
+};
+
 function summarize(job: PublishJob): PublishJobSummary {
-  const { resume: _resume, ...rest } = job;
+  const { resume: _resume, followUps, ...rest } = job;
   void _resume;
   const fallback = job.source.kind === "text" ? job.source.text.replace(/\s+/g, " ").trim().slice(0, 80) : undefined;
-  return { ...rest, title: typeof job.options.title === "string" ? job.options.title : (job.source.name ?? fallback) };
+  const summary: PublishJobSummary = { ...rest, title: typeof job.options.title === "string" ? job.options.title : (job.source.name ?? fallback) };
+  if (followUps && followUps.length > 0) {
+    summary.followUps = followUps.map(({ resume: _followUpResume, ...entry }) => {
+      void _followUpResume;
+      return { ...entry, ...(entry.result ? { result: { ...entry.result } } : {}) };
+    });
+    // Une suite en échec ne fait pas échouer la publication : elle s'ajoute à l'avertissement.
+    const failures = followUps.filter((entry) => entry.state === "failed").map((entry) => `${FOLLOW_UP_FAILURES[entry.kind]} : ${entry.error ?? "erreur inconnue"}`);
+    if (failures.length > 0) summary.warning = [job.warning, ...failures].filter(Boolean).join(" ");
+  }
+  return summary;
 }
+
+/** Le travail a-t-il encore des suites à exécuter ? */
+const hasWaitingFollowUps = (job: PublishJob) => Boolean(job.followUps?.some((entry) => entry.state === "waiting"));
 
 /** Garde l'historique borné : les plus anciens travaux terminés partent en premier. */
 function prune(jobs: PublishJob[]): PublishJob[] {
-  const finished = jobs.filter((job) => FINISHED.has(job.state)).sort((a, b) => b.updatedAt - a.updatedAt);
+  // Un travail publié dont une suite attend encore n'est jamais effacé.
+  const finished = jobs.filter((job) => FINISHED.has(job.state) && !hasWaitingFollowUps(job)).sort((a, b) => b.updatedAt - a.updatedAt);
   const drop = new Set(finished.slice(KEEP_FINISHED).map((job) => job.id));
   return jobs.filter((job) => !drop.has(job.id));
 }
@@ -225,35 +283,48 @@ function publishedText(source: PublishSource, options: Record<string, unknown>):
  * compte sans la capacité voulue, ou à reconnecter, est refusé, de même
  * qu'un envoi qui dépasserait le budget mensuel du service.
  */
-export function enqueuePublish(input: { accountId: string; source: PublishSource; options: unknown; publishAt?: number | null }): PublishJobSummary {
+export function enqueuePublish(input: {
+  accountId: string;
+  source: PublishSource;
+  options: unknown;
+  publishAt?: number | null;
+  /** Suites à exécuter une fois la publication faite (premier commentaire, sous-titres, couverture). */
+  followUps?: PublishFollowUpsInput | null;
+}): PublishJobSummary {
   assertSource(input.source);
   const [first, ...others] = requiredCapabilities(input.source);
   const { connector, account } = requireCapability(input.accountId, first);
   for (const capability of others) requireCapability(input.accountId, capability);
   if (!connector.publish) throw new Error(`${connector.label} ne sait pas encore publier.`);
-  const problems = checkPublishLimits(account.limits ?? connector.limits, input.source, {
+  const requested = readFollowUpsInput(input.followUps);
+  // Couverture prise par le service à la publication : elle devient celle de la source.
+  const prepared = applyPublishCover(connector, input.source, input.options, requested.cover);
+  const source = prepared.source;
+  const problems = checkPublishLimits(account.limits ?? connector.limits, source, {
     measure: connector.measureText ? (text) => connector.measureText!(text) : undefined,
   });
   if (problems.length > 0) throw new Error(`${connector.label} n’accepte pas cette publication : ${problems.join(" ")}`);
   const options = connector.normalizeOptions
-    ? connector.normalizeOptions(input.options, input.source)
-    : ((input.options && typeof input.options === "object" ? input.options : {}) as Record<string, unknown>);
+    ? connector.normalizeOptions(prepared.options, source)
+    : ((prepared.options && typeof prepared.options === "object" ? prepared.options : {}) as Record<string, unknown>);
+  const followUps = buildFollowUps(connector, account, source, requested, prepared.coverAtPublish);
   const now = Date.now();
   let publishAt: number | undefined;
   if (input.publishAt !== undefined && input.publishAt !== null) {
     if (!Number.isFinite(input.publishAt) || input.publishAt > now + MAX_DELAY_MS) throw new Error("Date de publication invalide.");
     if (input.publishAt > now + 60_000) publishAt = Math.round(input.publishAt);
   }
-  const estimate = estimatePublishCost(connector.pricing, input.source.kind, publishedText(input.source, options));
+  const estimate = estimatePublishCost(connector.pricing, source.kind, publishedText(source, options));
   if (estimate) assertBudget(connector, estimate.amount, now);
   const job: PublishJob = {
     id: newId("pub"),
     accountId: input.accountId,
     connector: connector.id,
-    source: { ...input.source },
+    source: { ...source },
     options,
     state: "queued",
     bytesSent: 0,
+    ...(followUps.length > 0 ? { followUps } : {}),
     ...(publishAt ? { publishAt } : {}),
     ...(estimate ? { cost: { amount: estimate.amount, currency: estimate.currency } } : {}),
     createdAt: now,
@@ -264,11 +335,18 @@ export function enqueuePublish(input: { accountId: string; source: PublishSource
   return summarize(job);
 }
 
-export function listJobs(filter: { accountId?: string; ids?: string[] } = {}): PublishJobSummary[] {
+/**
+ * Travaux, du plus récent au plus ancien ; filtrés par compte, par
+ * identifiants, ou par source (`sourceModule`, `sourceId` : les publications
+ * d'un export).
+ */
+export function listJobs(filter: { accountId?: string; ids?: string[]; sourceModule?: string; sourceId?: string } = {}): PublishJobSummary[] {
   const ids = filter.ids ? new Set(filter.ids) : null;
   return readJobs()
     .filter((job) => !filter.accountId || job.accountId === filter.accountId)
     .filter((job) => !ids || ids.has(job.id))
+    .filter((job) => !filter.sourceModule || job.source.module === filter.sourceModule)
+    .filter((job) => !filter.sourceId || job.source.id === filter.sourceId)
     .sort((a, b) => b.createdAt - a.createdAt)
     .map(summarize);
 }
@@ -291,7 +369,8 @@ export function cancelJob(id: string): PublishJobSummary {
   if (job.state === "processing" && job.result) throw new Error("La vidéo est déjà envoyée : supprimez-la depuis l’onglet « Publications ».");
   if (state.running?.jobId === id) state.running.controller.abort();
   state.continuing.get(id)?.abort();
-  return summarize(patchJob(id, { state: "cancelled", retryAt: undefined, checkAt: undefined, note: undefined })!);
+  const followUps = job.followUps?.map((entry) => (entry.state === "waiting" ? skippedFollowUp(entry, "cancelled", "Publication annulée.") : entry));
+  return summarize(patchJob(id, { state: "cancelled", retryAt: undefined, checkAt: undefined, note: undefined, ...(followUps ? { followUps } : {}) })!);
 }
 
 /**
@@ -332,7 +411,13 @@ export function startPublishQueue() {
 
 /** Réveille la file (un compte reconnecté, une tâche planifiée). */
 export function wakePublishQueue() {
+  // Suites suspendues jusqu'à la reconnexion du compte : elles repartent au prochain passage.
+  changeJobs((jobs) => {
+    for (const job of jobs) for (const entry of job.followUps ?? []) if (entry.state === "waiting" && entry.note === RECONNECT_NOTE) delete entry.checkAt;
+  });
   schedulePump();
+  // Des suites attendaient peut-être la reconnexion du compte.
+  scheduleProcessing();
 }
 
 /** Attend la fin de la file (tests). */
@@ -607,6 +692,11 @@ function scheduleWake() {
 function nextProcessingAt(): number | undefined {
   let next = Number.POSITIVE_INFINITY;
   for (const job of readJobs()) {
+    if (job.state === "done") {
+      // Suites d'une publication faite : à leur heure, sinon tout de suite.
+      for (const entry of job.followUps ?? []) if (entry.state === "waiting") next = Math.min(next, entry.checkAt ?? 0);
+      continue;
+    }
     if (job.state !== "processing") continue;
     // Suivi sans heure fixée : un intervalle après l'entrée en traitement.
     next = Math.min(next, job.checkAt ?? (job.processingSince ?? job.updatedAt) + state.processingIntervalMs);
@@ -657,6 +747,8 @@ export function checkProcessingJobs(options: { all?: boolean } = {}): Promise<vo
         if (job.result) await trackProcessing(job);
         else await continueJob(job);
       }
+      // Les suites des publications faites (celles qui viennent de finir comprises).
+      await runFollowUps(options);
     })
     .finally(() => {
       if (state.processingPromise === promise) state.processingPromise = null;
@@ -750,4 +842,395 @@ async function trackProcessing(job: PublishJob) {
       patchJob(job.id, { checkAt: later, processingSince: job.processingSince ?? job.updatedAt });
     }
   }
+}
+
+// ─── Suites de publication ────────────────────────────────────────
+
+/** Attentes avant un nouvel essai après une erreur passagère d'une suite. */
+const FOLLOW_UP_BACKOFF_MS = [60_000, 2 * 60_000, 5 * 60_000, 15 * 60_000, 30 * 60_000, 60 * 60_000, 3 * 60 * 60_000];
+/** Erreurs passagères de suite tolérées avant l'échec. */
+const FOLLOW_UP_MAX_ERRORS = 8;
+/** Attente d'une condition sans date connue (vidéo privée) : abandon après trente jours. */
+const FOLLOW_UP_MAX_WAIT_MS = 30 * 24 * 60 * 60 * 1000;
+/** Une attente demandée par le connecteur est reprise au plus tôt après une seconde, au plus tard après un jour. */
+const FOLLOW_UP_MIN_DELAY_MS = 1000;
+const FOLLOW_UP_MAX_DELAY_MS = 24 * 60 * 60 * 1000;
+const RECONNECT_NOTE = "En attente de la reconnexion du compte.";
+const COMMENT_HARD_LIMIT = 20_000;
+
+const FOLLOW_UP_LABELS: Record<PublishFollowUpKind, string> = {
+  comment: "un premier commentaire",
+  subtitles: "des sous-titres",
+  cover: "une couverture après la publication",
+};
+
+/** Autorisation à ajouter, telle que l'interface la propose. */
+const AUTHORIZE_LABELS: Record<PublishFollowUpKind, string> = {
+  comment: "Autoriser les commentaires",
+  subtitles: "Autoriser les sous-titres",
+  cover: "Autoriser la couverture",
+};
+
+/** Nom de fichier venu d'un module : un nom seul, jamais un chemin. */
+function assertFileName(value: unknown, what: string): string {
+  if (typeof value !== "string" || !value || value.length > 255 || /[\\/\u0000-\u001f]/.test(value) || value === "." || value === "..") {
+    throw new Error(`${what} invalide.`);
+  }
+  return value;
+}
+
+const optionalId = (value: unknown) => (typeof value === "string" && /^[A-Za-z0-9_.:-]{1,200}$/.test(value) ? value : undefined);
+
+/** Lit et vérifie la forme des suites demandées. */
+function readFollowUpsInput(input: unknown): PublishFollowUpsInput {
+  if (input === undefined || input === null) return {};
+  if (typeof input !== "object") throw new Error("Suites de publication invalides.");
+  const raw = input as Record<string, unknown>;
+  const result: PublishFollowUpsInput = {};
+  if (raw.comment !== undefined && raw.comment !== null) {
+    if (typeof raw.comment !== "string") throw new Error("Premier commentaire invalide.");
+    const text = raw.comment
+      .replace(/\r\n?/g, "\n")
+      .replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, "")
+      .trim();
+    if (text.length > COMMENT_HARD_LIMIT) throw new Error("Premier commentaire trop long.");
+    if (text) result.comment = text;
+  }
+  if (raw.subtitles !== undefined && raw.subtitles !== null) {
+    const subtitles = raw.subtitles as Record<string, unknown>;
+    const file = assertFileName(subtitles?.file, "Fichier de sous-titres");
+    const language = typeof subtitles.language === "string" ? subtitles.language.trim() : "";
+    if (!/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(language)) throw new Error("Langue des sous-titres invalide (code BCP 47 attendu, « fr », « en-US »…).");
+    const id = optionalId(subtitles.id);
+    result.subtitles = { file, language, ...(id ? { id } : {}) };
+  }
+  if (raw.cover !== undefined && raw.cover !== null) {
+    const cover = raw.cover as Record<string, unknown>;
+    const file = assertFileName(cover?.file, "Fichier de couverture");
+    const positive = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.round(value) : undefined);
+    const id = optionalId(cover.id);
+    const width = positive(cover.width);
+    const height = positive(cover.height);
+    const bytes = positive(cover.bytes);
+    result.cover = {
+      file,
+      ...(id ? { id } : {}),
+      ...(typeof cover.mimeType === "string" && /^image\/[a-z0-9.+-]+$/.test(cover.mimeType) ? { mimeType: cover.mimeType } : {}),
+      ...(width ? { width } : {}),
+      ...(height ? { height } : {}),
+      ...(bytes ? { bytes } : {}),
+    };
+  }
+  return result;
+}
+
+/**
+ * Couverture qu'un service ne prend qu'à la publication (Instagram) : elle
+ * devient la couverture de la source, et l'option du connecteur qui la fait
+ * servir est fixée. Une source qui a déjà sa couverture la garde.
+ */
+function applyPublishCover(
+  connector: Connector,
+  source: PublishSource,
+  options: unknown,
+  cover: PublishFollowUpsInput["cover"]
+): { source: PublishSource; options: unknown; coverAtPublish: boolean } {
+  const support = connector.followUps?.cover;
+  if (!cover || support?.mode !== "publish" || (source.kind !== "video" && source.kind !== "image")) return { source, options, coverAtPublish: false };
+  if (support.sourceKinds && !support.sourceKinds.includes(source.kind)) return { source, options, coverAtPublish: false };
+  const base = options && typeof options === "object" ? { ...(options as Record<string, unknown>) } : {};
+  if (support.option) base[support.option.key] = support.option.value;
+  if (source.cover) return { source, options: base, coverAtPublish: true };
+  const withCover: PublishSource = {
+    ...source,
+    cover: {
+      id: cover.id ?? source.id,
+      kind: "image" as const,
+      file: cover.file,
+      bytes: cover.bytes ?? 0,
+      ...(cover.mimeType ? { mimeType: cover.mimeType } : {}),
+      ...(cover.width ? { width: cover.width } : {}),
+      ...(cover.height ? { height: cover.height } : {}),
+    },
+  };
+  return { source: withCover, options: base, coverAtPublish: true };
+}
+
+function skippedFollowUp(entry: PublishFollowUp, code: NonNullable<PublishFollowUp["skipCode"]>, note: string): PublishFollowUp {
+  const { checkAt: _checkAt, ...rest } = entry;
+  void _checkAt;
+  return { ...rest, state: "skipped", skipCode: code, note, updatedAt: Date.now() };
+}
+
+/** Le service accepte-t-il cette suite pour ce type de source ? */
+function followUpSupported(connector: Connector, kind: PublishFollowUpKind, source: PublishSource): boolean {
+  const support = connector.followUps?.[kind];
+  if (!support) return false;
+  if (support.sourceKinds && !support.sourceKinds.includes(source.kind)) return false;
+  if (kind === "comment") return Boolean(connector.postComment);
+  if (kind === "subtitles") return Boolean(connector.uploadSubtitles);
+  return connector.followUps?.cover?.mode === "publish" || Boolean(connector.setCover);
+}
+
+/**
+ * Suites d'un nouveau travail. Ce que le service ne permet pas, ou ce que le
+ * compte n'a pas autorisé, est rangé « skipped » avec la raison (jamais une
+ * erreur : la publication part quand même). Un commentaire trop long, ou des
+ * sous-titres dans un format refusé, sont refusés avant d'entrer dans la file.
+ */
+function buildFollowUps(
+  connector: Connector,
+  account: AccountSummary,
+  source: PublishSource,
+  input: PublishFollowUpsInput,
+  coverAtPublish: boolean
+): PublishFollowUp[] {
+  const now = Date.now();
+  const entries: PublishFollowUp[] = [];
+  const add = (entry: Omit<PublishFollowUp, "state" | "attempts" | "updatedAt">) => {
+    let followUp: PublishFollowUp = { ...entry, state: "waiting", attempts: 0, updatedAt: now };
+    const capability = FOLLOW_UP_CAPABILITY[entry.kind];
+    if (!followUpSupported(connector, entry.kind, source)) {
+      followUp = skippedFollowUp(followUp, "unsupported", `${connector.label} ne permet pas d’ajouter ${FOLLOW_UP_LABELS[entry.kind]} à cette publication.`);
+    } else if (!entry.atPublish && !account.capabilities.includes(capability)) {
+      followUp = skippedFollowUp(
+        followUp,
+        "unauthorized",
+        `Autorisation manquante chez ${connector.label} : « ${AUTHORIZE_LABELS[entry.kind]} » relance la connexion du compte avec cette permission en plus.`
+      );
+    }
+    entries.push(followUp);
+  };
+  if (input.comment) {
+    const limit = connector.followUps?.comment;
+    if (limit && followUpSupported(connector, "comment", source)) {
+      const used = countText(input.comment, limit.count);
+      if (used > limit.maxLength) throw new Error(`Premier commentaire trop long pour ${connector.label} : ${used} caractères, ${limit.maxLength} au plus.`);
+    }
+    add({ kind: "comment", text: input.comment });
+  }
+  if (input.subtitles) {
+    const formats = connector.followUps?.subtitles?.formats;
+    const extension = path.extname(input.subtitles.file).slice(1).toLowerCase();
+    if (formats && followUpSupported(connector, "subtitles", source) && !formats.includes(extension)) {
+      throw new Error(`${connector.label} n’accepte que des sous-titres au format ${formats.map((format) => `.${format}`).join(", ")}.`);
+    }
+    add({ kind: "subtitles", file: input.subtitles.file, language: input.subtitles.language, ...(input.subtitles.id ? { fileId: input.subtitles.id } : {}) });
+  }
+  if (input.cover) {
+    add({ kind: "cover", file: input.cover.file, ...(input.cover.id ? { fileId: input.cover.id } : {}), ...(coverAtPublish ? { atPublish: true } : {}) });
+  }
+  return entries;
+}
+
+/** Modifie une suite d'un travail ; une clé à `undefined` est retirée. */
+function patchFollowUp(jobId: string, kind: PublishFollowUpKind, patch: Partial<PublishFollowUp>): PublishFollowUp | null {
+  let updated: PublishFollowUp | null = null;
+  changeJobs((jobs) => {
+    const job = jobs.find((entry) => entry.id === jobId);
+    const followUp = job?.followUps?.find((entry) => entry.kind === kind);
+    if (!job || !followUp) return;
+    Object.assign(followUp, patch, { updatedAt: Date.now() });
+    for (const key of Object.keys(patch) as (keyof PublishFollowUp)[]) if (patch[key] === undefined) delete followUp[key];
+    job.updatedAt = Date.now();
+    updated = { ...followUp };
+  });
+  return updated;
+}
+
+/**
+ * Passe sur les suites dues des publications faites (toutes avec `all`).
+ * Hors du verrou d'envoi ; un seul passage à la fois. Appelé par la boucle de
+ * suivi, au démarrage et après chaque publication.
+ */
+export function runFollowUps(options: { all?: boolean } = {}): Promise<void> {
+  if (state.followUpPromise) return state.followUpPromise;
+  const promise: Promise<void> = Promise.resolve()
+    .then(async () => {
+      const due: { jobId: string; kind: PublishFollowUpKind }[] = [];
+      const now = Date.now();
+      for (const job of readJobs()) {
+        if (job.state !== "done" || !job.result) continue;
+        for (const entry of job.followUps ?? []) {
+          if (entry.state === "waiting" && (options.all || !entry.checkAt || entry.checkAt <= now)) due.push({ jobId: job.id, kind: entry.kind });
+        }
+      }
+      // Le commentaire en dernier : couverture et sous-titres ne dépendent pas de la visibilité.
+      const order: Record<PublishFollowUpKind, number> = { cover: 0, subtitles: 1, comment: 2 };
+      due.sort((a, b) => order[a.kind] - order[b.kind]);
+      for (const { jobId, kind } of due) await runFollowUp(jobId, kind);
+    })
+    .finally(() => {
+      if (state.followUpPromise === promise) state.followUpPromise = null;
+    });
+  state.followUpPromise = promise;
+  return promise;
+}
+
+/** Chemin du fichier d'une suite, résolu par le module propriétaire. */
+function resolveFollowUpFile(job: PublishJob, entry: PublishFollowUp): Promise<string> {
+  return state.resolveSource({ module: job.source.module, id: entry.fileId ?? job.source.id, file: entry.file, purpose: entry.kind === "subtitles" ? "subtitles" : "cover" });
+}
+
+/** Une suite : vérifications, appel au connecteur, puis rangement de ce qu'il rend. */
+async function runFollowUp(jobId: string, kind: PublishFollowUpKind) {
+  const job = readJobs().find((entry) => entry.id === jobId);
+  const entry = job?.followUps?.find((candidate) => candidate.kind === kind);
+  if (!job || !entry || job.state !== "done" || !job.result || entry.state !== "waiting") return;
+  const now = Date.now();
+  // Couverture envoyée avec la publication : rien à faire de plus.
+  if (entry.atPublish) {
+    patchFollowUp(jobId, kind, { state: "done", result: { ...job.result }, note: "Couverture envoyée avec la publication.", checkAt: undefined, error: undefined });
+    return;
+  }
+  const connector = getConnector(job.connector);
+  if (!connector || !followUpSupported(connector, kind, job.source)) {
+    patchFollowUp(jobId, kind, skippedFollowUp(entry, "unsupported", `${connector?.label ?? "Ce service"} ne permet pas d’ajouter ${FOLLOW_UP_LABELS[kind]}.`));
+    return;
+  }
+  const account = getAccountSummary(job.accountId);
+  if (!account) {
+    patchFollowUp(jobId, kind, skippedFollowUp(entry, "cancelled", "Le compte a été déconnecté."));
+    return;
+  }
+  if (account.status !== "connected") {
+    patchFollowUp(jobId, kind, { checkAt: now + 60 * 60 * 1000, note: RECONNECT_NOTE });
+    return;
+  }
+  if (!account.capabilities.includes(FOLLOW_UP_CAPABILITY[kind])) {
+    patchFollowUp(
+      jobId,
+      kind,
+      skippedFollowUp(entry, "unauthorized", `Autorisation manquante chez ${connector.label} : « ${AUTHORIZE_LABELS[kind]} » relance la connexion du compte avec cette permission en plus.`)
+    );
+    return;
+  }
+  const paused = quotaPausedUntil(connector, now) ?? accountQuotaPausedUntil(job.accountId, now);
+  if (paused) {
+    patchFollowUp(jobId, kind, { checkAt: paused, note: "Quota du service épuisé : la suite reprendra après la remise à zéro." });
+    return;
+  }
+
+  const attempt = entry.attempts + 1;
+  patchFollowUp(jobId, kind, { attempts: attempt });
+  try {
+    const { context } = accountContext(job.accountId);
+    const followUpContext: FollowUpContext = {
+      ...context,
+      result: { ...job.result },
+      source: job.source,
+      options: job.options,
+      attempt,
+      resume: entry.resume,
+      saveProgress: (resume) => void patchFollowUp(jobId, kind, { resume }),
+    };
+    let outcome: FollowUpOutcome;
+    if (kind === "comment") {
+      outcome = await connector.postComment!(followUpContext, entry.text ?? "");
+    } else if (kind === "subtitles") {
+      const filePath = await resolveFollowUpFile(job, entry);
+      outcome = await connector.uploadSubtitles!(followUpContext, { path: filePath, language: entry.language ?? "fr" });
+    } else {
+      const filePath = await resolveFollowUpFile(job, entry);
+      outcome = await connector.setCover!(followUpContext, { path: filePath, mimeType: mimeTypeOfName(entry.file ?? filePath) });
+    }
+    settleFollowUp(jobId, entry, outcome);
+  } catch (error) {
+    failFollowUp(jobId, entry, connector, job.accountId, error);
+  }
+}
+
+/** Range ce qu'a rendu le connecteur : faite, à reprendre, ou abandonnée sans erreur. */
+function settleFollowUp(jobId: string, entry: PublishFollowUp, outcome: FollowUpOutcome) {
+  const now = Date.now();
+  if (isFollowUpSkipped(outcome)) {
+    patchFollowUp(jobId, entry.kind, { ...skippedFollowUp(entry, "service", String(outcome.note || "Suite non faite.").slice(0, 300)), resume: undefined, error: undefined });
+    return;
+  }
+  if (isFollowUpPending(outcome)) {
+    const note = String(outcome.note || "En attente chez le service.").slice(0, 300);
+    const waitingSince = entry.waitingSince ?? now;
+    const explicit = typeof outcome.retryAt === "number" && Number.isFinite(outcome.retryAt) ? outcome.retryAt : undefined;
+    if (explicit !== undefined && explicit > now + MAX_DELAY_MS) {
+      patchFollowUp(jobId, entry.kind, { ...skippedFollowUp(entry, "expired", `${note} La date annoncée est trop lointaine : la suite est abandonnée.`), resume: undefined });
+      return;
+    }
+    // Sans date annoncée (vidéo restée privée), l'attente est bornée.
+    if (explicit === undefined && now - waitingSince > FOLLOW_UP_MAX_WAIT_MS) {
+      patchFollowUp(jobId, entry.kind, { ...skippedFollowUp(entry, "expired", `${note} Toujours impossible après trente jours : la suite est abandonnée.`), resume: undefined });
+      return;
+    }
+    const delay = Math.min(Math.max(Number(outcome.retryAfterMs) || 0, FOLLOW_UP_MIN_DELAY_MS), FOLLOW_UP_MAX_DELAY_MS);
+    patchFollowUp(jobId, entry.kind, { checkAt: Math.max(explicit ?? now + delay, now + FOLLOW_UP_MIN_DELAY_MS), waitingSince, note, error: undefined });
+    return;
+  }
+  const result = {
+    ...(typeof outcome.externalId === "string" && outcome.externalId ? { externalId: outcome.externalId } : {}),
+    ...(typeof outcome.url === "string" && /^https:\/\//.test(outcome.url) ? { url: outcome.url } : {}),
+  };
+  patchFollowUp(jobId, entry.kind, {
+    state: "done",
+    result: Object.keys(result).length > 0 ? result : undefined,
+    note: typeof outcome.note === "string" && outcome.note ? outcome.note.slice(0, 300) : undefined,
+    error: undefined,
+    checkAt: undefined,
+    resume: undefined,
+    skipCode: undefined,
+  });
+}
+
+/** Erreur d'une suite : quota, reconnexion, erreur passagère (nouvel essai) ou échec. Jamais l'échec du travail. */
+function failFollowUp(jobId: string, entry: PublishFollowUp, connector: Connector, accountId: string, error: unknown) {
+  const now = Date.now();
+  const message = errorMessage(error, "Suite de publication impossible.").slice(0, 300);
+  if (error instanceof QuotaExceededError) {
+    let retryAt: number;
+    if (error.scope === "account") {
+      retryAt = error.retryAt > now ? error.retryAt : now + 60 * 60 * 1000;
+      markAccountQuotaExhausted(accountId, retryAt);
+    } else {
+      retryAt = markQuotaExhausted(connector, error.bucket);
+    }
+    patchFollowUp(jobId, entry.kind, { checkAt: retryAt, note: message });
+    return;
+  }
+  if (error instanceof ReconnectRequiredError) {
+    noteReconnectRequired(accountId, error);
+    patchFollowUp(jobId, entry.kind, { checkAt: now + 60 * 60 * 1000, note: RECONNECT_NOTE, error: message });
+    return;
+  }
+  if (isTransientError(error)) {
+    const errorCount = (entry.errorCount ?? 0) + 1;
+    if (errorCount < FOLLOW_UP_MAX_ERRORS) {
+      const delay = FOLLOW_UP_BACKOFF_MS[Math.min(errorCount - 1, FOLLOW_UP_BACKOFF_MS.length - 1)];
+      patchFollowUp(jobId, entry.kind, { errorCount, checkAt: now + delay, error: message, note: "Nouvel essai prévu après une erreur passagère." });
+      return;
+    }
+    patchFollowUp(jobId, entry.kind, { state: "failed", errorCount, error: message, checkAt: undefined, note: undefined });
+    return;
+  }
+  patchFollowUp(jobId, entry.kind, { state: "failed", error: message, checkAt: undefined, note: undefined });
+}
+
+/** « Réessayer » une suite en échec ou non faite (après avoir ajouté l'autorisation…). */
+export function retryFollowUp(jobId: string, kind: PublishFollowUpKind): PublishJobSummary {
+  const job = readJobs().find((entry) => entry.id === jobId);
+  if (!job) throw new Error("Travail introuvable.");
+  const entry = job.followUps?.find((candidate) => candidate.kind === kind);
+  if (!entry) throw new Error("Cette publication n’a pas cette suite.");
+  if (entry.state === "failed" || entry.state === "skipped") {
+    patchFollowUp(jobId, kind, { state: "waiting", error: undefined, note: undefined, skipCode: undefined, checkAt: undefined, errorCount: undefined, waitingSince: undefined });
+    scheduleProcessing();
+  }
+  return summarize(readJobs().find((candidate) => candidate.id === jobId)!);
+}
+
+/** Annule une suite qui attend encore (le premier commentaire d'une vidéo restée privée…). */
+export function cancelFollowUp(jobId: string, kind: PublishFollowUpKind): PublishJobSummary {
+  const job = readJobs().find((entry) => entry.id === jobId);
+  if (!job) throw new Error("Travail introuvable.");
+  const entry = job.followUps?.find((candidate) => candidate.kind === kind);
+  if (!entry) throw new Error("Cette publication n’a pas cette suite.");
+  if (entry.state === "waiting") patchFollowUp(jobId, kind, { ...skippedFollowUp(entry, "cancelled", "Suite annulée."), resume: undefined });
+  return summarize(readJobs().find((candidate) => candidate.id === jobId)!);
 }

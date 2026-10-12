@@ -14,6 +14,12 @@ export type {
   PostSummary,
   PublishField,
   PublishJobSummary,
+  PublishFieldRole,
+  PublishFollowUp,
+  PublishFollowUpKind,
+  PublishFollowUpState,
+  PublishFollowUpSummary,
+  PublishFollowUpsInput,
   PublishLimits,
   PublishSource,
   PublishTextSource,
@@ -26,5 +32,5 @@ export type {
 export { checkPublishLimits, describeMediaLimits, estimatePublishCost, measureText } from "./limits";
 export { listAccounts, getAccountSummary } from "./accounts";
 export { listConnectors, getConnector, describeConnector } from "./registry";
-export { enqueuePublish, listJobs, getJob, cancelJob, retryJob } from "./publish-queue";
+export { enqueuePublish, listJobs, getJob, cancelJob, retryJob, retryFollowUp, cancelFollowUp } from "./publish-queue";
 export { setProfileImage, listPosts, quotaForAccount, accountQuotaForAccount } from "./manage";

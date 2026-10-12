@@ -240,8 +240,13 @@ Jeux proposés à la connexion :
   « Manage a Page » dit au contraire de l’ajouter pour publier des vidéos :
   contradiction notée (§ 11). On ne la demande pas ; si un envoi de vidéo
   échoue en erreur 200 (autorisation), on l’ajoutera au jeu « Tout ».
-- `pages_manage_engagement` (commentaires), `pages_read_user_content`,
-  `pages_manage_metadata` (réglages, webhooks) : inutiles ici.
+- `pages_manage_engagement` (commentaires, miniatures) et
+  `pages_read_user_content` (miniatures) : jamais demandées à la connexion,
+  seulement ajoutées à la demande à une Page connectée, par une seconde
+  configuration (`config_id_extended`) ; voir le dossier 07, § 8.9
+  (« Suites de publication », « Autorisation incrémentale ») et le dossier
+  01 ter, § 6.
+- `pages_manage_metadata` (réglages, webhooks) : inutile ici.
 - `business_management` : ajoutée d’office par le cas d’usage, mais rien dans
   le connecteur ne s’en sert.
 
@@ -394,7 +399,7 @@ publication. Adresse : `https://www.facebook.com/{page_post_id}`.
 | Clé | Type | Rôle | Pour | Envoyé comme |
 | --- | --- | --- | --- | --- |
 | `title` | `text` | `title` | vidéo | `title` (vidéo et Reel) |
-| `description` | `textarea` | `description` | vidéo, image | `description` (vidéo, Reel), `caption` (image) ; pour un texte, le `message` est `source.text` |
+| `description` | `textarea` | `caption` (texte affiché dans le fil) | vidéo, image | `description` (vidéo, Reel), `caption` (image) ; pour un texte, le `message` est `source.text` |
 | `link` | `text` | – | texte | `link` |
 | `format` | `select` (Automatique, Reel, Vidéo) | – | vidéo | choix du point d’entrée (§ 5.1) |
 | `privacy` | `select` (Publique, Brouillon) | `privacy` | vidéo | Reel : `video_state=DRAFT` ; vidéo : `published=false` et `unpublished_content_type=DRAFT` |

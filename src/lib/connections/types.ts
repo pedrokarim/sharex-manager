@@ -16,7 +16,10 @@ export type ConnectionCapability =
   | "posts.list" // lister les publications du compte
   | "posts.manage" // modifier, changer la visibilité, supprimer
   | "profile.banner" // changer la bannière
-  | "profile.watermark"; // changer le filigrane des vidéos
+  | "profile.watermark" // changer le filigrane des vidéos
+  | "comment.create" // poser un commentaire sous sa propre publication (premier commentaire)
+  | "captions.upload" // joindre des sous-titres à une vidéo publiée
+  | "cover.set"; // changer la couverture (miniature) d'une vidéo publiée
 
 export const CAPABILITIES: readonly ConnectionCapability[] = [
   "publish.video",
@@ -26,6 +29,9 @@ export const CAPABILITIES: readonly ConnectionCapability[] = [
   "posts.manage",
   "profile.banner",
   "profile.watermark",
+  "comment.create",
+  "captions.upload",
+  "cover.set",
 ];
 
 /** Libellés affichés, communs à toutes les interfaces. */
@@ -37,6 +43,9 @@ export const CAPABILITY_LABELS: Record<ConnectionCapability, string> = {
   "posts.manage": "gérer les publications",
   "profile.banner": "changer la bannière",
   "profile.watermark": "changer le filigrane",
+  "comment.create": "commenter ses publications",
+  "captions.upload": "ajouter des sous-titres",
+  "cover.set": "changer la couverture d’une vidéo",
 };
 
 export function isCapability(value: unknown): value is ConnectionCapability {
@@ -205,6 +214,16 @@ export interface AccountSummary {
   tokenStateReason?: string;
   /** Limites propres à ce compte (`limitsFor`) ; absentes : celles du connecteur valent. */
   limits?: PublishLimits;
+  /**
+   * Capacités que le service offre mais que les portées accordées à ce compte
+   * ne couvrent pas : l'interface les grise avec « Autoriser… », qui relance
+   * la connexion du compte avec les portées en plus (connexion incrémentale,
+   * `GET /api/connections/<connecteur>/connect?account=<id>&add=<capacités>`).
+   * Une capacité retirée par le rôle du compte chez le service (Page sans
+   * droit de modération…) n'y figure pas : une reconnexion n'y changerait rien.
+   * Toujours rempli par le cœur (facultatif pour les objets construits ailleurs).
+   */
+  requestableCapabilities?: ConnectionCapability[];
 }
 
 // ─── Champs de publication ────────────────────────────────────────
@@ -216,8 +235,20 @@ export interface AccountSummary {
  */
 export type PublishFieldRole =
   | "title"
+  // Texte long sous la vidéo (YouTube).
   | "description"
+  // Texte court affiché avec le média dans un fil : légende Instagram, texte Threads, message Facebook.
+  | "caption"
+  // Premier commentaire, quand un service le prend comme option de publication (sinon : suite de publication).
+  | "firstComment"
+  // Mots-dièse visibles, distincts des tags cachés.
+  | "hashtags"
+  // Mots-clés cachés (YouTube).
   | "tags"
+  // Choix de la couverture d'une vidéo, quand le service la prend à la publication (Instagram).
+  | "cover"
+  // Sous-titres, quand un service les prend comme option de publication (sinon : suite de publication).
+  | "subtitles"
   | "category"
   | "privacy"
   | "scheduledAt"
@@ -355,12 +386,88 @@ export interface PublishJob {
   processingSince?: number;
   /** Étape en cours, lisible, rendue par le connecteur (pendant une attente chez le service). */
   note?: string;
+  /**
+   * Suites de publication (premier commentaire, sous-titres, couverture),
+   * exécutées une fois la publication faite. Leur échec ne fait jamais
+   * échouer le travail, qui reste « done » avec un avertissement.
+   */
+  followUps?: PublishFollowUp[];
   createdAt: number;
   updatedAt: number;
 }
 
+// ─── Suites de publication ────────────────────────────────────────
+
+export type PublishFollowUpKind = "comment" | "subtitles" | "cover";
+
+/**
+ * État d'une suite :
+ * - « waiting » : attend la fin de la publication, l'heure de `checkAt`, une
+ *   condition chez le service (vidéo privée ou programmée) ou un nouvel essai ;
+ * - « done » : faite ; « failed » : abandonnée après une erreur ;
+ * - « skipped » : non faite, sans erreur (service qui ne le permet pas,
+ *   autorisation manquante, annulée, attente trop longue).
+ */
+export type PublishFollowUpState = "waiting" | "done" | "failed" | "skipped";
+
+/** Pourquoi une suite n'a pas été faite, pour que l'interface propose l'action juste. */
+export type PublishFollowUpSkipCode = "unsupported" | "unauthorized" | "cancelled" | "expired" | "service";
+
+/** Ce que l'appelant demande en plus de la publication (`enqueuePublish({ followUps })`). */
+export interface PublishFollowUpsInput {
+  /** Premier commentaire, posté sous la publication par le compte lui-même. */
+  comment?: string;
+  /**
+   * Fichier de sous-titres (`.srt`), résolu par le module propriétaire comme
+   * la vidéo : `resolveExportFile(id ?? source.id, { file, purpose: "subtitles" })`.
+   * `language` : code BCP 47 (« fr », « en-US »).
+   */
+  subtitles?: { file: string; language: string; id?: string };
+  /**
+   * Image de couverture, résolue de même (`purpose: "cover"`). Chez un
+   * service qui ne la prend qu'à la publication (Instagram), elle devient la
+   * couverture de la source (`PublishFileSource.cover`) au lieu d'une suite.
+   */
+  cover?: { file: string; id?: string; mimeType?: string; width?: number; height?: number; bytes?: number };
+}
+
+/** Une suite de publication, rangée avec son travail (et donc persistée). */
+export interface PublishFollowUp {
+  kind: PublishFollowUpKind;
+  state: PublishFollowUpState;
+  /** Texte du commentaire. */
+  text?: string;
+  /** Fichier (sous-titres, couverture) chez le module, et identifiant à lui passer (sinon celui de la source). */
+  file?: string;
+  fileId?: string;
+  /** Langue des sous-titres (BCP 47). */
+  language?: string;
+  /** Couverture prise par le service au moment de la publication (aucun appel après). */
+  atPublish?: boolean;
+  /** Ce qui a été obtenu chez le service : commentaire, piste… */
+  result?: { externalId?: string; url?: string };
+  error?: string;
+  /** Remarque lisible (« en attente de la mise en ligne de la vidéo »…). */
+  note?: string;
+  skipCode?: PublishFollowUpSkipCode;
+  /** Passages chez le service. */
+  attempts: number;
+  /** Erreurs passagères de suite (réseau, service indisponible) : au-delà d'un seuil, la suite échoue. */
+  errorCount?: number;
+  /** Prochain passage ; absent : dès que la publication est faite. */
+  checkAt?: number;
+  /** Début de l'attente d'une condition chez le service (vidéo privée…), pour l'abandon. */
+  waitingSince?: number;
+  /** État de reprise propre au connecteur (conteneur de réponse…). Jamais envoyé au client. */
+  resume?: Record<string, unknown>;
+  updatedAt: number;
+}
+
+/** Suite vue par l'interface : sans état de reprise. */
+export type PublishFollowUpSummary = Omit<PublishFollowUp, "resume">;
+
 /** Travail vu par l'interface : sans état de reprise. */
-export type PublishJobSummary = Omit<PublishJob, "resume"> & { title?: string };
+export type PublishJobSummary = Omit<PublishJob, "resume" | "followUps"> & { title?: string; followUps?: PublishFollowUpSummary[] };
 
 // ─── Gestion des publications ─────────────────────────────────────
 
@@ -564,6 +671,100 @@ export function isPublishPending(value: unknown): value is PublishPending {
   return Boolean(value && typeof value === "object" && (value as { pending?: unknown }).pending === true);
 }
 
+/** Ce qu'un connecteur reçoit pour exécuter une suite de publication. */
+export interface FollowUpContext extends ConnectorContext {
+  /** Publication obtenue (identifiant et adresse chez le service). */
+  result: PublishResult;
+  source: PublishSource;
+  /** Options du travail, telles que le connecteur les a validées. */
+  options: Record<string, unknown>;
+  /** Numéro du passage (1 au premier) : au-delà, la suite a pu aboutir sans que la réponse arrive. */
+  attempt: number;
+  /** État de reprise de la suite, enregistré par `saveProgress`. */
+  resume?: Record<string, unknown>;
+  saveProgress(resume: Record<string, unknown> | undefined): void;
+}
+
+/** Suite faite : ce qui a été créé chez le service (commentaire, piste…), s'il a un identifiant. */
+export interface FollowUpDone {
+  externalId?: string;
+  url?: string;
+  /** Remarque lisible (« l’API ne sait pas épingler »…). */
+  note?: string;
+}
+
+/**
+ * Suite à reprendre plus tard : la publication n'est pas encore visible
+ * (vidéo privée, programmée, conteneur en traitement). `retryAt` (instant
+ * précis, la date de mise en ligne) prime sur `retryAfterMs`.
+ */
+export interface FollowUpPending {
+  pending: true;
+  retryAt?: number;
+  retryAfterMs?: number;
+  /** Raison lisible, affichée avec la suite. */
+  note: string;
+}
+
+/** Suite abandonnée sans erreur (la publication ne s'y prête pas : une photo n'a pas de sous-titres). */
+export interface FollowUpSkipped {
+  skipped: true;
+  note: string;
+}
+
+export type FollowUpOutcome = FollowUpDone | FollowUpPending | FollowUpSkipped;
+
+export function isFollowUpPending(value: unknown): value is FollowUpPending {
+  return isPublishPending(value);
+}
+
+export function isFollowUpSkipped(value: unknown): value is FollowUpSkipped {
+  return Boolean(value && typeof value === "object" && (value as { skipped?: unknown }).skipped === true);
+}
+
+/**
+ * Suites qu'un service accepte, et leurs limites, lues par l'interface. La
+ * capacité exigée est fixe : `comment.create`, `captions.upload`,
+ * `cover.set` (sauf une couverture prise à la publication, qui n'exige que
+ * la publication elle-même).
+ */
+export interface FollowUpSupport {
+  comment?: {
+    /** Longueur maximale du commentaire. */
+    maxLength: number;
+    /** Mesure du texte (voir `TextCount`) ; « characters » par défaut. */
+    count?: TextCount;
+    /** Limite documentée par le service, ou borne interne prudente faute de documentation. */
+    documented: boolean;
+    /** Types de source sous lesquels on peut commenter ; absent : tous. */
+    sourceKinds?: PublishSource["kind"][];
+    help?: string;
+  };
+  subtitles?: {
+    /** Extensions acceptées (« srt »). */
+    formats: string[];
+    maxBytes?: number;
+    sourceKinds?: PublishSource["kind"][];
+    help?: string;
+  };
+  cover?: {
+    /** « after » : posée par une suite (`setCover`) ; « publish » : envoyée avec la publication. */
+    mode: "after" | "publish";
+    /** Option du connecteur à fixer pour que la couverture fournie serve (`{ key: "cover", value: "custom" }`). */
+    option?: { key: string; value: string };
+    limits?: MediaLimits;
+    sourceKinds?: PublishSource["kind"][];
+    help?: string;
+  };
+}
+
+/** Capacité qu'exige chaque suite. */
+export const FOLLOW_UP_CAPABILITY: Record<PublishFollowUpKind, ConnectionCapability> = {
+  comment: "comment.create",
+  subtitles: "captions.upload",
+  cover: "cover.set",
+};
+
 export interface ConnectorApp {
   /** Préfixe des variables d'environnement : `<PREFIX>_CLIENT_ID`, `<PREFIX>_CLIENT_SECRET`. */
   envPrefix: string;
@@ -641,6 +842,14 @@ export interface ConnectorOAuth {
   extraParams?: Record<string, string>;
   /** Jeux de portées proposés à la connexion (« tout », « lecture et envoi »). */
   scopeSets: { id: string; label: string; description?: string; scopes: string[] }[];
+  /**
+   * Connexion incrémentale (ajout de portées à un compte déjà connecté, à la
+   * demande) : paramètres d'autorisation à lire dans un autre réglage de
+   * l'application. Chez Meta (Facebook Login for Business), les autorisations
+   * sont fixées par une configuration (`config_id`) : les portées en plus
+   * demandent une seconde configuration, `{ config_id: "config_id_extended" }`.
+   */
+  incremental?: { settingParams?: Record<string, string>; help?: string };
 }
 
 /**
@@ -907,6 +1116,18 @@ export interface Connector {
    * résultat définitif (`ProcessingStatus.result`).
    */
   checkProcessing?(context: ConnectorContext, externalId: string): Promise<ProcessingStatus>;
+  /** Suites de publication acceptées et leurs limites (lues par l'interface et par la file). */
+  followUps?: FollowUpSupport;
+  /**
+   * Premier commentaire sous la publication `context.result`, posté par le
+   * compte lui-même. Rend une attente si la publication n'est pas encore
+   * visible (vidéo privée ou programmée). Capacité `comment.create`.
+   */
+  postComment?(context: FollowUpContext, text: string): Promise<FollowUpOutcome>;
+  /** Joint un fichier de sous-titres à la vidéo publiée. Capacité `captions.upload`. */
+  uploadSubtitles?(context: FollowUpContext, subtitles: { path: string; language: string }): Promise<FollowUpOutcome>;
+  /** Change la couverture (miniature) de la vidéo publiée. Capacité `cover.set`. */
+  setCover?(context: FollowUpContext, cover: { path: string; mimeType?: string }): Promise<FollowUpOutcome>;
   /** Actions de gestion, présentes selon les capacités. */
   posts?: {
     list(context: ConnectorContext): Promise<PostSummary[]>;
@@ -951,6 +1172,26 @@ export interface ConnectorInfo {
   multipleAccounts?: boolean;
   /** Le service va chercher les fichiers à une adresse publique de l'instance. */
   publicMedia?: boolean;
+  /**
+   * Suites de publication que le service accepte, avec leurs limites et la
+   * capacité exigée ; seules celles que le connecteur sait exécuter figurent.
+   */
+  followUps?: {
+    comment?: NonNullable<FollowUpSupport["comment"]> & { capability: ConnectionCapability };
+    subtitles?: NonNullable<FollowUpSupport["subtitles"]> & { capability: ConnectionCapability };
+    cover?: NonNullable<FollowUpSupport["cover"]> & { capability?: ConnectionCapability };
+  };
+  /**
+   * Capacités offertes par le service qu'aucun jeu de portées de la
+   * connexion ne donne : on ne les obtient qu'en les ajoutant à un compte
+   * connecté, à la demande (connexion incrémentale). Toujours rempli par
+   * `describeConnector`, comme `capabilityScopes`.
+   */
+  onDemandCapabilities?: ConnectionCapability[];
+  /** Pour chaque capacité, les portées qu'une connexion incrémentale demandera en plus. */
+  capabilityScopes?: Partial<Record<ConnectionCapability, string[]>>;
+  /** Consigne propre à la connexion incrémentale (seconde configuration chez Meta…). */
+  incrementalHelp?: string;
 }
 
 // ─── Parcours de connexion ────────────────────────────────────────

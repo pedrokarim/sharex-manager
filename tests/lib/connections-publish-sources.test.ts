@@ -161,6 +161,10 @@ describe("limites déclarées par le connecteur", () => {
     expect(checkPublishLimits({ video: { aspectRatio: { min: 0.8, max: 1.91 } } }, video({ width: 1080, height: 1350 }))).toEqual([]);
     expect(checkPublishLimits({ video: { aspectRatio: { min: 0.8, max: 1.91 } } }, video({ width: 1080, height: 1920 }))[0]).toMatch(/9:16/);
     expect(describeMediaLimits(LIMITS.video)).toBe("1 min 30 au plus · format 9:16 · 49 Ko au plus · MP4");
+    // Un seul côté borné : jamais « 1920 × ? px ».
+    expect(describeMediaLimits({ maxWidth: 1920 })).toBe("1920 px de large au plus");
+    expect(describeMediaLimits({ minHeight: 640 })).toBe("640 px de haut au moins");
+    expect(describeMediaLimits({ maxWidth: 1920, maxHeight: 1080 })).toBe("1920 × 1080 px au plus");
   });
 
   test("limites propres au compte, lues dans ses données", async () => {

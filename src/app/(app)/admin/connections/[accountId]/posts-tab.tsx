@@ -755,7 +755,11 @@ function PostRow({
               <a href={post.url} target="_blank" rel="noreferrer noopener" className="line-clamp-2 text-sm font-medium [overflow-wrap:anywhere] hover:underline">
                 {post.title || "Sans titre"}
               </a>
-              {post.description ? <span className="hidden truncate text-xs text-muted-foreground xl:block">{post.description.split("\n")[0]}</span> : null}
+              {post.description ? (
+                <span className="hidden truncate text-xs text-muted-foreground xl:block" title={post.description.split("\n")[0]}>
+                  {post.description.split("\n")[0]}
+                </span>
+              ) : null}
               {/* Ce que les colonnes masquées ne montrent plus, sous le titre. */}
               <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground xl:hidden">
                 <PrivacyLabel post={post} className="md:hidden" />
@@ -808,7 +812,8 @@ function EditPostSheet({
   onSubmit: (patch: PostPatch) => Promise<void>;
 }) {
   const fields = useMemo(
-    () => connector.publishFields.filter((field) => field.role === "title" || field.role === "description" || field.role === "tags" || field.role === "category"),
+    // Le texte d'une publication est la « description » (YouTube) ou la « caption » (message Facebook).
+    () => connector.publishFields.filter((field) => field.role === "title" || field.role === "description" || field.role === "caption" || field.role === "tags" || field.role === "category"),
     [connector.publishFields]
   );
   const [values, setValues] = useState<Record<string, FieldValue>>({});
@@ -819,7 +824,7 @@ function EditPostSheet({
     const next: Record<string, FieldValue> = {};
     for (const field of fields) {
       if (field.role === "title") next[field.key] = post.title;
-      else if (field.role === "description") next[field.key] = post.description;
+      else if (field.role === "description" || field.role === "caption") next[field.key] = post.description;
       else if (field.role === "tags") next[field.key] = post.tags;
       else if (field.role === "category") next[field.key] = post.categoryId ?? defaultFieldValue(field);
     }
@@ -855,7 +860,7 @@ function EditPostSheet({
             setBusy(true);
             const patch: PostPatch = {};
             const title = valueOf("title");
-            const description = valueOf("description");
+            const description = valueOf("description") ?? valueOf("caption");
             const tags = valueOf("tags");
             const category = valueOf("category");
             if (typeof title === "string") patch.title = title;
@@ -879,7 +884,9 @@ function EditPostSheet({
           ))}
         </form>
         <SheetFooter className="flex-row items-center justify-between gap-2 border-t px-5 py-3">
-          <span className="min-w-0 truncate text-xs text-destructive">{problems[0] ?? ""}</span>
+          <span className="min-w-0 truncate text-xs text-destructive" title={problems[0]}>
+            {problems[0] ?? ""}
+          </span>
           <Button type="submit" form="edit-post-form" disabled={busy || problems.length > 0} className="gap-2">
             {busy ? <Loader2 className="size-4 animate-spin" /> : null}
             Enregistrer

@@ -29,6 +29,12 @@ const REASON_MESSAGES: Record<string, string> = {
   bannerAlbumFull: "L’album des bannières de la chaîne est plein : supprimez d’anciennes bannières dans YouTube Studio.",
   mediaBodyRequired: "Image manquante.",
   youtubeSignupRequired: "Ce compte Google n’a pas de chaîne YouTube.",
+  commentsDisabled: "Les commentaires sont désactivés sur cette vidéo.",
+  commentTextTooLong: "Commentaire trop long pour YouTube.",
+  ineligibleAccount: "Ce compte YouTube doit être rattaché à un compte Google pour commenter.",
+  captionExists: "La vidéo a déjà une piste de sous-titres dans cette langue.",
+  invalidImage: "Image de miniature refusée par YouTube.",
+  uploadRateLimitExceeded: "Trop de miniatures envoyées récemment : nouvel essai plus tard.",
 };
 
 /** Lit l'erreur d'une réponse de Google et la convertit en erreur affichable. */
@@ -190,7 +196,7 @@ function toPost(video: VideoResource): PostSummary {
   };
 }
 
-async function getVideo(context: ConnectorContext, id: string, part: string): Promise<VideoResource> {
+export async function getVideo(context: ConnectorContext, id: string, part: string): Promise<VideoResource> {
   const body = await youtubeRequest<{ items?: VideoResource[] }>(context, "videos.list", "videos", { query: { part, id } });
   const video = body.items?.[0];
   if (!video) throw new ServiceError(404, "Vidéo introuvable sur YouTube.", "videoNotFound");

@@ -41,11 +41,11 @@ export const INSTAGRAM_PUBLISH_FIELDS: PublishField[] = [
     key: "caption",
     kind: "textarea",
     label: "Légende",
-    role: "description",
+    role: "caption",
     maxLength: CAPTION_MAX_CHARS,
     help: "2 200 caractères, 30 hashtags et 20 mentions au plus, hashtags ajoutés compris.",
   },
-  { key: "hashtags", kind: "tags", label: "Hashtags", role: "tags", maxTotal: HASHTAGS_MAX_CHARS },
+  { key: "hashtags", kind: "tags", label: "Hashtags", role: "hashtags", maxTotal: HASHTAGS_MAX_CHARS },
   {
     key: "shareToFeed",
     kind: "toggle",
@@ -54,7 +54,7 @@ export const INSTAGRAM_PUBLISH_FIELDS: PublishField[] = [
     sourceKinds: ["video"],
     help: "Le Reel apparaît dans le fil et dans l’onglet Reels ; Instagram choisit seul ce qu’il met en avant.",
   },
-  { key: "cover", kind: "select", label: "Couverture", choices: COVER_CHOICES, defaultValue: "start", sourceKinds: ["video"] },
+  { key: "cover", kind: "select", label: "Couverture", role: "cover", choices: COVER_CHOICES, defaultValue: "start", sourceKinds: ["video"] },
   {
     key: "trial",
     kind: "select",

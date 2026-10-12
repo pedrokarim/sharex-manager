@@ -19,9 +19,12 @@ import { INSTAGRAM_ACCOUNT_QUOTA, INSTAGRAM_LIMITS } from "./limits";
 import { INSTAGRAM_PUBLISH_FIELDS, normalizeInstagramOptions } from "./metadata";
 import { listInstagramPosts } from "./posts";
 import { findExistingInstagramPost, publishToInstagram } from "./publish";
+import { COMMENT_MAX_CHARS, postInstagramComment } from "./follow-ups";
 
 export const SCOPE_BASIC = "instagram_business_basic";
 export const SCOPE_PUBLISH = "instagram_business_content_publish";
+/** Premier commentaire : jamais demandée à la première connexion, seulement ajoutée à la demande. */
+export const SCOPE_MANAGE_COMMENTS = "instagram_business_manage_comments";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -37,6 +40,7 @@ export const instagramConnector: Connector = {
     { capability: "publish.video", scopes: [SCOPE_PUBLISH], allOf: [SCOPE_BASIC] },
     { capability: "publish.image", scopes: [SCOPE_PUBLISH], allOf: [SCOPE_BASIC] },
     { capability: "posts.list", scopes: [SCOPE_BASIC] },
+    { capability: "comment.create", scopes: [SCOPE_MANAGE_COMMENTS], allOf: [SCOPE_BASIC] },
   ],
   app: {
     envPrefix: "INSTAGRAM",
@@ -47,6 +51,7 @@ export const instagramConnector: Connector = {
       "Dans « Generate access tokens », cliquer sur « Add account » et se connecter avec le compte Instagram à publier : c’est ce qui le rend utilisable sans revue d’application.",
       "Dans « Set up Instagram business login », ajouter l’URI de redirection ci-dessus, puis vérifier dans « Business login settings » qu’aucune barre oblique n’a été ajoutée à la fin.",
       "Recopier ici l’« Instagram app ID » et l’« Instagram app secret » affichés sur la même page (pas l’identifiant de l’application Meta), ou les définir dans INSTAGRAM_CLIENT_ID et INSTAGRAM_CLIENT_SECRET.",
+      "Facultatif, pour le premier commentaire : vérifier que l’autorisation instagram_business_manage_comments figure dans le cas d’usage. Elle n’est demandée qu’au moment où vous l’ajoutez à un compte déjà connecté.",
       "Ne pas demander de revue d’application : elle ne sert qu’à publier pour des comptes qui ne sont pas les vôtres.",
       "L’instance doit être joignable en HTTPS depuis Internet : Instagram vient télécharger chaque fichier à une adresse temporaire sous /api/connections/media/. Derrière Cloudflare, exempter ce seul chemin des défis anti-robots.",
     ],
@@ -95,6 +100,16 @@ export const instagramConnector: Connector = {
   },
   normalizeOptions: (options, source) => ({ ...normalizeInstagramOptions(options, source) }),
   publish: publishToInstagram,
+  followUps: {
+    comment: {
+      maxLength: COMMENT_MAX_CHARS,
+      documented: false,
+      help: "Posté par le compte juste après la publication. Instagram ne documente aucune limite : celle de la légende est appliquée.",
+    },
+    // Couverture d'un Reel : envoyée avec le conteneur (`cover_url`), jamais après.
+    cover: { mode: "publish", option: { key: "cover", value: "custom" }, limits: INSTAGRAM_LIMITS.cover, sourceKinds: ["video"] },
+  },
+  postComment: postInstagramComment,
   findExisting: findExistingInstagramPost,
   posts: {
     list: listInstagramPosts,

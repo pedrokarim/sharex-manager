@@ -35,7 +35,7 @@ import {
 import { OAuthError, ReconnectRequiredError, errorMessage } from "./errors";
 import { decryptJson, encryptJson } from "./crypto";
 import { newId, readStore, updateStore, withLock } from "./store";
-import { capabilitiesForScopes, getConnector, requireReadyConnector } from "./registry";
+import { capabilitiesForScopes, getConnector, requestableCapabilities, requireReadyConnector } from "./registry";
 import { exchangeCode, refreshTokens, requireApp, revokeToken, type Transaction } from "./oauth";
 import { appSecretProof, getAppSettings } from "./apps";
 import { chargeAccountQuota, chargeQuota, forgetAccountQuota } from "./quota";
@@ -145,6 +145,7 @@ export function summarizeAccount(account: ConnectedAccount): AccountSummary {
     tokenState: token.state,
     tokenStateReason: token.reason,
     ...(limits ? { limits } : {}),
+    requestableCapabilities: connector && connector.status === "ready" ? requestableCapabilities(connector, account.scopes) : [],
   };
 }
 
@@ -307,7 +308,7 @@ export async function discoverAuthorization(connectorId: string, code: string, t
       scopes = undefined;
     }
   }
-  const requested = connector.oauth.scopeSets.find((set) => set.id === transaction.scopeSet)?.scopes ?? [];
+  const requested = transaction.scopes ?? connector.oauth.scopeSets.find((set) => set.id === transaction.scopeSet)?.scopes ?? [];
   // Les portées réellement accordées priment : l'utilisateur a pu en décocher chez le service.
   const granted = scopes && scopes.length > 0 ? scopes : requested;
   const charge = (method: string) => chargeQuota(connector, method);

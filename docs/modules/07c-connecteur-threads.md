@@ -139,7 +139,12 @@ Deux jeux proposés à la connexion :
 - « Publication seulement » : `threads_basic`, `threads_content_publish` ; la
   suppression reste grisée.
 
-Non demandées : `threads_manage_replies`, `threads_read_replies`,
+`threads_manage_replies` n’est jamais demandée à la connexion : elle
+s’ajoute à la demande pour le premier commentaire, publié comme une
+réponse à sa propre publication (`reply_to_id` ; dossier 07, § 8.9 ;
+dossier 01 ter, § 6).
+
+Non demandées : `threads_read_replies`,
 `threads_manage_insights`, `threads_manage_mentions`,
 `threads_keyword_search`, `threads_location_tagging`,
 `threads_profile_discovery` [S3], `threads_share_to_instagram` [S17]. Le
@@ -209,7 +214,7 @@ on ne l’emploie pas, pour garder une seule logique de reprise.
 
 | Clé | Paramètre Threads | Forme | Source | Limite |
 | --- | --- | --- | --- | --- |
-| `text` | `text` | textarea, rôle `description` | modèle de description de la marque | 500 caractères, un émoji comptant pour son nombre d’octets UTF‑8 [S6] ; obligatoire pour un texte seul |
+| `text` | `text` | textarea, rôle `caption` | texte court de publication | 500 caractères, un émoji comptant pour son nombre d’octets UTF‑8 [S6] ; obligatoire pour un texte seul |
 | `topicTag` | `topic_tag` | text | premier tag de la marque | 1 à 50 caractères, ni `.` ni `&` ; un seul sujet par publication [S6] |
 | `linkAttachment` | `link_attachment` | text (texte seul) | – | adresse publique ; texte seul uniquement [S6] |
 | `altText` | `alt_text` | textarea (image, vidéo) | – | 1 000 caractères [S13] ; sans effet sur un texte seul [S16] |

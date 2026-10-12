@@ -23,10 +23,26 @@ import {
 import { facebookProcessing, findExistingPost, listPagePosts, publishPhoto, publishText, removePagePost, updatePagePost } from "./posts";
 import { publishReel } from "./reels";
 import { publishPageVideo } from "./videos";
+import {
+  CAPTION_MAX_BYTES,
+  COMMENT_MAX_CHARS,
+  THUMBNAIL_MAX_BYTES,
+  THUMBNAIL_TYPES,
+  postFacebookComment,
+  setFacebookThumbnail,
+  uploadFacebookSubtitles,
+} from "./follow-ups";
 
 export const SCOPE_SHOW_LIST = "pages_show_list";
 export const SCOPE_READ_ENGAGEMENT = "pages_read_engagement";
 export const SCOPE_MANAGE_POSTS = "pages_manage_posts";
+/**
+ * Commentaires et miniatures : jamais demandées à la première connexion,
+ * seulement ajoutées à la demande, par une seconde configuration Facebook
+ * Login for Business (réglage `config_id_extended`).
+ */
+export const SCOPE_MANAGE_ENGAGEMENT = "pages_manage_engagement";
+export const SCOPE_READ_USER_CONTENT = "pages_read_user_content";
 
 /** Publie selon la source : message, photo, Reel ou vidéo de la Page. */
 async function publish(context: PublishContext) {
@@ -59,6 +75,10 @@ export const facebookConnector: Connector = {
     { capability: "publish.text", scopes: [SCOPE_MANAGE_POSTS] },
     { capability: "posts.list", scopes: [SCOPE_READ_ENGAGEMENT] },
     { capability: "posts.manage", scopes: [SCOPE_MANAGE_POSTS] },
+    // Suites de publication. Les sous-titres ne demandent que de gérer la Page.
+    { capability: "comment.create", scopes: [SCOPE_MANAGE_ENGAGEMENT] },
+    { capability: "captions.upload", scopes: [SCOPE_MANAGE_POSTS] },
+    { capability: "cover.set", scopes: [SCOPE_MANAGE_ENGAGEMENT], allOf: [SCOPE_READ_USER_CONTENT] },
   ],
   app: {
     envPrefix: "FACEBOOK",
@@ -84,6 +104,13 @@ export const facebookConnector: Connector = {
         authorizeParam: true,
         pattern: "^[0-9]{5,25}$",
       },
+      {
+        key: "config_id_extended",
+        label: "Configuration avec commentaires (facultative)",
+        help: "Seconde configuration Facebook Login for Business, avec les autorisations de la première plus pages_manage_engagement et pages_read_user_content. Elle ne sert que quand vous ajoutez « commentaires et miniatures » à une Page déjà connectée.",
+        env: "FACEBOOK_EXTENDED_CONFIG_ID",
+        pattern: "^[0-9]{5,25}$",
+      },
     ],
   },
   oauth: {
@@ -94,6 +121,12 @@ export const facebookConnector: Connector = {
     // Meta ne documente que l'échange du code en GET.
     tokenMethod: "GET",
     scopeSeparator: ",",
+    // Chez Meta, les autorisations viennent de la configuration (`config_id`) :
+    // en ajouter demande la seconde configuration.
+    incremental: {
+      settingParams: { config_id: "config_id_extended" },
+      help: "Facebook fixe les autorisations par configuration : créez dans Facebook Login for Business une seconde configuration avec pages_show_list, pages_read_engagement, pages_manage_posts, pages_manage_engagement et pages_read_user_content (ajoutez d’abord ces deux dernières au cas d’usage), puis recopiez son identifiant dans « Configuration avec commentaires ».",
+    },
     scopeSets: [
       {
         id: "all",
@@ -120,6 +153,18 @@ export const facebookConnector: Connector = {
   normalizeOptions: (options, source) => ({ ...normalizeFacebookOptions(options, source) }),
   publish,
   checkProcessing: facebookProcessing,
+  followUps: {
+    comment: {
+      maxLength: COMMENT_MAX_CHARS,
+      documented: false,
+      help: "Posté par la Page une fois la publication en ligne ; il faut le droit de modérer la Page.",
+    },
+    subtitles: { formats: ["srt"], maxBytes: CAPTION_MAX_BYTES, sourceKinds: ["video"] },
+    cover: { mode: "after", limits: { mimeTypes: THUMBNAIL_TYPES, maxBytes: THUMBNAIL_MAX_BYTES }, sourceKinds: ["video"] },
+  },
+  postComment: postFacebookComment,
+  uploadSubtitles: uploadFacebookSubtitles,
+  setCover: setFacebookThumbnail,
   findExisting: findExistingPost,
   posts: {
     list: (context) => listPagePosts(context),

@@ -185,7 +185,7 @@ export function PublishFieldInput({
             className="flex w-full flex-wrap"
           >
             {field.choices.map((choice) => (
-              <ToggleGroupItem key={choice.value} value={choice.value} className="h-auto min-h-9 min-w-0 flex-1 px-2 py-1.5 leading-tight whitespace-normal">
+              <ToggleGroupItem key={choice.value} value={choice.value} className="h-auto min-h-9 min-w-min flex-auto px-2 py-1.5 leading-tight whitespace-normal">
                 {choice.label}
               </ToggleGroupItem>
             ))}

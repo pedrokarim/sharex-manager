@@ -32,6 +32,10 @@ const COSTS: Record<string, { bucket: string; units: number }> = {
   "channelBanners.insert": { bucket: "general", units: 50 },
   "watermarks.set": { bucket: "general", units: 50 },
   "thumbnails.set": { bucket: "general", units: 50 },
+  // Suites de publication (référence vérifiée le 12/10/2026).
+  "commentThreads.insert": { bucket: "general", units: 50 },
+  "commentThreads.list": { bucket: "general", units: 1 },
+  "captions.insert": { bucket: "general", units: 400 },
 };
 
 export function youtubeCost(method: string): { bucket: string; units: number } {

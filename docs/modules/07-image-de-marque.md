@@ -354,13 +354,44 @@ interface BrandEndCard {
   poseAssetId?: string;
 }
 
+/** Un lien de la marque, repris par {links} : adresse http(s) seulement. */
+interface BrandLink {
+  label: string;
+  url: string;
+}
+
+/** Modèles propres à un service : seulement ce qui diffère des modèles communs. */
+interface BrandServiceTemplates {
+  titleTemplate?: string;
+  descriptionTemplate?: string;
+  captionTemplate?: string;
+  firstCommentTemplate?: string;
+  /** Où vont les hashtags (dossier 01 ter, § 4.2) ; absent : la règle du service. */
+  hashtagRule?: "description" | "caption" | "firstComment" | "field" | "topic" | "none";
+}
+
 interface BrandPublishing {
   /** Comptes connectés où publier par défaut (cœur, § 8), de n'importe quel service. */
   accountIds: string[];
-  /** Modèles avec variables : {title}, {hook}, {tags}, {date}, {brand}. */
+  /**
+   * Modèles avec variables : {title}, {hook}, {summary}, {cta}, {tags},
+   * {hashtags}, {links}, {credits}, {date}, {brand}. Une variable vide
+   * emporte la ligne qu'elle laisserait vide.
+   */
   titleTemplate: string;
   descriptionTemplate: string;
+  /** Texte court publié avec le média (légende Instagram, texte Threads). */
+  captionTemplate: string;
+  /** Premier commentaire ; vide : aucun. */
+  firstCommentTemplate: string;
+  /** Par identifiant de connecteur, douze au plus. */
+  serviceTemplates: Record<string, BrandServiceTemplates>;
+  /** Mots-dièse visibles, sans « # » ; recopiés des tags à la lecture d'une marque qui n'en a pas. */
+  hashtags: string[];
+  /** Mots-clés cachés (YouTube). */
   tags: string[];
+  /** Dix au plus. */
+  links: BrandLink[];
   categoryId: string;
   defaultPrivacy: "private" | "unlisted" | "public";
   containsSyntheticMedia: boolean;
@@ -856,11 +887,14 @@ l’autre chaîne (ou le compte de marque) chez Google.
 | `https://www.googleapis.com/auth/youtube.upload` | `publish.video`, `profile.watermark` (`watermarks.set`) |
 | `https://www.googleapis.com/auth/youtube` | `posts.list`, `posts.manage` (`videos.update`, `videos.delete`), `profile.banner` (`channelBanners.insert` puis `channels.update`, que `youtube.upload` ne permet pas) |
 | `https://www.googleapis.com/auth/youtube.readonly` | `posts.list` seulement |
+| `https://www.googleapis.com/auth/youtube.force-ssl` (à la demande) | `comment.create` (`commentThreads.insert`), `captions.upload` (`captions.insert`) ; `cover.set` (`thumbnails.set`) passe aussi avec `youtube.upload` ou `youtube` |
 
 Deux jeux proposés à la connexion : « Tout » (`youtube.upload` +
 `youtube`) et « Lecture et envoi seulement » (`youtube.upload` +
-`youtube.readonly`), où la gestion et la bannière restent grisées. On ne demande ni
-`youtube.force-ssl` ni `youtubepartner`.
+`youtube.readonly`), où la gestion et la bannière restent grisées. On ne
+demande pas `youtubepartner` ; `youtube.force-ssl` (premier commentaire,
+sous-titres) n'est jamais demandée à la connexion, seulement ajoutée à un
+compte connecté, à la demande (§ 8.9, « Autorisation incrémentale »).
 
 ### 8.5 La file de publication
 
@@ -950,6 +984,10 @@ D’après la documentation de l’API (pages « Quota calculator » et
   `thumbnails.set`, `channels.update`, `videos.update` et `videos.delete`
   coûtent 50 unités, une lecture (`videos.list`, `channels.list`,
   `playlistItems.list`) 1.
+- suites de publication (référence vérifiée le 12/10/2026) :
+  `commentThreads.insert` 50 unités, `captions.insert` **400 unités**,
+  `thumbnails.set` 50 unités ; `commentThreads.list` (recherche d'un
+  commentaire déjà posté après une réponse perdue) 1.
 
 Le quota appartient à l’application Google, donc à toutes les chaînes
 connectées ensemble. Les coûts sont rangés dans une seule table
@@ -1222,6 +1260,110 @@ une fois par intervalle (`checkAt`). `ProcessingStatus.result` peut y rendre le
 résultat définitif : Facebook remplace ainsi l'adresse provisoire d'un Reel par
 son `permalink_url`, qui n'existe parfois qu'après le traitement.
 
+#### Suites de publication
+
+Une publication peut porter des **suites**, exécutées par la file une fois
+la publication faite : premier commentaire, sous-titres, couverture
+(dossier 01 ter, § 6, pour ce que chaque service permet et les sources).
+
+```ts
+enqueuePublish({
+  accountId, source, options, publishAt,
+  followUps: {
+    comment: "Lien en bio !",
+    subtitles: { file: "clip.fr.srt", language: "fr" },
+    cover: { file: "cover.png" },
+  },
+});
+```
+
+- **Fichiers.** Sous-titres et couverture sont résolus par le module
+  propriétaire, comme la vidéo : la file appelle
+  `resolveExportFile(id, { file, purpose: "subtitles" | "cover" })`
+  (`id` : celui de la suite, sinon celui de la source) et vérifie que le
+  fichier rendu est bien celui demandé (par son nom) ; un module qui ne
+  connaît pas encore ce second argument rendrait la vidéo, qui n'est alors
+  jamais envoyée à sa place.
+- **Ce que le service accepte** : `Connector.followUps` (limites lues par
+  l'interface, `documented` dit si la limite vient du service ou d'une borne
+  interne faute de documentation) et les méthodes `postComment`,
+  `uploadSubtitles`, `setCover`, qui reçoivent un `FollowUpContext` (le
+  contexte du compte, plus `result`, `source`, `options`, `attempt`,
+  `resume`, `saveProgress`). Capacités exigées : `comment.create`,
+  `captions.upload`, `cover.set`.
+- **Couverture prise à la publication** (`followUps.cover.mode:
+  "publish"`, Instagram) : la couverture devient celle de la source
+  (`PublishFileSource.cover`) et l'option du connecteur qui la fait servir
+  est fixée (`cover: "custom"`) ; la suite est marquée faite quand la
+  publication l'est.
+- **À la mise en file**, une suite que le service ne permet pas, ou que le
+  compte n'a pas autorisée, est rangée `skipped` avec sa raison
+  (`skipCode: "unsupported" | "unauthorized"`) : la publication part quand
+  même. Un commentaire trop long, des sous-titres dans un format refusé ou
+  une langue invalide sont refusés, comme un texte trop long.
+- **Exécution** : quand le travail passe à `done`, hors du verrou d'envoi,
+  par la boucle de suivi (`runFollowUps`, aussi appelée par
+  `checkProcessingJobs`). Le connecteur rend le résultat (`externalId`,
+  `url`, `note`), une attente (`{ pending, retryAt | retryAfterMs, note }` :
+  vidéo YouTube privée ou programmée, publication Facebook programmée ou en
+  brouillon, conteneur Threads en traitement) ou un abandon sans erreur
+  (`{ skipped, note }` : commentaires désactivés, piste déjà présente). Une
+  attente sans date est abandonnée après trente jours (`skipCode:
+  "expired"`) ; une attente datée reprend à son heure (`checkAt`).
+- **Erreurs** : un quota épuisé fait attendre la remise à zéro (et suspend
+  le service, comme pour un envoi), un jeton refusé passe le compte « à
+  reconnecter » et la suite attend la reconnexion, une erreur passagère
+  (réseau, 5xx, 429) est réessayée après 1, 2, 5, 15, 30 minutes, 1 puis
+  3 heures, huit fois au plus ; toute autre erreur, ou la huitième, rend la
+  suite `failed`. **Jamais le travail** : il reste `done`, et
+  `PublishJobSummary.warning` dit « Premier commentaire non posé : … ».
+- Chaque suite garde son état (`waiting`, `done`, `failed`, `skipped`), son
+  erreur, sa remarque, son résultat, ses essais (`attempts`, `errorCount`),
+  `checkAt` et son état de reprise (`resume`, jamais envoyé au client). Tout
+  est rangé avec le travail dans `publish-jobs.json` : les suites survivent
+  au redémarrage, et un travail dont une suite attend n'est jamais effacé
+  de l'historique. Au-delà du premier passage, le connecteur cherche d'abord
+  un commentaire identique déjà posté (réponse perdue) avant de reposter.
+- `retryFollowUp(jobId, kind)` relance une suite en échec ou non faite
+  (après avoir ajouté l'autorisation) ; `cancelFollowUp(jobId, kind)`
+  annule une suite qui attend ; annuler le travail annule ses suites.
+- `listJobs({ sourceModule, sourceId })` retrouve les publications d'un
+  export (fiche d'un export de Clip Studio).
+
+#### Autorisation incrémentale
+
+Les portées des suites ne sont **jamais demandées à la première
+connexion** : les jeux de portées proposés restent ceux d'avant, et une
+capacité que seul un ajout donne figure dans
+`ConnectorInfo.onDemandCapabilities`.
+
+- `AccountSummary.requestableCapabilities` : capacités que le service offre
+  mais que les portées accordées au compte ne couvrent pas. Une capacité
+  retirée par le rôle du compte chez le service (Page Facebook sans la tâche
+  MODERATE pour commenter) n'y figure pas : reconnecter n'y changerait rien.
+- `ConnectorInfo.capabilityScopes` : les portées qu'un ajout demandera pour
+  chaque capacité (la première de `scopes`, plus toutes ses `allOf`).
+- `GET /api/connections/<connecteur>/connect?account=<id>&add=comment.create`
+  relance la connexion du compte avec ses portées actuelles **plus** celles
+  des capacités ajoutées (`incrementalScopes`) ; les portées demandées
+  voyagent dans le cookie de transaction signé (`Transaction.scopes`) et
+  valent quand le service ne rend pas celles accordées. Avec `mode=popup` et
+  `returnTo`, comme une connexion ordinaire.
+- YouTube : `include_granted_scopes=true` (déjà envoyé), on ajoute
+  `youtube.force-ssl` (commentaire, sous-titres) ; la miniature passe avec
+  `youtube.upload`, déjà accordée.
+- Facebook : Facebook Login for Business fixe les autorisations par
+  configuration (`config_id` remplace `scope`). L'ajout passe par une
+  seconde configuration, avec en plus `pages_manage_engagement` et
+  `pages_read_user_content` : réglage d'application `config_id_extended`
+  (ou `FACEBOOK_EXTENDED_CONFIG_ID`), lu par `oauth.incremental.settingParams`.
+  Sans lui, la demande s'arrête sur la configuration de l'application, avec
+  la consigne (`ConnectorInfo.incrementalHelp`).
+- Instagram : `instagram_business_manage_comments` ; Threads :
+  `threads_manage_replies`. Chacune doit d'abord être ajoutée au cas
+  d'usage de l'application chez Meta (étape facultative de la
+  configuration).
+
 #### Ce qui reste à faire ailleurs
 
 - L'interface du parcours (choix des comptes, fenêtre surgissante, saisie des
@@ -1261,6 +1403,7 @@ son `permalink_url`, qui n'existe parfois qu'après le traitement.
 | `saveFormatExport(kitId, format, png)` / `sendFormatToGallery(kitId, file)` | user | Formats rendus par le navigateur |
 | `getWatermarkImage(kitId)` | serveur | Logo du filigrane pour le module `watermark` |
 | `listPublishAccounts()` | user | Comptes capables de publier une vidéo, sans jeton (pour le choix des comptes d’une marque) |
+| `listPublishServices()` | user | Services prêts à publier une vidéo, avec leurs champs, leur règle de hashtags et la limite du premier commentaire (onglets « par service » des textes de publication) |
 | `pushBrandToAccount({ kitId, accountId, what })` | admin | Bannière ou filigrane de la marque vers un compte qui a la capacité |
 
 « serveur » : la fonction est déclarée `public` dans `functions`, ce que la
@@ -1275,8 +1418,11 @@ l’atteint.
 | `templates.ts` | modèles thémables, indications `theme` |
 | `lib/fonts.ts` | `ensureBrandFonts` |
 | `startAssistant(request)` | accepte `brandKitId` |
-| `resolveExportFile(id)` | serveur : chemin contrôlé d’un export, pour la file de publication |
-| `listPublishTargets()` / `publishExport({ exportId, targets })` | user / admin : comptes capables et mise en file, un travail par compte |
+| `resolveExportFile(id, { file, purpose }?)` | serveur : chemin contrôlé d’un export, de sa couverture ou de ses sous-titres, pour la file de publication |
+| `listPublishTargets()` / `publishExport({ exportId, targets })` | user / admin : comptes capables et mise en file, un travail par compte ; les textes de chaque cible sont calculés par le serveur à partir des textes de l’export (dossier 01 ter, § 4) |
+| `getExport`, `updateExportPost`, `setExportCover`, `defaultPostTexts`, `draftPostTexts` | user : fiche d’un export, ses textes de publication, sa couverture, le jeu tiré de la marque, les propositions de l’assistant (dossier 01 ter, § 7) |
+| `listExportPublications(id)` | admin : publications d’un export, retrouvées dans la file par leur source |
+| `lib/post-texts.ts`, `lib/credits.ts`, `lib/subtitles.ts` | fonctions pures : résolution des textes par service, crédits complets du projet, sous-titres SubRip |
 | Inspecteur sans sélection | section « Image de marque » |
 | Fenêtre « Créer » | sélecteur « Image de marque » |
 | Menu d’un export | « Publier », pour un administrateur, si un compte sait publier une vidéo |

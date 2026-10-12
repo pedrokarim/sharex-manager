@@ -162,6 +162,12 @@ const MIME_LABELS: Record<string, string> = {
   "image/gif": "GIF",
 };
 
+/** Taille bornée : « 1920 × 1080 px », ou un seul côté quand l'autre ne l'est pas (jamais « 1920 × ? »). */
+function sizeText(width: number | undefined, height: number | undefined): string {
+  if (width && height) return `${width} × ${height} px`;
+  return width ? `${width} px de large` : `${height} px de haut`;
+}
+
 /** Description courte des limites d'un format : « 3 min au plus · 9:16 à 16:9 · 1 Go au plus · MP4 ». */
 export function describeMediaLimits(limits: MediaLimits | undefined): string {
   if (!limits) return "";
@@ -173,8 +179,8 @@ export function describeMediaLimits(limits: MediaLimits | undefined): string {
     const { min, max } = limits.aspectRatio;
     parts.push(Math.abs(min - max) < 0.001 ? `format ${formatRatio(min)}` : `formats ${formatRatio(min)} à ${formatRatio(max)}`);
   }
-  if (limits.minWidth || limits.minHeight) parts.push(`${limits.minWidth ?? "?"} × ${limits.minHeight ?? "?"} px au moins`);
-  if (limits.maxWidth || limits.maxHeight) parts.push(`${limits.maxWidth ?? "?"} × ${limits.maxHeight ?? "?"} px au plus`);
+  if (limits.minWidth || limits.minHeight) parts.push(`${sizeText(limits.minWidth, limits.minHeight)} au moins`);
+  if (limits.maxWidth || limits.maxHeight) parts.push(`${sizeText(limits.maxWidth, limits.maxHeight)} au plus`);
   if (limits.maxBytes) parts.push(`${formatBytes(limits.maxBytes)} au plus`);
   if (limits.mimeTypes?.length) parts.push(limits.mimeTypes.map((type) => MIME_LABELS[type] ?? type).join(", "));
   return parts.join(" · ");
@@ -213,10 +219,10 @@ export function checkMediaLimits(limits: MediaLimits | undefined, media: Omit<Pu
       }
     }
     if ((limits.minWidth && media.width < limits.minWidth) || (limits.minHeight && media.height < limits.minHeight)) {
-      problems.push(`${noun} est trop petite (${media.width} × ${media.height}) : ${limits.minWidth ?? "?"} × ${limits.minHeight ?? "?"} px au moins.`);
+      problems.push(`${noun} est trop petite (${media.width} × ${media.height}) : ${sizeText(limits.minWidth, limits.minHeight)} au moins.`);
     }
     if ((limits.maxWidth && media.width > limits.maxWidth) || (limits.maxHeight && media.height > limits.maxHeight)) {
-      problems.push(`${noun} est trop grande (${media.width} × ${media.height}) : ${limits.maxWidth ?? "?"} × ${limits.maxHeight ?? "?"} px au plus.`);
+      problems.push(`${noun} est trop grande (${media.width} × ${media.height}) : ${sizeText(limits.maxWidth, limits.maxHeight)} au plus.`);
     }
   }
   return problems;

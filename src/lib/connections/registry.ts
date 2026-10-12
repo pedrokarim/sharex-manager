@@ -6,7 +6,7 @@
  * sans autre modification.
  */
 
-import type { ConnectionCapability, Connector, ConnectorInfo } from "./types";
+import { FOLLOW_UP_CAPABILITY, type ConnectionCapability, type Connector, type ConnectorInfo } from "./types";
 import { youtubeConnector } from "./connectors/youtube";
 import { facebookConnector } from "./connectors/facebook";
 import { instagramConnector } from "./connectors/instagram";
@@ -68,8 +68,62 @@ export function capabilitiesForScopes(connector: Connector, scopes: string[]): C
     .map((entry) => entry.capability);
 }
 
+/** Portées qu'une connexion incrémentale demandera pour obtenir une capacité : la première de `scopes`, et toutes ses `allOf`. */
+export function scopesForCapability(connector: Connector, capability: ConnectionCapability): string[] {
+  const entry = connector.capabilities.find((candidate) => candidate.capability === capability);
+  if (!entry || entry.scopes.length === 0) return [];
+  return [...new Set([entry.scopes[0], ...(entry.allOf ?? [])])];
+}
+
+/**
+ * Capacités du service que des portées ne couvrent pas (connexion
+ * incrémentale possible). Une capacité couverte par les portées mais retirée
+ * par le rôle du compte n'y figure pas.
+ */
+export function requestableCapabilities(connector: Connector, scopes: string[]): ConnectionCapability[] {
+  const granted = new Set(capabilitiesForScopes(connector, scopes));
+  return [...new Set(connector.capabilities.map((entry) => entry.capability))].filter((capability) => !granted.has(capability));
+}
+
+/**
+ * Portées à demander pour ajouter des capacités à un compte : celles qu'il a
+ * déjà, plus celles qui manquent. Lève une erreur pour une capacité que le
+ * service n'offre pas ; rend `null` si rien ne manque.
+ */
+export function incrementalScopes(connector: Connector, currentScopes: string[], capabilities: ConnectionCapability[]): string[] | null {
+  const scopes = new Set(currentScopes);
+  const before = scopes.size;
+  const granted = new Set(capabilitiesForScopes(connector, currentScopes));
+  for (const capability of capabilities) {
+    if (granted.has(capability)) continue;
+    const needed = scopesForCapability(connector, capability);
+    if (needed.length === 0) throw new Error(`${connector.label} n’offre pas cette autorisation.`);
+    for (const scope of needed) scopes.add(scope);
+  }
+  return scopes.size > before ? [...scopes] : null;
+}
+
+/** Capacités qu'aucun jeu de portées de la connexion ne donne : seulement à la demande. */
+function onDemandCapabilities(connector: Connector): ConnectionCapability[] {
+  const offered = new Set(connector.oauth.scopeSets.flatMap((set) => capabilitiesForScopes(connector, set.scopes)));
+  return [...new Set(connector.capabilities.map((entry) => entry.capability))].filter((capability) => !offered.has(capability));
+}
+
+/** Suites que le connecteur sait exécuter, avec la capacité exigée. */
+function describeFollowUps(connector: Connector): ConnectorInfo["followUps"] {
+  const support = connector.followUps;
+  if (!support) return undefined;
+  const result: NonNullable<ConnectorInfo["followUps"]> = {};
+  if (support.comment && connector.postComment) result.comment = { ...support.comment, capability: FOLLOW_UP_CAPABILITY.comment };
+  if (support.subtitles && connector.uploadSubtitles) result.subtitles = { ...support.subtitles, capability: FOLLOW_UP_CAPABILITY.subtitles };
+  if (support.cover?.mode === "publish") result.cover = { ...support.cover };
+  else if (support.cover && connector.setCover) result.cover = { ...support.cover, capability: FOLLOW_UP_CAPABILITY.cover };
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 /** Description publique : ni URL de jeton, ni fonction, rien qui serve à se connecter. */
 export function describeConnector(connector: Connector): ConnectorInfo {
+  const followUps = describeFollowUps(connector);
   return {
     id: connector.id,
     label: connector.label,
@@ -91,6 +145,10 @@ export function describeConnector(connector: Connector): ConnectorInfo {
     ...(connector.app.disconnectHelp ? { disconnectHelp: connector.app.disconnectHelp } : {}),
     ...(connector.fetchAccounts ? { multipleAccounts: true } : {}),
     ...(connector.publicMedia ? { publicMedia: true } : {}),
+    ...(followUps ? { followUps } : {}),
+    onDemandCapabilities: onDemandCapabilities(connector),
+    capabilityScopes: Object.fromEntries(connector.capabilities.map((entry) => [entry.capability, scopesForCapability(connector, entry.capability)])),
+    ...(connector.oauth.incremental?.help ? { incrementalHelp: connector.oauth.incremental.help } : {}),
   };
 }
 

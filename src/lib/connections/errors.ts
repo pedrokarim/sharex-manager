@@ -70,3 +70,19 @@ export class ServiceError extends Error {
 export function errorMessage(error: unknown, fallback = "Erreur inconnue"): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
+
+/**
+ * Erreur passagère, qu'un nouvel essai plus tard peut faire aboutir : coupure
+ * réseau, service indisponible (5xx, 429), erreur marquée passagère par le
+ * connecteur (`transient`, `RetryableError`). Ni un quota, ni une reconnexion,
+ * ni un refus définitif.
+ */
+export function isTransientError(error: unknown): boolean {
+  if (!(error instanceof Error) || error.name === "AbortError") return false;
+  if (error instanceof QuotaExceededError || error instanceof ReconnectRequiredError || error instanceof CreditsExhaustedError || error instanceof OAuthError) return false;
+  const marked = (error as { transient?: unknown }).transient;
+  if (typeof marked === "boolean") return marked;
+  if (error.name === "RetryableError") return true;
+  if (error instanceof ServiceError) return error.status >= 500 || error.status === 429 || error.status === 408;
+  return error instanceof TypeError || /network|socket|ECONN|ETIMEDOUT|EPIPE|fetch failed|terminated/i.test(error.message);
+}

@@ -42,7 +42,7 @@ export const THREADS_PUBLISH_FIELDS: PublishField[] = [
     key: "text",
     kind: "textarea",
     label: "Texte",
-    role: "description",
+    role: "caption",
     maxLength: TEXT_MAX,
     sourceKinds: ["image", "video"],
     help: "500 caractères au plus ; un émoji compte pour plusieurs. La première adresse devient l’aperçu du lien.",

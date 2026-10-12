@@ -62,7 +62,8 @@ export const FACEBOOK_PUBLISH_FIELDS: PublishField[] = [
     key: "description",
     kind: "textarea",
     label: "Description",
-    role: "description",
+    // Le texte affiché avec la vidéo ou la photo dans le fil de la Page (`description`, `caption`).
+    role: "caption",
     maxLength: MESSAGE_MAX_CHARS,
     sourceKinds: ["video", "image"],
     help: "Les mots-clés # vont ici : Facebook n’a pas de champ de tags.",
