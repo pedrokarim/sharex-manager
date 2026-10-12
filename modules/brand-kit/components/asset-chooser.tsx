@@ -22,6 +22,8 @@ export function AssetChooser({
   noneLabel,
   emptyText,
   className,
+  noneIcon,
+  hint,
 }: {
   kit: BrandKit;
   assets: BrandAsset[];
@@ -34,6 +36,10 @@ export function AssetChooser({
   /** Phrase quand aucune image ne convient. */
   emptyText: string;
   className?: string;
+  /** Icône du choix « aucune image » ; par défaut, celle du texte (le nom de la marque). */
+  noneIcon?: React.ReactNode;
+  /** Précision sous le choix retenu : « proposée ». */
+  hint?: string;
 }) {
   const [open, setOpen] = useState(false);
   const current = value ? assets.find((asset) => asset.id === value) : undefined;
@@ -58,7 +64,7 @@ export function AssetChooser({
               // eslint-disable-next-line @next/next/no-img-element -- image de la marque, servie par le module
               <img src={kitAssetUrl(kit.id, current.file)} alt="" className="h-full w-full object-contain p-1" />
             ) : (
-              <Type aria-hidden className="size-5 text-muted-foreground" />
+              (noneIcon ?? <Type aria-hidden className="size-5 text-muted-foreground" />)
             )}
           </span>
           <span className="grid min-w-0 flex-1">
@@ -66,6 +72,7 @@ export function AssetChooser({
             <span className="line-clamp-2 text-sm font-medium break-words" title={current?.label ?? noneLabel}>
               {current?.label ?? noneLabel ?? "Aucune image"}
             </span>
+            {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
           </span>
           <ChevronsUpDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />
         </button>
@@ -78,7 +85,7 @@ export function AssetChooser({
           <div role="listbox" aria-label={label} className="grid max-h-72 grid-cols-4 gap-1.5 overflow-y-auto p-0.5">
             {noneLabel && (
               <ChoiceTile selected={!current} label={noneLabel} onSelect={() => choose(undefined)}>
-                <Type aria-hidden className="size-5 text-muted-foreground" />
+                {noneIcon ?? <Type aria-hidden className="size-5 text-muted-foreground" />}
               </ChoiceTile>
             )}
             {assets.map((asset) => (

@@ -27,9 +27,27 @@ export interface BrandFont {
   size: number;
 }
 
-export type AssetKind = "logo" | "logo-mark" | "mascot-sheet" | "mascot-pose" | "background" | "texture" | "reference";
+/**
+ * `format` : image finie importée pour un format (bannière, avatar…), qui
+ * remplace son rendu composé. Elle n'entre que par `setFormatImage`, jamais
+ * par l'ajout d'une image ordinaire : elle n'est pas dans `ASSET_KINDS`.
+ */
+export type AssetKind = "logo" | "logo-mark" | "mascot-sheet" | "mascot-pose" | "background" | "texture" | "reference" | "format";
 
+/** Types qu'une image ajoutée à la main peut prendre. */
 export const ASSET_KINDS: readonly AssetKind[] = ["logo", "logo-mark", "mascot-sheet", "mascot-pose", "background", "texture", "reference"];
+
+/** Formats d'une chaîne (§ 4.3) ; leurs tailles et leurs rendus sont dans `formats.ts`. */
+export const FORMAT_IDS = ["banner", "avatar", "watermark", "x-header", "endcard-vertical", "endcard-horizontal", "short-cover"] as const;
+export type FormatId = (typeof FORMAT_IDS)[number];
+
+/**
+ * Formats qui peuvent mettre en scène une pose de la mascotte, réglée dans
+ * `mascot.formatPoses`. Le carton de fin a la sienne (`endCard.poseAssetId`),
+ * partagée avec les vidéos ; le filigrane n'en a jamais.
+ */
+export const MASCOT_FORMAT_IDS = ["banner", "avatar", "x-header", "short-cover"] as const;
+export type MascotFormatId = (typeof MASCOT_FORMAT_IDS)[number];
 
 export interface BrandAsset {
   id: string;
@@ -120,6 +138,27 @@ export interface BrandPublishing {
   containsSyntheticMedia: boolean;
   /** Public enfant : faux par défaut, vrai seulement sur choix explicite. */
   madeForKids: boolean;
+  /**
+   * Profil des comptes connectés (onglet « Chaîne / Profil ») : description
+   * de la chaîne, modèle avec les variables {brand}, {hook}, {links},
+   * {hashtags}, {tags}, {date}. Les mots-clés reprennent `tags`, la langue
+   * celle de la marque.
+   */
+  channelDescriptionTemplate: string;
+  /** Bio courte du profil (Instagram, Threads, Facebook). */
+  bio: string;
+  /** Pays de la marque, ISO 3166-1 alpha-2 (« FR ») ; vide : aucun. */
+  country: string;
+}
+
+/** Présence de la mascotte dans les vidéos de Clip Studio (le carton de fin a son propre réglage). */
+export interface BrandMascotPresence {
+  /** Une pose accompagne l'accroche du début. */
+  opening: boolean;
+  /** Pose de l'ouverture ; absente : celle de l'en-tête X, sinon la première. */
+  openingPoseId?: string;
+  /** Une petite pose dans un coin pendant les segments, une autre à chaque segment. */
+  reactions: boolean;
 }
 
 export interface BrandMascot {
@@ -127,6 +166,12 @@ export interface BrandMascot {
   identityPrompt: string;
   sheetAssetIds: string[];
   poseAssetIds: string[];
+  /**
+   * Pose de chaque format : un identifiant de pose, ou `null` pour « sans
+   * mascotte ». Un format absent prend la proposition de `formatPose()`.
+   */
+  formatPoses?: Partial<Record<MascotFormatId, string | null>>;
+  presence?: BrandMascotPresence;
 }
 
 export interface BrandKit {
@@ -147,6 +192,10 @@ export interface BrandKit {
   mascot?: BrandMascot;
   watermark?: BrandWatermark;
   endCard: BrandEndCard;
+  /** Image finie de chaque format (asset `format`), qui remplace le rendu composé. */
+  formatImages?: Partial<Record<FormatId, string>>;
+  /** Croix de repérage d'imprimeur aux coins de la bannière et du carton de fin mis en scène. */
+  registrationMarks?: boolean;
   ai: { styleNotes: string; collectionId?: string; scriptTone: string };
   publishing: BrandPublishing;
   isDefault: boolean;
@@ -185,6 +234,8 @@ export const KIT_LIMITS = {
   descriptionTemplate: 4000,
   captionTemplate: 2200,
   firstCommentTemplate: 2200,
+  channelDescriptionTemplate: 2000,
+  bio: 150,
   serviceTemplates: 12,
   hashtags: 30,
   links: 10,

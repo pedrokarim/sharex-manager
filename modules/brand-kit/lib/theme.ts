@@ -4,6 +4,7 @@
  */
 
 import type { MediaSource } from "@/modules/clip-studio/engine/types";
+import { formatImageAsset, mascotPoses, openingPose } from "./mascot";
 import { MODULE_NAME, kitAssetUrl, type BrandAsset, type BrandKit, type BrandTheme } from "./types";
 
 export function assetSource(kit: BrandKit, asset: BrandAsset): MediaSource {
@@ -28,6 +29,8 @@ export function toBrandTheme(kit: BrandKit): BrandTheme {
   const logo = findAsset(kit, kit.logoAssetId);
   const mark = kit.watermark ? findAsset(kit, kit.watermark.assetId) : undefined;
   const pose = findAsset(kit, kit.endCard.poseAssetId);
+  const cardImages = endCardImages(kit);
+  const mascot = mascotTheme(kit);
   return {
     kitId: kit.id,
     name: kit.name,
@@ -53,7 +56,29 @@ export function toBrandTheme(kit: BrandKit): BrandTheme {
           tagline: kit.tagline || undefined,
           callToAction: kit.endCard.callToAction,
           pose: pose ? assetSource(kit, pose) : undefined,
+          ...(cardImages ? { images: cardImages } : {}),
         }
       : undefined,
+    ...(mascot ? { mascot } : {}),
+  };
+}
+
+/** Images finies des cartons de fin, à leur orientation ; absentes : la composition. */
+function endCardImages(kit: BrandKit): NonNullable<BrandTheme["endCard"]>["images"] | undefined {
+  const vertical = formatImageAsset(kit, "endcard-vertical");
+  const horizontal = formatImageAsset(kit, "endcard-horizontal");
+  if (!vertical && !horizontal) return undefined;
+  return { ...(vertical ? { vertical: assetSource(kit, vertical) } : {}), ...(horizontal ? { horizontal: assetSource(kit, horizontal) } : {}) };
+}
+
+/** Présence de la mascotte dans le montage ; rien quand elle est éteinte ou sans pose. */
+function mascotTheme(kit: BrandKit): BrandTheme["mascot"] {
+  const presence = kit.mascot?.presence;
+  const poses = mascotPoses(kit);
+  if (!presence || poses.length === 0 || (!presence.opening && !presence.reactions)) return undefined;
+  const opening = presence.opening ? openingPose(kit) : undefined;
+  return {
+    ...(opening ? { opening: assetSource(kit, opening) } : {}),
+    reactions: presence.reactions ? poses.map((pose) => assetSource(kit, pose)) : [],
   };
 }

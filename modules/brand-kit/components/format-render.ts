@@ -13,7 +13,7 @@ import type { ClipProject, ImageItem, VideoItem } from "@/modules/clip-studio/en
 import { ensureBrandFonts, ensureFonts } from "@/modules/clip-studio/lib/fonts";
 import type { BuiltFormat } from "../lib/formats";
 import { toBrandTheme } from "../lib/theme";
-import type { BrandKit } from "../lib/types";
+import { kitAssetUrl, type BrandKit } from "../lib/types";
 
 // ─── Images ──────────────────────────────────────────────────────
 
@@ -92,8 +92,18 @@ export function drawProject(canvas: HTMLCanvasElement, project: ClipProject, fra
   drawFrame(context, { ...project, width: canvas.width, height: canvas.height }, frame, resolver);
 }
 
-/** PNG plein format d'un format : polices et images attendues, aucune zone sûre. */
+/**
+ * PNG plein format d'un format : polices et images attendues, aucune zone
+ * sûre. Une image finie importée est reprise telle quelle, sans être
+ * redessinée : elle est déjà contrôlée et à la bonne taille.
+ */
 export async function renderFormatPng(kit: BrandKit, built: BuiltFormat): Promise<Blob> {
+  if (built.supplied) {
+    const response = await fetch(kitAssetUrl(kit.id, built.supplied.file));
+    if (!response.ok) throw new Error(`L’image finie de ce format est introuvable (HTTP ${response.status}).`);
+    const blob = await response.blob();
+    return blob.type === "image/png" ? blob : new Blob([await blob.arrayBuffer()], { type: "image/png" });
+  }
   await prepareKitFonts(kit);
   await Promise.all(imageUrls(built.project).map(loadImage));
   const canvas = document.createElement("canvas");

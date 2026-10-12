@@ -56,6 +56,9 @@ export function createDefaultKit(name: string, now = Date.now()): BrandKit {
   };
 }
 
+/** Description de chaîne d'une marque neuve : l'accroche, puis les liens. */
+export const DEFAULT_CHANNEL_DESCRIPTION = "{hook}\n\n{links}";
+
 /** Réglages de publication d'une marque neuve. */
 export function defaultPublishing(): BrandPublishing {
   return {
@@ -73,6 +76,9 @@ export function defaultPublishing(): BrandPublishing {
     defaultPrivacy: "private",
     containsSyntheticMedia: true,
     madeForKids: false,
+    channelDescriptionTemplate: DEFAULT_CHANNEL_DESCRIPTION,
+    bio: "",
+    country: "",
   };
 }
 
@@ -97,6 +103,10 @@ export function upgradePublishing(input: unknown): BrandPublishing {
     firstCommentTemplate: typeof publishing.firstCommentTemplate === "string" ? publishing.firstCommentTemplate : "",
     serviceTemplates: services && typeof services === "object" && !Array.isArray(services) ? services : {},
     links: Array.isArray(publishing.links) ? publishing.links : [],
+    // Profil des comptes : une marque d'avant les reçoit vides, sauf le modèle de description.
+    channelDescriptionTemplate: typeof publishing.channelDescriptionTemplate === "string" ? publishing.channelDescriptionTemplate : fresh.channelDescriptionTemplate,
+    bio: typeof publishing.bio === "string" ? publishing.bio : "",
+    country: typeof publishing.country === "string" ? publishing.country : "",
   };
 }
 

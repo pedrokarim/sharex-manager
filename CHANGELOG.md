@@ -7,6 +7,25 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Image de marque : la mascotte entre dans les formats. Chaque format a sa
+  pose (bannière accoudée au bandeau, avatar en portrait lisible à 40 px,
+  en-tête X en pied à droite, carton de fin en grand sous le nom, couverture
+  de short au choix), réglée dans la section Mascotte avec la vignette du
+  format, ou proposée d’après la note et la forme des poses ; jamais sur le
+  filigrane. La mise en scène suit l’esprit Riso : disque tramé à l’accent,
+  bandeau à la seconde encre, croix de repérage en option. Sans pose, les
+  formats ne changent pas.
+- Image de marque : un format peut être une image finie, importée par le
+  sélecteur d’images (« Utiliser une image finie… »), contrôlée, ramenée à
+  sa taille et ré-encodée en PNG sans métadonnées. Elle remplace le rendu
+  composé dans l’aperçu, l’export, l’onglet Chaîne des comptes connectés, le
+  filigrane des captures et le carton de fin des vidéos ; « Revenir au rendu
+  composé » la retire.
+- Clip Studio : la mascotte de la marque dans les vidéos (« Dans les vidéos »,
+  section Mascotte). Une pose accompagne l’accroche du début, puis une petite
+  pose change à chaque segment, animée, jamais sur un texte ni sous
+  l’interface d’un short. Elle part avec la marque ; l’assistant ne génère
+  plus d’illustration de la mascotte quand ses réactions sont posées.
 - Clip Studio : l’assistant vérifie les faits de ses scripts. La consigne
   porte la date du jour ; quand la demande parle de faits réels (jeux à
   venir, classement, quiz, noms propres, dates…) et que « Chercher aussi sur
@@ -540,6 +559,30 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 - Module AI Image Gen : mode d'isolation réglable pour les agents CLI qui en
   proposent un, le mécanisme du noyau n'étant pas toujours disponible en
   conteneur.
+- Comptes connectés : l’onglet « Chaîne / Profil » d’un compte rassemble
+  tout ce qui fait son identité, en deux groupes. « Modifiable depuis
+  ShareX Manager » : valeur actuelle lue chez le service, valeur proposée
+  depuis l’image de marque (modifiable), ce qui change, puis « Envoyer » ou
+  « Tout envoyer », avec relecture après l’envoi et « Autoriser… » quand une
+  autorisation manque. « À changer chez {service} » : ce que l’API ne permet
+  pas, dit franchement, avec l’image rendue depuis la marque à télécharger,
+  le texte à copier et le lien vers la bonne page du service.
+- YouTube : description, mots-clés, langue, pays, bande-annonce pour les
+  non-abonnés et traductions du nom et de la description modifiables depuis
+  l’application (`channels.update`, en renvoyant le reste et le nom
+  inchangés), sections de la page d’accueil (ajout, ordre, retrait, 10 au
+  plus) et playlists (création, titre, description, visibilité, ajout de
+  vidéos). Nom, identifiant, photo de profil et liens restent à changer dans
+  YouTube Studio.
+- Facebook : description et site web de la Page modifiables, avec
+  l’autorisation `pages_manage_metadata` ajoutée à la demande (seconde
+  configuration Facebook Login for Business) ; nom, photo et couverture à
+  changer chez Facebook. Instagram et Threads : profil lu, tout est à changer
+  dans l’application, avec les textes et la photo de la marque.
+- Image de marque : section « Publication », groupe « Profil des comptes » :
+  modèle de description de la chaîne, bio courte et pays, qui préremplissent
+  l’onglet « Chaîne / Profil » ; les marques existantes les reçoivent à la
+  lecture.
 
 ### Changed
 

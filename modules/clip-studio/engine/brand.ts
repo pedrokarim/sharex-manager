@@ -11,6 +11,7 @@
  */
 
 import { CAPTION_STYLE, TEXT_PRESETS, uid } from "./edit";
+import { getPreset } from "./motion/registry";
 import { projectDuration } from "./timeline";
 import type { ClipItem, ClipProject, ImageItem, MediaSource, ShapeItem, TextItem, TextRole, TextStyle, ThemeHint, Track } from "./types";
 
@@ -60,6 +61,21 @@ export interface BrandTheme {
     tagline?: string;
     callToAction?: string;
     pose?: MediaSource;
+    /**
+     * Image finie du carton, importée dans la marque pour une orientation :
+     * elle remplace la composition, posée telle quelle sur tout le cadre.
+     */
+    images?: { vertical?: MediaSource; horizontal?: MediaSource };
+  };
+  /**
+   * Mascotte dans le montage, hors carton de fin. Absente : rien n'est posé,
+   * le rendu est celui d'une marque sans mascotte.
+   */
+  mascot?: {
+    /** Pose qui accompagne l'accroche du début. */
+    opening?: MediaSource;
+    /** Poses des réactions, une par segment, à tour de rôle ; vide : aucune réaction. */
+    reactions: MediaSource[];
   };
 }
 
@@ -281,6 +297,34 @@ export function endCardTracks(project: ClipProject, theme: BrandTheme, start: nu
   });
 
   const layers: { name: string; item: ClipItem }[] = [];
+  const image = vertical ? card.images?.vertical : card.images?.horizontal;
+  if (image) {
+    // Carton fini importé : posé tel quel, sur tout le cadre.
+    layers.push({
+      name: "Fin – image",
+      item: {
+        ...base,
+        id: uid("i-"),
+        type: "image",
+        source: image,
+        fit: "cover",
+        motion: "none",
+        radius: 0,
+        transform: { x: 0.5, y: 0.5, width: 1, height: 1, rotation: 0, opacity: 1 },
+        animIn: fade(8),
+        animOut: { kind: "none", frames: 6 },
+      },
+    });
+    layers.push({ name: "Fin – fond", item: plate });
+    return layers.map((layer) => brandTrack(layer.name, [layer.item]));
+  }
+  if (vertical && card.pose) {
+    // Mise en scène du carton vertical avec la mascotte : le nom en bloc sur deux lignes en haut à gauche,
+    // l'accroche et l'appel dessous, la mascotte en grand dans le bas du cadre.
+    for (const layer of posedEndCardLayers(project, theme, card, card.pose, base)) layers.push(layer);
+    layers.push({ name: "Fin – fond", item: plate });
+    return layers.map((layer) => brandTrack(layer.name, [layer.item]));
+  }
   const hasPose = Boolean(card.pose);
   if (card.callToAction) {
     layers.push({ name: "Fin – appel", item: text(card.callToAction, "label", vertical ? (hasPose ? 0.6 : 0.68) : 0.74, vertical ? 0.032 : 0.045, { accent: 0 }) });
@@ -333,6 +377,277 @@ export function endCardTracks(project: ClipProject, theme: BrandTheme, start: nu
 }
 
 /**
+ * Nom coupé sur deux lignes, pour le bloc du carton de fin : à l'espace la
+ * plus proche du milieu, sinon au milieu du mot. Un nom court reste entier.
+ */
+export function splitBrandName(name: string): string {
+  const clean = name.replace(/\s+/g, " ").trim();
+  if (clean.length < 5) return clean;
+  const middle = clean.length / 2;
+  const spaces = [...clean].map((char, index) => (char === " " ? index : -1)).filter((index) => index > 0);
+  if (spaces.length > 0) {
+    const cut = spaces.reduce((best, index) => (Math.abs(index - middle) < Math.abs(best - middle) ? index : best), spaces[0]);
+    return `${clean.slice(0, cut)}\n${clean.slice(cut + 1)}`;
+  }
+  const cut = Math.ceil(clean.length / 2);
+  return `${clean.slice(0, cut)}\n${clean.slice(cut)}`;
+}
+
+type CardBase = { start: number; duration: number; origin: "brand" };
+
+/** Couches du carton vertical mis en scène avec la mascotte, de la plus haute à la plus basse. */
+function posedEndCardLayers(project: ClipProject, theme: BrandTheme, card: NonNullable<BrandTheme["endCard"]>, pose: MediaSource, base: CardBase) {
+  const left = 80 / 1080;
+  const width = 1 - left * 2;
+  const leftText = (content: string, role: TextRole, y: number, height: number, size: number, hint: ThemeHint = {}): TextItem => ({
+    ...base,
+    id: uid("x-"),
+    type: "text",
+    text: content,
+    style: themedTextStyle(theme, { role, ...hint }, { size, align: "left" }),
+    fit: "shrink",
+    transform: { x: left + width / 2, y, width, height, rotation: 0, opacity: 1 },
+    animIn: { kind: "pop", frames: 10 },
+    animOut: { kind: "none", frames: 6 },
+  });
+  const layers: { name: string; item: ClipItem }[] = [];
+  if (card.callToAction) {
+    const cta = leftText(card.callToAction, "label", 0.375, 0.04, 0.024, { accent: 0 });
+    // L'étiquette se mesure à son texte : elle part du bord gauche du bloc.
+    cta.transform = { ...cta.transform, width: 0.62, x: left + 0.31 };
+    layers.push({ name: "Fin – appel", item: cta });
+  }
+  if (card.tagline) layers.push({ name: "Fin – accroche", item: leftText(card.tagline, "subtitle", 0.322, 0.04, 44 / 1920) });
+  layers.push({ name: "Fin – logo", item: leftText(splitBrandName(card.name), "title", 0.19, 0.22, 190 / 1920) });
+
+  // La mascotte en pied, centrée, du dessous de l'appel au bas du cadre.
+  const top = card.callToAction ? 0.405 : 0.307;
+  let height = Math.min(0.665, 0.985 - top);
+  let poseWidth = (height * project.height) / aspectOf(pose) / project.width;
+  if (poseWidth > 0.8) {
+    poseWidth = 0.8;
+    height = (poseWidth * project.width * aspectOf(pose)) / project.height;
+  }
+  layers.push({
+    name: "Fin – mascotte",
+    item: {
+      ...base,
+      id: uid("i-"),
+      type: "image",
+      source: pose,
+      fit: "contain",
+      motion: "none",
+      radius: 0,
+      transform: { x: 0.5, y: top + height / 2, width: poseWidth, height, rotation: 0, opacity: 1 },
+      animIn: { kind: "slide-up", frames: 12 },
+      animOut: { kind: "none", frames: 6 },
+    },
+  });
+  return layers;
+}
+
+// ─── Mascotte dans le montage ────────────────────────────────────
+
+/**
+ * Zone visible d'un short 9:16, en fractions du cadre 1080 × 1920 : les
+ * mêmes valeurs que la zone de sécurité de l'aperçu (`preview-stage.tsx`).
+ * En haut le nom du compte, en bas la légende, à droite sous la moitié les
+ * boutons.
+ */
+export const SHORT_SAFE_ZONE = { top: 230 / 1920, bottom: 1440 / 1920, buttonsTop: 900 / 1920, buttonsLeft: 850 / 1080 };
+
+/** Rectangle en fractions du cadre. */
+export interface FrameBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+const isShort = (project: ClipProject) => Math.abs(project.height / project.width - 16 / 9) < 0.02;
+
+/** Où une pose de la mascotte peut aller : la zone visible, moins ce que cache l'interface. */
+export function mascotArea(project: ClipProject): { area: FrameBox; blocked: FrameBox[] } {
+  if (isShort(project)) {
+    const { top, bottom, buttonsTop, buttonsLeft } = SHORT_SAFE_ZONE;
+    return { area: { left: 0.03, right: 0.97, top, bottom }, blocked: [{ left: buttonsLeft, right: 1, top: buttonsTop, bottom: 1 }] };
+  }
+  const short = Math.min(project.width, project.height);
+  const mx = (0.04 * short) / project.width;
+  const my = (0.04 * short) / project.height;
+  return { area: { left: mx, right: 1 - mx, top: my, bottom: 1 - my }, blocked: [] };
+}
+
+/**
+ * Place qu'occupe un texte, estimée sans le dessiner (la fonction reste pure) :
+ * la longueur de ses lignes à la taille de sa police, bornée par son cadre.
+ */
+function textExtent(item: TextItem, project: ClipProject): FrameBox {
+  const { transform: t, style } = item;
+  const W = project.width;
+  const H = project.height;
+  const boxWidth = t.width * W;
+  const fontPx = style.size * H;
+  const charPx = fontPx * (style.uppercase ? 0.68 : 0.58) + style.letterSpacing * fontPx;
+  const padding = style.background ? style.background.padding * fontPx * 2 : 0;
+  const paragraphs = item.karaoke ? [item.text.split(/\s+/).slice(0, item.karaoke.groupSize).join(" ")] : item.text.split("\n");
+  let lines = 0;
+  let widest = 0;
+  for (const paragraph of paragraphs) {
+    const width = paragraph.length * charPx;
+    lines += Math.max(1, Math.ceil(width / Math.max(1, boxWidth - padding)));
+    widest = Math.max(widest, Math.min(boxWidth, width + padding));
+  }
+  const height = item.fit === "shrink" ? t.height * H : Math.max(t.height * H, lines * fontPx * style.lineHeight + padding);
+  const width = widest / W;
+  const left = style.align === "left" ? t.x - t.width / 2 : style.align === "right" ? t.x + t.width / 2 - width : t.x - width / 2;
+  return { left, right: left + width, top: t.y - height / H / 2, bottom: t.y + height / H / 2 };
+}
+
+/** Ce que le montage montre entre deux instants : textes, cadres, images, sauf les fonds plein cadre. */
+function contentBoxes(project: ClipProject, start: number, end: number): FrameBox[] {
+  const boxes: FrameBox[] = [];
+  for (const track of project.tracks) {
+    if (track.kind !== "visual" || track.hidden) continue;
+    for (const item of track.items) {
+      if (item.type === "audio" || item.origin === "brand") continue;
+      if (item.start >= end || item.start + item.duration <= start) continue;
+      const t = item.transform;
+      if (t.opacity <= 0.02 || (t.width >= 0.95 && t.height >= 0.95)) continue;
+      boxes.push(
+        item.type === "text"
+          ? textExtent(item, project)
+          : { left: t.x - t.width / 2, right: t.x + t.width / 2, top: t.y - t.height / 2, bottom: t.y + t.height / 2 }
+      );
+    }
+  }
+  return boxes;
+}
+
+const GAP = 0.008;
+const overlaps = (a: FrameBox, b: FrameBox) => a.left < b.right + GAP && a.right > b.left - GAP && a.top < b.bottom + GAP && a.bottom > b.top - GAP;
+
+/**
+ * Premier emplacement libre pour une pose : la plus grande des hauteurs
+ * proposées, du côté préféré, en partant du bas. `null` quand rien ne tient
+ * sans masquer le contenu : la pose n'est alors pas posée.
+ */
+export function findMascotSpot(
+  project: ClipProject,
+  source: MediaSource,
+  start: number,
+  end: number,
+  options: { heights: number[]; sides: ("left" | "right" | "center")[] }
+): FrameBox | null {
+  const { area, blocked } = mascotArea(project);
+  const obstacles = [...blocked, ...contentBoxes(project, start, end)];
+  const ratio = aspectOf(source);
+  for (const height of options.heights) {
+    const width = (height * project.height) / ratio / project.width;
+    if (width > area.right - area.left || height > area.bottom - area.top) continue;
+    for (const side of options.sides) {
+      const left = side === "left" ? area.left : side === "right" ? area.right - width : 0.5 - width / 2;
+      // Hauteurs candidates : le bas de la zone, puis juste sous ou juste au-dessus de chaque obstacle.
+      const tops = [area.bottom - height, ...obstacles.flatMap((obstacle) => [obstacle.bottom + GAP + 1e-6, obstacle.top - GAP - 1e-6 - height])]
+        .filter((top) => top >= area.top - 1e-9 && top + height <= area.bottom + 1e-9)
+        .sort((a, b) => b - a);
+      for (const top of tops) {
+        const box = { left, right: left + width, top, bottom: top + height };
+        if (!obstacles.some((obstacle) => overlaps(box, obstacle))) return box;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Segments du montage : les plans de la piste principale (un fond par
+ * segment dans les modèles). Sans piste principale, aucun segment.
+ */
+function contentSegments(project: ClipProject, end: number): { start: number; end: number }[] {
+  const starts = new Map<number, number>();
+  for (const track of project.tracks) {
+    if (track.kind !== "visual" || track.origin === "brand" || !/^Principale( \d+)?$/.test(track.name)) continue;
+    for (const item of track.items) {
+      if (item.origin === "brand" || item.start >= end) continue;
+      starts.set(item.start, Math.max(starts.get(item.start) ?? 0, Math.min(end, item.start + item.duration)));
+    }
+  }
+  return [...starts.entries()].sort((a, b) => a[0] - b[0]).map(([start, stop]) => ({ start, end: stop }));
+}
+
+function presetFrames(id: string, fps: number, fallback: number): number {
+  const preset = getPreset(id, "in");
+  return preset ? Math.max(1, Math.round((preset.durationMs / 1000) * fps)) : fallback;
+}
+
+/** Préréglages du registre : la pose d'ouverture monte en grandissant, une réaction surgit du bas avec un rebond. */
+export const MASCOT_OPENING_ANIM = "rise-grow";
+export const MASCOT_REACTION_ANIM = "surge-up";
+
+function mascotItem(project: ClipProject, source: MediaSource, box: FrameBox, start: number, end: number, label: string, anim: string): ImageItem {
+  return {
+    id: uid("i-"),
+    type: "image",
+    origin: "brand",
+    label,
+    start,
+    duration: end - start,
+    source,
+    fit: "contain",
+    motion: "none",
+    radius: 0,
+    transform: { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2, width: box.right - box.left, height: box.bottom - box.top, rotation: 0, opacity: 1 },
+    animIn: { kind: anim, frames: presetFrames(anim, project.fps, 14) },
+    animOut: { kind: "fade", frames: 6 },
+  };
+}
+
+/**
+ * Mascotte posée par la marque dans le montage : une pose qui accompagne
+ * l'accroche du premier segment, puis une petite pose dans un coin à chaque
+ * segment suivant, une autre à chaque fois. Chaque pose va là où elle ne
+ * masque aucun texte ni aucun cadre, dans la zone visible d'un short ; si
+ * rien ne tient, elle n'est pas posée. Rien sans `theme.mascot`.
+ */
+export function mascotTracks(project: ClipProject, theme: BrandTheme, contentEnd: number): Track[] {
+  const mascot = theme.mascot;
+  if (!mascot || contentEnd < project.fps) return [];
+  const segments = contentSegments(project, contentEnd);
+  const tracks: Track[] = [];
+  const vertical = project.height > project.width;
+
+  if (mascot.opening) {
+    const first = segments[0] ?? { start: 0, end: Math.min(contentEnd, Math.round(3 * project.fps)) };
+    const start = first.start + 4;
+    if (first.end - start >= project.fps) {
+      const box = findMascotSpot(project, mascot.opening, start, first.end, {
+        heights: vertical ? [0.3, 0.26, 0.22, 0.18, 0.15] : [0.5, 0.42, 0.36, 0.3],
+        sides: ["center", "right", "left"],
+      });
+      if (box) tracks.push(brandTrack("Mascotte – ouverture", [mascotItem(project, mascot.opening, box, start, first.end, "Mascotte – ouverture", MASCOT_OPENING_ANIM)]));
+    }
+  }
+
+  if (mascot.reactions.length > 0) {
+    const items: ImageItem[] = [];
+    // L'ouverture a son segment ; les réactions prennent les suivants.
+    segments.slice(1).forEach((segment, index) => {
+      const source = mascot.reactions[index % mascot.reactions.length];
+      const start = segment.start + 6;
+      if (segment.end - start < project.fps) return;
+      const box = findMascotSpot(project, source, start, segment.end, {
+        heights: vertical ? [0.16, 0.13, 0.11, 0.09, 0.075] : [0.3, 0.25, 0.2, 0.16, 0.13],
+        sides: ["right", "left"],
+      });
+      if (box) items.push(mascotItem(project, source, box, start, segment.end, "Mascotte – réaction", MASCOT_REACTION_ANIM));
+    });
+    if (items.length > 0) tracks.push(brandTrack("Mascotte – réactions", items));
+  }
+  return tracks;
+}
+
+/**
  * Applique une image de marque, la remplace, ou la retire (`null`).
  *
  * Appliquer deux fois la même marque donne le même projet (aux identifiants
@@ -363,5 +678,7 @@ export function applyBrandTheme(project: ClipProject, theme: BrandTheme | null):
   const card = endCardTracks(base, theme, contentEnd);
   const lastVisual = tracks.reduce((found, track, index) => (track.kind === "visual" ? index : found), -1);
   const ordered = [...tracks.slice(0, lastVisual + 1), ...card, ...tracks.slice(lastVisual + 1)];
-  return { ...base, tracks: mark ? [brandTrack("Filigrane", [mark]), ...ordered] : ordered };
+  // La mascotte passe au-dessus du montage, à des places où elle ne masque rien.
+  const mascot = mascotTracks(base, theme, contentEnd);
+  return { ...base, tracks: [...(mark ? [brandTrack("Filigrane", [mark])] : []), ...mascot, ...ordered] };
 }

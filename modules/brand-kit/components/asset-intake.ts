@@ -56,4 +56,5 @@ export const ASSET_KIND_LABELS: Record<AssetKind, string> = {
   background: "Fond",
   texture: "Texture",
   reference: "Référence",
+  format: "Image finie d’un format",
 };

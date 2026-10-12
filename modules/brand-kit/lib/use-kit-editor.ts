@@ -11,6 +11,12 @@ const SAVE_DELAY = 500;
 /** Le serveur refuse un enregistrement quand la fiche a changé ailleurs. */
 const isConflict = (error: unknown) => /changé ailleurs/i.test(errorMessage(error, ""));
 
+/** Pose de chaque format, sans celles que le serveur a retirées. */
+function keepPoses(formatPoses: NonNullable<BrandKit["mascot"]>["formatPoses"], poseIds: string[]) {
+  if (!formatPoses) return undefined;
+  return Object.fromEntries(Object.entries(formatPoses).filter(([, id]) => id === null || poseIds.includes(id ?? ""))) as typeof formatPoses;
+}
+
 /**
  * Fusionne la fiche rendue par une opération serveur (image ajoutée, police
  * retirée…) avec des modifications locales faites pendant l'opération : les
@@ -39,9 +45,24 @@ function mergeServerKit(local: BrandKit, server: BrandKit): BrandKit {
     markAssetId: server.markAssetId,
     watermark: server.watermark && local.watermark ? { ...local.watermark, assetId: server.watermark.assetId } : server.watermark,
     mascot: server.mascot
-      ? { ...server.mascot, ...(local.mascot ? { name: local.mascot.name, identityPrompt: local.mascot.identityPrompt } : {}) }
+      ? {
+          ...server.mascot,
+          ...(local.mascot
+            ? {
+                name: local.mascot.name,
+                identityPrompt: local.mascot.identityPrompt,
+                // Réglages faits pendant l'opération, sur des poses que le serveur garde encore.
+                formatPoses: keepPoses(local.mascot.formatPoses, server.mascot.poseAssetIds),
+                presence: local.mascot.presence && {
+                  ...local.mascot.presence,
+                  openingPoseId: server.mascot.poseAssetIds.includes(local.mascot.presence.openingPoseId ?? "") ? local.mascot.presence.openingPoseId : undefined,
+                },
+              }
+            : {}),
+        }
       : local.mascot,
     endCard: { ...local.endCard, poseAssetId: server.endCard.poseAssetId },
+    formatImages: server.formatImages,
     ai: { ...local.ai, collectionId: server.ai.collectionId },
     isDefault: server.isDefault,
     updatedAt: server.updatedAt,

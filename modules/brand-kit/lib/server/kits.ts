@@ -15,10 +15,13 @@ import { getAbsoluteUploadPath } from "@/lib/config";
 import { announceNewUpload } from "@/lib/gallery-events";
 import { FONT_FILE_LIMITS, inspectFont } from "@/lib/fonts/inspect";
 import { createDefaultKit, newItemId } from "../defaults";
+import { FORMATS } from "../formats";
+import { formatImageAsset } from "../mascot";
 import { toBrandTheme, watermarkAsset } from "../theme";
 import { sanitizeKit } from "../validate";
 import {
   ASSET_KINDS,
+  FORMAT_IDS,
   KIT_LIMITS,
   brandFontFamily,
   isItemId,
@@ -30,6 +33,7 @@ import {
   type BrandFont,
   type BrandKit,
   type BrandTheme,
+  type FormatId,
   type KitSummary,
 } from "../types";
 import { isFileName, kitArea, kitDir, listKitFiles, readKit, removeKitDir, uploadsDir, writeKit } from "./store";
@@ -44,8 +48,7 @@ const MAX_ARCHIVE_UNPACKED = 60 * 1024 * 1024;
 
 const IMAGE_EXTENSIONS: Record<string, string> = { png: "png", jpeg: "jpg", webp: "webp", gif: "gif" };
 
-export const FORMAT_IDS = ["banner", "avatar", "watermark", "x-header", "endcard-vertical", "endcard-horizontal", "short-cover"] as const;
-export type FormatId = (typeof FORMAT_IDS)[number];
+export { FORMAT_IDS, type FormatId };
 
 // ─── Lecture ─────────────────────────────────────────────────────
 
@@ -289,13 +292,113 @@ export function removeKitAsset(kitId: unknown, assetId: unknown): BrandKit {
   }
   if (next.endCard.poseAssetId === asset.id) next.endCard = { ...next.endCard, poseAssetId: undefined };
   if (next.mascot) {
+    // Un format qui montrait cette pose reprend la proposition par défaut.
+    const formatPoses = Object.fromEntries(Object.entries(next.mascot.formatPoses ?? {}).filter(([, id]) => id !== asset.id));
+    const presence = next.mascot.presence;
     next.mascot = {
       ...next.mascot,
       sheetAssetIds: next.mascot.sheetAssetIds.filter((id) => id !== asset.id),
       poseAssetIds: next.mascot.poseAssetIds.filter((id) => id !== asset.id),
+      ...(next.mascot.formatPoses ? { formatPoses } : {}),
+      ...(presence ? { presence: { ...presence, openingPoseId: presence.openingPoseId === asset.id ? undefined : presence.openingPoseId } } : {}),
     };
   }
+  if (next.formatImages) {
+    next.formatImages = Object.fromEntries(Object.entries(next.formatImages).filter(([, id]) => id !== asset.id));
+  }
   return touch(next);
+}
+
+// ─── Images finies des formats ───────────────────────────────────
+
+/** Écart toléré entre la proportion d'une image fournie et celle de son format. */
+const FORMAT_RATIO_TOLERANCE = 0.01;
+
+/**
+ * Contrôle et ré-encode l'image finie d'un format : une image lisible, à la
+ * proportion du format (1 % d'écart au plus), ramenée à sa taille exacte et
+ * réécrite en PNG. Le ré-encodage ne garde que les pixels : métadonnées,
+ * profils et signatures (C2PA) ne passent pas. Le filigrane garde sa
+ * transparence ; les autres formats sont posés sur un fond opaque.
+ */
+export async function normalizeFormatImage(format: FormatId, buffer: Buffer): Promise<Buffer> {
+  const spec = FORMATS.find((entry) => entry.id === format);
+  if (!spec) throw new Error("Format inconnu");
+  if (buffer.length > MAX_IMAGE_BYTES) throw new Error("Image trop lourde (20 Mo au plus).");
+  let metadata: Metadata;
+  try {
+    metadata = await sharp(buffer, { limitInputPixels: MAX_PIXELS }).metadata();
+  } catch {
+    throw new Error("Ce fichier n’est pas une image lisible.");
+  }
+  if (!IMAGE_EXTENSIONS[metadata.format ?? ""] || !metadata.width || !metadata.height) throw new Error("Image refusée : PNG, JPEG, WebP ou GIF seulement.");
+  const turned = (metadata.orientation ?? 1) >= 5;
+  const width = turned ? metadata.height : metadata.width;
+  const height = turned ? metadata.width : metadata.height;
+  const expected = spec.width / spec.height;
+  if (Math.abs(width / height - expected) / expected > FORMAT_RATIO_TOLERANCE) {
+    throw new Error(`${spec.label} : il faut une image de ${spec.width} × ${spec.height} (ou à cette proportion) ; celle-ci mesure ${width} × ${height}.`);
+  }
+  let pipeline = sharp(buffer, { limitInputPixels: MAX_PIXELS }).rotate().resize(spec.width, spec.height, { fit: "fill" });
+  if (!spec.transparent) pipeline = pipeline.flatten({ background: "#ffffff" });
+  return pipeline.png({ compressionLevel: 9 }).toBuffer();
+}
+
+const FORMAT_IMAGE_LABEL = (format: FormatId) => `${FORMATS.find((entry) => entry.id === format)?.label ?? format} (image finie)`;
+
+/**
+ * Range l'image finie d'un format, qui remplace son rendu composé. Une image
+ * précédente du même format est retirée. La même image, déjà rangée, ne
+ * change rien.
+ */
+export async function setFormatImage(kitId: unknown, format: unknown, buffer: Buffer): Promise<BrandKit> {
+  if (!FORMAT_IDS.includes(format as FormatId)) throw new Error("Format inconnu");
+  const id = format as FormatId;
+  const kit = requireKit(kitId);
+  const png = await normalizeFormatImage(id, buffer);
+  const previous = formatImageAsset(kit, id);
+  if (previous) {
+    const current = path.join(kitArea(kit.id, "assets"), previous.file);
+    if (fs.existsSync(current) && fs.readFileSync(current).equals(png)) return kit;
+  }
+  const without = previous ? { ...kit, assets: kit.assets.filter((asset) => asset.id !== previous.id) } : kit;
+  const asset = await storeImage(without, png, "format", FORMAT_IMAGE_LABEL(id));
+  if (previous) fs.rmSync(path.join(kitArea(kit.id, "assets"), previous.file), { force: true });
+  return touch({ ...without, assets: [...without.assets, asset], formatImages: { ...without.formatImages, [id]: asset.id } });
+}
+
+/** Image finie déposée par la route d'upload, ou prise dans la galerie. */
+export async function setFormatImageFrom(kitId: unknown, format: unknown, input: { file?: unknown; gallery?: unknown }): Promise<BrandKit> {
+  if (input?.gallery !== undefined) {
+    if (!isGalleryFileName(input.gallery)) throw new Error("Nom de fichier invalide");
+    const source = path.join(path.resolve(getAbsoluteUploadPath()), input.gallery);
+    const stats = fs.lstatSync(source, { throwIfNoEntry: false });
+    if (!stats?.isFile()) throw new Error(`Image introuvable dans la galerie : « ${input.gallery} ».`);
+    if (stats.size > MAX_IMAGE_BYTES) throw new Error("Image trop lourde (20 Mo au plus).");
+    return setFormatImage(kitId, format, fs.readFileSync(source));
+  }
+  if (!isFileName(input?.file)) throw new Error("Nom de fichier invalide");
+  const dropped = path.join(uploadsDir(), input.file);
+  if (!fs.existsSync(dropped)) throw new Error("Fichier déposé introuvable");
+  try {
+    return await setFormatImage(kitId, format, fs.readFileSync(dropped));
+  } finally {
+    fs.rmSync(dropped, { force: true });
+  }
+}
+
+/** Le format revient à son rendu composé ; l'image finie quitte la marque. */
+export function clearFormatImage(kitId: unknown, format: unknown): BrandKit {
+  if (!FORMAT_IDS.includes(format as FormatId)) throw new Error("Format inconnu");
+  const kit = requireKit(kitId);
+  const asset = formatImageAsset(kit, format as FormatId);
+  if (!asset) {
+    if (!kit.formatImages?.[format as FormatId]) return kit;
+    const formatImages = { ...kit.formatImages };
+    delete formatImages[format as FormatId];
+    return touch({ ...kit, formatImages });
+  }
+  return removeKitAsset(kit.id, asset.id);
 }
 
 // ─── Polices ─────────────────────────────────────────────────────
@@ -402,7 +505,8 @@ export async function sendFormatToGallery(kitId: unknown, format: unknown): Prom
 /** Logo du filigrane et ses réglages, pour le module `watermark` (appel serveur seulement). */
 export function getWatermarkImage(kitId: unknown) {
   const kit = requireKit(kitId);
-  const asset = watermarkAsset(kit);
+  // L'image finie du filigrane, si la marque en a une, passe telle quelle.
+  const asset = formatImageAsset(kit, "watermark") ?? watermarkAsset(kit);
   if (!asset) throw new Error(`L'image de marque « ${kit.name} » n'a pas de logo pour le filigrane.`);
   return {
     kitId: kit.id,
@@ -432,6 +536,17 @@ export function exportKit(kitId: unknown): { fileName: string; data: Buffer } {
   }
   const slug = kit.name.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "marque";
   return { fileName: `${slug}.zip`, data: Buffer.from(zipSync(files)) };
+}
+
+/** Identifiants d'images d'une table (format → image) réécrits ; `null` (« sans mascotte ») est gardé. */
+function remapRecord(value: unknown, remap: (id: unknown) => string | undefined): Record<string, string | null> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const out: Record<string, string | null> = {};
+  for (const [key, id] of Object.entries(value as Record<string, unknown>)) {
+    if (id === null) out[key] = null;
+    else if (remap(id)) out[key] = remap(id)!;
+  }
+  return out;
 }
 
 /**
@@ -475,7 +590,7 @@ export async function importKit(archive: unknown): Promise<BrandKit> {
     const assetIds = new Map<string, string>();
     for (const asset of Array.isArray(source.assets) ? source.assets.slice(0, KIT_LIMITS.assets) : []) {
       const bytes = typeof asset?.file === "string" ? entries[`assets/${asset.file}`] : undefined;
-      if (!bytes || !ASSET_KINDS.includes(asset.kind)) continue;
+      if (!bytes || !(ASSET_KINDS.includes(asset.kind) || asset.kind === "format")) continue;
       const stored = await storeImage(kit, Buffer.from(bytes), asset.kind, String(asset.label ?? "Image"), {
         note: typeof asset.note === "string" ? asset.note.slice(0, KIT_LIMITS.note) : undefined,
       });
@@ -509,13 +624,18 @@ export async function importKit(archive: unknown): Promise<BrandKit> {
             ...source.mascot,
             sheetAssetIds: (source.mascot.sheetAssetIds ?? []).map(remap).filter(Boolean),
             poseAssetIds: (source.mascot.poseAssetIds ?? []).map(remap).filter(Boolean),
+            formatPoses: remapRecord(source.mascot.formatPoses, remap),
+            presence: source.mascot.presence ? { ...source.mascot.presence, openingPoseId: remap(source.mascot.presence.openingPoseId) } : undefined,
           }
         : undefined,
+      formatImages: remapRecord(source.formatImages, remap),
       // Les comptes et la collection appartiennent à l'autre instance.
       publishing: source.publishing ? { ...source.publishing, accountIds: [] } : undefined,
       ai: source.ai ? { ...source.ai, collectionId: undefined } : undefined,
     };
-    return touch(sanitizeKit(draft, kit));
+    // Les images finies sont des fichiers : elles passent par la fiche « enregistrée », jamais par le brouillon.
+    const formatImages = draft.formatImages as BrandKit["formatImages"];
+    return touch(sanitizeKit(draft, { ...kit, ...(formatImages ? { formatImages } : {}) }));
   } catch (error) {
     removeKitDir(kit.id);
     throw error;

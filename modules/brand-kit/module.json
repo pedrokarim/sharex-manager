@@ -32,6 +32,8 @@
     "removeFont": "user",
     "saveFormatExport": "user",
     "sendFormatToGallery": "user",
+    "setFormatImage": "user",
+    "clearFormatImage": "user",
     "exportKit": "user",
     "importKit": "user",
     "startKitAssistant": "user",

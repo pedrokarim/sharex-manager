@@ -219,7 +219,7 @@ export default function EditorPage() {
             {section === "colors" && <ColorsSection {...sectionProps} />}
             {section === "typography" && <TypographySection {...sectionProps} fontsVersion={fontsVersion} fontsReady={fontsReady} />}
             {section === "logos" && <LogosSection {...sectionProps} />}
-            {section === "mascot" && <MascotSection {...sectionProps} />}
+            {section === "mascot" && <MascotSection {...sectionProps} fontsVersion={fontsVersion} fontsReady={fontsReady} onShowFormat={setFormat} />}
             {section === "video" && <VideoSection {...sectionProps} />}
             {section === "ai" && <AiSection {...sectionProps} />}
             {section === "publishing" && <PublishingSection {...sectionProps} />}
@@ -246,6 +246,8 @@ export default function EditorPage() {
       beforeExport={editor.flush}
       selected={format}
       onSelect={setFormat}
+      update={editor.update}
+      runOperation={editor.runOperation}
     />
   ) : (
     <div className="grid gap-4" aria-hidden>

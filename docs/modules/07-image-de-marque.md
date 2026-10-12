@@ -225,14 +225,48 @@ une fonction pure à partir de la marque (`lib/formats.ts`). Ce que montre
 l’aperçu est exactement ce qui sort en PNG, et la bannière utilise les mêmes
 polices que les vidéos.
 
-| Format | Taille | Note |
-| --- | --- | --- |
-| Bannière YouTube | 2560 × 1440 | Zone sûre centrale 1546 × 423 dessinée en pointillés dans l’aperçu seulement ; fichier de 6 Mo au plus |
-| Avatar | 800 × 800 | Aperçu à 320, 88 et 40 px |
-| Filigrane YouTube | 150 × 150 | PNG transparent, envoyé à la chaîne par l’API |
-| En-tête X | 1500 × 500 | Coin bas gauche réservé à l’avatar |
-| Carton de fin | 1080 × 1920 et 1920 × 1080 | Le même que celui ajouté aux vidéos (même fonction) |
-| Couverture de short | 1080 × 1920 | Titre d’exemple modifiable |
+| Format | Taille | Note | Avec une pose de la mascotte |
+| --- | --- | --- | --- |
+| Bannière YouTube | 2560 × 1440 | Zone sûre centrale 1546 × 423 dessinée en pointillés dans l’aperçu seulement ; fichier de 6 Mo au plus | Logo et accroche à gauche dans la zone sûre, la mascotte accoudée au bandeau du bas, à droite, sur un disque tramé ; son visage tient dans la zone sûre |
+| Avatar | 800 × 800 | Aperçu à 320, 88 et 40 px | Portrait cadré par le haut sur un disque tramé et le papier de la marque ; une pose en pied est agrandie pour rester lisible à 40 px |
+| Filigrane YouTube | 150 × 150 | PNG transparent, envoyé à la chaîne par l’API | Jamais de mascotte : à cette taille, un visage ne se lit plus |
+| En-tête X | 1500 × 500 | Coin bas gauche réservé à l’avatar | Logo et accroche en haut à gauche, la mascotte en pied à droite sur un disque tramé ; rien sous l’avatar |
+| Carton de fin | 1080 × 1920 et 1920 × 1080 | Le même que celui ajouté aux vidéos (même fonction) | En 9:16 : le nom en bloc sur deux lignes en haut à gauche, l’accroche et l’appel dessous, la mascotte en grand dans le bas (le format ajoute le disque tramé et le papier) |
+| Couverture de short | 1080 × 1920 | Titre d’exemple modifiable | Facultative : la pose dans le bas du 3:4 central |
+
+**La mascotte dans les formats.** Chaque format peut mettre en scène une
+pose (`mascot.formatPoses`, réglé dans la section Mascotte : une rangée par
+format, avec sa vignette, qui montre le format en grand). Sans choix, une pose
+est proposée (`lib/mascot.ts`, `proposedFormatPose`) : celle dont la note ou
+le libellé nomme le format (« Bannière YouTube. », « Avatar. », « en-tête
+X »), sinon la plus large pour la bannière, la plus carrée pour l’avatar, la
+plus haute pour l’en-tête X ; la couverture de short n’en a pas d’office, le
+filigrane jamais. « Sans mascotte » (`null`) garde le rendu du logo seul. Le
+carton de fin garde sa propre pose (`endCard.poseAssetId`), partagée avec les
+vidéos. Une marque sans pose rend exactement les formats d’avant.
+
+La mise en scène reprend la planche d’identité d’une marque Riso : la
+première encre (l’accent) trame un disque derrière la mascotte, la seconde
+(`accentSecondary`, sinon l’encre) peint le bandeau de la bannière ; trames
+et croix de repérage sont de petites images SVG dessinées par le navigateur.
+Les croix (`registrationMarks`, interrupteur « Croix de repérage » de
+l’aperçu) se posent aux coins de la bannière et du carton de fin mis en
+scène.
+
+**Les images finies.** Un format peut aussi être une image faite ailleurs
+(planche d’identité, graphiste) : « Utiliser une image finie… » ouvre le
+sélecteur commun (`ImagePickerDialog` : galerie, ordinateur, lien), puis
+`setFormatImage` contrôle l’image (lisible, à la proportion du format à
+1 % près, 20 Mo et 40 mégapixels au plus), la ramène à la taille exacte et
+la réécrit en PNG : seuls les pixels passent (métadonnées et signatures C2PA
+tombent), le filigrane garde sa transparence, les autres formats sont posés
+sur un fond opaque. Elle est rangée comme un fichier de la marque (`kind:
+"format"`, `formatImages[format]`), remplace la précédente, et ne vient
+jamais du navigateur par `saveKit`. L’aperçu, l’export, l’onglet Chaîne d’un
+compte connecté (bannière, filigrane, avatar) et `pushBrandToAccount`
+l’utilisent telle quelle ; le filigrane des captures aussi (7), et le carton
+de fin des vidéos à cette orientation (5.3). « Revenir au rendu composé »
+(`clearFormatImage`) la retire.
 
 « Exporter les formats en PNG » rend chaque format dans le navigateur, puis
 `saveFormatExport` l’écrit dans `kits/<id>/exports/` ; chaque fichier se
@@ -322,7 +356,8 @@ interface BrandAsset {
   id: string;
   /** Nom de fichier dans data/kits/<kitId>/assets/. */
   file: string;
-  kind: "logo" | "logo-mark" | "mascot-sheet" | "mascot-pose" | "background" | "texture" | "reference";
+  /** `format` : image finie d'un format, rangée par `setFormatImage` seulement. */
+  kind: "logo" | "logo-mark" | "mascot-sheet" | "mascot-pose" | "background" | "texture" | "reference" | "format";
   label: string;
   note?: string;
   width: number;
@@ -415,9 +450,22 @@ interface BrandKit {
   assets: BrandAsset[];
   logoAssetId?: string;
   markAssetId?: string;
-  mascot?: { name?: string; identityPrompt: string; sheetAssetIds: string[]; poseAssetIds: string[] };
+  mascot?: {
+    name?: string;
+    identityPrompt: string;
+    sheetAssetIds: string[];
+    poseAssetIds: string[];
+    /** Pose de la bannière, de l'avatar, de l'en-tête X, de la couverture ; `null` : sans mascotte ; absente : proposée. */
+    formatPoses?: Partial<Record<"banner" | "avatar" | "x-header" | "short-cover", string | null>>;
+    /** Présence dans les vidéos (6.2). */
+    presence?: { opening: boolean; openingPoseId?: string; reactions: boolean };
+  };
   watermark?: BrandWatermark;
   endCard: BrandEndCard;
+  /** Image finie de chaque format, qui remplace le rendu composé (4.3). */
+  formatImages?: Partial<Record<FormatId, string>>;
+  /** Croix de repérage sur la bannière et le carton de fin mis en scène. */
+  registrationMarks?: boolean;
   ai: { styleNotes: string; collectionId?: string; scriptTone: string };
   publishing: BrandPublishing;
   isDefault: boolean;
@@ -425,6 +473,12 @@ interface BrandKit {
   updatedAt: number;
 }
 ```
+
+Les champs de la mascotte et des formats sont facultatifs : une fiche écrite
+avant eux se lit telle quelle (poses proposées, aucune présence dans les
+vidéos, aucune image finie), et un réglage abîmé (pose disparue, format
+inconnu) est oublié à l’enregistrement, jamais remplacé par une valeur
+inventée.
 
 `TextStyle` est celui de `modules/clip-studio/engine/types.ts`, importé et non
 recopié : une marque ne peut pas décrire un style que le moteur ne sait pas
@@ -513,7 +567,18 @@ interface BrandTheme {
   /** Familles des polices importées, à charger avant de dessiner. */
   fonts: { family: string; kitId: string; fontId: string }[];
   watermark?: { source: MediaSource; anchor: BrandWatermark["anchor"]; size: number; opacity: number; margin: number; startSeconds: number };
-  endCard?: { seconds: number; logo?: MediaSource; name: string; tagline?: string; callToAction?: string; pose?: MediaSource };
+  endCard?: {
+    seconds: number;
+    logo?: MediaSource;
+    name: string;
+    tagline?: string;
+    callToAction?: string;
+    pose?: MediaSource;
+    /** Image finie du carton 9:16 ou 16:9 : posée telle quelle à son orientation. */
+    images?: { vertical?: MediaSource; horizontal?: MediaSource };
+  };
+  /** Présence de la mascotte au montage ; absente quand elle est éteinte ou sans pose. */
+  mascot?: { opening?: MediaSource; reactions: MediaSource[] };
 }
 ```
 
@@ -639,7 +704,19 @@ comme les modèles :
 6. **Carton de fin** : un segment ajouté à la fin (aplat du fond, logo ou nom
    de la marque en titre, accroche, appel à l’action en étiquette, pose de la
    mascotte), sur des pistes `origin: "brand"`.
-7. **Idempotence** : appliquer deux fois la même marque donne le même projet ;
+7. **Mascotte** (`mascotTracks`, seulement avec `theme.mascot`) : à
+   l’ouverture, une pose accompagne l’accroche du premier segment (préréglage
+   « Montée en grandissant », `rise-grow`) ; puis, à chaque segment suivant
+   (les plans de la piste principale), une petite pose dans un coin, une
+   autre à chaque fois (« Surgissement rebondi », `surge-up`). Chaque pose va
+   à la première place libre, de la plus grande taille proposée à la plus
+   petite : jamais sur un texte (estimé à sa longueur, sans le dessiner) ni
+   sur un cadre du segment, toujours dans la zone de sécurité d’un short
+   (`SHORT_SAFE_ZONE`, la même que l’aperçu de Clip Studio : ni sous le nom du
+   compte, ni sous la légende, ni sous les boutons) ou dans les marges d’un
+   autre cadre. Quand rien ne tient, le segment reste tel quel. Pistes
+   `origin: "brand"`, sous le filigrane.
+8. **Idempotence** : appliquer deux fois la même marque donne le même projet ;
    appliquer une autre marque remplace la précédente ; `null` retire la
    marque et rend le rendu du thème par défaut.
 
@@ -680,6 +757,11 @@ reprend le modèle de Scan Studio :
   collection (mascotte, références) partent avec chaque image. Si la marque a
   une mascotte, son `identityPrompt` est ajouté à toute consigne qui la met en
   scène.
+- Quand la marque pose ses réactions à chaque segment (`theme.mascot`), la
+  mascotte n’est plus mise en scène dans les illustrations : la consigne le
+  dit, aucun segment ne la demande, et son identité ne part plus vers AI
+  Image Gen (`AssistantBrand.mascotPlaced`). Avec l’ouverture seule, rien ne
+  change.
 - Le montage passe le thème à `buildFromTemplate` ; la musique est posée après
   le carton de fin, pour le couvrir.
 
@@ -705,7 +787,7 @@ chaque envoi) et gagne une seconde source.
 | Réglage | Texte (actuel) | Image de marque (nouveau) |
 | --- | --- | --- |
 | `source` | `"text"` | `"brand"` |
-| Contenu | `text`, `color`, `fontSize` | `kitId` : le logo du filigrane de la marque (`watermark.assetId`, sinon le logo principal) |
+| Contenu | `text`, `color`, `fontSize` | `kitId` : l’image finie du filigrane de la marque s’il y en a une (4.3), sinon le logo du filigrane (`watermark.assetId`, sinon le logo principal) |
 | Position | neuf positions | neuf positions ; par défaut le coin de la marque |
 | Taille | `fontSize` à l’échelle de 1 000 px | `size` de la marque, relative au petit côté |
 | Opacité, marge | réglages | ceux de la marque, modifiables |
@@ -970,7 +1052,7 @@ orientée Shorts.
 | Changer la miniature | `thumbnails.set` (vidéos longues surtout ; pour un Short, YouTube choisit souvent l’image dans la vidéo) |
 | Bannière | `channelBanners.insert` avec le PNG exporté (2560 × 1440 recommandés, 2048 × 1152 au minimum, 6 Mo au plus), puis `channels.update?part=brandingSettings` avec `brandingSettings.image.bannerExternalUrl`. `channels.update` remplace toute la partie `brandingSettings` : lire d’abord l’existant et le renvoyer complet |
 | Filigrane | `watermarks.set` avec le PNG 150 × 150 et `timing` (`offsetFromStart` ou `offsetFromEnd`, `offsetMs`, `durationMs` d’une seconde au moins) ; le champ `position` est ignoré, YouTube le place toujours en haut à droite |
-| Avatar | **Pas d’API** : la page propose le PNG 800 × 800 au téléchargement et un lien vers YouTube Studio |
+| Avatar | **Pas d’API** : la page propose le PNG 800 × 800 au téléchargement et un lien vers YouTube Studio (§ 8.10) |
 
 ### 8.8 Quotas
 
@@ -988,6 +1070,10 @@ D’après la documentation de l’API (pages « Quota calculator » et
   `commentThreads.insert` 50 unités, `captions.insert` **400 unités**,
   `thumbnails.set` 50 unités ; `commentThreads.list` (recherche d'un
   commentaire déjà posté après une réponse perdue) 1.
+- profil, sections et playlists (calculateur vérifié le 12/10/2026) :
+  `channelSections.list` et `playlists.list` 1 unité ;
+  `channelSections.insert`, `update`, `delete`, `playlists.insert`,
+  `update` et `playlistItems.insert` 50 unités (§ 8.10).
 
 Le quota appartient à l’application Google, donc à toutes les chaînes
 connectées ensemble. Les coûts sont rangés dans une seule table
@@ -1381,6 +1467,146 @@ capacité que seul un ajout donne figure dans
   (`signed_request`) ne sont pas écrites : à ajouter quand une application
   passera en production chez son service.
 
+### 8.10 Profil des comptes
+
+L’onglet « Chaîne / Profil » de la fiche d’un compte rassemble tout ce qui
+fait l’identité du compte, en deux groupes visibles d’un coup d’œil :
+
+- **« Modifiable depuis ShareX Manager »** : pour chaque élément, la valeur
+  actuelle chez le service (lue par l’API), la valeur proposée (préremplie
+  depuis l’image de marque choisie, modifiable avant l’envoi, avec son
+  compteur), ce qui change (mots ajoutés et retirés, langues traduites,
+  ancienne et nouvelle valeur), puis « Envoyer » (un bouton par élément,
+  « Tout envoyer » dès que plusieurs ont changé). Après l’envoi, le profil
+  est relu chez le service. Une capacité que le compte n’a pas encore
+  accordée affiche « Autoriser… » (connexion incrémentale, ci-dessus), pas
+  une erreur ; une capacité retirée par le rôle du compte le dit.
+- **« À changer chez {service} »** : ce que l’API ne permet pas, dit
+  franchement (« YouTube ne permet pas de le changer par son API »), avec
+  l’aide pour le faire à la main : l’image rendue depuis la marque au clic
+  (comme l’avatar, `renderFormatPng` + `buildFormat`) à télécharger, le
+  texte de la marque à copier en un clic, et le lien direct vers la bonne
+  page du service.
+
+Une valeur vide dans la marque ne propose rien : elle n’efface jamais ce qui
+existe chez le service.
+
+#### Contrat du cœur
+
+Rien dans l’interface ne cite un service. Chaque connecteur déclare ses
+éléments (`Connector.profileFields`, type `ProfileField`) : clé, libellé,
+`editable`, nature (`text`, `textarea`, `url`, `keywords`, `language`,
+`country`, `video`, `localizations`, `image`), limites (`maxLength`,
+`itemLimits`), `clearable`, capacité exigée, ce que la marque fournit
+(`brand`, `imageFormat`) et, pour un élément non modifiable, la page d’aide
+(`manual.url`, avec `{externalId}`, `{handle}` ou `{url}`). Méthodes :
+
+- `readProfile(context)` : valeurs actuelles (aucune capacité exigée) ;
+- `updateProfile(context, changes)` : valeurs déjà contrôlées par le cœur
+  (`cleanProfileValue`, `src/lib/connections/profile.ts`) ; le connecteur
+  relit d’abord ce que le service remplacerait en entier et renvoie le reste
+  tel quel, puis rend les valeurs relues ;
+- `profileChoices(context, key)` : choix d’un élément « vidéo » (bande-annonce) ;
+- `sections` et `playlists` : page d’accueil du compte et playlists.
+
+`describeConnector` publie les éléments avec les portées de leur capacité
+(`ConnectorInfo.profileFields[].scopes`), `profileRead`,
+`profileChoiceKeys`, `profileSections` et `playlists`. Côté gestion
+(`manage.ts`) : `readAccountProfile`, `updateAccountProfile` (rien ne part si
+un seul élément est refusé), `accountProfileChoices`, `listAccountSections`,
+`addAccountSection`, `moveAccountSection`, `removeAccountSection`,
+`listAccountPlaylists`, `createAccountPlaylist`, `updateAccountPlaylist`,
+`addVideoToAccountPlaylist`. Nouvelles capacités : `profile.details`,
+`profile.sections`, `playlists.manage`.
+
+#### Ce que la marque fournit
+
+`BrandPublishing` gagne trois champs, complétés à la lecture pour une marque
+d’avant (`upgradePublishing`) : `channelDescriptionTemplate` (modèle de la
+description de la chaîne, `{hook}\n\n{links}` par défaut, avec `{brand}`,
+`{hook}`, `{cta}`, `{links}`, `{hashtags}`, `{tags}`, `{date}`), `bio` (bio
+courte, 150 caractères) et `country` (ISO 3166-1 alpha-2, facultatif). Les
+mots-clés reprennent les tags, la langue celle de la marque. Section
+« Publication » de l’éditeur, groupe « Profil des comptes ».
+`profileBrandInput(kit)` (`modules/brand-kit/lib/profile.ts`) rend le modèle
+et passe le tout au cœur, qui ne connaît pas la forme d’une marque.
+
+#### YouTube
+
+Références vérifiées le 12/10/2026 :
+[`channels.update`](https://developers.google.com/youtube/v3/docs/channels/update),
+[ressource `channels`](https://developers.google.com/youtube/v3/docs/channels),
+[`channelSections`](https://developers.google.com/youtube/v3/docs/channelSections),
+[`channelSections.update`](https://developers.google.com/youtube/v3/docs/channelSections/update),
+[`playlists`](https://developers.google.com/youtube/v3/docs/playlists),
+[`playlists.update`](https://developers.google.com/youtube/v3/docs/playlists/update),
+[`playlistItems.insert`](https://developers.google.com/youtube/v3/docs/playlistItems/insert),
+[calculateur de quota](https://developers.google.com/youtube/v3/determine_quota_cost),
+[historique des révisions](https://developers.google.com/youtube/v3/revision_history).
+
+| Élément | Par l’API | Appel, coût, portée |
+| --- | --- | --- |
+| Description (1 000 caractères) | Oui | `channels.update?part=brandingSettings`, 50 unités, après `channels.list` (1) ; `youtube` ou `youtube.force-ssl` |
+| Mots-clés (séparés par des espaces, 500 caractères au total) | Oui | idem ; un mot-clé de plusieurs mots part entre guillemets |
+| Langue de la chaîne | Oui | idem (`defaultLanguage`) |
+| Pays | Oui | idem (`country`), vidable |
+| Bande-annonce pour les non-abonnés | Oui | idem (`unsubscribedTrailer`), vidéo publique ou non répertoriée de la chaîne, choisie parmi les 50 derniers envois (3 unités) |
+| Traductions du nom et de la description | Oui | `channels.update?part=localizations`, 50 unités, requête à part (une partie par requête) ; langue de la chaîne exigée avant |
+| Bannière, filigrane | Oui | inchangés (§ 8.7) |
+| Sections de la page d’accueil (10 au plus) | Oui | `channelSections.list` 1, `insert`, `update`, `delete` 50 chacune ; `profile.sections` |
+| Playlists | Oui | `playlists.list` 1, `insert` et `update` 50, `playlistItems.insert` 50 ; `playlists.manage` |
+| Nom de la chaîne | Non | `channelTitleUpdateForbidden` : le titre est renvoyé inchangé |
+| Identifiant @, photo de profil, liens | Non | aucun champ dans la ressource ; YouTube Studio › Personnalisation › Profil |
+
+`channels.update` remplace toutes les valeurs modifiables de la partie
+envoyée, et efface une propriété absente : on relit la chaîne et on renvoie
+`brandingSettings` complet (titre, `trackingAnalyticsAccountId`, langue, pays,
+bande-annonce…). `channelSections.update` et `playlists.update` effacent de
+même ce qui n’est pas renvoyé : la section (type, titre, contenu) ou la
+playlist (titre, description, langue, `podcastStatus`) est relue d’abord.
+Une mise à jour du profil coûte donc 52 unités (lecture, écriture,
+relecture), 102 si les traductions changent avec.
+
+#### Facebook, Instagram, Threads
+
+- **Facebook (Page)**, d’après la référence
+  [Page](https://developers.facebook.com/docs/graph-api/reference/page/)
+  (section « Updating ») et le guide
+  [Manage a Page](https://developers.facebook.com/docs/pages-api/manage-pages) :
+  `POST /{page-id}` change `about` (la « Description » de la Page,
+  100 caractères) et `website`, avec un jeton de Page d’une personne qui a
+  la tâche MANAGE et l’autorisation `pages_manage_metadata`. Cette
+  autorisation n’est demandée qu’à la demande, par la seconde configuration
+  Facebook Login for Business (`config_id_extended`), qui doit la porter ;
+  une Page sans la tâche MANAGE n’a pas `profile.details`. À changer chez
+  Facebook : le nom, la photo de profil (aucune méthode documentée) et la
+  couverture (`cover` exige `business_management`, que l’application ne
+  demande pas ; la marque fournit son format 3:1).
+- **Instagram** : la référence
+  [IG User](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user)
+  dit « Updating : This operation is not supported ». Tout est à changer
+  dans l’application (Modifier le profil) : nom, nom d’utilisateur, bio
+  (150 caractères dans l’application), lien et photo. La lecture rend les
+  valeurs actuelles, sans la bio ni le lien si l’API refuse ces champs.
+- **Threads** : la page
+  [Threads Profiles](https://developers.facebook.com/docs/threads/threads-profiles)
+  ne décrit que la lecture (`threads_basic`) : nom, nom d’utilisateur, bio,
+  liens et photo sont à changer dans l’application.
+
+#### Ce que la documentation a corrigé
+
+- `brandingSettings.image` (dont `bannerExternalUrl`) est marquée dépréciée
+  dans la ressource `channels` depuis septembre 2020, alors que
+  `channelBanners.insert` dit encore de l’utiliser : la bannière (§ 8.7)
+  continue de s’en servir, à surveiller.
+- Les types de section `likedPlaylists`, `likes`, `postedPlaylists`,
+  `postedVideos`, `recentActivity` et `recentPosts` ont été retirés le
+  12/05/2021 : une section existante de ce type s’affiche « Type retiré par
+  YouTube », on ne peut plus en ajouter.
+- Les limites des playlists (150 caractères pour le titre, 5 000 pour la
+  description) sont celles de YouTube Studio : la référence de l’API ne les
+  écrit pas. Celle du nom traduit n’est pas documentée non plus.
+
 ## 9. Fonctions serveur
 
 ### 9.1 Module `brand-kit`
@@ -1401,6 +1627,7 @@ capacité que seul un ajout donne figure dans
 | `regenerateAsset(kitId, assetId, note?)` | user | Refaire un visuel avec tout le contexte |
 | `exportKit(id)` / `importKit(archive)` | user | ZIP au format `brand.json` |
 | `saveFormatExport(kitId, format, png)` / `sendFormatToGallery(kitId, file)` | user | Formats rendus par le navigateur |
+| `setFormatImage(kitId, format, { file } \| { gallery })` / `clearFormatImage(kitId, format)` | user | Image finie d’un format (fichier déposé ou image de la galerie), contrôlée et ré-encodée ; retour au rendu composé |
 | `getWatermarkImage(kitId)` | serveur | Logo du filigrane pour le module `watermark` |
 | `listPublishAccounts()` | user | Comptes capables de publier une vidéo, sans jeton (pour le choix des comptes d’une marque) |
 | `listPublishServices()` | user | Services prêts à publier une vidéo, avec leurs champs, leur règle de hashtags et la limite du premier commentaire (onglets « par service » des textes de publication) |
@@ -1606,6 +1833,15 @@ Ascencia ID) et demande une file avec une concurrence d’un rendu à la fois.
   - `toBrandTheme` et la maquette par défaut ; validation d’une fiche
     (couleurs, rôles, bornes) ;
   - formats : la bannière place logo et accroche dans la zone sûre ;
+  - mascotte (`brand-kit-mascot.test.ts`) : pose proposée puis choisie par
+    format, « sans mascotte », visage de la bannière dans la zone sûre, rien
+    sous l’avatar de l’en-tête X, formats inchangés sans pose ; image finie
+    contrôlée, ré-encodée, sans doublon, qui remplace le rendu, sert de
+    filigrane aux captures et suit les archives ; migration douce ;
+  - mascotte au montage (`clip-studio-brand-mascot.test.ts`) : ouverture et
+    réactions ajoutées, une autre pose à chaque segment, zone de sécurité des
+    shorts, aucun cadre ni texte court masqué, retrait, idempotence, carton de
+    fin mis en scène ou fini, assistant qui ne génère plus la mascotte ;
   - modèles de titre et de description (variables, troncature à 100
     caractères, 5 000 octets, 500 caractères de tags) ;
   - `crypto.ts` : aller-retour, refus d’un blob altéré, refus d’une mauvaise

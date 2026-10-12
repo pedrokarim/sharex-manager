@@ -13,6 +13,7 @@ import type { TextCount } from "@/lib/connections/types";
 import { defaultHashtagRule } from "@/modules/clip-studio/lib/post-texts";
 import type { HashtagRule } from "@/modules/clip-studio/lib/post-types";
 import type { BrandKit, BrandTheme, KitSummary } from "./lib/types";
+import { formatImageAsset } from "./lib/mascot";
 import { ensureDirs, kitArea } from "./lib/server/store";
 import {
   createKit as create,
@@ -30,6 +31,8 @@ import {
   registerKitAsset as register,
   removeFont as dropFont,
   removeKitAsset as dropAsset,
+  clearFormatImage as dropFormatImage,
+  setFormatImageFrom as storeFormatImage,
   requireKit,
   saveFormatExport as saveFormat,
   saveKit as save,
@@ -119,6 +122,16 @@ export async function saveFormatExport(kitId: string, format: string, png: Buffe
 
 export async function sendFormatToGallery(kitId: string, format: string) {
   return formatToGallery(kitId, format);
+}
+
+/** Image finie d'un format (déposée par la route d'upload, ou prise dans la galerie), qui remplace son rendu composé. */
+export async function setFormatImage(kitId: string, format: string, input: { file?: string; gallery?: string }): Promise<BrandKit> {
+  return storeFormatImage(kitId, format, input ?? {});
+}
+
+/** Le format revient à son rendu composé. */
+export async function clearFormatImage(kitId: string, format: string): Promise<BrandKit> {
+  return dropFormatImage(kitId, format);
 }
 
 export async function exportKit(kitId: string): Promise<{ fileName: string; data: string }> {
@@ -221,7 +234,9 @@ export async function pushBrandToAccount(input: { kitId: string; accountId: stri
   const kit = requireKit(input?.kitId);
   const what = input?.what;
   if (what !== "banner" && what !== "watermark") throw new Error("Format inconnu");
-  const file = path.join(kitArea(kit.id, "exports"), `${what}.png`);
+  // Une image finie importée pour ce format part telle quelle ; sinon, l'export rendu depuis la marque.
+  const supplied = formatImageAsset(kit, what);
+  const file = supplied ? path.join(kitArea(kit.id, "assets"), supplied.file) : path.join(kitArea(kit.id, "exports"), `${what}.png`);
   if (!fs.existsSync(file)) {
     throw new Error(
       what === "banner"

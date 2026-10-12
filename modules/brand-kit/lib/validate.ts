@@ -12,7 +12,9 @@ import { TEXT_ROLES } from "@/modules/clip-studio/engine/brand";
 import { HASHTAG_RULES } from "@/modules/clip-studio/lib/post-types";
 import { DEFAULT_PALETTE, defaultTextStyles, upgradePublishing } from "./defaults";
 import {
+  FORMAT_IDS,
   KIT_LIMITS,
+  MASCOT_FORMAT_IDS,
   type BrandAsset,
   type BrandKit,
   type BrandLink,
@@ -20,6 +22,8 @@ import {
   type HashtagRule,
   type BrandPalette,
   type BrandWatermark,
+  type BrandMascot,
+  type FormatId,
   type Privacy,
   type TextStyle,
   type WatermarkAnchor,
@@ -182,6 +186,46 @@ export function sanitizeServiceTemplates(value: unknown): Record<string, BrandSe
   return out;
 }
 
+// ─── Mascotte et formats ─────────────────────────────────────────
+
+/**
+ * Pose de chaque format : une pose de la mascotte, ou `null` (« sans
+ * mascotte »). Un format inconnu, ou une pose qui n'en est plus une, est
+ * oublié : le format reprend la proposition par défaut.
+ */
+export function sanitizeFormatPoses(value: unknown, poseIds: readonly string[]): BrandMascot["formatPoses"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const out: NonNullable<BrandMascot["formatPoses"]> = {};
+  for (const id of MASCOT_FORMAT_IDS) {
+    const entry = (value as Record<string, unknown>)[id];
+    if (entry === null) out[id] = null;
+    else if (typeof entry === "string" && poseIds.includes(entry)) out[id] = entry;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** Présence de la mascotte dans les vidéos : deux interrupteurs et la pose de l'ouverture. */
+export function sanitizePresence(value: unknown, poseIds: readonly string[]): BrandMascot["presence"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const input = value as Record<string, unknown>;
+  const openingPoseId = typeof input.openingPoseId === "string" && poseIds.includes(input.openingPoseId) ? input.openingPoseId : undefined;
+  return { opening: input.opening === true, reactions: input.reactions === true, ...(openingPoseId ? { openingPoseId } : {}) };
+}
+
+/**
+ * Images finies des formats : comme les autres fichiers, elles ne viennent
+ * jamais du navigateur. Celles de la fiche enregistrée qui existent encore.
+ */
+function keepFormatImages(stored: BrandKit["formatImages"], assets: BrandAsset[]): BrandKit["formatImages"] {
+  if (!stored) return undefined;
+  const out: Partial<Record<FormatId, string>> = {};
+  for (const id of FORMAT_IDS) {
+    const assetId = stored[id];
+    if (assetId && assets.some((asset) => asset.id === assetId && asset.kind === "format")) out[id] = assetId;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 const assetIdOrUndefined = (value: unknown, assets: BrandAsset[]) =>
   typeof value === "string" && assets.some((asset) => asset.id === value) ? value : undefined;
 
@@ -218,14 +262,20 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
   const mascotInput = kit.mascot && typeof kit.mascot === "object" ? kit.mascot : null;
   const keepAssets = (value: unknown, kind: BrandAsset["kind"]) =>
     (Array.isArray(value) ? value : []).filter((id) => assets.some((asset) => asset.id === id && asset.kind === kind)).slice(0, 20) as string[];
+  const poseAssetIds = mascotInput ? keepAssets(mascotInput.poseAssetIds, "mascot-pose") : [];
+  const formatPoses = mascotInput ? sanitizeFormatPoses(mascotInput.formatPoses, poseAssetIds) : undefined;
+  const presence = mascotInput ? sanitizePresence(mascotInput.presence, poseAssetIds) : undefined;
   const mascot = mascotInput
     ? {
         name: optional(mascotInput.name, KIT_LIMITS.name),
         identityPrompt: text(mascotInput.identityPrompt, KIT_LIMITS.identityPrompt),
         sheetAssetIds: keepAssets(mascotInput.sheetAssetIds, "mascot-sheet"),
-        poseAssetIds: keepAssets(mascotInput.poseAssetIds, "mascot-pose"),
+        poseAssetIds,
+        ...(formatPoses ? { formatPoses } : {}),
+        ...(presence ? { presence } : {}),
       }
     : undefined;
+  const formatImages = keepFormatImages(stored.formatImages, assets);
 
   const endCard = kit.endCard && typeof kit.endCard === "object" ? kit.endCard : stored.endCard;
   const ai = kit.ai && typeof kit.ai === "object" ? kit.ai : stored.ai;
@@ -255,6 +305,8 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
       callToAction: optional(endCard.callToAction, KIT_LIMITS.callToAction),
       poseAssetId: assetIdOrUndefined(endCard.poseAssetId, assets),
     },
+    ...(formatImages ? { formatImages } : {}),
+    ...(typeof kit.registrationMarks === "boolean" ? { registrationMarks: kit.registrationMarks } : stored.registrationMarks !== undefined ? { registrationMarks: stored.registrationMarks } : {}),
     ai: {
       styleNotes: text(ai.styleNotes, KIT_LIMITS.styleNotes),
       collectionId: typeof ai.collectionId === "string" && /^col-[A-Za-z0-9-]{1,60}$/.test(ai.collectionId) ? ai.collectionId : undefined,
@@ -276,6 +328,9 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
       defaultPrivacy: PRIVACIES.includes(publishing.defaultPrivacy) ? publishing.defaultPrivacy : stored.publishing.defaultPrivacy,
       containsSyntheticMedia: typeof publishing.containsSyntheticMedia === "boolean" ? publishing.containsSyntheticMedia : stored.publishing.containsSyntheticMedia,
       madeForKids: publishing.madeForKids === true,
+      channelDescriptionTemplate: text(publishing.channelDescriptionTemplate, KIT_LIMITS.channelDescriptionTemplate),
+      bio: text(publishing.bio, KIT_LIMITS.bio).trim(),
+      country: typeof publishing.country === "string" && /^[A-Z]{2}$/.test(publishing.country) ? publishing.country : "",
     },
     isDefault: stored.isDefault,
     createdAt: stored.createdAt,

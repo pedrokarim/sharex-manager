@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { AlertTriangle, Check, Download, FileImage, ImageUp, Loader2, Pause, Play, RotateCcw } from "lucide-react";
+import { AlertTriangle, Check, Download, FileImage, ImagePlus, ImageUp, Loader2, Pause, Play, RotateCcw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
+import { ImagePickerDialog, type PickedImage } from "@/components/gallery/image-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,9 @@ import { cn } from "@/lib/utils";
 import { api, errorMessage, type FormatExport } from "../lib/client";
 import { FORMATS, buildFormat, type BuiltFormat, type FormatId, type FormatSpec } from "../lib/formats";
 import type { BrandKit } from "../lib/types";
+import { uploadPicked } from "./asset-intake";
 import { drawProject, onImageLoaded, renderFormatPng } from "./format-render";
+import type { FileSectionProps } from "./sections/types";
 
 const CHECKERBOARD =
   "repeating-conic-gradient(color-mix(in oklch, var(--muted-foreground) 18%, transparent) 0% 25%, transparent 0% 50%) 50% / 16px 16px";
@@ -250,6 +253,8 @@ export function FormatsPanel({
   beforeExport,
   selected,
   onSelect,
+  update,
+  runOperation,
 }: {
   kit: BrandKit;
   exports: FormatExport[];
@@ -260,8 +265,14 @@ export function FormatsPanel({
   beforeExport: () => Promise<void>;
   selected: FormatId;
   onSelect: (id: FormatId) => void;
+  /** Réglages de la fiche (croix de repérage). */
+  update: FileSectionProps["update"];
+  /** Opération serveur (image finie d'un format). */
+  runOperation: FileSectionProps["runOperation"];
 }) {
   const [showSafeArea, setShowSafeArea] = useState(true);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [replacing, setReplacing] = useState<FormatId | null>(null);
   const [coverTitle, setCoverTitle] = useState("");
   const [exporting, setExporting] = useState<FormatId | null>(null);
   const [batch, setBatch] = useState<Partial<Record<FormatId, ExportState>> | null>(null);
@@ -340,6 +351,33 @@ export function FormatsPanel({
     }
   };
 
+  /** L'image finie choisie remplace le rendu composé du format affiché. */
+  const applyFinishedImage = async (format: FormatId, picked: PickedImage) => {
+    const label = FORMATS.find((entry) => entry.id === format)?.label ?? format;
+    setReplacing(format);
+    try {
+      const reference = await uploadPicked(picked);
+      await runOperation(() => api.setFormatImage(kit.id, format, reference.kind === "gallery" ? { gallery: reference.name } : { file: reference.name }));
+      toast.success(`${label} : l’image finie remplace le rendu composé`);
+    } catch (error) {
+      toast.error(errorMessage(error, "Cette image n’a pas pu être utilisée."));
+    } finally {
+      setReplacing(null);
+    }
+  };
+
+  const backToComposed = async (format: FormatId) => {
+    setReplacing(format);
+    try {
+      await runOperation(() => api.clearFormatImage(kit.id, format));
+      toast.success("Retour au rendu composé");
+    } catch (error) {
+      toast.error(errorMessage(error, "Retour impossible."));
+    } finally {
+      setReplacing(null);
+    }
+  };
+
   const busy = exporting !== null || (batch !== null && Object.values(batch).some((state) => state === "waiting" || state === "running"));
   const batchDone = batch ? Object.values(batch).filter((state) => state === "done" || state === "error").length : 0;
   const ratio = spec.width / spec.height;
@@ -353,6 +391,10 @@ export function FormatsPanel({
         <label data-disabled={spec.safeArea ? undefined : ""} className="flex items-center gap-2 text-sm text-muted-foreground data-[disabled]:opacity-50">
           <Switch checked={showSafeArea} onCheckedChange={setShowSafeArea} disabled={!spec.safeArea} />
           Zone sûre
+        </label>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground" title="Aux coins de la bannière et du carton de fin quand la mascotte y est mise en scène.">
+          <Switch checked={kit.registrationMarks === true} onCheckedChange={(checked) => update((draft) => ({ ...draft, registrationMarks: checked }))} />
+          Croix de repérage
         </label>
         <Button size="sm" className="ml-auto gap-2" onClick={() => void exportAll()} disabled={busy}>
           {batch && busy ? <Loader2 className="size-4 animate-spin" /> : <FileImage className="size-4" />}
@@ -435,7 +477,8 @@ export function FormatsPanel({
               </span>
             </p>
             <p className="text-xs text-muted-foreground">
-              {spec.note}
+              {current.supplied ? "Image finie importée, utilisée telle quelle à l’export et sur les comptes connectés." : spec.note}
+              {!current.supplied && current.pose && ` Mascotte : ${current.pose.label}.`}
               {isEndCard && !kit.endCard.enabled && " Le carton de fin est désactivé pour les vidéos."}
               {exported && (
                 <>
@@ -447,6 +490,17 @@ export function FormatsPanel({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {current.supplied ? (
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => void backToComposed(selected)} disabled={busy || replacing !== null}>
+                {replacing === selected ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}
+                Revenir au rendu composé
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setPickerOpen(true)} disabled={busy || replacing !== null}>
+                {replacing === selected ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+                Utiliser une image finie…
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="gap-2" onClick={() => void exportSelected()} disabled={busy}>
               {exporting === selected && !batch ? <Loader2 className="size-4 animate-spin" /> : <FileImage className="size-4" />}
               {exported ? "Réexporter" : "Exporter"}
@@ -467,8 +521,15 @@ export function FormatsPanel({
             )}
           </div>
         </div>
+        <ImagePickerDialog
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onPick={(picked) => void applyFinishedImage(selected, picked)}
+          title={`${spec.label} : image finie`}
+          description={`Un PNG de ${spec.width} × ${spec.height} (ou à cette proportion), qui remplace le rendu composé.`}
+        />
         <AnimatePresence initial={false}>
-          {selected === "short-cover" && (
+          {selected === "short-cover" && !current.supplied && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
               <div className="grid max-w-md gap-1.5 pt-1">
                 <Label htmlFor="brand-kit-cover-title" className="text-xs font-medium">
@@ -507,6 +568,7 @@ function FormatTab({
 }) {
   const ratio = spec.width / spec.height;
   const stale = exported ? exported.updatedAt < kitUpdatedAt : false;
+  const finished = built.supplied ? "image finie, " : "";
   const status =
     state === "running"
       ? "export en cours"
@@ -524,8 +586,8 @@ function FormatTab({
       type="button"
       role="tab"
       aria-selected={selected}
-      aria-label={`${spec.label}, ${status}`}
-      title={`${spec.label} · ${status}`}
+      aria-label={`${spec.label}, ${finished}${status}`}
+      title={`${spec.label} · ${finished}${status}`}
       onClick={onSelect}
       className={cn(
         "flex w-full min-w-0 flex-col gap-1 rounded-lg p-1 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
