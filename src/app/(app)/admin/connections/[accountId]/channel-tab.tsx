@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * Bannière, filigrane et avatar du compte, depuis les formats exportés par
- * une image de marque : on voit l'image avant de l'envoyer, et pourquoi un
- * envoi n'est pas possible quand il ne l'est pas.
+ * Bannière, filigrane et avatar du compte, depuis une image de marque. Le
+ * format est rendu à neuf depuis la marque au moment de l'envoi (le même rendu
+ * que « Exporter » dans l'éditeur de marque) : rien à exporter avant, et
+ * l'image envoyée suit toujours la dernière version de la marque.
  */
 
 import { useState } from "react";
@@ -17,6 +18,16 @@ import type { AccountSummary } from "@/lib/connections/types";
 import type { ConnectorView } from "@/components/connections/types";
 import type { BrandFormats } from "../data";
 import { pushBrandAction } from "../actions";
+import { api as brandKitApi, editorHref } from "@/modules/brand-kit/lib/client";
+import { buildFormat } from "@/modules/brand-kit/lib/formats";
+import { renderFormatPng } from "@/modules/brand-kit/components/format-render";
+
+/** Rend un format depuis la marque et l'enregistre comme export de la marque, là où l'envoi le lit. */
+async function renderBrandFormat(kitId: string, format: "banner" | "watermark") {
+  const { kit } = await brandKitApi.getKit(kitId);
+  const png = await renderFormatPng(kit, buildFormat(kit, format));
+  await brandKitApi.saveFormatExport(kit.id, format, png);
+}
 
 export function ChannelTab({
   account,
@@ -35,11 +46,17 @@ export function ChannelTab({
   const canBanner = account.capabilities.includes("profile.banner");
   const canWatermark = account.capabilities.includes("profile.watermark");
   const connected = account.status === "connected";
-  const editHref = (id: string) => `/m/brand-kit/edit?id=${encodeURIComponent(id)}`;
+  const editHref = editorHref;
 
   const push = async (what: "banner" | "watermark") => {
     if (!kit) return;
     setBusy(what);
+    try {
+      await renderBrandFormat(kit.id, what);
+    } catch (error) {
+      setBusy(null);
+      return void toast.error(error instanceof Error ? error.message : "Le format n’a pas pu être rendu depuis la marque.");
+    }
     const result = await pushBrandAction(account.id, kit.id, what);
     setBusy(null);
     onPushed();
@@ -52,7 +69,7 @@ export function ChannelTab({
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold">Depuis une image de marque</h2>
-          <p className="text-xs text-pretty text-muted-foreground">Les formats exportés par l’éditeur d’une image de marque, envoyés tels quels.</p>
+          <p className="text-xs text-pretty text-muted-foreground">Chaque format est rendu depuis la marque au moment de l’envoi, à sa dernière version.</p>
         </div>
         {kits && kits.length > 0 ? (
           <Select value={kitId} onValueChange={setKitId}>
@@ -89,7 +106,7 @@ export function ChannelTab({
             title="Bannière"
             image={kit.banner}
             preview="aspect-video w-full max-w-md object-cover"
-            missing="Bannière pas encore exportée."
+            missing="La bannière sera rendue depuis la marque à l’envoi."
             editHref={editHref(kit.id)}
             disabledReason={!canBanner ? "La bannière demande un accès plus large : reconnectez le compte avec « Tout »." : !connected ? "Compte à reconnecter." : undefined}
             busy={busy === "banner"}
@@ -101,7 +118,7 @@ export function ChannelTab({
             title="Filigrane"
             image={kit.watermark}
             preview="size-24 object-contain [background:repeating-conic-gradient(#8882_0_25%,transparent_0_50%)_0_0/12px_12px]"
-            missing="Filigrane pas encore exporté."
+            missing="Le filigrane sera rendu depuis la marque à l’envoi."
             editHref={editHref(kit.id)}
             disabledReason={!canWatermark ? "Ce compte n’a pas le droit de changer le filigrane." : !connected ? "Compte à reconnecter." : undefined}
             busy={busy === "watermark"}
@@ -173,13 +190,13 @@ function FormatRow({
         <p className="text-xs text-muted-foreground">
           {missing}{" "}
           <Link href={editHref} className="underline underline-offset-2">
-            Exporter les formats depuis la marque
+            Voir la marque
           </Link>
         </p>
       )}
       <p className={cn("text-xs text-pretty", disabledReason ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>{disabledReason ?? help}</p>
       <div>
-        <Button size="sm" disabled={!image || Boolean(disabledReason) || busy} onClick={onPush} className="gap-2">
+        <Button size="sm" disabled={Boolean(disabledReason) || busy} onClick={onPush} className="gap-2">
           {busy ? <Loader2 className="size-4 animate-spin" /> : null}
           {action}
         </Button>

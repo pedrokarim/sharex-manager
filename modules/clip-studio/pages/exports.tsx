@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
   ArrowRight,
@@ -295,8 +296,12 @@ function ExportsList() {
 
 // ─── Fiche ───────────────────────────────────────────────────────
 
+const DETAIL_TABS = ["texts", "publications", "credits"] as const;
+
 function ExportDetail({ id }: { id: string }) {
   const router = useRouter();
+  // Onglet gardé dans l'adresse (?tab=) : un lien ou le bouton Retour rouvrent le même.
+  const [detailTab, setDetailTab] = useQueryState("tab", parseAsStringLiteral(DETAIL_TABS).withDefault("texts").withOptions({ history: "push" }));
   const isAdmin = useIsAdmin();
   const targets = usePublishTargets();
   const [details, setDetails] = useState<ExportDetails | null | undefined>(undefined);
@@ -574,7 +579,7 @@ function ExportDetail({ id }: { id: string }) {
           <ExportCover entry={entry} video={() => videoRef.current} onChanged={(next) => setDetails((current) => (current ? { ...current, export: next } : current))} />
         </aside>
 
-        <Tabs defaultValue="texts" className="min-w-0 gap-4">
+        <Tabs value={detailTab} onValueChange={(next) => void setDetailTab(next === "texts" ? null : (next as (typeof DETAIL_TABS)[number]))} className="min-w-0 gap-4">
           {/* Onglets sur plusieurs lignes : hauteur fixe, sinon la hauteur en pourcentage des onglets s'étire et ils passent sur les champs. */}
           <TabsList className="h-auto w-full min-w-0 flex-wrap justify-start group-data-[orientation=horizontal]/tabs:h-auto *:data-[slot=tabs-trigger]:h-7.5">
             <TabsTrigger value="texts" className="flex-none px-3">

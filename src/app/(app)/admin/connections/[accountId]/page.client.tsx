@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQueryState } from "nuqs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MotionConfig } from "framer-motion";
@@ -86,11 +87,14 @@ export function AccountPageClient({ initial }: { initial: AccountPageData }) {
   const hasProfile = connector.capabilities.includes("profile.banner") || connector.capabilities.includes("profile.watermark");
   const tabs = [
     hasPosts && { id: "posts", label: "Publications" },
-    hasQueue && { id: "queue", label: "File", count: openJobs },
+    hasQueue && { id: "queue", label: "Envois en cours", count: openJobs },
     hasQuota && { id: "quota", label: "Quotas" },
     hasProfile && { id: "profile", label: connector.accountNoun.one === "chaîne" ? "Chaîne" : "Profil" },
   ].filter(Boolean) as { id: string; label: string; count?: number }[];
-  const [tab, setTab] = useState(() => tabs[0]?.id ?? "queue");
+  // Onglet gardé dans l'adresse (?tab=) : un lien, un rechargement ou le bouton Retour rouvrent le même.
+  const [tabParam, setTabParam] = useQueryState("tab", { history: "push" });
+  const tab = tabs.some((entry) => entry.id === tabParam) ? tabParam! : (tabs[0]?.id ?? "queue");
+  const setTab = (next: string) => void setTabParam(next === tabs[0]?.id ? null : next);
 
   return (
     <MotionConfig reducedMotion="user">

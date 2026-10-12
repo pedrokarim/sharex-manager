@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { uploadConfigSchema, type UploadConfig } from "@/schemas/upload-config";
@@ -14,8 +15,12 @@ import { ThumbnailsTab } from "../_components/thumbnails-tab";
 import { StorageTab } from "../_components/storage-tab";
 import { useTranslation } from "@/lib/i18n";
 
+const CONFIG_TABS = ["general", "thumbnails", "storage"] as const;
+
 export function ConfigPageClient() {
   const { t } = useTranslation();
+  // Onglet gardé dans l'adresse (?tab=) : un lien ou le bouton Retour rouvrent le même.
+  const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(CONFIG_TABS).withDefault("general").withOptions({ history: "push" }));
   const { config, isLoading, isSaving, saveConfig } = useUploadConfig();
 
   const form = useForm<UploadConfig>({
@@ -62,7 +67,7 @@ export function ConfigPageClient() {
           onSubmit={form.handleSubmit(onSubmit)}
           className="space-y-6 sm:space-y-8"
         >
-          <Tabs defaultValue="general" className="space-y-5">
+          <Tabs value={tab} onValueChange={(next) => void setTab(next === "general" ? null : (next as (typeof CONFIG_TABS)[number]))} className="space-y-5">
             <div className="space-y-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
               <div className="space-y-1">
                 <p className="text-sm font-medium sm:text-base">
