@@ -1,6 +1,11 @@
 {
   "title": "Filigrane",
   "description": "Ajoutez un filigrane à votre image",
+  "source": {
+    "label": "Source du filigrane",
+    "text": "Texte",
+    "brand": "Image de marque"
+  },
   "text": "Texte du filigrane",
   "position": "Position",
   "positions": {
@@ -42,5 +47,24 @@
     "background": "Arrière-plan",
     "rotation": "Rotation",
     "scale": "Échelle"
+  },
+  "brand": {
+    "kit": "Image de marque",
+    "choose_kit": "Choisir une image de marque",
+    "default_kit": "{name} (par défaut)",
+    "no_kits": "Aucune image de marque pour l’instant. Créez-en une dans la page « Image de marque ».",
+    "no_logo": "Cette image de marque n’a pas de logo pour le filigrane : ajoutez-en un dans son éditeur.",
+    "loading": "Lecture de l’image de marque…",
+    "load_error": "Image de marque illisible",
+    "size": "Taille du logo (petit côté)",
+    "margin": "Marge (petit côté)",
+    "reset": "Reprendre les réglages de la marque",
+    "hint": "Le logo reprend le coin, la taille et l’opacité enregistrés dans la marque. Ce que vous changez ici ne vaut que pour cette image."
+  },
+  "defaults": {
+    "save": "Utiliser pour chaque envoi",
+    "hint": "Enregistre ces réglages pour le traitement à l’envoi (« Appliquer à chaque envoi » dans la gestion des modules).",
+    "saved": "Réglages enregistrés : ils s’appliquent aux captures envoyées quand « Appliquer à chaque envoi » est activé.",
+    "error": "Enregistrement des réglages impossible"
   }
 }

@@ -1,4 +1,5 @@
 import { ModuleHooks } from "@/types/modules";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import sharp from "sharp";
 
 export type WatermarkPosition =
@@ -60,6 +61,8 @@ function escapeXml(value: string): string {
 }
 
 function clamp(value: unknown, min: number, max: number, fallback: number): number {
+  // `null` ou une chaîne vide valent « non réglé » : `Number(null)` donnait 0.
+  if (value === null || value === undefined || value === "") return fallback;
   const number = Number(value);
   return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
 }
@@ -121,8 +124,207 @@ export async function addWatermark(imageBuffer: Buffer, input?: Partial<Watermar
     .toBuffer();
 }
 
-/** Point d'entrée du gestionnaire de modules. */
-export async function processImage(imageBuffer: Buffer, data?: Partial<WatermarkOptions>): Promise<Buffer> {
+// ─── Logo d'une image de marque ──────────────────────────────────
+
+export type WatermarkSource = "text" | "brand";
+
+/** Coin du filigrane enregistré dans une image de marque. */
+export type BrandAnchor = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+/**
+ * Réglages de la source « Image de marque ». Chaque valeur absente reprend
+ * celle de la marque : position, taille, opacité et marge ne sont que des
+ * retouches pour une image.
+ */
+export interface BrandWatermarkOptions {
+  kitId: string;
+  /** Absente : le coin de la marque. */
+  position?: WatermarkPosition;
+  /** Largeur du logo, relative au petit côté de l'image. */
+  size?: number;
+  /** 0 à 1. */
+  opacity?: number;
+  /** Marge au bord, relative au petit côté de l'image. */
+  margin?: number;
+}
+
+/**
+ * Réglages reçus par `processImage` : sans `source`, c'est du texte. `null`
+ * vaut « reprendre la valeur de la marque » (réglages enregistrés).
+ */
+export type WatermarkSettings = Partial<WatermarkOptions> & {
+  source?: WatermarkSource;
+  kitId?: string;
+  size?: number | null;
+  margin?: number | null;
+};
+
+/** Ce que rend `getWatermarkImage` du module `brand-kit`. */
+export interface BrandWatermarkImage {
+  kitId: string;
+  name: string;
+  image: Buffer;
+  anchor: BrandAnchor;
+  size: number;
+  opacity: number;
+  margin: number;
+  updatedAt: number;
+}
+
+const BRAND_MODULE = "brand-kit";
+
+/** Bornes des réglages de la marque, les mêmes que l'interface. */
+export const BRAND_LIMITS = {
+  size: { min: 0.02, max: 0.8 },
+  margin: { min: 0, max: 0.25 },
+} as const;
+
+/** Réglages de la source marque ramenés à des valeurs sûres. */
+export function normalizeBrandOptions(input: WatermarkSettings | undefined): BrandWatermarkOptions {
+  const kitId = typeof input?.kitId === "string" ? input.kitId.trim() : "";
+  if (!kitId) throw new Error("Aucune image de marque n'est choisie pour le filigrane.");
+  const optional = (value: unknown, min: number, max: number) => {
+    const number = clamp(value, min, max, Number.NaN);
+    return Number.isNaN(number) ? undefined : number;
+  };
+  return {
+    kitId,
+    position: input?.position && POSITIONS.includes(input.position) ? input.position : undefined,
+    size: optional(input?.size, BRAND_LIMITS.size.min, BRAND_LIMITS.size.max),
+    opacity: optional(input?.opacity, 0.05, 1),
+    margin: optional(input?.margin, BRAND_LIMITS.margin.min, BRAND_LIMITS.margin.max),
+  };
+}
+
+/**
+ * Logo du filigrane d'une marque, lu par le module `brand-kit`. Un module
+ * absent ou désactivé rend `null` : l'erreur le dit plutôt que de laisser
+ * passer une image sans filigrane.
+ */
+async function loadBrandWatermark(kitId: string): Promise<BrandWatermarkImage> {
+  const brand = (await apiModuleManager.callModuleFunction(BRAND_MODULE, "getWatermarkImage", kitId)) as
+    | BrandWatermarkImage
+    | null;
+  if (!brand) {
+    throw new Error("Le module « Image de marque » est absent ou désactivé : le logo de la marque ne peut pas être posé.");
+  }
+  if (!Buffer.isBuffer(brand.image) || brand.image.length === 0) {
+    throw new Error(`L'image de marque « ${brand.name ?? kitId} » n'a pas de logo pour le filigrane.`);
+  }
+  return brand;
+}
+
+interface ResizedLogo {
+  data: Buffer;
+  width: number;
+  height: number;
+}
+
+/**
+ * Logos déjà redimensionnés, par marque, version de la marque et largeur :
+ * une rafale de captures de même taille ne redécode pas le logo à chaque
+ * envoi. Une marque modifiée change de `updatedAt`, donc de clé.
+ */
+const logoCache = new Map<string, ResizedLogo>();
+const LOGO_CACHE_LIMIT = 32;
+
+/** Proportions des logos (largeur / hauteur), par marque et version. */
+const ratioCache = new Map<string, number>();
+
+/** Garde une entrée en fin de file et retire la plus ancienne au-delà de la limite. */
+function remember<T>(cache: Map<string, T>, key: string, value: T): T {
+  cache.delete(key);
+  cache.set(key, value);
+  if (cache.size > LOGO_CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
+  return value;
+}
+
+async function logoRatio(brand: BrandWatermarkImage): Promise<number> {
+  const key = `${brand.kitId}:${brand.updatedAt}`;
+  const cached = ratioCache.get(key);
+  if (cached) return cached;
+  const { width, height } = await sharp(brand.image).metadata();
+  if (!width || !height) throw new Error(`Le logo de l'image de marque « ${brand.name} » est illisible.`);
+  return remember(ratioCache, key, width / height);
+}
+
+async function resizedLogo(brand: BrandWatermarkImage, width: number): Promise<ResizedLogo> {
+  const key = `${brand.kitId}:${brand.updatedAt}:${width}`;
+  const cached = logoCache.get(key);
+  // Remis en fin de file : les logos servis souvent restent en mémoire.
+  if (cached) return remember(logoCache, key, cached);
+  const { data, info } = await sharp(brand.image)
+    .ensureAlpha()
+    .resize({ width })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return remember(logoCache, key, { data, width: info.width, height: info.height });
+}
+
+/** Vide les caches de logos (tests). */
+export function clearBrandLogoCache() {
+  logoCache.clear();
+  ratioCache.clear();
+}
+
+/**
+ * Pose le logo d'une image de marque. La largeur du logo et la marge sont
+ * relatives au petit côté de l'image, comme dans Clip Studio : le logo garde
+ * la même place sur une capture en largeur et sur une photo en hauteur.
+ *
+ * Une marque introuvable ou sans logo fait échouer le traitement : rendre
+ * l'image intacte ferait croire que le filigrane a été posé.
+ */
+export async function addBrandWatermark(imageBuffer: Buffer, input?: WatermarkSettings): Promise<Buffer> {
+  const options = normalizeBrandOptions(input);
+  const brand = await loadBrandWatermark(options.kitId);
+
+  const metadata = await sharp(imageBuffer).metadata();
+  const width = metadata.width;
+  const height = metadata.height;
+  if (!width || !height) throw new Error("Dimensions de l'image illisibles.");
+
+  const position = options.position ?? (POSITIONS.includes(brand.anchor) ? brand.anchor : "bottom-right");
+  const size = options.size ?? clamp(brand.size, BRAND_LIMITS.size.min, BRAND_LIMITS.size.max, 0.14);
+  const opacity = options.opacity ?? clamp(brand.opacity, 0.05, 1, 0.85);
+  const marginRatio = options.margin ?? clamp(brand.margin, BRAND_LIMITS.margin.min, BRAND_LIMITS.margin.max, 0.035);
+
+  const shortSide = Math.min(width, height);
+  const margin = Math.round(Math.min(marginRatio * shortSide, width / 4, height / 4));
+  // Le logo tient toujours dans l'image, marges comprises, même très allongé.
+  const ratio = await logoRatio(brand);
+  const logoWidth = Math.max(1, Math.floor(Math.min(size * shortSide, width - 2 * margin, (height - 2 * margin) * ratio)));
+  const logo = await resizedLogo(brand, logoWidth);
+
+  // L'opacité s'applique au canal alpha, sur une copie : le logo en cache
+  // sert à toutes les opacités.
+  const pixels = Buffer.from(logo.data);
+  for (let index = 3; index < pixels.length; index += 4) pixels[index] = Math.round(pixels[index] * opacity);
+
+  const [vertical, horizontal] = position.split("-") as ["top" | "middle" | "bottom", "left" | "center" | "right"];
+  const left =
+    horizontal === "left" ? margin : horizontal === "right" ? width - margin - logo.width : Math.round((width - logo.width) / 2);
+  const top =
+    vertical === "top" ? margin : vertical === "bottom" ? height - margin - logo.height : Math.round((height - logo.height) / 2);
+
+  return sharp(imageBuffer)
+    .composite([
+      {
+        input: pixels,
+        raw: { width: logo.width, height: logo.height, channels: 4 },
+        left: Math.max(0, Math.min(width - logo.width, left)),
+        top: Math.max(0, Math.min(height - logo.height, top)),
+      },
+    ])
+    .toBuffer();
+}
+
+/**
+ * Point d'entrée du gestionnaire de modules. Sans `source`, le filigrane est
+ * un texte, comme avant l'arrivée des images de marque.
+ */
+export async function processImage(imageBuffer: Buffer, data?: WatermarkSettings): Promise<Buffer> {
+  if (data?.source === "brand") return addBrandWatermark(imageBuffer, data);
   return addWatermark(imageBuffer, data);
 }
 
