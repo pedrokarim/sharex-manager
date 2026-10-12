@@ -18,15 +18,16 @@ import type { AccountSummary } from "@/lib/connections/types";
 import type { ConnectorView } from "@/components/connections/types";
 import type { BrandFormats } from "../data";
 import { pushBrandAction } from "../actions";
-import { api as brandKitApi, editorHref } from "@/modules/brand-kit/lib/client";
+import { api as brandKitApi, downloadBlob, editorHref } from "@/modules/brand-kit/lib/client";
 import { buildFormat } from "@/modules/brand-kit/lib/formats";
 import { renderFormatPng } from "@/modules/brand-kit/components/format-render";
 
 /** Rend un format depuis la marque et l'enregistre comme export de la marque, là où l'envoi le lit. */
-async function renderBrandFormat(kitId: string, format: "banner" | "watermark") {
+async function renderBrandFormat(kitId: string, format: "banner" | "watermark" | "avatar"): Promise<Blob> {
   const { kit } = await brandKitApi.getKit(kitId);
   const png = await renderFormatPng(kit, buildFormat(kit, format));
   await brandKitApi.saveFormatExport(kit.id, format, png);
+  return png;
 }
 
 export function ChannelTab({
@@ -41,7 +42,7 @@ export function ChannelTab({
   onPushed: () => void;
 }) {
   const [kitId, setKitId] = useState(() => kits?.find((kit) => kit.isDefault)?.id ?? kits?.[0]?.id ?? "");
-  const [busy, setBusy] = useState<"banner" | "watermark" | null>(null);
+  const [busy, setBusy] = useState<"banner" | "watermark" | "avatar" | null>(null);
   const kit = kits?.find((entry) => entry.id === kitId) ?? null;
   const canBanner = account.capabilities.includes("profile.banner");
   const canWatermark = account.capabilities.includes("profile.watermark");
@@ -62,6 +63,20 @@ export function ChannelTab({
     onPushed();
     if (!result.ok) return void toast.error(result.error);
     toast.success(what === "banner" ? "Bannière mise à jour" : "Filigrane mis à jour");
+  };
+
+  // L'avatar ne s'envoie pas par l'API : on le rend depuis la marque et on le télécharge, pour le poser à la main.
+  const downloadAvatar = async () => {
+    if (!kit) return;
+    setBusy("avatar");
+    try {
+      downloadBlob("avatar.png", await renderBrandFormat(kit.id, "avatar"));
+      onPushed();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "L’avatar n’a pas pu être rendu depuis la marque.");
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
@@ -131,25 +146,16 @@ export function ChannelTab({
             <p className="text-xs text-pretty text-muted-foreground">
               {connector.label} ne permet pas de le changer par son API : téléchargez le PNG de la marque, puis changez-le chez {connector.label}.
             </p>
-            {kit.avatar ? (
-              <div className="flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element -- format exporté par la marque */}
+            <div className="flex items-center gap-3">
+              {kit.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element -- format exporté par la marque
                 <img src={kit.avatar} alt="" className="size-16 rounded-full object-cover" />
-                <Button asChild variant="outline" size="sm" className="gap-2">
-                  <a href={kit.avatar} download="avatar.png">
-                    <Download className="size-4" />
-                    Télécharger
-                  </a>
-                </Button>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Avatar pas encore exporté.{" "}
-                <Link href={editHref(kit.id)} className="underline underline-offset-2">
-                  Ouvrir la marque
-                </Link>
-              </p>
-            )}
+              ) : null}
+              <Button variant="outline" size="sm" className="gap-2" disabled={busy === "avatar"} onClick={() => void downloadAvatar()}>
+                {busy === "avatar" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                Télécharger l’avatar
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
