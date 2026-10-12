@@ -76,7 +76,11 @@ export function useFillHeight<T extends HTMLElement>(enabled: boolean, minimum =
       // Le haut de l'élément dans sa zone défilante, défilement compris.
       const scroller = element.closest<HTMLElement>(".overflow-y-auto") ?? document.documentElement;
       const top = element.getBoundingClientRect().top + scroller.scrollTop;
-      setHeight(Math.max(minimum, Math.floor(window.innerHeight - top)));
+      // Jusqu'au bas visible de la zone défilante, pas de la fenêtre : l'encart du
+      // menu latéral garde une marge de 8 px en bas, et la page défilait d'autant.
+      const bottom =
+        scroller === document.documentElement ? window.innerHeight : scroller.getBoundingClientRect().top + scroller.clientTop + scroller.clientHeight;
+      setHeight(Math.max(minimum, Math.floor(bottom - top)));
     };
     measure();
     window.addEventListener("resize", measure);

@@ -284,6 +284,7 @@ export function GalleryClient({
     data: files,
     loading,
     loadingPrevious,
+    hasMore,
     ref,
     topRef,
     firstPage,
@@ -1447,7 +1448,9 @@ export function GalleryClient({
 
             {/* La suite arrive : des cartes d'attente tiennent sa place. */}
             {loading && <MediaGridSkeleton count={8} size={thumbnailSize === "tiny" ? "small" : thumbnailSize} />}
-            <div ref={ref} className="h-10" />
+            {/* Sentinelle du chargement suivant. Tout chargé, elle ne garde plus ses 40 px :
+                sous le dernier jour, ils faisaient défiler la page pour ne montrer que du vide. */}
+            <div ref={ref} className={hasMore ? "h-10" : "h-px"} />
           </>
         )}
         </UploadZone>

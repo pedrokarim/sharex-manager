@@ -147,6 +147,8 @@ export function useInfiniteScroll<T>({
     data,
     loading,
     loadingPrevious,
+    /** Une page suivante reste à charger. */
+    hasMore,
     ref,
     topRef,
     firstPage,
