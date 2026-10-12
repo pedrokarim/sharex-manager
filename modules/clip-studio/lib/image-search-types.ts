@@ -12,6 +12,12 @@ export const IMAGE_SOURCE_MODES: readonly ImageSourceMode[] = ["find-then-genera
 /** Où une image a été trouvée. */
 export type ImageProvider = "openverse" | "web";
 
+/**
+ * Ce que l'on cherche : une illustration (plein cadre, derrière le texte) ou
+ * une icône (icône d'appli, logo, avatar officiel, posée à côté d'un nom).
+ */
+export type FoundImageKind = "illustration" | "icon";
+
 /** Une image candidate, avant import dans les médias du module. */
 export interface FoundImage {
   /** Identifiant stable de la candidate : `openverse:<id>` ou `web:<fichier>`. */
@@ -29,6 +35,8 @@ export interface FoundImage {
   width?: number;
   height?: number;
   rights: "free" | "unverified";
+  /** Icône ou logo officiel ; absent : une illustration. */
+  kind?: "icon";
 }
 
 /** Une image trouvée et importée : un média du module, prêt pour un projet. */
@@ -41,6 +49,8 @@ export interface ImportedImage {
   height: number;
   credit: string;
   rights: "free" | "unverified";
+  /** Icône ou logo officiel ; absent : une illustration. */
+  kind?: "icon";
 }
 
 /** Source retenue pour un segment, affichée dans le suivi de l'assistant. */
@@ -49,6 +59,8 @@ export type SegmentImageSource = "openverse" | "web" | "generated" | "none";
 export const FOUND_LIMITS = {
   /** Petit côté minimal d'une image retenue, en pixels. */
   minShortSide: 640,
+  /** Petit côté minimal d'une icône ou d'un logo : ils sont montrés petits. */
+  iconMinShortSide: 128,
   /** Candidates examinées par segment. */
   candidatesPerSegment: 4,
   /** Recherches web lancées en même temps. */

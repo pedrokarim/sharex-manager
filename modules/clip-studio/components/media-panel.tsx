@@ -4,18 +4,30 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AudioLines,
+  BadgeCheck,
+  Check,
   CloudUpload,
+  ExternalLink,
   Film,
+  Globe,
   HardDrive,
   ImageOff,
+  Library,
+  Plus,
   Search,
+  ShieldAlert,
   Sparkles,
+  Telescope,
   Trash2,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -32,12 +44,14 @@ import {
   type BrowsableMedia,
 } from "../lib/client";
 import type { ClipAsset, MediaSource } from "../engine/types";
+import type { FoundImage, ImportedImage } from "../lib/image-search-types";
 import { MEDIA_DRAG_TYPE } from "./timeline";
 
-type Tab = "mine" | "gallery" | "studio";
+type Tab = "mine" | "find" | "gallery" | "studio";
 
 const TABS: { id: Tab; label: string; icon: typeof HardDrive }[] = [
   { id: "mine", label: "Mes médias", icon: HardDrive },
+  { id: "find", label: "Trouver", icon: Telescope },
   { id: "gallery", label: "Galerie", icon: CloudUpload },
   { id: "studio", label: "Studio IA", icon: Sparkles },
 ];
@@ -50,31 +64,44 @@ export function MediaPanel({ onAdd }: { onAdd: (source: MediaSource) => void }) 
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 gap-1 border-b p-2">
+      {/* Quatre onglets dans 300 px : seul l'onglet ouvert montre son nom, les autres le disent au survol. */}
+      <div className="flex shrink-0 gap-1 border-b p-2" role="tablist" aria-label="Sources des médias">
         {TABS.map((entry) => {
           const Icon = entry.icon;
           const active = tab === entry.id;
-          return (
-            <button
-              key={entry.id}
+          const button = (
+            <motion.button
+              layout
               type="button"
+              role="tab"
+              aria-selected={active}
+              aria-label={entry.label}
               onClick={() => setTab(entry.id)}
+              transition={{ type: "spring", stiffness: 500, damping: 40 }}
               className={cn(
-                "relative flex flex-1 items-center justify-center gap-1.5 rounded-md px-1.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
-                active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                "relative flex min-w-0 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
+                active ? "flex-1 text-foreground" : "shrink-0 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
               )}
             >
               {active && (
                 <motion.span layoutId="media-tab" className="absolute inset-0 rounded-md bg-muted" transition={{ type: "spring", stiffness: 500, damping: 40 }} />
               )}
-              <Icon className="relative h-3.5 w-3.5" />
-              <span className="relative">{entry.label}</span>
-            </button>
+              <Icon className="relative h-3.5 w-3.5 shrink-0" />
+              {active && <span className="relative min-w-0 truncate">{entry.label}</span>}
+            </motion.button>
+          );
+          // Même arbre ouvert ou fermé : le bouton n'est pas recréé et sa largeur s'anime.
+          return (
+            <Tooltip key={entry.id}>
+              <TooltipTrigger asChild>{button}</TooltipTrigger>
+              {!active && <TooltipContent side="bottom">{entry.label}</TooltipContent>}
+            </Tooltip>
           );
         })}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === "mine" && <MyMedia onAdd={onAdd} />}
+        {tab === "find" && <FindMedia onAdd={onAdd} />}
         {tab === "gallery" && <GalleryMedia onAdd={onAdd} />}
         {tab === "studio" && <StudioMedia onAdd={onAdd} />}
       </div>
@@ -397,5 +424,351 @@ function StudioMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
         empty="Aucun rendu d'AI Image Gen."
       />
     </div>
+  );
+}
+
+// ─── Trouver : des images qui existent ───────────────────────────
+
+/** Où chercher : la banque libre (Openverse), le web par Codex, ou l'icône officielle d'un sujet. */
+type FindSource = "openverse" | "web" | "icon";
+
+const FIND_SOURCES: { id: FindSource; label: string; hint: string; icon: typeof Library }[] = [
+  { id: "openverse", label: "Libre", hint: "Banque libre Openverse : CC0, CC BY et domaine public, licence vérifiée.", icon: Library },
+  { id: "web", label: "Web", hint: "Le web par Codex, de 20 à 60 secondes : visuels officiels, droits à vérifier avant de publier.", icon: Globe },
+  { id: "icon", label: "Icône", hint: "Icône ou logo officiel d'un jeu, d'une appli, d'une marque…, par Codex : droits à vérifier.", icon: BadgeCheck },
+];
+
+/** Openverse ne sert pas plus de dix pages à un visiteur anonyme. */
+const OPENVERSE_MAX_PAGE = 10;
+
+/** Dernière recherche, gardée entre deux ouvertures de l'onglet. */
+let findSnapshot: { query: string; source: FindSource; page: number; results: FoundImage[]; hasMore: boolean } | null = null;
+
+/** Média du projet tiré d'une image importée : la mention et l'état des droits la suivent jusqu'à la publication. */
+function importedToSource(image: ImportedImage): MediaSource {
+  return {
+    url: image.url,
+    ref: image.ref,
+    name: image.name,
+    kind: "image",
+    width: image.width,
+    height: image.height,
+    credit: image.credit || undefined,
+    rights: image.rights,
+  };
+}
+
+function FindMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
+  const [query, setQuery] = useState(findSnapshot?.query ?? "");
+  const [source, setSource] = useState<FindSource>(findSnapshot?.source ?? "openverse");
+  const [results, setResults] = useState<FoundImage[]>(findSnapshot?.results ?? []);
+  const [page, setPage] = useState(findSnapshot?.page ?? 0);
+  const [hasMore, setHasMore] = useState(findSnapshot?.hasMore ?? false);
+  const [searched, setSearched] = useState(findSnapshot !== null);
+  const [loading, setLoading] = useState<"search" | "more" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  /** Import en cours ou fait, par candidate : l'image importée sert aux clics suivants. */
+  const [imports, setImports] = useState<Record<string, "pending" | ImportedImage>>({});
+  const searchId = useRef(0);
+
+  const run = async (target: number) => {
+    const text = query.replace(/\s+/g, " ").trim();
+    if (text.length < 2) {
+      setError("Tapez au moins deux lettres.");
+      return;
+    }
+    const id = ++searchId.current;
+    setLoading(target > 1 ? "more" : "search");
+    setError(null);
+    try {
+      const found = await callModule<FoundImage[]>("searchImages", {
+        query: text,
+        provider: source === "openverse" ? "openverse" : "web",
+        page: target,
+        ...(source === "icon" ? { kind: "icon" } : {}),
+      });
+      if (id !== searchId.current) return;
+      const next = target > 1 ? [...results, ...found.filter((entry) => !results.some((known) => known.id === entry.id))] : found;
+      const more = source === "openverse" && found.length > 0 && target < OPENVERSE_MAX_PAGE;
+      setResults(next);
+      setPage(target);
+      setHasMore(more);
+      setSearched(true);
+      findSnapshot = { query: text, source, page: target, results: next, hasMore: more };
+    } catch (failure: any) {
+      if (id !== searchId.current) return;
+      setError(failure?.message ?? "Recherche impossible");
+    } finally {
+      if (id === searchId.current) setLoading(null);
+    }
+  };
+
+  const importOne = async (image: FoundImage, add: boolean) => {
+    const known = imports[image.id];
+    if (known === "pending") return;
+    if (known) {
+      if (add) onAdd(importedToSource(known));
+      return;
+    }
+    setImports((current) => ({ ...current, [image.id]: "pending" }));
+    try {
+      const imported = await callModule<ImportedImage>("importFoundImage", { id: image.id });
+      setImports((current) => ({ ...current, [image.id]: imported }));
+      // « Mes médias » relira la liste à sa prochaine ouverture.
+      assetsSnapshot = null;
+      if (add) onAdd(importedToSource(imported));
+      toast.success(add ? "Image ajoutée au clip, avec sa mention" : "Image importée dans vos médias, avec sa mention", {
+        description: imported.rights === "unverified" ? "Droits à vérifier avant de publier." : undefined,
+      });
+    } catch (failure: any) {
+      setImports((current) => {
+        const { [image.id]: _removed, ...rest } = current;
+        return rest;
+      });
+      toast.error(failure?.message ?? "Import impossible");
+    }
+  };
+
+  const current = FIND_SOURCES.find((entry) => entry.id === source)!;
+  const icons = source === "icon";
+  const slow = source !== "openverse";
+
+  return (
+    <div className="flex min-w-0 flex-col gap-2 p-3">
+      <form
+        className="flex min-w-0 gap-1.5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void run(1);
+        }}
+      >
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={icons ? "Nom exact du jeu, de l'appli…" : "Mont Fuji, Zelda, panda roux…"}
+            maxLength={100}
+            aria-label="Image à chercher"
+            className="h-8 pl-8 text-xs"
+          />
+        </div>
+        <Button type="submit" size="sm" className="h-8 shrink-0 px-2.5 text-xs" disabled={loading === "search"}>
+          {loading === "search" ? <Spinner className="size-3.5" aria-label="Recherche en cours" /> : "Chercher"}
+        </Button>
+      </form>
+
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        value={source}
+        onValueChange={(value) => {
+          if (!value || value === source) return;
+          setSource(value as FindSource);
+          setResults([]);
+          setHasMore(false);
+          setSearched(false);
+          setError(null);
+          searchId.current++;
+          setLoading(null);
+        }}
+        className="w-full"
+        aria-label="Où chercher"
+      >
+        {FIND_SOURCES.map((entry) => {
+          const Icon = entry.icon;
+          return (
+            <ToggleGroupItem key={entry.id} value={entry.id} className="h-7 min-w-0 flex-1 gap-1 px-1.5 text-xs" aria-label={entry.label}>
+              <Icon className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{entry.label}</span>
+            </ToggleGroupItem>
+          );
+        })}
+      </ToggleGroup>
+
+      <p className={cn("flex min-w-0 items-start gap-1.5 text-[11px] leading-snug", slow ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
+        {slow ? <ShieldAlert className="mt-px h-3.5 w-3.5 shrink-0" /> : <BadgeCheck className="mt-px h-3.5 w-3.5 shrink-0" />}
+        <span className="min-w-0 break-words">{current.hint}</span>
+      </p>
+
+      {error && <p className="rounded-md bg-destructive/10 px-2.5 py-2 text-[11px] break-words text-destructive">{error}</p>}
+
+      {loading === "search" && slow && (
+        <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Spinner className="size-3.5" aria-label="Recherche en cours" />
+          Codex cherche sur le web…
+        </p>
+      )}
+
+      {loading === "search" ? (
+        <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-2">
+          {Array.from({ length: slow ? 3 : 6 }, (_, index) => (
+            <div key={index} className="flex min-w-0 flex-col gap-1.5">
+              <Skeleton className={cn("w-full rounded-md", icons ? "aspect-square" : "aspect-video")} />
+              <Skeleton className="h-3 w-3/4" />
+              <Skeleton className="h-2.5 w-1/2" />
+            </div>
+          ))}
+        </div>
+      ) : results.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 px-2 py-8 text-center text-xs text-muted-foreground">
+          {searched ? <ImageOff className="h-6 w-6 opacity-40" /> : <Telescope className="h-6 w-6 opacity-40" />}
+          <span className="break-words">
+            {searched
+              ? icons
+                ? "Aucune icône officielle trouvée. Essayez le nom exact, en anglais."
+                : "Aucune image trouvée. Essayez d'autres mots, en anglais de préférence."
+              : "Cherchez une image qui existe : un lieu, une espèce, un jeu, un film… Un clic l'ajoute au clip, avec sa mention."}
+          </span>
+        </div>
+      ) : (
+        <motion.div layout className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-2">
+          <AnimatePresence initial={false}>
+            {results.map((image, index) => (
+              <FoundCard
+                key={image.id}
+                image={image}
+                index={index}
+                icon={icons || image.kind === "icon"}
+                state={imports[image.id]}
+                onAdd={() => void importOne(image, true)}
+                onImport={() => void importOne(image, false)}
+              />
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      )}
+
+      {hasMore && loading !== "search" && results.length > 0 && (
+        <Button type="button" variant="outline" size="sm" className="h-8 text-xs" disabled={loading === "more"} onClick={() => void run(page + 1)}>
+          {loading === "more" ? <Spinner className="size-3.5" aria-label="Chargement" /> : <Plus className="h-3.5 w-3.5" />}
+          Plus de résultats
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function FoundCard({
+  image,
+  index,
+  icon,
+  state,
+  onAdd,
+  onImport,
+}: {
+  image: FoundImage;
+  index: number;
+  icon: boolean;
+  state: "pending" | ImportedImage | undefined;
+  onAdd: () => void;
+  onImport: () => void;
+}) {
+  const pending = state === "pending";
+  const imported = Boolean(state && state !== "pending");
+  const unverified = image.rights === "unverified";
+  const size = image.width && image.height ? `${image.width} × ${image.height}` : null;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1, transition: { delay: Math.min(index, 12) * 0.03 } }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="flex min-w-0 flex-col gap-1"
+    >
+      <div className="group relative min-w-0">
+        <button
+          type="button"
+          onClick={onAdd}
+          disabled={pending}
+          aria-label={`Ajouter au clip : ${image.title}`}
+          className={cn(
+            "relative block w-full overflow-hidden rounded-md border bg-muted transition-transform hover:scale-[1.02] disabled:hover:scale-100",
+            icon ? "aspect-square" : "aspect-video"
+          )}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={image.thumbnail}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className={cn("h-full w-full max-w-full", icon ? "object-contain p-2" : "object-cover")}
+          />
+          {pending && (
+            <span className="absolute inset-0 flex items-center justify-center bg-background/60">
+              <Spinner className="size-5" aria-label="Import en cours" />
+            </span>
+          )}
+          {imported && (
+            <span className="absolute top-1 left-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+              <Check className="h-3 w-3" />
+            </span>
+          )}
+        </button>
+        {!imported && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="secondary"
+                disabled={pending}
+                onClick={onImport}
+                aria-label="Importer dans Mes médias sans l'ajouter au clip"
+                className="absolute top-1 right-1 opacity-90 shadow-sm group-hover:opacity-100"
+              >
+                <Upload />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Importer dans Mes médias</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <p className="min-w-0 truncate text-[11px] font-medium">{image.title}</p>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-64 break-words">
+          {image.title}
+          {image.creator ? ` – ${image.creator}` : ""}
+          {size ? ` (${size})` : ""}
+        </TooltipContent>
+      </Tooltip>
+
+      <div className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
+        <span
+          className={cn(
+            "inline-flex min-w-0 items-center gap-0.5 rounded px-1 py-px font-medium",
+            unverified ? "bg-amber-500/15 text-amber-800 dark:text-amber-300" : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+          )}
+        >
+          {unverified ? <ShieldAlert className="h-2.5 w-2.5 shrink-0" /> : <BadgeCheck className="h-2.5 w-2.5 shrink-0" />}
+          <span className="truncate">{image.license}</span>
+        </span>
+        {image.sourcePage && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href={image.sourcePage}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Ouvrir la page source"
+                className="ml-auto inline-flex shrink-0 items-center rounded p-0.5 hover:bg-muted hover:text-foreground"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-64 break-all">
+              {image.sourcePage}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+      {image.creator && <p className="min-w-0 truncate text-[10px] text-muted-foreground" title={image.creator}>{image.creator}</p>}
+    </motion.div>
   );
 }

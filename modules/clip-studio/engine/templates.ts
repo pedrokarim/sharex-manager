@@ -45,6 +45,8 @@ export interface QuizQuestion {
   answer: number;
   explanation?: string;
   image?: MediaSource;
+  /** Icône ou logo officiel de la bonne réponse, montré à la révélation seulement ; absent, rien ne change. */
+  icon?: MediaSource;
   voice?: { question?: VoiceClip; reveal?: VoiceClip };
 }
 
@@ -60,6 +62,8 @@ export interface TopEntry {
   title: string;
   detail?: string;
   image?: MediaSource;
+  /** Icône ou logo officiel du sujet, posé à côté de son nom ; absent, rien ne change. */
+  icon?: MediaSource;
   voice?: VoiceClip;
 }
 
@@ -73,7 +77,13 @@ export interface TopData {
 
 export interface SlideshowData {
   title?: string;
-  slides: { caption?: string; image?: MediaSource; voice?: VoiceClip }[];
+  slides: {
+    caption?: string;
+    image?: MediaSource;
+    /** Icône ou logo officiel du sujet, posé à côté de son nom ; absent, rien ne change. */
+    icon?: MediaSource;
+    voice?: VoiceClip;
+  }[];
   outro?: string;
   voice?: { intro?: VoiceClip; outro?: VoiceClip };
 }
@@ -83,6 +93,8 @@ export interface FreeScene {
   heading?: string;
   text?: string;
   image?: MediaSource;
+  /** Icône ou logo officiel du sujet, posé à côté de son nom ; absent, rien ne change. */
+  icon?: MediaSource;
   voice?: VoiceClip;
 }
 
@@ -112,10 +124,11 @@ export interface BeforeAfterData {
 
 /**
  * Un modèle range ses éléments par couche, de la plus haute à la plus
- * basse : textes au-dessus des surlignages, eux-mêmes au-dessus des cadres,
- * eux-mêmes au-dessus du fond.
+ * basse : textes au-dessus des icônes, puis des surlignages, eux-mêmes
+ * au-dessus des cadres, eux-mêmes au-dessus du fond. Une couche vide ne
+ * crée aucune piste.
  */
-const LAYERS = ["Textes", "Surlignage", "Cadres", "Voile", "Après", "Principale"] as const;
+const LAYERS = ["Textes", "Icônes", "Surlignage", "Cadres", "Voile", "Après", "Principale"] as const;
 type Layer = (typeof LAYERS)[number];
 
 class Builder {
@@ -303,6 +316,83 @@ function background(b: Builder, start: number, duration: number, image: MediaSou
   }
 }
 
+/** Où poser une icône : centre ou bord gauche, centre ou bord bas, en fractions du canevas. */
+interface IconPlace {
+  x?: number;
+  left?: number;
+  y?: number;
+  bottom?: number;
+  /** Côté de l'icône, en fraction du petit côté du canevas. */
+  side: number;
+  /** Largeur au plus, en fraction de la largeur du canevas (un logo large est réduit). */
+  maxWidth?: number;
+}
+
+/** Préréglage d'apparition des icônes (registre `engine/motion/registry.ts`) et sa durée. */
+const ICON_ANIM_IN = { kind: "pop-in", seconds: 0.52 } as const;
+/** Arrondi des coins d'une icône, en fraction de son côté. */
+const ICON_RADIUS = 0.22;
+
+/**
+ * Icône ou logo officiel d'un sujet, posé à côté de son nom : coins
+ * arrondis, petite ombre, apparition en éclosion. Une icône carrée (icône
+ * d'appli) remplit sa carte ; un logo plus large ou plus haut est posé dans
+ * une carte claire à sa mesure. Ombre et carte suivent le thème (voile et
+ * surface) comme les autres cadres. Sans icône, rien n'est posé : le rendu
+ * reste celui d'avant.
+ */
+function iconSlot(b: Builder, icon: MediaSource | undefined, start: number, duration: number, place: IconPlace) {
+  if (!icon || icon.kind !== "image" || duration <= 0) return;
+  const { width: W, height: H } = b.project;
+  const ratio = icon.width && icon.height ? icon.width / icon.height : 1;
+  const logo = ratio > 1.25 || ratio < 0.8;
+  let side = place.side * Math.min(W, H);
+  let boxWidth = logo ? side * Math.min(Math.max(ratio, 1), 2.2) : side;
+  const maxWidth = (place.maxWidth ?? 0.8) * W;
+  if (boxWidth > maxWidth) {
+    side *= maxWidth / boxWidth;
+    boxWidth = maxWidth;
+  }
+  const width = boxWidth / W;
+  const height = side / H;
+  const x = place.left !== undefined ? place.left + width / 2 : place.x ?? 0.5;
+  const y = place.bottom !== undefined ? place.bottom - height / 2 : place.y ?? 0.5;
+  const animIn = { kind: ICON_ANIM_IN.kind, frames: Math.max(1, Math.round(ICON_ANIM_IN.seconds * b.fps)) };
+  const animOut = { kind: "fade", frames: 6 };
+  const card = (paint: "veil" | "surface", dy: number, opacity: number): ShapeItem => ({
+    id: uid("s-"),
+    type: "shape",
+    shape: "rect",
+    start,
+    duration,
+    fill: paintFill(null, { paint }) ?? "#000000",
+    theme: { paint },
+    radius: ICON_RADIUS,
+    transform: { x, y: y + dy, width, height, rotation: 0, opacity },
+    animIn,
+    animOut,
+  });
+
+  // L'icône d'abord, sa carte ensuite : sur la même couche, la première piste est dessinée par-dessus.
+  const inset = logo ? 0.8 : 1;
+  b.add("Icônes", {
+    id: uid("i-"),
+    type: "image",
+    start,
+    duration,
+    source: icon,
+    fit: logo ? "contain" : "cover",
+    motion: "none",
+    radius: logo ? 0 : Math.round(ICON_RADIUS * side),
+    transform: { x, y, width: width * inset, height: height * inset, rotation: 0, opacity: 1 },
+    animIn,
+    animOut,
+  } satisfies ImageItem);
+  if (logo) b.add("Icônes", card("surface", 0, 1));
+  // Ombre portée : la même carte, sombre et décalée vers le bas, sous les autres cadres.
+  b.add("Cadres", card("veil", (side * 0.06) / H, 0.35));
+}
+
 // ─── Quiz ────────────────────────────────────────────────────────
 
 export interface QuizTiming {
@@ -357,6 +447,8 @@ export function buildQuiz(
       accent,
       animIn: "slide-down",
     }));
+    // Icône de la bonne réponse, à droite de l'étiquette : à la révélation seulement, pour ne rien dévoiler.
+    iconSlot(b, question.icon, cursor + think, reveal, { left: 0.82, y: 0.1, side: 0.11, maxWidth: 0.15 });
 
     // Question
     b.add("Textes", text(b, question.question, cursor + 4, total - 4, {
@@ -463,6 +555,7 @@ export function buildTop(name: string, aspect: AspectPreset, data: TopData): Cli
       animIn: "zoom",
     }));
     b.add("Textes", text(b, entry.title, cursor + 6, duration - 6, { role: "title", y: vertical ? 0.72 : 0.7, height: 0.16, size: vertical ? 0.055 : 0.08, animIn: "slide-up" }));
+    iconSlot(b, entry.icon, cursor + 6, duration - 6, { bottom: (vertical ? 0.72 : 0.7) - 0.08 - 0.01, side: 0.16 });
     if (entry.detail) {
       b.add("Textes", text(b, entry.detail, cursor + 12, duration - 12, { role: "caption", y: vertical ? 0.82 : 0.84, height: 0.12, size: vertical ? 0.03 : 0.042, animIn: "fade" }));
     }
@@ -498,6 +591,7 @@ export function buildSlideshow(name: string, aspect: AspectPreset, data: Slidesh
     if (slide.caption) {
       b.add("Textes", text(b, slide.caption, cursor + 6, duration - 6, { role: "caption", y: vertical ? 0.8 : 0.84, height: 0.16, size: vertical ? 0.038 : 0.05, animIn: "slide-up" }));
     }
+    iconSlot(b, slide.icon, cursor + 6, duration - 6, slide.caption ? { bottom: (vertical ? 0.8 : 0.84) - 0.08 - 0.01, side: 0.15 } : { y: vertical ? 0.8 : 0.82, side: 0.15 });
     cursor += duration;
   });
   if (data.outro) {
@@ -554,6 +648,11 @@ export function buildFree(name: string, aspect: AspectPreset, data: FreeData): C
         animIn: "slide-up",
       }));
     }
+    // Icône juste au-dessus du texte de la séquence (ou de son titre seul).
+    const anchorTop = scene.text
+      ? (scene.heading ? (vertical ? 0.74 : 0.76) : 0.5) - (vertical ? 0.24 : 0.2) / 2
+      : 0.46 - 0.18 / 2;
+    iconSlot(b, scene.icon, cursor + 6, duration - 6, { bottom: anchorTop - 0.01, side: 0.15 });
     cursor += duration;
   });
 

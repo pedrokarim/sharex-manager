@@ -2,13 +2,21 @@
  * Assistant IA : « fais-moi un short sur les animaux », en forme libre ou
  * selon un modèle (quiz, classement, diaporama).
  *
- * Trois étapes, suivies par l'interface :
- * 1. script : Codex CLI écrit le contenu, en JSON, selon le modèle choisi ;
+ * Étapes suivies par l'interface :
+ * 1. script : Codex CLI écrit le contenu, en JSON, selon le modèle choisi,
+ *    avec la date du jour ; quand la demande porte sur des faits réels et que
+ *    le web est permis, il vérifie en écrivant (`lib/fact-check.ts`) ;
+ * 1 bis. vérification des faits : une seconde passe de Codex relit le script
+ *    comme une donnée, corrige, remplace ou retire ce qui est faux et range
+ *    ses sources dans le projet. Si elle échoue, le clip continue et le suivi
+ *    le dit ;
  * 2. illustrations : une image par segment. Selon le mode, le segment qui
  *    parle d'un sujet réel la cherche d'abord (Openverse, puis le web par
  *    Codex si la demande l'autorise, `lib/image-search.ts`) ; ce qui ne se
  *    trouve pas est demandé à la file d'AI Image Gen (les images générées
- *    apparaissent aussi dans son fil) ;
+ *    apparaissent aussi dans son fil). Avec le web, un sujet nommé (jeu,
+ *    film, appli, marque…) reçoit aussi son icône ou son logo officiel,
+ *    reconnu par Codex, posé à côté de son nom ;
  * 3. narration : chaque segment est lu par une voix de synthèse (Piper) ;
  * 4. montage : le modèle transforme le tout en projet, prêt à retoucher, en
  *    allongeant chaque segment pour laisser le temps à la voix.
@@ -31,11 +39,22 @@ import {
   type VoiceClip,
 } from "../engine/templates";
 import type { BrandTheme } from "../engine/brand";
-import type { AspectPreset, MediaSource } from "../engine/types";
+import type { AspectPreset, ClipProject, MediaSource } from "../engine/types";
 import { addItem, createMusicItems } from "../engine/edit";
 import { projectDuration } from "../engine/timeline";
-import { askCodex, extractJson } from "./codex";
-import { findSegmentImage } from "./image-search";
+import { askCodex, extractJson, type CodexOptions } from "./codex";
+import {
+  changeLines,
+  classifySubject,
+  doubtLines,
+  factCheckPrompt,
+  factCheckSummary,
+  parseFactCheck,
+  todayLines,
+  type FactCheckReport,
+  type FactSource,
+} from "./fact-check";
+import { findSegmentIcon, findSegmentImage, type FoundForSegment } from "./image-search";
 import { FOUND_LIMITS, IMAGE_SOURCE_MODES, type ImageSourceMode, type SegmentImageSource } from "./image-search-types";
 import { MOODS, pickTrack } from "./music";
 import { cleanScriptText, frenchTypography, pickBestHook, scriptRuleLines, spokenSeconds, type ScriptHook } from "./script-rules";
@@ -71,7 +90,7 @@ export interface AssistantRequest {
 
 const KIT_ID = /^kit-[a-z0-9]{6,32}$/;
 
-type StepId = "script" | "images" | "narration" | "montage";
+type StepId = "script" | "facts" | "images" | "narration" | "montage";
 type StepState = "pending" | "running" | "done" | "error" | "skipped";
 
 export interface AssistantJob {
@@ -93,6 +112,17 @@ export interface AssistantJob {
   images: { total: number; done: number; failed: number; found: number; generated: number; missing: number };
   /** Source retenue pour chaque segment, dans l'ordre du script ; `null` tant qu'il n'est pas résolu. */
   imageSources?: (SegmentImageSource | null)[];
+  /**
+   * Icônes et logos officiels des sujets nommés (jeu, film, appli…) :
+   * `total` cherchées, `found` reconnues et posées. Absent sans recherche web.
+   */
+  icons?: { total: number; found: number };
+  /**
+   * Bilan de la vérification des faits : compteurs par verdict, ce qui a
+   * changé et ce qui reste douteux (« Ananta : date de sortie non
+   * confirmée »). Absent quand elle n'a pas eu lieu.
+   */
+  facts?: FactCheckTracking;
   projectId?: string;
   error?: string;
   createdAt: number;
@@ -101,6 +131,12 @@ export interface AssistantJob {
 
 const JOBS_FILE = path.join(DATA_DIR, "assistant.json");
 const IMAGE_TIMEOUT_MS = 20 * 60 * 1000;
+/** Un script écrit en cherchant sur le web prend plus longtemps que de mémoire (quatre minutes par défaut). */
+const SCRIPT_WEB_TIMEOUT_MS = 6 * 60 * 1000;
+/** La vérification fait une passe de plus : bornée, elle ne retient pas le clip au-delà. */
+export const FACT_CHECK_TIMEOUT_MS = 5 * 60 * 1000;
+const FACTS_LABEL = "Vérification des faits";
+const FACTS_FAILED_LABEL = "Vérification impossible";
 
 const controllers = new Map<string, { abort: AbortController; imageJobs: string[] }>();
 
@@ -187,8 +223,9 @@ export function cleanRequest(request: AssistantRequest): AssistantRequest {
     count: Math.min(10, Math.max(2, Math.round(Number(request.count) || 5))),
     images: imageSource !== "none",
     imageSource,
-    // Le web n'est jamais fouillé sans un geste explicite, et seulement quand on cherche.
-    webSearch: finds(imageSource) && request.webSearch === true,
+    // Le web n'est jamais fouillé sans un geste explicite. Il sert au script et à sa
+    // vérification dans tous les modes ; aux images seulement quand on cherche (`searchesWeb`).
+    webSearch: request.webSearch === true,
     voice: isKnownVoice(request.voice) ? request.voice : undefined,
     music: request.music === "auto" || (MOODS as readonly string[]).includes(String(request.music)) ? request.music : undefined,
     brandKitId: typeof request.brandKitId === "string" && KIT_ID.test(request.brandKitId) ? request.brandKitId : undefined,
@@ -209,6 +246,10 @@ export function startAssistant(request: AssistantRequest): AssistantJob {
     request: clean,
     steps: [
       { id: "script", label: "Écriture du script", state: "pending" },
+      // Une fiction déclarée n'a rien à vérifier.
+      classifySubject(clean.brief, clean.template).fiction
+        ? { id: "facts", label: FACTS_LABEL, state: "skipped", detail: "Fiction : rien à vérifier" }
+        : { id: "facts", label: FACTS_LABEL, state: "pending" },
       { id: "images", label: imagesStepLabel(imageSource), state: imageSource !== "none" ? "pending" : "skipped" },
       { id: "narration", label: "Enregistrement de la voix", state: clean.voice ? "pending" : "skipped" },
       { id: "montage", label: "Montage du clip", state: "pending" },
@@ -225,8 +266,8 @@ export function startAssistant(request: AssistantRequest): AssistantJob {
 }
 
 async function run(job: AssistantJob, signal: AbortSignal) {
-  const step = (id: StepId, state: StepState, detail?: string) => {
-    job.steps = job.steps.map((entry) => (entry.id === id ? { ...entry, state, detail } : entry));
+  const step = (id: StepId, state: StepState, detail?: string, label?: string) => {
+    job.steps = job.steps.map((entry) => (entry.id === id ? { ...entry, state, detail, ...(label ? { label } : {}) } : entry));
     save(job);
   };
 
@@ -238,38 +279,58 @@ async function run(job: AssistantJob, signal: AbortSignal) {
       brand = await loadBrand(job.request.brandKitId);
     }
 
-    // 1. Script
-    step("script", "running", "Codex rédige le contenu…");
-    const answer = await askCodex(scriptPrompt(job.request, brand), { signal });
-    const script = sanitize(job.request, extractJson<RawScript>(answer), brand?.language);
+    // 1. Script : avec le web quand la demande porte sur des faits réels et que l'utilisateur l'a permis.
+    const web = scriptUsesWeb(job.request);
+    step("script", "running", web ? "Codex rédige le contenu et vérifie sur le web…" : "Codex rédige le contenu…");
+    const answer = await askCodex(scriptPrompt(job.request, brand, { web }), {
+      signal,
+      ...(web ? { search: true, timeoutMs: SCRIPT_WEB_TIMEOUT_MS } : {}),
+    });
+    let script = sanitize(job.request, extractJson<RawScript>(answer), brand?.language);
     job.title = script.title;
     job.hook = script.hook;
     job.spokenSeconds = script.spokenSeconds;
     step("script", "done", `« ${script.title} », environ ${script.spokenSeconds} s de voix`);
 
+    // 1 bis. Vérification des faits : le script corrigé repart dans la suite normale.
+    let facts: FactCheckOutcome | null = null;
+    if (job.steps.some((entry) => entry.id === "facts" && entry.state === "pending")) {
+      ({ script, outcome: facts } = await verifyScript(job, script, signal, (state, detail, label) => step("facts", state, detail, label), {
+        language: brand?.language,
+      }));
+      job.title = script.title;
+      job.hook = script.hook;
+      job.spokenSeconds = script.spokenSeconds;
+      save(job);
+    }
+
     // 2. Illustrations : chercher d'abord ce qui existe, générer le reste.
     const plans = segmentPlans(job.request, script);
     let images: (MediaSource | undefined)[] = [];
+    let icons: (MediaSource | undefined)[] = [];
     if (plans.length) {
       step("images", "running", `0 sur ${plans.length}`);
       const webSearch = job.request.webSearch === true;
-      images = await illustrateSegments(job, plans, signal, () => step("images", "running", imagesProgress(job)), {
-        find: async (plan, findSignal) => {
-          const found = await findSegmentImage({ query: plan.query ?? "", text: plan.text, webSearch, signal: findSignal });
-          if (!found) return null;
-          const { image, provider } = found;
-          return {
-            provider,
-            source: { url: image.url, ref: image.ref, name: image.name, kind: "image", width: image.width, height: image.height, credit: image.credit, rights: image.rights },
-          };
-        },
-        generate: (entries, generateSignal, onResult) => generateImages(job, entries, brand, generateSignal, onResult),
-      });
-      step("images", job.images.done > 0 ? "done" : "error", imagesSummary(job));
+      const progress = () => step("images", "running", imagesProgress(job));
+      // Les icônes se cherchent en même temps que les illustrations, dans la même file du web.
+      [images, icons] = await Promise.all([
+        illustrateSegments(job, plans, signal, progress, {
+          find: async (plan, findSignal) => {
+            const found = await findSegmentImage({ query: plan.query ?? "", text: plan.text, webSearch, webFirst: plan.webFirst, signal: findSignal });
+            return found ? { provider: found.provider, source: foundToSource(found) } : null;
+          },
+          generate: (entries, generateSignal, onResult) => generateImages(job, entries, brand, generateSignal, onResult),
+        }),
+        findIcons(job, plans, signal, progress, async (plan, iconSignal) => {
+          const found = await findSegmentIcon({ query: plan.iconQuery ?? "", text: plan.text, signal: iconSignal });
+          return found ? foundToSource(found) : null;
+        }),
+      ]);
+      step("images", job.images.done > 0 || (job.icons?.found ?? 0) > 0 ? "done" : "error", imagesSummary(job));
     }
 
     // 3. Narration
-    let data = attachImages(job.request.template, script, images);
+    let data = attachImages(job.request.template, script, images, icons);
     if (job.request.voice) {
       const lines = narrationLines(job.request.template, data);
       let done = 0;
@@ -301,6 +362,8 @@ async function run(job: AssistantJob, signal: AbortSignal) {
         for (const item of createMusicItems(source, 0, end, project.fps, volume)) project = addItem(project, item, undefined, "Musique");
       }
     }
+    // La demande, le script et ses sources suivent le projet : l'assistant de publication les relit pour rédiger les textes.
+    project = { ...project, brief: projectBrief(job.request, script, facts) };
     writeProject(project);
     job.projectId = project.id;
     job.status = "done";
@@ -327,6 +390,10 @@ interface RawImage {
   mode?: unknown;
   query?: unknown;
   prompt?: unknown;
+  /** Produit commercial ou œuvre récente : ses visuels officiels se cherchent d'abord sur le web. */
+  official?: unknown;
+  /** Icône ou logo officiel du sujet nommé, en plus de l'illustration. */
+  icon?: unknown;
 }
 
 interface RawScript {
@@ -345,42 +412,106 @@ interface RawScript {
 const IMAGE_GUIDE =
   "imagePrompt : en anglais, une illustration marquante et détaillée du sujet du segment, sans aucun texte ni lettre ni logo dans l'image";
 
+/** Les icônes et la décision « web d'abord » n'ont de sens que si le web peut être fouillé. */
+const searchesWeb = (request: AssistantRequest) => finds(resolveImageSource(request)) && request.webSearch === true;
+
 /**
  * Champ d'image du schéma : `imagePrompt` quand tout est généré (le
- * fonctionnement d'avant), un objet `image` quand l'assistant cherche.
+ * fonctionnement d'avant), un objet `image` quand l'assistant cherche ; avec
+ * la recherche web, il dit aussi si le sujet est un produit officiel et
+ * quelle icône chercher.
  */
 function imageField(request: AssistantRequest): string {
-  return finds(resolveImageSource(request)) ? '"image": {"mode": "find" | "generate", "query": string, "prompt": string}' : '"imagePrompt": string';
+  if (!finds(resolveImageSource(request))) return '"imagePrompt": string';
+  return searchesWeb(request)
+    ? '"image": {"mode": "find" | "generate", "query": string, "prompt": string, "official": boolean, "icon": {"query": string} | null}'
+    : '"image": {"mode": "find" | "generate", "query": string, "prompt": string}';
 }
 
 /** Consigne des illustrations. En recherche, le script dit segment par segment s'il faut trouver ou générer. */
 function imageGuide(request: AssistantRequest, quiz = false): string[] {
   const source = resolveImageSource(request);
   if (!finds(source)) return [IMAGE_GUIDE + (quiz ? ", qui ne révèle pas la réponse." : ".")];
+  const web = searchesWeb(request);
   return [
-    "image : l'illustration du segment. Une vraie image qui existe est cherchée d'abord ; seul ce qui ne peut pas se trouver est généré.",
-    '- mode "find" quand le segment montre un sujet réel et précis, qui existe en photo ou en visuel officiel : un jeu vidéo, un film, un personnage, une œuvre, un lieu, un monument, une personne publique, une espèce animale ou végétale, un objet ou un événement réel.',
+    "image : l'illustration du segment. Une vraie image qui existe est cherchée d'abord ; seul ce qui ne peut pas se trouver est généré.",
+    '- mode "find" quand le segment montre un sujet réel et précis, qui existe en photo ou en visuel officiel : un jeu vidéo, un film, un personnage, une œuvre, un lieu, un monument, une personne publique, une espèce animale ou végétale, un objet ou un événement réel.',
     '- mode "generate" pour une idée, une ambiance, une métaphore, une scène inventée ou un concept abstrait.',
-    `- query : requête de recherche d'images en anglais, de 2 à 6 mots, avec le nom exact du sujet (titre complet du jeu, nom du lieu, nom courant de l'espèce…), sans mot vague comme "image" ou "photo". ${
+    `- query : requête de recherche d'images en anglais, de 2 à 6 mots, avec le nom exact et complet du sujet tel qu'il est publié (titre complet du jeu, du film ou de la série avec son sous-titre, nom du lieu, nom courant de l'espèce…), sans mot vague comme "image" ou "photo", sans nom de catégorie à la place du nom propre. ${
       source === "find"
-        ? 'Toujours fournie, même en mode "generate" : rien ne sera généré, seule une image trouvée illustrera le segment.'
+        ? 'Toujours fournie, même en mode "generate" : rien ne sera généré, seule une image trouvée illustrera le segment.'
         : 'Obligatoire en mode "find".'
     }`,
-    "- prompt : toujours fourni, en anglais, une illustration marquante et détaillée du sujet, sans aucun texte ni lettre ni logo dans l'image ; il sert aussi de secours si rien n'est trouvé.",
-    ...(quiz ? ["L'image ne doit pas révéler la réponse : query et prompt montrent le sujet de la question, jamais la bonne réponse."] : []),
+    "- prompt : toujours fourni, en anglais, une illustration marquante et détaillée du sujet, sans aucun texte ni lettre ni logo dans l'image ; il sert aussi de secours si rien n'est trouvé.",
+    ...(web
+      ? [
+          '- official : true quand le sujet est un produit commercial ou une œuvre récente (jeu vidéo, gacha, film, série, anime, appli, marque) : ses visuels officiels sont cherchés directement sur le web, et query est alors son titre exact suivi de "key art" (par exemple "Honkai Star Rail key art") ; false sinon.',
+          `- icon : quand le segment nomme une chose réelle et identifiable qui a une identité visuelle officielle (jeu, film, série, marque, appli, personnage, lieu), {"query": requête en anglais pour trouver son icône ou son logo officiel, son nom exact suivi de "app icon" ou de "logo"} ; null sinon (idée, ambiance, sujet générique, mascotte de la marque). L'icône s'ajoute à l'illustration, elle ne la remplace pas.${
+            quiz ? " Au quiz, icon désigne le sujet de la BONNE RÉPONSE quand c'est une chose nommée : elle n'apparaît qu'à la révélation." : ""
+          }`,
+        ]
+      : []),
+    ...(quiz ? ["L'image ne doit pas révéler la réponse : query et prompt montrent le sujet de la question, jamais la bonne réponse."] : []),
   ];
 }
 
-export function scriptPrompt(request: AssistantRequest, brand: AssistantBrand | null = null): string {
-  const foreign = brand?.language && !/^fr\b/i.test(brand.language) ? brand.language : null;
+/**
+ * Le script s'écrit avec le web quand la demande porte sur des faits réels
+ * (`classifySubject`) et que l'utilisateur a laissé la case « Chercher aussi
+ * sur le web » cochée. Une fiction ou un sujet intemporel s'écrit de mémoire ;
+ * sans la case, tout s'écrit de mémoire et la vérification le dit.
+ */
+export function scriptUsesWeb(request: Pick<AssistantRequest, "brief" | "template" | "webSearch">): boolean {
+  return request.webSearch === true && classifySubject(request.brief, request.template).factual;
+}
+
+/** Schéma d'un segment du script, selon le modèle : la vérification renvoie ses corrections dans le même. */
+function segmentSchema(request: AssistantRequest): string {
   const image = imageField(request);
+  if (request.template === "quiz") return `{"question": string, "choices": [string, string, string], "answer": number, "explanation": string, ${image}}`;
+  if (request.template === "free") return `{"heading": string, "text": string, ${image}}`;
+  if (request.template === "top") return `{"title": string, "detail": string, ${image}}`;
+  return `{"caption": string, ${image}}`;
+}
+
+/** Limites de longueur d'un segment, rappelées à la vérification. */
+const SEGMENT_LIMITS: Record<AssistantTemplate, string> = {
+  quiz: "question de 80 caractères au plus ; 3 choix de 26 caractères au plus ; answer est l'index (0, 1 ou 2) de la bonne réponse ; explanation de 70 caractères au plus",
+  free: "heading de 32 caractères au plus ; text de 110 caractères au plus, écrit pour être lu à voix haute",
+  top: "title de 30 caractères au plus ; detail de 50 caractères au plus, précis et vérifiable",
+  slideshow: "caption de 70 caractères au plus",
+};
+
+/**
+ * Consigne du script. `web` : Codex peut chercher sur le web en écrivant
+ * (par défaut, `scriptUsesWeb`) ; `now` : la date du jour, donnée dans la
+ * consigne pour que rien de ce qui dépend du temps ne vienne de sa mémoire.
+ */
+export function scriptPrompt(
+  request: AssistantRequest,
+  brand: AssistantBrand | null = null,
+  options: { web?: boolean; now?: Date } = {}
+): string {
+  const foreign = brand?.language && !/^fr\b/i.test(brand.language) ? brand.language : null;
+  const web = options.web ?? scriptUsesWeb(request);
+  const segment = segmentSchema(request);
   const common = [
     foreign
       ? `Tu écris le script d'un clip vidéo court pour les réseaux sociaux, dans la langue de la marque (code BCP 47 « ${foreign} »).`
       : "Tu écris le script d'un clip vidéo court pour les réseaux sociaux, en français, avec la typographie française.",
     `Demande de l'utilisateur : ${request.brief}`,
     "Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour ni bloc de code.",
-    "N'utilise aucun outil, n'exécute aucune commande et n'écris aucun fichier.",
+    ...todayLines(options.now),
+    ...(web
+      ? [
+          "Sers-toi de la recherche web pour vérifier, avant de l'écrire, chaque fait qui peut avoir changé ou que tu ne connais pas avec certitude : date et statut de sortie, studio, éditeur, chiffres, records, classements, nom exact. N'utilise aucun autre outil, n'exécute aucune commande et n'écris aucun fichier.",
+          "Préfère les sources officielles (éditeur, studio, store, site officiel), puis les grands médias ; jamais une rumeur ou une fuite.",
+        ]
+      : [
+          "N'utilise aucun outil, n'exécute aucune commande et n'écris aucun fichier.",
+          "Tu n'as pas accès au web : quand un élément peut avoir changé depuis ta mémoire (sortie, statut, record, classement), choisis-en un dont tu es certain, et n'affirme aucune date ni aucun chiffre dont tu n'es pas sûr.",
+        ]),
+    "Écris chaque nom propre exactement comme il est publié (orthographe officielle, sous-titre compris) : il sert aussi à chercher les images.",
     ...(request.music === "auto"
       ? [`Ajoute au JSON une clé "mood" : l'ambiance musicale la plus adaptée, parmi ${MOODS.join(", ")}.`]
       : []),
@@ -391,7 +522,7 @@ export function scriptPrompt(request: AssistantRequest, brand: AssistantBrand | 
     return [
       ...common,
       `Format : un quiz de ${request.count} questions.`,
-      `Schéma : {"title": string, "subtitle": string, "questions": [{"question": string, "choices": [string, string, string], "answer": number, "explanation": string, ${image}}], "outro": string}`,
+      `Schéma : {"title": string, "subtitle": string, "questions": [${segment}], "outro": string}`,
       "Contraintes : title accrocheur de 40 caractères au plus ; question de 80 caractères au plus ; 3 choix de 26 caractères au plus ; answer est l'index (0, 1 ou 2) de la bonne réponse, à varier d'une question à l'autre ; explanation de 70 caractères au plus, qui apprend quelque chose ; outro de 40 caractères au plus.",
       "Les questions doivent être exactes, vérifiables et de difficulté croissante.",
       ...imageGuide(request, true),
@@ -401,7 +532,7 @@ export function scriptPrompt(request: AssistantRequest, brand: AssistantBrand | 
     return [
       ...common,
       `Format libre en ${request.count} séquences : choisis toi-même la forme qui sert le mieux la demande (histoire, explication, conseils, recette, anecdote, comparaison, tutoriel…), sans en faire un quiz ni un classement sauf si la demande le réclame.`,
-      `Schéma : {"title": string, "subtitle": string, "scenes": [{"heading": string, "text": string, ${image}}], "outro": string}`,
+      `Schéma : {"title": string, "subtitle": string, "scenes": [${segment}], "outro": string}`,
       "Contraintes : title de 45 caractères au plus ; subtitle facultatif de 70 caractères au plus ; heading facultatif de 32 caractères au plus ; text de 110 caractères au plus, écrit pour être lu à voix haute ; chaque séquence porte au moins un heading ou un text ; outro facultatif de 40 caractères au plus.",
       "Les séquences s'enchaînent : la première accroche, la dernière conclut.",
       ...imageGuide(request),
@@ -411,7 +542,7 @@ export function scriptPrompt(request: AssistantRequest, brand: AssistantBrand | 
     return [
       ...common,
       `Format : un classement de ${request.count} éléments, présenté du numéro ${request.count} au numéro 1.`,
-      `Schéma : {"title": string, "entries": [{"title": string, "detail": string, ${image}}], "outro": string}`,
+      `Schéma : {"title": string, "entries": [${segment}], "outro": string}`,
       `Contraintes : entries dans l'ordre d'apparition, le premier est le numéro ${request.count} et le dernier le numéro 1 ; title de 45 caractères au plus ; chaque title d'entrée de 30 caractères au plus ; detail de 50 caractères au plus, précis et vérifiable ; outro de 40 caractères au plus.`,
       ...imageGuide(request),
     ].join("\n");
@@ -419,7 +550,7 @@ export function scriptPrompt(request: AssistantRequest, brand: AssistantBrand | 
   return [
     ...common,
     `Format : un diaporama narratif de ${request.count} diapositives.`,
-    `Schéma : {"title": string, "slides": [{"caption": string, ${image}}], "outro": string}`,
+    `Schéma : {"title": string, "slides": [${segment}], "outro": string}`,
     "Contraintes : title de 40 caractères au plus ; caption de 70 caractères au plus ; outro de 40 caractères au plus.",
     ...imageGuide(request),
   ].join("\n");
@@ -470,6 +601,10 @@ export interface ScriptImage {
   query?: string;
   /** Consigne de génération, qui sert aussi de secours. */
   prompt: string;
+  /** Produit commercial ou œuvre récente : ses visuels officiels se cherchent d'abord sur le web. */
+  official?: boolean;
+  /** Requête de l'icône ou du logo officiel du sujet nommé, en plus de l'illustration. */
+  iconQuery?: string;
 }
 
 type ScriptContent = (FreeData | QuizData | TopData | SlideshowData) & {
@@ -504,13 +639,22 @@ function readImage(segment: { imagePrompt?: unknown; image?: RawImage; mascot?: 
   const prompt = cut(image.prompt, 500) || cut(segment.imagePrompt, 500);
   const query = cut(image.query, 80).replace(/["«»]/g, "").trim() || undefined;
   const mode = image.mode === "find" && query && !mascot ? "find" : "generate";
-  return { mode, query: mascot ? undefined : query, prompt, mascot };
+  const icon = image.icon && typeof image.icon === "object" ? (image.icon as { query?: unknown }) : {};
+  const iconQuery = mascot ? undefined : cut(icon.query, 80).replace(/["«»]/g, "").trim() || undefined;
+  return {
+    mode,
+    query: mascot ? undefined : query,
+    prompt,
+    mascot,
+    ...(image.official === true && !mascot ? { official: true } : {}),
+    ...(iconQuery ? { iconQuery } : {}),
+  };
 }
 
 /** Champs d'image gardés sur un segment nettoyé. */
 function imageFields(segment: { imagePrompt?: unknown; image?: RawImage; mascot?: unknown }) {
-  const { mode, query, prompt, mascot } = readImage(segment);
-  return { imagePrompt: prompt, imageMode: mode, imageQuery: query, mascot };
+  const { mode, query, prompt, mascot, official, iconQuery } = readImage(segment);
+  return { imagePrompt: prompt, imageMode: mode, imageQuery: query, imageOfficial: official, iconQuery, mascot };
 }
 
 type ImageFields = ReturnType<typeof imageFields>;
@@ -520,7 +664,15 @@ function imageArrays(segments: ImageFields[], texts: string[]) {
   return {
     prompts: segments.map((segment) => segment.imagePrompt),
     mascots: segments.map((segment) => segment.mascot),
-    imagePlans: segments.map((segment) => ({ mode: segment.imageMode, query: segment.imageQuery, prompt: segment.imagePrompt })),
+    imagePlans: segments.map(
+      (segment): ScriptImage => ({
+        mode: segment.imageMode,
+        query: segment.imageQuery,
+        prompt: segment.imagePrompt,
+        ...(segment.imageOfficial ? { official: true } : {}),
+        ...(segment.iconQuery ? { iconQuery: segment.iconQuery } : {}),
+      })
+    ),
     segmentTexts: texts,
   };
 }
@@ -620,6 +772,236 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
   };
 }
 
+// ─── Vérification des faits ──────────────────────────────────────
+
+/** Suivi de la vérification, rangé avec le travail. */
+export interface FactCheckTracking {
+  /** La vérification a pu chercher sur le web. */
+  web: boolean;
+  checked: number;
+  ok: number;
+  fixed: number;
+  replaced: number;
+  removed: number;
+  doubtful: number;
+  /** Ce qui a changé : « Ananta remplacé : déjà sorti ». */
+  changes: string[];
+  /** Ce qui reste douteux : « Ananta : date de sortie non confirmée ». */
+  doubts: string[];
+}
+
+/** Ce que la vérification laisse au projet : ses sources, rattachées aux segments gardés. */
+export interface FactCheckOutcome {
+  report: FactCheckReport;
+  /** Sources par segment, `segment` étant l'index dans le script final (après retraits). */
+  sources: { segment: number; url: string; title: string }[];
+  checkedAt: number;
+}
+
+/** Accès extérieurs de la vérification, remplaçables par les tests. */
+export interface FactCheckDeps {
+  ask?: (prompt: string, options: CodexOptions) => Promise<string>;
+  now?: () => Date;
+}
+
+/** Nom d'un segment, pour le bilan. */
+const SEGMENT_UNITS: Record<AssistantTemplate, { one: string; many: string; feminine?: boolean }> = {
+  quiz: { one: "question", many: "questions", feminine: true },
+  top: { one: "élément", many: "éléments" },
+  free: { one: "séquence", many: "séquences", feminine: true },
+  slideshow: { one: "diapositive", many: "diapositives", feminine: true },
+};
+
+/** Clé des segments dans le script brut, selon le modèle. */
+const SEGMENT_KEYS = { quiz: "questions", top: "entries", free: "scenes", slideshow: "slides" } as const;
+
+/** Champ d'image d'un segment nettoyé, remis dans le schéma que Codex a reçu. */
+function rawImage(request: AssistantRequest, segment: ImageFields): Record<string, unknown> {
+  if (!finds(resolveImageSource(request))) return { imagePrompt: segment.imagePrompt };
+  const web = searchesWeb(request);
+  return {
+    image: {
+      mode: segment.imageMode,
+      query: segment.imageQuery ?? "",
+      prompt: segment.imagePrompt,
+      ...(web ? { official: segment.imageOfficial === true, icon: segment.iconQuery ? { query: segment.iconQuery } : null } : {}),
+    },
+  };
+}
+
+/** Segments d'un script nettoyé, dans le schéma du script brut : ce que la vérification relit et renvoie. */
+function rawSegments(request: AssistantRequest, script: CleanScript): Record<string, unknown>[] {
+  const mascot = (segment: ImageFields) => (segment.mascot ? { mascot: true } : {});
+  if (request.template === "quiz") {
+    return (script as CleanScript & QuizData).questions.map((question) => {
+      const segment = question as typeof question & ImageFields;
+      return {
+        question: segment.question,
+        choices: segment.choices,
+        answer: segment.answer,
+        explanation: segment.explanation ?? "",
+        ...rawImage(request, segment),
+        ...mascot(segment),
+      };
+    });
+  }
+  if (request.template === "top") {
+    return (script as CleanScript & TopData).entries.map((entry) => {
+      const segment = entry as typeof entry & ImageFields;
+      return { title: segment.title, detail: segment.detail ?? "", ...rawImage(request, segment), ...mascot(segment) };
+    });
+  }
+  if (request.template === "free") {
+    return (script as CleanScript & FreeData).scenes.map((scene) => {
+      const segment = scene as typeof scene & ImageFields;
+      return { heading: segment.heading ?? "", text: segment.text ?? "", ...rawImage(request, segment), ...mascot(segment) };
+    });
+  }
+  return (script as CleanScript & SlideshowData).slides.map((slide) => {
+    const segment = slide as typeof slide & ImageFields;
+    return { caption: segment.caption ?? "", ...rawImage(request, segment), ...mascot(segment) };
+  });
+}
+
+/**
+ * Applique le rapport : « fixed » et « replaced » prennent le segment rendu
+ * (un remplaçant ne garde rien de l'ancien, pas même son image), « removed »
+ * disparaît, le reste est gardé tel quel. Le script repasse par `sanitize` :
+ * bornes, typographie et requêtes d'images sortent du segment corrigé.
+ * L'accroche retenue reste, au texte du titre près.
+ */
+export function applyFactCheck(request: AssistantRequest, script: CleanScript, report: FactCheckReport, language?: string): CleanScript {
+  const originals = rawSegments(request, script);
+  const segments = originals.flatMap((original, index) => {
+    const check = report.checks[index];
+    if (!check || check.verdict === "removed") return [];
+    if ((check.verdict === "fixed" || check.verdict === "replaced") && check.segment) {
+      const base = check.verdict === "fixed" ? original : {};
+      // Une mascotte ne s'invente pas : le segment corrigé garde le choix d'origine.
+      return [{ ...base, ...check.segment, mascot: original.mascot === true }];
+    }
+    return [original];
+  });
+  if (segments.length === 0) {
+    throw new Error("La vérification des faits a écarté tout le script : aucun élément ne tient. Reformulez la demande.");
+  }
+  const raw = {
+    title: report.title ?? script.title,
+    subtitle: "subtitle" in script ? (script.subtitle as string | undefined) : undefined,
+    outro: script.outro,
+    mood: script.mood,
+    [SEGMENT_KEYS[request.template]]: segments,
+  } as RawScript;
+  const rebuilt = sanitize({ ...request, count: segments.length }, raw, language);
+  return { ...rebuilt, hook: script.hook ? { ...script.hook, text: rebuilt.title } : undefined };
+}
+
+/** Sources du rapport, rattachées à l'index de leur segment dans le script final. */
+function keptSources(report: FactCheckReport): FactCheckOutcome["sources"] {
+  let position = 0;
+  const sources: FactCheckOutcome["sources"] = [];
+  for (const check of report.checks) {
+    if (check.verdict === "removed") continue;
+    for (const source of check.sources) sources.push({ segment: position, url: source.url, title: source.title });
+    position++;
+  }
+  return sources.slice(0, 40);
+}
+
+function tracking(report: FactCheckReport): FactCheckTracking {
+  const count = (verdict: FactCheckReport["checks"][number]["verdict"]) => report.checks.filter((check) => check.verdict === verdict).length;
+  return {
+    web: report.web,
+    checked: report.checks.length,
+    ok: count("ok"),
+    fixed: count("fixed"),
+    replaced: count("replaced"),
+    removed: count("removed"),
+    doubtful: count("doubtful"),
+    changes: changeLines(report),
+    doubts: doubtLines(report),
+  };
+}
+
+/**
+ * Étape « Vérification des faits » : une seconde passe de Codex relit le
+ * script comme une donnée, avec la date du jour et le web quand la demande
+ * l'autorise, et rend un verdict par segment. Le script corrigé repart dans
+ * la suite normale.
+ *
+ * Bornée par `FACT_CHECK_TIMEOUT_MS`. Si elle échoue (Codex absent, délai
+ * dépassé, réponse illisible), le clip continue avec le script tel quel et
+ * l'étape devient « Vérification impossible » : jamais un échec silencieux.
+ * Elle ne rejette que sur annulation du travail, ou quand rien du script ne
+ * tient.
+ */
+export async function verifyScript(
+  job: Pick<AssistantJob, "request" | "facts">,
+  script: CleanScript,
+  signal: AbortSignal,
+  onStep: (state: StepState, detail?: string, label?: string) => void,
+  options: { language?: string; deps?: FactCheckDeps } = {}
+): Promise<{ script: CleanScript; outcome: FactCheckOutcome | null }> {
+  const request = job.request;
+  const web = request.webSearch === true;
+  const ask = options.deps?.ask ?? askCodex;
+  const now = options.deps?.now?.() ?? new Date();
+  const foreign = options.language && !/^fr\b/i.test(options.language) ? options.language : undefined;
+  const segments = rawSegments(request, script);
+  const input = {
+    brief: request.brief,
+    template: request.template,
+    title: script.title,
+    segments,
+    segmentSchema: segmentSchema(request),
+    segmentLimits: SEGMENT_LIMITS[request.template],
+    web,
+    language: foreign,
+    now,
+  };
+
+  onStep("running", web ? "Codex contrôle chaque affirmation sur le web…" : "Codex relit le script, sans le web…", FACTS_LABEL);
+  let report: FactCheckReport;
+  try {
+    const answer = await ask(factCheckPrompt(input), { signal, search: web, timeoutMs: FACT_CHECK_TIMEOUT_MS });
+    signal.throwIfAborted();
+    report = parseFactCheck(answer, input);
+  } catch (error) {
+    if (signal.aborted) throw error;
+    const reason = (error as Error)?.message || "Codex n'a pas pu relire le script";
+    onStep("error", `Script gardé tel quel, faits non vérifiés. ${reason}`.slice(0, 300), FACTS_FAILED_LABEL);
+    return { script, outcome: null };
+  }
+
+  const checked = applyFactCheck(request, script, report, options.language);
+  const kept = report.checks.filter((check) => check.verdict !== "removed").length;
+  job.facts = tracking(report);
+  onStep("done", factCheckSummary(report, kept, segments.length, SEGMENT_UNITS[request.template]), FACTS_LABEL);
+  return { script: checked, outcome: { report, sources: keptSources(report), checkedAt: now.getTime() } };
+}
+
+/**
+ * Demande, script et sources rangés dans le projet : l'assistant de
+ * publication les relit pour rédiger les textes, et peut citer les sources.
+ */
+export function projectBrief(request: Pick<AssistantRequest, "brief">, script: Pick<CleanScript, "title" | "segmentTexts">, facts: FactCheckOutcome | null): NonNullable<ClipProject["brief"]> {
+  return {
+    prompt: String(request.brief ?? "").slice(0, 4000),
+    title: script.title.slice(0, 200),
+    script: script.segmentTexts.slice(0, 100).map((line) => String(line ?? "").slice(0, 2000)),
+    ...(facts
+      ? {
+          sources: facts.sources.map((source: { segment: number } & FactSource) => ({
+            segment: source.segment,
+            url: source.url.slice(0, 500),
+            title: source.title.slice(0, 160),
+          })),
+          checkedAt: facts.checkedAt,
+        }
+      : {}),
+  };
+}
+
 // ─── Illustrations : trouver, sinon générer ──────────────────────
 
 /** Ce que l'assistant fera pour l'image d'un segment. */
@@ -633,6 +1015,10 @@ export interface SegmentPlan {
   mascot: boolean;
   /** Texte du segment, pour choisir entre plusieurs images trouvées. */
   text: string;
+  /** Produit commercial récent : le web avant Openverse (sinon, `prefersWebFirst` en décide). */
+  webFirst?: boolean;
+  /** Icône ou logo officiel à chercher en plus de l'illustration, seulement quand le web est permis. */
+  iconQuery?: string;
 }
 
 /**
@@ -649,9 +1035,18 @@ export function segmentPlans(
 ): SegmentPlan[] {
   const source = resolveImageSource(request);
   if (source === "none") return [];
+  const web = searchesWeb(request);
   return script.imagePlans.map((plan, index): SegmentPlan => {
     const mascot = script.mascots[index] === true;
-    const base = { query: plan.query, prompt: plan.prompt || script.title, mascot, text: script.segmentTexts[index] ?? "" };
+    const base = {
+      query: plan.query,
+      prompt: plan.prompt || script.title,
+      mascot,
+      text: script.segmentTexts[index] ?? "",
+      ...(web && plan.official && !mascot ? { webFirst: true } : {}),
+      // Une icône vient toujours du web : sans lui, on n'en cherche pas.
+      ...(web && plan.iconQuery && !mascot ? { iconQuery: plan.iconQuery } : {}),
+    };
     const searchable = Boolean(plan.query) && !mascot;
     if (source === "find") return { ...base, action: searchable ? "find" : "none", fallback: false };
     if (source === "find-then-generate" && searchable && plan.mode === "find") return { ...base, action: "find", fallback: true };
@@ -759,42 +1154,114 @@ export async function illustrateSegments(
   return results;
 }
 
-/** Compteurs lisibles : trouvées, créées, sans image. */
-function imagesCounts(job: AssistantJob): string[] {
+/**
+ * Icônes et logos officiels des segments qui en demandent une
+ * (`plan.iconQuery`), cherchés en parallèle bornée. Une icône non reconnue
+ * laisse simplement le segment sans icône : le modèle n'y change rien. Le
+ * suivi (`job.icons`) est tenu à jour à chaque icône trouvée.
+ */
+export async function findIcons(
+  job: Pick<AssistantJob, "icons">,
+  plans: SegmentPlan[],
+  signal: AbortSignal,
+  onProgress: () => void,
+  findIcon: (plan: SegmentPlan, signal: AbortSignal) => Promise<MediaSource | null>
+): Promise<(MediaSource | undefined)[]> {
+  const results: (MediaSource | undefined)[] = plans.map(() => undefined);
+  const wanted = plans.flatMap((plan, index) => (plan.iconQuery ? [index] : []));
+  if (wanted.length === 0) return results;
+  const icons = { total: wanted.length, found: 0 };
+  job.icons = icons;
+  await eachLimited(wanted, FOUND_LIMITS.webConcurrency, async (index) => {
+    signal.throwIfAborted();
+    let icon: MediaSource | null = null;
+    try {
+      icon = await findIcon(plans[index], signal);
+    } catch (error) {
+      if (signal.aborted) throw error;
+    }
+    if (!icon) return;
+    results[index] = icon;
+    icons.found++;
+    onProgress();
+  });
+  signal.throwIfAborted();
+  return results;
+}
+
+/** Image trouvée et importée, telle qu'un modèle la pose : avec sa mention et l'état de ses droits. */
+function foundToSource({ image }: FoundForSegment): MediaSource {
+  return {
+    url: image.url,
+    ref: image.ref,
+    name: image.name,
+    kind: "image",
+    width: image.width,
+    height: image.height,
+    credit: image.credit,
+    rights: image.rights,
+  };
+}
+
+type ImagesTracking = Pick<AssistantJob, "images" | "imageSources" | "icons">;
+
+const plural = (count: number, word: string) => `${count} ${word}${count > 1 ? "s" : ""}`;
+
+/** Où les illustrations ont été trouvées : « sur le web », ou le détail quand les deux sources ont servi. */
+function foundWhere(job: ImagesTracking): string {
+  const sources = job.imageSources ?? [];
+  const web = sources.filter((source) => source === "web").length;
+  const openverse = sources.filter((source) => source === "openverse").length;
+  if (web && openverse) return ` (${web} sur le web, ${openverse} sur Openverse)`;
+  if (web) return " sur le web";
+  if (openverse) return " sur Openverse";
+  return "";
+}
+
+/** Compteurs lisibles : trouvées (et où), créées, sans image. */
+function imagesCounts(job: ImagesTracking): string[] {
   const { found, generated, missing } = job.images;
   return [
-    found ? `${found} trouvée${found > 1 ? "s" : ""}` : "",
-    generated ? `${generated} créée${generated > 1 ? "s" : ""}` : "",
+    found ? `${plural(found, "trouvée")}${foundWhere(job)}` : "",
+    generated ? plural(generated, "créée") : "",
     missing ? `${missing} sans image` : "",
   ].filter(Boolean);
 }
 
 /** Avancement de l'étape, pendant le travail. */
-function imagesProgress(job: AssistantJob): string {
+export function imagesProgress(job: ImagesTracking): string {
   const { total, found, generated, missing } = job.images;
-  return [`${found + generated + missing} sur ${total}`, ...imagesCounts(job)].join(", ");
+  const icons = job.icons?.found ? plural(job.icons.found, "icône") : "";
+  return [`${found + generated + missing} sur ${total}`, ...imagesCounts(job), icons].filter(Boolean).join(", ");
 }
 
 /** Bilan de l'étape, une fois terminée. */
-function imagesSummary(job: AssistantJob): string {
-  return imagesCounts(job).join(", ") || `0 sur ${job.images.total}`;
+export function imagesSummary(job: ImagesTracking): string {
+  const icons = job.icons
+    ? job.icons.found
+      ? `${plural(job.icons.found, "icône")} officielle${job.icons.found > 1 ? "s" : ""} sur ${job.icons.total}`
+      : `aucune icône reconnue sur ${job.icons.total}`
+    : "";
+  return [...imagesCounts(job), icons].filter(Boolean).join(", ") || `0 sur ${job.images.total}`;
 }
 
-function attachImages(template: TemplateId, script: CleanScript, images: (MediaSource | undefined)[]) {
+/** Illustration et icône de chaque segment, posées sur les données du modèle. */
+function attachImages(template: TemplateId, script: CleanScript, images: (MediaSource | undefined)[], icons: (MediaSource | undefined)[] = []) {
+  const media = (index: number) => ({ image: images[index], ...(icons[index] ? { icon: icons[index] } : {}) });
   if (template === "free") {
     const data = script as FreeData & CleanScript;
-    return { ...data, scenes: data.scenes.map((scene, index) => ({ ...scene, image: images[index] })) };
+    return { ...data, scenes: data.scenes.map((scene, index) => ({ ...scene, ...media(index) })) };
   }
   if (template === "quiz") {
     const data = script as QuizData & CleanScript;
-    return { ...data, questions: data.questions.map((question, index) => ({ ...question, image: images[index] })) };
+    return { ...data, questions: data.questions.map((question, index) => ({ ...question, ...media(index) })) };
   }
   if (template === "top") {
     const data = script as TopData & CleanScript;
-    return { ...data, entries: data.entries.map((entry, index) => ({ ...entry, image: images[index] })) };
+    return { ...data, entries: data.entries.map((entry, index) => ({ ...entry, ...media(index) })) };
   }
   const data = script as SlideshowData & CleanScript;
-  return { ...data, slides: data.slides.map((slide, index) => ({ ...slide, image: images[index] })) };
+  return { ...data, slides: data.slides.map((slide, index) => ({ ...slide, ...media(index) })) };
 }
 
 // ─── Narration ───────────────────────────────────────────────────

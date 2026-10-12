@@ -298,7 +298,7 @@ export function CreateDialog({
                         setMode(entry.id);
                         if (entry.id === "assistant" && !ASSISTANT_TEMPLATE_IDS.includes(template)) setTemplate("free");
                       }}
-                      className={cn("relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors", active ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+                      className={cn("relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors", active ? "text-foreground" : "text-foreground/70 hover:text-foreground")}
                     >
                       {active && <motion.span layoutId="create-mode" className="absolute inset-0 rounded-md bg-background shadow-sm" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
                       <Icon className={cn("relative h-4 w-4", active && entry.id === "assistant" && "text-primary")} />
@@ -377,19 +377,17 @@ export function CreateDialog({
                           ))}
                         </div>
                       </div>
-                      <AnimatePresence initial={false}>
-                        {(imageSource === "find-then-generate" || imageSource === "find") && (
-                          <motion.label initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="flex items-start justify-between gap-3 overflow-hidden">
-                            <span className="min-w-0 text-sm">
-                              Chercher aussi sur le web
-                              <span className="block text-xs text-muted-foreground">
-                                Visuels officiels, logos et icônes des jeux, films ou marques cités, trouvés par Codex. Leurs droits restent à vérifier avant de publier.
-                              </span>
-                            </span>
-                            <Switch checked={webSearch} onCheckedChange={chooseWebSearch} />
-                          </motion.label>
-                        )}
-                      </AnimatePresence>
+                      <label className="flex items-start justify-between gap-3 border-t pt-3">
+                        <span className="min-w-0 text-sm">
+                          Chercher sur le web
+                          <span className="block text-xs text-muted-foreground">
+                            {imageSource === "find-then-generate" || imageSource === "find"
+                              ? "Faits du script vérifiés avec leurs sources, visuels officiels, logos et icônes des jeux, films ou marques cités. Les droits des images restent à vérifier avant de publier."
+                              : "Faits du script vérifiés avec leurs sources : dates de sortie, noms, chiffres, bonnes réponses."}
+                          </span>
+                        </span>
+                        <Switch checked={webSearch} onCheckedChange={chooseWebSearch} />
+                      </label>
                     </div>
                     <div className="space-y-3 rounded-lg border p-3">
                       <label className="flex items-start justify-between gap-3">
@@ -549,7 +547,9 @@ function BrandPicker({
             title={kit.tagline}
           >
             <BrandKitMark kit={kit} />
-            <span className="max-w-40 truncate">{kit.name}</span>
+            <span className="max-w-40 truncate" title={kit.name}>
+              {kit.name}
+            </span>
           </button>
         ))}
       </div>
@@ -588,7 +588,7 @@ function RecipePicker({ value, onChange, files }: { value: Recipe; onChange: (va
           >
             <Icon className={cn("h-5 w-5", selected ? "text-primary" : "text-muted-foreground")} />
             <span className="text-sm font-medium">{entry.label}</span>
-            <span className="text-xs leading-4 text-muted-foreground">{entry.description}</span>
+            <span className={cn("text-xs leading-4", selected ? "text-foreground/70" : "text-muted-foreground")}>{entry.description}</span>
           </button>
         );
       })}
@@ -621,7 +621,7 @@ function TemplatePicker({
           >
             <Icon className={cn("h-5 w-5", selected ? "text-primary" : "text-muted-foreground")} />
             <span className="text-sm font-medium">{entry.label}</span>
-            <span className="text-xs leading-4 text-muted-foreground">{entry.description}</span>
+            <span className={cn("text-xs leading-4", selected ? "text-foreground/70" : "text-muted-foreground")}>{entry.description}</span>
           </button>
         );
       })}
@@ -647,7 +647,7 @@ function AspectPicker({ value, onChange }: { value: AspectPreset; onChange: (val
               <span className={cn("rounded-[3px] border-2", selected ? "border-primary" : "border-muted-foreground/60")} style={{ width: width * scale, height: height * scale }} />
             </span>
             <span className="text-xs font-medium">{key}</span>
-            <span className="text-[10px] text-muted-foreground">{label}</span>
+            <span className={cn("text-[10px]", selected ? "text-foreground/70" : "text-muted-foreground")}>{label}</span>
           </button>
         );
       })}
@@ -667,7 +667,7 @@ export function AssistantProgress({ job, onCancel }: { job: AssistantJob; onCanc
       </div>
       <ol className="space-y-2">
         {job.steps.map((step) => (
-          <motion.li key={step.id} layout className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+          <motion.li key={step.id} layout className="flex items-start gap-3 rounded-lg border px-3 py-2.5">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center">
               {step.state === "running" && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
               {step.state === "done" && (
@@ -678,10 +678,13 @@ export function AssistantProgress({ job, onCancel }: { job: AssistantJob; onCanc
               {step.state === "error" && <X className="h-4 w-4 text-destructive" />}
               {(step.state === "pending" || step.state === "skipped") && <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />}
             </span>
-            <span className={cn("flex-1 text-sm", step.state === "skipped" && "text-muted-foreground line-through", step.state === "pending" && "text-muted-foreground")}>
-              {step.label}
+            {/* Le détail passe sous l'intitulé et se lit en entier : le bilan de la vérification des faits peut être long. */}
+            <span className="min-w-0 flex-1 pt-0.5">
+              <span className={cn("block text-sm", step.state === "skipped" && "text-muted-foreground line-through", step.state === "pending" && "text-muted-foreground")}>
+                {step.label}
+              </span>
+              {step.detail && <span className="mt-0.5 block text-xs text-pretty text-muted-foreground [overflow-wrap:anywhere]">{step.detail}</span>}
             </span>
-            {step.detail && <span className="truncate text-xs text-muted-foreground">{step.detail}</span>}
           </motion.li>
         ))}
       </ol>

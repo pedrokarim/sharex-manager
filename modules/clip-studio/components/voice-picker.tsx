@@ -112,7 +112,7 @@ export function VoicePicker({
                       {(state.status === "missing" || state.status === "error") && <Download className="h-3.5 w-3.5 text-muted-foreground" />}
                     </span>
                   </span>
-                  <span className="line-clamp-1 text-[11px] text-muted-foreground">
+                  <span className={cn("line-clamp-1 text-[11px]", selected ? "text-foreground/70" : "text-muted-foreground")} title={voice.description}>
                     {state.status === "downloading"
                       ? `Téléchargement ${progress(state)} %`
                       : state.status === "error"

@@ -80,8 +80,9 @@ Ajoutés pour ce module et réutilisables par tous :
 | 6 | Banque de musique libre de droits : sélection de base versionnée (`music/library.json`, morceaux Jamendo sous CC0 ou CC BY via Openverse), téléchargée au démarrage dans les données du module ; recherche et ajout depuis l’éditeur (onglet Découvrir) ; musique de fond choisie par l’assistant selon l’ambiance ; crédits rappelés à l’export | Réalisée |
 | 7 | Compléments du cahier des charges : transitions entre plans (fondu enchaîné, fondu au noir, glissement, balayage, zoom), le plan précédent figé sur sa dernière image sans changer les durées ; recettes « Diaporama » (fondus de 0,6 s), « Rythmé » (1,2 s par image, coupes franches) et « Avant / Après » depuis la galerie, vidéos comprises ; raccourcis J, K, L, + et -, M ; lecture d’un export au clic | Réalisée |
 | 8 | Vitesse d’un plan vidéo (×0,25 à ×4, le son suit) ; forme d’onde des pistes son ; normalisation du volume à l’export (−16 dB en moyenne, crête sous −1 dB) ; « Créer un clip » depuis une série d’AI Image Gen | Réalisée |
-| 9 | Trouver avant de générer : l’assistant cherche une image qui existe (banque libre Openverse, puis le web par Codex si on l’autorise) et ne génère que ce qui n’existe pas ; onglet « Trouver » dans le panneau Médias ; droits suivis jusqu’à la publication. Voir « Trouver avant de générer » ci-dessous | En cours |
+| 9 | Trouver avant de générer : l’assistant cherche une image qui existe (banque libre Openverse, puis le web par Codex si on l’autorise ; le web d’abord pour un produit commercial récent) et ne génère que ce qui n’existe pas ; icône ou logo officiel posé à côté du nom d’un jeu, d’un film, d’une appli ou d’une marque ; onglet « Trouver » dans le panneau Médias ; droits suivis jusqu’à la publication. Voir « Trouver avant de générer » ci-dessous | Réalisée |
 | 10 | Bibliothèque d’animations : un modèle à pistes d’images clés, le texte animé lettre par lettre et mot par mot, 250 à 300 préréglages (éléments, texte, transitions, caméra, impacts), un sélecteur à vignettes animées, le mouvement des marques. Voir [01 bis – la bibliothèque d’animations](01-clip-studio-animations.md) | En cours (A0 à A3 faites) |
+| 11 | Vérification des faits : la date du jour dans les consignes ; le web pour écrire le script quand la demande porte sur des faits réels et que la case « Chercher aussi sur le web » est cochée ; une seconde passe de Codex qui contrôle chaque segment (corrigé, remplacé, retiré ou douteux, avec ses sources), les doutes dits dans le suivi, les sources rangées dans le projet (`lib/fact-check.ts`). Voir « Vérification des faits » ci-dessous | Réalisée |
 
 ### Trouver avant de générer (étape 9)
 
@@ -102,11 +103,25 @@ interface ScriptImage {
   query?: string;
   /** Consigne de génération, toujours fournie : elle sert aussi de secours. */
   prompt: string;
+  /** Avec le web : produit commercial ou œuvre récente, cherché directement sur le web. */
+  official?: boolean;
+  /** Avec le web : l’icône ou le logo officiel du sujet nommé, en plus de l’illustration. */
+  icon?: { query: string } | null;
 }
 ```
 
 Un segment qui met en scène la mascotte de la marque est toujours en
 `generate` : on ne trouve pas sa mascotte sur Internet.
+
+Un **produit commercial récent** (jeu vidéo, gacha, film, série, anime,
+appli) n’est pas dans Openverse, fait surtout de photos sous licence libre :
+quand le script le marque `official`, ou qu’une règle simple le devine sur la
+requête (`prefersWebFirst` : « game », « gacha », « key art », « movie »,
+une année récente…), le web passe d’abord et Openverse ne reste qu’un
+secours. Sa requête est alors son titre exact suivi de « key art », et la
+consigne de Codex demande le visuel officiel ou une capture officielle du
+bon titre (site officiel, kit presse, page du store, wiki officiel), jamais
+un autre titre de la même licence.
 
 **L’échelle des sources**, pour un segment en `find`, s’arrête à la
 première qui donne une image retenue :
@@ -137,6 +152,39 @@ projet ne dépend jamais d’un site extérieur.
 rend le numéro de l’image qui illustre le mieux, ou 0 si aucune ne convient.
 Sans Codex, la première candidate qui passe les contrôles est retenue.
 
+**Icônes et logos officiels.** Une illustration plein cadre ne dit pas
+toujours de quel jeu on parle ; une icône, si. Quand la recherche web est
+permise, le script donne pour chaque segment qui nomme une chose réelle et
+identifiable (jeu, film, série, marque, appli, personnage, lieu) une requête
+`icon.query` (« Genshin Impact app icon », « Ananta logo »), en plus de son
+illustration. L’icône est cherchée sur le web seulement (`findSegmentIcon`),
+avec sa propre consigne : icône d’appli du store, logo du kit presse ou du
+site officiel, avatar du compte officiel ; format carré ou logo détouré, PNG
+transparent accepté, SVG refusé (le téléchargement et sharp n’acceptent que
+des pixels), petit côté d’au moins 128 px au lieu de 640. Les candidates sont
+posées sur un fond gris (un logo noir comme un logo blanc y restent visibles)
+et montrées à Codex, qui doit reconnaître l’icône officielle de CE sujet :
+sans Codex, s’il échoue ou s’il hésite, la réponse est 0 et le segment reste
+sans icône. Rien plutôt qu’un faux. Les icônes partagent la file du web
+(cinq recherches à la fois au plus) avec les illustrations.
+
+Les modèles réservent à l’icône un emplacement facultatif, qui ne change rien
+au rendu quand il est vide :
+
+| Modèle | Emplacement |
+| --- | --- |
+| Classement | au-dessus du nom de l’entrée, pendant qu’il est affiché |
+| Quiz | à droite de l’étiquette « Question n/N », à la révélation seulement : c’est l’icône de la bonne réponse |
+| Diaporama | au-dessus de la légende |
+| Libre | au-dessus du texte de la séquence, ou de son titre seul |
+
+Une icône carrée remplit sa carte aux coins arrondis ; un logo plus large ou
+plus haut est posé dans une carte claire (peinture `surface`), réduit pour
+tenir dans le canevas. Une ombre portée (peinture `veil`, décalée vers le bas)
+la détache du fond, et le tout apparaît avec le préréglage « pop-in » du
+registre d’animations. Carte et ombre suivent l’image de marque comme les
+autres cadres.
+
 **Les modes**, dans la fenêtre « Créer » de l’assistant :
 
 | Mode | Comportement |
@@ -146,13 +194,24 @@ Sans Codex, la première candidate qui passe les contrôles est retenue.
 | Générer | le fonctionnement d’avant |
 | Aucune | pas d’illustration |
 
-La case « Chercher aussi sur le web (droits à vérifier) » est retenue par
-le navigateur d’une fois sur l’autre.
+La case « Chercher aussi sur le web (droits à vérifier) » est cochée par
+défaut et retenue par le navigateur d’une fois sur l’autre ; le serveur ne
+fouille le web que si la demande le dit explicitement (`webSearch: true`).
+Sans elle, ni icône ni « web d’abord ».
+
+**Le suivi de l’assistant** dit, à l’étape des illustrations, combien ont été
+trouvées et où (« 3 trouvées (2 sur le web, 1 sur Openverse) »), combien ont
+été créées, combien sont restées sans image, et combien d’icônes officielles
+ont été posées sur combien cherchées.
 
 **À la main**, dans l’éditeur : le panneau Médias gagne un onglet
-« Trouver ». On y cherche dans Openverse (vignettes, licence, auteur) et, à
-la demande, sur le web par Codex ; un clic importe l’image dans les médias du
-projet, avec sa mention.
+« Trouver ». On y cherche dans Openverse (vignettes, licence, auteur, page
+source, résultats suivants à la demande), sur le web par Codex, ou parmi les
+icônes officielles ; les images du web et les icônes sont signalées « droits à
+vérifier ». Un clic importe l’image dans les médias du projet, avec sa
+mention et l’état de ses droits, et l’ajoute au clip ; un second bouton
+l’importe seulement dans « Mes médias ». Une image trouvée ajoutée plus tard
+depuis « Mes médias » garde l’état de ses droits.
 
 **Les droits suivent l’image** jusqu’à la publication. `MediaSource` porte la
 mention (`credit`) et un état `rights` : `"free"` (licence libre vérifiée) ou
@@ -164,17 +223,104 @@ dans la description.
 **Limites et sécurité**
 
 - Une recherche web lance Codex : elle prend de vingt à soixante secondes, et
-  elle est bornée à une recherche par segment, cinq segments en parallèle au
-  plus.
+  elle est bornée à une recherche d’illustration et une d’icône par
+  segment, cinq recherches web à la fois au plus
+  (`FOUND_LIMITS.webConcurrency`).
 - Les adresses rendues par Codex sont des données : elles passent toutes par
   `fetchRemoteImage`, jamais par le navigateur ; un SVG ou un fichier qui
   n’est pas une image est refusé.
 - Les candidates téléchargées pour l’onglet « Trouver » vivent dans
   `data/found/` et sont effacées après vingt-quatre heures si elles n’ont pas
   été importées.
-- Les visuels d’anime et de jeu restent des œuvres protégées : « droits à
-  vérifier » n’est pas une formalité, c’est la raison pour laquelle la case
-  du web n’est jamais cochée sans un geste de l’utilisateur.
+- Les visuels d’anime et de jeu, leurs icônes et leurs logos restent des
+  œuvres et des marques protégées : « droits à vérifier » n’est pas une
+  formalité, et la fenêtre de publication demande de le confirmer.
+
+### Vérification des faits (étape 11)
+
+Un script écrit par Codex **de mémoire**, sans la date du jour et sans
+relecture, se trompe sur ce qui dépend du temps. Cas réel : « un top sur les
+prochains jeux gacha les plus attendus » donnait quatre jeux justes sur cinq,
+le cinquième étant sorti depuis longtemps. Les mêmes causes donnent une bonne
+réponse de quiz fausse (le pire), des chiffres, records ou dates inventés, un
+mauvais studio, un classement sans fondement, un nom mal orthographié qui
+fausse aussi la recherche d’images et d’icônes. Trois garde-fous, dans
+`lib/fact-check.ts`.
+
+**La date du jour** entre dans la consigne du script et dans celle de la
+vérification, lisible et au format ISO (« lundi 12 octobre 2026
+(2026-10-12) »), avec la règle : tout ce qui dépend du temps (« à venir »,
+« récent », « cette année », « actuel », « le plus… », un record, un statut
+sorti ou à venir) se juge à cette date et se vérifie, jamais de mémoire.
+
+**Le web pour écrire le script**, quand la demande porte sur des faits réels.
+La décision est une règle simple, testée sur la seule demande
+(`classifySubject`) :
+
+| Demande | Exemples | Web pour le script |
+| --- | --- | --- |
+| Fiction déclarée | conte, histoire inventée, poème, « il était une fois » | non, et pas de vérification |
+| Faits réels | mots du temps (« prochains », « récent », « attendus », une année), superlatif ou classement, nom propre ou sigle, chiffre, « record », « biographie », modèle Quiz ou Classement | oui |
+| Sujet intemporel | une recette, des conseils, une explication générale | non |
+
+Le choix d’une règle sur la demande plutôt que d’un champ du plan : la
+décision se prend **avant** d’écrire le script, quand il n’y a pas encore de
+plan, et elle se teste sans Codex. La case « Chercher aussi sur le web » de
+la fenêtre « Créer » reste maîtresse : décochée (ou absente, quand les
+illustrations sont seulement générées), le script s’écrit de mémoire, et la
+vérification relit sans le web en le disant.
+
+**La vérification**, nouvelle étape du suivi entre « Écriture du script » et
+les illustrations. Une seconde passe de Codex, avec le web quand il est
+permis, reçoit la demande et le script **comme des données** (en JSON entre
+balises, `<` échappé, comme la fiche de marque et les sujets de recherche) et
+la date du jour. Elle contrôle chaque affirmation vérifiable, segment par
+segment : nom exact, date de sortie, statut sorti ou à venir, studio et
+éditeur, chiffres, records ; pour un quiz, la bonne réponse de chaque
+question **et** la fausseté des autres choix. Elle répond en JSON strict, un
+verdict par segment :
+
+| Verdict | Effet |
+| --- | --- |
+| `ok` | gardé tel quel |
+| `fixed` | remplacé par le segment corrigé (nom, date, bonne réponse…) |
+| `replaced` | remplacé par un autre élément réel qui répond vraiment à la demande (un autre jeu réellement à venir), image comprise |
+| `removed` | retiré, sans remplaçant fabriqué : le clip peut compter moins d’éléments que demandé, et le suivi le dit |
+| `doubtful` | gardé, et le doute est dit dans le suivi (« Ananta : date de sortie non confirmée ») |
+
+Un verdict inconnu, une correction illisible (bonne réponse hors des choix,
+segment vide) ou un segment oublié deviennent `doubtful` : rien ne passe pour
+vérifié sans l’avoir été. Le script corrigé repasse par le nettoyage habituel
+et repart dans la suite normale : les noms exacts donnent de meilleures
+requêtes d’images et d’icônes. Si le titre annonce un nombre qui ne tient
+plus, la vérification le corrige. Si tout tombe, le travail s’arrête avec un
+message clair plutôt que de monter un clip vide.
+
+**Le suivi** dit le bilan en une ligne : « 5 éléments vérifiés sur le web ;
+1 corrigé, 1 remplacé, 1 retiré ; le clip compte 4 éléments au lieu de 5 ;
+à confirmer – Ananta : date de sortie non confirmée ». Sans le web : « Sans
+le web : 5 éléments relus de mémoire, non vérifiés ». Le travail garde aussi
+le détail (`facts` : compteurs, changements, doutes).
+
+**Les sources** de chaque segment (adresse et titre de page) sont rangées dans
+le projet, avec la date de la vérification : `brief.sources`
+(`{ segment, url, title }`, `segment` étant l’index de la ligne dans
+`brief.script`) et `brief.checkedAt`. La rédaction des textes de publication
+peut les citer dans la description.
+
+**Limites et sécurité**
+
+- La vérification ajoute une passe de Codex, bornée à cinq minutes
+  (`FACT_CHECK_TIMEOUT_MS`) et annulée avec le travail. Un script écrit avec
+  le web a six minutes au lieu de quatre.
+- Si elle échoue (Codex absent, délai dépassé, réponse illisible), le clip
+  continue avec le script tel quel et l’étape devient « Vérification
+  impossible », en erreur visible, avec la raison : jamais un échec
+  silencieux.
+- Les adresses rendues par Codex sont des données non fiables : https
+  seulement, sans identifiants, 500 caractères au plus, trois par segment,
+  titres nettoyés et bornés. Elles ne sont **jamais** téléchargées par le
+  serveur.
 
 ## 1. Pourquoi ce module
 

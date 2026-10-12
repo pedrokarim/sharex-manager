@@ -58,10 +58,13 @@ describe("assistant : mode des illustrations", () => {
     expect(resolveImageSource({ images: false, imageSource: "find" })).toBe("find");
   });
 
-  it("nettoie la demande : le web seulement sur un geste explicite, et seulement quand on cherche", () => {
+  it("nettoie la demande : le web seulement sur un geste explicite, pour le script dans tous les modes", () => {
     expect(cleanRequest({ ...REQUEST, webSearch: true })).toMatchObject({ imageSource: "find-then-generate", webSearch: true, images: true });
     expect(cleanRequest({ ...REQUEST, webSearch: "oui" as never }).webSearch).toBe(false);
-    expect(cleanRequest({ ...REQUEST, imageSource: "generate", webSearch: true }).webSearch).toBe(false);
+    // Le web vérifie le script même quand les images sont toutes créées ; il ne sert pas à les chercher.
+    const generating = cleanRequest({ ...REQUEST, imageSource: "generate", webSearch: true });
+    expect(generating.webSearch).toBe(true);
+    expect(scriptPrompt(generating)).toContain('"imagePrompt": string');
     expect(cleanRequest({ ...REQUEST, imageSource: undefined, images: false })).toMatchObject({ imageSource: "none", images: false });
   });
 
