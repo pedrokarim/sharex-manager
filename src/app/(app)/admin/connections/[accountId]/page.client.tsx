@@ -176,7 +176,8 @@ export function AccountPageClient({ initial }: { initial: AccountPageData }) {
 
         {tabs.length > 0 ? (
           <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-            <TabsList className="max-w-full overflow-x-auto">
+            {/* Défilement horizontal seulement : sans overflow-y-hidden, le trait masqué des onglets (2 px sous la barre) fait paraître une barre verticale. */}
+            <TabsList className="max-w-full overflow-x-auto overflow-y-hidden">
               {tabs.map((entry) => (
                 <TabsTrigger key={entry.id} value={entry.id} className="gap-1.5">
                   {entry.label}
