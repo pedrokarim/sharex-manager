@@ -16,7 +16,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { api, type PublishAccount } from "../../lib/client";
 import type { Privacy } from "../../lib/types";
 import { ConfirmDialog, Field, FieldGroup, SectionHeading } from "../fields";
-import { HashtagsLinksGroup, PostTemplatesGroup } from "./publishing-texts";
+import { HashtagsLinksGroup, PostTemplatesGroup, ProfileTextsGroup } from "./publishing-texts";
 import type { SectionProps } from "./types";
 
 const CATEGORIES = [
@@ -166,6 +166,8 @@ export function PublishingSection({ kit, update }: SectionProps) {
       <PostTemplatesGroup kit={kit} setPublishing={setPublishing} />
 
       <HashtagsLinksGroup kit={kit} setPublishing={setPublishing} />
+
+      <ProfileTextsGroup kit={kit} setPublishing={setPublishing} />
 
       <FieldGroup title="Réglages par défaut">
         <div className="grid gap-4">

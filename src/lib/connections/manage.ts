@@ -1,10 +1,27 @@
 /**
  * Gestion d'un compte connecté : publications (liste, modification,
- * suppression), bannière et filigrane, quotas. Chaque action vérifie la
+ * suppression), bannière et filigrane, profil, sections de la page
+ * d'accueil, playlists, quotas. Chaque action vérifie la
  * capacité du compte ; le connecteur fait l'appel, le cœur garde les jetons.
  */
 
-import type { AccountQuotaUsage, ConnectionCapability, ConnectorContext, Connector, PostPatch, PostSummary, QuotaUsage, WatermarkTiming } from "./types";
+import type {
+  AccountQuotaUsage,
+  ConnectionCapability,
+  ConnectorContext,
+  Connector,
+  PlaylistInput,
+  PlaylistSummary,
+  PostPatch,
+  PostSummary,
+  ProfileChoice,
+  ProfileSection,
+  ProfileSnapshot,
+  ProfileValue,
+  QuotaUsage,
+  WatermarkTiming,
+} from "./types";
+import { cleanProfileValue } from "./profile";
 import { QuotaExceededError, ReconnectRequiredError } from "./errors";
 import { accountContext, noteReconnectRequired, requireCapability } from "./accounts";
 import { getAccountQuotaUsage, getQuotaUsage, markAccountQuotaExhausted, markQuotaExhausted } from "./quota";
@@ -87,6 +104,174 @@ export async function setProfileImage(accountId: string, what: "banner" | "water
       return connector.profile.setWatermark(context, png, timing);
     });
   }
+}
+
+// ─── Profil du compte ─────────────────────────────────────────────
+
+/** Une lecture (profil, sections, playlists) : aucune capacité exigée, mais un compte utilisable. */
+async function withAccountRead<T>(accountId: string, action: (connector: Connector, context: ConnectorContext) => Promise<T>): Promise<T> {
+  const resolved = accountContext(accountId);
+  if (resolved.account.status !== "connected") throw new ReconnectRequiredError(`Le compte « ${resolved.account.displayName} » doit être reconnecté.`);
+  try {
+    return await action(resolved.connector, resolved.context);
+  } catch (error) {
+    if (error instanceof QuotaExceededError) {
+      if (error.scope === "account") markAccountQuotaExhausted(accountId, error.retryAt);
+      else markQuotaExhausted(resolved.connector, error.bucket);
+    }
+    if (error instanceof ReconnectRequiredError) noteReconnectRequired(accountId, error);
+    throw error;
+  }
+}
+
+/** Message d'une capacité manquante : « Autoriser… » la donne, sauf si le rôle du compte l'interdit. */
+function missingCapabilityMessage(account: { displayName: string; requestableCapabilities?: ConnectionCapability[] }, capability: ConnectionCapability): string {
+  return account.requestableCapabilities?.includes(capability)
+    ? `Le compte « ${account.displayName} » n’a pas encore autorisé cela : utilisez « Autoriser… ».`
+    : `Le compte « ${account.displayName} » n’a pas le droit de faire cela chez le service.`;
+}
+
+/** Valeurs actuelles du profil chez le service. */
+export async function readAccountProfile(accountId: string): Promise<ProfileSnapshot> {
+  return withAccountRead(accountId, (connector, context) => {
+    if (!connector.readProfile) throw new Error(`${connector.label} ne permet pas de lire le profil.`);
+    return connector.readProfile(context);
+  });
+}
+
+/**
+ * Envoie des éléments modifiables du profil. Chaque valeur est contrôlée
+ * (`cleanProfileValue`) et chaque capacité vérifiée avant le moindre appel :
+ * rien ne part si un seul élément est refusé.
+ */
+export async function updateAccountProfile(accountId: string, changes: Record<string, unknown>): Promise<ProfileSnapshot> {
+  const { account, connector } = accountContext(accountId);
+  const update = connector.updateProfile;
+  if (!update) throw new Error(`${connector.label} ne permet pas de modifier le profil.`);
+  if (!changes || typeof changes !== "object" || Array.isArray(changes)) throw new Error("Rien à envoyer.");
+  const clean: Record<string, ProfileValue> = {};
+  for (const [key, value] of Object.entries(changes)) {
+    const field = connector.profileFields?.find((entry) => entry.key === key);
+    if (!field) throw new Error("Élément du profil inconnu.");
+    if (!field.editable || field.kind === "image") throw new Error(`${connector.label} ne permet pas de changer « ${field.label} » par son API.`);
+    if (field.capability && !account.capabilities.includes(field.capability)) throw new Error(missingCapabilityMessage(account, field.capability));
+    clean[key] = cleanProfileValue(field, value);
+  }
+  if (Object.keys(clean).length === 0) throw new Error("Rien à envoyer.");
+  return withAccountRead(accountId, (_, context) => update(context, clean));
+}
+
+/** Choix possibles d'un élément (vidéos de la chaîne pour la bande-annonce). */
+export async function accountProfileChoices(accountId: string, key: string): Promise<ProfileChoice[]> {
+  return withAccountRead(accountId, (connector, context) => {
+    const field = connector.profileFields?.find((entry) => entry.key === key);
+    if (!field || !connector.profileChoices) throw new Error("Aucun choix pour cet élément.");
+    return connector.profileChoices(context, field.key);
+  });
+}
+
+// ─── Sections de la page d'accueil ────────────────────────────────
+
+const ITEM_ID = /^[A-Za-z0-9_.-]{1,80}$/;
+
+function requireSections(connector: Connector) {
+  if (!connector.sections) throw new Error(`${connector.label} ne gère pas les sections de la page d’accueil.`);
+  return connector.sections;
+}
+
+export async function listAccountSections(accountId: string): Promise<ProfileSection[]> {
+  return withAccountRead(accountId, (connector, context) => requireSections(connector).list(context));
+}
+
+/** Ajoute une section (type permis par le service, dans la limite du service), puis rend la liste relue. */
+export async function addAccountSection(accountId: string, input: { type: string; playlistId?: string }): Promise<ProfileSection[]> {
+  const sections = requireSections(accountContext(accountId).connector);
+  const type = sections.support.types.find((entry) => entry.value === input?.type);
+  if (!type) throw new Error("Type de section refusé.");
+  const playlistId = input.playlistId;
+  if (type.needsPlaylist && !(typeof playlistId === "string" && ITEM_ID.test(playlistId))) throw new Error("Choisissez une playlist.");
+  return withAccount(accountId, sections.support.capability, async (_, context) => {
+    const current = await sections.list(context);
+    if (current.length >= sections.support.maxSections) throw new Error(`${sections.support.maxSections} sections au plus : retirez-en une d’abord.`);
+    await sections.add(context, { type: type.value, ...(type.needsPlaylist ? { playlistId } : {}) });
+    return sections.list(context);
+  });
+}
+
+export async function moveAccountSection(accountId: string, sectionId: string, position: number): Promise<ProfileSection[]> {
+  if (typeof sectionId !== "string" || !ITEM_ID.test(sectionId)) throw new Error("Section invalide.");
+  if (!Number.isInteger(position) || position < 0 || position > 50) throw new Error("Position invalide.");
+  const sections = requireSections(accountContext(accountId).connector);
+  return withAccount(accountId, sections.support.capability, async (_, context) => {
+    await sections.move(context, sectionId, position);
+    return sections.list(context);
+  });
+}
+
+export async function removeAccountSection(accountId: string, sectionId: string): Promise<ProfileSection[]> {
+  if (typeof sectionId !== "string" || !ITEM_ID.test(sectionId)) throw new Error("Section invalide.");
+  const sections = requireSections(accountContext(accountId).connector);
+  return withAccount(accountId, sections.support.capability, async (_, context) => {
+    await sections.remove(context, sectionId);
+    return sections.list(context);
+  });
+}
+
+// ─── Playlists ────────────────────────────────────────────────────
+
+function requirePlaylists(connector: Connector) {
+  if (!connector.playlists) throw new Error(`${connector.label} ne gère pas les playlists.`);
+  return connector.playlists;
+}
+
+/** Contrôle d'une playlist reçue : titre obligatoire, limites du service, visibilité connue. */
+export function cleanPlaylistInput(input: unknown, limits: { titleMax: number; descriptionMax: number }, partial = false): Partial<PlaylistInput> {
+  const raw = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const out: Partial<PlaylistInput> = {};
+  if (raw.title !== undefined || !partial) {
+    const title = typeof raw.title === "string" ? raw.title.replace(/[\u0000-\u001f\u007f<>]/g, "").replace(/\s+/g, " ").trim() : "";
+    if (!title) throw new Error("Le titre de la playlist est obligatoire.");
+    if (Array.from(title).length > limits.titleMax) throw new Error(`Le titre dépasse ${limits.titleMax} caractères.`);
+    out.title = title;
+  }
+  if (raw.description !== undefined || !partial) {
+    const description =
+      typeof raw.description === "string" ? raw.description.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f<>]/g, "").trim() : "";
+    if (Array.from(description).length > limits.descriptionMax) throw new Error(`La description dépasse ${limits.descriptionMax.toLocaleString("fr-FR")} caractères.`);
+    out.description = description;
+  }
+  if (raw.privacy !== undefined || !partial) {
+    if (raw.privacy !== "private" && raw.privacy !== "unlisted" && raw.privacy !== "public") throw new Error("Visibilité inconnue.");
+    out.privacy = raw.privacy;
+  }
+  return out;
+}
+
+export async function listAccountPlaylists(accountId: string): Promise<PlaylistSummary[]> {
+  return withAccountRead(accountId, (connector, context) => requirePlaylists(connector).list(context));
+}
+
+export async function createAccountPlaylist(accountId: string, input: unknown): Promise<PlaylistSummary> {
+  const playlists = requirePlaylists(accountContext(accountId).connector);
+  const clean = cleanPlaylistInput(input, playlists.support) as PlaylistInput;
+  return withAccount(accountId, playlists.support.capability, (_, context) => playlists.create(context, clean));
+}
+
+export async function updateAccountPlaylist(accountId: string, playlistId: string, patch: unknown): Promise<PlaylistSummary> {
+  if (typeof playlistId !== "string" || !ITEM_ID.test(playlistId)) throw new Error("Playlist invalide.");
+  const playlists = requirePlaylists(accountContext(accountId).connector);
+  const clean = cleanPlaylistInput(patch, playlists.support, true);
+  if (Object.keys(clean).length === 0) throw new Error("Rien à modifier.");
+  return withAccount(accountId, playlists.support.capability, (_, context) => playlists.update(context, playlistId, clean));
+}
+
+export async function addVideoToAccountPlaylist(accountId: string, playlistId: string, videoId: string): Promise<void> {
+  if (typeof playlistId !== "string" || !ITEM_ID.test(playlistId)) throw new Error("Playlist invalide.");
+  if (typeof videoId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(videoId)) throw new Error("Vidéo invalide.");
+  const playlists = requirePlaylists(accountContext(accountId).connector);
+  const addVideo = playlists.addVideo;
+  if (!addVideo) throw new Error("Ce service ne permet pas d’ajouter une vidéo à une playlist.");
+  await withAccount(accountId, playlists.support.capability, (_, context) => addVideo(context, playlistId, videoId));
 }
 
 /** Quotas du jour du service de ce compte (partagés par tous ses comptes). */

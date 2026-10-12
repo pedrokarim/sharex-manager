@@ -64,9 +64,22 @@ const unsaved = ((globalThis as typeof globalThis & { __sxmUnsavedTokens?: Map<s
 const credentialsContext = (accountId: string) => `account:${accountId}`;
 const grantCredentialsContext = (accountId: string) => `account-grant:${accountId}`;
 
+/**
+ * Capacités d'un compte recalculées depuis ses portées : une capacité ajoutée
+ * au connecteur après la connexion (gestion du profil…) vaut aussitôt si les
+ * portées accordées la couvrent. Seul un compte dont le service limite les
+ * droits selon le rôle (Page Facebook : tâches) garde la liste retenue à la
+ * connexion, faute de savoir ce que son rôle permet de plus.
+ */
+function withCurrentCapabilities(account: ConnectedAccount): ConnectedAccount {
+  const connector = getConnector(account.connector);
+  if (!connector || connector.id === "facebook" || !Array.isArray(account.scopes) || account.scopes.length === 0) return account;
+  return { ...account, capabilities: capabilitiesForScopes(connector, account.scopes) };
+}
+
 function readAccounts(): ConnectedAccount[] {
   const file = readStore<AccountsFile>("accounts", { accounts: [] });
-  return Array.isArray(file.accounts) ? file.accounts : [];
+  return Array.isArray(file.accounts) ? file.accounts.map(withCurrentCapabilities) : [];
 }
 
 function changeAccounts(change: (accounts: ConnectedAccount[]) => ConnectedAccount[] | void): ConnectedAccount[] {

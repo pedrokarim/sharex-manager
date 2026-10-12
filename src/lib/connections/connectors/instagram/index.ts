@@ -20,6 +20,7 @@ import { INSTAGRAM_PUBLISH_FIELDS, normalizeInstagramOptions } from "./metadata"
 import { listInstagramPosts } from "./posts";
 import { findExistingInstagramPost, publishToInstagram } from "./publish";
 import { COMMENT_MAX_CHARS, postInstagramComment } from "./follow-ups";
+import { INSTAGRAM_PROFILE_FIELDS, readInstagramProfile } from "./profile";
 
 export const SCOPE_BASIC = "instagram_business_basic";
 export const SCOPE_PUBLISH = "instagram_business_content_publish";
@@ -114,4 +115,7 @@ export const instagramConnector: Connector = {
   posts: {
     list: listInstagramPosts,
   },
+  // Profil : lecture seulement, tout se change dans l'application Instagram.
+  profileFields: INSTAGRAM_PROFILE_FIELDS,
+  readProfile: readInstagramProfile,
 };

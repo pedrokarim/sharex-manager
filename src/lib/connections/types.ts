@@ -17,6 +17,9 @@ export type ConnectionCapability =
   | "posts.manage" // modifier, changer la visibilité, supprimer
   | "profile.banner" // changer la bannière
   | "profile.watermark" // changer le filigrane des vidéos
+  | "profile.details" // changer les textes du profil (description, mots-clés, langue, pays…)
+  | "profile.sections" // organiser les sections de la page d'accueil du compte
+  | "playlists.manage" // créer et modifier les playlists, y ajouter des vidéos
   | "comment.create" // poser un commentaire sous sa propre publication (premier commentaire)
   | "captions.upload" // joindre des sous-titres à une vidéo publiée
   | "cover.set"; // changer la couverture (miniature) d'une vidéo publiée
@@ -29,6 +32,9 @@ export const CAPABILITIES: readonly ConnectionCapability[] = [
   "posts.manage",
   "profile.banner",
   "profile.watermark",
+  "profile.details",
+  "profile.sections",
+  "playlists.manage",
   "comment.create",
   "captions.upload",
   "cover.set",
@@ -43,6 +49,9 @@ export const CAPABILITY_LABELS: Record<ConnectionCapability, string> = {
   "posts.manage": "gérer les publications",
   "profile.banner": "changer la bannière",
   "profile.watermark": "changer le filigrane",
+  "profile.details": "modifier le profil",
+  "profile.sections": "organiser la page d’accueil",
+  "playlists.manage": "gérer les playlists",
   "comment.create": "commenter ses publications",
   "captions.upload": "ajouter des sous-titres",
   "cover.set": "changer la couverture d’une vidéo",
@@ -502,6 +511,142 @@ export interface PostPatch {
 }
 
 /** Moment d'apparition du filigrane d'une chaîne. */
+// ─── Profil du compte ─────────────────────────────────────────────
+
+/**
+ * Ce que l'image de marque fournit pour un élément du profil : de quoi
+ * préremplir un élément modifiable, ou le texte à copier pour un élément à
+ * changer chez le service (`src/lib/connections/profile.ts`).
+ */
+export type ProfileBrandSource =
+  | "name" // nom de la marque
+  | "bio" // bio courte
+  | "description" // modèle « Description de la chaîne », rendu
+  | "keywords" // tags de la marque
+  | "language" // langue de la marque
+  | "country" // pays de la marque
+  | "links" // liens, un par ligne
+  | "website"; // premier lien
+
+/** Format d'image rendu depuis la marque (identifiant de format du module « Image de marque »). */
+export type ProfileImageFormat = "avatar" | "banner" | "watermark" | "x-header";
+
+/**
+ * Nature d'un élément du profil, pour que l'interface le dessine sans
+ * connaître le service : « keywords » est une liste de mots-clés, « video »
+ * une vidéo du compte (choisie dans `profileChoices`), « localizations » des
+ * traductions du nom et de la description par langue.
+ */
+export type ProfileFieldKind = "text" | "textarea" | "url" | "keywords" | "language" | "country" | "video" | "localizations" | "image";
+
+/**
+ * Un élément de l'identité d'un compte, déclaré par son connecteur. Modifiable
+ * (`editable`) : l'application l'envoie par l'API du service, avec la
+ * capacité `capability`. Sinon : l'interface dit franchement que le service
+ * ne le permet pas, et aide à le faire à la main (`manual`), avec ce que la
+ * marque fournit (`brand`, `imageFormat`).
+ */
+export interface ProfileField {
+  key: string;
+  /** Libellé affiché, en français. */
+  label: string;
+  kind: ProfileFieldKind;
+  editable: boolean;
+  help?: string;
+  /**
+   * Longueur maximale : en caractères pour un texte, longueur totale de la
+   * liste telle que le service la compte pour des mots-clés.
+   */
+  maxLength?: number;
+  /** Traductions : longueur maximale du nom et de la description de chaque langue. */
+  itemLimits?: { title?: number; description?: number };
+  /** La valeur peut être vidée (pays, bande-annonce). */
+  clearable?: boolean;
+  /** Capacité exigée pour l'envoyer (élément modifiable). */
+  capability?: ConnectionCapability;
+  brand?: ProfileBrandSource;
+  /** Image rendue depuis la marque, à envoyer (modifiable) ou à télécharger. */
+  imageFormat?: ProfileImageFormat;
+  /**
+   * Élément à changer chez le service : la page exacte où le faire. Dans
+   * `url`, `{externalId}`, `{handle}` (sans « @ ») et `{url}` (adresse
+   * publique du compte) sont remplacés. `reason` remplace la phrase commune
+   * « {service} ne permet pas de le changer par son API ».
+   */
+  manual?: { url: string; linkLabel: string; reason?: string };
+}
+
+/** Traduction du nom et de la description d'un compte, dans une langue. */
+export interface ProfileLocalization {
+  title: string;
+  description: string;
+}
+
+/** Valeur d'un élément : texte, liste (mots-clés) ou traductions par langue (code BCP 47). */
+export type ProfileValue = string | string[] | Record<string, ProfileLocalization>;
+
+/** Valeurs lues chez le service ; une clé absente est inconnue (le service ne la rend pas). */
+export interface ProfileSnapshot {
+  values: Record<string, ProfileValue>;
+  fetchedAt: number;
+}
+
+/** Un choix possible pour un élément (vidéo de la chaîne pour la bande-annonce…). */
+export interface ProfileChoice {
+  value: string;
+  label: string;
+  detail?: string;
+  thumbnailUrl?: string;
+}
+
+/** Une section de la page d'accueil du compte. */
+export interface ProfileSection {
+  id: string;
+  type: string;
+  /** Titre propre à la section, quand son type en prend un. */
+  title?: string;
+  position: number;
+  playlistIds?: string[];
+  channelIds?: string[];
+}
+
+/** Ce que le service permet pour les sections de la page d'accueil. */
+export interface ProfileSectionsSupport {
+  maxSections: number;
+  /** Types qu'on peut ajouter ; `needsPlaylist` : une playlist à choisir. */
+  types: { value: string; label: string; needsPlaylist?: boolean }[];
+  /** Libellés de tous les types connus, y compris ceux qu'on ne peut plus ajouter. */
+  labels: Record<string, string>;
+  capability: ConnectionCapability;
+  /** Page du service où les arranger à la main (mêmes remplacements que `ProfileField.manual.url`). */
+  manualUrl?: string;
+}
+
+export interface PlaylistSummary {
+  id: string;
+  title: string;
+  description: string;
+  privacy: PostPrivacy;
+  itemCount?: number;
+  thumbnailUrl?: string;
+  url: string;
+}
+
+export interface PlaylistInput {
+  title: string;
+  description: string;
+  privacy: PostPrivacy;
+}
+
+/** Ce que le service permet pour les playlists. */
+export interface PlaylistsSupport {
+  capability: ConnectionCapability;
+  titleMax: number;
+  descriptionMax: number;
+  /** Ajout de vidéos du compte à une playlist. */
+  addVideo: boolean;
+}
+
 export interface WatermarkTiming {
   type: "offsetFromStart" | "offsetFromEnd";
   offsetMs: number;
@@ -1139,6 +1284,38 @@ export interface Connector {
     setBanner?(context: ConnectorContext, png: Buffer): Promise<void>;
     setWatermark?(context: ConnectorContext, png: Buffer, timing?: WatermarkTiming): Promise<void>;
   };
+  /**
+   * Éléments de l'identité du compte, modifiables par l'API ou non. Les
+   * images modifiables passent par `profile.setBanner` / `setWatermark`.
+   */
+  profileFields?: ProfileField[];
+  /** Lit les valeurs actuelles chez le service (sans capacité particulière). */
+  readProfile?(context: ConnectorContext): Promise<ProfileSnapshot>;
+  /**
+   * Applique des valeurs déjà contrôlées (`cleanProfileValue`), d'éléments
+   * modifiables seulement. Le connecteur relit d'abord ce que le service
+   * remplacerait en entier et renvoie le reste tel quel ; il rend les valeurs
+   * relues après l'envoi.
+   */
+  updateProfile?(context: ConnectorContext, changes: Record<string, ProfileValue>): Promise<ProfileSnapshot>;
+  /** Choix possibles d'un élément (vidéos de la chaîne pour la bande-annonce). */
+  profileChoices?(context: ConnectorContext, key: string): Promise<ProfileChoice[]>;
+  /** Sections de la page d'accueil du compte. */
+  sections?: {
+    support: ProfileSectionsSupport;
+    list(context: ConnectorContext): Promise<ProfileSection[]>;
+    add(context: ConnectorContext, input: { type: string; playlistId?: string }): Promise<void>;
+    move(context: ConnectorContext, id: string, position: number): Promise<void>;
+    remove(context: ConnectorContext, id: string): Promise<void>;
+  };
+  /** Playlists du compte. */
+  playlists?: {
+    support: PlaylistsSupport;
+    list(context: ConnectorContext): Promise<PlaylistSummary[]>;
+    create(context: ConnectorContext, input: PlaylistInput): Promise<PlaylistSummary>;
+    update(context: ConnectorContext, id: string, patch: Partial<PlaylistInput>): Promise<PlaylistSummary>;
+    addVideo?(context: ConnectorContext, playlistId: string, videoId: string): Promise<void>;
+  };
 }
 
 /** Ce qu'un service fait d'une vidéo selon son format (Shorts de YouTube…). */
@@ -1192,6 +1369,14 @@ export interface ConnectorInfo {
   capabilityScopes?: Partial<Record<ConnectionCapability, string[]>>;
   /** Consigne propre à la connexion incrémentale (seconde configuration chez Meta…). */
   incrementalHelp?: string;
+  /** Éléments du profil, avec les portées qu'une connexion incrémentale demandera pour les modifier. */
+  profileFields?: (ProfileField & { scopes?: string[] })[];
+  /** Le connecteur sait lire les valeurs actuelles du profil. */
+  profileRead?: boolean;
+  /** Le connecteur propose des choix pour ces éléments (`profileChoices`). */
+  profileChoiceKeys?: string[];
+  profileSections?: ProfileSectionsSupport;
+  playlists?: PlaylistsSupport;
 }
 
 // ─── Parcours de connexion ────────────────────────────────────────

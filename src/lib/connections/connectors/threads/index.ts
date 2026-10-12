@@ -25,6 +25,7 @@ import {
 import { TEXT_MAX, THREADS_LIMITS, THREADS_PUBLISH_FIELDS, normalizeThreadsOptions } from "./options";
 import { findExistingThreadsPost, publishToThreads } from "./publish";
 import { REPLY_QUOTA_METHOD, postThreadsReply } from "./follow-ups";
+import { THREADS_PROFILE_FIELDS, readThreadsProfile } from "./profile";
 
 export const SCOPE_BASIC = "threads_basic";
 export const SCOPE_PUBLISH = "threads_content_publish";
@@ -143,4 +144,7 @@ export const threadsConnector: Connector = {
     list: (context) => listThreadsPosts(context),
     remove: deleteThreadsPost,
   },
+  // Profil : lecture seulement, tout se change dans l'application Threads.
+  profileFields: THREADS_PROFILE_FIELDS,
+  readProfile: readThreadsProfile,
 };

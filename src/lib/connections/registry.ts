@@ -149,6 +149,21 @@ export function describeConnector(connector: Connector): ConnectorInfo {
     onDemandCapabilities: onDemandCapabilities(connector),
     capabilityScopes: Object.fromEntries(connector.capabilities.map((entry) => [entry.capability, scopesForCapability(connector, entry.capability)])),
     ...(connector.oauth.incremental?.help ? { incrementalHelp: connector.oauth.incremental.help } : {}),
+    ...describeProfile(connector),
+  };
+}
+
+/** Éléments du profil, avec les portées de leur capacité ; sections et playlists quand le connecteur les gère. */
+function describeProfile(connector: Connector): Pick<ConnectorInfo, "profileFields" | "profileRead" | "profileChoiceKeys" | "profileSections" | "playlists"> {
+  const fields = connector.profileFields ?? [];
+  return {
+    ...(fields.length > 0
+      ? { profileFields: fields.map((field) => ({ ...field, ...(field.capability ? { scopes: scopesForCapability(connector, field.capability) } : {}) })) }
+      : {}),
+    ...(connector.readProfile ? { profileRead: true } : {}),
+    ...(connector.profileChoices ? { profileChoiceKeys: fields.filter((field) => field.kind === "video").map((field) => field.key) } : {}),
+    ...(connector.sections ? { profileSections: connector.sections.support } : {}),
+    ...(connector.playlists ? { playlists: connector.playlists.support } : {}),
   };
 }
 

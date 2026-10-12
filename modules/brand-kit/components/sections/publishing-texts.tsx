@@ -11,6 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TagInput } from "@/components/ui/tag-input";
 import { TemplateInput, type TemplateVariable } from "@/components/ui/template-input";
+import { Textarea } from "@/components/ui/textarea";
+import { PROFILE_COUNTRIES, countryLabel, languageLabel } from "@/lib/connections/profile";
 import { cn } from "@/lib/utils";
 import { renderTemplate, type TemplateVariables } from "@/lib/connections/templates";
 import type { PublishField } from "@/lib/connections/types";
@@ -327,6 +329,76 @@ function ServiceTemplates({
         </Select>
       </Field>
     </>
+  );
+}
+
+// ─── Profil des comptes ──────────────────────────────────────────
+
+/** Variables qui ont un sens pour un profil : rien de propre à un clip (titre, résumé, crédits). */
+const PROFILE_VARIABLES = new Set(["hook", "cta", "hashtags", "tags", "links", "date", "brand"]);
+
+/**
+ * Ce que la marque apporte au profil des comptes connectés (onglet « Chaîne
+ * / Profil » d'un compte) : description de la chaîne, bio courte, pays. Les
+ * mots-clés reprennent les tags, la langue celle de la marque.
+ */
+export function ProfileTextsGroup({ kit, setPublishing }: { kit: BrandKit; setPublishing: (patch: Partial<BrandPublishing>) => void }) {
+  const publishing = kit.publishing;
+  const sample = useMemo(() => ({ ...sampleVariables(kit), title: "", summary: "", credits: [] }), [kit]);
+  const variables = useMemo(() => templateVariables(kit, sample).filter((variable) => PROFILE_VARIABLES.has(variable.name)), [kit, sample]);
+  const render = useMemo(() => (template: string) => renderTemplate(template, sample), [sample]);
+  const countries = useMemo(() => PROFILE_COUNTRIES.map((code) => ({ code, label: countryLabel(code) })).sort((a, b) => a.label.localeCompare(b.label, "fr")), []);
+
+  return (
+    <FieldGroup
+      title="Profil des comptes"
+      text="Préremplit l’onglet « Chaîne / Profil » de chaque compte connecté : ce que le service permet part de là, le reste se copie en un clic."
+    >
+      <Field label="Description de la chaîne" htmlFor="kit-channel-description" hint="YouTube en accepte 1 000 caractères. Les mots-clés de la chaîne reprennent les tags.">
+        <TemplateInput
+          id="kit-channel-description"
+          multiline
+          rows={4}
+          value={publishing.channelDescriptionTemplate}
+          onChange={(channelDescriptionTemplate) => setPublishing({ channelDescriptionTemplate })}
+          variables={variables}
+          render={render}
+          maxLength={KIT_LIMITS.channelDescriptionTemplate}
+          limit={{ max: 1000 }}
+        />
+      </Field>
+      <Field label="Bio courte" htmlFor="kit-bio" hint="Instagram, Threads, Description de la Page Facebook (100 caractères là-bas).">
+        <div className="grid min-w-0 gap-1">
+          <Textarea
+            id="kit-bio"
+            rows={3}
+            value={publishing.bio}
+            maxLength={KIT_LIMITS.bio}
+            onChange={(event) => setPublishing({ bio: event.target.value })}
+            placeholder={kit.tagline || "Une phrase qui dit qui vous êtes."}
+            className="min-w-0 resize-y"
+          />
+          <div className="flex justify-end">
+            <CharacterCount value={publishing.bio} max={KIT_LIMITS.bio} />
+          </div>
+        </div>
+      </Field>
+      <Field label="Pays" htmlFor="kit-country" hint={`Langue du profil : celle de la marque (${languageLabel(kit.language)}).`}>
+        <Select value={publishing.country || "none"} onValueChange={(value) => setPublishing({ country: value === "none" ? "" : value })}>
+          <SelectTrigger id="kit-country" className="w-full min-w-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            <SelectItem value="none">Aucun</SelectItem>
+            {countries.map((country) => (
+              <SelectItem key={country.code} value={country.code}>
+                {country.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+    </FieldGroup>
   );
 }
 

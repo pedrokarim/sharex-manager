@@ -84,7 +84,9 @@ export function AccountPageClient({ initial }: { initial: AccountPageData }) {
   const hasPosts = caps.includes("posts.list") || connector.capabilities.includes("posts.list");
   const hasQueue = caps.some((capability) => capability.startsWith("publish.")) || jobs.length > 0;
   const hasQuota = Boolean(quota || accountQuota);
-  const hasProfile = connector.capabilities.includes("profile.banner") || connector.capabilities.includes("profile.watermark");
+  // Profil : tout service qui déclare ses éléments, modifiables ou à changer chez lui.
+  const hasProfile =
+    (connector.profileFields?.length ?? 0) > 0 || connector.capabilities.includes("profile.banner") || connector.capabilities.includes("profile.watermark");
   const tabs = [
     hasPosts && { id: "posts", label: "Publications" },
     hasQueue && { id: "queue", label: "Envois en cours", count: openJobs },
@@ -180,8 +182,8 @@ export function AccountPageClient({ initial }: { initial: AccountPageData }) {
 
         {tabs.length > 0 ? (
           <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-            {/* Défilement horizontal seulement : sans overflow-y-hidden, le trait masqué des onglets (2 px sous la barre) fait paraître une barre verticale. */}
-            <TabsList className="max-w-full overflow-x-auto overflow-y-hidden">
+            {/* Onglets sur plusieurs lignes sur téléphone plutôt qu'une barre qui défile pour quelques pixels ; hauteur fixe des onglets, sinon ils s'étirent. */}
+            <TabsList className="h-auto max-w-full flex-wrap justify-start group-data-[orientation=horizontal]/tabs:h-auto *:data-[slot=tabs-trigger]:h-7.5">
               {tabs.map((entry) => (
                 <TabsTrigger key={entry.id} value={entry.id} className="gap-1.5">
                   {entry.label}

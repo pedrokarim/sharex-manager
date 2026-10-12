@@ -22,6 +22,7 @@ import {
 } from "./metadata";
 import { facebookProcessing, findExistingPost, listPagePosts, publishPhoto, publishText, removePagePost, updatePagePost } from "./posts";
 import { publishReel } from "./reels";
+import { FACEBOOK_PROFILE_FIELDS, readFacebookProfile, updateFacebookProfile } from "./profile";
 import { publishPageVideo } from "./videos";
 import {
   CAPTION_MAX_BYTES,
@@ -43,6 +44,11 @@ export const SCOPE_MANAGE_POSTS = "pages_manage_posts";
  */
 export const SCOPE_MANAGE_ENGAGEMENT = "pages_manage_engagement";
 export const SCOPE_READ_USER_CONTENT = "pages_read_user_content";
+/**
+ * Profil de la Page (`POST /{page-id}` : description, site web). Ajoutée à
+ * la demande seulement, par la même seconde configuration.
+ */
+export const SCOPE_MANAGE_METADATA = "pages_manage_metadata";
 
 /** Publie selon la source : message, photo, Reel ou vidéo de la Page. */
 async function publish(context: PublishContext) {
@@ -79,6 +85,8 @@ export const facebookConnector: Connector = {
     { capability: "comment.create", scopes: [SCOPE_MANAGE_ENGAGEMENT] },
     { capability: "captions.upload", scopes: [SCOPE_MANAGE_POSTS] },
     { capability: "cover.set", scopes: [SCOPE_MANAGE_ENGAGEMENT], allOf: [SCOPE_READ_USER_CONTENT] },
+    // Profil de la Page : la tâche MANAGE est en plus exigée (restriction rendue par `fetchAccounts`).
+    { capability: "profile.details", scopes: [SCOPE_MANAGE_METADATA] },
   ],
   app: {
     envPrefix: "FACEBOOK",
@@ -107,7 +115,7 @@ export const facebookConnector: Connector = {
       {
         key: "config_id_extended",
         label: "Configuration avec commentaires (facultative)",
-        help: "Seconde configuration Facebook Login for Business, avec les autorisations de la première plus pages_manage_engagement et pages_read_user_content. Elle ne sert que quand vous ajoutez « commentaires et miniatures » à une Page déjà connectée.",
+        help: "Seconde configuration Facebook Login for Business, avec les autorisations de la première plus pages_manage_engagement, pages_read_user_content et pages_manage_metadata (profil de la Page). Elle ne sert que quand vous ajoutez« commentaires et miniatures » à une Page déjà connectée.",
         env: "FACEBOOK_EXTENDED_CONFIG_ID",
         pattern: "^[0-9]{5,25}$",
       },
@@ -125,7 +133,7 @@ export const facebookConnector: Connector = {
     // en ajouter demande la seconde configuration.
     incremental: {
       settingParams: { config_id: "config_id_extended" },
-      help: "Facebook fixe les autorisations par configuration : créez dans Facebook Login for Business une seconde configuration avec pages_show_list, pages_read_engagement, pages_manage_posts, pages_manage_engagement et pages_read_user_content (ajoutez d’abord ces deux dernières au cas d’usage), puis recopiez son identifiant dans « Configuration avec commentaires ».",
+      help: "Facebook fixe les autorisations par configuration : créez dans Facebook Login for Business une seconde configuration avec pages_show_list, pages_read_engagement, pages_manage_posts, pages_manage_engagement, pages_read_user_content et pages_manage_metadata (ajoutez d’abord ces trois dernières au cas d’usage), puis recopiez son identifiant dans « Configuration avec commentaires ».",
     },
     scopeSets: [
       {
@@ -171,4 +179,7 @@ export const facebookConnector: Connector = {
     update: updatePagePost,
     remove: removePagePost,
   },
+  profileFields: FACEBOOK_PROFILE_FIELDS,
+  readProfile: readFacebookProfile,
+  updateProfile: updateFacebookProfile,
 };

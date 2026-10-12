@@ -34,6 +34,22 @@ const REASON_MESSAGES: Record<string, string> = {
   ineligibleAccount: "Ce compte YouTube doit être rattaché à un compte Google pour commenter.",
   captionExists: "La vidéo a déjà une piste de sous-titres dans cette langue.",
   invalidImage: "Image de miniature refusée par YouTube.",
+  // Profil, sections et playlists.
+  channelTitleUpdateForbidden: "YouTube ne permet pas de changer le nom de la chaîne par son API.",
+  brandingValidationError: "YouTube a refusé une valeur du profil (description, mots-clés, langue, pays ou bande-annonce).",
+  defaultLanguageNotSetError: "Choisissez d’abord la langue de la chaîne : YouTube l’exige avant les traductions.",
+  localizationValidationError: "YouTube a refusé une traduction du profil.",
+  channelForbidden: "YouTube refuse cette modification pour cette chaîne.",
+  notEditable: "YouTube ne permet pas de modifier cette section.",
+  channelSectionForbidden: "YouTube refuse cette modification des sections de la chaîne.",
+  channelSectionNotFound: "Section introuvable sur YouTube.",
+  playlistNotFound: "Playlist introuvable sur YouTube.",
+  playlistIsPrivate: "Une section ne peut pas afficher une playlist privée.",
+  playlistForbidden: "YouTube refuse cette modification de playlist.",
+  playlistOperationUnsupported: "YouTube ne permet pas de modifier cette playlist.",
+  invalidPlaylistSnippet: "Titre ou description de playlist refusé par YouTube.",
+  playlistTitleRequired: "Le titre de la playlist est obligatoire.",
+  playlistContainsMaximumNumberOfVideos: "La playlist contient déjà le nombre maximal de vidéos.",
   uploadRateLimitExceeded: "Trop de miniatures envoyées récemment : nouvel essai plus tard.",
 };
 

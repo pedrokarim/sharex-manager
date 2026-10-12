@@ -75,9 +75,12 @@ export async function fetchGrantedFacebookScopes(token: AccessToken, context: To
 function pageCapabilities(tasks: string[] | undefined): ConnectionCapability[] | undefined {
   if (!Array.isArray(tasks)) return undefined;
   if (!tasks.includes("CREATE_CONTENT")) return ["posts.list"];
+  const removed = new Set<ConnectionCapability>();
   // Commenter au nom de la Page exige la tâche MODERATE (référence de `/{object-id}/comments`).
-  if (!tasks.includes("MODERATE")) return CAPABILITIES.filter((capability) => capability !== "comment.create");
-  return undefined;
+  if (!tasks.includes("MODERATE")) removed.add("comment.create");
+  // Modifier les informations de la Page exige la tâche MANAGE (guide « Manage a Page ») : sans elle, pas de profil.
+  if (!tasks.includes("MANAGE")) removed.add("profile.details");
+  return removed.size > 0 ? CAPABILITIES.filter((capability) => !removed.has(capability)) : undefined;
 }
 
 const pageUrl = (page: { id: string; link?: string }) => (page.link?.startsWith("https://") ? page.link : `${FACEBOOK_WEB}/${encodeURIComponent(page.id)}`);

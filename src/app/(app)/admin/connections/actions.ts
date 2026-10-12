@@ -15,9 +15,34 @@ import { getConnector } from "@/lib/connections/registry";
 import { wakePublishQueue } from "@/lib/connections/publish-queue";
 import { cancelJob, cancelJobsForAccount, listJobs, retryJob } from "@/lib/connections/publish-queue";
 import { accountQuotaForAccount, forgetPosts, listPosts, quotaForAccount, removePost, updatePost } from "@/lib/connections/manage";
+import {
+  accountProfileChoices,
+  addAccountSection,
+  addVideoToAccountPlaylist,
+  createAccountPlaylist,
+  listAccountPlaylists,
+  listAccountSections,
+  moveAccountSection,
+  readAccountProfile,
+  removeAccountSection,
+  updateAccountPlaylist,
+  updateAccountProfile,
+} from "@/lib/connections/manage";
 import { errorMessage } from "@/lib/connections/errors";
 import { auditConnection } from "@/lib/connections/audit";
-import type { AccountQuotaUsage, AccountSummary, PostPatch, PostSummary, PublishJobSummary, QuotaUsage } from "@/lib/connections/types";
+import type {
+  AccountQuotaUsage,
+  AccountSummary,
+  PlaylistInput,
+  PlaylistSummary,
+  PostPatch,
+  PostSummary,
+  ProfileChoice,
+  ProfileSection,
+  ProfileSnapshot,
+  PublishJobSummary,
+  QuotaUsage,
+} from "@/lib/connections/types";
 import { adminSession, connectionsOverview, type ConnectionsOverview } from "./data";
 
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -203,6 +228,89 @@ export async function pushBrandAction(accountId: string, kitId: string, what: "b
     if (!result) throw new Error("Le module « Image de marque » n’est pas chargé.");
     auditConnection(session, `${what === "banner" ? "Bannière" : "Filigrane"} de la marque envoyé au compte ${id}`, { accountId: id, kitId, what });
     return result;
+  });
+}
+
+// ─── Profil du compte ─────────────────────────────────────────────
+
+export async function readProfileAction(accountId: string): Promise<ActionResult<ProfileSnapshot>> {
+  return run(() => readAccountProfile(requireId(accountId)));
+}
+
+/** Envoie un ou plusieurs éléments modifiables du profil ; rend les valeurs relues chez le service. */
+export async function updateProfileAction(accountId: string, changes: Record<string, unknown>): Promise<ActionResult<ProfileSnapshot>> {
+  return run(async (session) => {
+    const id = requireId(accountId);
+    const snapshot = await updateAccountProfile(id, changes);
+    auditConnection(session, `Profil du compte ${id} modifié`, { accountId: id, fields: Object.keys(changes ?? {}).slice(0, 20) });
+    return snapshot;
+  });
+}
+
+export async function profileChoicesAction(accountId: string, key: string): Promise<ActionResult<ProfileChoice[]>> {
+  return run(() => accountProfileChoices(requireId(accountId), String(key)));
+}
+
+export async function listSectionsAction(accountId: string): Promise<ActionResult<ProfileSection[]>> {
+  return run(() => listAccountSections(requireId(accountId)));
+}
+
+export async function addSectionAction(accountId: string, input: { type: string; playlistId?: string }): Promise<ActionResult<ProfileSection[]>> {
+  return run(async (session) => {
+    const id = requireId(accountId);
+    const type = String(input?.type ?? "");
+    const sections = await addAccountSection(id, { type, ...(input?.playlistId ? { playlistId: String(input.playlistId) } : {}) });
+    auditConnection(session, `Section ajoutée à la page d’accueil du compte ${id}`, { accountId: id, type });
+    return sections;
+  });
+}
+
+export async function moveSectionAction(accountId: string, sectionId: string, position: number): Promise<ActionResult<ProfileSection[]>> {
+  return run(async (session) => {
+    const id = requireId(accountId);
+    const sections = await moveAccountSection(id, String(sectionId), Number(position));
+    auditConnection(session, `Section déplacée sur la page d’accueil du compte ${id}`, { accountId: id, sectionId, position });
+    return sections;
+  });
+}
+
+export async function removeSectionAction(accountId: string, sectionId: string): Promise<ActionResult<ProfileSection[]>> {
+  return run(async (session) => {
+    const id = requireId(accountId);
+    const sections = await removeAccountSection(id, String(sectionId));
+    auditConnection(session, `Section retirée de la page d’accueil du compte ${id}`, { accountId: id, sectionId }, "warning");
+    return sections;
+  });
+}
+
+export async function listPlaylistsAction(accountId: string): Promise<ActionResult<PlaylistSummary[]>> {
+  return run(() => listAccountPlaylists(requireId(accountId)));
+}
+
+export async function createPlaylistAction(accountId: string, input: PlaylistInput): Promise<ActionResult<PlaylistSummary>> {
+  return run(async (session) => {
+    const id = requireId(accountId);
+    const playlist = await createAccountPlaylist(id, input);
+    auditConnection(session, `Playlist créée : « ${playlist.title.slice(0, 120)} »`, { accountId: id, playlistId: playlist.id });
+    return playlist;
+  });
+}
+
+export async function updatePlaylistAction(accountId: string, playlistId: string, patch: Partial<PlaylistInput>): Promise<ActionResult<PlaylistSummary>> {
+  return run(async (session) => {
+    const id = requireId(accountId);
+    const playlist = await updateAccountPlaylist(id, String(playlistId), patch);
+    auditConnection(session, `Playlist modifiée : « ${playlist.title.slice(0, 120)} »`, { accountId: id, playlistId, fields: Object.keys(patch ?? {}) });
+    return playlist;
+  });
+}
+
+export async function addPlaylistVideoAction(accountId: string, playlistId: string, videoId: string): Promise<ActionResult<{ added: true }>> {
+  return run(async (session) => {
+    const id = requireId(accountId);
+    await addVideoToAccountPlaylist(id, String(playlistId), String(videoId));
+    auditConnection(session, `Vidéo ajoutée à une playlist du compte ${id}`, { accountId: id, playlistId, videoId });
+    return { added: true as const };
   });
 }
 

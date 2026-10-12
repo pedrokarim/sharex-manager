@@ -36,6 +36,15 @@ const COSTS: Record<string, { bucket: string; units: number }> = {
   "commentThreads.insert": { bucket: "general", units: 50 },
   "commentThreads.list": { bucket: "general", units: 1 },
   "captions.insert": { bucket: "general", units: 400 },
+  // Profil, sections et playlists (page « Quota calculator », vérifiée le 12/10/2026).
+  "channelSections.list": { bucket: "general", units: 1 },
+  "channelSections.insert": { bucket: "general", units: 50 },
+  "channelSections.update": { bucket: "general", units: 50 },
+  "channelSections.delete": { bucket: "general", units: 50 },
+  "playlists.list": { bucket: "general", units: 1 },
+  "playlists.insert": { bucket: "general", units: 50 },
+  "playlists.update": { bucket: "general", units: 50 },
+  "playlistItems.insert": { bucket: "general", units: 50 },
 };
 
 export function youtubeCost(method: string): { bucket: string; units: number } {

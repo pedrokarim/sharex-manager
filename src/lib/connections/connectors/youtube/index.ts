@@ -11,6 +11,22 @@ import { YOUTUBE_PUBLISH_FIELDS, normalizeYoutubeOptions, type YoutubeOptions } 
 import { youtubeQuota } from "./quota";
 import { uploadVideo } from "./upload";
 import {
+  YOUTUBE_PLAYLISTS_SUPPORT,
+  YOUTUBE_PROFILE_FIELDS,
+  YOUTUBE_SECTIONS_SUPPORT,
+  addYoutubePlaylistVideo,
+  addYoutubeSection,
+  createYoutubePlaylist,
+  listYoutubePlaylists,
+  listYoutubeSections,
+  moveYoutubeSection,
+  readYoutubeProfile,
+  removeYoutubeSection,
+  updateYoutubePlaylist,
+  updateYoutubeProfile,
+  youtubeProfileChoices,
+} from "./profile";
+import {
   CAPTION_FORMATS,
   CAPTION_MAX_BYTES,
   COMMENT_MAX_CHARS,
@@ -46,6 +62,11 @@ export const youtubeConnector: Connector = {
     { capability: "profile.banner", scopes: [SCOPE_MANAGE] },
     { capability: "posts.list", scopes: [SCOPE_MANAGE, SCOPE_READONLY] },
     { capability: "posts.manage", scopes: [SCOPE_MANAGE] },
+    // Profil, sections et playlists : `channels.update`, `channelSections.*` et
+    // `playlists.*` acceptent `youtube` ou `youtube.force-ssl`.
+    { capability: "profile.details", scopes: [SCOPE_MANAGE, SCOPE_FORCE_SSL] },
+    { capability: "profile.sections", scopes: [SCOPE_MANAGE, SCOPE_FORCE_SSL] },
+    { capability: "playlists.manage", scopes: [SCOPE_MANAGE, SCOPE_FORCE_SSL] },
     // Suites de publication. La miniature passe avec la portée d'envoi déjà accordée.
     { capability: "comment.create", scopes: [SCOPE_FORCE_SSL] },
     { capability: "captions.upload", scopes: [SCOPE_FORCE_SSL] },
@@ -73,7 +94,7 @@ export const youtubeConnector: Connector = {
       {
         id: "all",
         label: "Tout",
-        description: "Publier, gérer les vidéos, la bannière et le filigrane.",
+        description: "Publier, gérer les vidéos, le profil de la chaîne, ses sections et ses playlists.",
         scopes: [SCOPE_UPLOAD, SCOPE_MANAGE],
       },
       {
@@ -123,5 +144,23 @@ export const youtubeConnector: Connector = {
   profile: {
     setBanner: setChannelBanner,
     setWatermark: setChannelWatermark,
+  },
+  profileFields: YOUTUBE_PROFILE_FIELDS,
+  readProfile: readYoutubeProfile,
+  updateProfile: updateYoutubeProfile,
+  profileChoices: youtubeProfileChoices,
+  sections: {
+    support: YOUTUBE_SECTIONS_SUPPORT,
+    list: listYoutubeSections,
+    add: addYoutubeSection,
+    move: moveYoutubeSection,
+    remove: removeYoutubeSection,
+  },
+  playlists: {
+    support: YOUTUBE_PLAYLISTS_SUPPORT,
+    list: listYoutubePlaylists,
+    create: createYoutubePlaylist,
+    update: updateYoutubePlaylist,
+    addVideo: addYoutubePlaylistVideo,
   },
 };

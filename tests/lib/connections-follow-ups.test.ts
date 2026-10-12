@@ -463,7 +463,7 @@ describe("rôles de champ et description des connecteurs", () => {
     const facebook = describeConnector(getConnector("facebook")!);
     expect(facebook.followUps?.comment?.maxLength).toBe(8000);
     expect(facebook.followUps?.subtitles?.formats).toEqual(["srt"]);
-    expect(facebook.onDemandCapabilities?.sort()).toEqual(["comment.create", "cover.set"]);
+    expect(facebook.onDemandCapabilities?.sort()).toEqual(["comment.create", "cover.set", "profile.details"]);
     expect(facebook.incrementalHelp).toMatch(/seconde configuration/);
   });
 });

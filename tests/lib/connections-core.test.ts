@@ -102,7 +102,8 @@ describe("registre des connecteurs", () => {
       for (const entry of connector.capabilities) {
         expect(entry.scopes.length, `${connector.id} ${entry.capability}`).toBeGreaterThan(0);
         // Les capacités des suites de publication ne viennent qu'à la demande (connexion incrémentale).
-        const onDemand = ["comment.create", "captions.upload", "cover.set"].includes(entry.capability);
+        // Le profil d'une Page Facebook aussi : la seconde configuration de Meta le porte.
+        const onDemand = ["comment.create", "captions.upload", "cover.set"].includes(entry.capability) || (connector.id === "facebook" && entry.capability === "profile.details");
         expect(onDemand || entry.scopes.some((scope) => offered.has(scope)), `${connector.id} ${entry.capability}`).toBe(true);
       }
       for (const set of connector.oauth.scopeSets) expect(capabilitiesForScopes(connector, set.scopes).length).toBeGreaterThan(0);
@@ -115,7 +116,7 @@ describe("registre des connecteurs", () => {
     const youtube = getConnector("youtube")!;
     const [all, upload] = youtube.oauth.scopeSets;
     expect(capabilitiesForScopes(youtube, all.scopes).sort()).toEqual(
-      ["cover.set", "posts.list", "posts.manage", "profile.banner", "profile.watermark", "publish.video"].sort()
+      ["cover.set", "playlists.manage", "posts.list", "posts.manage", "profile.banner", "profile.details", "profile.sections", "profile.watermark", "publish.video"].sort()
     );
     const limited = capabilitiesForScopes(youtube, upload.scopes);
     expect(limited).toContain("publish.video");
