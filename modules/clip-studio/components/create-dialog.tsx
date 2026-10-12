@@ -48,6 +48,7 @@ import { applyBrandTheme } from "../engine/brand";
 import { ASPECTS, type AspectPreset, type MediaSource } from "../engine/types";
 import { callModule, fetchBrandTheme, probeMedia, useBrandKits, type BrandKitChoice } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
+import { IMAGE_SOURCE_MODES, type ImageSourceMode } from "../lib/image-search-types";
 import { useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
 import { MOOD_LABELS } from "./music-panel";
 import { BrandKitMark } from "./inspector";
@@ -101,6 +102,41 @@ const IDEAS = [
 ];
 
 
+const IMAGE_SOURCE_LABELS: Record<ImageSourceMode, string> = {
+  "find-then-generate": "Trouver, sinon créer",
+  find: "Trouver seulement",
+  generate: "Créer seulement",
+  none: "Aucune",
+};
+
+const IMAGE_SOURCE_HELP: Record<ImageSourceMode, string> = {
+  "find-then-generate": "Une vraie image du sujet quand elle existe (banques libres, puis le web), sinon créée avec AI Image Gen.",
+  find: "Seulement des images existantes ; un segment sans image trouvée garde un aplat.",
+  generate: "Toutes créées avec AI Image Gen, environ une minute chacune.",
+  none: "Aucune illustration : textes et aplats de couleur.",
+};
+
+const IMAGE_PREFS_KEY = "clip-studio:assistant-images";
+
+/** Dernier choix d'illustrations, gardé dans ce navigateur. Par défaut : trouver d'abord, web compris. */
+function readImagePrefs(): { source: ImageSourceMode; web: boolean } {
+  try {
+    const stored = JSON.parse(localStorage.getItem(IMAGE_PREFS_KEY) ?? "null");
+    if (stored && IMAGE_SOURCE_MODES.includes(stored.source)) return { source: stored.source, web: stored.web !== false };
+  } catch {
+    // Stockage indisponible ou valeur illisible : réglage par défaut.
+  }
+  return { source: "find-then-generate", web: true };
+}
+
+function writeImagePrefs(prefs: { source: ImageSourceMode; web: boolean }) {
+  try {
+    localStorage.setItem(IMAGE_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // Rien à faire : le choix vaut pour cette fenêtre seulement.
+  }
+}
+
 export function CreateDialog({
   request,
   onClose,
@@ -121,7 +157,16 @@ export function CreateDialog({
   const [recipe, setRecipe] = useState<Recipe>("slideshow");
   const [brief, setBrief] = useState("");
   const [count, setCount] = useState(5);
-  const [withImages, setWithImages] = useState(true);
+  const [imageSource, setImageSource] = useState<ImageSourceMode>(() => readImagePrefs().source);
+  const [webSearch, setWebSearch] = useState(() => readImagePrefs().web);
+  const chooseImageSource = (next: ImageSourceMode) => {
+    setImageSource(next);
+    writeImagePrefs({ source: next, web: webSearch });
+  };
+  const chooseWebSearch = (next: boolean) => {
+    setWebSearch(next);
+    writeImagePrefs({ source: imageSource, web: next });
+  };
   const [withVoice, setWithVoice] = useState(true);
   const [voice, setVoice] = useState("siwis");
   const [music, setMusic] = useState<string>("auto");
@@ -206,7 +251,9 @@ export function CreateDialog({
         template,
         aspect,
         count,
-        images: withImages,
+        images: imageSource !== "none",
+        imageSource,
+        webSearch,
         voice: withVoice ? voice : undefined,
         music: music === "none" ? undefined : music,
         brandKitId: chosenKitId ?? undefined,
@@ -300,23 +347,49 @@ export function CreateDialog({
                       </div>
                     </div>
                     <TemplatePicker value={template} onChange={setTemplate} only={ASSISTANT_TEMPLATE_IDS} />
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <label className="space-y-1.5">
-                        <span className="flex items-center justify-between text-sm">
-                          <span>{COUNT_LABELS[template] ?? "Séquences"}</span>
-                          <span className="font-mono text-xs tabular-nums">{count}</span>
+                    <label className="block space-y-1.5">
+                      <span className="flex items-center justify-between text-sm">
+                        <span>{COUNT_LABELS[template] ?? "Séquences"}</span>
+                        <span className="font-mono text-xs tabular-nums">{count}</span>
+                      </span>
+                      <input type="range" min={2} max={10} value={count} onChange={(event) => setCount(Number(event.target.value))} className="w-full accent-primary" />
+                    </label>
+                    <div className="space-y-3 rounded-lg border p-3">
+                      <div className="space-y-2">
+                        <span className="block text-sm">
+                          Illustrations
+                          <span className="block text-xs text-muted-foreground">{IMAGE_SOURCE_HELP[imageSource]}</span>
                         </span>
-                        <input type="range" min={2} max={10} value={count} onChange={(event) => setCount(Number(event.target.value))} className="w-full accent-primary" />
-                      </label>
-                      <label className="flex items-start justify-between gap-3 rounded-lg border p-3">
-                        <span className="text-sm">
-                          Illustrations générées
-                          <span className="block text-xs text-muted-foreground">
-                            Une image par segment avec AI Image Gen, environ une minute chacune.
-                          </span>
-                        </span>
-                        <Switch checked={withImages} onCheckedChange={setWithImages} />
-                      </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {IMAGE_SOURCE_MODES.map((key) => (
+                            <button
+                              key={key}
+                              type="button"
+                              aria-pressed={imageSource === key}
+                              onClick={() => chooseImageSource(key)}
+                              className={cn(
+                                "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                                imageSource === key ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              {IMAGE_SOURCE_LABELS[key]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <AnimatePresence initial={false}>
+                        {(imageSource === "find-then-generate" || imageSource === "find") && (
+                          <motion.label initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="flex items-start justify-between gap-3 overflow-hidden">
+                            <span className="min-w-0 text-sm">
+                              Chercher aussi sur le web
+                              <span className="block text-xs text-muted-foreground">
+                                Visuels officiels, logos et icônes des jeux, films ou marques cités, trouvés par Codex. Leurs droits restent à vérifier avant de publier.
+                              </span>
+                            </span>
+                            <Switch checked={webSearch} onCheckedChange={chooseWebSearch} />
+                          </motion.label>
+                        )}
+                      </AnimatePresence>
                     </div>
                     <div className="space-y-3 rounded-lg border p-3">
                       <label className="flex items-start justify-between gap-3">
