@@ -7,6 +7,26 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Clip Studio, voix : les voix de la lecture à voix haute de Microsoft Edge,
+  gratuites et sans clé, avec les instants des mots donnés par Microsoft pour
+  les sous-titres. Accès non officiel, signalé comme tel ; en cas de
+  changement chez Microsoft, un message clair renvoie vers Azure ou une voix
+  locale, sans nouvel essai en boucle.
+- Clip Studio, voix : Microsoft Azure (API officielle), clé et région par
+  `AZURE_SPEECH_KEY` et `AZURE_SPEECH_REGION` ou dans « Voix en ligne ». Les
+  caractères envoyés sont comptés par mois et affichés en jauge ; au-delà des
+  500 000 caractères de l’offre gratuite, Clip Studio n’envoie plus rien. Un
+  refus 429 donne un message clair.
+- Clip Studio, voix : le choix d’une voix commence par la source (locales,
+  Edge, Azure, OpenAI, Google, ElevenLabs), avec recherche, langue et genre ;
+  chaque voix a un bouton « Écouter » (phrase d’exemple synthétisée une fois,
+  puis gardée en cache).
+- Clip Studio, voix : « Changer la voix de la piste… » (clic droit sur un
+  extrait de voix, ou inspecteur) relit chaque extrait avec une autre voix, à
+  sa place, sous-titres animés recalés, en une seule étape d’annulation ; un
+  échec partiel garde l’ancienne voix des extraits concernés.
+- Clip Studio, voix locales : réglage d’intonation (Régulière, Équilibrée,
+  Expressive). Le texte lu est désormais gardé avec chaque voix.
 - Image de marque : la mascotte entre dans les formats. Chaque format a sa
   pose (bannière accoudée au bandeau, avatar en portrait lisible à 40 px,
   en-tête X en pied à droite, carton de fin en grand sous le nom, couverture
@@ -679,6 +699,9 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Clip Studio, voix locales : débit moins irrégulier par défaut (intonation
+  « Équilibrée », bruit de Piper abaissé de 0,667 / 0,8 à 0,6 / 0,6). La chaîne
+  audio ne déformait rien : ni fréquence mal lue, ni étirement de la voix.
 - Clip Studio : « Exporter » et « Publier » n’apparaissent plus dans le menu
   latéral (le champ `menu` des pages d’un module était perdu au chargement),
   et le fil d’Ariane continue de les nommer.

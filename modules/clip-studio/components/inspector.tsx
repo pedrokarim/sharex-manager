@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AlignCenter, AlignLeft, AlignRight, Check, Loader2, Palette, X } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, Check, Loader2, Mic, Palette, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { TEXT_PRESETS, videoSpeedPatch } from "../engine/edit";
+import { isVoiceItem } from "../engine/revoice";
 import { MAX_SPEED, MIN_SPEED, speedOf } from "../engine/timeline";
 import type {
   AudioItem,
@@ -44,9 +45,11 @@ interface InspectorProps {
   onCaption?: (itemId: string) => void;
   /** Polices importées de la marque du projet, proposées après celles du catalogue. */
   brandFonts?: BrandFontChoice[];
+  /** Relit tous les extraits de la piste de cette voix avec une autre voix. */
+  onChangeTrackVoice?: (trackId: string) => void;
 }
 
-export function Inspector({ project, item, onPatch, onClose, onCaption, brandFonts = [] }: InspectorProps) {
+export function Inspector({ project, item, onPatch, onClose, onCaption, brandFonts = [], onChangeTrackVoice }: InspectorProps) {
   const fps = project.fps;
   const title =
     item.type === "text" ? "Texte" : item.type === "image" ? "Image" : item.type === "video" ? "Vidéo" : item.type === "shape" ? "Forme" : "Son";
@@ -78,6 +81,22 @@ export function Inspector({ project, item, onPatch, onClose, onCaption, brandFon
           </Section>
         ) : null}
         {item.type === "text" && item.karaoke && <KaraokeFields item={item} onPatch={onPatch} />}
+        {onChangeTrackVoice && isVoiceItem(item) && (
+          <Section title="Voix">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-2"
+              onClick={() => {
+                const track = project.tracks.find((entry) => entry.items.some((other) => other.id === item.id));
+                if (track) onChangeTrackVoice(track.id);
+              }}
+            >
+              <Mic className="h-4 w-4" />
+              Changer la voix de la piste…
+            </Button>
+          </Section>
+        )}
 
         <Section title="Temps">
           <Slider

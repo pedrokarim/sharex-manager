@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { ClipAsset, MediaSource } from "../engine/types";
 import { assetToSource, callModule } from "../lib/client";
-import { useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
+import { ToneControl, useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
 import { useAccountPreference } from "@/hooks/use-account-preference";
 
 const SPEEDS = [
@@ -36,19 +36,21 @@ export function VoicePanel({
   const [text, setText] = useState("");
   const [voice, setVoice] = useState("siwis");
   const [speed, setSpeed] = useState(1);
+  const [tone, setTone] = useState("balanced");
   const [busy, setBusy] = useState(false);
   const [captions, setCaptions] = useState(true);
 
   // Voix, vitesse et sous-titres suivent le compte, d'une visite et d'un
   // appareil à l'autre.
-  const preference = useAccountPreference<{ voice?: string; speed?: number; captions?: boolean }>("clip-studio.voice", {});
+  const preference = useAccountPreference<{ voice?: string; speed?: number; tone?: string; captions?: boolean }>("clip-studio.voice", {});
   const saved = preference.value;
   useEffect(() => {
     if (!preference.ready) return;
     if (typeof saved.voice === "string" && saved.voice) setVoice(saved.voice);
     if (typeof saved.speed === "number" && saved.speed > 0) setSpeed(saved.speed);
+    if (typeof saved.tone === "string" && saved.tone) setTone(saved.tone);
     if (typeof saved.captions === "boolean") setCaptions(saved.captions);
-  }, [preference.ready, saved.voice, saved.speed, saved.captions]);
+  }, [preference.ready, saved.voice, saved.speed, saved.tone, saved.captions]);
 
   const remember = preference.update;
 
@@ -60,7 +62,7 @@ export function VoicePanel({
     if (!content) return;
     setBusy(true);
     try {
-      const result = await callModule<{ asset: ClipAsset; durationMs: number }>("speak", { text: content, voice, speed });
+      const result = await callModule<{ asset: ClipAsset; durationMs: number }>("speak", { text: content, voice, speed, tone });
       onAdd(assetToSource(result.asset), captions);
       toast.success(`Voix ajoutée, ${(result.durationMs / 1000).toFixed(1)} s`);
     } catch (error: any) {
@@ -108,6 +110,8 @@ export function VoicePanel({
           value={voice}
           voices={info}
           onPrepare={prepare}
+          speed={speed}
+          tone={tone}
           onChange={(id) => {
             setVoice(id);
             remember({ voice: id });
@@ -137,6 +141,19 @@ export function VoicePanel({
           ))}
         </div>
       </section>
+
+      {selected?.provider === "piper" && (
+        <section className="flex flex-col gap-2">
+          <h3 className="text-[11px] font-medium text-muted-foreground">Intonation</h3>
+          <ToneControl
+            value={tone}
+            onChange={(next) => {
+              setTone(next);
+              remember({ tone: next });
+            }}
+          />
+        </section>
+      )}
 
       <label className="flex items-center justify-between gap-3 text-sm">
         <span>

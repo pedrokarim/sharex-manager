@@ -79,6 +79,7 @@ export function assetToSource(asset: ClipAsset): MediaSource {
     // Une image trouvée garde l'état de ses droits jusqu'à la publication (étape 9).
     ...(rightsOf(asset) ? { rights: rightsOf(asset) } : {}),
     words: asset.words,
+    ...(asset.speech ? { speech: asset.speech } : {}),
   };
 }
 

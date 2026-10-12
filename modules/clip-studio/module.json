@@ -42,6 +42,8 @@
     "getVoices": "user",
     "prepareVoice": "user",
     "speak": "user",
+    "previewVoice": "user",
+    "respeakVoice": "user",
     "getMusic": "user",
     "prepareMusic": "user",
     "searchMusic": "user",

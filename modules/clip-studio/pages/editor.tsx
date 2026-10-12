@@ -73,6 +73,8 @@ import { TextPanel } from "../components/text-panel";
 import { VoicePanel } from "../components/voice-panel";
 import { MusicPanel } from "../components/music-panel";
 import { Timeline } from "../components/timeline";
+import { TrackVoiceDialog } from "../components/track-voice-dialog";
+import { applyVoiceReplacements } from "../engine/revoice";
 import { useProjectHistory, type SaveState } from "../components/use-project-history";
 
 export default function EditorPage() {
@@ -356,6 +358,8 @@ function Editor({ initial }: { initial: ClipProject }) {
   // Sans sélection, l'inspecteur montre le projet, tant que le module des marques est là.
   // Sur un téléphone, il ne s'ouvre pas tout seul : il couvrirait l'aperçu.
   const projectInspector = !selected && Array.isArray(brandKits) && !narrow;
+  /** Piste dont on change la voix (fenêtre ouverte), sinon `null`. */
+  const [voiceTrackId, setVoiceTrackId] = useState<string | null>(null);
 
   return (
     <div className="-mx-4 -mb-4 flex h-[calc(100svh-var(--header-height)-1rem)] min-h-[560px] flex-col overflow-hidden border-t">
@@ -512,6 +516,7 @@ function Editor({ initial }: { initial: ClipProject }) {
                     onPatch={(patch, key) =>
                       commit((current) => updateItem(current, selected.id, patch), `inspect-${selected.id}-${key}`)
                     }
+                    onChangeTrackVoice={setVoiceTrackId}
                   />
                 ) : (
                   <ProjectInspector project={project} kits={brandKits ?? []} onApplyBrand={applyBrand} />
@@ -547,8 +552,20 @@ function Editor({ initial }: { initial: ClipProject }) {
               toast.error("Média illisible");
             }
           }}
+          onChangeTrackVoice={setVoiceTrackId}
         />
       </div>
+      <TrackVoiceDialog
+        project={project}
+        trackId={voiceTrackId}
+        onOpenChange={(open) => !open && setVoiceTrackId(null)}
+        onApply={(trackId, replacements) => {
+          // Une seule modification du projet : une seule étape d'annulation.
+          const { overlaps } = applyVoiceReplacements(projectRef.current, trackId, replacements);
+          commit((current) => applyVoiceReplacements(current, trackId, replacements).project);
+          return { overlaps };
+        }}
+      />
 
     </div>
   );

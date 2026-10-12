@@ -9,12 +9,23 @@
 
 import fs from "fs";
 import path from "path";
+import { createHash } from "crypto";
 import { spawn } from "child_process";
-import type { ClipAsset, TimedWord } from "../engine/types";
+import type { ClipAsset, SpeechInfo, TimedWord } from "../engine/types";
 import { ensureResource, resourcePath, resourceState, type ResourceSpec, type ResourceState } from "./resources";
 import { alignWords } from "./align";
-import { ASSETS_DIR, ensureDirs, readAssets, writeAssets } from "./store";
-import { cloudVoiceLabel, isCloudVoiceUsable, listCloudVoices, parseCloudVoice, synthesizeCloud, type CloudProvider } from "./cloud-tts";
+import { ASSETS_DIR, DATA_DIR, ensureDirs, readAssets, writeAssets } from "./store";
+import {
+  cloudVoiceLabel,
+  isCloudVoiceUsable,
+  listCloudVoices,
+  parseCloudVoice,
+  providerLabel,
+  sourceAvailability,
+  synthesizeCloud,
+  type CloudProvider,
+  type SourceAvailability,
+} from "./cloud-tts";
 import { toPcmWav } from "@/lib/media/ffmpeg";
 
 import { childEnv } from "@/lib/child-env";
@@ -127,6 +138,25 @@ export const VOICES: Voice[] = [
 
 export const DEFAULT_VOICE = "siwis";
 
+/**
+ * Intonation des voix locales : réglages du bruit de Piper. `noise_scale`
+ * fait varier le timbre et la mélodie, `noise_w` la durée des sons. Les
+ * valeurs d'origine des modèles (0,667 et 0,8) donnent un débit irrégulier,
+ * qui peut sonner « mou » ; les réglages plus bas le stabilisent.
+ */
+export const PIPER_TONES = {
+  steady: { label: "Régulière", noiseScale: 0.5, noiseW: 0.4 },
+  balanced: { label: "Équilibrée", noiseScale: 0.6, noiseW: 0.6 },
+  expressive: { label: "Expressive", noiseScale: 0.667, noiseW: 0.8 },
+} as const;
+
+export type PiperTone = keyof typeof PIPER_TONES;
+export const DEFAULT_TONE: PiperTone = "balanced";
+
+export function isPiperTone(value: unknown): value is PiperTone {
+  return typeof value === "string" && value in PIPER_TONES;
+}
+
 function voiceResources(voice: Voice): [ResourceSpec, ResourceSpec] {
   const base = `${VOICES_BASE}/${voice.modelPath}/${voice.model}`;
   return [
@@ -151,17 +181,32 @@ export interface VoiceStatus {
   /** Voix locale : mention de licence. En ligne : nom du fournisseur. */
   credit: string;
   license?: string;
+  /** Langue de la voix (« fr-FR »). */
+  locale?: string;
   state: ResourceState;
+}
+
+/** Source de voix et sa disponibilité, pour le sélecteur. */
+export interface VoiceSource {
+  id: "piper" | CloudProvider;
+  label: string;
+  available: boolean;
+  reason?: string;
+  usage?: SourceAvailability["usage"];
 }
 
 const READY = (id: string): ResourceState => ({ id, label: id, status: "ready", received: 0, total: 0 });
 
-const PROVIDER_LABELS: Record<CloudProvider, string> = { openai: "OpenAI", google: "Google Cloud", elevenlabs: "ElevenLabs" };
-
-export async function voiceStatuses(): Promise<{ engine: ResourceState; voices: VoiceStatus[] }> {
+export async function voiceStatuses(): Promise<{ engine: ResourceState; voices: VoiceStatus[]; sources: VoiceSource[] }> {
   const cloud = await listCloudVoices();
+  // Après la liste : elle note les erreurs des fournisseurs.
+  const sources: VoiceSource[] = [
+    { id: "piper", label: "Locales", available: true },
+    ...sourceAvailability().map((source: SourceAvailability): VoiceSource => source),
+  ];
   return {
     engine: resourceState(PIPER),
+    sources,
     voices: [
       ...VOICES.map((voice): VoiceStatus => ({
         id: voice.id,
@@ -171,6 +216,7 @@ export async function voiceStatuses(): Promise<{ engine: ResourceState; voices: 
         provider: "piper",
         credit: voice.credit,
         license: voice.license,
+        locale: "fr-FR",
         state: resourceState(voiceResources(voice)[0]),
       })),
       ...cloud.map((voice): VoiceStatus => ({
@@ -179,7 +225,8 @@ export async function voiceStatuses(): Promise<{ engine: ResourceState; voices: 
         description: voice.description,
         gender: voice.gender,
         provider: voice.provider,
-        credit: PROVIDER_LABELS[voice.provider],
+        credit: providerLabel(voice.provider),
+        locale: voice.locale,
         state: READY(voice.id),
       })),
     ],
@@ -244,15 +291,23 @@ export interface SpeechResult {
   words: TimedWord[];
 }
 
-/**
- * Lit un texte avec une voix et range le son parmi les médias du module.
- * Les synthèses passent une par une : Piper occupe un cœur à plein.
- */
 /** Synthèses en attente au plus : chacune occupe un cœur et écrit un fichier. */
 const MAX_PENDING = 20;
 let pending = 0;
 
-export function synthesize(input: { text: string; voice?: string; speed?: number }): Promise<SpeechResult> {
+export interface SpeakInput {
+  text: string;
+  voice?: string;
+  speed?: number;
+  /** Intonation d'une voix locale ; ignorée par les voix en ligne. */
+  tone?: string;
+}
+
+/**
+ * Lit un texte avec une voix et range le son parmi les médias du module.
+ * Les synthèses locales passent une par une : Piper occupe un cœur à plein.
+ */
+export function synthesize(input: SpeakInput): Promise<SpeechResult> {
   if (pending >= MAX_PENDING) {
     return Promise.reject(new Error("Trop de voix en cours de génération : réessayez dans un instant."));
   }
@@ -263,11 +318,16 @@ export function synthesize(input: { text: string; voice?: string; speed?: number
       pending--;
     });
   }
-  const task = queue.then(() => runSynthesis(input)).finally(() => {
+  return inPiperQueue(() => runSynthesis(input)).finally(() => {
     pending--;
   });
-  queue = task.catch(() => undefined);
-  return task;
+}
+
+/** File d'attente de Piper, commune aux voix et aux extraits d'écoute. */
+function inPiperQueue<T>(task: () => Promise<T>): Promise<T> {
+  const run = queue.then(task);
+  queue = run.catch(() => undefined);
+  return run;
 }
 
 function cleanText(value: unknown): string {
@@ -276,36 +336,49 @@ function cleanText(value: unknown): string {
   return text;
 }
 
-/** Durée, alignement et rangement parmi les médias : communs aux deux moteurs. */
-function registerSpeech(file: string, text: string, label: string, credit: string): SpeechResult {
+function cleanSpeed(value: unknown): number {
+  return Math.min(1.6, Math.max(0.7, Number(value) || 1));
+}
+
+/** Durée, alignement et rangement parmi les médias : communs à tous les moteurs. */
+function registerSpeech(file: string, label: string, credit: string, speech: SpeechInfo, providedWords?: TimedWord[]): SpeechResult {
   const output = path.join(ASSETS_DIR, file);
   const durationMs = wavDurationMs(output);
-  let words: TimedWord[] = [];
-  try {
-    words = alignWords(output, text);
-  } catch {
-    // Sans alignement, la voix reste utilisable ; seuls les sous-titres manquent.
+  let words: TimedWord[] = providedWords?.length ? providedWords : [];
+  if (!words.length) {
+    try {
+      words = alignWords(output, speech.text);
+    } catch {
+      // Sans alignement, la voix reste utilisable ; seuls les sous-titres manquent.
+    }
   }
   const asset: ClipAsset = {
     file,
     kind: "audio",
-    originalName: `Voix ${label} : ${text.slice(0, 60)}`,
+    originalName: `Voix ${label} : ${speech.text.slice(0, 60)}`,
     size: fs.statSync(output).size,
     durationMs,
     credit,
     words,
+    speech,
     createdAt: Date.now(),
   };
   writeAssets([asset, ...readAssets()]);
   return { asset, durationMs, words };
 }
 
-async function runCloudSynthesis(input: { text: string; voice?: string; speed?: number }): Promise<SpeechResult> {
+function creditFor(provider: string, label: string): string {
+  return provider === "Microsoft Edge"
+    ? `Voix ${label} : synthèse Microsoft (lecture à voix haute d'Edge), voix générée par IA`
+    : `Voix ${label} : synthèse ${provider}, voix générée par IA`;
+}
+
+async function runCloudSynthesis(input: SpeakInput): Promise<SpeechResult> {
   const text = cleanText(input.text);
   const voice = String(input.voice);
-  const speed = Math.min(1.6, Math.max(0.7, Number(input.speed) || 1));
+  const speed = cleanSpeed(input.speed);
   ensureDirs();
-  const { audio, extension } = await synthesizeCloud(voice, text, speed);
+  const { audio, extension, words } = await synthesizeCloud(voice, text, speed);
   const stem = `voice-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const raw = path.join(ASSETS_DIR, `${stem}.source.${extension}`);
   const file = `${stem}.wav`;
@@ -316,18 +389,13 @@ async function runCloudSynthesis(input: { text: string; voice?: string; speed?: 
     fs.rmSync(raw, { force: true });
   }
   const { label, provider } = await cloudVoiceLabel(voice);
-  return registerSpeech(file, text, label, `Voix ${label} : synthèse ${provider}, voix générée par IA`);
+  return registerSpeech(file, label, creditFor(provider, label), { text, voice, speed }, words);
 }
 
-async function runSynthesis(input: { text: string; voice?: string; speed?: number }): Promise<SpeechResult> {
-  const text = cleanText(input.text);
-  const voice = findVoice(input.voice ?? DEFAULT_VOICE);
+/** Lance Piper sur un texte et écrit le WAV produit. */
+async function runPiper(voice: Voice, text: string, speed: number, tone: PiperTone, output: string): Promise<void> {
   await prepareVoice(voice.id);
-  ensureDirs();
-
-  const file = `voice-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.wav`;
-  const output = path.join(ASSETS_DIR, file);
-  const speed = Math.min(1.6, Math.max(0.7, Number(input.speed) || 1));
+  const settings = PIPER_TONES[tone];
   const args = [
     "--model",
     resourcePath(voiceResources(voice)[0]),
@@ -335,6 +403,10 @@ async function runSynthesis(input: { text: string; voice?: string; speed?: numbe
     output,
     "--length_scale",
     (1 / speed).toFixed(3),
+    "--noise_scale",
+    settings.noiseScale.toFixed(3),
+    "--noise_w",
+    settings.noiseW.toFixed(3),
     "--sentence_silence",
     "0.2",
   ];
@@ -360,6 +432,119 @@ async function runSynthesis(input: { text: string; voice?: string; speed?: numbe
     child.stdin.write(text);
     child.stdin.end();
   });
+}
 
-  return registerSpeech(file, text, voice.label, `Voix ${voice.label} : ${voice.credit}, ${voice.license}`);
+async function runSynthesis(input: SpeakInput): Promise<SpeechResult> {
+  const text = cleanText(input.text);
+  const voice = findVoice(input.voice ?? DEFAULT_VOICE);
+  const speed = cleanSpeed(input.speed);
+  const tone = isPiperTone(input.tone) ? input.tone : DEFAULT_TONE;
+  ensureDirs();
+  const file = `voice-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.wav`;
+  await runPiper(voice, text, speed, tone, path.join(ASSETS_DIR, file));
+  return registerSpeech(file, voice.label, `Voix ${voice.label} : ${voice.credit}, ${voice.license}`, { text, voice: voice.id, speed, tone });
+}
+
+// ─── Relire avec une autre voix ──────────────────────────────────
+
+/** Texte d'une voix déjà rangée : gardé avec elle, sinon reconstitué depuis ses mots ou son nom. */
+export function speechTextOf(asset: Pick<ClipAsset, "originalName" | "words" | "speech">): string {
+  if (asset.speech?.text) return asset.speech.text;
+  if (asset.words?.length) return asset.words.map((word) => word.text).join(" ");
+  return asset.originalName.replace(/^Voix [^:]{1,60}:\s*/, "").trim();
+}
+
+/**
+ * Relit une voix de la timeline avec une autre voix. Le texte vient de la
+ * fiche du son d'origine (référence « module:clip-studio/assets/… ») ; à
+ * défaut, de celui envoyé par l'éditeur.
+ */
+export function respeak(input: { ref?: string; text?: string; voice: string; speed?: number; tone?: string }): Promise<SpeechResult & { text: string }> {
+  const file = /^module:clip-studio\/assets\/([a-z0-9][a-z0-9._-]{0,120})$/i.exec(String(input.ref ?? ""))?.[1];
+  const asset = file ? readAssets().find((entry) => entry.file === file) : undefined;
+  const text = (asset ? speechTextOf(asset) : "") || String(input.text ?? "").trim();
+  if (!text) return Promise.reject(new Error("Texte d'origine introuvable pour cette voix."));
+  const speed = input.speed ?? asset?.speech?.speed;
+  return synthesize({ text, voice: input.voice, speed, tone: input.tone ?? asset?.speech?.tone }).then((result) => ({ ...result, text }));
+}
+
+// ─── Extraits d'écoute ───────────────────────────────────────────
+
+export const SAMPLES_DIR = path.join(DATA_DIR, "voice-samples");
+
+/** Phrase d'exemple dans la langue de la voix ; le français par défaut. */
+const SAMPLE_SENTENCES: Record<string, string> = {
+  fr: "Bonjour ! Voici ma voix pour raconter vos vidéos. Qu'en pensez-vous ?",
+  en: "Hello! This is my voice, ready to tell your video's story. What do you think?",
+  es: "¡Hola! Esta es mi voz para contar tus vídeos. ¿Qué te parece?",
+  de: "Hallo! So klingt meine Stimme in deinen Videos. Wie gefällt sie dir?",
+  it: "Ciao! Questa è la mia voce per raccontare i tuoi video. Che ne pensi?",
+  pt: "Olá! Esta é a minha voz para narrar os seus vídeos. O que acha?",
+  nl: "Hallo! Dit is mijn stem voor jouw video's. Wat vind je ervan?",
+  pl: "Cześć! Tak brzmi mój głos w twoich filmach. Jak ci się podoba?",
+  ja: "こんにちは。これがあなたの動画のための私の声です。いかがですか？",
+  zh: "你好！这是我为你的视频配音的声音。你觉得怎么样？",
+  ko: "안녕하세요! 여러분의 영상을 위한 제 목소리입니다. 어떠세요?",
+  ar: "مرحبا! هذا صوتي لرواية مقاطع الفيديو الخاصة بك. ما رأيك؟",
+  ru: "Привет! Так звучит мой голос в ваших видео. Как вам?",
+};
+
+export function sampleSentence(locale?: string): string {
+  const language = String(locale ?? "fr").slice(0, 2).toLowerCase();
+  return SAMPLE_SENTENCES[language] ?? SAMPLE_SENTENCES.en;
+}
+
+/** Nom du fichier d'un extrait : une empreinte de la voix, des réglages et de la phrase. */
+export function sampleFileName(voice: string, speed: number, tone: string | undefined, text: string, extension: "mp3" | "wav"): string {
+  const key = JSON.stringify({ voice, speed: Number(speed.toFixed(2)), tone: tone ?? "", text });
+  return `sample-${createHash("sha256").update(key).digest("hex").slice(0, 32)}.${extension}`;
+}
+
+export function sampleUrl(file: string): string {
+  return `/api/modules/clip-studio/data/voice-samples/${file}`;
+}
+
+const pendingSamples = new Map<string, Promise<{ url: string; cached: boolean }>>();
+
+/**
+ * Extrait d'écoute d'une voix : synthétisé une seule fois, puis gardé dans
+ * les données du module. Les voix en ligne gardent le son tel qu'il arrive
+ * (MP3 ou WAV), que le navigateur lit directement.
+ */
+export function voiceSample(input: { voice: string; speed?: number; tone?: string; locale?: string }): Promise<{ url: string; cached: boolean }> {
+  const voiceId = String(input.voice ?? "");
+  const cloud = parseCloudVoice(voiceId);
+  if (!cloud && !VOICES.some((voice) => voice.id === voiceId)) return Promise.reject(new Error("Voix inconnue."));
+  if (cloud && !isCloudVoiceUsable(voiceId)) return Promise.reject(new Error("Cette source de voix n'est pas configurée."));
+  const speed = cleanSpeed(input.speed);
+  const tone = cloud ? undefined : isPiperTone(input.tone) ? input.tone : DEFAULT_TONE;
+  // Langue : celle de la voix (« fr-FR-DeniseNeural »), sinon celle donnée par l'interface.
+  const locale = cloud ? /^([a-z]{2,3})-/.exec(cloud.voice)?.[1] ?? input.locale : "fr";
+  const text = sampleSentence(locale);
+
+  // Fichier déjà là : quelle que soit son extension.
+  for (const extension of ["mp3", "wav"] as const) {
+    const file = sampleFileName(voiceId, speed, tone, text, extension);
+    if (fs.existsSync(path.join(SAMPLES_DIR, file))) return Promise.resolve({ url: sampleUrl(file), cached: true });
+  }
+  const key = sampleFileName(voiceId, speed, tone, text, "wav");
+  const running = pendingSamples.get(key);
+  if (running) return running;
+
+  const task = (async () => {
+    fs.mkdirSync(SAMPLES_DIR, { recursive: true });
+    if (cloud) {
+      const { audio, extension } = await synthesizeCloud(voiceId, text, speed);
+      const file = sampleFileName(voiceId, speed, tone, text, extension);
+      fs.writeFileSync(path.join(SAMPLES_DIR, file), audio);
+      return { url: sampleUrl(file), cached: false };
+    }
+    const file = key;
+    const temporary = path.join(SAMPLES_DIR, `${file}.${process.pid}.tmp.wav`);
+    await inPiperQueue(() => runPiper(findVoice(voiceId), text, speed, tone ?? DEFAULT_TONE, temporary));
+    fs.renameSync(temporary, path.join(SAMPLES_DIR, file));
+    return { url: sampleUrl(file), cached: false };
+  })().finally(() => pendingSamples.delete(key));
+  pendingSamples.set(key, task);
+  return task;
 }

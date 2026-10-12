@@ -83,6 +83,7 @@ Ajoutés pour ce module et réutilisables par tous :
 | 9 | Trouver avant de générer : l’assistant cherche une image qui existe (banque libre Openverse, puis le web par Codex si on l’autorise ; le web d’abord pour un produit commercial récent) et ne génère que ce qui n’existe pas ; icône ou logo officiel posé à côté du nom d’un jeu, d’un film, d’une appli ou d’une marque ; onglet « Trouver » dans le panneau Médias ; droits suivis jusqu’à la publication. Voir « Trouver avant de générer » ci-dessous | Réalisée |
 | 10 | Bibliothèque d’animations : un modèle à pistes d’images clés, le texte animé lettre par lettre et mot par mot, 250 à 300 préréglages (éléments, texte, transitions, caméra, impacts), un sélecteur à vignettes animées, le mouvement des marques. Voir [01 bis – la bibliothèque d’animations](01-clip-studio-animations.md) | En cours (A0 à A3 faites) |
 | 11 | Vérification des faits : la date du jour dans les consignes ; le web pour écrire le script quand la demande porte sur des faits réels et que la case « Chercher aussi sur le web » est cochée ; une seconde passe de Codex qui contrôle chaque segment (corrigé, remplacé, retiré ou douteux, avec ses sources), les doutes dits dans le suivi, les sources rangées dans le projet (`lib/fact-check.ts`). Voir « Vérification des faits » ci-dessous | Réalisée |
+| 12 | Voix gratuites et naturelles : sélecteur de source (locales, Edge, Azure, OpenAI, Google, ElevenLabs), voix de la lecture à voix haute d’Edge sans clé, Microsoft Azure avec son offre gratuite suivie, bouton « Écouter » mis en cache, intonation des voix locales, « Changer la voix de la piste… ». Voir « Voix : sources, écoute et changement de voix » ci-dessous | Réalisée |
 
 ### Trouver avant de générer (étape 9)
 
@@ -321,6 +322,85 @@ peut les citer dans la description.
   seulement, sans identifiants, 500 caractères au plus, trois par segment,
   titres nettoyés et bornés. Elles ne sont **jamais** téléchargées par le
   serveur.
+
+### Voix : sources, écoute et changement de voix (étape 12)
+
+**Diagnostic de la chaîne audio.** Les voix locales jugées « molles » ne
+venaient pas de Clip Studio. Le WAV de Piper (22 050 Hz, 16 bits, mono) est lu
+avec la fréquence de son en-tête, au mixage comme à l’aperçu, et aucune voix
+n’est étirée ni accélérée pour tenir dans un segment (seules les vidéos ont
+une vitesse ; c’est le segment qui s’allonge à la durée de sa voix). Un même
+texte lu par Piper en direct et par Clip Studio donne la même durée à 1 % près,
+l’écart venant de la part aléatoire de Piper,
+qui ne lit jamais deux fois un texte à l’identique. L’impression vient des réglages
+d’origine des modèles (`noise_scale` 0,667, `noise_w` 0,8) : la durée des sons
+varie beaucoup, d’où un débit irrégulier, que le débit « Posée » (×0,85)
+accentue.
+
+**Intonation des voix locales.** Le panneau Voix et la fenêtre de changement
+de voix proposent « Régulière » (0,5 / 0,4), « Équilibrée » (0,6 / 0,6, par
+défaut) et « Expressive » (valeurs d’origine du modèle). Le réglage suit le
+compte et reste dans la fiche de chaque voix produite.
+
+**Sources.** Le choix d’une voix commence par la source, puis la voix, avec
+recherche, langue (le français par défaut) et genre quand il est connu. Une
+source indisponible dit comment l’activer. La langue et le genre filtrés
+restent dans le navigateur.
+
+| Source | Clé | Coût | Mots horodatés |
+| --- | --- | --- | --- |
+| Locales (Piper) | aucune | gratuit, calcul sur le serveur | alignement sur les pauses (`lib/align.ts`) |
+| Microsoft Edge (lecture à voix haute) | aucune | gratuit | donnés par Microsoft (`WordBoundary`) |
+| Microsoft Azure | `AZURE_SPEECH_KEY` et `AZURE_SPEECH_REGION` | gratuit jusqu’à 500 000 caractères par mois (offre F0) | alignement sur les pauses |
+| OpenAI, Google Cloud, ElevenLabs | une clé chacun | payé à l’usage | alignement sur les pauses |
+
+**Microsoft Edge.** Clip Studio parle le protocole de la lecture à voix haute
+du navigateur Edge (`lib/edge-tts.ts`) : liste des voix en HTTPS, synthèse par
+WebSocket avec la clé publique du client Edge, un jeton `Sec-MS-GEC` recalculé
+toutes les cinq minutes et l’en-tête `Origin` d’Edge. Depuis octobre 2026,
+Microsoft synthétise par `api.msedgeservices.com` ; l’ancien hôte
+`speech.platform.bing.com` répond 403 dans beaucoup de pays et ne sert plus
+que de second essai. **Accès non officiel :** il peut cesser du jour au
+lendemain. Chaque hôte est essayé une fois, l’horloge est recalée une fois sur
+l’heure de Microsoft si elle était décalée, puis l’erreur dit « Microsoft a
+changé l’accès de lecture d’Edge : passez par Azure ou une voix locale ».
+Délais bornés : 10 s pour se connecter, 45 s pour une lecture. Un admin peut
+désactiver Edge dans « Voix en ligne ».
+
+**Microsoft Azure.** API REST officielle : liste
+`https://<région>.tts.speech.microsoft.com/cognitiveservices/voices/list`,
+synthèse `POST …/cognitiveservices/v1` en SSML, en-têtes
+`Ocp-Apim-Subscription-Key`, `Content-Type: application/ssml+xml`,
+`X-Microsoft-OutputFormat: riff-24khz-16bit-mono-pcm` et `User-Agent`. Seules
+les voix neuronales standard sont proposées, pas les voix HD, hors offre
+gratuite. Les caractères facturés (tout le SSML sauf `<speak>` et `<voice>`,
+un idéogramme chinois compte double) sont comptés par mois dans
+`data/tts-usage.json`, extraits d’écoute compris, et affichés en jauge dans
+« Voix en ligne » et dans le sélecteur. Au-delà de 500 000 dans le mois, Clip
+Studio n’envoie plus rien : une ressource payante ne facture donc rien par ce
+module. Le compte est local : une autre application qui utilise la même clé
+n’y figure pas. Un refus 429 (quota du mois ou plus de 20 demandes par
+minute) donne un message clair, sans nouvel essai ; les demandes sont espacées
+pour rester sous 20 par minute.
+
+**Écouter.** Chaque voix a un bouton « Écouter », partout où l’on choisit une
+voix : une phrase d’exemple dans la langue de la voix, synthétisée une seule
+fois puis gardée dans `data/voice-samples/` (nom = empreinte de la voix, des
+réglages et de la phrase). Un seul extrait joue à la fois ; un second clic
+l’arrête.
+
+**Changer la voix d’une piste.** Clic droit sur un extrait de voix dans la
+timeline, ou bouton de l’inspecteur : « Changer la voix de la piste… ». On
+choisit la voix (avec écoute), le débit et l’intonation, puis chaque extrait
+est relu dans l’ordre avec son texte d’origine (`respeakVoice`). Le texte est
+gardé dans la fiche du son (`speech`) depuis cette étape, et retrouvé par ses
+mots horodatés pour les voix plus anciennes. Chaque extrait garde son instant
+de départ ; sa durée suit la nouvelle lecture. Les sous-titres animés liés
+reprennent les nouveaux mots (un sous-titre scindé redevient un seul
+morceau). Le projet change une seule fois : une seule étape d’annulation. Un
+extrait en échec garde l’ancienne voix et reste signalé ; relancer avec les
+mêmes réglages ne refait que les échecs. Un extrait devenu plus long que
+l’écart avant le suivant est signalé.
 
 ## 1. Pourquoi ce module
 
@@ -619,6 +699,11 @@ dès qu’il est prêt, sans que l’utilisateur ait à le savoir.
 | `getStudioState(projectId)` | Travaux en cours et exports, en un appel |
 | `cancelExport(jobId)` | Annulation |
 | `sendToGallery(projectId, exportId)` | Copie dans les uploads et `announceNewUpload` |
+| `getVoices()` | Voix de toutes les sources prêtes, et disponibilité de chaque source |
+| `speak({ text, voice, speed, tone })` | Lit un texte et range le son parmi les médias |
+| `previewVoice({ voice, speed, tone })` | Extrait d’écoute, mis en cache |
+| `respeakVoice({ ref, text, voice, speed, tone })` | Relit une voix de la timeline avec une autre voix |
+| `getTtsProviders()`, `saveTtsKey({ provider, key, region, enabled })` | Clés, région d’Azure, interrupteur d’Edge (admins seulement) |
 
 ## 7. Intégration
 

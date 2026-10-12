@@ -1333,6 +1333,7 @@ async function speakLine(text: string, voice: string): Promise<VoiceClip | undef
         durationMs,
         credit: asset.credit,
         words,
+        ...(asset.speech ? { speech: asset.speech } : {}),
       },
     };
   } catch {

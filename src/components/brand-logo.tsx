@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
  * ElevenLabs, Claude, Codex, Gemini, Google, Google Cloud et Stability AI ;
  * simple-icons (CC0) pour Openverse ; icône publiée par jamendo.com pour
  * Jamendo ; icônes publiées par leurs propres sites pour trace.moe, SauceNAO,
- * IQDB, Yandex, TinEye, ascii2d, Bing et SerpApi ; simple-icons 16.28.0
+ * IQDB, Yandex, TinEye, ascii2d, Bing et SerpApi ; logo à quatre carrés
+ * publié par Microsoft pour Microsoft ; simple-icons 16.28.0
  * (CC0) pour les tracés de YouTube, Facebook, Instagram, Threads et X, avec
  * les couleurs de leurs chartes (rouge YouTube #FF0000, bleu Facebook
  * #0866FF, dégradé d'Instagram ; Threads et X sont monochromes). Les marques
@@ -39,6 +40,7 @@ export type Brand =
   | "ascii2d"
   | "bing"
   | "serpapi"
+  | "microsoft"
   | "youtube"
   | "facebook"
   | "instagram"
@@ -81,6 +83,7 @@ const FILES: Partial<Record<Brand, string>> = {
   ascii2d: "/logos/ascii2d.png",
   bing: "/logos/bing.png",
   serpapi: "/logos/serpapi.png",
+  microsoft: "/logos/microsoft.svg",
 };
 
 const NAMES: Record<Brand, string> = {
@@ -102,6 +105,7 @@ const NAMES: Record<Brand, string> = {
   ascii2d: "ascii2d",
   bing: "Bing",
   serpapi: "SerpApi",
+  microsoft: "Microsoft",
   youtube: "YouTube",
   facebook: "Facebook",
   instagram: "Instagram",

@@ -94,6 +94,17 @@ export interface MediaSource {
   rights?: "free" | "unverified";
   /** Voix de synthèse : instants de chaque mot, pour les sous-titres. */
   words?: TimedWord[];
+  /** Voix de synthèse : texte lu et réglages, pour la relire avec une autre voix. */
+  speech?: SpeechInfo;
+}
+
+/** Texte d'une voix de synthèse et réglages qui l'ont produite. */
+export interface SpeechInfo {
+  text: string;
+  voice: string;
+  speed?: number;
+  /** Intonation d'une voix locale (Piper) : « steady », « balanced » ou « expressive ». */
+  tone?: string;
 }
 
 /** Position et taille relatives au canevas ; x et y désignent le centre. */
@@ -367,5 +378,7 @@ export interface ClipAsset {
   credit?: string;
   /** Voix de synthèse : instants de chaque mot, pour les sous-titres. */
   words?: TimedWord[];
+  /** Voix de synthèse : texte lu et réglages. */
+  speech?: SpeechInfo;
   createdAt: number;
 }

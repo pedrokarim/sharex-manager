@@ -49,7 +49,7 @@ import { ASPECTS, type AspectPreset, type MediaSource } from "../engine/types";
 import { callModule, fetchBrandTheme, probeMedia, useBrandKits, type BrandKitChoice } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
 import { IMAGE_SOURCE_MODES, type ImageSourceMode } from "../lib/image-search-types";
-import { useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
+import { lastPickedVoice, useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
 import { MOOD_LABELS } from "./music-panel";
 import { BrandKitMark } from "./inspector";
 
@@ -169,8 +169,17 @@ export function CreateDialog({
   };
   const [withVoice, setWithVoice] = useState(true);
   const [voice, setVoice] = useState("siwis");
+  // Voix choisie la dernière fois sur ce navigateur (préférence locale).
+  useEffect(() => {
+    const remembered = lastPickedVoice();
+    if (remembered) setVoice(remembered);
+  }, []);
   const [music, setMusic] = useState<string>("auto");
   const { info: voices, prepare: prepareVoice } = useVoices();
+  // Une voix retenue mais plus proposée (clé retirée, source coupée) : retour à la voix locale.
+  useEffect(() => {
+    if (voices && !voices.voices.some((entry) => entry.id === voice)) setVoice("siwis");
+  }, [voices, voice]);
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<AssistantJob | null>(null);
   // Module des marques absent (`null`) ou sans marque : le sélecteur ne s'affiche pas.

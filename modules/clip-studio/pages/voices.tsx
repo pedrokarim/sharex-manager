@@ -7,9 +7,12 @@ import { ArrowLeft, AudioLines, ExternalLink, Eye, EyeOff, Lock, TriangleAlert }
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import type { ProviderStatus } from "../lib/cloud-tts";
@@ -17,12 +20,17 @@ import type { VoiceStatus } from "../lib/tts";
 import { callModule } from "../lib/client";
 
 const PROVIDER_BRANDS: Record<ProviderStatus["id"], Brand> = {
+  edge: "microsoft",
+  azure: "microsoft",
   openai: "openai",
   google: "googlecloud",
   elevenlabs: "elevenlabs",
 };
 
 const DESCRIPTIONS: Record<ProviderStatus["id"], string> = {
+  edge: "Les voix neuronales de la lecture à voix haute d’Edge, gratuites, sans clé ni compte. Accès non officiel : Microsoft peut le changer ou le couper sans préavis.",
+  azure:
+    "Les voix neuronales officielles de Microsoft. Créez une ressource « Speech » au niveau gratuit (F0) : 500 000 caractères par mois, 20 demandes par minute. Copiez sa clé et sa région.",
   openai: "Neuf voix naturelles qui parlent français (modèle gpt-4o-mini-tts).",
   google: "Voix françaises Neural2, WaveNet et Studio. Activez l’API Cloud Text-to-Speech sur le projet de la clé.",
   elevenlabs: "Les voix de votre compte ElevenLabs, lues avec le modèle multilingue.",
@@ -66,7 +74,8 @@ export default function VoicesPage() {
         <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight">Voix en ligne</h1>
           <p className="text-sm text-muted-foreground">
-            Des voix plus naturelles que Piper, payées à l’usage chez chaque fournisseur.
+            Des voix plus naturelles que Piper&nbsp;: gratuites avec Microsoft Edge et l’offre gratuite d’Azure, payées à
+            l’usage chez les autres fournisseurs.
           </p>
         </div>
       </header>
@@ -85,7 +94,7 @@ export default function VoicesPage() {
         </p>
       ) : providers === null ? (
         <div className="space-y-3">
-          {[0, 1, 2].map((index) => (
+          {[0, 1, 2, 3, 4].map((index) => (
             <Skeleton key={index} className="h-36 rounded-xl" />
           ))}
         </div>
@@ -118,6 +127,8 @@ function ProviderCard({
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const [regionDraft, setRegionDraft] = useState(provider.region ?? "");
+
   const save = async () => {
     setBusy(true);
     try {
@@ -131,6 +142,54 @@ function ProviderCard({
       setBusy(false);
     }
   };
+
+  const saveRegion = async () => {
+    setBusy(true);
+    try {
+      await callModule("saveTtsKey", { provider: provider.id, region: regionDraft });
+      await onSaved();
+      toast.success(regionDraft ? "Région enregistrée" : "Région supprimée");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Enregistrement impossible");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleEdge = async (enabled: boolean) => {
+    setBusy(true);
+    try {
+      await callModule("saveTtsKey", { provider: provider.id, enabled });
+      await onSaved();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Enregistrement impossible");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (provider.keyless) {
+    return (
+      <section className="rounded-xl border p-4">
+        <Field>
+          <div className="flex items-start gap-3">
+            <FieldLabel htmlFor={`tts-enabled-${provider.id}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <BrandLogo brand={PROVIDER_BRANDS[provider.id]} className="size-5" />
+              Microsoft Edge (lecture à voix haute)
+              {provider.enabled && !provider.error && (
+                <span className="text-xs font-normal text-muted-foreground">
+                  {voiceCount} voix disponible{voiceCount > 1 ? "s" : ""}
+                </span>
+              )}
+            </FieldLabel>
+            <Switch id={`tts-enabled-${provider.id}`} checked={Boolean(provider.enabled)} disabled={busy} onCheckedChange={toggleEdge} />
+          </div>
+          <FieldDescription>{DESCRIPTIONS[provider.id]}</FieldDescription>
+          {provider.error && <p className="text-xs break-words text-destructive">{provider.error}</p>}
+        </Field>
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-xl border p-4">
@@ -169,7 +228,23 @@ function ProviderCard({
         </div>
         <FieldDescription>{DESCRIPTIONS[provider.id]}</FieldDescription>
 
-        {provider.error && <p className="text-xs text-destructive">{provider.error}</p>}
+        {provider.error && <p className="text-xs break-words text-destructive">{provider.error}</p>}
+
+        {provider.usage && (
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs">
+              <span className="text-muted-foreground">Caractères envoyés ce mois-ci (offre gratuite)</span>
+              <span className="tabular-nums">
+                {provider.usage.characters.toLocaleString("fr-FR")} / {provider.usage.limit.toLocaleString("fr-FR")}
+              </span>
+            </div>
+            <Progress value={Math.min(100, (provider.usage.characters / provider.usage.limit) * 100)} className="h-1.5" />
+            <p className="text-[11px] text-muted-foreground">
+              Compté par Clip Studio, écoutes comprises. Au-delà de 500&nbsp;000, Clip Studio refuse d’envoyer, pour qu’une
+              ressource payante ne facture rien.
+            </p>
+          </div>
+        )}
 
         {provider.fromEnv ? (
           <FieldDescription>
@@ -203,6 +278,26 @@ function ProviderCard({
             </Button>
           </div>
         )}
+        {provider.id === "azure" &&
+          (provider.regionFromEnv ? (
+            <FieldDescription>
+              Région définie par l’environnement du serveur ({provider.regionEnvVariable}) : {provider.region}.
+            </FieldDescription>
+          ) : (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                aria-label="Région de la ressource Azure"
+                placeholder="Région, par exemple westeurope ou francecentral"
+                value={regionDraft}
+                onChange={(event) => setRegionDraft(event.target.value)}
+                className="flex-1 font-mono text-xs"
+                autoComplete="off"
+              />
+              <Button variant="outline" disabled={busy || regionDraft.trim() === (provider.region ?? "")} onClick={saveRegion}>
+                Enregistrer la région
+              </Button>
+            </div>
+          ))}
       </Field>
     </section>
   );

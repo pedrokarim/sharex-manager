@@ -30,8 +30,8 @@ import {
   writeExports,
   writeProject,
 } from "./lib/store";
-import { prefetchTts, prepareVoice as downloadVoice, synthesize, voiceStatuses } from "./lib/tts";
-import { isCloudProvider, providerStatuses, saveProviderKey, type ProviderStatus } from "./lib/cloud-tts";
+import { prefetchTts, prepareVoice as downloadVoice, respeak, synthesize, voiceSample, voiceStatuses, type SpeakInput } from "./lib/tts";
+import { isCloudProvider, isKeyProvider, providerStatuses, saveAzureRegion, saveProviderKey, setEdgeEnabled, type ProviderStatus } from "./lib/cloud-tts";
 import {
   addMusic,
   downloadTrack,
@@ -790,16 +790,47 @@ export async function getTtsProviders(): Promise<ProviderStatus[]> {
   return providerStatuses();
 }
 
-/** Enregistre (ou efface, avec une chaîne vide) la clé d'un fournisseur. */
-export async function saveTtsKey(input: { provider: string; key: string }): Promise<ProviderStatus[]> {
+/**
+ * Enregistre (ou efface, avec une chaîne vide) la clé d'un fournisseur, la
+ * région d'Azure, ou active les voix d'Edge. Seuls les champs présents
+ * changent. Réservée aux admins, comme `getTtsProviders`.
+ */
+export async function saveTtsKey(input: { provider: string; key?: string; region?: string; enabled?: boolean }): Promise<ProviderStatus[]> {
   if (!isCloudProvider(input?.provider)) throw new Error("Fournisseur inconnu.");
-  saveProviderKey(input.provider, String(input.key ?? ""));
+  if (input.provider === "edge") {
+    if (typeof input.enabled === "boolean") setEdgeEnabled(input.enabled);
+    return providerStatuses();
+  }
+  if (input.provider === "azure" && typeof input.region === "string") saveAzureRegion(input.region);
+  if (typeof input.key === "string" && isKeyProvider(input.provider)) saveProviderKey(input.provider, input.key);
   return providerStatuses();
 }
 
 /** Lit un texte et range le son parmi les médias du module. */
-export async function speak(input: { text: string; voice?: string; speed?: number }) {
+export async function speak(input: SpeakInput) {
   return synthesize(input);
+}
+
+/**
+ * Extrait d'écoute d'une voix, synthétisé une fois puis gardé en cache dans
+ * les données du module. Renvoie son adresse de lecture.
+ */
+export async function previewVoice(input: { voice: string; speed?: number; tone?: string; locale?: string }): Promise<{ url: string; cached: boolean }> {
+  return voiceSample({ voice: String(input?.voice ?? ""), speed: input?.speed, tone: input?.tone, locale: input?.locale });
+}
+
+/**
+ * Relit une voix de la timeline avec une autre voix, à partir de son texte
+ * d'origine (gardé dans la fiche du son). Sert à changer la voix d'une piste.
+ */
+export async function respeakVoice(input: { ref?: string; text?: string; voice: string; speed?: number; tone?: string }) {
+  return respeak({
+    ref: typeof input?.ref === "string" ? input.ref : undefined,
+    text: typeof input?.text === "string" ? input.text.slice(0, 2000) : undefined,
+    voice: String(input?.voice ?? ""),
+    speed: typeof input?.speed === "number" ? input.speed : undefined,
+    tone: typeof input?.tone === "string" ? input.tone : undefined,
+  });
 }
 
 // ─── Banque de musique ───────────────────────────────────────────

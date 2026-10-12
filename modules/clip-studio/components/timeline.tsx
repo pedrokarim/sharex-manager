@@ -10,6 +10,7 @@ import {
   Film,
   Image as ImageIcon,
   Lock,
+  Mic,
   Minus,
   Pause,
   Play,
@@ -51,6 +52,7 @@ import {
 import { ScenePickerDialog, SceneSubmenu, useSceneFavorites } from "./scene-picker";
 import { ShotFxMarker } from "./scene-fx";
 import type { ClipItem, ClipProject, ShotEffect, Track, VisualItem } from "../engine/types";
+import { isVoiceItem } from "../engine/revoice";
 
 export const MEDIA_DRAG_TYPE = "application/x-clip-media";
 
@@ -89,6 +91,8 @@ interface TimelineProps {
   /** `key` regroupe les réglages successifs (curseur d'un effet de plan) en une étape d'annulation. */
   onTrackPatch: (trackId: string, patch: Partial<Track>, key?: string) => void;
   onDropMedia: (payload: string, trackId: string, frame: number) => void;
+  /** Relit tous les extraits d'une piste de voix avec une autre voix. */
+  onChangeTrackVoice?: (trackId: string) => void;
 }
 
 type Drag =
@@ -1013,6 +1017,16 @@ function TimelineItem({
             onPick={(kind) => onAddEffect(kind, contextFrame)}
             onMore={() => onOpenScene({ kind: "shotfx", trackId: track.id, frame: contextFrame })}
           />
+        )}
+        {props.onChangeTrackVoice && isVoiceItem(item) && (
+          <>
+            <ContextMenuSeparator />
+            {/* Le menu se ferme avant que la fenêtre s'ouvre, comme pour les animations. */}
+            <ContextMenuItem onClick={() => window.setTimeout(() => props.onChangeTrackVoice?.(track.id), 0)}>
+              <Mic className="mr-2 h-4 w-4" />
+              Changer la voix de la piste…
+            </ContextMenuItem>
+          </>
         )}
         <ContextMenuSeparator />
         <ContextMenuItem variant="destructive" onClick={() => props.onDelete(item.id)}>
