@@ -134,19 +134,21 @@ export interface UploadResult {
   ref: string;
 }
 
-/** Dépose un fichier dans les données du module, avec suivi de progression. */
-export function uploadFile(
-  file: Blob,
-  name: string,
-  onProgress?: (ratio: number) => void
-): Promise<UploadResult> {
+/**
+ * Au-delà, un fichier part en morceaux : Cloudflare refuse toute requête de
+ * plus de 100 Mo, et un clip de quelques minutes les dépasse.
+ */
+const CHUNK_BYTES = 48 * 1024 * 1024;
+
+/** Réponse d'un envoi : JSON du serveur, ou l'erreur à montrer. */
+function sendUpload<T>(url: string, body: Blob | FormData, onProgress?: (loaded: number) => void, extraHeaders?: Record<string, string>): Promise<T> {
   return new Promise((resolve, reject) => {
-    const form = new FormData();
-    form.append("file", file, name);
     const request = new XMLHttpRequest();
-    request.open("POST", `/api/modules/${MODULE_NAME}/upload`);
+    request.open("POST", url);
+    if (!(body instanceof FormData)) request.setRequestHeader("Content-Type", "application/octet-stream");
+    for (const [header, value] of Object.entries(extraHeaders ?? {})) request.setRequestHeader(header, value);
     request.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress?.(event.loaded / event.total);
+      if (event.lengthComputable) onProgress?.(event.loaded);
     };
     request.onload = () => {
       let payload: any = null;
@@ -156,12 +158,41 @@ export function uploadFile(
         // Réponse non JSON (proxy qui refuse un fichier trop lourd, par exemple).
       }
       if (request.status >= 200 && request.status < 300 && payload) resolve(payload);
-      else if (request.status === 413) reject(new Error("Fichier trop lourd pour le serveur"));
+      else if (request.status === 413) reject(new Error(payload?.error ?? "Fichier trop lourd pour le serveur"));
       else reject(new Error(payload?.error ?? `Envoi impossible (HTTP ${request.status})`));
     };
     request.onerror = () => reject(new Error("Envoi interrompu"));
-    request.send(form);
+    request.send(body);
   });
+}
+
+/** Envoi en morceaux successifs, recollés par le serveur ; la progression couvre tout le fichier. */
+async function uploadInChunks(file: Blob, name: string, onProgress?: (ratio: number) => void): Promise<UploadResult> {
+  const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const chunks = Math.ceil(file.size / CHUNK_BYTES);
+  let result: UploadResult | null = null;
+  for (let index = 0; index < chunks; index++) {
+    const start = index * CHUNK_BYTES;
+    const part = file.slice(start, Math.min(file.size, start + CHUNK_BYTES));
+    // Le nom d'origine part une seule fois, en en-tête : il ne finit ni dans l'adresse ni dans les journaux.
+    const query = new URLSearchParams({ upload: id, chunk: String(index), of: String(chunks), size: String(file.size) });
+    const extraHeaders = index === 0 ? { "X-File-Name": encodeURIComponent(name) } : undefined;
+    const response = await sendUpload<UploadResult>(`/api/modules/${MODULE_NAME}/upload?${query}`, part, (loaded) => onProgress?.((start + loaded) / file.size), extraHeaders);
+    if (index === chunks - 1) result = response;
+  }
+  return result!;
+}
+
+/** Dépose un fichier dans les données du module, avec suivi de progression. */
+export function uploadFile(
+  file: Blob,
+  name: string,
+  onProgress?: (ratio: number) => void
+): Promise<UploadResult> {
+  if (file.size > CHUNK_BYTES) return uploadInChunks(file, name, onProgress);
+  const form = new FormData();
+  form.append("file", file, name);
+  return sendUpload<UploadResult>(`/api/modules/${MODULE_NAME}/upload`, form, (loaded) => onProgress?.(loaded / Math.max(1, file.size)));
 }
 
 /** Envoie un fichier local et l'enregistre comme média du module. */

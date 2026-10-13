@@ -126,7 +126,8 @@ async function generateThumbnail(
   config: UploadConfig,
   originalFormat: string
 ): Promise<Buffer> {
-  let sharpInstance = sharp(buffer);
+  // Une image minuscule sur le disque peut décoder des centaines de millions de pixels : plafond explicite.
+  let sharpInstance = sharp(buffer, { limitInputPixels: 40_000_000 });
 
   // Déterminer le format de sortie
   const outputFormat =

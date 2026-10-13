@@ -58,6 +58,13 @@ vi.mock("@/lib/connections", () => ({
 }));
 
 const clip = await import("@/modules/clip-studio/index.process");
+/** Début d'un MP4 tel que l'écrit l'encodeur (boîte `ftyp`, marque `isom`), complété d'octets quelconques. */
+function fakeMp4(size = 2048): Buffer {
+  const file = Buffer.alloc(size, 1);
+  Buffer.from([0, 0, 0, 0x1c, ...Buffer.from("ftypisom", "latin1")]).copy(file);
+  return file;
+}
+
 const { ASSETS_DIR, EXPORTS_DIR, writeProject } = await import("@/modules/clip-studio/lib/store");
 
 const KIT = {
@@ -135,7 +142,7 @@ beforeEach(() => {
 /** Dépose une vidéo comme le ferait la route d'upload, puis l'enregistre. */
 async function newExport(extra: Record<string, unknown> = {}) {
   const file = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}.mp4`;
-  fs.writeFileSync(path.join(ASSETS_DIR, file), Buffer.alloc(2048, 1));
+  fs.writeFileSync(path.join(ASSETS_DIR, file), fakeMp4());
   return clip.registerExport({ file, projectId: "clip-demo", projectName: "Cinq jeux à surveiller", width: 1080, height: 1920, durationMs: 12_000, ...extra });
 }
 
@@ -166,10 +173,17 @@ describe("registerExport", () => {
 
   it("refuse des sous-titres mal formés sans déplacer la vidéo", async () => {
     const file = "refus-1.mp4";
-    fs.writeFileSync(path.join(ASSETS_DIR, file), "x");
+    fs.writeFileSync(path.join(ASSETS_DIR, file), fakeMp4());
     await expect(clip.registerExport({ file, projectId: "clip-demo", projectName: "p", width: 1, height: 1, durationMs: 1, subtitles: { srt: "n'importe quoi" } })).rejects.toThrow("Sous-titres invalides");
     expect(fs.existsSync(path.join(ASSETS_DIR, file))).toBe(true);
     expect(await clip.listExports()).toEqual([]);
+  });
+
+  it("refuse un fichier déposé qui n'est pas une vidéo MP4", async () => {
+    const file = "pas-une-video.mp4";
+    fs.writeFileSync(path.join(ASSETS_DIR, file), "x".repeat(64));
+    await expect(clip.registerExport({ file, projectId: "clip-demo", projectName: "p", width: 1, height: 1, durationMs: 1 })).rejects.toThrow("n'est pas une vidéo MP4");
+    expect(fs.existsSync(path.join(ASSETS_DIR, file))).toBe(true);
   });
 
   it("enregistre l'export même sans marque disponible", async () => {

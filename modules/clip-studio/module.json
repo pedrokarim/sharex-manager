@@ -14,7 +14,7 @@
   "hasUI": false,
   "supportedFileTypes": [],
   "settings": {},
-  "uploads": { "maxMb": 95, "kinds": ["image", "video", "audio"] },
+  "uploads": { "maxMb": 500, "kinds": ["image", "video", "audio"] },
   "functions": {
     "listProjects": "user",
     "getProject": "user",

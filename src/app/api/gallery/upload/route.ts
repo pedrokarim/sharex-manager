@@ -7,6 +7,8 @@ import { recordUpload } from "@/lib/history";
 import { getServerConfig } from "@/lib/server/config";
 import { handleFileUpload } from "@/lib/upload";
 import { logDb } from "@/lib/utils/db";
+import { isTrustedOrigin } from "@/lib/api-guard";
+import { maxVideoMb } from "@/lib/media-kind";
 
 export async function POST(request: NextRequest) {
   // Hors du try : le bloc catch en a besoin pour journaliser l'erreur, et y
@@ -34,6 +36,24 @@ export async function POST(request: NextRequest) {
         userEmail: session.user?.email || undefined,
       });
       return NextResponse.json({ error: "Session invalide" }, { status: 401 });
+    }
+
+    // Envoi par cookie de session : une page d'un autre sous-domaine d'ascencia.re
+    // (cookie SameSite=Lax) ne doit pas pouvoir déposer dans la galerie.
+    if (!isTrustedOrigin(request.headers.get("origin"))) {
+      return NextResponse.json({ error: "Origine refusée" }, { status: 403 });
+    }
+
+    // `formData()` charge tout le corps en mémoire : taille annoncée et bornée d'abord.
+    const declared = Number(request.headers.get("content-length"));
+    const serverConfig = await getServerConfig();
+    const limits = serverConfig.limits;
+    const maxMb = serverConfig.allowedTypes.videos ? Math.max(limits.maxFileSize, maxVideoMb(limits)) : limits.maxFileSize;
+    if (!Number.isFinite(declared) || declared <= 0) {
+      return NextResponse.json({ error: "Taille de l'envoi non annoncée" }, { status: 411 });
+    }
+    if (declared > maxMb * 1024 * 1024 + 1024 * 1024) {
+      return NextResponse.json({ error: `La taille du fichier dépasse la limite de ${maxMb} Mo` }, { status: 413 });
     }
 
     const formData = await request.formData();

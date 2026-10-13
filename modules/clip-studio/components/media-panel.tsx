@@ -198,7 +198,7 @@ function MyMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
       >
         <Upload className="h-5 w-5 text-primary" />
         <span className="text-xs font-medium">Importer des vidéos, images ou sons</span>
-        <span className="text-[11px] text-muted-foreground">ou glissez-les ici, 95 Mo maximum</span>
+        <span className="text-[11px] text-muted-foreground">ou glissez-les ici, 500 Mo maximum</span>
       </button>
 
       <AnimatePresence initial={false}>

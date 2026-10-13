@@ -357,6 +357,23 @@ export interface RegisterExportInput {
 /** Sous-titres d'un export : même base de nom que la vidéo, 512 Kio au plus, format SubRip contrôlé. */
 const SUBTITLES_MAX_BYTES = 512 * 1024;
 
+/** Boîte `ftyp` d'un MP4 (marques vidéo courantes), lue sur les premiers octets. */
+function isMp4File(file: string): boolean {
+  const head = Buffer.alloc(12);
+  let handle: number | undefined;
+  try {
+    handle = fs.openSync(file, "r");
+    fs.readSync(handle, head, 0, 12, 0);
+  } catch {
+    return false;
+  } finally {
+    if (handle !== undefined) fs.closeSync(handle);
+  }
+  if (head.subarray(4, 8).toString("latin1") !== "ftyp") return false;
+  const brand = head.subarray(8, 12).toString("latin1");
+  return /^(isom|iso[2-9]|mp4[12]|avc1|M4V |mp42|dash)$/.test(brand);
+}
+
 /**
  * Range un clip exporté. Le navigateur l'a d'abord déposé comme média
  * importé ; on le déplace dans `exports/` pour ne pas le mélanger aux
@@ -369,6 +386,8 @@ export async function registerExport(input: RegisterExportInput): Promise<ClipEx
   ensureDirs();
   const from = path.join(ASSETS_DIR, input.file);
   if (!fs.existsSync(from)) throw new Error("Fichier exporté introuvable");
+  // Un export est une vidéo MP4 rendue par le navigateur : n'importe quel média déposé ne le devient pas.
+  if (!isMp4File(from)) throw new Error("Le fichier exporté n'est pas une vidéo MP4");
   // Contrôlés avant de déplacer la vidéo : un refus ne laisse rien à moitié rangé.
   const srt = input.subtitles?.srt !== undefined ? validateSrt(input.subtitles.srt, SUBTITLES_MAX_BYTES) : null;
   const project = readProject(input.projectId);

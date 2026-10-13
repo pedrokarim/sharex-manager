@@ -516,7 +516,8 @@ export function voiceSample(input: { voice: string; speed?: number; tone?: strin
   const cloud = parseCloudVoice(voiceId);
   if (!cloud && !VOICES.some((voice) => voice.id === voiceId)) return Promise.reject(new Error("Voix inconnue."));
   if (cloud && !isCloudVoiceUsable(voiceId)) return Promise.reject(new Error("Cette source de voix n'est pas configurée."));
-  const speed = cleanSpeed(input.speed);
+  // Débit arrondi au pas de 0,05 : quelques extraits par voix, pas un par centième (cache et appels en ligne bornés).
+  const speed = cleanSpeed(Math.round(cleanSpeed(input.speed) * 20) / 20);
   const tone = cloud ? undefined : isPiperTone(input.tone) ? input.tone : DEFAULT_TONE;
   // Langue : celle de la voix (« fr-FR-DeniseNeural »), sinon celle donnée par l'interface.
   const locale = cloud ? /^([a-z]{2,3})-/.exec(cloud.voice)?.[1] ?? input.locale : "fr";
