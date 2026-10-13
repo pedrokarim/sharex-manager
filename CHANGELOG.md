@@ -715,6 +715,13 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Clip Studio : un export de plus de 100 Mo (clip de plus d’une minute et
+  demie environ) était refusé par Cloudflare ; les fichiers de plus de 48 Mo
+  partent désormais en morceaux, recollés par le serveur (500 Mo par fichier).
+- Envois de fichiers : origine contrôlée sur les envois par session (modules,
+  galerie), taille annoncée bornée avant lecture, type vérifié dès le premier
+  morceau, envois en cours limités par compte, plafond de pixels pour les
+  miniatures, export accepté seulement s’il est une vidéo MP4.
 - Clip Studio, voix locales : débit moins irrégulier par défaut (intonation
   « Équilibrée », bruit de Piper abaissé de 0,667 / 0,8 à 0,6 / 0,6). La chaîne
   audio ne déformait rien : ni fréquence mal lue, ni étirement de la voix.
