@@ -14,7 +14,7 @@ import { getBillingStatus, setMonthlyBudget, type BillingStatus } from "@/lib/co
 import { getConnector } from "@/lib/connections/registry";
 import { wakePublishQueue } from "@/lib/connections/publish-queue";
 import { cancelJob, cancelJobsForAccount, listJobs, retryJob } from "@/lib/connections/publish-queue";
-import { accountQuotaForAccount, forgetPosts, listPosts, quotaForAccount, removePost, updatePost } from "@/lib/connections/manage";
+import { accountPublishForm, accountQuotaForAccount, forgetPosts, listPosts, quotaForAccount, removePost, updatePost } from "@/lib/connections/manage";
 import {
   accountProfileChoices,
   addAccountSection,
@@ -33,6 +33,7 @@ import { auditConnection } from "@/lib/connections/audit";
 import type {
   AccountQuotaUsage,
   AccountSummary,
+  LivePublishForm,
   PlaylistInput,
   PlaylistSummary,
   PostPatch,
@@ -207,6 +208,18 @@ export async function measureTextAction(connectorId: string, text: string): Prom
     if (!connector.measureText) return null;
     return connector.measureText(String(text ?? "").slice(0, 100_000));
   });
+}
+
+/**
+ * Formulaire de publication d'un compte lu chez le service à l'affichage de
+ * l'écran Publier (identité, réglages permis, déclarations) ; `null` quand
+ * le service n'en a pas.
+ */
+export async function publishFormAction(
+  accountId: string,
+  media: { kind: "video" | "image" | "text" | "carousel"; durationMs?: number }
+): Promise<ActionResult<LivePublishForm | null>> {
+  return run(() => accountPublishForm(requireId(accountId), { kind: media?.kind, durationMs: Number(media?.durationMs) || undefined }));
 }
 
 export async function cancelJobAction(jobId: string): Promise<ActionResult<PublishJobSummary>> {

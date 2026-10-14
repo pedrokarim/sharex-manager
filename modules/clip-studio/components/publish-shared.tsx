@@ -39,7 +39,7 @@ import {
   type PublishMediaItem,
 } from "@/lib/connections/types";
 import { checkMediaLimits, describeMediaLimits, formatRatio, mimeTypeOfName } from "@/lib/connections/limits";
-import { defaultFieldValue, type FieldValue } from "@/components/connections/publish-field-input";
+import { defaultFieldValue, visibleValues, type FieldValue } from "@/components/connections/publish-field-input";
 import { formatSchedule } from "@/components/connections/date-time-picker";
 import { ServiceLogo, formatBytes } from "@/components/connections/shared";
 import { cancelJobAction, retryJobAction } from "@/app/(app)/admin/connections/actions";
@@ -85,6 +85,11 @@ export function prefillSettings(fields: PublishField[], kit: BrandKit | null, sy
   const values: Values = {};
   for (const field of fields) {
     let value = defaultFieldValue(field);
+    // Un choix que le service veut voir fait à la main n'est jamais prérempli.
+    if (field.kind === "select" && field.noDefault) {
+      values[field.key] = value;
+      continue;
+    }
     switch (field.role) {
       case "category":
         if (field.kind === "select" && publishing?.categoryId && field.choices.some((choice) => choice.value === publishing.categoryId)) value = publishing.categoryId;
@@ -104,11 +109,13 @@ export function prefillSettings(fields: PublishField[], kit: BrandKit | null, sy
   return values;
 }
 
-/** Options envoyées au serveur pour les réglages : champs remplis, plus la langue de la marque. */
+/** Options envoyées au serveur pour les réglages : champs remplis et affichés, plus la langue de la marque. */
 export function settingOptions(fields: PublishField[], values: Values, kit: BrandKit | null): Record<string, unknown> {
   const options: Record<string, unknown> = {};
+  const shown = visibleValues(fields, values);
   for (const field of fields) {
-    const value = values[field.key];
+    if (!(field.key in shown)) continue;
+    const value = shown[field.key];
     if (value === undefined || value === "") continue;
     options[field.key] = value;
   }
@@ -390,10 +397,11 @@ export function JobTimeline({
                   {job.state === "failed" && job.processingSince && !/sans republier/.test(job.error) ? " « Reprendre » repart du même envoi chez le service, sans republier." : ""}
                 </StepTimelineDescription>
               ) : null}
+              {job.state === "done" && job.note ? <StepTimelineDescription className="[overflow-wrap:anywhere]">{job.note}</StepTimelineDescription> : null}
               {job.warning ? <StepTimelineDescription className="text-amber-700 [overflow-wrap:anywhere] dark:text-amber-400">{job.warning}</StepTimelineDescription> : null}
               <FollowUpList job={job} account={account} authorizeReturn={authorizeReturn} />
               <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-                {job.result ? (
+                {job.result?.url ? (
                   <a href={job.result.url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-xs underline underline-offset-2">
                     Voir la publication
                     <ExternalLink className="size-3" />

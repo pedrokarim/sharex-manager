@@ -7,6 +7,17 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Comptes connectés : connecteur TikTok (dossier 07e). Connexion par Login Kit
+  (`TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, ou saisie dans « Comptes
+  connectés »), jetons renouvelés et révoqués à la déconnexion. Publication
+  d’une vidéo en brouillon dans la boîte de réception de TikTok par défaut,
+  envoyée en morceaux et suivie jusqu’à la note « Envoyé en brouillon dans
+  TikTok » ; publication directe prête, activée par la case « Application
+  auditée par TikTok », avec l’écran que TikTok exige (pseudo et réglages lus
+  à l’affichage, visibilité sans valeur d’avance, interactions, contenu
+  commercial, consentement). Quota de 15 publications directes et 5 brouillons
+  par compte sur 24 heures, liste des vidéos publiques, profil en lecture avec
+  liens vers l’application.
 - Clip Studio : écran « Idées » qui propose des sujets de vidéos, chacun
   avec titre, accroche, angle, concept, « pourquoi maintenant » (source https
   datée de moins de 72 heures pour une actualité), modèle, nombre d’éléments,
@@ -647,6 +658,12 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Comptes connectés, écran Publier : un service peut lire chez lui les
+  réglages d’un compte à l’affichage (identité, choix permis, déclarations à
+  montrer avant l’envoi) ; un choix peut n’avoir aucune valeur d’avance et
+  être exigé, une case être obligatoire ou figée, un réglage n’apparaître que
+  selon un autre. Une publication finie peut garder une remarque, affichée
+  dans le suivi.
 - Clip Studio : la recherche d’images vise le titre exact et les visuels
   officiels (key art, captures des stores et des kits presse) ; un produit
   commercial récent (jeu, film, série, appli) est cherché directement sur le

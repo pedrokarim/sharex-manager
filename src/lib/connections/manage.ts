@@ -13,6 +13,8 @@ import type {
   ConnectionCapability,
   ConnectorContext,
   Connector,
+  LivePublishForm,
+  PublishSource,
   PlaylistInput,
   PlaylistSummary,
   PostPatch,
@@ -153,6 +155,25 @@ function missingCapabilityMessage(account: { displayName: string; requestableCap
   return account.requestableCapabilities?.includes(capability)
     ? `Le compte « ${account.displayName} » n’a pas encore autorisé cela : utilisez « Autoriser… ».`
     : `Le compte « ${account.displayName} » n’a pas le droit de faire cela chez le service.`;
+}
+
+/**
+ * Formulaire de publication d'un compte, lu chez le service au moment
+ * d'afficher l'écran Publier (`Connector.publishForm`) ; `null` quand le
+ * service n'en a pas (les champs fixes du connecteur valent).
+ */
+export async function accountPublishForm(
+  accountId: string,
+  media: { kind: PublishSource["kind"]; durationMs?: number }
+): Promise<LivePublishForm | null> {
+  const kind = (["video", "image", "text", "carousel"] as const).find((value) => value === media?.kind);
+  if (!kind) throw new Error("Type de publication inconnu.");
+  const durationMs = Number(media.durationMs);
+  const { connector, account } = accountContext(accountId);
+  if (!connector.publishForm) return null;
+  return withAccount(accountId, kind === "video" ? "publish.video" : kind === "text" ? "publish.text" : "publish.image", (current, context) =>
+    current.publishForm!(context, { scopes: account.scopes, media: { kind, ...(durationMs > 0 ? { durationMs } : {}) } })
+  );
 }
 
 /** Valeurs actuelles du profil chez le service. */

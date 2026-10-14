@@ -49,6 +49,8 @@ export interface AppSettingStatus {
   secret: boolean;
   envName?: string;
   pattern?: string;
+  /** « text » (valeur saisie) ou « toggle » (case à cocher, « true » quand elle est cochée). */
+  kind?: "text" | "toggle";
   source: "env" | "file" | null;
   /** Valeur d'un réglage non secret. */
   value?: string;
@@ -62,6 +64,8 @@ export interface AppStatus {
   /** L'identifiant du client n'est pas un secret : il figure dans l'adresse d'autorisation. */
   clientId?: string;
   envNames: { clientId: string; clientSecret: string };
+  /** Libellés de l'identifiant et du secret chez le service, quand il les nomme autrement (« Client key »). */
+  credentialLabels?: { clientId: string; clientSecret: string };
   /** URI à déclarer chez le service, ou `null` si AUTH_URL manque. */
   redirectUri: string | null;
   /** Adresses de rappel signées à déclarer aussi (services de Meta) : retrait de l'autorisation, suppression des données. */
@@ -79,7 +83,7 @@ const appContext = (connectorId: string) => `app:${connectorId}`;
 const settingContext = (connectorId: string, key: string) => `app-setting:${connectorId}:${key}`;
 
 function envNames(connector: Connector) {
-  return { clientId: `${connector.app.envPrefix}_CLIENT_ID`, clientSecret: `${connector.app.envPrefix}_CLIENT_SECRET` };
+  return connector.app.envNames ?? { clientId: `${connector.app.envPrefix}_CLIENT_ID`, clientSecret: `${connector.app.envPrefix}_CLIENT_SECRET` };
 }
 
 function fromEnv(connector: Connector): AppCredentials | null {
@@ -202,12 +206,14 @@ export function getAppStatus(connector: Connector): AppStatus {
       secret: Boolean(setting.secret),
       envName: setting.env,
       pattern: setting.pattern,
+      kind: setting.kind ?? "text",
       source,
       ...(value && !setting.secret ? { value } : {}),
     };
   });
   const missing = settings.filter((setting) => setting.required && !setting.source).map((setting) => setting.label);
   const base: AppStatus = { connector: connector.id, configured: false, source: null, envNames: names, redirectUri: redirect, settings };
+  if (connector.app.credentialLabels) base.credentialLabels = connector.app.credentialLabels;
   const origin = publicBaseUrl();
   if (origin && SIGNED_CALLBACK_CONNECTORS.includes(connector.id)) {
     const prefix = `${origin}/api/connections/${encodeURIComponent(connector.id)}`;
@@ -240,6 +246,13 @@ function applySettings(connector: Connector, entry: StoredApp, input: unknown) {
   for (const setting of connector.app.settings ?? []) {
     if (!(setting.key in values)) continue;
     const raw = values[setting.key];
+    if (setting.kind === "toggle") {
+      // Case à cocher : « true » quand elle est cochée, absente sinon.
+      const on = raw === true || raw === "true";
+      if (on) entry.settings = { ...entry.settings, [setting.key]: "true" };
+      else if (entry.settings) delete entry.settings[setting.key];
+      continue;
+    }
     const value = typeof raw === "string" ? raw.trim() : "";
     if (value.length > 500) throw new Error(`${setting.label} : 500 caractères au plus.`);
     if (value && setting.pattern && !new RegExp(`^(?:${setting.pattern})$`).test(value)) throw new Error(`${setting.label} : forme invalide.`);

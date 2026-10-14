@@ -170,6 +170,29 @@ describe("champs de publication", () => {
     expect(screen.getByRole("combobox")).toHaveTextContent("Catégorie 3");
   });
 
+  it("visibilité sans choix d’avance : liste déroulante vide, choix exigé ; case figée par le service", async () => {
+    const privacy: PublishField = {
+      key: "privacy",
+      kind: "select",
+      label: "Qui peut voir cette vidéo",
+      choices: [
+        { value: "PUBLIC_TO_EVERYONE", label: "Tout le monde" },
+        { value: "SELF_ONLY", label: "Moi uniquement" },
+      ],
+      noDefault: true,
+      required: true,
+    };
+    expect(fieldProblem(privacy, "")).toMatch(/choisissez/);
+    const { unmount } = render(<PublishFieldInput field={privacy} value="" onChange={() => {}} idPrefix="t" />);
+    expect(screen.getByRole("combobox")).toHaveTextContent("Choisir");
+    expect(screen.queryByRole("radio")).toBeNull();
+    unmount();
+
+    const duet: PublishField = { key: "allowDuet", kind: "toggle", label: "Autoriser le duo", disabled: true, help: "Coupé dans les réglages de ce compte." };
+    render(<PublishFieldInput field={duet} value={false} onChange={() => {}} idPrefix="t" />);
+    expect(screen.getByRole("switch", { name: "Autoriser le duo" })).toBeDisabled();
+  });
+
   it("compte les tags en jetons", () => {
     const tags: PublishField = { key: "tags", kind: "tags", label: "Tags", maxTotal: 5 };
     render(<PublishFieldInput field={tags} value={["abc", "def"]} onChange={() => {}} idPrefix="t" />);

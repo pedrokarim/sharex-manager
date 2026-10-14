@@ -839,8 +839,11 @@ chaque envoi) et gagne une seconde source.
 Les comptes connectés sont une brique du cœur, comme les albums ou les
 réglages : ils ne dépendent d’aucun module, et un module peut s’en servir
 sans savoir quel service se trouve derrière. YouTube en est le premier
-connecteur ; Facebook, Instagram, Threads, X ou TikTok s’y ajouteront en un
-fichier chacun.
+connecteur ; Facebook, Instagram et Threads ont suivi (dossiers 07a, 07b,
+07c), puis TikTok (dossier 07e : brouillon dans la boîte de réception de
+TikTok par défaut, publication directe une fois l’application auditée) ; X
+est étudié (dossier 07d). Chacun tient en un dossier de
+`src/lib/connections/connectors/`.
 
 ### 8.1 Le registre des connecteurs
 
@@ -1582,7 +1585,7 @@ playlist (titre, description, langue, `podcastStatus`) est relue d’abord.
 Une mise à jour du profil coûte donc 52 unités (lecture, écriture,
 relecture), 102 si les traductions changent avec.
 
-#### Facebook, Instagram, Threads
+#### Facebook, Instagram, Threads, TikTok
 
 - **Facebook (Page)**, d’après la référence
   [Page](https://developers.facebook.com/docs/graph-api/reference/page/)
@@ -1607,6 +1610,11 @@ relecture), 102 si les traductions changent avec.
   [Threads Profiles](https://developers.facebook.com/docs/threads/threads-profiles)
   ne décrit que la lecture (`threads_basic`) : nom, nom d’utilisateur, bio,
   liens et photo sont à changer dans l’application.
+- **TikTok** : la page
+  [Get User Info](https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info)
+  ne décrit que la lecture (nom et photo avec `user.info.basic`, pseudo et
+  bio avec `user.info.profile`) : tout est à changer dans l’application
+  (dossier 07e, § 8).
 
 #### Ce que la documentation a corrigé
 

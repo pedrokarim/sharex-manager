@@ -109,6 +109,9 @@ export function AppConfigForm({
   }, [connector.id, app]);
 
   const editableSettings = (app?.settings ?? []).filter((setting) => setting.source !== "env");
+  // Noms de l'identifiant et du secret tels que la console du service les affiche (« Client key » chez TikTok).
+  const idLabel = app?.credentialLabels?.clientId ?? "Identifiant du client";
+  const secretLabel = app?.credentialLabels?.clientSecret ?? "Secret du client";
   const secretKept = app?.source === "file" && !app.secretUnreadable;
 
   const problems = useMemo(() => {
@@ -228,14 +231,14 @@ export function AppConfigForm({
       <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
         <h3 className="text-sm font-semibold">Identifiants de l’application</h3>
         {fromEnv ? (
-          <FromEnvironment label="Identifiant et secret du client" envName={`${app?.envNames.clientId} et ${app?.envNames.clientSecret}`} value={app?.clientId} />
+          <FromEnvironment label={app?.credentialLabels ? `${app.credentialLabels.clientId} et ${app.credentialLabels.clientSecret}` : "Identifiant et secret du client"} envName={`${app?.envNames.clientId} et ${app?.envNames.clientSecret}`} value={app?.clientId} />
         ) : (
           <>
             {app?.secretUnreadable ? (
               <p className="text-sm text-destructive">Le secret enregistré ne se déchiffre plus (clé de chiffrement changée) : collez-le de nouveau.</p>
             ) : null}
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1.5">
-              <Label htmlFor={`${connector.id}-client-id`}>Identifiant du client</Label>
+              <Label htmlFor={`${connector.id}-client-id`}>{idLabel}</Label>
               <Input
                 id={`${connector.id}-client-id`}
                 value={clientId}
@@ -248,7 +251,7 @@ export function AppConfigForm({
               <ShapeHint shape={credentialShape(clientId.trim(), "L’identifiant")} />
             </div>
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1.5">
-              <Label htmlFor={`${connector.id}-client-secret`}>Secret du client</Label>
+              <Label htmlFor={`${connector.id}-client-secret`}>{secretLabel}</Label>
               <Input
                 id={`${connector.id}-client-secret`}
                 type="password"
@@ -272,6 +275,23 @@ export function AppConfigForm({
         {(app?.settings ?? []).map((setting) =>
           setting.source === "env" ? (
             <FromEnvironment key={setting.key} label={setting.label} envName={setting.envName ?? setting.key} value={setting.secret ? undefined : setting.value} />
+          ) : setting.kind === "toggle" ? (
+            <label key={setting.key} className="flex min-w-0 cursor-pointer items-start gap-3 text-sm">
+              <Checkbox
+                id={`${connector.id}-setting-${setting.key}`}
+                checked={settings[setting.key] === "true"}
+                onCheckedChange={(value) => setSettings((current) => ({ ...current, [setting.key]: value === true ? "true" : "" }))}
+                className="mt-0.5"
+              />
+              <span className="grid min-w-0 gap-0.5">
+                <span className="font-medium">{setting.label}</span>
+                {setting.help ? (
+                  <span className="text-xs text-pretty text-muted-foreground">
+                    <LinkifiedText text={setting.help} />
+                  </span>
+                ) : null}
+              </span>
+            </label>
           ) : (
             <div key={setting.key} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1.5">
               <Label htmlFor={`${connector.id}-setting-${setting.key}`}>

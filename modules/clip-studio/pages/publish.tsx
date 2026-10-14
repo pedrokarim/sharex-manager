@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, CloudOff, Eye, FileVideo, Loader2, Plus, Send, Timer } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, CloudOff, Eye, FileVideo, Loader2, Plus, RotateCcw, Send, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
@@ -46,13 +46,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ConnectAccountSheet, useConnectionReturn, type ConnectFlowStart } from "@/components/connections/connect-account-sheet";
 import { DateTimePicker } from "@/components/connections/date-time-picker";
-import { PublishFieldInput, fieldProblem } from "@/components/connections/publish-field-input";
+import { PublishFieldInput, conditionHolds, fieldProblem, isFieldVisible, ruleProblems, visibleValues } from "@/components/connections/publish-field-input";
 import { AccountAvatar, AccountStatus, ServiceLogo } from "@/components/connections/shared";
 import useMediaQuery from "@/hooks/use-media-query";
-import { accountActivityAction, measureTextAction } from "@/app/(app)/admin/connections/actions";
+import { accountActivityAction, measureTextAction, publishFormAction } from "@/app/(app)/admin/connections/actions";
 import { useSession } from "@/lib/auth-client";
 import { estimatePublishCost, formatCost } from "@/lib/connections/limits";
-import type { AccountSummary, ConnectorInfo, PublishJobSummary } from "@/lib/connections/types";
+import type { AccountSummary, ConnectorInfo, LivePublishForm, PublishField, PublishJobSummary } from "@/lib/connections/types";
 import { cn } from "@/lib/utils";
 import type { BrandKit } from "@/modules/brand-kit/lib/types";
 import type { ClipProject } from "../engine/types";
@@ -192,9 +192,15 @@ function PublishLoader({ id }: { id: string }) {
 
 // ─── Ce que l'on sait de chaque compte coché ─────────────────────
 
+/** Formulaire lu chez le service pour un compte (`livePublishForm`) : en cours, prêt ou en échec. */
+type LiveForm = { state: "loading" } | { state: "ready"; form: LivePublishForm } | { state: "error"; error: string };
+
 interface AccountReview {
   account: AccountSummary;
   connector: ConnectorInfo;
+  /** Réglages du compte : ceux lus chez le service, sinon ceux du connecteur. */
+  fields: PublishField[];
+  live?: LiveForm;
   checks: CheckLine[];
   blockers: string[];
   cost: ReturnType<typeof estimatePublishCost>;
@@ -240,6 +246,38 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
     if (on && !settings[account.id]) setSettings((current) => ({ ...current, [account.id]: prefillSettings(settingFields(connectorOf(account)), kit, synthetic) }));
   };
   const checkedAccounts = useMemo(() => accounts.filter((account) => checked.has(account.id)), [accounts, checked]);
+
+  // Réglages lus chez le service à l'affichage, pour un compte coché dont le service l'exige (identité, visibilités permises…).
+  const [liveForms, setLiveForms] = useState<Record<string, LiveForm>>({});
+  const requestedForms = useRef<Set<string>>(new Set());
+  const loadLiveForm = useCallback(
+    async (account: AccountSummary) => {
+      requestedForms.current.add(account.id);
+      setLiveForms((current) => ({ ...current, [account.id]: { state: "loading" } }));
+      const result = await publishFormAction(account.id, { kind: "video", durationMs: entry.durationMs });
+      if (!result.ok || !result.data) {
+        setLiveForms((current) => ({ ...current, [account.id]: { state: "error", error: result.ok ? "Réglages indisponibles." : result.error } }));
+        return;
+      }
+      const form = result.data;
+      setLiveForms((current) => ({ ...current, [account.id]: { state: "ready", form } }));
+      setSettings((current) => ({ ...current, [account.id]: prefillSettings(form.fields, kit, synthetic) }));
+    },
+    [entry.durationMs, kit, synthetic]
+  );
+  useEffect(() => {
+    for (const account of checkedAccounts) {
+      if (requestedForms.current.has(account.id) || account.status !== "connected") continue;
+      if (connectorOf(account)?.livePublishForm) void loadLiveForm(account);
+    }
+  }, [checkedAccounts, connectorOf, loadLiveForm]);
+  const fieldsOf = useCallback(
+    (account: AccountSummary, connector: ConnectorInfo | null): PublishField[] => {
+      const live = liveForms[account.id];
+      return live?.state === "ready" ? live.form.fields : connector?.livePublishForm ? [] : settingFields(connector);
+    },
+    [liveForms]
+  );
 
   const groups = useMemo(() => {
     const map = new Map<string, { connector: ConnectorInfo | null; label: string; logo: string; accounts: AccountSummary[] }>();
@@ -386,15 +424,25 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
   const reviews: AccountReview[] = checkedAccounts.flatMap((account) => {
     const connector = connectorOf(account);
     if (!connector) return [];
-    const fields = settingFields(connector);
+    const fields = fieldsOf(account, connector);
+    const live: LiveForm | undefined = connector.livePublishForm ? (liveForms[account.id] ?? { state: "loading" }) : undefined;
     const values = settings[account.id] ?? {};
+    const shown = visibleValues(fields, values);
     const count = connector.limits?.text?.count;
-    const fieldErrors = fields.map((field) => fieldProblem(field, values[field.key], count)).filter((problem): problem is string => Boolean(problem));
+    const fieldErrors = fields
+      .filter((field) => field.key in shown)
+      .map((field) => fieldProblem(field, values[field.key], count))
+      .filter((problem): problem is string => Boolean(problem));
+    if (live?.state === "ready") fieldErrors.push(...ruleProblems(live.form.rules, shown));
     const measure = measures[connector.id];
     if (measure && measure.used > measure.max) fieldErrors.push(`Texte trop long pour ${connector.label} : ${measure.used.toLocaleString("fr-FR")}/${measure.max.toLocaleString("fr-FR")}.`);
-    const checks = limitChecks(account.limits?.video ?? connector.limits?.video, entry);
+    const baseLimits = account.limits?.video ?? connector.limits?.video;
+    const checks = limitChecks(live?.state === "ready" && live.form.limits?.video ? { ...baseLimits, ...live.form.limits.video } : baseLimits, entry);
     const blockers = [
       ...(account.status !== "connected" ? ["Compte à reconnecter."] : []),
+      ...(live?.state === "loading" ? [`Lecture du compte chez ${connector.label}…`] : []),
+      ...(live?.state === "error" ? [live.error] : []),
+      ...(live?.state === "ready" ? (live.form.blockers ?? []) : []),
       ...(problemsByService[connector.id] ?? []).map((problem) => problem.message),
       ...fieldErrors,
       ...(timeProblems[account.id] ? [timeProblems[account.id]] : []),
@@ -415,6 +463,8 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
       {
         account,
         connector,
+        fields,
+        live,
         checks,
         blockers,
         cost: estimatePublishCost(connector.pricing, "video", text),
@@ -425,6 +475,18 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
     ];
   });
 
+  // Phrases que le service veut voir avant l'envoi (consentement), une fois chacune.
+  const declarations = [
+    ...new Set(
+      reviews.flatMap((review) =>
+        review.live?.state === "ready"
+          ? (review.live.form.declarations ?? [])
+              .filter((item) => (item.when ?? []).every((condition) => conditionHolds(condition, visibleValues(review.fields, settings[review.account.id] ?? {}))))
+              .map((item) => item.text)
+          : []
+      )
+    ),
+  ];
   const rightsBlocking = rightsNames.length > 0 && !rightsConfirmed;
   const blockerCount = reviews.reduce((sum, review) => sum + review.blockers.length, 0) + (rightsBlocking ? 1 : 0);
   const firstBlocker = reviews.flatMap((review) => review.blockers.map((blocker) => `${review.account.displayName} – ${blocker}`))[0] ?? (rightsBlocking ? "Vérifiez les droits des images." : undefined);
@@ -458,7 +520,7 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
       const list: PublishTarget[] = reviews.map((review) => {
         const time = times[review.account.id];
         const scheduleField = scheduleFieldOf(review.connector);
-        const options = settingOptions(settingFields(review.connector), settings[review.account.id] ?? {}, kit);
+        const options = settingOptions(review.fields, settings[review.account.id] ?? {}, kit);
         if (time !== undefined && scheduleField) options[scheduleField.key] = new Date(time).toISOString();
         return {
           accountId: review.account.id,
@@ -543,7 +605,7 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
       coverUrl={entry.cover ? exportUrl(entry.cover.file) : null}
       ratio={entry.width && entry.height ? entry.width / entry.height : 16 / 9}
       schedule={previewAccount ? times[previewAccount.id] : undefined}
-      privacy={previewAccount ? privacyLabel(settings[previewAccount.id] ?? {}, connectorOf(previewAccount)) : undefined}
+      privacy={previewAccount ? privacyLabel(settings[previewAccount.id] ?? {}, fieldsOf(previewAccount, connectorOf(previewAccount))) : undefined}
       canComment={previewAccount ? previewAccount.capabilities.includes("comment.create") : false}
     />
   ) : (
@@ -588,6 +650,7 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
                 review={review}
                 values={settings[review.account.id] ?? {}}
                 onValue={(key, value) => setSettings((current) => ({ ...current, [review.account.id]: { ...(current[review.account.id] ?? {}), [key]: value } }))}
+                onReload={() => void loadLiveForm(review.account)}
               />
             ))}
           </Accordion>
@@ -660,6 +723,15 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
             <Checkbox checked={rightsConfirmed} onCheckedChange={(value) => setRightsConfirmed(value === true)} className="mt-0.5" />
             <span className="min-w-0 text-pretty">J’ai vérifié les droits des images trouvées sur le web ({rightsNames.length}).</span>
           </label>
+        ) : null}
+        {declarations.length > 0 ? (
+          <ul className="grid min-w-0 gap-1 text-xs text-pretty text-muted-foreground" aria-label="Déclarations">
+            {declarations.map((text) => (
+              <li key={text} className="min-w-0 [overflow-wrap:anywhere]">
+                {text}
+              </li>
+            ))}
+          </ul>
         ) : null}
         <div className="grid min-w-0 gap-1 text-xs text-muted-foreground">
           <span>
@@ -835,8 +907,8 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
   );
 }
 
-function privacyLabel(values: Values, connector: ConnectorInfo | null): string | undefined {
-  const field = settingFields(connector).find((item) => item.role === "privacy");
+function privacyLabel(values: Values, fields: PublishField[]): string | undefined {
+  const field = fields.find((item) => item.role === "privacy");
   if (field?.kind !== "select") return undefined;
   return field.choices.find((choice) => choice.value === values[field.key])?.label;
 }
@@ -960,9 +1032,21 @@ function AccountsColumn({
 
 // ─── Réglages d'un compte ────────────────────────────────────────
 
-function AccountSettings({ review, values, onValue }: { review: AccountReview; values: Values; onValue: (key: string, value: Values[string]) => void }) {
-  const { account, connector, checks, blockers, cost, note } = review;
-  const fields = settingFields(connector);
+function AccountSettings({
+  review,
+  values,
+  onValue,
+  onReload,
+}: {
+  review: AccountReview;
+  values: Values;
+  onValue: (key: string, value: Values[string]) => void;
+  /** Relit chez le service les réglages d'un compte à formulaire lu à l'affichage. */
+  onReload: () => void;
+}) {
+  const { account, connector, checks, blockers, cost, note, live } = review;
+  const shown = visibleValues(review.fields, values);
+  const fields = review.fields.filter((field) => isFieldVisible(field, shown));
   return (
     <AccordionItem value={account.id} className="min-w-0 rounded-lg border last:border-b">
       <AccordionTrigger className="min-w-0 items-center px-3 py-3 hover:no-underline">
@@ -986,6 +1070,7 @@ function AccountSettings({ review, values, onValue }: { review: AccountReview; v
       </AccordionTrigger>
       <AccordionContent className="grid min-w-0 gap-4 px-3">
         <CheckList lines={checks} note={note} />
+        {live ? <LiveFormHeader live={live} connector={connector} onReload={onReload} /> : null}
         {fields.length > 0 ? (
           <div className="grid min-w-0 gap-4">
             {fields.map((field) => (
@@ -1018,6 +1103,60 @@ function AccountSettings({ review, values, onValue }: { review: AccountReview; v
         ) : null}
       </AccordionContent>
     </AccordionItem>
+  );
+}
+
+/**
+ * En-tête des réglages d'un compte dont le service se lit à l'affichage :
+ * compte qui publiera (pseudo), remarques du service, ou lecture en cours.
+ */
+function LiveFormHeader({ live, connector, onReload }: { live: LiveForm; connector: ConnectorInfo; onReload: () => void }) {
+  if (live.state === "loading") {
+    return (
+      <div className="grid min-w-0 gap-2" aria-busy>
+        <Skeleton className="h-4 w-48 max-w-full" />
+        <Skeleton className="h-9 w-full" />
+      </div>
+    );
+  }
+  if (live.state === "error") {
+    return (
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs text-destructive">
+        <span className="min-w-0 [overflow-wrap:anywhere]">{live.error}</span>
+        <Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" onClick={onReload}>
+          <RotateCcw className="size-3.5" />
+          Relire
+        </Button>
+      </div>
+    );
+  }
+  const { identity, notices } = live.form;
+  return (
+    <div className="grid min-w-0 gap-2">
+      {identity ? (
+        <div className="flex min-w-0 items-center gap-2 text-sm">
+          {identity.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- avatar d'un service tiers, adresse temporaire
+            <img src={identity.avatarUrl} alt="" className="size-6 shrink-0 rounded-full object-cover" referrerPolicy="no-referrer" />
+          ) : (
+            <ServiceLogo logo={connector.logo} />
+          )}
+          <span className="min-w-0 truncate" title={identity.handle ? `${identity.name} (${identity.handle})` : identity.name}>
+            Publié par <span className="font-medium">{identity.handle ?? identity.name}</span>
+            {identity.handle && identity.name !== identity.handle ? <span className="text-muted-foreground"> · {identity.name}</span> : null}
+          </span>
+          <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 shrink-0 gap-1.5 px-2 text-xs" onClick={onReload} title={`Relire le compte chez ${connector.label}`}>
+            <RotateCcw className="size-3.5" />
+            Relire
+          </Button>
+        </div>
+      ) : null}
+      {(notices ?? []).map((notice) => (
+        <p key={notice} className="text-xs text-pretty text-muted-foreground [overflow-wrap:anywhere]">
+          {notice}
+        </p>
+      ))}
+    </div>
   );
 }
 

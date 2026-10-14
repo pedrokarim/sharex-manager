@@ -111,7 +111,7 @@ export function startAuthorization(
   const verifier = connector.oauth.pkce ? base64url(randomBytes(48)) : undefined;
   const url = new URL(connector.oauth.authorizeUrl);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", app.clientId);
+  url.searchParams.set(connector.oauth.clientIdParam ?? "client_id", app.clientId);
   url.searchParams.set("redirect_uri", redirectUri(connector.id));
   const incremental = Array.isArray(options.scopes) && options.scopes.length > 0 ? [...new Set(options.scopes.filter((scope) => typeof scope === "string" && scope))].slice(0, 50) : undefined;
   url.searchParams.set("scope", (incremental ?? scopeSet.scopes).join(connector.oauth.scopeSeparator ?? " "));
@@ -272,7 +272,7 @@ export function splitScopes(scope: string | undefined): string[] | undefined {
 async function tokenRequest(connector: Connector, params: Record<string, string>): Promise<{ tokens: TokenSet; scopes?: string[] }> {
   const app = requireApp(connector);
   const basic = connector.oauth.clientAuth === "basic";
-  const body = new URLSearchParams(basic ? params : { ...params, client_id: app.clientId, client_secret: app.clientSecret });
+  const body = new URLSearchParams(basic ? params : { ...params, [connector.oauth.clientIdParam ?? "client_id"]: app.clientId, client_secret: app.clientSecret });
   const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" };
   if (basic) headers.Authorization = basicAuthorization(app);
   let response: Response;

@@ -272,6 +272,21 @@ interface PublishFieldBase {
   help?: string;
   /** Types de source pour lesquels le champ vaut ; absent : tous. */
   sourceKinds?: PublishSource["kind"][];
+  /**
+   * Champ affiché, vérifié et envoyé seulement quand un autre champ a l'une
+   * de ces valeurs (réglages de la publication directe, cases du contenu de
+   * marque…). Masqué, il ne part pas.
+   */
+  showWhen?: PublishFieldCondition;
+  /** Champ affiché mais figé (réglage coupé chez le service) ; `help` dit pourquoi. */
+  disabled?: boolean;
+}
+
+/** Condition sur la valeur d'un autre champ (`showWhen` d'un champ, `when` d'une règle). */
+export interface PublishFieldCondition {
+  key: string;
+  /** Valeurs pour lesquelles la condition tient (valeur d'un choix, `true` ou `false` d'une bascule). */
+  values: (string | boolean)[];
 }
 
 /** Un champ de publication : l'interface le dessine sans connaître le service. */
@@ -279,9 +294,75 @@ export type PublishField =
   | (PublishFieldBase & { kind: "text"; maxLength: number; maxBytes?: number; required?: boolean })
   | (PublishFieldBase & { kind: "textarea"; maxLength: number; maxBytes?: number })
   | (PublishFieldBase & { kind: "tags"; maxTotal: number })
-  | (PublishFieldBase & { kind: "select"; choices: { value: string; label: string }[]; defaultValue?: string })
+  | (PublishFieldBase & {
+      kind: "select";
+      choices: { value: string; label: string }[];
+      defaultValue?: string;
+      /**
+       * Aucun choix fait d'avance, pas même le premier (règle d'un service
+       * pour la visibilité) : la personne choisit elle-même.
+       */
+      noDefault?: boolean;
+      /** Un choix est exigé avant l'envoi. */
+      required?: boolean;
+    })
   | (PublishFieldBase & { kind: "datetime" })
-  | (PublishFieldBase & { kind: "toggle"; defaultValue?: boolean });
+  | (PublishFieldBase & {
+      kind: "toggle";
+      defaultValue?: boolean;
+      /** La case doit être cochée pour envoyer (consentement explicite). */
+      required?: boolean;
+    });
+
+/**
+ * Règle entre champs, vérifiée par l'interface et par le connecteur : quand
+ * `when` tient (un champ masqué comptant comme vide), au moins une des bascules `anyOf` doit être cochée, ou le
+ * champ `field` ne doit valoir aucune des `notValues`.
+ */
+export interface PublishFieldRule {
+  when: PublishFieldCondition;
+  anyOf?: string[];
+  field?: string;
+  notValues?: string[];
+  /** Message affiché quand la règle n'est pas respectée. */
+  message: string;
+}
+
+/**
+ * Formulaire de publication propre à un compte, lu chez le service au moment
+ * d'afficher l'écran Publier (`Connector.publishForm`) : identité du compte,
+ * réglages permis à cet instant, déclarations à montrer avant l'envoi. Ses
+ * champs remplacent les réglages fixes du connecteur (champs de
+ * `publishFields` sans rôle de texte) pour ce compte.
+ */
+export interface LivePublishForm {
+  /** Compte qui publiera, tel que le service le nomme (pseudo, avatar). */
+  identity?: { name: string; handle?: string; avatarUrl?: string };
+  /** Réglages du compte (champs sans rôle de texte), dans l'ordre d'affichage. */
+  fields: PublishField[];
+  /** Règles entre champs. */
+  rules?: PublishFieldRule[];
+  /** Remarques affichées avec les réglages (mode brouillon…). */
+  notices?: string[];
+  /**
+   * Phrases à montrer près du bouton d'envoi (consentement exigé par le
+   * service), chacune sous conditions éventuelles (toutes requises). Un champ
+   * masqué compte comme vide.
+   */
+  declarations?: { text: string; when?: PublishFieldCondition[] }[];
+  /** Ce qui empêche ce compte de publier maintenant (limite du service atteinte…). */
+  blockers?: string[];
+  /** Limites propres à ce compte à cet instant (durée maximale…), prioritaires sur celles du connecteur. */
+  limits?: { video?: MediaLimits };
+}
+
+/** Ce que reçoit `Connector.normalizeOptions` en plus des options : le compte et l'application. */
+export interface NormalizeContext {
+  /** Réglages non secrets de l'application. */
+  appSettings: Record<string, string>;
+  /** Portées accordées au compte. */
+  scopes: string[];
+}
 
 // ─── Publication ──────────────────────────────────────────────────
 
@@ -839,7 +920,10 @@ export interface ProcessingStatus {
 /** Publication obtenue chez le service. */
 export interface PublishResult {
   externalId: string;
+  /** Adresse de la publication ; vide quand il n'y en a pas encore (brouillon chez le service). */
   url: string;
+  /** Remarque gardée avec le travail fini (« envoyé en brouillon : à publier dans l'application »). */
+  note?: string;
 }
 
 /**
@@ -961,6 +1045,10 @@ export const FOLLOW_UP_CAPABILITY: Record<PublishFollowUpKind, ConnectionCapabil
 export interface ConnectorApp {
   /** Préfixe des variables d'environnement : `<PREFIX>_CLIENT_ID`, `<PREFIX>_CLIENT_SECRET`. */
   envPrefix: string;
+  /** Noms des variables quand le service nomme autrement son identifiant (`TIKTOK_CLIENT_KEY`). */
+  envNames?: { clientId: string; clientSecret: string };
+  /** Libellés de l'identifiant et du secret tels que la console du service les nomme (« Client key »). */
+  credentialLabels?: { clientId: string; clientSecret: string };
   setupSteps: string[];
   consoleUrl: string;
   /**
@@ -990,6 +1078,11 @@ export interface AppSetting {
   authorizeParam?: boolean | string;
   /** Forme attendue, vérifiée à la saisie. */
   pattern?: string;
+  /**
+   * « text » (par défaut) : valeur saisie. « toggle » : case à cocher, rangée
+   * « true » quand elle est cochée, absente sinon (jamais secrète).
+   */
+  kind?: "text" | "toggle";
 }
 
 /** Réponse de jeton ramenée aux champs de la norme OAuth (RFC 6749, § 5.1 et 5.2). */
@@ -1016,6 +1109,12 @@ export interface ConnectorOAuth {
    * révocation).
    */
   clientAuth?: "body" | "basic";
+  /**
+   * Nom du paramètre qui porte l'identifiant du client dans l'adresse
+   * d'autorisation et dans l'échange (`client_key` chez TikTok) ;
+   * `client_id` par défaut.
+   */
+  clientIdParam?: string;
   /** Méthode de l'échange du code et du renouvellement : `POST` en corps de formulaire (par défaut) ou `GET` en paramètres. */
   tokenMethod?: "POST" | "GET";
   /** Séparateur des portées dans l'adresse d'autorisation : espace par défaut, virgule chez certains services. */
@@ -1283,8 +1382,21 @@ export interface Connector {
   publishFields?: PublishField[];
   /** Remarque sur le format d'une vidéo (format court du service), affichée par la fenêtre de publication. */
   shortForm?: ShortFormNote;
-  /** Valide les options reçues et les complète (limites du service). */
-  normalizeOptions?(options: unknown, source: PublishSource): Record<string, unknown>;
+  /**
+   * Valide les options reçues et les complète (limites du service).
+   * `context` donne les réglages de l'application et les portées du compte.
+   */
+  normalizeOptions?(options: unknown, source: PublishSource, context?: NormalizeContext): Record<string, unknown>;
+  /**
+   * Formulaire de publication lu chez le service pour un compte, au moment
+   * d'afficher l'écran Publier (règle d'un service qui veut que l'on montre
+   * l'état du compte juste avant de publier). `scopes` : portées accordées
+   * au compte ; `media` : ce que l'on s'apprête à publier.
+   */
+  publishForm?(
+    context: ConnectorContext,
+    input: { scopes: string[]; media: { kind: PublishSource["kind"]; durationMs?: number } }
+  ): Promise<LivePublishForm>;
   /**
    * Publie (un fichier, plusieurs, ou un texte) ; enregistre l'état de reprise
    * au fil de l'envoi par `saveProgress`. Pour un service qui crée d'abord
@@ -1407,6 +1519,8 @@ export interface ConnectorInfo {
   multipleAccounts?: boolean;
   /** Le service va chercher les fichiers à une adresse publique de l'instance. */
   publicMedia?: boolean;
+  /** Les réglages d'un compte se lisent chez le service à l'affichage (`Connector.publishForm`, action `publishFormAction`). */
+  livePublishForm?: boolean;
   /**
    * Suites de publication que le service accepte, avec leurs limites et la
    * capacité exigée ; seules celles que le connecteur sait exécuter figurent.

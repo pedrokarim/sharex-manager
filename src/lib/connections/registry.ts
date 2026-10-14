@@ -11,10 +11,11 @@ import { youtubeConnector } from "./connectors/youtube";
 import { facebookConnector } from "./connectors/facebook";
 import { instagramConnector } from "./connectors/instagram";
 import { threadsConnector } from "./connectors/threads";
+import { tiktokConnector } from "./connectors/tiktok";
 import { plannedConnectors } from "./connectors/planned";
 
 /** Connecteurs réalisés ; un service annoncé disparaît des « bientôt » dès qu'il est ici. */
-const READY: Connector[] = [youtubeConnector, facebookConnector, instagramConnector, threadsConnector];
+const READY: Connector[] = [youtubeConnector, facebookConnector, instagramConnector, threadsConnector, tiktokConnector];
 
 const CONNECTORS: Connector[] = [
   ...READY,
@@ -145,6 +146,7 @@ export function describeConnector(connector: Connector): ConnectorInfo {
     ...(connector.app.disconnectHelp ? { disconnectHelp: connector.app.disconnectHelp } : {}),
     ...(connector.fetchAccounts ? { multipleAccounts: true } : {}),
     ...(connector.publicMedia ? { publicMedia: true } : {}),
+    ...(connector.publishForm ? { livePublishForm: true } : {}),
     ...(followUps ? { followUps } : {}),
     onDemandCapabilities: onDemandCapabilities(connector),
     capabilityScopes: Object.fromEntries(connector.capabilities.map((entry) => [entry.capability, scopesForCapability(connector, entry.capability)])),

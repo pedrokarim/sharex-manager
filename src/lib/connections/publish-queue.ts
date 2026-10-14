@@ -293,7 +293,7 @@ export function enqueuePublish(input: {
 }): PublishJobSummary {
   assertSource(input.source);
   const [first, ...others] = requiredCapabilities(input.source);
-  const { connector, account } = requireCapability(input.accountId, first);
+  const { connector, account, context } = requireCapability(input.accountId, first);
   for (const capability of others) requireCapability(input.accountId, capability);
   if (!connector.publish) throw new Error(`${connector.label} ne sait pas encore publier.`);
   const requested = readFollowUpsInput(input.followUps);
@@ -305,7 +305,7 @@ export function enqueuePublish(input: {
   });
   if (problems.length > 0) throw new Error(`${connector.label} n’accepte pas cette publication : ${problems.join(" ")}`);
   const options = connector.normalizeOptions
-    ? connector.normalizeOptions(prepared.options, source)
+    ? connector.normalizeOptions(prepared.options, source, { appSettings: context.appSettings, scopes: account.scopes })
     : ((prepared.options && typeof prepared.options === "object" ? prepared.options : {}) as Record<string, unknown>);
   const followUps = buildFollowUps(connector, account, source, requested, prepared.coverAtPublish);
   const now = Date.now();
@@ -623,11 +623,12 @@ function settle(job: PublishJob, connector: Connector, outcome: PublishOutcome, 
   if (job.cost) recordSpend(connector, job.cost.amount);
   patchJob(job.id, {
     state: connector.checkProcessing ? "processing" : "done",
-    result: { externalId: outcome.externalId, url: outcome.url },
+    result: { externalId: outcome.externalId, url: typeof outcome.url === "string" ? outcome.url : "" },
     resume: undefined,
     bytesSent: job.source.bytes,
     error: undefined,
-    note: undefined,
+    // Remarque du connecteur gardée avec le travail fini (brouillon à finir chez le service…).
+    note: typeof outcome.note === "string" && outcome.note ? outcome.note.slice(0, 300) : undefined,
     checkAt: undefined,
     processingSince: connector.checkProcessing ? now : undefined,
     ...(found ? { warning: "Publication retrouvée chez le service après une coupure : elle n’a pas été republiée." } : {}),

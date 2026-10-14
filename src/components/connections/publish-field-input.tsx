@@ -22,7 +22,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { countText } from "@/lib/connections/limits";
-import type { PublishField, TextCount } from "@/lib/connections/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { PublishField, PublishFieldCondition, PublishFieldRule, TextCount } from "@/lib/connections/types";
 import { DateTimePicker } from "./date-time-picker";
 
 export type FieldValue = string | string[] | boolean | undefined;
@@ -35,10 +36,50 @@ export function defaultFieldValue(field: PublishField): FieldValue {
     case "toggle":
       return field.defaultValue ?? false;
     case "select":
-      return field.defaultValue ?? field.choices[0]?.value ?? "";
+      // Aucun choix d'avance quand le service l'exige (visibilité) : la personne choisit elle-même.
+      return field.noDefault ? (field.defaultValue ?? "") : (field.defaultValue ?? field.choices[0]?.value ?? "");
     default:
       return "";
   }
+}
+
+/** La condition tient-elle pour ces valeurs ? Une bascule absente vaut « non ». */
+export function conditionHolds(condition: PublishFieldCondition, values: Record<string, FieldValue>): boolean {
+  const value = values[condition.key];
+  return condition.values.some((expected) => (typeof expected === "boolean" ? (value === true) === expected : value === expected));
+}
+
+/**
+ * Champ à montrer, vérifier et envoyer : sans condition, ou condition remplie.
+ * `values` doit être passé par `visibleValues` pour qu'un champ dont le
+ * parent est masqué le soit aussi.
+ */
+export function isFieldVisible(field: PublishField, values: Record<string, FieldValue>): boolean {
+  return !field.showWhen || conditionHolds(field.showWhen, values);
+}
+
+/**
+ * Valeurs des seuls champs affichés, dans l'ordre des champs (un parent
+ * avant ses enfants) : un champ masqué compte comme vide pour les
+ * conditions, les règles et les déclarations, et ne part pas.
+ */
+export function visibleValues(fields: PublishField[], values: Record<string, FieldValue>): Record<string, FieldValue> {
+  const shown: Record<string, FieldValue> = {};
+  for (const field of fields) if (isFieldVisible(field, shown)) shown[field.key] = values[field.key];
+  return shown;
+}
+
+/** Messages des règles entre champs qui ne sont pas respectées (`values` passées par `visibleValues`). */
+export function ruleProblems(rules: PublishFieldRule[] | undefined, values: Record<string, FieldValue>): string[] {
+  const problems: string[] = [];
+  for (const rule of rules ?? []) {
+    if (!conditionHolds(rule.when, values)) continue;
+    const anyOfBroken = rule.anyOf && rule.anyOf.length > 0 && !rule.anyOf.some((key) => values[key] === true);
+    const value = rule.field ? values[rule.field] : undefined;
+    const notValueBroken = Boolean(rule.field && rule.notValues && typeof value === "string" && rule.notValues.includes(value));
+    if (anyOfBroken || notValueBroken) problems.push(rule.message);
+  }
+  return problems;
 }
 
 const utf8 = typeof TextEncoder === "undefined" ? null : new TextEncoder();
@@ -70,6 +111,10 @@ export function fieldProblem(field: PublishField, value: FieldValue, count?: Tex
   if (field.kind === "tags" && Array.isArray(value) && tagsLength(value) > field.maxTotal) {
     return `${field.label} : ${field.maxTotal.toLocaleString("fr-FR")} caractères au total au plus.`;
   }
+  if (field.kind === "select" && field.required && !(typeof value === "string" && field.choices.some((choice) => choice.value === value))) {
+    return `${field.label} : choisissez une option.`;
+  }
+  if (field.kind === "toggle" && field.required && !field.disabled && value !== true) return `${field.label} : à cocher pour envoyer.`;
   if (field.kind === "datetime" && typeof value === "string" && value && new Date(value).getTime() < Date.now() + 60_000) {
     return `${field.label} : la date doit être dans le futur.`;
   }
@@ -172,6 +217,31 @@ export function PublishFieldInput({
       );
     }
     case "select":
+      // Sans choix d'avance : une liste déroulante qui affiche « Choisir » tant que rien n'est pris.
+      if (field.noDefault) {
+        const current = typeof value === "string" ? value : "";
+        return (
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor={id}>
+              {field.label}
+              {field.required ? <span className="font-normal text-muted-foreground">(obligatoire)</span> : null}
+            </Label>
+            <Select value={current || undefined} onValueChange={(next) => onChange(next)} disabled={disabled || field.disabled}>
+              <SelectTrigger id={id} className="w-full min-w-0" aria-invalid={(field.required && !current) || undefined}>
+                <SelectValue placeholder="Choisir" />
+              </SelectTrigger>
+              <SelectContent className="max-w-[min(32rem,calc(100vw-2rem))]">
+                {field.choices.map((choice) => (
+                  <SelectItem key={choice.value} value={choice.value}>
+                    {choice.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {help}
+          </div>
+        );
+      }
       return field.choices.length <= SHORT_CHOICES ? (
         <div className="grid min-w-0 gap-1.5">
           <Label id={`${id}-label`}>{field.label}</Label>
@@ -214,7 +284,7 @@ export function PublishFieldInput({
             <Label htmlFor={id}>{field.label}</Label>
             {help}
           </div>
-          <Switch id={id} checked={value === true} onCheckedChange={(checked) => onChange(checked)} disabled={disabled} />
+          <Switch id={id} checked={value === true} onCheckedChange={(checked) => onChange(checked)} disabled={disabled || field.disabled} />
         </div>
       );
   }

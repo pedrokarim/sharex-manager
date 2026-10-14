@@ -173,7 +173,7 @@ function JobTimeline({
                       </StepTimelineDescription>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-1">
-                      {job.result ? (
+                      {job.result?.url ? (
                         <Button asChild variant="ghost" size="sm" className="h-7 gap-1.5 px-2">
                           <a href={job.result.url} target="_blank" rel="noreferrer noopener">
                             <ExternalLink className="size-3.5" />
@@ -205,7 +205,7 @@ function JobTimeline({
                   ) : job.state === "processing" ? (
                     <Progress value={100} className="h-1.5 animate-pulse" aria-label="Traitement chez le service" />
                   ) : null}
-                  {waitingService && job.note ? <p className="text-xs text-pretty text-muted-foreground [overflow-wrap:anywhere]">{job.note}</p> : null}
+                  {(waitingService || job.state === "done") && job.note ? <p className="text-xs text-pretty text-muted-foreground [overflow-wrap:anywhere]">{job.note}</p> : null}
                   {job.error && job.state !== "done" ? (
                     <StepTimelineDescription className="text-destructive">
                       {job.error}
