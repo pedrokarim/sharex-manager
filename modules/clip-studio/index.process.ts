@@ -84,6 +84,29 @@ import {
   type CoverInput,
 } from "./lib/exports";
 import { draftExportPost, type DraftRequest, type DraftResult } from "./lib/post-draft";
+import { apiModuleManager } from "@/lib/modules/module-manager.api";
+import { askCodex } from "./lib/codex";
+import { channelReadCost, quotaForAccount, readChannelVideos } from "@/lib/connections";
+import { cleanScriptText } from "./lib/script-rules";
+import type { HistoryEntry, IdeaBrand } from "./lib/ideas";
+import type { ConceptBank, Idea, IdeaTask } from "./lib/idea-types";
+import {
+  addReferenceChannel as addChannelToBank,
+  answerSuggestedChannel,
+  chooseIdeaHook as pickIdeaHook,
+  getBoard,
+  getTask,
+  linkIdeaToJob,
+  removeConcept as dropConcept,
+  removeReferenceChannel as dropChannel,
+  setIdeaStatus as changeIdeaStatus,
+  startChannelSuggestions as launchChannelSuggestions,
+  startHookVariants,
+  startIdeaSearch as launchIdeaSearch,
+  startStudy,
+  type IdeaDeps,
+  type IdeasBoard,
+} from "./lib/idea-service";
 
 export interface ProjectSummary {
   id: string;
@@ -768,9 +791,15 @@ export async function importGalleryItems(ids: string[]): Promise<GallerySourceIm
 
 // ─── Assistant IA ────────────────────────────────────────────────
 
-/** Lance la création d'un short par l'assistant ; le suivi se fait par `getAssistantJob`. */
-export async function startAssistant(request: AssistantRequest): Promise<AssistantJob> {
-  return launchAssistant(request);
+/**
+ * Lance la création d'un short par l'assistant ; le suivi se fait par
+ * `getAssistantJob`. Avec `ideaId` (« Créer cette vidéo » de l'écran Idées),
+ * l'idée devient « faite » quand le projet existe.
+ */
+export async function startAssistant(request: AssistantRequest & { ideaId?: string }): Promise<AssistantJob> {
+  const job = launchAssistant(request);
+  if (request?.ideaId) linkIdeaToJob(request.ideaId, job.id);
+  return job;
 }
 
 export async function getAssistantJob(id: string): Promise<AssistantJob | null> {
@@ -786,6 +815,135 @@ export async function cancelAssistant(id: string): Promise<{ success: boolean }>
   assertId(id, "Identifiant de travail");
   cancelAssistantJob(id);
   return { success: true };
+}
+
+// ─── Idées de vidéos ─────────────────────────────────────────────
+
+const LANGUAGE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
+
+/** Liste de textes courts d'une fiche, bornée. */
+const shortList = (value: unknown, max: number, length: number) =>
+  (Array.isArray(value) ? value : [])
+    .map((entry) => cleanScriptText(entry, length))
+    .filter(Boolean)
+    .slice(0, max);
+
+/** Fiche de la marque réduite à ce que les idées transmettent à Codex, et ses comptes connectés. */
+async function loadIdeaBrand(kitId: string): Promise<{ brand: IdeaBrand; accountIds: string[] } | null> {
+  try {
+    const record = (await apiModuleManager.callModuleFunction("brand-kit", "getKit", kitId)) as {
+      kit?: {
+        name?: string;
+        tagline?: string;
+        language?: string;
+        tone?: string;
+        rules?: { always?: unknown; never?: unknown };
+        ai?: { scriptTone?: string };
+        publishing?: { tags?: unknown; hashtags?: unknown; accountIds?: unknown };
+      };
+    } | null;
+    const kit = record?.kit;
+    if (!kit) return null;
+    const tagline = cleanScriptText(kit.tagline, 140);
+    const tone = cleanScriptText(kit.tone, 600);
+    const scriptTone = cleanScriptText(kit.ai?.scriptTone, 400);
+    return {
+      brand: {
+        name: cleanScriptText(kit.name, 80) || "Marque",
+        ...(tagline ? { tagline } : {}),
+        ...(typeof kit.language === "string" && LANGUAGE.test(kit.language) ? { language: kit.language } : {}),
+        ...(tone ? { tone } : {}),
+        ...(scriptTone ? { scriptTone } : {}),
+        always: shortList(kit.rules?.always, 8, 160),
+        never: shortList(kit.rules?.never, 8, 160),
+        tags: shortList(kit.publishing?.tags, 30, 60),
+        hashtags: shortList(kit.publishing?.hashtags, 30, 60),
+      },
+      accountIds: shortList(kit.publishing?.accountIds, 30, 80),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Vidéos déjà faites : noms et demandes des projets, noms des exports. */
+function videoHistory(): HistoryEntry[] {
+  const entries: HistoryEntry[] = [];
+  for (const project of listProjectFiles()) {
+    const title = cleanScriptText(project.brief?.title || project.name, 200);
+    const brief = cleanScriptText(project.brief?.prompt, 600);
+    entries.push({ title, ...(brief ? { brief } : {}) });
+  }
+  for (const entry of readExports()) entries.push({ title: cleanScriptText(entry.projectName, 200) });
+  return entries.filter((entry) => entry.title).slice(0, 400);
+}
+
+const ideaDeps: IdeaDeps = {
+  ask: (prompt, options) => askCodex(prompt, options),
+  loadBrand: loadIdeaBrand,
+  history: videoHistory,
+  // Comptes connectés qui savent lire une chaîne publique (YouTube aujourd'hui).
+  researchAccounts: () => listAccounts({ capability: "posts.list" }).filter((account) => channelReadCost(account.id) !== null),
+  readChannel: (accountId, query, options) => readChannelVideos(accountId, query, options),
+  channelCost: (accountId, options) => channelReadCost(accountId, options),
+  quota: (accountId) => quotaForAccount(accountId),
+  assistantJob: (id) => readAssistantJob(id),
+  now: () => new Date(),
+};
+
+/** Idées de la marque, sa banque de concepts, les comptes qui peuvent étudier la niche et le coût estimé. */
+export async function getIdeasBoard(input: { kitId?: string | null; accountId?: string } = {}): Promise<IdeasBoard> {
+  return getBoard(input ?? {}, ideaDeps);
+}
+
+/** Lance « Trouver des idées » ; le suivi se fait par `getIdeaTask`. */
+export async function startIdeaSearch(settings: unknown): Promise<IdeaTask> {
+  return launchIdeaSearch(settings, ideaDeps);
+}
+
+export async function getIdeaTask(id: string): Promise<IdeaTask | null> {
+  return getTask(id);
+}
+
+/** Garder, écarter, remettre parmi les nouvelles. */
+export async function setIdeaStatus(input: { id: string; status: string }): Promise<Idea> {
+  return changeIdeaStatus(input?.id, input?.status);
+}
+
+/** « Autres accroches » : trois variantes, en arrière-plan. */
+export async function startIdeaHooks(id: string): Promise<IdeaTask> {
+  return startHookVariants(id, ideaDeps);
+}
+
+export async function chooseIdeaHook(input: { id: string; hook: string }): Promise<Idea> {
+  return pickIdeaHook(input?.id, input?.hook);
+}
+
+export async function addReferenceChannel(input: { kitId?: string | null; handle: string }): Promise<ConceptBank> {
+  return addChannelToBank(input?.kitId, input?.handle);
+}
+
+export async function removeReferenceChannel(input: { kitId?: string | null; handle: string }): Promise<ConceptBank> {
+  return dropChannel(input?.kitId, input?.handle);
+}
+
+/** Valide ou refuse une chaîne proposée par Codex. */
+export async function answerChannelSuggestion(input: { kitId?: string | null; handle: string; accept: boolean }): Promise<ConceptBank> {
+  return answerSuggestedChannel(input?.kitId, input?.handle, input?.accept);
+}
+
+/** Chaînes de référence proposées par Codex avec la recherche web, à valider. */
+export async function suggestReferenceChannels(input: { kitId?: string | null; topic?: string }): Promise<IdeaTask> {
+  return launchChannelSuggestions(input?.kitId, input?.topic, ideaDeps);
+}
+
+/** « Étudier la niche » : lecture des chaînes par l'API YouTube, puis rangement des succès en concepts. */
+export async function startNicheStudy(input: { kitId?: string | null; accountId: string }): Promise<IdeaTask> {
+  return startStudy(input?.kitId, input?.accountId, ideaDeps);
+}
+
+export async function removeConcept(input: { kitId?: string | null; conceptId: string }): Promise<ConceptBank> {
+  return dropConcept(input?.kitId, input?.conceptId);
 }
 
 // ─── Voix de synthèse ────────────────────────────────────────────

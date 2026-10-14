@@ -7,6 +7,9 @@
 
 import type {
   AccountQuotaUsage,
+  ChannelQuery,
+  ChannelReadOptions,
+  ChannelVideos,
   ConnectionCapability,
   ConnectorContext,
   Connector,
@@ -86,6 +89,27 @@ export async function removePost(accountId: string, postId: string): Promise<voi
   });
   const cached = postsCache.get(accountId);
   if (cached) cached.posts = cached.posts.filter((post) => post.id !== postId);
+}
+
+// ─── Lecture publique d'une chaîne ────────────────────────────────
+
+/**
+ * Vidéos publiques d'une chaîne (la sienne avec `{ mine: true }`, une autre
+ * par son `@nom`), lues avec le jeton de ce compte. Exige `posts.list` :
+ * une portée de lecture. Chaque appel est compté dans le quota du service ;
+ * un quota épuisé suspend la file comme pour toute autre action.
+ */
+export async function readChannelVideos(accountId: string, query: ChannelQuery, options: ChannelReadOptions = {}): Promise<ChannelVideos> {
+  return withAccount(accountId, "posts.list", (connector, context) => {
+    if (!connector.research) throw new Error(`${connector.label} ne permet pas de lire une autre chaîne.`);
+    return connector.research.channelVideos(context, query, options);
+  });
+}
+
+/** Unités au moins et au plus pour lire une chaîne avec ce compte ; `null` si le service ne le permet pas. */
+export function channelReadCost(accountId: string, options: ChannelReadOptions = {}): { min: number; max: number } | null {
+  const { connector } = accountContext(accountId);
+  return connector.research ? connector.research.costPerChannel(options) : null;
 }
 
 /** Envoie une image de profil (bannière ou filigrane) au compte. */

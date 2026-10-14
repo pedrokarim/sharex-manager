@@ -10,6 +10,7 @@ import {
   AudioLines,
   Copy,
   Film,
+  Lightbulb,
   MoreHorizontal,
   Plus,
   Trash2,
@@ -37,6 +38,7 @@ import type { ClipExport } from "../engine/types";
 import { callModule, type ProjectSummary } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
 import { AssistantProgress, CreateDialog } from "../components/create-dialog";
+import { readCreatePrefill, type CreatePrefill } from "../lib/idea-prefill";
 import { ExportCard, publishHref } from "../components/export-card";
 import { useSession } from "@/lib/auth-client";
 
@@ -51,7 +53,7 @@ export default function ProjectsPage() {
   const params = useSearchParams();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(snapshot?.projects ?? null);
   const [exports, setExports] = useState<ClipExport[]>(snapshot?.exports ?? []);
-  const [creating, setCreating] = useState<{ files: string[] } | null>(null);
+  const [creating, setCreating] = useState<{ files: string[]; prefill?: CreatePrefill } | null>(null);
   const [assistantJobs, setAssistantJobs] = useState<AssistantJob[]>([]);
   // Publication : réservée aux administrateurs (comptes connectés du cœur).
   const { data: session } = useSession();
@@ -110,11 +112,13 @@ export default function ProjectsPage() {
     router.replace(`${publishHref(id)}${suffix ? `&${suffix}` : ""}`, { scroll: false });
   }, [params, router]);
 
-  // Arrivée depuis la galerie : « Créer un clip avec la sélection ».
+  // Arrivée depuis la galerie (« Créer un clip avec la sélection ») ou depuis
+  // l'écran Idées (« Créer cette vidéo », assistant prérempli).
   useEffect(() => {
     const files = params.get("files");
     if (params.get("action") === "create") {
-      setCreating({ files: files ? files.split(",").filter(Boolean) : [] });
+      const prefill = readCreatePrefill(params);
+      setCreating({ files: files ? files.split(",").filter(Boolean) : [], ...(prefill ? { prefill } : {}) });
       router.replace("/m/clip-studio", { scroll: false });
     }
   }, [params, router]);
@@ -131,6 +135,12 @@ export default function ProjectsPage() {
             </p>
           </div>
           <Button asChild variant="outline" className="ml-auto gap-2">
+            <Link href="/m/clip-studio/ideas">
+              <Lightbulb className="h-4 w-4" />
+              Idées
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="gap-2">
             <Link href="/m/clip-studio/voices">
               <AudioLines className="h-4 w-4" />
               Voix en ligne

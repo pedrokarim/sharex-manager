@@ -85,6 +85,7 @@ Ajoutés pour ce module et réutilisables par tous :
 | 11 | Vérification des faits : la date du jour dans les consignes ; le web pour écrire le script quand la demande porte sur des faits réels et que la case « Chercher aussi sur le web » est cochée ; une seconde passe de Codex qui contrôle chaque segment (corrigé, remplacé, retiré ou douteux, avec ses sources), les doutes dits dans le suivi, les sources rangées dans le projet (`lib/fact-check.ts`). Voir « Vérification des faits » ci-dessous | Réalisée |
 | 12 | Voix gratuites et naturelles : sélecteur de source (locales, Edge, Azure, OpenAI, Google, ElevenLabs), voix de la lecture à voix haute d’Edge sans clé, Microsoft Azure avec son offre gratuite suivie, bouton « Écouter » mis en cache, intonation des voix locales, « Changer la voix de la piste… ». Voir « Voix : sources, écoute et changement de voix » ci-dessous | Réalisée |
 | 13 | Voix de l’assistant : débit et intonation dans « Créer », voix de la marque préremplie (et prise d’office quand la demande n’en précise aucune, avec repli sur la voix locale si elle manque), calage de la voix sur une durée visée par format (accélération de 10 % au plus, sinon script raccourci par Codex). Voir « Voix de l’assistant, voix de la marque et calage » ci-dessous | Réalisée |
+| 14 | Idées de vidéos : écran « Idées » qui propose des sujets (titre, accroche, angle, concept, « pourquoi maintenant », prompt initial) selon un mélange conseillé, « Créer cette vidéo » qui préremplit l’assistant, banque de concepts par marque nourrie par l’étude de la niche (chaînes de référence lues par l’API YouTube, 3 à 5 unités de quota par chaîne). Voir « Idées de vidéos » ci-dessous | Réalisée |
 
 ### Trouver avant de générer (étape 9)
 
@@ -459,6 +460,151 @@ les sous-titres karaoké viennent de la voix finale. Le travail garde ce suivi
 dans `narration` (voix retenue et son origine, repli, durée mesurée,
 accélération, secondes gagnées, tentatives). Le script raccourci n’est pas
 revérifié : la consigne interdit d’ajouter ou de changer un fait.
+
+### Idées de vidéos (étape 14)
+
+Un short se joue avant d’être écrit : **le sujet compte plus que tout**. Le
+bon réflexe n’est pas la page blanche mais ce qui a déjà sur-performé, chez
+soi et chez les chaînes voisines. L’écran « Idées » (`/m/clip-studio/ideas`,
+dans le menu du module et en haut de la page des projets) en fait une
+méthode : il propose des sujets avec titre, accroche, angle et prompt initial
+prêt à lancer, et range ce qu’on apprend de la niche dans une banque de
+concepts.
+
+**Réglages d’une série.** Marque (par défaut la marque par défaut ; sa langue,
+son ton, ses sujets – mots-clés et mots-dièse de publication – et ses règles
+guident Codex), nombre d’idées (5 par défaut, de 3 à 10), part d’actualité
+(aucune, 20, 40 ou 60 %, le reste intemporel), modèles permis (libre, quiz,
+classement, diaporama), format (9:16 par défaut), thème ou mot-clé
+facultatif, recherche web. Ces réglages sont gardés dans le navigateur
+(`clip-studio:idea-settings`), sauf la marque.
+
+**« Trouver des idées ».** Codex reçoit la date du jour, la fiche de la
+marque, la banque de concepts, les vidéos déjà faites (noms et demandes des
+projets, noms des exports, idées déjà proposées) pour ne pas se répéter, les
+idées écartées comme exemples négatifs et, après une étude, les statistiques
+de la chaîne de la marque. Tout cela entre dans la consigne comme des
+**données** entre balises (`asData`, comme la marque dans l’assistant) :
+titres et descriptions venus du web ou d’autres chaînes ne sont jamais des
+instructions. Il rend du JSON strict, relu par `parseIdeas`
+(`lib/ideas.ts`) :
+
+- chaque idée porte un titre, une accroche (la première phrase dite, huit
+  mots environ), un angle, un concept (et sa preuve quand il vient de la
+  banque), un « pourquoi maintenant », le modèle conseillé, le nombre
+  d’éléments, la durée visée (bornée au format comme dans « Créer ») et un
+  prompt initial écrit comme le conseil donné à l’utilisateur (faits datés et
+  vérifiables, noms exacts, une phrase par élément) ;
+- une idée « concept prouvé » doit citer un concept qui existe dans la
+  banque ; la preuve affichée vient de nos mesures, jamais de Codex. Une
+  reprise doit citer un de ses propres succès récents. Sinon l’idée devient
+  « nouveau sujet » ;
+- une actualité exige une source https, titrée et datée de moins de
+  72 heures, vérifiée le jour même : sans elle, l’idée est écartée ;
+- une idée qui reprend une vidéo déjà faite, une idée déjà proposée (écartées
+  comprises) ou une autre idée de la série est écartée (mêmes mots porteurs à
+  60 %, ou titre contenu à 80 % dans un titre ou une demande) ; de même pour
+  un titre ou une accroche recopiés d’une autre chaîne : la forme est libre,
+  les phrases non ;
+- typographie française et règles d’écriture de `script-rules.ts` (familles
+  d’accroches, tournures d’IA à éviter) ;
+- l’accroche et le prompt tiennent ensemble dans les 600 caractères de la
+  demande de l’assistant (`ideaBrief`, coupé à la dernière phrase entière).
+
+**Mélange conseillé.** Sur une série de cinq : au moins trois idées sur des
+concepts prouvés quand la banque en a, au moins une actualité de moins de
+72 heures quand le web est permis, une reprise d’un succès récent quand il y
+en a (`mixTargets`). Le bilan affiché après la recherche dit ce qui a été
+obtenu et ce qui manque (`checkMix`) : banque vide, web coupé, part
+d’actualité qui laisse moins de trois idées prouvées.
+
+**Filtre avant d’écrire**, affiché sur chaque idée : la première phrase
+nomme l’objet ou la douleur avec un détail concret (un chiffre, un nom connu,
+« gratuit ») ; quelque chose à montrer dès la première seconde ; une seule
+promesse, tenue ; 45 secondes au plus, sauf classement ou duel. La dernière
+case est recalculée par le serveur ; les autres sont l’avis de Codex.
+
+**Une carte par idée.** Onglets Nouvelles, Gardées, Faites, Écartées.
+
+- « Créer cette vidéo » ouvre la page des projets avec des paramètres
+  d’adresse (`createHref`, `readCreatePrefill` dans `lib/idea-prefill.ts`) ;
+  la fenêtre « Créer » s’ouvre en mode Assistant, préremplie : demande
+  (accroche puis prompt), modèle, nombre, durée, format, marque. La demande
+  envoie `ideaId` ; l’idée devient « faite » quand l’assistant a rendu son
+  projet (« Ouvrir le projet »), et revient parmi les nouvelles si la
+  création échoue ou est annulée.
+- « Garder » la met de côté ; « Écarter » la retire et la donne à Codex comme
+  exemple de ce qui ne plaît pas ; « Rétablir » la remet parmi les nouvelles.
+- « Autres accroches » demande trois variantes de familles différentes ;
+  « Choisir » remplace l’accroche, l’ancienne rejoint les variantes.
+
+Les idées sont rangées dans `data/ideas.json`, bornées : 300 au plus (les
+nouvelles les plus anciennes partent d’abord, jamais une gardée ou une
+faite), 120 écartées au plus, longueurs de chaque champ, adresses https
+seulement. Le fichier est relu champ par champ à chaque lecture.
+
+#### Banque de concepts
+
+Un **concept** est une forme de sujet (« N jeux à surveiller avant leur
+sortie », « le moins cher contre le plus cher, même résultat »), pas un titre.
+Chaque concept garde ses preuves (vidéo, chaîne, score, vues), son moule
+(squelette de l’accroche et temps forts), son rythme (actualité ou
+intemporel) et ses flops. Un seul succès, ou une seule chaîne, c’est un
+**pari** ; trois succès sur au moins deux chaînes, une **recette**. La banque
+est rangée par marque (`data/concepts/<marque>.json`, `none.json` sans
+marque), 60 concepts au plus, recettes d’abord, et s’affiche à droite de
+l’écran (statut, succès, chaînes, moule et preuves au clic, « Retirer »).
+
+**Score d’une vidéo.** Ses vues divisées par la médiane des vues de sa
+chaîne. La médiane se calcule sur les 12 vidéos courtes qui suivent les 3 plus
+récentes : celles-ci sont trop jeunes, leurs vues grimpent encore. 3 fois la
+médiane ou plus, c’est un vrai signal ; de 1,5 à 3, peut-être. Une chaîne de
+moins de 15 vidéos courtes donne une médiane fragile, et l’écran le dit. Ce
+sont des seuils éditoriaux, pas une preuve (`lib/idea-scoring.ts`).
+
+**Ses propres succès.** Un sujet qui a fait 3 fois sa propre médiane se
+refait sous deux semaines, avec une autre accroche : ce sont les reprises.
+
+#### Étude de la niche
+
+« Étudier la niche » ouvre un tiroir latéral ; une étude par mois suffit
+(l’écran la signale au-delà de trente jours).
+
+- **Chaînes de référence**, propres à la marque : une liste éditable
+  (`@nom` ou adresse `youtube.com/@…`), et « Proposer des chaînes » : Codex
+  cherche sur le web des chaînes directes, voisines et beaucoup plus grosses,
+  qui restent « à valider » tant que l’utilisateur ne les a pas acceptées. Les
+  12 premières chaînes actives sont mesurées.
+- **Mesure.** Pour chaque chaîne, ses 30 dernières vidéos courtes (3 minutes
+  au plus), la médiane hors 3 plus récentes et le score de chacune ; la
+  chaîne de la marque de la même façon, quand le compte choisi lui est
+  rattaché. Les vidéos à 3 fois la médiane ou plus partent à Codex, qui les
+  range dans des concepts existants ou nouveaux, avec moule, rythme et flops
+  (moins de la moitié de la médiane) ; seuls les identifiants de vidéos
+  envoyés comptent, vues et scores viennent de la mesure.
+- **API YouTube, lecture publique.** Les données sont publiques ; le jeton
+  d’un compte YouTube connecté (capacité `posts.list`, une portée de lecture)
+  sert à les demander, par le cœur (`readChannelVideos` dans
+  `src/lib/connections/manage.ts`, `connectors/youtube/research.ts`). Trois
+  méthodes à 1 unité (page « Quota calculator », mise à jour le 08/10/2026) :
+  `channels.list` par `forHandle` ou `mine`, `playlistItems.list` sur la
+  playlist des envois (50 par page) et `videos.list` (durée et vues, 50 par
+  appel). Une page suffit d’ordinaire, deux au plus : **3 à 5 unités par
+  chaîne**, soit de 39 à 65 unités pour 12 chaînes et la sienne, sur 10 000
+  par jour. `search.list` n’est jamais appelé. Chaque appel est compté dans
+  le quota existant du connecteur avant d’être fait ; un quota épuisé arrête
+  l’étude sans perdre ce qui a été lu. Le coût estimé et le reste du jour
+  s’affichent avant de lancer.
+- **Sans compte YouTube connecté**, l’étude par l’API est indisponible et le
+  tiroir le dit ; les idées restent possibles, au web seul, sans banque.
+
+**Limites, affichées dans le tiroir.** Un succès peut venir d’autre chose que
+le sujet ou l’accroche : une tendance du moment, une collaboration, une
+publicité. Les vues des vidéos récentes grimpent encore : leur score est
+provisoire. Une vidéo courte se reconnaît ici à sa durée, pas à son format :
+une vidéo horizontale de deux minutes compte aussi. Les travaux (recherche,
+accroches, propositions, étude) tournent en arrière-plan et se suivent dans
+l’écran ; un redémarrage du serveur les interrompt.
 
 ## 1. Pourquoi ce module
 

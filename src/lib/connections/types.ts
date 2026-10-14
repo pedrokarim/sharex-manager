@@ -500,6 +500,54 @@ export interface PostSummary {
   comments?: number;
 }
 
+// ─── Lecture publique d'une chaîne (étude d'une niche) ───────────
+
+/**
+ * Chaîne à lire : la sienne (`mine`), ou une chaîne publique par son
+ * identifiant `@…`. Les données lues sont publiques ; seul le jeton du
+ * compte connecté sert à les demander, et chaque appel est compté dans le
+ * quota du service.
+ */
+export type ChannelQuery = { mine: true } | { handle: string };
+
+/** Une vidéo publique d'une chaîne, telle que le service la décrit. */
+export interface ChannelVideo {
+  id: string;
+  title: string;
+  url: string;
+  /** Mise en ligne (ISO). */
+  publishedAt?: string;
+  /** Durée en secondes ; 0 si le service ne la donne pas. */
+  durationSeconds: number;
+  /** Vues ; absentes quand la chaîne les masque. */
+  views?: number;
+}
+
+export interface ChannelVideos {
+  channel: {
+    id: string;
+    title: string;
+    /** `@nom`, quand la chaîne en a un. */
+    handle?: string;
+    url: string;
+    /** Nombre de vidéos publiques annoncé par le service. */
+    videoCount?: number;
+  };
+  /** Dernières vidéos, de la plus récente à la plus ancienne. */
+  videos: ChannelVideo[];
+  /** Méthodes appelées, dans l'ordre (chacune comptée dans le quota). */
+  calls: string[];
+}
+
+export interface ChannelReadOptions {
+  /** Envois examinés au plus (50 par page), 100 au plus. */
+  scan?: number;
+  /** S'arrête dès que ce nombre de vidéos courtes est atteint. */
+  wantShorts?: number;
+  /** Durée maximale d'une vidéo courte, en secondes. */
+  shortMaxSeconds?: number;
+}
+
 export interface PostPatch {
   title?: string;
   description?: string;
@@ -1273,6 +1321,16 @@ export interface Connector {
   uploadSubtitles?(context: FollowUpContext, subtitles: { path: string; language: string }): Promise<FollowUpOutcome>;
   /** Change la couverture (miniature) de la vidéo publiée. Capacité `cover.set`. */
   setCover?(context: FollowUpContext, cover: { path: string; mimeType?: string }): Promise<FollowUpOutcome>;
+  /**
+   * Lecture publique des vidéos d'une chaîne (la sienne ou une autre), pour
+   * l'étude d'une niche. Exige `posts.list` (une portée de lecture) ;
+   * `costPerChannel` donne le nombre d'unités de quota au plus et au moins
+   * pour une chaîne, affiché avant de lancer.
+   */
+  research?: {
+    channelVideos(context: ConnectorContext, query: ChannelQuery, options?: ChannelReadOptions): Promise<ChannelVideos>;
+    costPerChannel(options?: ChannelReadOptions): { min: number; max: number };
+  };
   /** Actions de gestion, présentes selon les capacités. */
   posts?: {
     list(context: ConnectorContext): Promise<PostSummary[]>;

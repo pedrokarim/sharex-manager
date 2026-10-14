@@ -7,6 +7,27 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Clip Studio : écran « Idées » qui propose des sujets de vidéos, chacun
+  avec titre, accroche, angle, concept, « pourquoi maintenant » (source https
+  datée de moins de 72 heures pour une actualité), modèle, nombre d’éléments,
+  durée et prompt initial prêt pour l’assistant. Réglages : marque, nombre,
+  part d’actualité, modèles permis, format, thème. Mélange conseillé (concepts
+  prouvés, actualité, reprise d’un succès récent) et filtre avant d’écrire
+  affichés ; idées dédoublonnées contre les vidéos déjà faites et les idées
+  écartées. « Créer cette vidéo » ouvre « Créer » en mode Assistant,
+  préremplie, et l’idée passe dans « Faites » quand le projet existe ;
+  « Garder », « Écarter » et « Autres accroches » sur chaque carte.
+- Clip Studio, « Étudier la niche » : chaînes de référence par marque
+  (ajoutées à la main ou proposées par Codex avec le web, à valider), leurs
+  30 dernières vidéos courtes lues par l’API YouTube avec le compte connecté,
+  score de chaque vidéo (vues ÷ médiane de la chaîne hors trois plus récentes)
+  et banque de concepts par marque (pari ou recette, moule, rythme, flops) qui
+  nourrit les idées. Coût affiché avant de lancer : 3 à 5 unités de quota par
+  chaîne, jamais la recherche à 100 unités ; sans compte YouTube connecté,
+  l’étude est indisponible et les idées restent possibles au web seul.
+- Comptes connectés : lecture publique des vidéos d’une chaîne YouTube
+  (`readChannelVideos`, par `@nom` ou la sienne), chaque appel compté dans le
+  quota du connecteur.
 - Comptes connectés : adresses de rappel de Meta (Facebook, Instagram, Threads)
   pour le retrait de l’autorisation et la suppression des données, vérifiées par
   la signature de l’application ; affichées à copier dans la configuration du

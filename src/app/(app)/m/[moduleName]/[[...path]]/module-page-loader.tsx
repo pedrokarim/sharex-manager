@@ -28,6 +28,7 @@ const MODULE_PAGES: Record<string, Record<string, PageLoader>> = {
   "clip-studio": {
     "": () => import("@/modules/clip-studio/pages/projects"),
     edit: () => import("@/modules/clip-studio/pages/editor"),
+    ideas: () => import("@/modules/clip-studio/pages/ideas"),
     voices: () => import("@/modules/clip-studio/pages/voices"),
     export: () => import("@/modules/clip-studio/pages/export"),
     exports: () => import("@/modules/clip-studio/pages/exports"),

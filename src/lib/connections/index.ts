@@ -8,6 +8,10 @@
 
 export type {
   AccountSummary,
+  ChannelQuery,
+  ChannelReadOptions,
+  ChannelVideo,
+  ChannelVideos,
   ConnectionCapability,
   ConnectorInfo,
   PostPatch,
@@ -33,4 +37,4 @@ export { checkPublishLimits, describeMediaLimits, estimatePublishCost, measureTe
 export { listAccounts, getAccountSummary } from "./accounts";
 export { listConnectors, getConnector, describeConnector } from "./registry";
 export { enqueuePublish, listJobs, getJob, cancelJob, retryJob, retryFollowUp, cancelFollowUp } from "./publish-queue";
-export { setProfileImage, listPosts, quotaForAccount, accountQuotaForAccount } from "./manage";
+export { setProfileImage, listPosts, quotaForAccount, accountQuotaForAccount, readChannelVideos, channelReadCost } from "./manage";

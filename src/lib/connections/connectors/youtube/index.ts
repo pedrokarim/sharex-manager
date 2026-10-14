@@ -10,6 +10,7 @@ import { deleteVideo, fetchChannelProfile, listUploads, setChannelBanner, setCha
 import { YOUTUBE_PUBLISH_FIELDS, normalizeYoutubeOptions, type YoutubeOptions } from "./metadata";
 import { youtubeQuota } from "./quota";
 import { uploadVideo } from "./upload";
+import { fetchChannelVideos, youtubeChannelCost } from "./research";
 import {
   YOUTUBE_PLAYLISTS_SUPPORT,
   YOUTUBE_PROFILE_FIELDS,
@@ -136,6 +137,11 @@ export const youtubeConnector: Connector = {
   postComment: postYoutubeComment,
   uploadSubtitles: uploadYoutubeSubtitles,
   setCover: setYoutubeThumbnail,
+  // Lecture publique d'une chaîne (étude d'une niche) : trois lectures à 1 unité, jamais `search.list`.
+  research: {
+    channelVideos: fetchChannelVideos,
+    costPerChannel: youtubeChannelCost,
+  },
   posts: {
     list: (context) => listUploads(context),
     update: updateVideo,

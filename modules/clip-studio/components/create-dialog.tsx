@@ -60,6 +60,7 @@ import {
   maxTargetSeconds,
   voiceSourceOf,
 } from "../lib/voice-settings";
+import type { CreatePrefill } from "../lib/idea-prefill";
 import { lastPickedVoice, SpeedControl, ToneControl, useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
 import { MOOD_LABELS } from "./music-panel";
 import { BrandKitMark } from "./inspector";
@@ -177,8 +178,11 @@ export function CreateDialog({
   onCreated,
   onAssistantStarted,
 }: {
-  /** `files` : images venues de la galerie, montées en diaporama. */
-  request: { files: string[] } | null;
+  /**
+   * `files` : images venues de la galerie, montées en diaporama. `prefill` :
+   * demande préremplie pour l'assistant (« Créer cette vidéo » de l'écran Idées).
+   */
+  request: { files: string[]; prefill?: CreatePrefill } | null;
   onClose: () => void;
   onCreated: (projectId: string) => void;
   onAssistantStarted: () => void;
@@ -234,15 +238,25 @@ export function CreateDialog({
     if (!request) return;
     setMode(request.files.length ? "blank" : "assistant");
     setRecipe("slideshow");
+    const prefill = request.prefill;
+    if (prefill) {
+      setBrief(prefill.brief);
+      setTemplate(prefill.template);
+      setCount(prefill.count);
+      setAspect(prefill.aspect);
+      setTargetChoice(prefill.targetSeconds);
+    }
     setName(request.files.length ? `Diaporama du ${new Date().toLocaleDateString("fr-FR")}` : "Nouveau clip");
     setBusy(false);
     setJob(null);
   }, [request]);
 
-  // La marque par défaut est présélectionnée à chaque ouverture.
+  // La marque par défaut est présélectionnée à chaque ouverture, sauf quand l'idée en désigne une (ou aucune).
   useEffect(() => {
-    if (request) setBrandKitId(defaultKitId);
-  }, [request, defaultKitId]);
+    if (!request) return;
+    const wanted = request.prefill?.brandKitId;
+    setBrandKitId(wanted !== undefined && (wanted === null || brandKits?.some((kit) => kit.id === wanted)) ? wanted : defaultKitId);
+  }, [request, defaultKitId, brandKits]);
 
   // Un projet vide n'a rien à habiller : la marque vaut pour l'assistant, les modèles et les recettes.
   const brandable = mode !== "blank" || fromGallery;
@@ -348,6 +362,7 @@ export function CreateDialog({
         targetSeconds,
         music: music === "none" ? undefined : music,
         brandKitId: chosenKitId ?? undefined,
+        ...(request?.prefill?.ideaId ? { ideaId: request.prefill.ideaId } : {}),
       });
       setJob(started);
       onAssistantStarted();
@@ -368,7 +383,9 @@ export function CreateDialog({
           <DialogDescription>
             {fromGallery
               ? `${mediaCountLabel(request!.files)} ${request!.files.every((file) => file.startsWith(GENERATED_PREFIX)) ? "d'AI Image Gen" : "de la galerie"}, à monter en diaporama, en clip rythmé ou en avant / après.`
-              : "Laissez l'assistant monter un short, partez d'un modèle, ou commencez à vide."}
+              : request?.prefill
+                ? "Préremplie depuis une idée : relisez la demande, ajustez si besoin, puis lancez l'assistant."
+                : "Laissez l'assistant monter un short, partez d'un modèle, ou commencez à vide."}
           </DialogDescription>
         </DialogHeader>
 
