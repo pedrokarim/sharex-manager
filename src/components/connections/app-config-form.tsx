@@ -211,6 +211,20 @@ export function AppConfigForm({
         )}
       </section>
 
+      {app?.signedCallbacks ? (
+        <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
+          <Label>Adresses de rappel à déclarer chez {connector.label}</Label>
+          <p className="text-xs text-pretty text-muted-foreground">
+            Dans les paramètres de l’application, champs de désinstallation (retrait de l’autorisation) et de suppression des données. Chaque
+            appel est vérifié par la signature de l’application.
+          </p>
+          <span className="text-xs font-medium">Désinstallation</span>
+          <CopyField value={app.signedCallbacks.deauthorize} label="Copier l’adresse de désinstallation" />
+          <span className="text-xs font-medium">Suppression des données</span>
+          <CopyField value={app.signedCallbacks.dataDeletion} label="Copier l’adresse de suppression des données" />
+        </section>
+      ) : null}
+
       <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
         <h3 className="text-sm font-semibold">Identifiants de l’application</h3>
         {fromEnv ? (

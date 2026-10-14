@@ -7,6 +7,10 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Comptes connectés : adresses de rappel de Meta (Facebook, Instagram, Threads)
+  pour le retrait de l’autorisation et la suppression des données, vérifiées par
+  la signature de l’application ; affichées à copier dans la configuration du
+  service.
 - Clip Studio, assistant : le débit et, pour une voix locale, l’intonation se
   choisissent dans la fenêtre « Créer », à côté de la voix ; « Écouter » joue
   la voix ainsi réglée, et ces choix sont gardés dans le navigateur.

@@ -64,6 +64,8 @@ export interface AppStatus {
   envNames: { clientId: string; clientSecret: string };
   /** URI à déclarer chez le service, ou `null` si AUTH_URL manque. */
   redirectUri: string | null;
+  /** Adresses de rappel signées à déclarer aussi (services de Meta) : retrait de l'autorisation, suppression des données. */
+  signedCallbacks?: { deauthorize: string; dataDeletion: string };
   /** Secret enregistré mais illisible (clé de chiffrement changée). */
   secretUnreadable?: boolean;
   /** Réglages propres au service. */
@@ -100,6 +102,9 @@ export function publicBaseUrl(): string | null {
     return null;
   }
 }
+
+/** Services dont la console exige des adresses de rappel signées (retrait de l'autorisation, suppression des données). */
+export const SIGNED_CALLBACK_CONNECTORS: readonly string[] = ["facebook", "instagram", "threads"];
 
 /** URI de redirection fixe, tirée d'AUTH_URL et jamais d'une requête. */
 export function redirectUri(connectorId: string): string {
@@ -203,6 +208,11 @@ export function getAppStatus(connector: Connector): AppStatus {
   });
   const missing = settings.filter((setting) => setting.required && !setting.source).map((setting) => setting.label);
   const base: AppStatus = { connector: connector.id, configured: false, source: null, envNames: names, redirectUri: redirect, settings };
+  const origin = publicBaseUrl();
+  if (origin && SIGNED_CALLBACK_CONNECTORS.includes(connector.id)) {
+    const prefix = `${origin}/api/connections/${encodeURIComponent(connector.id)}`;
+    base.signedCallbacks = { deauthorize: `${prefix}/deauthorize`, dataDeletion: `${prefix}/data-deletion` };
+  }
   if (missing.length > 0) base.missingSettings = missing;
   const env = fromEnv(connector);
   if (env) return { ...base, configured: missing.length === 0, source: "env", clientId: env.clientId, updatedAt: stored?.updatedAt };

@@ -34,7 +34,7 @@ export function dataRoot(): string {
   return dataRootOverride ?? path.join(process.cwd(), "data", "connections");
 }
 
-export type StoreFile = "accounts" | "apps" | "publish-jobs" | "quota" | "account-quota" | "billing" | "pending" | "public-media";
+export type StoreFile = "accounts" | "apps" | "publish-jobs" | "quota" | "account-quota" | "billing" | "pending" | "public-media" | "deletions";
 
 // `dataRoot()` peut être déplacé par les tests : le build ne peut pas borner ce chemin.
 const filePath = (name: StoreFile) => path.join(/* turbopackIgnore: true */ dataRoot(), `${name}.json`);

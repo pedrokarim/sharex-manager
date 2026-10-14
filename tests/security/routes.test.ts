@@ -13,6 +13,8 @@ import { fileURLToPath } from "url";
 /** Routes publiques par conception, et pourquoi. */
 const PUBLIC_ROUTES: Record<string, string> = {
   "src/app/api/auth/[...all]/route.ts": "connexion et session (better-auth)",
+  "src/app/api/connections/[connector]/deauthorize/route.ts": "rappel de Meta, demande signée par le secret de l'application vérifiée (HMAC-SHA256), ne fait que passer des comptes « à reconnecter »",
+  "src/app/api/connections/[connector]/data-deletion/route.ts": "rappel de Meta, demande signée vérifiée ; suivi par un code de 80 bits",
   "src/app/api/connections/media/[token]/route.ts": "fichier prêté à un service qui publie, jeton de 256 bits lié à un seul fichier, temporaire, lectures bornées, limité en débit",
   "src/app/api/contact/route.ts": "formulaire de la page vitrine, limité en débit",
   "src/app/api/public/albums/[slug]/route.ts": "albums publiés",
