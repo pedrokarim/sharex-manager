@@ -10,6 +10,7 @@
 import fs from "fs";
 import path from "path";
 import type { ClipAsset, ClipExport, ClipProject } from "../engine/types";
+import { ensureSfxBank } from "./sfx";
 
 const MODULE_DIR = path.join(process.cwd(), "modules", "clip-studio");
 export const DATA_DIR = path.join(MODULE_DIR, "data");
@@ -26,6 +27,8 @@ export function ensureDirs() {
   for (const dir of [DATA_DIR, PROJECTS_DIR, ASSETS_DIR, EXPORTS_DIR]) {
     fs.mkdirSync(dir, { recursive: true });
   }
+  // Bruitages synthétisés (D3) : écrits au premier passage, vérifiés une fois par processus.
+  ensureSfxBank();
 }
 
 export function assertId(id: unknown, label = "identifiant"): asserts id is string {

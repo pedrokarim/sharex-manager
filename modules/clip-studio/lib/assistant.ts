@@ -39,6 +39,8 @@ import {
   type VoiceClip,
 } from "../engine/templates";
 import type { BrandTheme } from "../engine/brand";
+import { POSE_EMOTIONS, POSE_GESTURES, readEmotion, readGesture, type PoseEmotion, type PoseGesture } from "../engine/poses";
+import type { EditPace } from "../engine/rhythm";
 import type { AspectPreset, ClipProject, MediaSource } from "../engine/types";
 import { addItem, createMusicItems } from "../engine/edit";
 import { projectDuration } from "../engine/timeline";
@@ -300,6 +302,19 @@ export function startAssistant(request: AssistantRequest): AssistantJob {
   return job;
 }
 
+/**
+ * Musique sous une voix off (D3) : volume entre les répliques, et gain sous
+ * la voix. Mesuré sur la banque (musique vers −11 LUFS, voix de synthèse vers
+ * −16,5 LUFS à 0,9) : 0,28 × 0,43 ≈ 0,12 met la musique environ 12 dB sous la
+ * voix pendant qu'elle parle.
+ */
+export const MUSIC_UNDER_VOICE = { volume: 0.28, duck: 0.43 };
+
+/** Rythme d'un clip de l'assistant : celui de la marque, sinon le rythme normal. */
+export function assistantPace(brand: Pick<AssistantBrand, "theme"> | null): EditPace {
+  return brand?.theme.pace ?? "normal";
+}
+
 async function run(job: AssistantJob, signal: AbortSignal) {
   const step = (id: StepId, state: StepState, detail?: string, label?: string) => {
     job.steps = job.steps.map((entry) => (entry.id === id ? { ...entry, state, detail, ...(label ? { label } : {}) } : entry));
@@ -384,16 +399,19 @@ async function run(job: AssistantJob, signal: AbortSignal) {
     // 4. Montage
     step("montage", "running");
     // La musique est posée après la marque : elle couvre aussi le carton de fin.
-    let project = buildFromTemplate(job.request.template, script.title, job.request.aspect, data, brand?.theme ?? null);
+    // L'assistant crée le clip : le montage prend le rythme (D3), celui de la marque ou le rythme normal.
+    let project = buildFromTemplate(job.request.template, script.title, job.request.aspect, data, brand?.theme ?? null, { pace: assistantPace(brand) });
     if (job.request.music) {
       const mood = job.request.music === "auto" ? script.mood : job.request.music;
       const end = projectDuration(project);
       const track = pickTrack(mood, (end / project.fps) * 1000);
       if (track?.url) {
-        // Sous une voix off, la musique se fait discrète.
-        const volume = voice ? 0.14 : 0.4;
+        // Sous une voix off, la musique se fait discrète, et s'efface encore pendant que la voix parle.
+        const volume = voice ? MUSIC_UNDER_VOICE.volume : 0.4;
         const source: MediaSource = { url: track.url, ref: `module:clip-studio/resources/music/${track.id}.mp3`, name: `${track.title} – ${track.artist}`, kind: "audio", durationMs: track.durationMs, credit: track.credit };
-        for (const item of createMusicItems(source, 0, end, project.fps, volume)) project = addItem(project, item, undefined, "Musique");
+        for (const item of createMusicItems(source, 0, end, project.fps, volume)) {
+          project = addItem(project, voice ? { ...item, duck: MUSIC_UNDER_VOICE.duck } : item, undefined, "Musique");
+        }
       }
     }
     // La demande, le script et ses sources suivent le projet : l'assistant de publication les relit pour rédiger les textes.
@@ -430,15 +448,23 @@ interface RawImage {
   icon?: unknown;
 }
 
+/** Émotion et geste de la mascotte pendant un segment, tels que le script les écrit (lus avec rigueur). */
+interface RawDirection {
+  emotion?: unknown;
+  gesture?: unknown;
+}
+
 interface RawScript {
   title?: string;
   subtitle?: string;
   outro?: string;
   mood?: string;
-  questions?: { question?: string; choices?: string[]; answer?: number; explanation?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean }[];
-  entries?: { title?: string; detail?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean }[];
-  slides?: { caption?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean }[];
-  scenes?: { heading?: string; text?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean }[];
+  questions?: ({ question?: string; choices?: string[]; answer?: number; explanation?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection)[];
+  entries?: ({ title?: string; detail?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection)[];
+  slides?: ({ caption?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection)[];
+  scenes?: ({ heading?: string; text?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection)[];
+  /** Émotion de la mascotte pendant la conclusion. */
+  outroEmotion?: unknown;
   /** Accroches proposées et notées ; lues par `pickBestHook`. */
   hooks?: unknown;
 }
@@ -620,7 +646,7 @@ function brandLines(brand: AssistantBrand, finding = false): string[] {
     `<marque>${asData(data)}</marque>`,
     "Écris dans le ton de la marque (tone, scriptTone), applique ses règles « always » et ne fais jamais ce que listent ses règles « never ». Un carton de fin à son nom est ajouté au montage : inutile de la nommer dans outro.",
     ...(brand.mascotPlaced
-      ? ["La mascotte de la marque est déjà posée au montage, en petites poses, à chaque segment : aucune illustration ne la met en scène."]
+      ? ["La mascotte de la marque est déjà posée au montage, à chaque segment : aucune illustration ne la met en scène.", ...emotionLines()]
       : []),
     ...(brand.mascot
       ? [
@@ -632,6 +658,26 @@ function brandLines(brand: AssistantBrand, finding = false): string[] {
         ]
       : []),
   ];
+}
+
+/**
+ * Consigne des émotions (D2) : la mascotte posée au montage prend, à chaque
+ * segment, la pose de l'émotion que le script lui donne. Listes fermées ; une
+ * valeur hors liste vaut « neutral » à la lecture.
+ */
+export function emotionLines(): string[] {
+  return [
+    `Ajoute à chaque segment (question, élément, diapositive ou séquence) une clé "emotion" : l'émotion que la mascotte montre pendant ce segment, en accord avec ce qu'il dit, exactement l'une de ${POSE_EMOTIONS.map((emotion) => `"${emotion}"`).join(", ")}. Varie-la d'un segment à l'autre quand le contenu s'y prête (surprise sur un fait étonnant, réflexion sur une question, fierté sur le numéro 1, malice sur une astuce) ; "neutral" seulement quand rien d'autre ne va.`,
+    `Facultatif : une clé "gesture" quand un geste s'impose, exactement l'un de ${POSE_GESTURES.filter((gesture) => gesture !== "idle").map((gesture) => `"${gesture}"`).join(", ")} ; sinon ne la mets pas.`,
+    'Ajoute aussi au JSON une clé "outroEmotion" : l\'émotion de la mascotte pendant la conclusion, dans la même liste.',
+  ];
+}
+
+/** Émotion et geste d'un segment, lus avec rigueur : une émotion hors liste est neutre, un geste hors liste est absent. */
+function directionFields(segment: RawDirection): { emotion?: PoseEmotion; gesture?: PoseGesture } {
+  const emotion = segment.emotion === undefined ? undefined : readEmotion(segment.emotion);
+  const gesture = readGesture(segment.gesture);
+  return { ...(emotion ? { emotion } : {}), ...(gesture ? { gesture } : {}) };
 }
 
 /** Sans caractère invisible, sur une ligne, borné ; les espaces insécables restent. */
@@ -664,6 +710,8 @@ type ScriptContent = TemplateData & {
   /** Texte de chaque segment, qui guide le choix entre plusieurs images trouvées. */
   segmentTexts: string[];
   mood?: string;
+  /** Émotion de la mascotte pendant la conclusion (D2). */
+  outroEmotion?: PoseEmotion;
 };
 
 type CleanScript = ScriptContent & {
@@ -744,6 +792,8 @@ export function sanitize(request: AssistantRequest, raw: RawScript, language?: s
 
 function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: string, line: LineCleaner): ScriptContent {
   const mood = (MOODS as readonly string[]).includes(String(raw.mood)) ? String(raw.mood) : undefined;
+  const outroEmotion = raw.outroEmotion === undefined ? undefined : readEmotion(raw.outroEmotion);
+  const direction = outroEmotion ? { outroEmotion } : {};
   if (request.template === "quiz") {
     const questions = (raw.questions ?? [])
       .map((question) => {
@@ -755,6 +805,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
           answer: answer >= 0 && answer < choices.length ? answer : 0,
           explanation: line(question.explanation, 110) || undefined,
           ...imageFields(question),
+          ...directionFields(question),
         };
       })
       .filter((question) => question.question && question.choices.length >= 2)
@@ -766,6 +817,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
       subtitle: line(raw.subtitle, 80) || undefined,
       outro: line(raw.outro, 60) || undefined,
       questions,
+      ...direction,
       ...imageArrays(questions, questions.map((question) => question.question)),
     };
   }
@@ -775,6 +827,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
         heading: line(scene.heading, 50) || undefined,
         text: line(scene.text, 160) || undefined,
         ...imageFields(scene),
+        ...directionFields(scene),
       }))
       .filter((scene) => scene.heading || scene.text)
       .slice(0, request.count);
@@ -785,6 +838,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
       subtitle: line(raw.subtitle, 90) || undefined,
       outro: line(raw.outro, 60) || undefined,
       scenes,
+      ...direction,
       ...imageArrays(scenes, scenes.map((scene) => [scene.heading, scene.text].filter(Boolean).join(". "))),
     };
   }
@@ -794,6 +848,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
         title: line(entry.title, 50),
         detail: line(entry.detail, 80) || undefined,
         ...imageFields(entry),
+        ...directionFields(entry),
       }))
       .filter((entry) => entry.title)
       .slice(0, request.count);
@@ -803,11 +858,12 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
       mood,
       outro: line(raw.outro, 60) || undefined,
       entries,
+      ...direction,
       ...imageArrays(entries, entries.map((entry) => [entry.title, entry.detail].filter(Boolean).join(". "))),
     };
   }
   const slides = (raw.slides ?? [])
-    .map((slide) => ({ caption: line(slide.caption, 110) || undefined, ...imageFields(slide) }))
+    .map((slide) => ({ caption: line(slide.caption, 110) || undefined, ...imageFields(slide), ...directionFields(slide) }))
     .slice(0, request.count);
   if (slides.length === 0) throw new Error("Le script reçu ne contient aucune diapositive.");
   return {
@@ -815,6 +871,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
     mood,
     outro: line(raw.outro, 60) || undefined,
     slides,
+    ...direction,
     ...imageArrays(slides, slides.map((slide) => slide.caption ?? "")),
   };
 }
@@ -878,7 +935,12 @@ function rawImage(request: AssistantRequest, segment: ImageFields): Record<strin
 
 /** Segments d'un script nettoyé, dans le schéma du script brut : ce que la vérification relit et renvoie. */
 function rawSegments(request: AssistantRequest, script: CleanScript): Record<string, unknown>[] {
-  const mascot = (segment: ImageFields) => (segment.mascot ? { mascot: true } : {});
+  // Émotion et geste suivent le segment : la vérification et le raccourcissement les rendent tels quels.
+  const mascot = (segment: ImageFields & RawDirection) => ({
+    ...(segment.mascot ? { mascot: true } : {}),
+    ...(segment.emotion ? { emotion: segment.emotion } : {}),
+    ...(segment.gesture ? { gesture: segment.gesture } : {}),
+  });
   if (request.template === "quiz") {
     return (script as CleanScript & QuizData).questions.map((question) => {
       const segment = question as typeof question & ImageFields;
@@ -937,6 +999,7 @@ export function applyFactCheck(request: AssistantRequest, script: CleanScript, r
     subtitle: "subtitle" in script ? (script.subtitle as string | undefined) : undefined,
     outro: script.outro,
     mood: script.mood,
+    outroEmotion: script.outroEmotion,
     [SEGMENT_KEYS[request.template]]: segments,
   } as RawScript;
   const rebuilt = sanitize({ ...request, count: segments.length }, raw, language);
@@ -1292,9 +1355,22 @@ export function imagesSummary(job: ImagesTracking): string {
   return [...imagesCounts(job), icons].filter(Boolean).join(", ") || `0 sur ${job.images.total}`;
 }
 
+/** Nom du sujet d'une icône, d'après sa requête : « Honkai Star Rail logo » donne « Honkai Star Rail ». */
+export function iconNameOf(query: string | undefined): string | undefined {
+  const name = (query ?? "")
+    .replace(/\b(official|app icon|icon|logo|key art|game|poster|cover)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return name || undefined;
+}
+
 /** Illustration et icône de chaque segment, posées sur les données du modèle. */
 function attachImages(template: TemplateId, script: CleanScript, images: (MediaSource | undefined)[], icons: (MediaSource | undefined)[] = []) {
-  const media = (index: number) => ({ image: images[index], ...(icons[index] ? { icon: icons[index] } : {}) });
+  // L'icône d'un sujet apparaît quand la voix dit son nom (D3) : le nom vient de sa requête.
+  const media = (index: number) => {
+    const name = icons[index] ? iconNameOf(script.imagePlans[index]?.iconQuery) : undefined;
+    return { image: images[index], ...(icons[index] ? { icon: icons[index] } : {}), ...(name ? { iconName: name } : {}) };
+  };
   if (template === "free") {
     const data = script as FreeData & CleanScript;
     return { ...data, scenes: data.scenes.map((scene, index) => ({ ...scene, ...media(index) })) };
@@ -1728,6 +1804,7 @@ export function applyShortening(request: AssistantRequest, script: CleanScript, 
     subtitle: "subtitle" in script ? keep(parsed.subtitle, script.subtitle as string | undefined) : undefined,
     outro: keep(parsed.outro, script.outro),
     mood: script.mood,
+    outroEmotion: script.outroEmotion,
     [SEGMENT_KEYS[request.template]]: segments,
   } as RawScript;
   const rebuilt = sanitize({ ...request, count: segments.length }, raw, language);

@@ -7,6 +7,7 @@
  * exports et le serveur lisent la même réponse.
  */
 
+import { needsMirror, pickRankedPose, POSE_EMOTION_NEIGHBORS, type PoseQuery } from "@/modules/clip-studio/engine/poses";
 import {
   MASCOT_FORMAT_IDS,
   POSE_EMOTIONS,
@@ -139,25 +140,8 @@ export const POSE_FRAMING_LABELS: Record<PoseFraming, string> = { full: "En pied
 
 export const POSE_FACING_LABELS: Record<PoseFacing, string> = { left: "Vers la gauche", front: "De face", right: "Vers la droite" };
 
-/**
- * Émotions voisines, de la plus proche à la moins proche : quand aucune pose
- * n'a l'émotion demandée, une voisine dit à peu près la même chose. Jamais
- * une émotion de sens contraire (pas de pose triste pour un segment joyeux).
- */
-export const POSE_EMOTION_NEIGHBORS: Record<PoseEmotion, readonly PoseEmotion[]> = {
-  joy: ["excitement", "pride", "mischief"],
-  excitement: ["joy", "surprise", "pride"],
-  surprise: ["shock", "excitement", "thinking"],
-  shock: ["surprise", "disappointment"],
-  thinking: ["doubt", "neutral"],
-  doubt: ["thinking", "disappointment"],
-  disappointment: ["sadness", "doubt"],
-  sadness: ["disappointment", "doubt"],
-  anger: ["disappointment", "shock"],
-  mischief: ["joy", "pride"],
-  pride: ["joy", "excitement", "mischief"],
-  neutral: ["thinking", "joy"],
-};
+/** Émotions voisines, de la plus proche à la moins proche (listes du moteur, `engine/poses.ts`). */
+export { POSE_EMOTION_NEIGHBORS, needsMirror };
 
 /** Geste proposé d'office pour générer une pose d'une émotion donnée. */
 export const SUGGESTED_GESTURE: Record<PoseEmotion, PoseGesture> = {
@@ -280,42 +264,19 @@ export function poseTags(asset: BrandAsset): PoseTags {
   return asset.pose ? sanitizePoseTags(asset.pose, proposed) : proposed;
 }
 
-export interface PoseQuery {
-  emotion: PoseEmotion;
-  gesture?: PoseGesture;
-  framing?: PoseFraming;
-  /** Côté vers lequel la pose doit regarder (là où est le contenu). */
-  side?: "left" | "right";
-  /** Poses à éviter (celle qu'on vient de montrer), sauf si aucune autre ne convient. */
-  exclude?: string | readonly string[];
-}
+export type { PoseQuery };
 
 /**
- * La pose qui va le mieux à un segment : l'émotion exacte, sinon une émotion
- * voisine (la plus proche d'abord), sinon une pose neutre ; à égalité, le
+ * La pose qui va le mieux à un segment : l'émotion exacte, sinon une émotion
+ * voisine (la plus proche d'abord), sinon une pose neutre ; à égalité, le
  * bon geste, le bon cadrage, puis le bon côté (de face avant le côté
  * opposé). Jamais une pose exclue (la précédente) quand une autre convient.
- * Aucune pose ne convient (seulement des émotions éloignées) : `undefined`.
+ * Aucune pose ne convient (seulement des émotions éloignées) : `undefined`.
+ * Le classement est celui du moteur (`rankPoses`), qui choisit aussi les
+ * poses du montage.
  */
 export function pickPose(kit: BrandKit, query: PoseQuery): BrandAsset | undefined {
-  const neighbors = POSE_EMOTION_NEIGHBORS[query.emotion] ?? [];
-  const excluded = new Set<string>(typeof query.exclude === "string" ? [query.exclude] : (query.exclude ?? []));
-  const ranked = mascotPoses(kit)
-    .map((asset, order) => {
-      const tags = poseTags(asset);
-      const neighbor = neighbors.indexOf(tags.emotion);
-      // Rang d'émotion : 0 exacte, 1 à n voisines, n + 1 neutre ; -1 : ne convient pas.
-      const rank = tags.emotion === query.emotion ? 0 : neighbor >= 0 ? 1 + neighbor : tags.emotion === "neutral" ? 1 + neighbors.length : -1;
-      const side = !query.side ? 0 : tags.facing === query.side ? 0 : tags.facing === "front" ? 1 : 2;
-      const score = [rank, query.gesture && tags.gesture !== query.gesture ? 1 : 0, query.framing && tags.framing !== query.framing ? 1 : 0, side, order];
-      return { asset, rank, score };
-    })
-    .filter((entry) => entry.rank >= 0)
-    .sort((a, b) => {
-      for (let index = 0; index < a.score.length; index++) if (a.score[index] !== b.score[index]) return a.score[index] - b.score[index];
-      return 0;
-    });
-  return (ranked.find((entry) => !excluded.has(entry.asset.id)) ?? ranked[0])?.asset;
+  return pickRankedPose(mascotPoses(kit), poseTags, (asset) => asset.id, query);
 }
 
 /** Nombre de poses par émotion : la couverture de la bibliothèque. */

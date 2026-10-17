@@ -13,8 +13,11 @@
 import { CAPTION_STYLE, TEXT_PRESETS, uid } from "./edit";
 import { backdropOf, legibleKaraoke, legibleStyle, opaqueHex, type Backdrop } from "./legibility";
 import { getPreset } from "./motion/registry";
+import { needsMirror, rankPoses, readEmotion, readGesture, type PoseFraming, type PoseTags } from "./poses";
+import { wordGroups } from "./render";
+import { segmentsOf, type EditPace } from "./rhythm";
 import { projectDuration } from "./timeline";
-import type { ClipItem, ClipProject, ImageItem, MediaSource, ShapeItem, ShapePattern, TextItem, TextRole, TextStyle, ThemeHint, Track } from "./types";
+import type { ClipItem, ClipProject, ImageItem, MediaSource, SegmentCue, ShapeItem, ShapePattern, TextItem, TextRole, TextStyle, ThemeHint, Track } from "./types";
 
 /** Rôles de couleur, et non une liste anonyme : le moteur sait où mettre chacune. */
 export interface BrandPalette {
@@ -82,7 +85,24 @@ export interface BrandTheme {
     opening?: MediaSource;
     /** Poses des réactions, une par segment, à tour de rôle ; vide : aucune réaction. */
     reactions: MediaSource[];
+    /**
+     * Bibliothèque de poses étiquetées (D2) : le moteur y choisit la pose de
+     * chaque segment d'après son émotion. Absente : `reactions` à tour de rôle.
+     */
+    library?: MascotPose[];
   };
+  /**
+   * Rythme du montage des clips que la marque crée (D3). Absent (thème fait à
+   * la main) : un modèle est monté comme avant.
+   */
+  pace?: EditPace;
+}
+
+/** Pose de la bibliothèque d'une marque, telle que le moteur la reçoit. */
+export interface MascotPose {
+  id: string;
+  source: MediaSource;
+  tags: PoseTags;
 }
 
 export const TEXT_ROLES: readonly TextRole[] = ["title", "subtitle", "caption", "label", "body"];
@@ -561,12 +581,19 @@ function textExtent(item: TextItem, project: ClipProject): FrameBox {
   const fontPx = style.size * H;
   const charPx = fontPx * (style.uppercase ? 0.68 : 0.58) + style.letterSpacing * fontPx;
   const padding = style.background ? style.background.padding * fontPx * 2 : 0;
-  const paragraphs = item.karaoke ? [item.text.split(/\s+/).slice(0, item.karaoke.groupSize).join(" ")] : item.text.split("\n");
+  // Sous-titres mot à mot : le plus large et le plus haut des groupes de mots qu'ils montreront.
+  const paragraphs = item.karaoke
+    ? item.karaoke.words.length
+      ? wordGroups(item.karaoke.words, item.karaoke.groupSize).map((group) => group.map((index) => item.karaoke!.words[index].text).join(" "))
+      : [item.text.split(/\s+/).slice(0, item.karaoke.groupSize).join(" ")]
+    : item.text.split("\n");
   let lines = 0;
   let widest = 0;
   for (const paragraph of paragraphs) {
     const width = paragraph.length * charPx;
-    lines += Math.max(1, Math.ceil(width / Math.max(1, boxWidth - padding)));
+    const count = Math.max(1, Math.ceil(width / Math.max(1, boxWidth - padding)));
+    // Les groupes de sous-titres se remplacent : la place est celle du plus haut, pas leur somme.
+    lines = item.karaoke ? Math.max(lines, count) : lines + count;
     widest = Math.max(widest, Math.min(boxWidth, width + padding));
   }
   const height = item.fit === "shrink" ? t.height * H : Math.max(t.height * H, lines * fontPx * style.lineHeight + padding);
@@ -608,14 +635,14 @@ export function findMascotSpot(
   source: MediaSource,
   start: number,
   end: number,
-  options: { heights: number[]; sides: ("left" | "right" | "center")[] }
+  options: { heights: number[]; sides: ("left" | "right" | "center")[]; maxWidth?: number }
 ): FrameBox | null {
   const { area, blocked } = mascotArea(project);
   const obstacles = [...blocked, ...contentBoxes(project, start, end)];
   const ratio = aspectOf(source);
   for (const height of options.heights) {
     const width = (height * project.height) / ratio / project.width;
-    if (width > area.right - area.left || height > area.bottom - area.top) continue;
+    if (width > area.right - area.left || height > area.bottom - area.top || width > (options.maxWidth ?? Infinity)) continue;
     for (const side of options.sides) {
       const left = side === "left" ? area.left : side === "right" ? area.right - width : 0.5 - width / 2;
       // Hauteurs candidates : le bas de la zone, puis juste sous ou juste au-dessus de chaque obstacle.
@@ -655,6 +682,8 @@ function presetFrames(id: string, fps: number, fallback: number): number {
 /** Préréglages du registre : la pose d'ouverture monte en grandissant, une réaction surgit du bas avec un rebond. */
 export const MASCOT_OPENING_ANIM = "rise-grow";
 export const MASCOT_REACTION_ANIM = "surge-up";
+/** Sortie d'une pose de la bibliothèque : elle rétrécit en s'effaçant. */
+export const MASCOT_EXIT_ANIM = "shrink-out";
 
 function mascotItem(project: ClipProject, source: MediaSource, box: FrameBox, start: number, end: number, label: string, anim: string): ImageItem {
   return {
@@ -675,15 +704,19 @@ function mascotItem(project: ClipProject, source: MediaSource, box: FrameBox, st
 }
 
 /**
- * Mascotte posée par la marque dans le montage : une pose qui accompagne
- * l'accroche du premier segment, puis une petite pose dans un coin à chaque
- * segment suivant, une autre à chaque fois. Chaque pose va là où elle ne
- * masque aucun texte ni aucun cadre, dans la zone visible d'un short ; si
- * rien ne tient, elle n'est pas posée. Rien sans `theme.mascot`.
+ * Mascotte posée par la marque dans le montage. Avec la bibliothèque de
+ * poses étiquetées (`theme.mascot.library`), chaque segment reçoit la pose de
+ * son émotion (`libraryMascotTracks`). Sans elle, le fonctionnement d'avant :
+ * une pose qui accompagne l'accroche du premier segment, puis une petite
+ * pose dans un coin à chaque segment suivant, une autre à chaque fois.
+ * Chaque pose va là où elle ne masque aucun texte ni aucun cadre, dans la
+ * zone visible d'un short ; si rien ne tient, elle n'est pas posée. Rien sans
+ * `theme.mascot`.
  */
 export function mascotTracks(project: ClipProject, theme: BrandTheme, contentEnd: number): Track[] {
   const mascot = theme.mascot;
   if (!mascot || contentEnd < project.fps) return [];
+  if (mascot.library?.length && mascot.reactions.length > 0) return libraryMascotTracks(project, mascot, contentEnd);
   const segments = contentSegments(project, contentEnd);
   const tracks: Track[] = [];
   const vertical = project.height > project.width;
@@ -715,6 +748,128 @@ export function mascotTracks(project: ClipProject, theme: BrandTheme, contentEnd
     });
     if (items.length > 0) tracks.push(brandTrack("Mascotte – réactions", items));
   }
+  return tracks;
+}
+
+// ─── Bibliothèque de poses (D2) ──────────────────────────────────
+
+/**
+ * Hauteurs essayées pour une pose, de la plus grande à la plus petite, selon
+ * son cadrage : de 40 % à 24 % de la hauteur d'un short pour une pose en
+ * pied, moins pour un buste ou un visage. Plus petite, elle ne se lirait pas :
+ * elle n'est pas posée.
+ */
+export const MASCOT_HEIGHTS: Record<"vertical" | "wide", Record<PoseFraming, number[]>> = {
+  vertical: { full: [0.4, 0.36, 0.33, 0.3, 0.28, 0.26, 0.24], bust: [0.3, 0.27, 0.24, 0.21, 0.19], face: [0.2, 0.17, 0.15] },
+  wide: { full: [0.72, 0.64, 0.56, 0.5, 0.45], bust: [0.56, 0.48, 0.42, 0.38], face: [0.4, 0.34, 0.3] },
+};
+
+/** Largeur au plus d'une pose : 45 % d'un short, 30 % d'un cadre large. */
+const MASCOT_MAX_WIDTH = { vertical: 0.45, wide: 0.3 };
+
+/** Cadrage d'une image sans étiquette : en pied quand elle est bien plus haute que large. */
+const framingOf = (source: MediaSource): PoseFraming => (aspectOf(source) >= 1.5 ? "full" : "bust");
+
+/** Segments du montage avec leur indication (émotion, temps fort) ; sans indication, ceux de la piste principale. */
+function cuedSegments(project: ClipProject, end: number): { start: number; end: number; cue: SegmentCue }[] {
+  const cued = segmentsOf(project)
+    .filter((segment) => segment.start < end)
+    .map((segment) => ({ start: segment.start, end: Math.min(end, segment.end), cue: segment.cue }));
+  if (cued.length > 0) return cued;
+  return contentSegments(project, end).map((segment, index) => ({ ...segment, cue: { index } }));
+}
+
+/** Côté où le contenu se trouve, vu d'une pose posée à gauche ou à droite : elle regarde vers lui. */
+const towardContent = (place: "left" | "right"): "left" | "right" => (place === "left" ? "right" : "left");
+
+/**
+ * Pose une image de la bibliothèque : à la plus grande hauteur qui tient, à
+ * gauche ou à droite, sans rien masquer. Rend aussi le côté, pour savoir
+ * vers où elle doit regarder.
+ */
+function placePose(
+  project: ClipProject,
+  source: MediaSource,
+  framing: PoseFraming,
+  start: number,
+  end: number,
+  places: ("left" | "right" | "center")[]
+): { box: FrameBox; place: "left" | "right" | "center" } | null {
+  const shape = project.height > project.width ? "vertical" : "wide";
+  for (const place of places) {
+    const box = findMascotSpot(project, source, start, end, { heights: MASCOT_HEIGHTS[shape][framing], sides: [place], maxWidth: MASCOT_MAX_WIDTH[shape] });
+    if (box) return { box, place };
+  }
+  return null;
+}
+
+/** Pose posée : l'image, retournée en miroir quand elle regarderait à l'opposé du contenu. */
+function libraryItem(project: ClipProject, pose: MascotPose | null, source: MediaSource, spot: { box: FrameBox; place: string }, start: number, end: number, label: string, anim: string): ImageItem {
+  const item = mascotItem(project, source, spot.box, start, end, label, anim);
+  item.animOut = { kind: MASCOT_EXIT_ANIM, frames: 10 };
+  const facing = pose?.tags.facing ?? "front";
+  if ((spot.place === "left" || spot.place === "right") && needsMirror(facing, towardContent(spot.place))) item.flipX = true;
+  return item;
+}
+
+/**
+ * Mascotte d'une marque qui a une bibliothèque de poses étiquetées :
+ * - l'ouverture garde la pose choisie par la marque, en grand, à côté de
+ *   l'accroche ;
+ * - chaque segment suivant reçoit la pose de son émotion (`rankPoses` :
+ *   l'émotion exacte, une voisine, sinon une neutre ; le geste demandé à
+ *   égalité), jamais la même que la précédente, ni que l'avant-dernière tant
+ *   qu'une autre convient ;
+ * - elle va du côté libre, tournée vers le contenu (retournée en miroir
+ *   faute de pose du bon côté), à une taille lisible, sinon pas du tout.
+ */
+function libraryMascotTracks(project: ClipProject, mascot: NonNullable<BrandTheme["mascot"]>, contentEnd: number): Track[] {
+  const library = mascot.library ?? [];
+  const segments = cuedSegments(project, contentEnd);
+  const tracks: Track[] = [];
+  const recent: string[] = [];
+  let lastPlace: "left" | "right" | "center" | null = null;
+
+  let rest = segments;
+  if (mascot.opening) {
+    const first = segments[0] ?? { start: 0, end: Math.min(contentEnd, Math.round(3 * project.fps)), cue: { index: 0 } };
+    rest = segments.slice(1);
+    const start = first.start + 4;
+    const tagged = library.find((entry) => entry.source.url === mascot.opening!.url) ?? null;
+    if (first.end - start >= project.fps) {
+      const spot = placePose(project, mascot.opening, tagged?.tags.framing ?? framingOf(mascot.opening), start, first.end, ["right", "left", "center"]);
+      if (spot) {
+        tracks.push(brandTrack("Mascotte – ouverture", [libraryItem(project, tagged, mascot.opening, spot, start, first.end, "Mascotte – ouverture", MASCOT_OPENING_ANIM)]));
+        if (tagged) recent.unshift(tagged.id);
+        lastPlace = spot.place;
+      }
+    }
+  }
+
+  const items: ImageItem[] = [];
+  for (const segment of rest) {
+    const start = segment.start + 6;
+    if (segment.end - start < project.fps) continue;
+    const emotion = readEmotion(segment.cue.emotion);
+    const gesture = readGesture(segment.cue.gesture);
+    const ranked = rankPoses(library, (entry) => entry.tags, { emotion, ...(gesture ? { gesture } : {}) });
+    // Jamais la précédente ; l'avant-dernière seulement si rien d'autre ne convient.
+    const fresh = ranked.filter((entry) => !recent.slice(0, 2).includes(entry.pose.id));
+    const second = ranked.filter((entry) => entry.pose.id === recent[1] && entry.pose.id !== recent[0]);
+    const pool = [...fresh, ...second];
+    const candidates = pool.length ? pool : ranked;
+    // Alterner les côtés d'un segment à l'autre, le contenu décidant à la fin.
+    const places: ("left" | "right")[] = lastPlace === "left" ? ["right", "left"] : ["left", "right"];
+    for (const { pose } of candidates.slice(0, 8)) {
+      const spot = placePose(project, pose.source, pose.tags.framing, start, segment.end, places);
+      if (!spot) continue;
+      items.push(libraryItem(project, pose, pose.source, spot, start, segment.end, "Mascotte – réaction", MASCOT_REACTION_ANIM));
+      recent.unshift(pose.id);
+      lastPlace = spot.place;
+      break;
+    }
+  }
+  if (items.length > 0) tracks.push(brandTrack("Mascotte – réactions", items));
   return tracks;
 }
 

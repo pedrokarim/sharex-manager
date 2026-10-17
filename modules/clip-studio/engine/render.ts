@@ -1098,6 +1098,8 @@ function drawMedia(
     const current = String(ctx.filter ?? "none");
     ctx.filter = current && current !== "none" ? `${current} ${extra}` : extra;
   }
+  // Miroir : l'image se retourne dans son cadre, rien d'autre ne change.
+  if (item.type === "image" && item.flipX) ctx.scale(-1, 1);
   ctx.drawImage(source, dx, dy, dw, dh);
 }
 

@@ -7,6 +7,7 @@
  * même quand une vidéo peine à suivre.
  */
 
+import { applyGainPoints, ducks, gainPoints, voiceWindows } from "./mix";
 import { drawFrame, heldFrameOf, type VisualResolver } from "./render";
 import { isActive, projectDuration, sourceTimeAt, speedOf, transitionAt } from "./timeline";
 import {
@@ -269,6 +270,7 @@ export class PreviewPlayer {
     const ctx = this.audioContext;
     const now = ctx.currentTime;
     const fromFrame = this.frame;
+    const voices = voiceWindows(project);
     for (const track of project.tracks) {
       if (track.muted || (track.kind === "visual" && track.hidden)) continue;
       for (const item of track.items) {
@@ -291,7 +293,7 @@ export class PreviewPlayer {
         source.buffer = buffer;
         source.playbackRate.value = rate;
         const gain = ctx.createGain();
-        applyGainEnvelope(gain.gain, item, now + delay - skip, fps);
+        applyGainEnvelope(gain.gain, item, now + delay - skip, fps, voices);
         source.connect(gain).connect(ctx.destination);
         source.start(now + delay, offset, length);
         this.nodes.push(source);
@@ -320,8 +322,14 @@ export function applyGainEnvelope(
   param: AudioParam,
   item: AudioItem | VideoItem,
   itemStartTime: number,
-  fps: number
+  fps: number,
+  voices?: [number, number][]
 ) {
+  // Musique qui s'efface sous la voix (`mix.ts`) : son enveloppe propre ; tout autre son, celle d'avant.
+  if (voices && ducks(item)) {
+    applyGainPoints(param, gainPoints(item, fps, voices), itemStartTime);
+    return;
+  }
   const volume = item.volume;
   const duration = item.duration / fps;
   const fadeIn = item.type === "audio" ? item.fadeIn / fps : 0;

@@ -4,7 +4,8 @@
  */
 
 import type { MediaSource } from "@/modules/clip-studio/engine/types";
-import { formatImageAsset, mascotPoses, openingPose } from "./mascot";
+import { readPace } from "@/modules/clip-studio/engine/rhythm";
+import { formatImageAsset, mascotPoses, openingPose, poseTags } from "./mascot";
 import { repairTypography } from "./typography";
 import { MODULE_NAME, kitAssetUrl, type BrandAsset, type BrandKit, type BrandTheme } from "./types";
 
@@ -39,6 +40,8 @@ export function toBrandTheme(kit: BrandKit): BrandTheme {
     // Jamais de monospace dans un rôle de texte, même choisie dans l'éditeur sans être enregistrée.
     textStyles: structuredClone(repairTypography(kit).textStyles),
     ...(kit.halftone ? { halftone: true } : {}),
+    // Rythme du montage des clips créés avec la marque (D3) : « normal » tant qu'il n'est pas réglé.
+    pace: readPace(kit.pace) ?? "normal",
     fonts: kit.fonts.map((font) => ({ family: font.family, kitId: kit.id, fontId: font.id })),
     watermark:
       kit.watermark && mark
@@ -74,7 +77,11 @@ function endCardImages(kit: BrandKit): NonNullable<BrandTheme["endCard"]>["image
   return { ...(vertical ? { vertical: assetSource(kit, vertical) } : {}), ...(horizontal ? { horizontal: assetSource(kit, horizontal) } : {}) };
 }
 
-/** Présence de la mascotte dans le montage ; rien quand elle est éteinte ou sans pose. */
+/**
+ * Présence de la mascotte dans le montage ; rien quand elle est éteinte ou
+ * sans pose. Avec les réactions, la bibliothèque étiquetée part avec le
+ * thème : le moteur choisit la pose de chaque segment d'après son émotion.
+ */
 function mascotTheme(kit: BrandKit): BrandTheme["mascot"] {
   const presence = kit.mascot?.presence;
   const poses = mascotPoses(kit);
@@ -83,5 +90,6 @@ function mascotTheme(kit: BrandKit): BrandTheme["mascot"] {
   return {
     ...(opening ? { opening: assetSource(kit, opening) } : {}),
     reactions: presence.reactions ? poses.map((pose) => assetSource(kit, pose)) : [],
+    ...(presence.reactions ? { library: poses.map((pose) => ({ id: pose.id, source: assetSource(kit, pose), tags: poseTags(pose) })) } : {}),
   };
 }

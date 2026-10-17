@@ -7,6 +7,16 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Clip Studio : la mascotte d’une marque prend à chaque segment la pose de son
+  émotion (écrite par le script de l’assistant), jamais deux fois la même
+  d’affilée, tournée vers le contenu (miroir au besoin), en grand et sans jamais
+  couvrir un texte.
+- Clip Studio : rythme du montage pour les clips créés par une marque ou
+  l’assistant – plans de 1 à 2,5 s, sous-titres mot à mot, icône qui arrive sur
+  le mot qui la nomme, bruitages synthétisés sur l’accroche, la révélation et la
+  fin ; réglage de la marque « Rythme du montage » (calme, normal, vif).
+- Clip Studio : la musique s’efface sous la voix off (environ 12 dB dessous
+  pendant qu’elle parle) et remonte entre les répliques.
 - Image de marque, mascotte : bibliothèque de poses étiquetées (dossier 07f,
   D2, partie marque). Chaque pose porte une émotion, un geste, un cadrage et le
   côté vers lequel elle regarde, modifiables sous sa vignette ; compteur par

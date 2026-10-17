@@ -68,8 +68,8 @@ de la piste Riso).
 
 ## 5. D2 – Mascotte : la bibliothèque de poses (partie marque)
 
-Livrée côté marque en octobre 2026. Le choix de la pose dans le montage
-(moteur de Clip Studio) reste à brancher (§ 5.7).
+Livrée côté marque en octobre 2026, branchée dans le moteur de Clip Studio
+le même mois (§ 5.7).
 
 ### 5.1 Étiquettes
 
@@ -153,18 +153,10 @@ la gauche », dont le regard partait à l’opposé du geste. Les trois poses
 d’origine ont reçu leurs étiquettes. Les images restent dans les données
 locales de la marque, hors du dépôt.
 
-### 5.7 Reste pour le moteur (suite de D2)
+### 5.7 Moteur (suite de D2)
 
-- Émotion de chaque segment dans le script (assistant de Clip Studio).
-- Thème de la marque (`toBrandTheme`) : passer la bibliothèque étiquetée au
-  moteur au lieu de la simple liste `reactions`.
-- Le moteur appelle `pickPose` à chaque segment, avec `exclude` (la pose
-  précédente) et `side` (le côté du contenu) ; faute de pose du bon côté, il
-  peut retourner l’image en miroir (deux poses d’Okiro sur seize seulement
-  regardent vers la gauche, six vers la droite, huit sont de face).
-- Place réservée et taille lisible ; critère de l’étape : un clip de
-  5 segments montre au moins 4 poses différentes, chacune en accord avec son
-  segment.
+Branché en octobre 2026 : voir « D2 – Mascotte » dans l’état des étapes
+ci-dessous.
 
 ## 5. État des étapes
 
@@ -206,6 +198,106 @@ locales de la marque, hors du dépôt.
   textes sur 331 sous le seuil, jusqu’à 1,02:1. Après : aucun, minimum 5,5:1.
 - **Marque de la chaîne** : corrigée par un script hors dépôt (Poppins pour
   les textes, mise en avant rose, trame), l’ombre rose du titre gardée.
-- **Reste à voir** : la mascotte peut encore masquer un titre (D2) ; les
-  polices du catalogue n’ont pas d’espace fine insécable (U+202F), que le
-  navigateur emprunte à la police système.
+- **Reste à voir** : les polices du catalogue n’ont pas d’espace fine insécable (U+202F), que
+  le navigateur emprunte à la police système. (La mascotte qui masquait un
+  titre est réglée par D2.)
+
+### D2 – Mascotte : faite (octobre 2026)
+
+- **Étiquettes dans le moteur** (`modules/clip-studio/engine/poses.ts`) : les
+  listes fermées (émotion, geste, cadrage, côté), les émotions voisines et le
+  classement (`rankPoses`) vivent dans le moteur ; la marque les reprend
+  (`brand-kit/lib/types.ts`) et `pickPose` n’est plus qu’un appel au même
+  classement. Une seule logique pour la fiche et pour le montage.
+- **Script** : quand la mascotte est posée au montage, la consigne de
+  l’assistant demande à chaque segment une clé `emotion` (liste fermée), un
+  `gesture` facultatif et une `outroEmotion` pour la conclusion. Lecture
+  stricte : une émotion hors liste vaut `neutral`, un geste inconnu est écarté.
+  L’émotion suit le segment à travers la vérification des faits et le
+  raccourcissement. Les modèles la rangent sur le fond de chaque segment
+  (`cue` : rang, émotion, geste, temps fort), l’accroche en
+  « enthousiasme », la conclusion en joie à défaut.
+- **Thème** : `toBrandTheme` passe la bibliothèque étiquetée
+  (`mascot.library`). Sans elle (thème d’avant), le fonctionnement d’avant,
+  inchangé.
+- **Choix** : l’ouverture garde la pose choisie par la marque ; chaque segment
+  suivant reçoit la pose de son émotion (exacte, voisine, sinon neutre, le
+  geste demandé à égalité), jamais la précédente, ni l’avant-dernière tant
+  qu’une autre convient. Posée à gauche, elle regarde à droite (vers le
+  contenu), et inversement ; faute de pose du bon côté, l’image est
+  retournée en miroir (`flipX`, dessiné par `render.ts`).
+- **Place et taille** : le moteur estime la place de chaque texte du segment
+  (sous-titres compris, groupe de mots le plus large), des icônes et des
+  cadres, et pose la mascotte à gauche ou à droite là où elle ne recouvre
+  rien, dans la zone visible d’un short (ni le haut, ni la légende, ni les
+  boutons). Hauteurs essayées selon le cadrage : de 40 % à 24 % de la hauteur
+  pour une pose en pied, de 30 % à 19 % pour un buste ; plus petite, elle
+  n’est pas posée. Quand une marque ou l’assistant crée le clip, les modèles
+  lui gardent une place : titres de l’ouverture et de la conclusion remontés,
+  choix du quiz décalés à droite (la pose se tient dessous à gauche), icône à
+  droite. Entrée par « surgissement rebondi », sortie par « rétrécissement en
+  fondu » (préréglages du registre).
+- **Vérifié sur Okiro** (19 poses, rendu par `drawFrame`, une image toutes
+  les 0,5 s) : au libre (5 séquences), 7 poses posées, 7
+  différentes ; quiz 5 sur 5 ; classement 6 sur 6 ; diaporama 6 posées,
+  5 différentes ; libre en 16:9, 5 sur 5. Chacune en accord avec l’émotion de
+  son segment (la même ou une voisine). Hauteur de 24 % à 33 % d’un short
+  (38 % à 72 % d’un cadre large). Chevauchement mascotte / texte mesuré sur
+  les pixels rendus de chaque image : 0. Critère de l’étape tenu : sur
+  5 segments, au moins 4 poses différentes.
+
+### D3 – Rythme : fait (octobre 2026)
+
+Appliqué quand une marque ou l’assistant crée le clip
+(`buildFromTemplate(…, theme, { pace })`), jamais à un projet existant ouvert
+tel quel. Tout ce qui est posé est ordinaire : plans, effets de plan, pistes
+« Sous-titres » et « Bruitages », que l’éditeur déplace, retouche ou
+supprime.
+
+- **Réglage de la marque** : « Rythme du montage » (`pace`) : `calm`
+  (montage d’avant, la mascotte gardant sa place), `normal` (un changement
+  toutes les 2,2 s au plus), `lively` (toutes les 1,4 s). Absent : `normal`.
+  Un clip de l’assistant sans marque prend `normal`. Sans marque ni
+  assistant, rien ne change (128 images comparées avant et après, empreintes
+  identiques).
+- **Plans** (`engine/rhythm.ts`) : le fond image de chaque segment est
+  découpé en plans de 1 à 2,2 s, le même visuel cadré autrement à chaque
+  coupe, avec les mouvements de caméra existants (zoom avant au plus ×1,15,
+  panoramique, zoom arrière), un seul sens par plan. Un moment encore
+  immobile (aplat sans image, carton de fin fini) reçoit un zoom bref
+  (« zoom sur le temps fort ») sur le texte ou l’image de l’instant. Le
+  carton de fin de plus de 2,5 s montre son appel à l’action 1,2 s après le
+  reste.
+- **Sous-titres mot à mot** avec la voix off (libre et diaporama, dont le
+  texte lu devient les sous-titres) : gros, sans fondu, en bas du tiers
+  central d’un short (67 % de la hauteur), le mot prononcé aux couleurs de la
+  marque, lisibles selon D1. Le quiz et le classement les laissent de côté :
+  tout ce que la voix lit y est déjà écrit à l’écran.
+- **Le visuel sur le mot** : l’icône d’un sujet apparaît quand la voix
+  prononce son nom (mots horodatés de la voix, nom tiré de la requête de
+  l’icône, ou titre de l’élément au classement, réponse au quiz) ; un nom
+  absent de la voix laisse l’icône à sa place d’avant.
+- **Bruitages** (`engine/sfx.ts`, écrits dans `data/resources/sfx/` par
+  `lib/sfx.ts`) : impact, whoosh, pop, révélation, synthétisés par le code
+  d’après une recette fixe : aucun enregistrement d’autrui, donc ni licence ni
+  mention. Posés sur les temps forts seulement, trois au plus : l’accroche
+  (impact), la révélation (numéro 1, bonne réponse de la dernière question),
+  la fin (whoosh sur le carton). Volume 0,45, sous la voix (0,9).
+- **Musique sous la voix** (`engine/mix.ts`, aperçu et export) : avec une voix
+  off, la musique de l’assistant joue à 0,28 entre les répliques et s’efface à
+  ×0,43 pendant que la voix parle (descente 0,12 s, remontée 0,3 s). Mesuré
+  sur la banque (musique vers −11 LUFS, voix de synthèse vers −16,5 LUFS) :
+  la musique passe environ 12 dB sous la voix. Avant : 0,14 fixe, environ
+  10,7 dB sous elle, sans respiration entre les répliques.
+- **Vérifié sur des clips rendus** : chaque modèle avec Okiro (voix aux mots horodatés,
+  photos, icône), une image toutes les 0,5 s. Plus long plan sans
+  changement : libre 2,10 s, quiz 2,20 s, classement 1,97 s, diaporama
+  2,13 s, libre en 16:9 2,10 s, rythme vif 1,40 s, clip de l’assistant sans
+  marque 2,10 s (rythme calme : 8,7 s, le montage d’avant, voulu).
+  Contraste des textes mesuré sur les pixels, textes posés : 5,54:1 au plus
+  bas. Bruitages : 2 au libre et au diaporama (accroche, fin), 3 au quiz et
+  au classement (plus la révélation), 0 en rythme calme.
+- **Reste à faire** (interface, hors de ce lot) : le choix « Rythme du
+  montage » dans l’éditeur de la marque, et dans l’inspecteur de Clip Studio
+  le miroir d’une image et le creux sous la voix d’une musique (`flipX`,
+  `duck` se règlent aujourd’hui par le projet).

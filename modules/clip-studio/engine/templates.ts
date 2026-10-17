@@ -9,14 +9,18 @@
 import { accentOf, applyBrandTheme, paintFill, shade, themedTextStyle, type BrandTheme } from "./brand";
 import {
   appendSequence,
+  createCaptionItem,
   createImageItem,
   createProject,
   createVideoItem,
   createTextItem,
   uid,
 } from "./edit";
+import type { PoseEmotion, PoseGesture } from "./poses";
+import { addBeats, cutShots, fillStills, type EditPace } from "./rhythm";
 import type {
   AspectPreset,
+  AudioItem,
   ClipItem,
   ClipProject,
   ImageItem,
@@ -26,6 +30,8 @@ import type {
   TextRole,
   TextStyle,
   ThemeHint,
+  SegmentCue,
+  TimedWord,
   Track,
   VideoItem,
 } from "./types";
@@ -38,6 +44,19 @@ export interface VoiceClip {
   durationMs: number;
 }
 
+/**
+ * Direction d'un segment, écrite par le script de l'assistant : l'émotion
+ * que la mascotte d'une marque y montre (et un geste, s'il s'impose), et le
+ * nom du sujet de son icône, pour la faire apparaître quand la voix le
+ * prononce. Tout est facultatif : absent, le segment est neutre.
+ */
+export interface SegmentDirection {
+  emotion?: PoseEmotion;
+  gesture?: PoseGesture;
+  /** Nom du sujet de l'icône (« Minecraft », « le guépard ») ; absent : le titre du segment. */
+  iconName?: string;
+}
+
 export interface QuizQuestion {
   question: string;
   choices: string[];
@@ -48,6 +67,9 @@ export interface QuizQuestion {
   /** Icône ou logo officiel de la bonne réponse, montré à la révélation seulement ; absent, rien ne change. */
   icon?: MediaSource;
   voice?: { question?: VoiceClip; reveal?: VoiceClip };
+  emotion?: PoseEmotion;
+  gesture?: PoseGesture;
+  iconName?: string;
 }
 
 export interface QuizData {
@@ -56,6 +78,8 @@ export interface QuizData {
   questions: QuizQuestion[];
   outro?: string;
   voice?: { intro?: VoiceClip; outro?: VoiceClip };
+  /** Émotion de la conclusion ; absente : la joie. */
+  outroEmotion?: PoseEmotion;
 }
 
 export interface TopEntry {
@@ -65,6 +89,9 @@ export interface TopEntry {
   /** Icône ou logo officiel du sujet, posé à côté de son nom ; absent, rien ne change. */
   icon?: MediaSource;
   voice?: VoiceClip;
+  emotion?: PoseEmotion;
+  gesture?: PoseGesture;
+  iconName?: string;
 }
 
 export interface TopData {
@@ -73,6 +100,7 @@ export interface TopData {
   entries: TopEntry[];
   outro?: string;
   voice?: { intro?: VoiceClip; outro?: VoiceClip };
+  outroEmotion?: PoseEmotion;
 }
 
 export interface SlideshowData {
@@ -83,9 +111,13 @@ export interface SlideshowData {
     /** Icône ou logo officiel du sujet, posé à côté de son nom ; absent, rien ne change. */
     icon?: MediaSource;
     voice?: VoiceClip;
+    emotion?: PoseEmotion;
+    gesture?: PoseGesture;
+    iconName?: string;
   }[];
   outro?: string;
   voice?: { intro?: VoiceClip; outro?: VoiceClip };
+  outroEmotion?: PoseEmotion;
 }
 
 /** Une séquence du modèle libre : un titre, un texte, ou les deux. */
@@ -96,6 +128,9 @@ export interface FreeScene {
   /** Icône ou logo officiel du sujet, posé à côté de son nom ; absent, rien ne change. */
   icon?: MediaSource;
   voice?: VoiceClip;
+  emotion?: PoseEmotion;
+  gesture?: PoseGesture;
+  iconName?: string;
 }
 
 /** Modèle libre : aucune forme imposée, une suite de séquences. */
@@ -105,6 +140,7 @@ export interface FreeData {
   scenes: FreeScene[];
   outro?: string;
   voice?: { intro?: VoiceClip; outro?: VoiceClip };
+  outroEmotion?: PoseEmotion;
 }
 
 export interface BeforeAfterPair {
@@ -128,13 +164,30 @@ export interface BeforeAfterData {
  * au-dessus des cadres, eux-mêmes au-dessus du fond. Une couche vide ne
  * crée aucune piste.
  */
-const LAYERS = ["Textes", "Icônes", "Surlignage", "Cadres", "Voile", "Après", "Principale"] as const;
+const LAYERS = ["Sous-titres", "Textes", "Icônes", "Surlignage", "Cadres", "Voile", "Après", "Principale"] as const;
 type Layer = (typeof LAYERS)[number];
+
+/**
+ * Mise en page d'un clip monté par une marque ou par l'assistant (dossier
+ * 07 sexies, D2 et D3). Vide pour un modèle rempli à la main : le rendu
+ * d'avant, au pixel près.
+ */
+export interface TemplateLayout {
+  /** Sous-titres mot à mot sur la voix off, à la place du texte qu'elle lit (libre, diaporama). */
+  captions?: boolean;
+  /** L'icône d'un sujet apparaît quand la voix prononce son nom. */
+  onWord?: boolean;
+  /** Une place est gardée à la mascotte de la marque (ouverture, conclusion, choix du quiz). */
+  mascot?: boolean;
+}
 
 class Builder {
   private tracks = new Map<Layer | "Voix" | "Musique", Track>();
 
-  constructor(readonly project: ClipProject) {
+  constructor(
+    readonly project: ClipProject,
+    readonly layout: TemplateLayout = {}
+  ) {
     for (const layer of LAYERS) {
       this.tracks.set(layer, { id: uid("t-"), kind: "visual", name: layer, items: [] });
     }
@@ -144,6 +197,10 @@ class Builder {
 
   get fps() {
     return this.project.fps;
+  }
+
+  get vertical() {
+    return this.project.height > this.project.width;
   }
 
   seconds(value: number) {
@@ -156,9 +213,9 @@ class Builder {
   }
 
   /** Pose la narration d'un segment sur la piste Voix. */
-  narrate(voice: VoiceClip | undefined, start: number) {
-    if (!voice) return;
-    this.add("Voix", {
+  narrate(voice: VoiceClip | undefined, start: number): AudioItem | undefined {
+    if (!voice) return undefined;
+    return this.add("Voix", {
       id: uid("a-"),
       type: "audio",
       start,
@@ -169,10 +226,10 @@ class Builder {
       volume: 0.9,
       fadeIn: 0,
       fadeOut: 0,
-    });
+    }) as AudioItem;
   }
 
-  add(layer: Layer | "Voix" | "Musique", item: ClipItem) {
+  add<T extends ClipItem>(layer: Layer | "Voix" | "Musique", item: T): T {
     this.tracks.get(layer)!.items.push(item);
     return item;
   }
@@ -293,9 +350,11 @@ function box(
 }
 
 /** Fond d'un segment : l'image fournie sous un voile (retiré par une marque), sinon un aplat de la teinte du segment. */
-function background(b: Builder, start: number, duration: number, image: MediaSource | undefined, accent: number, motionIndex: number) {
+function background(b: Builder, start: number, duration: number, image: MediaSource | undefined, accent: number, motionIndex: number, cue?: SegmentCue) {
+  const cued = cue && (b.layout.captions || b.layout.mascot || b.layout.onWord) ? { cue } : {};
   if (image) {
     const item: ImageItem = {
+      ...cued,
       id: uid("i-"),
       type: "image",
       start,
@@ -313,8 +372,80 @@ function background(b: Builder, start: number, duration: number, image: MediaSou
     // reste éclatante et chaque texte reçoit sa propre étiquette ou son contour.
     b.add("Voile", box(b, start, duration, { y: 0.5, height: 1, width: 1 }, { paint: "veil" }, { opacity: 0.42, radius: 0, animIn: "none" }));
   } else {
-    b.add("Principale", box(b, start, duration, { y: 0.5, height: 1, width: 1 }, { paint: "plate", accent }, { radius: 0, animIn: "fade" }));
+    b.add("Principale", { ...box(b, start, duration, { y: 0.5, height: 1, width: 1 }, { paint: "plate", accent }, { radius: 0, animIn: "fade" }), ...cued });
   }
+}
+
+/** Indication de montage d'un segment, sans champ vide. */
+function cueOf(index: number, direction: { emotion?: PoseEmotion; gesture?: PoseGesture } = {}, beat?: SegmentCue["beat"], beatOffset?: number): SegmentCue {
+  return {
+    index,
+    ...(direction.emotion ? { emotion: direction.emotion } : {}),
+    ...(direction.gesture ? { gesture: direction.gesture } : {}),
+    ...(beat ? { beat } : {}),
+    ...(beatOffset !== undefined ? { beatOffset } : {}),
+  };
+}
+
+/**
+ * Sous-titres mot à mot d'une voix off (D3) : posés sur la voix, gros, sans
+ * fondu, le mot prononcé mis en valeur. `null` sans mots horodatés : le texte
+ * lu reste alors affiché comme avant.
+ */
+function spokenCaption(b: Builder, voice: AudioItem | undefined, y: number): TextItem | null {
+  const words = voice?.source.words;
+  if (!b.layout.captions || !voice || !words?.length) return null;
+  const caption = createCaptionItem(words, voice.start, b.fps, b.vertical);
+  caption.duration = voice.duration;
+  caption.karaoke = { ...caption.karaoke!, voiceId: voice.id };
+  caption.transform = { ...caption.transform, y };
+  return b.add("Sous-titres", caption);
+}
+
+/** Hauteur des sous-titres mot à mot : en bas du tiers central d'un short, au bas d'un cadre large. */
+const captionY = (b: Builder) => (b.vertical ? 0.67 : 0.8);
+
+const STOP_WORDS = new Set(["les", "des", "une", "aux", "the", "and", "logo", "app", "icon", "key", "art", "official", "officiel", "officielle", "game", "jeu"]);
+
+/** Mot sans accents, sans casse ni ponctuation. */
+const plainWord = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+/**
+ * Image où la voix prononce le nom d'un sujet (« guépard » dans « Numéro 1,
+ * le guépard ») : le premier mot de la voix qui est l'un des mots du nom.
+ * `null` si la voix ne le dit pas, ou sans mots horodatés.
+ */
+export function spokenAt(voice: Pick<AudioItem, "start" | "source"> | undefined, name: string | undefined, fps: number): number | null {
+  const words: TimedWord[] | undefined = voice?.source.words;
+  if (!voice || !words?.length || !name) return null;
+  const keys = name
+    .split(/[\s'’\-–:,.!?«»"()]+/)
+    .map(plainWord)
+    .filter((word) => (word.length >= 3 || /^\d+$/.test(word)) && !STOP_WORDS.has(word));
+  if (keys.length === 0) return null;
+  for (const word of words) {
+    const plain = plainWord(word.text);
+    if (!plain) continue;
+    // Un pluriel ou un accord (« guépards ») compte : même début, au moins cinq lettres en commun.
+    const hit = keys.some((key) => plain === key || (key.length >= 5 && plain.length >= 5 && (plain.startsWith(key) || key.startsWith(plain))));
+    if (hit) return voice.start + Math.round((word.startMs / 1000) * fps);
+  }
+  return null;
+}
+
+/**
+ * Début d'une icône : quand la voix nomme son sujet (D3), sinon `fallback`.
+ * Elle reste au moins 0,8 s : prononcé trop tard, le nom ne la retarde pas.
+ */
+function iconStart(b: Builder, voice: AudioItem | undefined, name: string | undefined, fallback: number, end: number): number {
+  if (!b.layout.onWord) return fallback;
+  const at = spokenAt(voice, name, b.fps);
+  return at !== null && at > fallback && end - at >= b.seconds(0.8) ? at : fallback;
 }
 
 /** Où poser une icône : centre ou bord gauche, centre ou bord bas, en fractions du canevas. */
@@ -409,20 +540,25 @@ export function buildQuiz(
   name: string,
   aspect: AspectPreset,
   data: QuizData,
-  timing: QuizTiming = DEFAULT_QUIZ_TIMING
+  timing: QuizTiming = DEFAULT_QUIZ_TIMING,
+  layout: TemplateLayout = {}
 ): ClipProject {
-  const b = new Builder(createProject(name, aspect));
+  const b = new Builder(createProject(name, aspect), layout);
   const vertical = aspect === "9:16" || aspect === "4:5";
+  // Place de la mascotte dans un short (D2) : titres remontés, choix décalés à droite, la pose dessous à gauche.
+  const reserve = Boolean(layout.mascot) && aspect === "9:16";
   let cursor = 0;
 
   // Intro
   const intro = b.fit(timing.intro, data.voice?.intro, 0.5);
-  background(b, cursor, intro, data.questions[0]?.image, 0, 0);
+  background(b, cursor, intro, data.questions[0]?.image, 0, 0, cueOf(0, { emotion: "excitement" }, "hook"));
   b.narrate(data.voice?.intro, cursor + 4);
-  b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: vertical ? 0.42 : 0.4, height: 0.24, size: vertical ? 0.07 : 0.1 }));
+  b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: reserve ? 0.28 : vertical ? 0.42 : 0.4, height: 0.24, size: vertical ? 0.07 : 0.1 }));
   b.add("Textes", text(b, data.subtitle ?? "Réponds avant la fin du compte à rebours !", cursor + 6, intro - 6, {
     role: "caption",
-    y: vertical ? 0.58 : 0.62,
+    y: reserve ? 0.43 : vertical ? 0.58 : 0.62,
+    // Une ligne : son cadre serré laisse la place à la mascotte dessous.
+    height: reserve ? 0.06 : 0.14,
     size: vertical ? 0.032 : 0.045,
     animIn: "slide-up",
   }));
@@ -434,9 +570,11 @@ export function buildQuiz(
     const think = b.fit(timing.think, question.voice?.question, 3);
     const reveal = b.fit(timing.reveal, question.voice?.reveal, 0.5);
     const total = think + reveal;
-    background(b, cursor, total, question.image, accent, index + 1);
+    // La révélation de la dernière question est le temps fort du quiz.
+    const last = index === data.questions.length - 1;
+    background(b, cursor, total, question.image, accent, index + 1, cueOf(index + 1, question, last ? "reveal" : undefined, last ? think : undefined));
     b.narrate(question.voice?.question, cursor + 4);
-    b.narrate(question.voice?.reveal, cursor + think + 2);
+    const revealVoice = b.narrate(question.voice?.reveal, cursor + think + 2);
 
     // Numéro de la question
     b.add("Textes", text(b, `Question ${index + 1}/${data.questions.length}`, cursor, total, {
@@ -448,8 +586,10 @@ export function buildQuiz(
       accent,
       animIn: "slide-down",
     }));
-    // Icône de la bonne réponse, à droite de l'étiquette : à la révélation seulement, pour ne rien dévoiler.
-    iconSlot(b, question.icon, cursor + think, reveal, { left: 0.82, y: 0.1, side: 0.11, maxWidth: 0.15 });
+    // Icône de la bonne réponse, à droite de l'étiquette : à la révélation seulement, pour ne rien dévoiler,
+    // et quand la voix nomme la réponse si elle la nomme.
+    const iconAt = iconStart(b, revealVoice, question.iconName ?? question.choices[question.answer], cursor + think, cursor + total);
+    iconSlot(b, question.icon, iconAt, cursor + total - iconAt, { left: 0.82, y: 0.1, side: 0.11, maxWidth: 0.15 });
 
     // Question
     b.add("Textes", text(b, question.question, cursor + 4, total - 4, {
@@ -464,22 +604,30 @@ export function buildQuiz(
     const rowHeight = vertical ? 0.075 : 0.1;
     const gap = vertical ? 0.022 : 0.03;
     const firstY = vertical ? 0.5 : 0.48;
+    const rowWidth = reserve ? 0.58 : vertical ? 0.86 : 0.7;
+    const rowX = reserve ? 0.36 + rowWidth / 2 : 0.5;
     choices.forEach((choice, choiceIndex) => {
       const y = firstY + choiceIndex * (rowHeight + gap);
       const delay = 10 + choiceIndex * 4;
-      b.add("Cadres", box(b, cursor + delay, total - delay, { y, height: rowHeight, width: vertical ? 0.86 : 0.7 }, { paint: "surface" }, { opacity: 0.94 }));
-      b.add("Textes", text(b, `${String.fromCharCode(65 + choiceIndex)}. ${choice}`, cursor + delay, total - delay, {
+      const frame = box(b, cursor + delay, total - delay, { y, height: rowHeight, width: rowWidth }, { paint: "surface" }, { opacity: 0.94 });
+      frame.transform.x = rowX;
+      b.add("Cadres", frame);
+      const label = text(b, `${String.fromCharCode(65 + choiceIndex)}. ${choice}`, cursor + delay, total - delay, {
         role: "body",
         y,
-        width: vertical ? 0.8 : 0.64,
+        width: reserve ? rowWidth - 0.06 : vertical ? 0.8 : 0.64,
         height: rowHeight,
-        size: vertical ? 0.03 : 0.042,
+        size: reserve ? 0.027 : vertical ? 0.03 : 0.042,
         align: "left",
         animIn: "slide-left",
-      }));
+      });
+      label.transform.x = rowX;
+      b.add("Textes", label);
       // Révélation : la bonne réponse passe au vert.
       if (choiceIndex === question.answer) {
-        b.add("Surlignage", box(b, cursor + think, reveal, { y, height: rowHeight, width: vertical ? 0.86 : 0.7 }, "#22c55e", { animIn: "pop" }));
+        const right = box(b, cursor + think, reveal, { y, height: rowHeight, width: rowWidth }, "#22c55e", { animIn: "pop" });
+        right.transform.x = rowX;
+        b.add("Surlignage", right);
       }
     });
 
@@ -519,25 +667,26 @@ export function buildQuiz(
 
   // Conclusion
   const outro = b.fit(timing.outro, data.voice?.outro, 0.8);
-  background(b, cursor, outro, undefined, data.questions.length, 0);
+  background(b, cursor, outro, undefined, data.questions.length, 0, cueOf(data.questions.length + 1, { emotion: data.outroEmotion ?? "joy" }, "end"));
   b.narrate(data.voice?.outro, cursor + 4);
-  b.add("Textes", text(b, data.outro ?? "Combien de bonnes réponses ?", cursor, outro, { role: "title", y: 0.44, height: 0.24, size: vertical ? 0.06 : 0.09 }));
-  b.add("Textes", text(b, "Dis-le en commentaire", cursor + 8, outro - 8, { role: "subtitle", y: 0.58, size: vertical ? 0.032 : 0.045, animIn: "slide-up" }));
+  b.add("Textes", text(b, data.outro ?? "Combien de bonnes réponses ?", cursor, outro, { role: "title", y: reserve ? 0.3 : 0.44, height: 0.24, size: vertical ? 0.06 : 0.09 }));
+  b.add("Textes", text(b, "Dis-le en commentaire", cursor + 8, outro - 8, { role: "subtitle", y: reserve ? 0.43 : 0.58, height: reserve ? 0.06 : 0.14, size: vertical ? 0.032 : 0.045, animIn: "slide-up" }));
 
   return b.build();
 }
 
 // ─── Top N ───────────────────────────────────────────────────────
 
-export function buildTop(name: string, aspect: AspectPreset, data: TopData): ClipProject {
-  const b = new Builder(createProject(name, aspect));
+export function buildTop(name: string, aspect: AspectPreset, data: TopData, layout: TemplateLayout = {}): ClipProject {
+  const b = new Builder(createProject(name, aspect), layout);
   const vertical = aspect === "9:16" || aspect === "4:5";
+  const reserve = Boolean(layout.mascot) && aspect === "9:16";
   let cursor = 0;
 
   const intro = b.fit(2.5, data.voice?.intro, 0.5);
-  background(b, cursor, intro, data.entries[0]?.image, 0, 0);
+  background(b, cursor, intro, data.entries[0]?.image, 0, 0, cueOf(0, { emotion: "excitement" }, "hook"));
   b.narrate(data.voice?.intro, cursor + 4);
-  b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: 0.45, height: 0.26, size: vertical ? 0.07 : 0.1 }));
+  b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: reserve ? 0.32 : 0.45, height: 0.26, size: vertical ? 0.07 : 0.1 }));
   cursor += intro;
 
   const count = data.entries.length;
@@ -545,8 +694,8 @@ export function buildTop(name: string, aspect: AspectPreset, data: TopData): Cli
     const rank = count - index;
     const accent = index;
     const duration = b.fit(rank === 1 ? 4.5 : 3.5, entry.voice, 0.6);
-    background(b, cursor, duration, entry.image, accent, index + 1);
-    b.narrate(entry.voice, cursor + 4);
+    background(b, cursor, duration, entry.image, accent, index + 1, cueOf(index + 1, entry, rank === 1 ? "reveal" : undefined));
+    const voice = b.narrate(entry.voice, cursor + 4);
     b.add("Textes", text(b, `#${rank}`, cursor, duration, {
       role: "title",
       y: vertical ? 0.2 : 0.22,
@@ -556,7 +705,9 @@ export function buildTop(name: string, aspect: AspectPreset, data: TopData): Cli
       animIn: "zoom",
     }));
     b.add("Textes", text(b, entry.title, cursor + 6, duration - 6, { role: "title", y: vertical ? 0.72 : 0.7, height: 0.16, size: vertical ? 0.055 : 0.08, animIn: "slide-up" }));
-    iconSlot(b, entry.icon, cursor + 6, duration - 6, { bottom: (vertical ? 0.72 : 0.7) - 0.08 - 0.01, side: 0.16 });
+    // L'icône arrive quand la voix dit le nom du sujet.
+    const iconAt = iconStart(b, voice, entry.iconName ?? entry.title, cursor + 6, cursor + duration);
+    iconSlot(b, entry.icon, iconAt, cursor + duration - iconAt, { bottom: (vertical ? 0.72 : 0.7) - 0.08 - 0.01, side: 0.16 });
     if (entry.detail) {
       b.add("Textes", text(b, entry.detail, cursor + 12, duration - 12, { role: "caption", y: vertical ? 0.82 : 0.84, height: 0.12, size: vertical ? 0.03 : 0.042, animIn: "fade" }));
     }
@@ -565,41 +716,50 @@ export function buildTop(name: string, aspect: AspectPreset, data: TopData): Cli
 
   if (data.outro) {
     const outro = b.fit(2.5, data.voice?.outro, 0.8);
-    background(b, cursor, outro, undefined, count, 0);
+    background(b, cursor, outro, undefined, count, 0, cueOf(count + 1, { emotion: data.outroEmotion ?? "joy" }, "end"));
     b.narrate(data.voice?.outro, cursor + 4);
-    b.add("Textes", text(b, data.outro, cursor, outro, { role: "title", y: 0.46, height: 0.24, size: vertical ? 0.06 : 0.09 }));
+    b.add("Textes", text(b, data.outro, cursor, outro, { role: "title", y: reserve ? 0.3 : 0.46, height: 0.24, size: vertical ? 0.06 : 0.09 }));
   }
   return b.build();
 }
 
 // ─── Diaporama ───────────────────────────────────────────────────
 
-export function buildSlideshow(name: string, aspect: AspectPreset, data: SlideshowData): ClipProject {
-  const b = new Builder(createProject(name, aspect));
+export function buildSlideshow(name: string, aspect: AspectPreset, data: SlideshowData, layout: TemplateLayout = {}): ClipProject {
+  const b = new Builder(createProject(name, aspect), layout);
   const vertical = aspect === "9:16" || aspect === "4:5";
+  const reserve = Boolean(layout.mascot) && aspect === "9:16";
   let cursor = 0;
   if (data.title) {
     const intro = b.fit(2.5, data.voice?.intro, 0.5);
-    background(b, cursor, intro, data.slides[0]?.image, 0, 0);
+    background(b, cursor, intro, data.slides[0]?.image, 0, 0, cueOf(0, { emotion: "excitement" }, "hook"));
     b.narrate(data.voice?.intro, cursor + 4);
-    b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: 0.46, height: 0.26, size: vertical ? 0.065 : 0.09 }));
+    b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: reserve ? 0.32 : 0.46, height: 0.26, size: vertical ? 0.065 : 0.09 }));
     cursor += intro;
   }
   data.slides.forEach((slide, index) => {
     const duration = b.fit(3.5, slide.voice, 0.6);
-    background(b, cursor, duration, slide.image, index, index + 1);
-    b.narrate(slide.voice, cursor + 4);
-    if (slide.caption) {
+    background(b, cursor, duration, slide.image, index, index + 1, cueOf(index + 1, slide));
+    const voice = b.narrate(slide.voice, cursor + 4);
+    // La légende lue devient des sous-titres mot à mot ; sans mots horodatés, elle reste affichée.
+    const caption = slide.caption ? spokenCaption(b, voice, captionY(b)) : null;
+    if (slide.caption && !caption) {
       b.add("Textes", text(b, slide.caption, cursor + 6, duration - 6, { role: "caption", y: vertical ? 0.8 : 0.84, height: 0.16, size: vertical ? 0.038 : 0.05, animIn: "slide-up" }));
     }
-    iconSlot(b, slide.icon, cursor + 6, duration - 6, slide.caption ? { bottom: (vertical ? 0.8 : 0.84) - 0.08 - 0.01, side: 0.15 } : { y: vertical ? 0.8 : 0.82, side: 0.15 });
+    const iconAt = iconStart(b, voice, slide.iconName, cursor + 6, cursor + duration);
+    const place: IconPlace = caption
+      ? { x: reserve ? 0.66 : 0.5, y: reserve ? 0.4 : vertical ? 0.44 : 0.42, side: vertical ? 0.26 : 0.2 }
+      : slide.caption
+        ? { bottom: (vertical ? 0.8 : 0.84) - 0.08 - 0.01, side: 0.15 }
+        : { y: vertical ? 0.8 : 0.82, side: 0.15 };
+    iconSlot(b, slide.icon, iconAt, cursor + duration - iconAt, place);
     cursor += duration;
   });
   if (data.outro) {
     const outro = b.fit(2.5, data.voice?.outro, 0.8);
-    background(b, cursor, outro, undefined, data.slides.length, 0);
+    background(b, cursor, outro, undefined, data.slides.length, 0, cueOf(data.slides.length + 1, { emotion: data.outroEmotion ?? "joy" }, "end"));
     b.narrate(data.voice?.outro, cursor + 4);
-    b.add("Textes", text(b, data.outro, cursor, outro, { role: "title", y: 0.46, height: 0.24, size: vertical ? 0.06 : 0.09 }));
+    b.add("Textes", text(b, data.outro, cursor, outro, { role: "title", y: reserve ? 0.3 : 0.46, height: 0.24, size: vertical ? 0.06 : 0.09 }));
   }
   return b.build();
 }
@@ -610,18 +770,19 @@ export function buildSlideshow(name: string, aspect: AspectPreset, data: Slidesh
  * Suite de séquences sans forme imposée : chacune porte son image, un titre
  * en haut et un texte plus bas, et dure le temps de sa narration.
  */
-export function buildFree(name: string, aspect: AspectPreset, data: FreeData): ClipProject {
-  const b = new Builder(createProject(name, aspect));
+export function buildFree(name: string, aspect: AspectPreset, data: FreeData, layout: TemplateLayout = {}): ClipProject {
+  const b = new Builder(createProject(name, aspect), layout);
   const vertical = aspect === "9:16" || aspect === "4:5";
+  const reserve = Boolean(layout.mascot) && aspect === "9:16";
   let cursor = 0;
 
   if (data.title) {
     const intro = b.fit(2.5, data.voice?.intro, 0.5);
-    background(b, cursor, intro, data.scenes[0]?.image, 0, 0);
+    background(b, cursor, intro, data.scenes[0]?.image, 0, 0, cueOf(0, { emotion: "excitement" }, "hook"));
     b.narrate(data.voice?.intro, cursor + 4);
-    b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: vertical ? 0.44 : 0.42, height: 0.26, size: vertical ? 0.065 : 0.09 }));
+    b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: reserve ? 0.28 : vertical ? 0.44 : 0.42, height: 0.26, size: vertical ? 0.065 : 0.09 }));
     if (data.subtitle) {
-      b.add("Textes", text(b, data.subtitle, cursor + 6, intro - 6, { role: "subtitle", y: vertical ? 0.58 : 0.62, size: vertical ? 0.032 : 0.045, animIn: "slide-up" }));
+      b.add("Textes", text(b, data.subtitle, cursor + 6, intro - 6, { role: "subtitle", y: reserve ? 0.43 : vertical ? 0.58 : 0.62, height: reserve ? 0.06 : 0.14, size: vertical ? 0.032 : 0.045, animIn: "slide-up" }));
     }
     cursor += intro;
   }
@@ -629,8 +790,11 @@ export function buildFree(name: string, aspect: AspectPreset, data: FreeData): C
   data.scenes.forEach((scene, index) => {
     const accent = index;
     const duration = b.fit(scene.text ? 4 : 3, scene.voice, 0.6);
-    background(b, cursor, duration, scene.image, accent, index + 1);
-    b.narrate(scene.voice, cursor + 4);
+    background(b, cursor, duration, scene.image, accent, index + 1, cueOf(index + 1, scene));
+    const voice = b.narrate(scene.voice, cursor + 4);
+    // Le texte lu devient des sous-titres mot à mot ; sans mots horodatés, il reste affiché.
+    const caption = scene.text ? spokenCaption(b, voice, captionY(b)) : null;
+    const shownText = scene.text && !caption ? scene.text : undefined;
     if (scene.heading) {
       b.add("Textes", text(b, scene.heading, cursor, duration, {
         role: "title",
@@ -640,8 +804,8 @@ export function buildFree(name: string, aspect: AspectPreset, data: FreeData): C
         animIn: "slide-down",
       }));
     }
-    if (scene.text) {
-      b.add("Textes", text(b, scene.text, cursor + 6, duration - 6, {
+    if (shownText) {
+      b.add("Textes", text(b, shownText, cursor + 6, duration - 6, {
         role: "caption",
         y: scene.heading ? (vertical ? 0.74 : 0.76) : 0.5,
         height: vertical ? 0.24 : 0.2,
@@ -649,19 +813,21 @@ export function buildFree(name: string, aspect: AspectPreset, data: FreeData): C
         animIn: "slide-up",
       }));
     }
-    // Icône juste au-dessus du texte de la séquence (ou de son titre seul).
+    // Icône juste au-dessus du texte de la séquence (ou de son titre seul) ; avec les sous-titres, entre le titre et eux.
     const anchorTop = scene.text
       ? (scene.heading ? (vertical ? 0.74 : 0.76) : 0.5) - (vertical ? 0.24 : 0.2) / 2
       : 0.46 - 0.18 / 2;
-    iconSlot(b, scene.icon, cursor + 6, duration - 6, { bottom: anchorTop - 0.01, side: 0.15 });
+    const iconAt = iconStart(b, voice, scene.iconName, cursor + 6, cursor + duration);
+    const place: IconPlace = caption ? { x: reserve ? 0.66 : 0.5, y: reserve ? 0.4 : vertical ? 0.44 : 0.48, side: vertical ? 0.26 : 0.2 } : { bottom: anchorTop - 0.01, side: 0.15 };
+    iconSlot(b, scene.icon, iconAt, cursor + duration - iconAt, place);
     cursor += duration;
   });
 
   if (data.outro) {
     const outro = b.fit(2.5, data.voice?.outro, 0.8);
-    background(b, cursor, outro, undefined, data.scenes.length, 0);
+    background(b, cursor, outro, undefined, data.scenes.length, 0, cueOf(data.scenes.length + 1, { emotion: data.outroEmotion ?? "joy" }, "end"));
     b.narrate(data.voice?.outro, cursor + 4);
-    b.add("Textes", text(b, data.outro, cursor, outro, { role: "title", y: 0.46, height: 0.24, size: vertical ? 0.06 : 0.09 }));
+    b.add("Textes", text(b, data.outro, cursor, outro, { role: "title", y: reserve ? 0.3 : 0.46, height: 0.24, size: vertical ? 0.06 : 0.09 }));
   }
   return b.build();
 }
@@ -864,27 +1030,53 @@ export const SAMPLE_BEFORE_AFTER: BeforeAfterData = {
   outro: "Laquelle préfères-tu ?",
 };
 
+/** Réglages d'un montage par une marque ou par l'assistant. */
+export interface BuildOptions {
+  /**
+   * Rythme du montage (D3). Absent : celui de la marque ; sans marque ni
+   * rythme, le modèle est monté comme avant, au pixel près. « calm » garde le
+   * montage d'avant, avec la place réservée à la mascotte.
+   */
+  pace?: EditPace;
+}
+
 /**
  * Construit un projet depuis un modèle. Avec une image de marque, le projet
  * est monté avec le thème par défaut puis habillé par `applyBrandTheme` :
  * une seule façon d'appliquer une marque, au montage comme après coup.
+ *
+ * Quand une marque ou l'assistant crée le clip (un rythme est connu), le
+ * montage gagne la direction artistique des vidéos (dossier 07 sexies) :
+ * place réservée à la mascotte, sous-titres mot à mot, icône sur le mot qui
+ * la nomme, plans découpés toutes les 1 à 2,5 s, bruitages sur les temps
+ * forts. Ce sont des éléments et des pistes ordinaires, que l'éditeur
+ * retouche ; un projet existant ouvert tel quel n'en reçoit aucun.
  */
 export function buildFromTemplate(
   template: TemplateId,
   name: string,
   aspect: AspectPreset,
   data: FreeData | QuizData | TopData | SlideshowData | BeforeAfterData,
-  theme: BrandTheme | null = null
+  theme: BrandTheme | null = null,
+  options: BuildOptions = {}
 ): ClipProject {
-  const project =
+  const pace = options.pace ?? theme?.pace;
+  // L'Avant / Après garde ses deux images immobiles et alignées : ni découpe ni secousse.
+  const lively = pace !== undefined && pace !== "calm" && template !== "before-after";
+  const layout: TemplateLayout =
+    pace === undefined ? {} : { captions: lively, onWord: lively, mascot: Boolean(theme?.mascot?.library?.length) };
+  let project =
     template === "free"
-      ? buildFree(name, aspect, data as FreeData)
+      ? buildFree(name, aspect, data as FreeData, layout)
       : template === "quiz"
-        ? buildQuiz(name, aspect, data as QuizData)
+        ? buildQuiz(name, aspect, data as QuizData, DEFAULT_QUIZ_TIMING, layout)
         : template === "top"
-          ? buildTop(name, aspect, data as TopData)
+          ? buildTop(name, aspect, data as TopData, layout)
           : template === "before-after"
             ? buildBeforeAfter(name, aspect, data as BeforeAfterData)
-            : buildSlideshow(name, aspect, data as SlideshowData);
-  return theme ? applyBrandTheme(project, theme) : project;
+            : buildSlideshow(name, aspect, data as SlideshowData, layout);
+  if (lively) project = cutShots(project, pace);
+  if (theme) project = applyBrandTheme(project, theme);
+  if (lively) project = fillStills(addBeats(project, pace), pace);
+  return project;
 }

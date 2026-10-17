@@ -213,6 +213,24 @@ export interface ThemeHint {
   accent?: number;
 }
 
+/**
+ * Indication de montage posée par un modèle sur le fond d'un segment : son
+ * rang, l'émotion que la mascotte d'une marque y montre, et le temps fort
+ * qu'il porte. Absente : un élément ordinaire, posé à la main.
+ */
+export interface SegmentCue {
+  /** Rang du segment dans le modèle : 0 l'ouverture, puis chaque segment, puis la conclusion. */
+  index: number;
+  /** Émotion du segment (liste fermée de `poses.ts`) ; absente : neutre. */
+  emotion?: string;
+  /** Geste souhaité de la mascotte (liste fermée de `poses.ts`). */
+  gesture?: string;
+  /** Temps fort du segment : accroche, révélation (numéro 1, bonne réponse), fin. */
+  beat?: "hook" | "reveal" | "end";
+  /** Instant du temps fort, en images depuis le début du segment (révélation d'un quiz) ; absent : son début. */
+  beatOffset?: number;
+}
+
 interface ItemBase {
   id: string;
   /** Première image où l'élément est visible. */
@@ -223,6 +241,8 @@ interface ItemBase {
   /** Élément ajouté par une image de marque, retiré ou remplacé avec elle. */
   origin?: "brand";
   theme?: ThemeHint;
+  /** Fond d'un segment de modèle (ou plan suivant d'un même segment) : voir `SegmentCue`. */
+  cue?: SegmentCue;
 }
 
 interface VisualBase extends ItemBase {
@@ -240,6 +260,8 @@ export interface ImageItem extends VisualBase {
   fit: "cover" | "contain";
   motion: Motion;
   radius: number;
+  /** Image retournée en miroir (pose de la mascotte tournée vers le contenu). */
+  flipX?: boolean;
 }
 
 export interface VideoItem extends VisualBase {
@@ -342,6 +364,11 @@ export interface AudioItem extends ItemBase {
   volume: number;
   fadeIn: number;
   fadeOut: number;
+  /**
+   * Musique qui s'efface sous la voix : gain appliqué (0 à 1) pendant qu'une
+   * voix off parle (`engine/mix.ts`). Absent : le volume ne bouge pas.
+   */
+  duck?: number;
 }
 
 export type VisualItem = ImageItem | VideoItem | TextItem | ShapeItem;

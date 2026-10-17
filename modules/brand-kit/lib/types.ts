@@ -61,46 +61,16 @@ export type MascotFormatId = (typeof MASCOT_FORMAT_IDS)[number];
 
 // ─── Bibliothèque de poses (dossier 07 sexies, D2) ───────────────
 
-/** Émotion qu'exprime une pose ; libellés français dans `mascot.ts`. */
-export const POSE_EMOTIONS = ["joy", "excitement", "surprise", "shock", "thinking", "doubt", "disappointment", "sadness", "anger", "mischief", "pride", "neutral"] as const;
-export type PoseEmotion = (typeof POSE_EMOTIONS)[number];
-
-/** Geste de la pose. `idle` : aucun geste marqué. */
-export const POSE_GESTURES = [
-  "pointing",
-  "leaning",
-  "arms-raised",
-  "hands-on-cheeks",
-  "thumbs-up",
-  "chin-in-hand",
-  "waving",
-  "showing-object",
-  "presenting",
-  "shrugging",
-  "arms-crossed",
-  "hands-on-hips",
-  "facepalm",
-  "finger-on-lips",
-  "recoiling",
-  "idle",
-] as const;
-export type PoseGesture = (typeof POSE_GESTURES)[number];
-
-/** Cadrage : en pied, buste, visage. */
-export const POSE_FRAMINGS = ["full", "bust", "face"] as const;
-export type PoseFraming = (typeof POSE_FRAMINGS)[number];
-
-/** Côté de l'image vers lequel la pose regarde ou pointe : on la place en regard du contenu. */
-export const POSE_FACINGS = ["left", "front", "right"] as const;
-export type PoseFacing = (typeof POSE_FACINGS)[number];
-
-/** Étiquettes d'une pose de la mascotte, qui servent à la choisir (`pickPose`). */
-export interface PoseTags {
-  emotion: PoseEmotion;
-  gesture: PoseGesture;
-  framing: PoseFraming;
-  facing: PoseFacing;
-}
+/**
+ * Étiquettes à listes fermées : elles vivent dans le moteur de Clip Studio,
+ * qui choisit la pose de chaque segment sans lire la fiche (`engine/poses.ts`).
+ * Libellés français dans `mascot.ts`.
+ */
+export { POSE_EMOTIONS, POSE_FACINGS, POSE_FRAMINGS, POSE_GESTURES } from "@/modules/clip-studio/engine/poses";
+export type { PoseEmotion, PoseFacing, PoseFraming, PoseGesture, PoseTags } from "@/modules/clip-studio/engine/poses";
+import type { PoseTags } from "@/modules/clip-studio/engine/poses";
+import type { EditPace } from "@/modules/clip-studio/engine/rhythm";
+export type { EditPace } from "@/modules/clip-studio/engine/rhythm";
 
 export interface BrandAsset {
   id: string;
@@ -248,6 +218,12 @@ export interface BrandKit {
   typographyNotice?: string;
   /** Trame Riso légère (points d'encre) sur les aplats unis des vidéos, jamais sur une image. */
   halftone?: boolean;
+  /**
+   * Rythme du montage des clips créés avec la marque (D3) : « calm » n'ajoute
+   * rien (montage d'avant), « normal » un changement toutes les 2,5 s au plus,
+   * « lively » toutes les 1,5 s. Absent : « normal ».
+   */
+  pace?: EditPace;
   assets: BrandAsset[];
   logoAssetId?: string;
   markAssetId?: string;

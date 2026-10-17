@@ -9,6 +9,7 @@
 
 import { isCatalogFamily } from "@/modules/clip-studio/lib/font-catalog";
 import { TEXT_ROLES } from "@/modules/clip-studio/engine/brand";
+import { readPace } from "@/modules/clip-studio/engine/rhythm";
 import { HASHTAG_RULES } from "@/modules/clip-studio/lib/post-types";
 import { cleanVoiceSettings } from "@/modules/clip-studio/lib/voice-settings";
 import { DEFAULT_PALETTE, defaultTextStyles, upgradePublishing } from "./defaults";
@@ -319,6 +320,8 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
     ...(typeof kit.registrationMarks === "boolean" ? { registrationMarks: kit.registrationMarks } : stored.registrationMarks !== undefined ? { registrationMarks: stored.registrationMarks } : {}),
     // Trame Riso des aplats (D1) ; l'avertissement de typographie, lui, n'est jamais enregistré.
     ...(typeof kit.halftone === "boolean" ? { halftone: kit.halftone } : stored.halftone !== undefined ? { halftone: stored.halftone } : {}),
+    // Rythme du montage (D3) : liste fermée ; une valeur inconnue garde celle de la fiche enregistrée.
+    ...(readPace(kit.pace) ? { pace: readPace(kit.pace) } : stored.pace ? { pace: stored.pace } : {}),
     ai: {
       styleNotes: text(ai.styleNotes, KIT_LIMITS.styleNotes),
       collectionId: typeof ai.collectionId === "string" && /^col-[A-Za-z0-9-]{1,60}$/.test(ai.collectionId) ? ai.collectionId : undefined,

@@ -26,6 +26,7 @@ import {
   canEncodeVideo,
   type WrappedCanvas,
 } from "mediabunny";
+import { voiceWindows } from "./mix";
 import { applyGainEnvelope } from "./preview";
 import { drawFrame } from "./render";
 import { isActive, projectDuration, sourceTimeAt, speedOf, transitionAt } from "./timeline";
@@ -374,6 +375,8 @@ async function mixAudio(project: ClipProject, totalFrames: number): Promise<Audi
   }
 
   let scheduled = 0;
+  // Fenêtres de voix off, sous lesquelles une musique marquée `duck` s'efface (`mix.ts`).
+  const voices = voiceWindows(project);
   for (const item of sounding) {
     const buffer = decoded.get(item.source.url);
     if (!buffer) continue;
@@ -385,7 +388,7 @@ async function mixAudio(project: ClipProject, totalFrames: number): Promise<Audi
     source.playbackRate.value = rate;
     const gain = offline.createGain();
     const when = item.start / fps;
-    applyGainEnvelope(gain.gain, item, when, fps);
+    applyGainEnvelope(gain.gain, item, when, fps, voices);
     source.connect(gain).connect(offline.destination);
     source.start(when, offset, (item.duration / fps) * rate);
     scheduled++;
