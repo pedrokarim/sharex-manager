@@ -26,6 +26,7 @@ import { GalleryProvenanceBadge } from "@/components/gallery/gallery-provenance"
 import { isVideoFile } from "@/lib/media-kind";
 import { cn } from "@/lib/utils";
 import { getGalleryImageUrl } from "@/lib/utils/url";
+import { FavoriteStar } from "@/components/motion/favorite-star";
 
 interface SelectableListItemCardProps {
   file: FileInfo;
@@ -234,7 +235,7 @@ export function SelectableListItemCard({
               }}
               className={cn("h-8 w-8", file.isStarred && "text-yellow-500")}
             >
-              <Star className="h-4 w-4" />
+              <FavoriteStar active={Boolean(file.isStarred)} className="size-4" activeClassName="" />
             </Button>
             <Button
               variant="ghost"

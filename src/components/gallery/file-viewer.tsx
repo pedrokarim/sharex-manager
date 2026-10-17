@@ -43,6 +43,7 @@ import { getGalleryImageUrl, getFileStoragePath } from "@/lib/utils/url";
 import { useRouter } from "next/navigation";
 import { AddToAlbumDialog } from "@/components/albums/add-to-album-dialog";
 import { CreateAlbumDialog } from "@/components/albums/create-album-dialog";
+import { FavoriteStar } from "@/components/motion/favorite-star";
 
 interface FileViewerProps {
   file: FileInfo | null;
@@ -504,7 +505,7 @@ function FileViewerBody({
                     className={cn(file.isStarred && "text-yellow-600 dark:text-yellow-400")}
                     onClick={() => void onToggleStar(file)}
                   >
-                    <Star className="h-5 w-5" />
+                    <FavoriteStar active={Boolean(file.isStarred)} className="size-5" activeClassName="" />
                   </Button>
 
                   <Button

@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { ModuleConfig } from "@/types/modules";
+import { FavoriteStar } from "@/components/motion/favorite-star";
 import { ModuleShell } from "../components/module-shell";
 import { ImageViewer, type Shot } from "../components/image-viewer";
 import {
@@ -504,12 +505,7 @@ function LibraryTile({
           onClick={(event) => void act(async () => onToggleFavorite(event))}
           className="h-7 w-7"
         >
-          <Star
-            className={cn(
-              "h-3.5 w-3.5",
-              shot.item.favorite && "fill-amber-400 text-amber-400"
-            )}
-          />
+          <FavoriteStar active={Boolean(shot.item.favorite)} className="size-3.5" />
         </Button>
         <Button
           size="icon"

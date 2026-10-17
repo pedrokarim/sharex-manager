@@ -14,7 +14,6 @@ import {
   Download,
   Copy,
   ExternalLink,
-  Star,
 } from "lucide-react";
 import { useAtom } from "jotai";
 import { useQueryState } from "nuqs";
@@ -45,6 +44,7 @@ import { getGalleryImageUrl } from "@/lib/utils/url";
 import type { ThumbnailSize } from "@/lib/atoms/preferences";
 import { FormStatus, useFeedback } from "@/components/feedback";
 import { useTranslation } from "@/lib/i18n";
+import { FavoriteStar } from "@/components/motion/favorite-star";
 
 interface FileCardProps {
   file: FileInfo;
@@ -233,7 +233,7 @@ export function FileCard({
                 file.isStarred ? "bg-yellow-500/80 hover:bg-yellow-500" : revealed,
               )}
             >
-              <Star className={cn("h-4 w-4", file.isStarred && "fill-current")} />
+              <FavoriteStar active={Boolean(file.isStarred)} className="size-4" activeClassName="" />
             </button>
           )}
 

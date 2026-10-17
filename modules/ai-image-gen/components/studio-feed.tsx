@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { cn } from "@/lib/utils";
+import { FavoriteStar } from "@/components/motion/favorite-star";
 import {
   aspectRatioOf,
   callModule,
@@ -1324,20 +1325,7 @@ function FavoriteButton({ actions, size = "sm" }: { actions: RenderActions; size
       size={size}
       onClick={actions.toggleFavorite}
     >
-      <motion.span
-        key={String(actions.favorite)}
-        initial={{ scale: 0.6 }}
-        animate={{ scale: 1 }}
-        transition={{ type: "spring", stiffness: 500, damping: 18 }}
-        className="flex"
-      >
-        <Star
-          className={cn(
-            size === "md" ? "h-4 w-4" : "h-3.5 w-3.5",
-            actions.favorite && "fill-amber-400 text-amber-400"
-          )}
-        />
-      </motion.span>
+      <FavoriteStar active={Boolean(actions.favorite)} className={size === "md" ? "size-4" : "size-3.5"} />
     </IconAction>
   );
 }

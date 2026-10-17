@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ProBadge } from "@/components/motion/pro-badge";
 import { useSession, signOut } from "@/lib/auth-client";
 import {
   BadgeCheck,
@@ -116,6 +117,10 @@ export function NavUser({ user: initialUser }: { user: NavUserData }) {
                 <Link href="/upgrade">
                   <Sparkles className="mr-2 h-4 w-4" />
                   {t("account.upgrade_pro")}
+                  {/* Pastille en métal liquide (metal-fx), seule de l'application. */}
+                  <span className="ml-auto flex">
+                    <ProBadge />
+                  </span>
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>

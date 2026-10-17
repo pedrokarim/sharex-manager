@@ -35,6 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 import { createProject } from "../engine/edit";
 import { isVideoFile, mediaCountLabel } from "@/lib/media-kind";
+import { AssistantAvatar } from "@/components/motion/assistant-avatar";
 import {
   SAMPLE_BEFORE_AFTER,
   SAMPLE_FREE,
@@ -826,10 +827,13 @@ function AspectPicker({ value, onChange }: { value: AspectPreset; onChange: (val
 export function AssistantProgress({ job, onCancel }: { job: AssistantJob; onCancel?: () => void }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border bg-muted/30 p-4">
-        <p className="text-xs text-muted-foreground">Demande</p>
-        <p className="text-sm">{job.request.brief}</p>
-        {job.title && <p className="mt-2 text-lg font-semibold">{job.title}</p>}
+      <div className="flex items-start gap-3 rounded-xl border bg-muted/30 p-4">
+        <AssistantAvatar persona="clip" busy={job.steps.some((step) => step.state === "running")} />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground">Demande</p>
+          <p className="text-sm break-words">{job.request.brief}</p>
+          {job.title && <p className="mt-2 text-lg font-semibold break-words">{job.title}</p>}
+        </div>
       </div>
       <ol className="space-y-2">
         {job.steps.map((step) => (

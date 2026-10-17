@@ -35,6 +35,7 @@ import {
   STAT_CARD_CONTENT,
   STAT_CARD_HEADER,
 } from "./card-spacing";
+import { RollingNumber } from "@/components/motion/rolling-number";
 
 const chartConfig = {
   api: { label: "Via API", color: "var(--chart-1)" },
@@ -66,7 +67,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
           </CardHeader>
           <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
-              {stats.totalUploads.toLocaleString()}
+              <RollingNumber value={stats.totalUploads} />
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">
               {t("uploads.stats.labels.total")}
@@ -85,7 +86,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
           </CardHeader>
           <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
-              {formatFileSize(stats.totalSize)}
+              <RollingNumber value={formatFileSize(stats.totalSize)} />
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">
               {t("uploads.stats.labels.space_used")}
@@ -104,7 +105,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
           </CardHeader>
           <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
-              {stats.uploadsByMethod.api.toLocaleString()}
+              <RollingNumber value={stats.uploadsByMethod.api} />
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">
               {t("uploads.stats.labels.files_via_api")}
@@ -123,7 +124,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
           </CardHeader>
           <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
-              {stats.uploadsByMethod.web.toLocaleString()}
+              <RollingNumber value={stats.uploadsByMethod.web} />
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">
               {t("uploads.stats.labels.files_via_web")}
@@ -142,7 +143,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
           </CardHeader>
           <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
-              {format(new Date(stats.oldestFile.date), "dd/MM/yy", { locale })}
+              <RollingNumber value={format(new Date(stats.oldestFile.date), "dd/MM/yy", { locale })} />
             </div>
             <p
               className="text-[11px] text-muted-foreground truncate mt-0.5"
@@ -164,7 +165,7 @@ export function StatsOverviewTab({ stats }: StatsOverviewTabProps) {
           </CardHeader>
           <CardContent className={STAT_CARD_CONTENT}>
             <div className="text-2xl font-bold tabular-nums">
-              {format(new Date(stats.newestFile.date), "dd/MM/yy", { locale })}
+              <RollingNumber value={format(new Date(stats.newestFile.date), "dd/MM/yy", { locale })} />
             </div>
             <p
               className="text-[11px] text-muted-foreground truncate mt-0.5"

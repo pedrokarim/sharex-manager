@@ -9,7 +9,6 @@ import {
   Layers,
   MoreHorizontal,
   Repeat2,
-  Star,
   Trash2,
   Wand2,
   ZoomIn,
@@ -30,6 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { FavoriteStar } from "@/components/motion/favorite-star";
 import {
   aspectRatioOf,
   callModule,
@@ -254,12 +254,7 @@ export function GenerationCard({
               disabled={busy}
               onClick={handleFavorite}
             >
-              <Star
-                className={cn(
-                  "h-3.5 w-3.5",
-                  favorite && "fill-amber-400 text-amber-400"
-                )}
-              />
+              <FavoriteStar active={favorite} className="size-3.5" />
             </Button>
 
             <DropdownMenu>

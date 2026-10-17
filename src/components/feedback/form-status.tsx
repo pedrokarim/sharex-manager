@@ -1,8 +1,9 @@
 "use client";
 
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { CircleAlert, CircleCheck, Info } from "lucide-react";
+import { CircleAlert, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DrawnCheck } from "./drawn-check";
 import type { FeedbackState, FeedbackTone } from "./use-feedback";
 
 /**
@@ -19,7 +20,8 @@ const TONES: Record<FeedbackTone, string> = {
   info: "bg-muted text-foreground",
 };
 
-const ICONS = { error: CircleAlert, success: CircleCheck, info: Info } as const;
+// La réussite se dessine (`DrawnCheck`) ; les autres tons gardent leur icône.
+const ICONS = { error: CircleAlert, success: DrawnCheck, info: Info } as const;
 
 export function FormStatus({ state, className }: { state: FeedbackState | null; className?: string }) {
   return (

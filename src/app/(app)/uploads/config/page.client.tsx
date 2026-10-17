@@ -95,7 +95,7 @@ export function ConfigPageClient() {
                   défilable. La barre prend la hauteur de ses onglets (h-auto) : à 36 px, le bas du
                   cadre de l'onglet actif était rogné. */}
               <div className="overflow-x-auto overflow-y-hidden">
-                <TabsList className="flex h-auto min-w-max group-data-[orientation=horizontal]/tabs:h-auto justify-start gap-1 bg-transparent p-0 sm:grid sm:min-w-0 sm:w-full sm:grid-cols-3 sm:gap-2">
+                <TabsList indicator="none" className="flex h-auto min-w-max group-data-[orientation=horizontal]/tabs:h-auto justify-start gap-1 bg-transparent p-0 sm:grid sm:min-w-0 sm:w-full sm:grid-cols-3 sm:gap-2">
                   <TabsTrigger
                     value="general"
                     className="shrink-0 rounded-xl border border-transparent px-4 py-2 text-xs sm:text-sm data-[state=active]:border-border/70 data-[state=active]:bg-muted/50"

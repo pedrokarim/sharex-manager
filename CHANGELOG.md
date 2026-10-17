@@ -7,6 +7,17 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Interface plus vivante, d’après libraries.dev et transitions.dev :
+  pastille d’onglet en goutte liquide qui glisse d’un onglet à l’autre
+  (`liquid-gooey`, toutes les barres d’onglets) ; étoile de favori qui
+  éclate en particules (galerie, AI Image Gen) ; chiffres des
+  statistiques d’envoi qui défilent comme un compteur ; coche dessinée
+  pour « Enregistré » ; visage animé des assistants d’Image de marque
+  et de Clip Studio, au travail pendant une génération (`bot-avatars`) ;
+  lueur qui parcourt une carte tant que son travail tourne (file de
+  génération, analyse et traduction d’un chapitre, `border-beam`) ;
+  pastille « Pro » en métal liquide dans le menu du compte (`metal-fx`).
+  Tout respecte le mouvement réduit.
 - Clip Studio : la mascotte d’une marque prend à chaque segment la pose de son
   émotion (écrite par le script de l’assistant), jamais deux fois la même
   d’affilée, tournée vers le contenu (miroir au besoin), en grand et sans jamais

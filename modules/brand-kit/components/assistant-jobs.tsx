@@ -14,6 +14,7 @@ import {
   StepTimelineTitle,
 } from "@/components/ui/step-timeline";
 import { cn } from "@/lib/utils";
+import { AssistantAvatar } from "@/components/motion/assistant-avatar";
 import { editorHref, type KitAssistantJob } from "../lib/client";
 
 const STATUS_LABELS: Record<KitAssistantJob["status"], string> = {
@@ -49,7 +50,8 @@ export function AssistantJobProgress({
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-3">
+        <AssistantAvatar persona="brand" busy={job.status === "running"} size={36} />
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-sm break-words" title={job.brief}>
             {job.brief}
