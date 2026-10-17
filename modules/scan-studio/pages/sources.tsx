@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { Download, ExternalLink, MoreHorizontal, Play, RefreshCw, TriangleAlert } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, useFeedback, type FeedbackState } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -40,6 +40,10 @@ export default function SourcesPage() {
   const [refreshing, setRefreshing] = useState(false);
   /** Exemple choisi dans la liste : il est mis dans le champ et lu. */
   const [example, setExample] = useState<string | undefined>(undefined);
+  /** Le chapitre demandé n'a pas pu être lu : dit au-dessus de la section d'import, avec ce qui en découle. */
+  const [targetNotice, setTargetNotice] = useState<FeedbackState | null>(null);
+  // L'échec d'« Actualiser » s'affiche à côté du bouton ; sans liste du tout, la page le dit à sa place.
+  const [refreshError, setRefreshError] = useState<FeedbackState | null>(null);
 
   useEffect(() => {
     if (!chapterId) {
@@ -49,13 +53,20 @@ export default function SourcesPage() {
     }
     let cancelled = false;
     setTargetPending(true);
+    setTargetNotice(null);
     api
       .getChapter(chapterId)
       .then((view) => {
         if (!cancelled) setTarget({ id: view.chapter.id, number: view.chapter.number, title: view.chapter.title });
       })
       .catch((error) => {
-        if (!cancelled) toast.error(errorMessage(error, "Ce chapitre est introuvable : le lien sera rangé dans le dossier de sa série."));
+        if (cancelled) return;
+        const reason = errorMessage(error, "Ce chapitre est introuvable.");
+        setTargetNotice({
+          tone: "info",
+          message: `${/[.!?…]$/.test(reason) ? reason : `${reason}.`} Le lien sera rangé dans le dossier de sa série.`,
+          id: Date.now(),
+        });
       })
       .finally(() => {
         if (!cancelled) setTargetPending(false);
@@ -83,11 +94,12 @@ export default function SourcesPage() {
   /** Lit l'état des sources sur ce serveur. Aucun site n'est joint, sauf la toute première fois, pour son icône. */
   const refresh = useCallback(async () => {
     setRefreshing(true);
+    setRefreshError(null);
     try {
       store(await api.listSources());
     } catch (error) {
       setFailed(true);
-      toast.error(errorMessage(error, "Liste des sources indisponible."));
+      setRefreshError({ tone: "error", message: errorMessage(error, "La liste des sources n’a pas pu être lue. Réessayez."), id: Date.now() });
     } finally {
       setRefreshing(false);
     }
@@ -107,10 +119,13 @@ export default function SourcesPage() {
       <ModuleShell
         crumbs={target ? [{ label: chapterLabel(target), href: chapterHref(target.id) }, { label: "Import par lien" }] : [{ label: "Import par lien" }]}
         actions={
-          <Button variant="outline" className="gap-2" loading={refreshing} onClick={() => void refresh()}>
-            <RefreshCw className="h-4 w-4" />
-            Actualiser
-          </Button>
+          <>
+            {sources !== null && <ActionStatus state={refreshError} className="max-w-40 sm:max-w-64" />}
+            <Button variant="outline" className="gap-2" loading={refreshing} onClick={() => void refresh()}>
+              <RefreshCw className="h-4 w-4" />
+              Actualiser
+            </Button>
+          </>
         }
       >
         <div className="flex flex-col gap-6">
@@ -134,7 +149,10 @@ export default function SourcesPage() {
               <Skeleton className="h-9 w-full" />
             </div>
           ) : (
-            <LinkImportPanel chapter={target ?? undefined} initialLink={example} onChanged={() => void refresh()} />
+            <>
+              <FormStatus state={targetNotice} className="pb-3" />
+              <LinkImportPanel chapter={target ?? undefined} initialLink={example} onChanged={() => void refresh()} />
+            </>
           )}
           </div>
 
@@ -143,7 +161,9 @@ export default function SourcesPage() {
           {sources === null ? (
             failed ? (
               <div className="flex flex-col items-start gap-3">
-                <p className="text-sm text-muted-foreground">La liste des sources n’a pas pu être chargée.</p>
+                <p className="text-sm break-words text-muted-foreground" role="alert">
+                  {refreshError?.message ?? "La liste des sources n’a pas pu être chargée."}
+                </p>
                 <Button variant="outline" size="sm" className="gap-2" onClick={() => void refresh()}>
                   <RefreshCw className="h-4 w-4" />
                   Réessayer
@@ -235,15 +255,18 @@ function SourceRow({ source, isAdmin, onSaved, onTry }: SourceRowProps) {
   const [expanded, setExpanded] = useState(false);
   const switchId = `scan-studio-source-${source.id}-enabled`;
   const notesId = `scan-studio-source-${source.id}-notes`;
+  // Le retour d'une action s'affiche sur la ligne de la source, sous son nom.
+  const feedback = useFeedback({ successDuration: 3000 });
 
   const setEnabled = async (enabled: boolean) => {
     if (saving) return;
     setSaving(true);
+    feedback.clear();
     try {
+      // L'interrupteur bascule : c'est le retour.
       onSaved(await api.setSourceEnabled(source.id, enabled));
-      toast.success(enabled ? `${source.name} est activé` : `${source.name} est désactivé`);
     } catch (error) {
-      toast.error(errorMessage(error, "Ce réglage n’a pas pu être enregistré."));
+      feedback.error(errorMessage(error, "Ce réglage n’a pas pu être enregistré. Réessayez."));
     } finally {
       setSaving(false);
     }
@@ -252,11 +275,13 @@ function SourceRow({ source, isAdmin, onSaved, onTry }: SourceRowProps) {
   const refreshIcon = async () => {
     if (refreshingIcon) return;
     setRefreshingIcon(true);
+    feedback.clear();
     try {
       onSaved(await api.refreshSourceIcon(source.id));
-      toast.success(`Icône de ${source.name} relue chez le site`);
+      // L'icône relue peut être la même : le message dit que c'est fait.
+      feedback.success("Icône relue chez le site");
     } catch (error) {
-      toast.error(errorMessage(error, "L’icône n’a pas pu être récupérée."));
+      feedback.error(errorMessage(error, "L’icône n’a pas pu être récupérée. Réessayez."));
     } finally {
       setRefreshingIcon(false);
     }
@@ -267,9 +292,10 @@ function SourceRow({ source, isAdmin, onSaved, onTry }: SourceRowProps) {
       <ItemMedia variant="image" className="size-9 rounded-md">
         <SourceIcon iconUrl={source.iconUrl} className="size-9 rounded-md" />
       </ItemMedia>
-      <ItemContent>
+      <ItemContent className="min-w-0">
         <ItemTitle>{source.name}</ItemTitle>
         <ItemDescription className="break-words">{mainHosts(source.hosts).join(", ")}</ItemDescription>
+        {feedback.state && <ActionStatus state={feedback.state} />}
       </ItemContent>
       <ItemActions>
         {isAdmin ? (

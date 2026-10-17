@@ -4,8 +4,8 @@ import { BrandLogo, type Brand } from "@/components/brand-logo";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { AudioLines, Download, HardDrive, Mars, Play, Search, Settings2, Square, Venus } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { errorMessage } from "@/components/feedback";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -66,9 +66,10 @@ function progress(state: ResourceState) {
 
 /**
  * Lecteur d'extraits partagé par toute la page : un seul extrait joue à la
- * fois, et un second clic sur le même l'arrête.
+ * fois, et un second clic sur le même l'arrête. Un échec reste attaché à sa
+ * voix : la ligne de la voix l'affiche, un nouveau clic réessaie.
  */
-type SampleState = { key: string; status: "loading" | "playing" } | null;
+type SampleState = { key: string; status: "loading" | "playing" } | { key: string; status: "error"; message: string } | null;
 
 let sampleState: SampleState = null;
 let sampleAudio: HTMLAudioElement | null = null;
@@ -100,7 +101,7 @@ function sampleKey(request: SampleRequest) {
 
 async function toggleSample(request: SampleRequest) {
   const key = sampleKey(request);
-  if (sampleState?.key === key) {
+  if (sampleState?.key === key && sampleState.status !== "error") {
     stopSample();
     return;
   }
@@ -118,14 +119,16 @@ async function toggleSample(request: SampleRequest) {
     audio.onerror = () => {
       if (sampleAudio === audio) {
         stopSample();
-        toast.error("Lecture de l’extrait impossible");
+        setSampleState({ key, status: "error", message: "Lecture de l’extrait impossible. Réessayez." });
       }
     };
     await audio.play();
     if (sampleAudio === audio) setSampleState({ key, status: "playing" });
   } catch (error) {
-    if (sampleState?.key === key) stopSample();
-    toast.error(error instanceof Error ? error.message : "Extrait indisponible");
+    if (sampleState?.key === key) {
+      stopSample();
+      setSampleState({ key, status: "error", message: errorMessage(error, "Extrait indisponible pour cette voix. Réessayez dans un instant.") });
+    }
   }
 }
 
@@ -144,7 +147,7 @@ function useSampleState(): SampleState {
 export function VoiceListenButton({ request, provider, className }: { request: SampleRequest; provider: SourceId; className?: string }) {
   const state = useSampleState();
   const mine = state?.key === sampleKey(request) ? state.status : null;
-  const label = mine === "playing" ? "Arrêter l’écoute" : mine === "loading" ? "Préparation de l’extrait…" : "Écouter";
+  const label = mine === "playing" ? "Arrêter l’écoute" : mine === "loading" ? "Préparation de l’extrait…" : mine === "error" ? "Réessayer l’écoute" : "Écouter";
   const quota = provider === "azure" ? " (la première écoute compte dans le quota Azure)" : provider === "piper" ? "" : " (texte envoyé au fournisseur)";
   return (
     <button
@@ -157,7 +160,7 @@ export function VoiceListenButton({ request, provider, className }: { request: S
       }}
       className={cn(
         "flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        mine && "text-primary",
+        mine && (mine === "error" ? "text-destructive" : "text-primary"),
         className
       )}
     >
@@ -281,6 +284,7 @@ export function VoicePicker({
   const [language, setLanguage] = useState("fr");
   const [gender, setGender] = useState<"all" | "female" | "male">("all");
   const [query, setQuery] = useState("");
+  const sample = useSampleState();
 
   // Préférences locales : lues après le montage (le rendu serveur n'a pas de stockage).
   useEffect(() => {
@@ -457,6 +461,8 @@ export function VoicePicker({
                 const selected = voice.id === value;
                 const state = voice.state;
                 const Gender = voice.gender === "female" ? Venus : voice.gender === "male" ? Mars : AudioLines;
+                const sampleRequest = { voice: voice.id, speed, tone: voice.provider === "piper" ? tone : undefined };
+                const sampleError = sample?.status === "error" && sample.key === sampleKey(sampleRequest) ? sample.message : null;
                 return (
                   <div
                     key={voice.id}
@@ -477,13 +483,20 @@ export function VoicePicker({
                       <Gender className={cn("h-3.5 w-3.5 shrink-0", selected ? "text-primary" : "text-muted-foreground")} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">{voice.label}</span>
-                        <span className="block truncate text-[11px] text-muted-foreground">
-                          {state.status === "downloading"
-                            ? `Téléchargement ${progress(state)} %`
-                            : state.status === "error"
-                              ? "Échec, cliquer pour réessayer"
-                              : voice.description}
-                        </span>
+                        {sampleError ? (
+                          // L'échec de l'écoute s'écrit sur la ligne de la voix écoutée.
+                          <span role="alert" title={sampleError} className="block truncate text-[11px] text-destructive">
+                            {sampleError}
+                          </span>
+                        ) : (
+                          <span className="block truncate text-[11px] text-muted-foreground">
+                            {state.status === "downloading"
+                              ? `Téléchargement ${progress(state)} %`
+                              : state.status === "error"
+                                ? "Échec, cliquer pour réessayer"
+                                : voice.description}
+                          </span>
+                        )}
                       </span>
                       {state.status === "downloading" && <Spinner className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
                       {(state.status === "missing" || state.status === "error") && (
@@ -492,7 +505,7 @@ export function VoicePicker({
                         </span>
                       )}
                     </button>
-                    <VoiceListenButton request={{ voice: voice.id, speed, tone: voice.provider === "piper" ? tone : undefined }} provider={voice.provider} />
+                    <VoiceListenButton request={sampleRequest} provider={voice.provider} />
                     {state.status === "downloading" && (
                       <span className="absolute inset-x-0 bottom-0 h-0.5 bg-primary/20">
                         <span className="block h-full bg-primary transition-[width]" style={{ width: `${progress(state)}%` }} />

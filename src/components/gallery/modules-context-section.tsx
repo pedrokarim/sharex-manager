@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Puzzle, SlidersHorizontal } from "lucide-react";
+import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
 import {
   ContextMenuItem,
@@ -20,6 +21,34 @@ import {
   useModuleFileActions,
 } from "@/lib/modules/file-actions";
 import type { FileInfo } from "@/types/files";
+
+/**
+ * Lance un module sur des fichiers depuis le menu contextuel. Le menu se
+ * referme aussitôt et le traitement peut durer : l'avancement et le bilan
+ * passent par un toast, seul endroit encore visible.
+ */
+async function runFromMenu(moduleName: string, fileNames: string[]) {
+  const total = fileNames.length;
+  const toastId = toast.loading(
+    total > 1 ? `${moduleName}\u00a0: 0 sur ${total}` : `${moduleName} en cours…`
+  );
+  const { succeeded, failures } = await runProcessorOnFiles(moduleName, fileNames, {
+    onProgress: (done) => {
+      if (total > 1) toast.loading(`${moduleName}\u00a0: ${done} sur ${total}`, { id: toastId });
+    },
+  });
+  if (failures.length === 0) {
+    toast.success(
+      succeeded > 1 ? `${moduleName} appliqué à ${succeeded}\u00a0fichiers` : `${moduleName} appliqué`,
+      { id: toastId }
+    );
+  } else {
+    toast.error(`${moduleName}\u00a0: ${failures.length}\u00a0échec(s) sur ${total}`, {
+      id: toastId,
+      description: failures.slice(0, 3).join("\n"),
+    });
+  }
+}
 
 interface ModulesContextSectionProps {
   files: FileInfo[];
@@ -119,7 +148,7 @@ export function ModulesContextSection({ files }: ModulesContextSectionProps) {
                           file: files[0],
                         });
                       } else {
-                        void runProcessorOnFiles(processor.name, fileNames);
+                        void runFromMenu(processor.name, fileNames);
                       }
                     }}
                   >

@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { CircleAlert, CircleCheck, Info } from "lucide-react";
+import type { FeedbackState } from "@/components/feedback";
+import { cn } from "@/lib/utils";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { nearestWeight } from "../../lib/fonts";
 import {
@@ -70,6 +73,16 @@ interface StageProps {
   onZoomChange: (scale: number) => void;
   /** Contenu du menu contextuel de la zone sélectionnée. */
   menu: React.ReactNode;
+  /**
+   * Message bref sur le geste qui vient d'avoir lieu (« Sélectionnez d'abord la
+   * zone… ») : il prend un instant la place de l'aide de l'outil, en bas de la
+   * scène, là où l'on regarde déjà.
+   */
+  notice?: FeedbackState | null;
+  /** La scène signale un geste qu'elle ne peut pas accomplir ; l'atelier l'affiche dans `notice`. */
+  onNotice?: (message: string) => void;
+  /** L'image de la page n'a pas pu être chargée : la raison s'affiche au milieu de la scène. */
+  failure?: string | null;
 }
 
 interface View {
@@ -467,7 +480,7 @@ export function Stage(props: StageProps) {
     draftRef.current = [];
     requestDraw();
     if (draft.length >= 3) propsRef.current.onCreateRegion(draft);
-    else toast.info("Un contour demande au moins trois points");
+    else propsRef.current.onNotice?.("Un contour demande au moins trois points.");
     return true;
   }, [requestDraw]);
 
@@ -584,23 +597,23 @@ export function Stage(props: StageProps) {
       // Hors de la page il n'y a pas de couleur à prendre : on ne prélève pas celle du bord à la place.
       const inside = point.x >= 0 && point.y >= 0 && point.x < current.page.width && point.y < current.page.height;
       if (inside) current.onPickColor(point);
-      else toast.info("Cliquez dans la page pour y prélever une couleur");
+      else current.onNotice?.("Cliquez dans la page pour y prélever une couleur.");
       return;
     }
 
     if (current.tool === "brush") {
       const region = selectedRegion() ?? pickRegion(point, kind, true)?.region ?? null;
       if (!region) {
-        toast.info("Sélectionnez d’abord la zone à retoucher");
+        current.onNotice?.("Sélectionnez d’abord la zone à retoucher.");
         return;
       }
       if (region.id !== current.selectedId) current.onSelect(region.id);
       if (region.mask.kind === "none") {
-        toast.info("Cette zone n’a pas de masque : choisissez un aplat ou un fond reconstruit dans l’inspecteur pour peindre");
+        current.onNotice?.("Cette zone n’a pas de masque : choisissez un aplat ou un fond reconstruit dans l’inspecteur pour peindre.");
         return;
       }
       if (region.mask.strokes.length >= MAX_STROKES) {
-        toast.info("Cette zone a atteint le nombre maximal de retouches");
+        current.onNotice?.("Cette zone a atteint le nombre maximal de retouches.");
         return;
       }
       const stroke: BrushStroke = { points: [inPage], width: Math.max(1, current.brushWidth), color: region.mask.color };
@@ -817,14 +830,71 @@ export function Stage(props: StageProps) {
               requestDraw();
             }}
           />
-          {activeTool && (
-            <p className="pointer-events-none absolute inset-x-0 bottom-2 mx-auto w-fit max-w-[calc(100%-2rem)] truncate rounded-md bg-background/85 px-2.5 py-1 text-[11px] text-muted-foreground backdrop-blur-sm">
-              {activeTool.hint}
-            </p>
+          {props.failure && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
+              <p role="alert" className="flex max-w-sm min-w-0 items-start gap-2.5 rounded-lg bg-background/90 px-4 py-3 text-sm text-destructive backdrop-blur-sm">
+                <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+                <span className="min-w-0 break-words">{props.failure}</span>
+              </p>
+            </div>
           )}
+          <StageBubble notice={props.notice ?? null} hint={activeTool?.hint ?? null} />
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52">{props.menu}</ContextMenuContent>
     </ContextMenu>
+  );
+}
+
+const NOTICE_TONES = {
+  error: "text-destructive",
+  success: "text-emerald-700 dark:text-emerald-400",
+  info: "text-foreground",
+} as const;
+
+const NOTICE_ICONS = { error: CircleAlert, success: CircleCheck, info: Info } as const;
+
+/**
+ * Bulle du bas de la scène : l'aide de l'outil en cours, ou, un instant, le
+ * message du geste qui vient d'avoir lieu. L'un remplace l'autre en fondu, sans
+ * rien déplacer ; un message long passe à la ligne au lieu d'être coupé.
+ */
+function StageBubble({ notice, hint }: { notice: FeedbackState | null; hint: string | null }) {
+  const Icon = notice ? NOTICE_ICONS[notice.tone] : null;
+  return (
+    <div aria-live="polite" className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center px-4">
+      <MotionConfig reducedMotion="user">
+        <AnimatePresence mode="wait" initial={false}>
+          {notice && Icon ? (
+            <motion.p
+              key={`notice-${notice.id}`}
+              role={notice.tone === "error" ? "alert" : "status"}
+              className={cn(
+                "flex max-w-lg min-w-0 items-start gap-1.5 rounded-md bg-background/90 px-2.5 py-1 text-xs font-medium backdrop-blur-sm",
+                NOTICE_TONES[notice.tone],
+              )}
+              initial={{ opacity: 0, y: 4, filter: "blur(2px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, filter: "blur(2px)" }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+            >
+              <Icon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+              <span className="min-w-0 break-words">{notice.message}</span>
+            </motion.p>
+          ) : hint ? (
+            <motion.p
+              key="hint"
+              className="min-w-0 truncate rounded-md bg-background/85 px-2.5 py-1 text-[11px] text-muted-foreground backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              {hint}
+            </motion.p>
+          ) : null}
+        </AnimatePresence>
+      </MotionConfig>
+    </div>
   );
 }

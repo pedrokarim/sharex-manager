@@ -3,10 +3,10 @@
 import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Trash2, TriangleAlert, Upload } from "lucide-react";
-import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { DropZone } from "@/components/ui/drop-zone";
 import { FontPicker } from "@/components/ui/font-picker";
 import { Input } from "@/components/ui/input";
@@ -127,30 +127,38 @@ export function TypographySection({ kit, update, runOperation, fontsVersion, fon
   const [importing, setImporting] = useState(false);
   const [doomed, setDoomed] = useState<BrandFont | null>(null);
   const roomLeft = KIT_LIMITS.fonts - kit.fonts.length;
+  // Import ou retrait refusé : le message s'écrit sous la liste des polices, là où l'on vient d'agir.
+  const fontsFeedback = useFeedback();
 
   const importFonts = async (files: File[]) => {
     setImporting(true);
+    fontsFeedback.clear();
+    const rejected: string[] = [];
     try {
       for (const file of files.slice(0, Math.max(0, roomLeft))) {
         if (!FONT_FILE.test(file.name)) {
-          toast.error(`« ${file.name} » : TTF, OTF ou WOFF2 seulement.`);
+          rejected.push(`« ${file.name} »`);
           continue;
         }
         await runOperation(() => api.importFont(kit.id, file));
       }
+      if (rejected.length > 0) {
+        fontsFeedback.error(`${rejected.join(", ")} : TTF, OTF ou WOFF2 seulement. Choisissez un fichier de police.`);
+      }
     } catch (error) {
-      toast.error(errorMessage(error, "Police refusée."));
+      fontsFeedback.error(errorMessage(error, "Cette police a été refusée. Essayez un autre fichier TTF, OTF ou WOFF2."));
     } finally {
       setImporting(false);
     }
   };
 
   const removeFont = async (font: BrandFont) => {
+    fontsFeedback.clear();
     try {
+      // La ligne de la police disparaît : c'est la confirmation.
       await runOperation(() => api.removeFont(kit.id, font.id));
-      toast.success("Police retirée");
     } catch (error) {
-      toast.error(errorMessage(error, "Retrait impossible."));
+      fontsFeedback.error(errorMessage(error, "La police n’a pas pu être retirée. Réessayez."));
     }
   };
 
@@ -271,6 +279,7 @@ export function TypographySection({ kit, update, runOperation, fontsVersion, fon
             {importing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
             Importer une police
           </Button>
+          <FormStatus state={fontsFeedback.state} />
         </DropZone>
       </FieldGroup>
 

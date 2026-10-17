@@ -43,7 +43,6 @@ import {
   SquareArrowOutUpRight,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -1045,7 +1044,7 @@ function AccountsStep({
             const result = await finalizePendingAuthorizationAction(view.id, [...kept]);
             setBusy(null);
             if (!result.ok) return setError(result.error);
-            toast.success(result.data.accounts.length > 1 ? `${result.data.accounts.length} comptes reliés` : "Compte relié");
+            // L'étape « C'est prêt » montre les comptes reliés : pas d'autre message.
             await onKept(result.data.accounts);
           }}
         >

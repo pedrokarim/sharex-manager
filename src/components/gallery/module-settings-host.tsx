@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type ComponentType } from "react";
 import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { LoadingState } from "@/components/loading";
@@ -40,6 +41,10 @@ export function ModuleSettingsHost() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [createNewVersion, setCreateNewVersion] = useState(true);
   const [applying, setApplying] = useState(false);
+  // Échec de l'application : la fenêtre reste ouverte et le dit au-dessus de
+  // ses boutons.
+  const feedback = useFeedback();
+  const clearFeedback = feedback.clear;
 
   useEffect(() => {
     const onRequest = (event: Event) => {
@@ -48,6 +53,7 @@ export function ModuleSettingsHost() {
       setComponent(null);
       setLoadError(null);
       setCreateNewVersion(true);
+      clearFeedback();
       import(`@/modules/${detail.moduleName.toLowerCase()}/ui`)
         .then((loaded) => setComponent(() => loaded.default))
         .catch((error) =>
@@ -56,11 +62,12 @@ export function ModuleSettingsHost() {
     };
     window.addEventListener(MODULE_SETTINGS_EVENT, onRequest);
     return () => window.removeEventListener(MODULE_SETTINGS_EVENT, onRequest);
-  }, []);
+  }, [clearFeedback]);
 
   const close = () => {
     setRequest(null);
     setComponent(null);
+    clearFeedback();
   };
 
   const apply = useCallback(
@@ -72,6 +79,7 @@ export function ModuleSettingsHost() {
         return;
       }
       setApplying(true);
+      clearFeedback();
       try {
         const response = await fetch("/api/modules/apply", {
           method: "POST",
@@ -87,15 +95,19 @@ export function ModuleSettingsHost() {
           const payload = await response.json().catch(() => null);
           throw new Error(payload?.error ?? `HTTP ${response.status}`);
         }
+        // Ouverte depuis un menu contextuel, la fenêtre se ferme : le toast est
+        // le seul endroit où lire la réussite.
         toast.success(`${request.moduleName} appliqué`);
         close();
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Application du module impossible");
+        feedback.error(errorMessage(error, "Le module n’a pas pu être appliqué. Réessayez."));
       } finally {
         setApplying(false);
       }
     },
-    [request, createNewVersion]
+    // `feedback.error` ne change pas de comportement d'un rendu à l'autre.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [request, createNewVersion, clearFeedback]
   );
 
   return (
@@ -150,6 +162,11 @@ export function ModuleSettingsHost() {
             </Label>
           </div>
         )}
+
+        {/* Marge annulée : l'écart de la grille s'ouvre avec le message. */}
+        <div className="-mt-4">
+          <FormStatus state={feedback.state} className="pt-4" />
+        </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={close}>

@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Columns2, Trash2 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ActionStatus, useFeedback } from "@/components/feedback";
 import { api, formatDate } from "../../lib/client";
 import { errorMessage } from "../../lib/library-helpers";
 import { acceptAiTranslation, addAiTrace } from "../../lib/region-edit";
@@ -134,18 +134,25 @@ export function PageAi({ pageId, chapterId, regions, page, image, renderManual, 
     setCompared(version);
   };
 
+  const removeFeedback = useFeedback();
+  const [failedVersion, setFailedVersion] = useState<string | null>(null);
+
   const accept = (proposal: { regionId: string; text: string; trace: AiTrace }) => {
     onPatchRegion(proposal.regionId, (current) => acceptAiTranslation(current, proposal.text, proposal.trace, Date.now()), `${proposal.regionId}:ai-translation:${proposal.trace.at}`);
     setProposals((current) => current.filter((entry) => entry.regionId !== proposal.regionId));
   };
 
   const removeVersion = async (version: AiPageVersion) => {
+    removeFeedback.clear();
+    setFailedVersion(null);
     try {
       await api.deleteAiPageVersion(pageId, version.id);
       setVersions((current) => (current ?? []).filter((entry) => entry.id !== version.id));
       if (compared?.id === version.id) setCompared(null);
     } catch (failure) {
-      toast.error(errorMessage(failure, "La version n’a pas pu être supprimée."));
+      // L'échec s'affiche sur la ligne de la version, là où l'on a cliqué.
+      setFailedVersion(version.id);
+      removeFeedback.error(errorMessage(failure, "La version n’a pas pu être supprimée. Réessayez."));
     }
   };
 
@@ -233,6 +240,9 @@ export function PageAi({ pageId, chapterId, regions, page, image, renderManual, 
                     <ProviderName provider={version.trace.provider} label={labelOf(version.trace.provider)} />
                     <br />
                     {formatDate(version.trace.at)} · {version.width} × {version.height} px
+                    {failedVersion === version.id && removeFeedback.state && (
+                      <ActionStatus state={removeFeedback.state} className="flex text-[11px]" />
+                    )}
                   </div>
                   <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Comparer avec la page de l’atelier" title="Comparer" onClick={() => setCompared(version)}>
                     <Columns2 className="h-3.5 w-3.5" />

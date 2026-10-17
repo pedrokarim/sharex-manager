@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Copy, FileArchive, FilePlus2, ImagePlus, Sparkles, Star, X } from "lucide-react";
-import { toast } from "sonner";
 import { ThinkingStatus } from "@/components/loading";
 import { Spinner } from "@/components/ui/spinner";
 import { ImagePickerDialog, type PickedImage } from "@/components/gallery/image-picker-dialog";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentMedia, AttachmentTitle } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { DropZone } from "@/components/ui/drop-zone";
 import { Label } from "@/components/ui/label";
@@ -78,6 +78,15 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
   const [uploading, setUploading] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [launched, setLaunched] = useState<string | null>(null);
+  // L'échec d'un envoi se lit juste au-dessus des boutons du tiroir ; celui
+  // d'une référence, sous la liste des références.
+  const submitFeedback = useFeedback();
+  const referenceFeedback = useFeedback();
+  const { clear: clearSubmitFeedback } = submitFeedback;
+  const { clear: clearReferenceFeedback } = referenceFeedback;
+  const clearSubmitError = () => {
+    if (submitFeedback.state?.tone === "error") submitFeedback.clear();
+  };
 
   const referencesRef = useRef(references);
   useEffect(() => {
@@ -96,6 +105,8 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
     setMascot(false);
     setReferences([]);
     setLaunched(null);
+    clearSubmitFeedback();
+    clearReferenceFeedback();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- remise à zéro à l'ouverture seulement
   }, [open]);
 
@@ -112,6 +123,7 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
   const submitManual = async () => {
     if (!manualReady || busy) return;
     setBusy(true);
+    submitFeedback.clear();
     try {
       let kit: BrandKit;
       if (start === "archive" && archive) {
@@ -125,7 +137,7 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
       onOpenChange(false);
       onCreated(kit);
     } catch (error) {
-      toast.error(errorMessage(error, "Création impossible."));
+      submitFeedback.error(errorMessage(error, start === "archive" ? "L’archive n’a pas pu être importée. Vérifiez qu’elle vient de ShareX Manager." : "La marque n’a pas pu être créée. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -134,6 +146,7 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
   const submitAssistant = async () => {
     if (!assistantReady || busy) return;
     setBusy(true);
+    submitFeedback.clear();
     try {
       const started = await api.startKitAssistant({
         brief: brief.trim(),
@@ -144,7 +157,7 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
       setLaunched(started.id);
       onAssistantStarted();
     } catch (error) {
-      toast.error(errorMessage(error, "L’assistant n’a pas pu démarrer."));
+      submitFeedback.error(errorMessage(error, "L’assistant n’a pas pu démarrer. Réessayez dans un instant."));
     } finally {
       setBusy(false);
     }
@@ -153,6 +166,7 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
   const addReference = async (picked: PickedImage) => {
     if (referencesRef.current.length + uploading >= MAX_REFERENCES) return;
     setUploading((count) => count + 1);
+    referenceFeedback.clear();
     try {
       const uploaded = await uploadPicked(picked);
       const preview = picked.kind === "gallery" ? galleryThumbnail(picked.name) : picked.kind === "file" ? URL.createObjectURL(picked.file) : picked.url;
@@ -161,7 +175,7 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
         { id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: uploaded.kind, name: uploaded.name, label: uploaded.label, preview, revoke: picked.kind === "file" },
       ]);
     } catch (error) {
-      toast.error(errorMessage(error, "Cette image n’a pas pu être jointe."));
+      referenceFeedback.error(errorMessage(error, "Cette image n’a pas pu être jointe. Essayez-en une autre."));
     } finally {
       setUploading((count) => count - 1);
     }
@@ -200,7 +214,14 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
                 <ThinkingStatus messages="Démarrage de l’assistant…" state="composing" />
               )
             ) : (
-              <Tabs value={tab} onValueChange={(value) => setTab(value as CreateTab)} className="gap-4">
+              <Tabs
+                value={tab}
+                onValueChange={(value) => {
+                  submitFeedback.clear();
+                  setTab(value as CreateTab);
+                }}
+                className="gap-4"
+              >
                 <TabsList className="w-full">
                   <TabsTrigger value="manual">À la main</TabsTrigger>
                   <TabsTrigger value="assistant">
@@ -213,6 +234,8 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
                   <form
                     id="brand-kit-manual"
                     className="grid gap-5"
+                    // Corriger la saisie retire le message d'erreur.
+                    onChange={clearSubmitError}
                     onSubmit={(event) => {
                       event.preventDefault();
                       void submitManual();
@@ -305,6 +328,7 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
                   <form
                     id="brand-kit-assistant"
                     className="grid gap-5"
+                    onChange={clearSubmitError}
                     onSubmit={(event) => {
                       event.preventDefault();
                       void submitAssistant();
@@ -401,6 +425,7 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
                           )}
                         </ul>
                       </DropZone>
+                      <FormStatus state={referenceFeedback.state} />
                       <p className="text-xs text-muted-foreground">Logo existant, captures, planches : transmis tels quels à l’assistant. Les fichiers se déposent aussi ici.</p>
                     </div>
                   </form>
@@ -409,6 +434,10 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
             )}
           </div>
 
+          {/* Hors de la zone qui défile : le message reste sous les yeux, au-dessus des boutons. */}
+          <div className="shrink-0 px-5 empty:hidden">
+            <FormStatus state={launched ? null : submitFeedback.state} className="pt-2 pb-3" />
+          </div>
           <SheetFooter className="flex-row justify-end gap-2 border-t px-5 py-3">
             {launched ? (
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

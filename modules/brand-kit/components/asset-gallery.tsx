@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ImagePickerDialog, type PickedImage } from "@/components/gallery/image-picker-dialog";
 import { Attachment, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentMedia, AttachmentTitle } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
+import { ActionStatus, FormStatus, useFeedback, type FeedbackState } from "@/components/feedback";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropZone } from "@/components/ui/drop-zone";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -113,6 +114,10 @@ export function AssetGallery({ kit, update, runOperation, kinds, addKind, roles 
   const [renaming, setRenaming] = useState<string | null>(null);
   const [doomed, setDoomed] = useState<BrandAsset | null>(null);
   const [redoing, setRedoing] = useState<BrandAsset | null>(null);
+  // Un ajout refusé s'écrit sous la grille ; une suppression refusée, sur sa vignette.
+  const addFeedback = useFeedback();
+  const removeFeedback = useFeedback();
+  const [failedAsset, setFailedAsset] = useState<string | null>(null);
 
   const ofKind = kit.assets.filter((asset) => kinds.includes(asset.kind));
   const assets = filter ? ofKind.filter(filter) : ofKind;
@@ -120,10 +125,11 @@ export function AssetGallery({ kit, update, runOperation, kinds, addKind, roles 
 
   const add = async (task: () => Promise<BrandKit>) => {
     setAdding((count) => count + 1);
+    addFeedback.clear();
     try {
       await runOperation(task);
     } catch (error) {
-      toast.error(errorMessage(error, "Cette image n’a pas pu être ajoutée."));
+      addFeedback.error(errorMessage(error, "Cette image n’a pas pu être ajoutée. Essayez un autre fichier."));
     } finally {
       setAdding((count) => count - 1);
     }
@@ -140,10 +146,12 @@ export function AssetGallery({ kit, update, runOperation, kinds, addKind, roles 
 
   const remove = async (asset: BrandAsset) => {
     setBusyAsset(asset.id);
+    removeFeedback.clear();
     try {
       await runOperation(() => api.removeKitAsset(kit.id, asset.id));
     } catch (error) {
-      toast.error(errorMessage(error, "Suppression impossible."));
+      setFailedAsset(asset.id);
+      removeFeedback.error(errorMessage(error, "L’image n’a pas pu être supprimée. Réessayez."));
     } finally {
       setBusyAsset(null);
     }
@@ -153,9 +161,10 @@ export function AssetGallery({ kit, update, runOperation, kinds, addKind, roles 
     setBusyAsset(asset.id);
     try {
       await runOperation(() => api.regenerateAsset(kit.id, asset.id, note.trim() || undefined));
-      toast.success(`« ${asset.label} » refait`);
+      // L'assistant redessine pendant de longues secondes : sa fin se notifie, où que l'on soit dans la page.
+      toast.success(`« ${asset.label} » refait.`);
     } catch (error) {
-      toast.error(errorMessage(error, "Le visuel n’a pas pu être refait."));
+      toast.error(errorMessage(error, "Le visuel n’a pas pu être refait. Réessayez dans un instant."));
     } finally {
       setBusyAsset(null);
     }
@@ -190,6 +199,7 @@ export function AssetGallery({ kit, update, runOperation, kinds, addKind, roles 
                 onRole={(role) => update((draft) => assignRole(draft, asset, role))}
                 onDelete={() => setDoomed(asset)}
                 onRedo={() => setRedoing(asset)}
+                status={failedAsset === asset.id ? removeFeedback.state : null}
                 extra={renderExtra?.(asset)}
               />
             </motion.li>
@@ -223,6 +233,7 @@ export function AssetGallery({ kit, update, runOperation, kinds, addKind, roles 
       {assets.length === 0 && adding === 0 && (
         <p className="pt-2 text-xs text-muted-foreground">{ofKind.length > 0 ? (filteredEmptyText ?? "Aucune image pour ce filtre.") : emptyText}</p>
       )}
+      <FormStatus state={addFeedback.state} className="pt-2" />
 
       <ImagePickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={addPicked} title={pickerTitle} description={ASSET_KIND_LABELS[addKind]} />
 
@@ -263,6 +274,7 @@ function AssetTile({
   onRole,
   onDelete,
   onRedo,
+  status,
   extra,
 }: {
   kit: BrandKit;
@@ -276,6 +288,8 @@ function AssetTile({
   onRole: (role: AssetRole) => void;
   onDelete: () => void;
   onRedo: () => void;
+  /** Échec d'une action sur cette image. */
+  status?: FeedbackState | null;
   extra?: ReactNode;
 }) {
   const url = kitAssetUrl(kit.id, asset.file);
@@ -362,6 +376,7 @@ function AssetTile({
             </span>
           )}
           {extra}
+          <ActionStatus state={status ?? null} className="max-w-full text-[11px] empty:hidden" />
         </AttachmentContent>
         <AttachmentActions>
           <ObjectMenuButton

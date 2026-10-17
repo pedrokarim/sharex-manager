@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -29,10 +29,17 @@ interface SettingsDialogProps {
 export function SettingsDialog({ open, onOpenChange, title, description, value, onSave }: SettingsDialogProps) {
   const [draft, setDraft] = useState(value);
   const [busy, setBusy] = useState(false);
+  // L'échec s'affiche au-dessus du bouton ; changer un réglage l'efface (les listes ne passent pas par `onChange`).
+  const feedback = useFeedback();
+  const clearFeedback = feedback.clear;
 
   useEffect(() => {
     if (open) setDraft(value);
   }, [open, value]);
+
+  useEffect(() => {
+    clearFeedback();
+  }, [draft, clearFeedback]);
 
   // Une langue cible saisie ailleurs, absente de la liste, reste proposée.
   const targets = useMemo(
@@ -51,11 +58,12 @@ export function SettingsDialog({ open, onOpenChange, title, description, value, 
     event.preventDefault();
     if (busy) return;
     setBusy(true);
+    feedback.clear();
     try {
       await onSave(draft);
       onOpenChange(false);
     } catch (error) {
-      toast.error(errorMessage(error, "Enregistrement des réglages impossible."));
+      feedback.error(errorMessage(error, "Les réglages n’ont pas pu être enregistrés. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -145,14 +153,17 @@ export function SettingsDialog({ open, onOpenChange, title, description, value, 
             </RadioGroup>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Annuler
-            </Button>
-            <Button type="submit" disabled={busy}>
-              Enregistrer
-            </Button>
-          </DialogFooter>
+          <div>
+            <FormStatus state={feedback.state} className="pb-4" />
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={busy}>
+                Enregistrer
+              </Button>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

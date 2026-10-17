@@ -13,9 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Copy, QrCode } from "lucide-react";
-import { toast } from "sonner";
+import { Check, Copy, QrCode, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import QRCode from "qrcode";
 
 interface ApiKeyDetailsDialogProps {
@@ -30,6 +30,8 @@ export function ApiKeyDetailsDialog({
   onOpenChange,
 }: ApiKeyDetailsDialogProps) {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
+  // La copie se lit sur le bouton « Copier » lui-même.
+  const { hasCopied, copyFailed, copyToClipboard } = useCopyToClipboard();
 
   useEffect(() => {
     if (apiKey && open) {
@@ -73,11 +75,6 @@ export function ApiKeyDetailsDialog({
       DeletionURL: "{json:deletion_url}",
       ErrorMessage: "{json:error}",
     };
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Configuration copiée dans le presse-papier");
   };
 
   const generateQRCodeData = () => {
@@ -239,8 +236,14 @@ export function ApiKeyDetailsDialog({
                       )
                     }
                   >
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copier
+                    {hasCopied ? (
+                      <Check className="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    ) : copyFailed ? (
+                      <X className="mr-2 h-4 w-4 text-destructive" />
+                    ) : (
+                      <Copy className="mr-2 h-4 w-4" />
+                    )}
+                    {hasCopied ? "Copié" : copyFailed ? "Copie impossible" : "Copier"}
                   </Button>
                 </div>
                 <pre className="max-h-[40svh] overflow-auto rounded-xl border border-border/60 bg-muted/20 p-4 text-xs sm:text-sm">

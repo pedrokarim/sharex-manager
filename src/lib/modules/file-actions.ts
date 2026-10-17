@@ -18,7 +18,6 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { toast } from "sonner";
 
 /** Action d'un module qui ouvre l'une de ses pages avec les fichiers choisis. */
 export interface ModuleLinkAction {
@@ -133,16 +132,25 @@ export function linkActionHref(action: ModuleLinkAction, fileNames: string[]) {
   return `${action.href}?${params.toString()}`;
 }
 
+/** Bilan d'un module appliqué à une série de fichiers. */
+export interface ProcessorRunResult {
+  succeeded: number;
+  /** « fichier : raison », un par fichier en échec. */
+  failures: string[];
+}
+
 /**
  * Applique un module sans réglages à une série de fichiers, un par un. Chaque
  * fichier produit une nouvelle version, que la galerie reçoit en direct.
+ *
+ * N'affiche rien : `onProgress` suit l'avancement et le bilan est rendu, pour
+ * que l'appelant le dise là où l'action a été lancée.
  */
-export async function runProcessorOnFiles(moduleName: string, fileNames: string[]) {
-  const toastId = toast.loading(
-    fileNames.length > 1
-      ? `${moduleName} : 0 sur ${fileNames.length}`
-      : `${moduleName} en cours…`
-  );
+export async function runProcessorOnFiles(
+  moduleName: string,
+  fileNames: string[],
+  { onProgress }: { onProgress?: (done: number, total: number) => void } = {}
+): Promise<ProcessorRunResult> {
   let succeeded = 0;
   const failures: string[] = [];
 
@@ -161,24 +169,10 @@ export async function runProcessorOnFiles(moduleName: string, fileNames: string[
     } catch (error) {
       failures.push(`${fileName} : ${error instanceof Error ? error.message : "échec"}`);
     }
-    if (fileNames.length > 1) {
-      toast.loading(`${moduleName} : ${index + 1} sur ${fileNames.length}`, { id: toastId });
-    }
+    onProgress?.(index + 1, fileNames.length);
   }
 
-  if (failures.length === 0) {
-    toast.success(
-      succeeded > 1
-        ? `${moduleName} appliqué à ${succeeded} fichiers`
-        : `${moduleName} appliqué`,
-      { id: toastId }
-    );
-  } else {
-    toast.error(
-      `${moduleName} : ${failures.length} échec(s) sur ${fileNames.length}`,
-      { id: toastId, description: failures.slice(0, 3).join("\n") }
-    );
-  }
+  return { succeeded, failures };
 }
 
 /** Événement écouté par l'hôte des réglages de module, monté dans la mise en page. */

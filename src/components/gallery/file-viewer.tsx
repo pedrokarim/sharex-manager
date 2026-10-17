@@ -35,6 +35,7 @@ import { VisuallyHidden } from "../ui/visually-hidden";
 import { useTranslation } from "@/lib/i18n";
 import { FileAlbumsSection } from "@/components/gallery/file-albums-section";
 import { toast } from "sonner";
+import { readApiError } from "@/lib/utils/chunk";
 import { ModuleActions } from "./module-actions";
 import { GalleryProvenanceSection } from "./gallery-provenance";
 import { DownloadMenu } from "./download-menu";
@@ -100,6 +101,8 @@ function FileViewerBody({
   const router = useRouter();
   const [isAddToAlbumDialogOpen, setIsAddToAlbumDialogOpen] = useState(false);
   const [isCreateAlbumDialogOpen, setIsCreateAlbumDialogOpen] = useState(false);
+  // Recharge la section « Albums » : l'album ajouté y apparaît.
+  const [albumsVersion, setAlbumsVersion] = useState(0);
 
   const fileName = file?.name ?? loadingName ?? "";
   const formattedDate = file
@@ -152,40 +155,45 @@ function FileViewerBody({
       return;
     }
 
-    try {
-      const response = await fetch("/api/albums", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
+    // Un échec de création remonte à `CreateAlbumDialog`, qui l'affiche dans
+    // sa fenêtre, restée ouverte.
+    const response = await fetch("/api/albums", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
 
-      if (!response.ok) {
-        throw new Error("Erreur lors de la création de l'album");
-      }
-
-      const albumData = await response.json();
-      const addFileResponse = await fetch(`/api/albums/${albumData.id}/files`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fileNames: [file.name],
-        }),
-      });
-
-      if (!addFileResponse.ok) {
-        throw new Error("Erreur lors de l'ajout du fichier à l'album");
-      }
-
-      toast.success(t("albums.create_success"));
-      setIsCreateAlbumDialogOpen(false);
-    } catch (error) {
-      console.error("Erreur lors de la création de l'album:", error);
-      toast.error(t("albums.create_error"));
+    if (!response.ok) {
+      throw new Error(
+        await readApiError(response, "L’album n’a pas pu être créé. Réessayez."),
+      );
     }
+
+    const albumData = await response.json();
+    const addFileResponse = await fetch(`/api/albums/${albumData.id}/files`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fileNames: [file.name],
+      }),
+    }).catch(() => null);
+
+    // L'album existe désormais : la fenêtre se ferme dans tous les cas, pour
+    // ne pas en créer un second en réessayant.
+    setIsCreateAlbumDialogOpen(false);
+    setAlbumsVersion((version) => version + 1);
+
+    if (!addFileResponse?.ok) {
+      // La fenêtre a disparu : seul un toast peut encore le dire.
+      toast.error(
+        `L’album « ${albumData.name ?? data.name} » a été créé, mais le fichier n’a pas pu y être ajouté. Ajoutez-le depuis « Ajouter à un album ».`,
+      );
+    }
+    // Sinon, le nouvel album apparaît dans la section « Albums » : pas d'autre message.
   };
 
   return (
@@ -464,6 +472,7 @@ function FileViewerBody({
                       fileName={file.name}
                       onAddToAlbum={() => setIsAddToAlbumDialogOpen(true)}
                       onCreateAlbum={() => setIsCreateAlbumDialogOpen(true)}
+                      version={albumsVersion}
                     />
                   </div>
                 </aside>
@@ -569,7 +578,7 @@ function FileViewerBody({
         open={isAddToAlbumDialogOpen}
         onClose={() => setIsAddToAlbumDialogOpen(false)}
         selectedFiles={file ? [file.name] : []}
-        onSuccess={() => {}}
+        onSuccess={() => setAlbumsVersion((version) => version + 1)}
       />
 
       <CreateAlbumDialog

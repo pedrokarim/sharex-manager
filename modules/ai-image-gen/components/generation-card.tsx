@@ -14,7 +14,7 @@ import {
   Wand2,
   ZoomIn,
 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -69,14 +69,18 @@ export function GenerationCard({
 }: GenerationCardProps) {
   const [busy, setBusy] = useState(false);
   const [favorite, setFavorite] = useState(Boolean(item.favorite));
+  // Le retour d'une action se lit sur la carte, au pied, à côté de ses
+  // boutons : pas au coin de l'écran.
+  const feedback = useFeedback();
   const ratio = aspectRatioOf(item.size);
 
   const run = async (task: () => Promise<void>) => {
     setBusy(true);
+    feedback.clear();
     try {
       await task();
-    } catch (error: any) {
-      toast.error(error?.message ?? "Action impossible");
+    } catch (error) {
+      feedback.error(errorMessage(error, "L’action n’a pas abouti. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -98,7 +102,7 @@ export function GenerationCard({
         item.id,
         file
       );
-      toast.success(`Ajoutée à la galerie : ${result?.fileName ?? file}`);
+      feedback.success(`Ajoutée à la galerie : ${result?.fileName ?? file}`);
       onMutate?.();
     });
 
@@ -110,14 +114,14 @@ export function GenerationCard({
         file,
         2
       );
-      toast.success(`Agrandie : ${result?.file}`);
+      feedback.success(result?.file ? `Agrandie ×2 : ${result.file}` : "Image agrandie ×2");
       onMutate?.();
     });
 
   const handleDelete = () =>
     run(async () => {
+      // La carte disparaît de la liste : c'est le retour.
       await callModule("deleteHistoryItem", item.id);
-      toast.success("Génération supprimée");
       onMutate?.();
     });
 
@@ -231,15 +235,17 @@ export function GenerationCard({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] tabular-nums text-muted-foreground">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
             {timeAgo(item.createdAt)}
             {formatDuration(item.durationMs)
               ? ` · ${formatDuration(item.durationMs)}`
               : ""}
           </span>
 
-          <div className="flex items-center gap-0.5">
+          <ActionStatus state={feedback.state} className="flex-1 justify-end" />
+
+          <div className="flex shrink-0 items-center gap-0.5">
             <Button
               variant="ghost"
               size="icon"
@@ -276,8 +282,10 @@ export function GenerationCard({
                 )}
                 <DropdownMenuItem
                   onClick={() => {
-                    void navigator.clipboard.writeText(item.prompt);
-                    toast.success("Prompt copié");
+                    navigator.clipboard.writeText(item.prompt).then(
+                      () => feedback.success("Prompt copié"),
+                      () => feedback.error("Copie impossible dans ce navigateur.")
+                    );
                   }}
                 >
                   <Copy className="mr-2 h-4 w-4" />
@@ -287,7 +295,7 @@ export function GenerationCard({
                   onClick={() =>
                     run(async () => {
                       await callModule("sendAllToGallery", item.id);
-                      toast.success("Lot envoyé dans la galerie");
+                      feedback.success("Lot envoyé dans la galerie");
                       onMutate?.();
                     })
                   }

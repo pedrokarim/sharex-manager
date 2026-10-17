@@ -9,8 +9,7 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronsUpDown, Copy, Download, ExternalLink, KeyRound, Plus, RotateCcw, Send, Undo2, X } from "lucide-react";
-import { toast } from "sonner";
+import { Check, ChevronsUpDown, Copy, CopyX, Download, ExternalLink, KeyRound, Plus, RotateCcw, Send, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CharacterCount } from "@/components/ui/character-count";
@@ -22,6 +21,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TagInput } from "@/components/ui/tag-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { ActionStatus, type FeedbackState } from "@/components/feedback";
 import { cn } from "@/lib/utils";
 import {
   PROFILE_COUNTRIES,
@@ -521,6 +522,8 @@ export interface EditableRowProps {
   error: string | null;
   access: FieldAccess;
   sending: boolean;
+  /** Résultat du dernier envoi de cet élément, affiché à côté de son état. */
+  sendStatus?: FeedbackState | null;
   choices?: LoadState<ProfileChoice[]>;
   onLoadChoices: () => void;
   onChange: (value: ProfileValue) => void;
@@ -571,6 +574,7 @@ export function EditableFieldRow(props: EditableRowProps) {
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h4 className="min-w-0 text-sm font-medium break-words">{field.label}</h4>
           {status}
+          <ActionStatus state={props.sendStatus ?? null} />
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {differsFromBrand ? (
@@ -642,25 +646,20 @@ export function EditableFieldRow(props: EditableRowProps) {
 
 /** Bouton de copie d'un texte, avec retour visible. */
 export function CopyButton({ text, label = "Copier" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
+  // Le bouton lui-même dit si la copie a réussi ; un échec y reste lisible le
+  // temps de sélectionner le texte à la main.
+  const { copyToClipboard, hasCopied, copyFailed } = useCopyToClipboard({ resetAfter: 4000 });
   return (
     <Button
       type="button"
       size="sm"
       variant="outline"
-      className="gap-1.5"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } catch {
-          toast.error("Copie impossible : sélectionnez le texte et copiez-le à la main.");
-        }
-      }}
+      className={cn("gap-1.5", copyFailed && "text-destructive")}
+      title={copyFailed ? "Copie impossible : sélectionnez le texte et copiez-le à la main." : undefined}
+      onClick={() => copyToClipboard(text)}
     >
-      {copied ? <Check className="text-emerald-600 dark:text-emerald-400" /> : <Copy />}
-      {copied ? "Copié" : label}
+      {hasCopied ? <Check className="text-emerald-600 dark:text-emerald-400" /> : copyFailed ? <CopyX /> : <Copy />}
+      <span aria-live="polite">{hasCopied ? "Copié" : copyFailed ? "Copie impossible" : label}</span>
     </Button>
   );
 }
@@ -675,6 +674,7 @@ export function ManualFieldRow({
   link,
   downloading,
   onDownload,
+  downloadStatus = null,
 }: {
   field: ProfileField;
   serviceLabel: string;
@@ -689,6 +689,8 @@ export function ManualFieldRow({
   downloading: boolean;
   /** Absent : pas d'image à télécharger (aucune marque). */
   onDownload?: () => void;
+  /** Échec du dernier téléchargement, affiché au bout des boutons. */
+  downloadStatus?: FeedbackState | null;
 }) {
   const reason = field.manual?.reason ?? `${serviceLabel} ne permet pas de le changer par son API.`;
   const hasCurrent = currentState === "ready" && current !== undefined && !isEmptyValue(current);
@@ -718,6 +720,7 @@ export function ManualFieldRow({
               <TooltipContent>{field.manual?.linkLabel ?? `Ouvrir ${serviceLabel}`}</TooltipContent>
             </Tooltip>
           ) : null}
+          <ActionStatus state={downloadStatus} />
         </div>
       </div>
       <p className="text-xs text-pretty text-muted-foreground">{reason}</p>

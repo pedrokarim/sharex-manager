@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Check, HardDrive, ImageOff, Link2, Play, Search, Upload, X, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -233,6 +234,8 @@ function ModulePane({ source, onDone }: { source: ModuleSource; onDone: () => vo
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
+  // Échec de l'import alors que la fenêtre reste ouverte : lu au-dessus du pied.
+  const feedback = useFeedback();
   const requestRef = useRef(0);
   // `t` change d'identité à chaque rendu : passé en dépendance, il relancerait
   // le chargement sans fin.
@@ -270,27 +273,36 @@ function ModulePane({ source, onDone }: { source: ModuleSource; onDone: () => vo
     return () => clearTimeout(timer);
   }, [query, load]);
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    feedback.clear();
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  };
 
   const confirm = async () => {
     setImporting(true);
+    feedback.clear();
     try {
       const result = await callModule<GallerySourceImport>(source.module, source.import, Array.from(selected));
+      const failures = result.failed.map((failure) => failure.error).join(" ; ");
       if (result.saved.length > 0) {
-        toast.success(
-          t(result.saved.length > 1 ? "gallery.add.added_many" : "gallery.add.added_one", { count: result.saved.length })
-        );
+        // La fenêtre se ferme : le bilan part dans un toast, seul endroit
+        // encore visible.
+        const added = t(result.saved.length > 1 ? "gallery.add.added_many" : "gallery.add.added_one", {
+          count: result.saved.length,
+        });
+        if (result.failed.length > 0) toast.warning(`${added}. Échec pour le reste : ${failures}`);
+        else toast.success(added);
+        onDone();
+      } else if (result.failed.length > 0) {
+        feedback.error(`Rien n’a pu être importé. ${failures}`);
       }
-      for (const failure of result.failed) toast.error(failure.error);
-      if (result.saved.length > 0) onDone();
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : t("gallery.add.source_error"));
+      feedback.error(errorMessage(reason, t("gallery.add.source_error")));
     } finally {
       setImporting(false);
     }
@@ -379,6 +391,10 @@ function ModulePane({ source, onDone }: { source: ModuleSource; onDone: () => vo
         )}
       </div>
 
+      <div className="shrink-0">
+        <FormStatus state={feedback.state} className="px-4 pb-3" />
+      </div>
+
       <footer className="flex items-center justify-between gap-3 border-t bg-muted/30 px-4 py-3">
         <span className="truncate text-xs text-muted-foreground">
           {selected.size === 0
@@ -401,6 +417,9 @@ function LinkPane({ onDone }: { onDone: () => void }) {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  // Liens importés alors que d'autres ont échoué : la fenêtre reste ouverte,
+  // le bilan se lit au-dessus des erreurs.
+  const [partialAdded, setPartialAdded] = useState(0);
 
   const links = text
     .split(/\s+/)
@@ -431,11 +450,13 @@ function LinkPane({ onDone }: { onDone: () => void }) {
     }
     setLoading(false);
     setErrors(failures);
+    setPartialAdded(failures.length > 0 ? added : 0);
     // Les liens refusés restent dans le champ, pour être corrigés.
     setText(remaining.join("\n"));
-    if (added > 0) {
+    if (added > 0 && failures.length === 0) {
+      // La fenêtre se ferme : le bilan part dans un toast.
       toast.success(t(added > 1 ? "gallery.add.added_many" : "gallery.add.added_one", { count: added }));
-      if (failures.length === 0) onDone();
+      onDone();
     }
   };
 
@@ -464,6 +485,12 @@ function LinkPane({ onDone }: { onDone: () => void }) {
         {loading ? <Spinner className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
         {t(links.length > 1 ? "gallery.add.link_import_many" : "gallery.add.link_import_one", { count: links.length })}
       </Button>
+      {partialAdded > 0 && (
+        <p className="text-xs text-emerald-700 dark:text-emerald-400">
+          {t(partialAdded > 1 ? "gallery.add.added_many" : "gallery.add.added_one", { count: partialAdded })}.
+          {" "}Les liens restés dans le champ ont échoué.
+        </p>
+      )}
       {errors.length > 0 && (
         <ul className="space-y-1 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {errors.map((error) => (

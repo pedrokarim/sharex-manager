@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
+import { ActionStatus, FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { ArrowUpRight, Download, Package, Trash2 } from "lucide-react";
 import { ModuleConfig } from "@/types/modules";
 import { Card } from "@/components/ui/card";
@@ -47,10 +48,17 @@ interface ModuleCardProps {
 export const ModuleCard = ({ module, onToggle, onDelete, onAutoProcessChange }: ModuleCardProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [savingAuto, setSavingAuto] = useState(false);
+  // Échec d'un interrupteur (activation, application automatique) : dit dans
+  // le pied de la carte ; la réussite se voit à l'interrupteur lui-même.
+  const cardFeedback = useFeedback();
+  // Échec de la suppression : la confirmation reste ouverte et le dit.
+  const deleteFeedback = useFeedback();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const processesImages = Boolean(module.capabilities?.includes("processImage")) && !module.manualOnly;
 
   const handleAutoProcess = async (enabled: boolean) => {
     setSavingAuto(true);
+    cardFeedback.clear();
     try {
       const response = await fetch(`/api/modules/${encodeURIComponent(module.name)}/auto-process`, {
         method: "POST",
@@ -62,13 +70,8 @@ export const ModuleCard = ({ module, onToggle, onDelete, onAutoProcessChange }: 
         throw new Error(data?.error ?? "Enregistrement impossible");
       }
       onAutoProcessChange?.(module.name, enabled);
-      toast.success(
-        enabled
-          ? `${module.name} s'appliquera à chaque capture envoyée`
-          : `${module.name} ne s'applique plus aux envois`
-      );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Enregistrement impossible");
+      cardFeedback.error(errorMessage(error, "Réglage non enregistré. Réessayez."));
     } finally {
       setSavingAuto(false);
     }
@@ -87,12 +90,12 @@ export const ModuleCard = ({ module, onToggle, onDelete, onAutoProcessChange }: 
   const handleToggle = async () => {
     try {
       setIsLoading(true);
+      cardFeedback.clear();
       await onToggle(module.name);
-      toast.success(
-        `Module ${module.name} ${module.enabled ? "désactivé" : "activé"}`
-      );
     } catch (error) {
-      toast.error(`Impossible de changer l'état du module ${module.name}`);
+      cardFeedback.error(
+        module.enabled ? "Désactivation impossible. Réessayez." : "Activation impossible. Réessayez."
+      );
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -102,10 +105,14 @@ export const ModuleCard = ({ module, onToggle, onDelete, onAutoProcessChange }: 
   const handleDelete = async () => {
     try {
       setIsLoading(true);
+      deleteFeedback.clear();
+      // En cas de réussite, la carte quitte la liste : pas d'autre message.
       await onDelete(module.name);
-      toast.success(`Module ${module.name} supprimé`);
+      setConfirmDelete(false);
     } catch (error) {
-      toast.error(`Impossible de supprimer le module ${module.name}`);
+      deleteFeedback.error(
+        errorMessage(error, `Le module ${module.name} n’a pas pu être supprimé. Réessayez.`)
+      );
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -126,7 +133,9 @@ export const ModuleCard = ({ module, onToggle, onDelete, onAutoProcessChange }: 
         throw new Error(data.error || "Installation des dépendances impossible");
       }
 
-      toast.success(`Dépendances installées pour ${module.name}`);
+      // L'installation peut durer : la fenêtre surgissante a pu être refermée
+      // entre-temps, le toast reste le seul endroit sûr pour le bilan.
+      toast.success(`Dépendances de ${module.name} installées.`);
     } catch (error) {
       console.error("Erreur lors de l'installation des dépendances :", error);
       toast.error(
@@ -320,7 +329,16 @@ export const ModuleCard = ({ module, onToggle, onDelete, onAutoProcessChange }: 
           </span>
         )}
 
-        <AlertDialog>
+        <div className="flex min-w-0 items-center justify-end gap-2">
+        <ActionStatus state={cardFeedback.state} />
+        <AlertDialog
+          open={confirmDelete}
+          onOpenChange={(open) => {
+            if (isLoading) return;
+            setConfirmDelete(open);
+            if (!open) deleteFeedback.clear();
+          }}
+        >
           <AlertDialogTrigger asChild>
             <Button
               variant="ghost"
@@ -342,14 +360,26 @@ export const ModuleCard = ({ module, onToggle, onDelete, onAutoProcessChange }: 
                 l&apos;instance. Cette action est définitive.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            {/* Marge annulée : l'écart de la grille s'ouvre avec le message. */}
+            <div className="-mt-4">
+              <FormStatus state={deleteFeedback.state} className="pt-4" />
+            </div>
             <AlertDialogFooter>
               <AlertDialogCancel>Annuler</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>
+              <AlertDialogAction
+                // La fenêtre se ferme après la réussite seulement.
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleDelete();
+                }}
+                disabled={isLoading}
+              >
                 Supprimer
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        </div>
       </div>
     </Card>
   );

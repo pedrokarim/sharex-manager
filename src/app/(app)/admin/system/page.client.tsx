@@ -18,7 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/lib/i18n";
 import { useState } from "react";
-import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 
 interface ModuleDependencyResult {
   name: string;
@@ -33,9 +33,12 @@ export default function SystemPageClient() {
   const [dependencyResults, setDependencyResults] = useState<
     ModuleDependencyResult[]
   >([]);
+  // Le bilan de l'installation s'affiche sous son bouton, au-dessus du détail.
+  const installFeedback = useFeedback({ successDuration: 6000 });
   const installAllModuleDependencies = async () => {
     setIsInstallingDependencies(true);
     setDependencyResults([]);
+    installFeedback.clear();
 
     try {
       const response = await fetch("/api/modules/install-all-dependencies", {
@@ -57,13 +60,17 @@ export default function SystemPageClient() {
       setDependencyResults(data.results || []);
 
       if (data.success) {
-        toast.success("Installation des dépendances terminée");
+        installFeedback.success("Les dépendances de tous les modules sont installées.");
       } else {
-        toast.error("Erreur lors de l'installation des dépendances");
+        installFeedback.error(
+          "Certains modules n’ont pas pu installer leurs dépendances. Le détail est ci-dessous.",
+        );
       }
     } catch (error) {
       console.error("Erreur lors de l'installation des dépendances:", error);
-      toast.error("Erreur lors de l'installation des dépendances");
+      installFeedback.error(
+        errorMessage(error, "L’installation des dépendances a échoué. Réessayez."),
+      );
     } finally {
       setIsInstallingDependencies(false);
     }
@@ -91,16 +98,19 @@ export default function SystemPageClient() {
                 Installez les dépendances NPM de tous les modules en une seule
                 fois.
               </p>
-              <Button
-                onClick={installAllModuleDependencies}
-                loading={isInstallingDependencies}
-                className="text-sm"
-              >
-                <Package />
-                {isInstallingDependencies
-                  ? "Installation en cours…"
-                  : "Installer toutes les dépendances"}
-              </Button>
+              <div>
+                <Button
+                  onClick={installAllModuleDependencies}
+                  loading={isInstallingDependencies}
+                  className="text-sm"
+                >
+                  <Package />
+                  {isInstallingDependencies
+                    ? "Installation en cours…"
+                    : "Installer toutes les dépendances"}
+                </Button>
+                <FormStatus state={installFeedback.state} className="pt-3" />
+              </div>
 
               {dependencyResults.length > 0 && (
                 <div className="mt-4 rounded-xl border border-border/60 bg-background p-3 sm:p-4">

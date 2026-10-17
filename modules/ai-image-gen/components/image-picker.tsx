@@ -5,6 +5,7 @@ import type { DateRange } from "react-day-picker";
 import {
   CalendarDays,
   Check,
+  CircleAlert,
   CloudUpload,
   HardDrive,
   ImageOff,
@@ -14,7 +15,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -102,29 +103,39 @@ export function ImagePicker({
   const [source, setSource] = useState<PickerSource>(initialSource);
   const [selected, setSelected] = useState<Tile[]>([]);
   const [importing, setImporting] = useState(false);
+  // Retour de la sélection (limite atteinte, import refusé) : dans le pied
+  // de la fenêtre, à côté du compte des images choisies et de « Joindre ».
+  const footer = useFeedback();
+  const clearFooter = footer.clear;
 
   useEffect(() => {
     if (open) {
       setSource(initialSource);
       setSelected([]);
+      clearFooter();
     }
-  }, [open, initialSource]);
+  }, [open, initialSource, clearFooter]);
 
   const toggle = useCallback(
     (tile: Tile) => {
-      setSelected((current) => {
-        if (current.some((entry) => entry.key === tile.key)) {
-          return current.filter((entry) => entry.key !== tile.key);
-        }
-        if (maxSelection <= 1) return [tile];
-        if (current.length >= maxSelection) {
-          toast.info(`${maxSelection} image(s) au maximum pour ce moteur`);
-          return current;
-        }
-        return [...current, tile];
-      });
+      clearFooter();
+      if (selected.some((entry) => entry.key === tile.key)) {
+        setSelected(selected.filter((entry) => entry.key !== tile.key));
+        return;
+      }
+      if (maxSelection <= 1) {
+        setSelected([tile]);
+        return;
+      }
+      if (selected.length >= maxSelection) {
+        footer.info(`${maxSelection} images au maximum pour ce moteur. Retirez-en une pour en choisir une autre.`);
+        return;
+      }
+      setSelected([...selected, tile]);
     },
-    [maxSelection]
+    // `footer.info` garde le même effet d'un rendu à l'autre.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selected, maxSelection, clearFooter]
   );
 
   const finish = useCallback(
@@ -138,6 +149,7 @@ export function ImagePicker({
 
   const confirmTiles = async () => {
     setImporting(true);
+    footer.clear();
     try {
       const images = await Promise.all(
         selected.map(async (tile) => ({
@@ -146,8 +158,8 @@ export function ImagePicker({
         }))
       );
       finish(images);
-    } catch (error: any) {
-      toast.error(error?.message ?? "Import de l'image impossible");
+    } catch (error) {
+      footer.error(errorMessage(error, "Les images choisies n’ont pas pu être importées. Réessayez."));
     } finally {
       setImporting(false);
     }
@@ -253,11 +265,12 @@ export function ImagePicker({
                       />
                     ))}
                   </div>
-                  <span className="truncate text-xs text-muted-foreground">
+                  <span className="shrink-0 text-xs text-muted-foreground">
                     {selected.length} sur {maxSelection}
                   </span>
                 </>
               )}
+              <ActionStatus state={footer.state} className="ml-1" />
             </div>
             <div className="flex shrink-0 gap-2">
               <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
@@ -465,6 +478,7 @@ function UploadsBrowser({
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const request = useRef(0);
 
   const load = useCallback(
@@ -482,6 +496,7 @@ function UploadsBrowser({
       if (start) params.set("start", start.toISOString());
       if (end) params.set("end", end.toISOString());
 
+      setLoadError(null);
       try {
         const response = await fetch(`/api/files?${params}`, { cache: "no-store" });
         if (!response.ok) throw new Error();
@@ -508,7 +523,9 @@ function UploadsBrowser({
         setTotal(payload.total);
         setPage(targetPage);
       } catch {
-        if (ticket === request.current) toast.error("Chargement des uploads impossible");
+        if (ticket === request.current) {
+          setLoadError("Vos captures n’ont pas pu être chargées. Vérifiez votre connexion, puis réessayez.");
+        }
       } finally {
         if (ticket === request.current) setLoading(false);
       }
@@ -536,6 +553,8 @@ function UploadsBrowser({
         onLoadMore={() => load(page + 1)}
         summary={loading && page === 1 ? null : `${total} fichier(s)`}
         emptyLabel="Aucune image ne correspond à ces critères."
+        error={loadError}
+        onRetry={() => void load(tiles.length ? page + 1 : 1)}
       />
     </>
   );
@@ -553,15 +572,18 @@ function StudioBrowser({
   const [filters, setFilters] = useState<BrowserFilters>({ query: "", preset: "all" });
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
   const [visible, setVisible] = useState(48);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    setLoadError(null);
     callModule<HistoryItem[]>("getHistory", 1000)
       .then(setHistory)
       .catch(() => {
         setHistory([]);
-        toast.error("Chargement des rendus impossible");
+        setLoadError("Les rendus du studio n’ont pas pu être chargés. Réessayez.");
       });
-  }, []);
+  }, [attempt]);
 
   useEffect(() => setVisible(48), [filters]);
 
@@ -604,6 +626,11 @@ function StudioBrowser({
         onLoadMore={() => setVisible((count) => count + 48)}
         summary={history === null ? null : `${tiles.length} rendu(s)`}
         emptyLabel="Aucun rendu ne correspond à ces critères."
+        error={loadError}
+        onRetry={() => {
+          setHistory(null);
+          setAttempt((count) => count + 1);
+        }}
       />
     </>
   );
@@ -620,6 +647,8 @@ function TileGrid({
   onLoadMore,
   summary,
   emptyLabel,
+  error = null,
+  onRetry,
 }: {
   tiles: Tile[];
   selected: Tile[];
@@ -629,6 +658,9 @@ function TileGrid({
   onLoadMore: () => void;
   summary: string | null;
   emptyLabel: string;
+  /** Échec du chargement : affiché dans la grille, avec de quoi réessayer. */
+  error?: string | null;
+  onRetry?: () => void;
 }) {
   const sentinel = useRef<HTMLDivElement>(null);
 
@@ -636,7 +668,7 @@ function TileGrid({
   // page suivante dès qu'elle approche de la zone visible.
   useEffect(() => {
     const node = sentinel.current;
-    if (!node || !hasMore || loading) return;
+    if (!node || !hasMore || loading || error) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) onLoadMore();
@@ -645,11 +677,26 @@ function TileGrid({
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasMore, loading, onLoadMore]);
+  }, [hasMore, loading, error, onLoadMore]);
 
   const groups = useMemo(() => groupByDay(tiles), [tiles]);
 
+  const retry = error && onRetry && (
+    <Button variant="outline" size="sm" onClick={onRetry}>
+      Réessayer
+    </Button>
+  );
+
   if (!loading && tiles.length === 0) {
+    if (error) {
+      return (
+        <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-sm text-destructive">
+          <CircleAlert className="h-8 w-8 opacity-60" />
+          <p className="max-w-sm break-words">{error}</p>
+          {retry}
+        </div>
+      );
+    }
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
         <ImageOff className="h-8 w-8 opacity-40" />
@@ -741,6 +788,13 @@ function TileGrid({
           ))}
         </div>
       )}
+      {error && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 pt-4 text-sm text-destructive">
+          <CircleAlert className="h-4 w-4 shrink-0" />
+          <p className="min-w-0 flex-1 break-words">{error}</p>
+          {retry}
+        </div>
+      )}
       <div ref={sentinel} className="h-1" />
     </div>
   );
@@ -774,13 +828,16 @@ function DevicePane({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+  // Fichier refusé ou illisible : sous la zone de dépôt.
+  const feedback = useFeedback();
 
   const read = async (files: FileList | File[] | null) => {
+    feedback.clear();
     const images = Array.from(files ?? []).filter((file) =>
       file.type.startsWith("image/")
     );
     if (!images.length) {
-      toast.error("Aucune image dans la sélection");
+      feedback.error("Aucune image dans la sélection. Choisissez un fichier PNG, JPEG ou WebP.");
       return;
     }
     try {
@@ -793,12 +850,12 @@ function DevicePane({
         )
       );
     } catch {
-      toast.error("Lecture du fichier impossible");
+      feedback.error("Le fichier n’a pas pu être lu. Essayez-en un autre.");
     }
   };
 
   return (
-    <div className="flex flex-1 p-4 md:p-6">
+    <div className="flex flex-1 flex-col p-4 md:p-6">
       <input
         ref={input}
         type="file"
@@ -842,6 +899,7 @@ function DevicePane({
           </span>
         </span>
       </button>
+      <FormStatus state={feedback.state} className="pt-3" />
     </div>
   );
 }

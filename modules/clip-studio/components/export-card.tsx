@@ -4,7 +4,8 @@
  * Carte d'un export : vignette (couverture, sinon la vidéo qui se lit au
  * survol), nom, durée, poids et, quand on les connaît, les services où il a
  * été publié. Un clic ouvre sa fiche ; le menu contextuel garde les gestes
- * rapides.
+ * rapides. Ces gestes n'ont pas d'autre endroit où répondre : leurs échecs
+ * passent par un toast ; une suppression réussie se voit (la carte part).
  */
 
 import Link from "next/link";
@@ -13,6 +14,7 @@ import { toast } from "sonner";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ServiceLogo } from "@/components/connections/shared";
+import { errorMessage } from "@/components/feedback";
 import type { ConnectorInfo, PublishJobSummary } from "@/lib/connections/types";
 import type { ClipExport } from "../engine/types";
 import { callModule, exportUrl, formatMegabytes, sendExportToGallery } from "../lib/client";
@@ -129,10 +131,10 @@ export function ExportCard({
             onClick={async () => {
               try {
                 await sendExportToGallery(entry.id);
-                toast.success("Clip ajouté à la galerie");
+                toast.success("Clip ajouté à la galerie.");
                 onChanged();
               } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Envoi impossible");
+                toast.error(errorMessage(error, "L’envoi dans la galerie a échoué. Réessayez."));
               }
             }}
           >
@@ -146,10 +148,9 @@ export function ExportCard({
           onClick={async () => {
             try {
               await callModule("deleteExport", entry.id);
-              toast.success("Export supprimé");
               onChanged();
             } catch (error) {
-              toast.error(error instanceof Error ? error.message : "Suppression impossible");
+              toast.error(errorMessage(error, "L’export n’a pas pu être supprimé. Réessayez."));
             }
           }}
         >

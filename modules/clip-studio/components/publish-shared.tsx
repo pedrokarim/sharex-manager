@@ -14,8 +14,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CircleAlert, CircleCheck, CircleDashed, ExternalLink, KeyRound, RotateCcw, ShieldAlert, SquareArrowOutUpRight, X } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ActionStatus, useFeedback } from "@/components/feedback";
 import { Progress } from "@/components/ui/progress";
 import {
   StepTimeline,
@@ -351,11 +351,18 @@ export function JobTimeline({
   showDate?: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
+  // L'échec de « Reprendre » ou « Annuler » s'écrit sur la ligne du travail concerné.
+  const feedback = useFeedback();
+  const [feedbackJob, setFeedbackJob] = useState<string | null>(null);
   const act = async (id: string, action: typeof retryJobAction) => {
     setBusy(id);
+    feedback.clear();
     const result = await action(id);
     setBusy(null);
-    if (!result.ok) toast.error(result.error);
+    if (!result.ok) {
+      setFeedbackJob(id);
+      feedback.error(result.error || "L’action n’a pas abouti. Réessayez dans un instant.");
+    }
     onChanged();
   };
   return (
@@ -423,6 +430,7 @@ export function JobTimeline({
                   Voir dans la fiche du compte
                   <SquareArrowOutUpRight className="size-3" />
                 </Link>
+                <ActionStatus state={feedbackJob === job.id ? feedback.state : null} className="max-w-full empty:hidden" />
               </div>
             </StepTimelineContent>
           </StepTimelineItem>

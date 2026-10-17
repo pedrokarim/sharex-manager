@@ -36,7 +36,8 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { nanoid } from "nanoid";
-import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
+import { readApiError } from "@/lib/utils/chunk";
 
 const formSchema = z.object({
   name: z.string().min(1, "Le nom est requis"),
@@ -78,7 +79,12 @@ export function CreateApiKeyDialog({
     },
   });
 
+  // L'échec se lit dans la fenêtre, au-dessus du bouton ; la réussite se voit
+  // à la nouvelle clé dans la liste.
+  const feedback = useFeedback();
+
   const onSubmit = async (data: FormValues) => {
+    feedback.clear();
     try {
       const response = await fetch("/api/api-keys", {
         method: "POST",
@@ -86,15 +92,18 @@ export function CreateApiKeyDialog({
         body: JSON.stringify(data),
       });
 
-      if (!response.ok) throw new Error();
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(response, "La clé n’a pas pu être créée. Réessayez."),
+        );
+      }
 
-      toast.success("Clé API créée avec succès");
       onSuccess();
       onOpenChange(false);
       form.reset();
     } catch (error) {
       console.error("Erreur lors de la création de la clé:", error);
-      toast.error("Erreur lors de la création de la clé");
+      feedback.error(errorMessage(error, "La clé n’a pas pu être créée. Réessayez."));
     }
   };
 
@@ -109,7 +118,12 @@ export function CreateApiKeyDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-0">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            // Corriger sa saisie retire le message d'erreur.
+            onChange={feedback.state?.tone === "error" ? feedback.clear : undefined}
+            className="space-y-0"
+          >
             <div className="space-y-4 px-5 py-5 sm:px-6">
               <FormField
                 control={form.control}
@@ -274,8 +288,14 @@ export function CreateApiKeyDialog({
               </div>
             </div>
 
+            <FormStatus state={feedback.state} className="px-5 pb-4 sm:px-6" />
+
             <DialogFooter className="border-t border-border/60 px-5 py-4 sm:px-6">
-              <Button type="submit" className="w-full sm:w-auto">
+              <Button
+                type="submit"
+                className="w-full sm:w-auto"
+                loading={form.formState.isSubmitting}
+              >
                 Créer la clé
               </Button>
             </DialogFooter>

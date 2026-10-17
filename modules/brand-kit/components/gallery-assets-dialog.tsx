@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,14 +35,18 @@ export function GalleryAssetsDialog({
   const [newName, setNewName] = useState("");
   const [kind, setKind] = useState<AssetKind>("logo");
   const [progress, setProgress] = useState<number | null>(null);
+  // Un échec avant toute copie laisse la fenêtre ouverte : il s'y lit, au-dessus des boutons.
+  const feedback = useFeedback();
+  const { clear: clearFeedback } = feedback;
 
   useEffect(() => {
     if (!open || !kits) return;
+    clearFeedback();
     setKitId((kits.find((kit) => kit.isDefault) ?? kits[0])?.id ?? NEW_KIT);
     setKind(files && files.length > 1 ? "reference" : "logo");
     setNewName("");
     setProgress(null);
-  }, [open, kits, files]);
+  }, [open, kits, files, clearFeedback]);
 
   const count = files?.length ?? 0;
   const ready = kitId === NEW_KIT ? Boolean(newName.trim()) : Boolean(kitId);
@@ -49,6 +54,7 @@ export function GalleryAssetsDialog({
   const submit = async () => {
     if (!files || !ready || progress !== null) return;
     setProgress(0);
+    feedback.clear();
     try {
       const target = kitId === NEW_KIT ? (await api.createKit({ name: newName.trim() })).id : kitId;
       const failures: string[] = [];
@@ -61,11 +67,14 @@ export function GalleryAssetsDialog({
         setProgress(index + 1);
       }
       const added = files.length - failures.length;
-      if (added > 0) toast.success(added > 1 ? `${added} images ajoutées à la marque` : "Image ajoutée à la marque");
-      if (failures.length > 0) toast.error(failures[0]);
+      // La fenêtre se ferme et l'éditeur de la marque s'ouvre : le bilan suit dans un toast.
+      if (added > 0) toast.success(added > 1 ? `${added} images ajoutées à la marque.` : "Image ajoutée à la marque.");
+      if (failures.length > 0) {
+        toast.error(failures.length > 1 ? `${failures.length} images n’ont pas pu être ajoutées.` : "Une image n’a pas pu être ajoutée.", { description: failures[0] });
+      }
       onDone(target);
     } catch (error) {
-      toast.error(errorMessage(error, "Ajout impossible."));
+      feedback.error(errorMessage(error, "Les images n’ont pas pu être ajoutées. Réessayez."));
       setProgress(null);
     }
   };
@@ -126,11 +135,21 @@ export function GalleryAssetsDialog({
           {kitId === NEW_KIT && (
             <div className="grid gap-1.5 sm:col-span-2">
               <Label htmlFor="brand-kit-gallery-name">Nom de la nouvelle marque</Label>
-              <Input id="brand-kit-gallery-name" value={newName} onChange={(event) => setNewName(event.target.value)} maxLength={KIT_LIMITS.name} autoFocus />
+              <Input
+                id="brand-kit-gallery-name"
+                value={newName}
+                onChange={(event) => {
+                  setNewName(event.target.value);
+                  if (feedback.state?.tone === "error") feedback.clear();
+                }}
+                maxLength={KIT_LIMITS.name}
+                autoFocus
+              />
             </div>
           )}
         </div>
 
+        <FormStatus state={feedback.state} />
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={progress !== null}>
             Annuler

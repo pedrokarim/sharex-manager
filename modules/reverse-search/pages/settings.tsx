@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Check, ExternalLink, KeyRound } from "lucide-react";
-import { toast } from "sonner";
 import { BrandLogo, type Brand } from "@/components/brand-logo";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -50,16 +50,21 @@ function KeyCard({
 }) {
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
+  // La réussite se lit sur le badge de la carte (« Clé enregistrée » /
+  // « Aucune clé ») ; seule une erreur s'affiche, au-dessus du champ.
+  const feedback = useFeedback();
 
   const save = async (next: string) => {
     setSaving(true);
+    feedback.clear();
     try {
       await callModule("saveKey", entry.name, next);
       setValue("");
-      toast.success(next ? `Clé ${entry.title} enregistrée` : `Clé ${entry.title} retirée`);
       onSaved();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Enregistrement impossible.");
+      feedback.error(
+        errorMessage(error, next ? `La clé ${entry.title} n’a pas pu être enregistrée. Réessayez.` : `La clé ${entry.title} n’a pas pu être retirée. Réessayez.`)
+      );
     } finally {
       setSaving(false);
     }
@@ -81,31 +86,35 @@ function KeyCard({
         </span>
       </div>
       <p className="text-sm leading-6 text-muted-foreground">{entry.description}</p>
-      <form
-        className="flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (value.trim()) void save(value.trim());
-        }}
-      >
-        <Input
-          type="password"
-          autoComplete="off"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          disabled={status?.fromEnv || saving}
-          placeholder={status?.fromEnv ? "Définie par une variable d’environnement" : status?.configured ? "Remplacer la clé" : "Coller la clé"}
-          className="h-9 font-mono text-xs"
-        />
-        <Button type="submit" size="sm" className="h-9" loading={saving} disabled={!value.trim() || status?.fromEnv}>
-          Enregistrer
-        </Button>
-        {status?.configured && !status.fromEnv && (
-          <Button type="button" variant="ghost" size="sm" className="h-9" disabled={saving} onClick={() => void save("")}>
-            Retirer
+      <div>
+        <FormStatus state={feedback.state} className="pb-2" />
+        <form
+          className="flex gap-2"
+          onChange={feedback.state ? feedback.clear : undefined}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (value.trim()) void save(value.trim());
+          }}
+        >
+          <Input
+            type="password"
+            autoComplete="off"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            disabled={status?.fromEnv || saving}
+            placeholder={status?.fromEnv ? "Définie par une variable d’environnement" : status?.configured ? "Remplacer la clé" : "Coller la clé"}
+            className="h-9 font-mono text-xs"
+          />
+          <Button type="submit" size="sm" className="h-9" loading={saving} disabled={!value.trim() || status?.fromEnv}>
+            Enregistrer
           </Button>
-        )}
-      </form>
+          {status?.configured && !status.fromEnv && (
+            <Button type="button" variant="ghost" size="sm" className="h-9" disabled={saving} onClick={() => void save("")}>
+              Retirer
+            </Button>
+          )}
+        </form>
+      </div>
       <a href={entry.href} target="_blank" rel="noopener noreferrer" className="inline-flex w-fit items-center gap-1 text-xs font-medium text-primary hover:underline">
         {entry.hrefLabel}
         <ExternalLink className="h-3 w-3" />

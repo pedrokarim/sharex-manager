@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
-import { ArrowLeft, Images } from "lucide-react";
+import { ArrowLeft, CircleAlert, Images, RotateCw } from "lucide-react";
 
 import {
   CATALOG_STICKY_OFFSET,
@@ -22,7 +21,7 @@ import { PublicImageViewer } from "@/components/catalog/public-image-viewer";
 import { FRONT_FULL } from "@/components/front/container";
 import { DISPLAY } from "@/components/front/fonts";
 import { PhotoHeader } from "@/components/front/photo-header";
-import { ACCENT, PILL_GLASS } from "@/components/front/styles";
+import { ACCENT, PILL_GLASS, PILL_SOFT } from "@/components/front/styles";
 import { TimelineNavigator, timelineGroupProps } from "@/components/timeline/timeline-navigator";
 import { isImageFile, isVideoFile, mediaCountLabel } from "@/lib/media-kind";
 import type { PublicAlbumSummary } from "@/lib/seo-album";
@@ -64,6 +63,9 @@ export function CatalogAlbumDetailPage({ slug, summary }: CatalogAlbumDetailPage
   const [missing, setMissing] = useState(summary === null);
   const [files, setFiles] = useState<AlbumImage[]>([]);
   const [loading, setLoading] = useState(summary !== null);
+  // Un échec de chargement s'affiche à la place de la grille, avec de quoi
+  // réessayer : sans lui, la page annoncerait à tort un album vide.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [density, setDensity] = useState<Density>("normal");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -87,6 +89,7 @@ export function CatalogAlbumDetailPage({ slug, summary }: CatalogAlbumDetailPage
   const fetchAlbumData = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadFailed(false);
       const response = await fetch(`/api/public/albums/${slug}`);
 
       if (!response.ok) {
@@ -110,7 +113,7 @@ export function CatalogAlbumDetailPage({ slug, summary }: CatalogAlbumDetailPage
       setFiles(imageFiles);
     } catch (error) {
       console.error("Erreur:", error);
-      toast.error("Erreur lors du chargement de l'album");
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -204,6 +207,18 @@ export function CatalogAlbumDetailPage({ slug, summary }: CatalogAlbumDetailPage
         {loading ? (
           <div className="pt-16">
             <MediaGridSkeleton density={density} />
+          </div>
+        ) : loadFailed ? (
+          <div role="alert" className="py-24 text-center">
+            <CircleAlert className="mx-auto size-9 text-destructive" strokeWidth={1.5} />
+            <h2 className={cn(DISPLAY, "mt-5 text-3xl")}>Chargement impossible</h2>
+            <p className="mt-2 text-pretty text-muted-foreground">
+              Les images de cet album n’ont pas pu être chargées. Vérifiez votre connexion, puis réessayez.
+            </p>
+            <button type="button" onClick={fetchAlbumData} className={cn(PILL_SOFT, "mt-6")}>
+              <RotateCw className="size-4" />
+              Réessayer
+            </button>
           </div>
         ) : files.length === 0 ? (
           <div className="py-24 text-center">

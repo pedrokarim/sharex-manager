@@ -16,7 +16,7 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,9 @@ export default function SettingsPage({
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
+  // Deux actions indépendantes, chacune avec son retour à côté de son bouton.
+  const detectFeedback = useFeedback();
+  const prefsFeedback = useFeedback();
 
   const load = useCallback(async () => {
     const next = await callModule<Catalogue>("getEngineDetails");
@@ -96,11 +99,12 @@ export default function SettingsPage({
 
   const redetect = async () => {
     setDetecting(true);
+    detectFeedback.clear();
     try {
       await load();
-      toast.success("Détection terminée");
-    } catch (error: any) {
-      toast.error(error?.message ?? "Détection impossible");
+      detectFeedback.success("Détection terminée");
+    } catch (error) {
+      detectFeedback.error(errorMessage(error, "La détection n’a pas abouti. Réessayez."));
     } finally {
       setDetecting(false);
     }
@@ -111,16 +115,17 @@ export default function SettingsPage({
 
   const savePrefs = async () => {
     setSavingPrefs(true);
+    prefsFeedback.clear();
     try {
       const response = await fetch(`/api/modules/${moduleName}/settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings }),
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      toast.success("Préférences enregistrées");
-    } catch (error: any) {
-      toast.error(error?.message ?? "Enregistrement impossible");
+      if (!response.ok) throw new Error(`Les préférences n’ont pas pu être enregistrées (erreur ${response.status}). Réessayez.`);
+      prefsFeedback.success("Préférences enregistrées");
+    } catch (error) {
+      prefsFeedback.error(errorMessage(error, "Les préférences n’ont pas pu être enregistrées. Réessayez."));
     } finally {
       setSavingPrefs(false);
     }
@@ -139,14 +144,18 @@ export default function SettingsPage({
       title="Moteurs"
       description="Agents installés sur le serveur, clés API et valeurs par défaut du studio."
       actions={
-        <Button variant="outline" size="sm" onClick={redetect} disabled={detecting}>
-          {detecting ? (
-            <Spinner className="mr-2 h-4 w-4" />
-          ) : (
-            <RefreshCw className="mr-2 h-4 w-4" />
-          )}
-          Relancer la détection
-        </Button>
+        <>
+          {/* Avant le bouton : le message s'étend vers la gauche sans le déplacer. */}
+          <ActionStatus state={detectFeedback.state} className="max-w-[min(16rem,30vw)]" />
+          <Button variant="outline" size="sm" onClick={redetect} disabled={detecting}>
+            {detecting ? (
+              <Spinner className="mr-2 h-4 w-4" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            Relancer la détection
+          </Button>
+        </>
       }
     >
       <div className="grid gap-5 xl:grid-cols-2">
@@ -406,7 +415,9 @@ export default function SettingsPage({
             </FieldGroup>
           </FieldSet>
 
-          <div className="mt-6 flex justify-end">
+          <div className="mt-6 flex min-w-0 flex-wrap items-center justify-end gap-3">
+            {/* Avant le bouton : le message s'étend vers la gauche sans le déplacer. */}
+            <ActionStatus state={prefsFeedback.state} className="min-w-0 flex-1 justify-end" />
             <Button onClick={savePrefs} disabled={savingPrefs}>
               {savingPrefs && <Spinner className="mr-2 h-4 w-4" />}
               Enregistrer les préférences
@@ -429,6 +440,9 @@ function CliEngineCard({
 }) {
   const [pathDraft, setPathDraft] = useState(engine.configuredPath ?? "");
   const [busy, setBusy] = useState(false);
+  // Échec d'un réglage de la carte : affiché au pied de la carte. La réussite
+  // se lit sur le réglage lui-même (chemin appliqué, interrupteur basculé).
+  const feedback = useFeedback();
 
   useEffect(() => {
     setPathDraft(engine.configuredPath ?? "");
@@ -436,11 +450,26 @@ function CliEngineCard({
 
   const save = async (patch: Record<string, unknown>) => {
     setBusy(true);
+    feedback.clear();
     try {
       await callModule("saveCliSettings", engine.id, patch);
       await onRefresh();
-    } catch (error: any) {
-      toast.error(error?.message ?? "Enregistrement impossible");
+    } catch (error) {
+      feedback.error(errorMessage(error, "Le réglage n’a pas pu être enregistré. Réessayez."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // La carte qui disparaît confirme la suppression.
+  const remove = async () => {
+    setBusy(true);
+    feedback.clear();
+    try {
+      await callModule("deleteCustomEngine", engine.id);
+      await onRefresh();
+    } catch (error) {
+      feedback.error(errorMessage(error, "Le moteur n’a pas pu être supprimé. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -512,7 +541,10 @@ function CliEngineCard({
             id={`path-${engine.id}`}
             placeholder="détection automatique"
             value={pathDraft}
-            onChange={(event) => setPathDraft(event.target.value)}
+            onChange={(event) => {
+              setPathDraft(event.target.value);
+              if (feedback.state) feedback.clear();
+            }}
             className="h-8 font-mono text-xs"
           />
           <Button
@@ -599,16 +631,17 @@ function CliEngineCard({
             size="sm"
             className="h-7 justify-start px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
             disabled={busy}
-            onClick={async () => {
-              await callModule("deleteCustomEngine", engine.id);
-              await onRefresh();
-              toast.success("Moteur supprimé");
-            }}
+            onClick={() => void remove()}
           >
             <Trash2 className="mr-1.5 h-3.5 w-3.5" />
             Supprimer ce moteur
           </Button>
         )}
+      </div>
+
+      {/* La marge négative absorbe l'écart de la carte tant qu'il n'y a pas de message. */}
+      <div className="-mt-3">
+        <FormStatus state={feedback.state} className="pt-3" />
       </div>
     </div>
   );
@@ -637,9 +670,13 @@ function CustomEngineDialog({ onSaved }: { onSaved: () => Promise<unknown> }) {
   const [template, setTemplate] = useState("generate\n--prompt\n{prompt}\n--out-dir\n{outdir}\n--count\n{n}");
   const [sizes, setSizes] = useState("1024x1024, 1536x1024, 1024x1536");
   const [busy, setBusy] = useState(false);
+  // Échec de l'enregistrement : au-dessus du bouton. La réussite ferme la
+  // fenêtre sur la nouvelle carte.
+  const feedback = useFeedback();
 
   const save = async () => {
     setBusy(true);
+    feedback.clear();
     try {
       await callModule("saveCustomEngine", {
         label: label.trim(),
@@ -658,16 +695,21 @@ function CustomEngineDialog({ onSaved }: { onSaved: () => Promise<unknown> }) {
       setOpen(false);
       setLabel("");
       setBinary("");
-      toast.success("Moteur enregistré");
-    } catch (error: any) {
-      toast.error(error?.message ?? "Enregistrement impossible");
+    } catch (error) {
+      feedback.error(errorMessage(error, "La commande n’a pas pu être enregistrée. Vérifiez l’exécutable, puis réessayez."));
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) feedback.clear();
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
@@ -683,7 +725,7 @@ function CustomEngineDialog({ onSaved }: { onSaved: () => Promise<unknown> }) {
           </DialogDescription>
         </DialogHeader>
 
-        <FieldGroup className="gap-4">
+        <FieldGroup className="gap-4" onChange={feedback.state ? feedback.clear : undefined}>
           <Field>
             <FieldLabel htmlFor="custom-label">Nom</FieldLabel>
             <Input
@@ -738,15 +780,18 @@ function CustomEngineDialog({ onSaved }: { onSaved: () => Promise<unknown> }) {
           </Field>
         </FieldGroup>
 
-        <DialogFooter>
-          <Button
-            onClick={save}
-            disabled={busy || !label.trim() || !binary.trim()}
-          >
-            {busy && <Spinner className="mr-2 h-4 w-4" />}
-            Enregistrer
-          </Button>
-        </DialogFooter>
+        <div>
+          <FormStatus state={feedback.state} className="pb-3" />
+          <DialogFooter>
+            <Button
+              onClick={save}
+              disabled={busy || !label.trim() || !binary.trim()}
+            >
+              {busy && <Spinner className="mr-2 h-4 w-4" />}
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -767,17 +812,20 @@ function ApiKeyField({
   const [test, setTest] = useState<{ success: boolean; message: string } | null>(
     null
   );
+  // Retour de l'enregistrement, au bout de la rangée de boutons.
+  const feedback = useFeedback();
 
   const save = async () => {
     setBusy(true);
+    feedback.clear();
     try {
       await callModule("saveApiKey", engine.id, draft);
       setDraft("");
       setTest(null);
       await onSaved();
-      toast.success(draft ? "Clé enregistrée" : "Clé supprimée");
-    } catch (error: any) {
-      toast.error(error?.message ?? "Enregistrement impossible");
+      feedback.success(draft ? "Clé enregistrée" : "Clé supprimée");
+    } catch (error) {
+      feedback.error(errorMessage(error, "La clé n’a pas pu être enregistrée. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -785,6 +833,7 @@ function ApiKeyField({
 
   const runTest = async () => {
     setBusy(true);
+    feedback.clear();
     try {
       setTest(
         await callModule<{ success: boolean; message: string }>(
@@ -893,6 +942,7 @@ function ApiKeyField({
             {test.message}
           </span>
         )}
+        <ActionStatus state={feedback.state} className="min-w-0" />
       </div>
     </Field>
   );

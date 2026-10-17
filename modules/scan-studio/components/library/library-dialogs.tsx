@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -35,10 +35,15 @@ interface NameDialogProps {
 export function NameDialog({ open, onOpenChange, title, description, label, placeholder, initialValue = "", submitLabel, onSubmit }: NameDialogProps) {
   const [name, setName] = useState(initialValue);
   const [busy, setBusy] = useState(false);
+  // L'échec s'affiche dans la fenêtre, au-dessus du bouton, et s'efface dès qu'on corrige.
+  const feedback = useFeedback();
+  const clearFeedback = feedback.clear;
 
   useEffect(() => {
-    if (open) setName(initialValue);
-  }, [open, initialValue]);
+    if (!open) return;
+    setName(initialValue);
+    clearFeedback();
+  }, [open, initialValue, clearFeedback]);
 
   const trimmed = name.trim();
 
@@ -46,11 +51,12 @@ export function NameDialog({ open, onOpenChange, title, description, label, plac
     event.preventDefault();
     if (!trimmed || busy) return;
     setBusy(true);
+    feedback.clear();
     try {
       await onSubmit(trimmed);
       onOpenChange(false);
     } catch (error) {
-      toast.error(errorMessage(error, "Enregistrement impossible."));
+      feedback.error(errorMessage(error, "L’enregistrement n’a pas abouti. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -59,7 +65,7 @@ export function NameDialog({ open, onOpenChange, title, description, label, plac
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <form onSubmit={submit} className="grid gap-4">
+        <form onSubmit={submit} onChange={feedback.state?.tone === "error" ? feedback.clear : undefined} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
@@ -76,14 +82,17 @@ export function NameDialog({ open, onOpenChange, title, description, label, plac
               autoComplete="off"
             />
           </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Annuler
-            </Button>
-            <Button type="submit" disabled={!trimmed || busy}>
-              {submitLabel}
-            </Button>
-          </DialogFooter>
+          <div>
+            <FormStatus state={feedback.state} className="pb-4" />
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={!trimmed || busy}>
+                {submitLabel}
+              </Button>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
@@ -106,12 +115,15 @@ export function ChapterDialog({ open, onOpenChange, title, description, initialN
   const [number, setNumber] = useState(initialNumber);
   const [chapterTitle, setChapterTitle] = useState(initialTitle);
   const [busy, setBusy] = useState(false);
+  const feedback = useFeedback();
+  const clearFeedback = feedback.clear;
 
   useEffect(() => {
     if (!open) return;
     setNumber(initialNumber);
     setChapterTitle(initialTitle);
-  }, [open, initialNumber, initialTitle]);
+    clearFeedback();
+  }, [open, initialNumber, initialTitle, clearFeedback]);
 
   const trimmedNumber = number.trim();
 
@@ -119,11 +131,12 @@ export function ChapterDialog({ open, onOpenChange, title, description, initialN
     event.preventDefault();
     if (!trimmedNumber || busy) return;
     setBusy(true);
+    feedback.clear();
     try {
       await onSubmit({ number: trimmedNumber, title: chapterTitle.trim() || undefined });
       onOpenChange(false);
     } catch (error) {
-      toast.error(errorMessage(error, "Enregistrement impossible."));
+      feedback.error(errorMessage(error, "L’enregistrement n’a pas abouti. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -132,20 +145,23 @@ export function ChapterDialog({ open, onOpenChange, title, description, initialN
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <form onSubmit={submit} className="grid gap-4">
+        <form onSubmit={submit} onChange={feedback.state?.tone === "error" ? feedback.clear : undefined} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           <ChapterFields number={number} title={chapterTitle} onNumberChange={setNumber} onTitleChange={setChapterTitle} autoFocus />
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Annuler
-            </Button>
-            <Button type="submit" disabled={!trimmedNumber || busy}>
-              {submitLabel}
-            </Button>
-          </DialogFooter>
+          <div>
+            <FormStatus state={feedback.state} className="pb-4" />
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={!trimmedNumber || busy}>
+                {submitLabel}
+              </Button>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

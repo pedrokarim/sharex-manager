@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -23,7 +24,10 @@ import { useTranslation } from "@/lib/i18n";
 interface FileWithPreview extends File {
   preview?: string;
   id: string;
+  /** Fichier refusé avant l'envoi (type, taille, nombre) : il ne partira pas. */
   error?: string | null;
+  /** Échec de l'envoi lui-même : le fichier reste dans la file pour réessayer. */
+  uploadError?: string | null;
 }
 
 interface UploadZoneProps {
@@ -31,7 +35,7 @@ interface UploadZoneProps {
   onFinishUpload?: () => void;
   /**
    * Reçoit de quoi alimenter la file d'envoi depuis l'extérieur : la fenêtre
-   * « Ajouter » de la galerie passe par là, il n'y a qu'un seul circuit d'envoi.
+   * « Ajouter » de la galerie passe par là, il n'y a qu'un seul circuit d'envoi.
    */
   pickerRef?: React.MutableRefObject<UploadZoneHandle | null>;
 }
@@ -64,6 +68,9 @@ export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZonePr
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const { config, isLoading, isFileAllowed } = useUploadConfig();
+  // Bilan de l'envoi, lu dans le panneau de la file, au-dessus de la liste.
+  // Le détail de chaque erreur est sur la ligne du fichier concerné.
+  const feedback = useFeedback();
 
   // Définir les types de fichiers acceptés en fonction de la configuration
   const acceptedFileTypes = useMemo(() => {
@@ -213,13 +220,9 @@ export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZonePr
         });
       });
 
-      // Afficher les messages d'erreur pour les fichiers non valides
-      filesWithPreview.forEach((file) => {
-        if (file.error) {
-          toast.error(`${file.name}: ${file.error}`);
-        }
-      });
-
+      // Un fichier refusé s'affiche dans la file, en erreur, avec sa raison
+      // sur sa ligne : pas de notification à part.
+      feedback.clear();
       setFilesToUpload((prev) => [...prev, ...filesWithPreview]);
       setIsDragging(false);
     },
@@ -228,16 +231,23 @@ export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZonePr
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    onDropRejected(fileRejections, event) {
-      for (const file of fileRejections) {
-        toast.error(
-          `${file.file.name}: ${t(
+    onDropRejected(fileRejections) {
+      // Les fichiers refusés rejoignent la file en erreur, comme ceux que
+      // `validateFile` écarte : la raison se lit sur leur ligne.
+      const rejected = fileRejections.map(({ file, errors }) =>
+        Object.assign(file, {
+          preview: undefined,
+          id: Math.random().toString(36).substring(7),
+          error: t(
             fileRejectionMessages?.[
-              file.errors[0]?.code as keyof typeof fileRejectionMessages
+              errors[0]?.code as keyof typeof fileRejectionMessages
             ] || "gallery.upload_zone.rejection_messages.unknown_error"
-          )}`
-        );
-      }
+          ),
+        })
+      );
+      feedback.clear();
+      setFilesToUpload((prev) => [...prev, ...rejected]);
+      setIsDragging(false);
     },
     accept:
       Object.keys(acceptedFileTypes).length > 0 ? acceptedFileTypes : undefined,
@@ -254,6 +264,7 @@ export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZonePr
   }, [pickerRef, open, onDrop]);
 
   const removeFile = (fileId: string) => {
+    feedback.clear();
     setFilesToUpload((files) => {
       const remainingFiles = files.filter((f) => f.id !== fileId);
       files
@@ -264,23 +275,35 @@ export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZonePr
   };
 
   const clearFiles = () => {
+    feedback.clear();
     filesToUpload.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
     setFilesToUpload([]);
   };
 
   const uploadFiles = async () => {
+    feedback.clear();
     const validFiles = filesToUpload.filter((file) => !file.error);
     if (validFiles.length === 0) {
-      toast.error(t("gallery.upload_zone.no_valid_files"));
+      feedback.error(
+        "Aucun fichier à envoyer\u00a0: retirez ceux en erreur ou ajoutez-en d’autres."
+      );
       return;
     }
 
     setIsUploading(true);
     setUploadProgress(0);
+    // Un nouvel essai efface les échecs du précédent.
+    setFilesToUpload((files) =>
+      files.map((file) =>
+        file.uploadError ? Object.assign(file, { uploadError: null }) : file
+      )
+    );
 
     const totalFiles = validFiles.length;
     let uploadedFiles = 0;
     const uploadedFileData: any[] = [];
+    const uploadedIds = new Set<string>();
+    const failures = new Map<string, string>();
 
     for (const file of validFiles) {
       const formData = new FormData();
@@ -303,19 +326,13 @@ export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZonePr
         uploadedFiles++;
         setUploadProgress((uploadedFiles / totalFiles) * 100);
         uploadedFileData.push(data);
-        toast.success(`${file.name} uploadé avec succès`, {
-          description: "Le fichier a été ajouté à votre galerie",
-          action: {
-            label: "Voir",
-            onClick: () =>
-              document
-                .getElementById(data.id)
-                ?.scrollIntoView({ behavior: "smooth" }),
-          },
-        });
+        uploadedIds.add(file.id);
       } catch (error: any) {
         console.error("Erreur d'upload:", error);
-        toast.error(error.message || `Erreur lors de l'upload de ${file.name}`);
+        failures.set(
+          file.id,
+          errorMessage(error, `L’envoi de ${file.name} a échoué.`)
+        );
       }
     }
 
@@ -326,7 +343,51 @@ export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZonePr
     window.dispatchEvent(event);
 
     setIsUploading(false);
-    clearFiles();
+
+    if (failures.size === 0) {
+      // Tout est parti : le panneau se ferme, le bilan part dans un toast
+      // (l'envoi a pu être long, et la file n'est plus là pour le dire).
+      clearFiles();
+      const first = uploadedFileData[0];
+      toast.success(
+        totalFiles === 1
+          ? `« ${validFiles[0].name} » ajouté à la galerie.`
+          : `${totalFiles}\u00a0fichiers ajoutés à la galerie.`,
+        first?.id
+          ? {
+              action: {
+                label: "Voir",
+                onClick: () =>
+                  document
+                    .getElementById(first.id)
+                    ?.scrollIntoView({ behavior: "smooth" }),
+              },
+            }
+          : undefined
+      );
+    } else {
+      // Les fichiers envoyés quittent la file ; ceux qui ont échoué y restent,
+      // leur erreur sur leur ligne, prêts à repartir.
+      filesToUpload
+        .filter((file) => uploadedIds.has(file.id))
+        .forEach((file) => file.preview && URL.revokeObjectURL(file.preview));
+      setFilesToUpload((files) =>
+        files
+          .filter((file) => !uploadedIds.has(file.id))
+          .map((file) =>
+            failures.has(file.id)
+              ? Object.assign(file, { uploadError: failures.get(file.id) })
+              : file
+          )
+      );
+      feedback.error(
+        uploadedIds.size > 0
+          ? `${uploadedIds.size}\u00a0envoyé(s), ${failures.size}\u00a0en échec. Réessayez ou retirez les fichiers en erreur.`
+          : failures.size === 1
+            ? "L’envoi a échoué. Réessayez ou retirez le fichier."
+            : "L’envoi a échoué. Réessayez ou retirez les fichiers."
+      );
+    }
 
     if (onFinishUpload) {
       onFinishUpload();
@@ -410,6 +471,7 @@ export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZonePr
             {isUploading && (
               <Progress value={uploadProgress} className="w-full mt-4" />
             )}
+            <FormStatus state={feedback.state} className="pt-3" />
           </div>
 
           <ScrollArea className="flex-1 p-4">
@@ -419,7 +481,7 @@ export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZonePr
                   key={file.id}
                   className={cn(
                     "flex items-center gap-2 p-2 rounded-lg border bg-muted/50 group relative",
-                    file.error && "border-destructive/50 bg-destructive/10"
+                    (file.error || file.uploadError) && "border-destructive/50 bg-destructive/10"
                   )}
                 >
                   <div className="w-8 h-8 rounded-md border bg-background overflow-hidden flex-shrink-0">
@@ -448,9 +510,12 @@ export const UploadZone = ({ children, onFinishUpload, pickerRef }: UploadZonePr
                         ({(file.size / 1024 / 1024).toFixed(1)} MB)
                       </span>
                     </div>
-                    {file.error && (
-                      <p className="text-xs text-destructive truncate">
-                        {file.error}
+                    {(file.error || file.uploadError) && (
+                      <p
+                        className="text-xs text-destructive truncate"
+                        title={file.error ?? file.uploadError ?? undefined}
+                      >
+                        {file.error ?? file.uploadError}
                       </p>
                     )}
                   </div>

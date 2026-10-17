@@ -12,7 +12,7 @@ import {
   Terminal,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, useFeedback } from "@/components/feedback";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { callModule, isJobActive, timeAgo, type Job } from "../lib/client";
+import { cancelJob } from "./generation-menu";
 
 interface JobQueueProps {
   jobs: Job[];
@@ -96,6 +97,8 @@ export function JobQueue({ jobs, onMutate }: JobQueueProps) {
 
 function JobRow({ job, onMutate }: { job: Job; onMutate: () => void }) {
   const [openLog, setOpenLog] = useState(false);
+  // L'icône « annulé » confirme l'annulation ; seul un échec s'affiche, ici.
+  const feedback = useFeedback();
   const active = isJobActive(job);
 
   const percent =
@@ -151,16 +154,18 @@ function JobRow({ job, onMutate }: { job: Job; onMutate: () => void }) {
             size="icon"
             className="h-6 w-6 shrink-0"
             aria-label="Annuler"
-            onClick={async () => {
-              await callModule("cancelGeneration", job.id);
-              toast.info("Génération annulée");
-              onMutate();
-            }}
+            onClick={() => void cancelJob(job, onMutate, feedback)}
           >
             <X className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
+
+      {feedback.state && (
+        <div className="mt-1.5 flex min-w-0">
+          <ActionStatus state={feedback.state} />
+        </div>
+      )}
 
       {active && (
         <div className="mt-2 space-y-1">

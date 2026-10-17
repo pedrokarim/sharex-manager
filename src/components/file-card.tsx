@@ -43,7 +43,7 @@ import { cn } from "@/lib/utils";
 import type { FileInfo } from "@/types/files";
 import { getGalleryImageUrl } from "@/lib/utils/url";
 import type { ThumbnailSize } from "@/lib/atoms/preferences";
-import { toast } from "sonner";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { useTranslation } from "@/lib/i18n";
 
 interface FileCardProps {
@@ -125,9 +125,14 @@ export function FileCard({
     tiny: "aspect-square",
   };
 
+  // Échec de la suppression : la confirmation reste ouverte et le dit. En
+  // cas de réussite, la carte disparaît de la grille, sans autre message.
+  const deleteFeedback = useFeedback();
+
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
+      deleteFeedback.clear();
       const response = await fetch(
         `/api/files?id=${encodeURIComponent(file.name)}`,
         {
@@ -139,11 +144,11 @@ export function FileCard({
         throw new Error("Erreur lors de la suppression");
       }
 
-      toast.success(t("gallery.file_card.delete_success"));
+      setConfirmDelete(false);
       onDelete?.();
     } catch (error) {
       console.error("Erreur lors de la suppression:", error);
-      toast.error(t("gallery.file_card.delete_error"));
+      deleteFeedback.error("Le fichier n’a pas pu être supprimé. Réessayez.");
     } finally {
       setIsDeleting(false);
     }
@@ -402,7 +407,14 @@ export function FileCard({
           </div>
         </CardContent>
       )}
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <AlertDialog
+        open={confirmDelete}
+        onOpenChange={(open) => {
+          if (isDeleting) return;
+          setConfirmDelete(open);
+          if (!open) deleteFeedback.clear();
+        }}
+      >
         <AlertDialogContent onClick={(e) => e.stopPropagation()}>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -412,11 +424,24 @@ export function FileCard({
               {t("gallery.file_card.delete_confirmation.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {/* Toujours présent, marge annulée : l'écart de la grille s'ouvre
+              avec le message au lieu d'apparaître d'un coup. */}
+          <div className="-mt-4">
+            <FormStatus state={deleteFeedback.state} className="pt-4" />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>
               {t("gallery.file_card.delete_confirmation.cancel")}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>
+            <AlertDialogAction
+              // La fenêtre se ferme après la réussite seulement : un échec
+              // s'affiche ici même.
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDelete();
+              }}
+              disabled={isDeleting}
+            >
               {t("gallery.file_card.delete_confirmation.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>

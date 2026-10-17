@@ -1,5 +1,4 @@
 import { useEffect, useCallback } from "react";
-import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
 
 interface KeyboardShortcutsOptions {
@@ -53,8 +52,8 @@ export function useKeyboardShortcuts({
         case "a":
           if (isModifierPressed) {
             event.preventDefault();
+            // La sélection se voit dans la grille : pas de notification.
             onSelectAll?.();
-            toast.success(t("gallery.select_all"));
           }
           break;
 
@@ -62,7 +61,6 @@ export function useKeyboardShortcuts({
           if (isModifierPressed) {
             event.preventDefault();
             onClearSelection?.();
-            toast.success(t("gallery.deselect_all"));
           }
           break;
 
@@ -77,8 +75,9 @@ export function useKeyboardShortcuts({
         case "c":
           if (isModifierPressed && hasSelection) {
             event.preventDefault();
+            // Le retour de la copie appartient à `onCopySelected`, qui sait
+            // si elle a réussi.
             onCopySelected?.();
-            toast.success(t("gallery.file_actions.copy_url"));
           }
           break;
 
@@ -115,7 +114,6 @@ export function useKeyboardShortcuts({
           if (hasSelection) {
             event.preventDefault();
             onClearSelection?.();
-            toast.success(t("gallery.deselect_all"));
           }
           break;
       }
@@ -131,7 +129,6 @@ export function useKeyboardShortcuts({
       onToggleSecuritySelected,
       onAddToAlbum,
       onShowHelp,
-      t,
     ]
   );
 

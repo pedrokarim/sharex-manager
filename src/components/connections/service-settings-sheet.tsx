@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { CircleAlert, X } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
@@ -34,6 +34,8 @@ function monthLabel(month: string): string {
 export function BudgetSection({ connector, billing, onChange }: { connector: ConnectorView; billing: BillingStatus; onChange: (billing: BillingStatus) => void }) {
   const [draft, setDraft] = useState(billing.budget === null ? "" : String(billing.budget).replace(".", ","));
   const [busy, setBusy] = useState(false);
+  // Réussite comme échec, à côté du bouton « Enregistrer » du budget.
+  const feedback = useFeedback();
   useEffect(() => setDraft(billing.budget === null ? "" : String(billing.budget).replace(".", ",")), [billing.budget]);
   const pricing = connector.pricing;
   const ratio = billing.budget ? Math.min(100, (billing.spent / billing.budget) * 100) : 0;
@@ -80,12 +82,15 @@ export function BudgetSection({ connector, billing, onChange }: { connector: Con
             event.preventDefault();
             if (invalid || unchanged) return;
             setBusy(true);
+            feedback.clear();
             const result = await setMonthlyBudgetAction(connector.id, parsed);
             setBusy(false);
-            if (!result.ok) return void toast.error(result.error);
+            if (!result.ok) return void feedback.error(result.error);
             if (result.data) onChange(result.data);
-            toast.success(parsed === null ? "Budget retiré" : "Budget enregistré");
+            feedback.success(parsed === null ? "Budget retiré" : "Budget enregistré");
           }}
+          // Modifier le montant retire un message d'erreur devenu caduc.
+          onChange={feedback.state?.tone === "error" ? feedback.clear : undefined}
         >
           <div className="grid min-w-0 flex-1 basis-48 gap-1.5">
             <Label htmlFor={`${connector.id}-budget`}>Budget par mois</Label>
@@ -106,6 +111,7 @@ export function BudgetSection({ connector, billing, onChange }: { connector: Con
           <Button type="submit" variant="outline" loading={busy} disabled={invalid || unchanged} className="gap-2">
             Enregistrer
           </Button>
+          <ActionStatus state={feedback.state} className="h-9" />
         </form>
       )}
       {invalid ? <p className="text-xs text-destructive">Un montant positif, ou vide pour aucun budget.</p> : null}

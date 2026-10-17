@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Download, ExternalLink, ScanSearch, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -25,6 +25,15 @@ export function DetectorSettings({ isAdmin }: { isAdmin: boolean }) {
   const [status, setStatus] = useState<DetectorStatus | null>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  // Le retour s'affiche là où l'on a agi : sous la ligne d'état pour le choix, sur la ligne de la variante
+  // pour son téléchargement ou son effacement.
+  const feedback = useFeedback({ successDuration: 4000 });
+  const [feedbackTarget, setFeedbackTarget] = useState<string | null>(null);
+  const tell = (target: string, tone: "success" | "error", message: string) => {
+    setFeedbackTarget(target);
+    feedback[tone](message);
+  };
+  const statusOf = (target: string) => (feedbackTarget === target ? feedback.state : null);
 
   const store = useCallback((next: DetectorStatus) => {
     setStatus(next);
@@ -40,11 +49,12 @@ export function DetectorSettings({ isAdmin }: { isAdmin: boolean }) {
   const choose = async (choice: DetectorChoice) => {
     if (busy) return;
     setBusy("choice");
+    feedback.clear();
     try {
+      // La ligne d'état, juste au-dessus, dit aussitôt le nouveau choix.
       store(await api.setDetectorChoice(choice));
-      toast.success(choice === "off" ? "Détecteur coupé : l’analyse repère le texte par les pixels" : "Détecteur choisi");
     } catch (error) {
-      toast.error(errorMessage(error, "Ce réglage n’a pas pu être enregistré."));
+      tell("choice", "error", errorMessage(error, "Ce réglage n’a pas pu être enregistré. Réessayez."));
     } finally {
       setBusy(null);
     }
@@ -53,12 +63,12 @@ export function DetectorSettings({ isAdmin }: { isAdmin: boolean }) {
   const download = async (variant: DetectorVariantId, size: number) => {
     if (busy) return;
     setBusy(variant);
-    const pending = toast.loading(`Téléchargement du modèle (${megabytes(size)})…`);
+    feedback.clear();
     try {
       store(await api.downloadDetector(variant));
-      toast.success("Modèle téléchargé et vérifié", { id: pending });
+      tell(variant, "success", "Modèle téléchargé et vérifié");
     } catch (error) {
-      toast.error(errorMessage(error, "Le modèle n’a pas pu être téléchargé."), { id: pending });
+      tell(variant, "error", errorMessage(error, `Le modèle (${megabytes(size)}) n’a pas pu être téléchargé. Réessayez.`));
     } finally {
       setBusy(null);
     }
@@ -67,11 +77,12 @@ export function DetectorSettings({ isAdmin }: { isAdmin: boolean }) {
   const remove = async (variant: DetectorVariantId) => {
     if (busy) return;
     setBusy(variant);
+    feedback.clear();
     try {
+      // La ligne repasse à « Télécharger » : c'est le retour.
       store(await api.removeDetector(variant));
-      toast.success("Modèle effacé du serveur");
     } catch (error) {
-      toast.error(errorMessage(error, "Le modèle n’a pas pu être effacé."));
+      tell(variant, "error", errorMessage(error, "Le modèle n’a pas pu être effacé. Réessayez."));
     } finally {
       setBusy(null);
     }
@@ -120,6 +131,7 @@ export function DetectorSettings({ isAdmin }: { isAdmin: boolean }) {
               </span>
             )}
           </p>
+          <FormStatus state={statusOf("choice")} className="max-w-3xl" />
 
           <RadioGroup value={status.active} onValueChange={(next) => void choose(next as DetectorChoice)} disabled={!isAdmin || busy !== null} className="gap-0">
             <ItemGroup className="gap-3">
@@ -128,13 +140,14 @@ export function DetectorSettings({ isAdmin }: { isAdmin: boolean }) {
                   <ItemMedia>
                     <RadioGroupItem id={`scan-studio-detector-${variant.id}`} value={variant.id} aria-label={`Variante ${variant.label}`} />
                   </ItemMedia>
-                  <ItemContent>
+                  <ItemContent className="min-w-0">
                     <ItemTitle>
                       <Label htmlFor={`scan-studio-detector-${variant.id}`} className="font-medium">
                         {variant.label}
                       </Label>
                     </ItemTitle>
                     <ItemDescription className="line-clamp-none text-pretty">{variant.description}</ItemDescription>
+                    {feedbackTarget === variant.id && <ActionStatus state={feedback.state} />}
                   </ItemContent>
                   <ItemActions>
                     {variant.installed ? (

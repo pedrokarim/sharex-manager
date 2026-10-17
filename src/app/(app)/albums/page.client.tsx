@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Plus, FolderOpen, Search, Grid, List } from "lucide-react";
+import { CircleAlert, Plus, FolderOpen, RotateCw, Search, Grid, List } from "lucide-react";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,10 +24,17 @@ export function AlbumsClient() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  // Un échec de chargement remplace la liste (avec de quoi réessayer) au lieu
+  // de laisser croire qu'il n'y a aucun album.
+  const [loadFailed, setLoadFailed] = useState(false);
+  // Une suppression réussie se voit (la carte disparaît) ; un échec s'affiche
+  // au-dessus des albums. Créer et modifier se règlent dans leur fenêtre.
+  const deleteFeedback = useFeedback();
 
   const fetchAlbums = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadFailed(false);
       const params = new URLSearchParams();
       if (searchQuery) {
         params.set("q", searchQuery);
@@ -42,7 +49,7 @@ export function AlbumsClient() {
       setAlbums(data.albums || []);
     } catch (error) {
       console.error("Erreur:", error);
-      toast.error("Erreur lors du chargement des albums");
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -52,34 +59,31 @@ export function AlbumsClient() {
     fetchAlbums();
   }, [fetchAlbums]);
 
+  // Créer et modifier : un échec lève une erreur que la fenêtre affiche
+  // au-dessus de ses boutons ; une réussite la ferme et l'album apparaît.
   const handleCreateAlbum = async (albumData: {
     name: string;
     description?: string;
   }) => {
-    try {
-      const response = await fetch("/api/albums", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(albumData),
-      });
+    const response = await fetch("/api/albums", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(albumData),
+    }).catch(() => null);
 
-      if (!response.ok) {
-        throw new Error("Erreur lors de la création de l'album");
-      }
-
-      const newAlbum = await response.json();
-      setAlbums([newAlbum, ...albums]);
-      setIsCreateDialogOpen(false);
-      toast.success(t("albums.create_success"));
-    } catch (error) {
-      console.error("Erreur:", error);
-      toast.error(t("albums.create_error"));
+    if (!response?.ok) {
+      throw new Error(t("albums.create_error"));
     }
+
+    const newAlbum = await response.json();
+    setAlbums([newAlbum, ...albums]);
+    setIsCreateDialogOpen(false);
   };
 
   const handleDeleteAlbum = async (albumId: number) => {
+    deleteFeedback.clear();
     try {
       const response = await fetch(`/api/albums/${albumId}`, {
         method: "DELETE",
@@ -90,10 +94,14 @@ export function AlbumsClient() {
       }
 
       setAlbums(albums.filter((album) => album.id !== albumId));
-      toast.success("Album supprimé avec succès");
     } catch (error) {
       console.error("Erreur:", error);
-      toast.error("Erreur lors de la suppression de l'album");
+      const name = albums.find((album) => album.id === albumId)?.name;
+      deleteFeedback.error(
+        name
+          ? `L’album « ${name} » n’a pas pu être supprimé. Réessayez.`
+          : "L’album n’a pas pu être supprimé. Réessayez.",
+      );
     }
   };
 
@@ -103,27 +111,21 @@ export function AlbumsClient() {
   }) => {
     if (!editingAlbum) return;
 
-    try {
-      const response = await fetch(`/api/albums/${editingAlbum.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(albumData),
-      });
+    const response = await fetch(`/api/albums/${editingAlbum.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(albumData),
+    }).catch(() => null);
 
-      if (!response.ok) {
-        throw new Error("Erreur lors de la modification de l'album");
-      }
-
-      const updatedAlbum = await response.json();
-      setAlbums(
-        albums.map((a) => (a.id === editingAlbum.id ? { ...a, ...updatedAlbum } : a))
-      );
-      setEditingAlbum(null);
-      toast.success(t("albums.edit_success"));
-    } catch (error) {
-      console.error("Erreur:", error);
-      toast.error(t("albums.edit_error"));
+    if (!response?.ok) {
+      throw new Error(t("albums.edit_error"));
     }
+
+    const updatedAlbum = await response.json();
+    setAlbums(
+      albums.map((a) => (a.id === editingAlbum.id ? { ...a, ...updatedAlbum } : a))
+    );
+    setEditingAlbum(null);
   };
 
   const filteredAlbums = albums.filter((album) =>
@@ -191,8 +193,26 @@ export function AlbumsClient() {
         </div>
       </div>
 
+      <FormStatus state={deleteFeedback.state} className="pb-4" />
+
       {/* Contenu */}
-      {filteredAlbums.length === 0 ? (
+      {loadFailed ? (
+        <Empty className="py-12 sm:py-24">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <CircleAlert className="h-5 w-5 text-destructive" />
+            </EmptyMedia>
+            <EmptyTitle>Chargement impossible</EmptyTitle>
+            <EmptyDescription>
+              Les albums n’ont pas pu être chargés. Vérifiez votre connexion, puis réessayez.
+            </EmptyDescription>
+          </EmptyHeader>
+          <Button variant="outline" onClick={() => void fetchAlbums()} className="text-sm">
+            <RotateCw className="h-4 w-4 mr-2" />
+            Réessayer
+          </Button>
+        </Empty>
+      ) : filteredAlbums.length === 0 ? (
         <Empty className="py-12 sm:py-24">
           <EmptyHeader>
             <EmptyMedia variant="icon">

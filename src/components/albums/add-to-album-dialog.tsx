@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, FolderOpen, Plus, Check } from "lucide-react";
 import { LoadingState } from "@/components/loading";
 import { toast } from "sonner";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { useTranslation } from "@/lib/i18n";
 import { CreateAlbumDialog } from "./create-album-dialog";
 import { AlbumVisibilityIcon } from "./album-visibility";
@@ -47,10 +48,16 @@ export function AddToAlbumDialog({
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(
     null,
   );
+  // Échec du chargement : affiché à la place de la liste, avec « Réessayer ».
+  const [loadFailed, setLoadFailed] = useState(false);
+  // Échec de l'ajout : la fenêtre reste ouverte, le message se lit au-dessus
+  // des boutons.
+  const feedback = useFeedback();
 
   const fetchAlbums = async () => {
     try {
       setLoading(true);
+      setLoadFailed(false);
       const response = await fetch("/api/albums");
       if (!response.ok) {
         throw new Error("Erreur lors du chargement des albums");
@@ -60,7 +67,7 @@ export function AddToAlbumDialog({
       setAlbums(data.albums || []);
     } catch (error) {
       console.error("Erreur:", error);
-      toast.error("Erreur lors du chargement des albums");
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -115,6 +122,7 @@ export function AddToAlbumDialog({
     if (selectedAlbums.size === 0) return;
 
     setAdding(true);
+    feedback.clear();
     setProgress({ done: 0, total: selectedAlbums.size });
 
     const failures: string[] = [];
@@ -144,6 +152,9 @@ export function AddToAlbumDialog({
 
     const fileCount = selectedFiles.length;
 
+    // Réussite (même partielle) : la fenêtre se ferme et l'album n'est pas à
+    // l'écran, d'où le toast. Échec total : la fenêtre reste ouverte et le
+    // message s'y affiche.
     if (failures.length === 0) {
       const albumNames = albums
         .filter((album) => selectedAlbums.has(album.id))
@@ -152,15 +163,19 @@ export function AddToAlbumDialog({
 
       toast.success(
         selectedAlbums.size === 1
-          ? `${fileCount} fichier(s) ajouté(s) à l'album "${albumNames}"`
-          : `${fileCount} fichier(s) ajouté(s) à ${selectedAlbums.size} albums`,
+          ? `${fileCount} fichier(s) ajouté(s) à l’album « ${albumNames} ».`
+          : `${fileCount} fichier(s) ajouté(s) à ${selectedAlbums.size} albums.`,
       );
     } else if (succeeded === 0) {
-      toast.error(`Échec de l'ajout : ${failures.join(", ")}`);
+      feedback.error(
+        failures.length === 1
+          ? `L’ajout à l’album « ${failures[0]} » a échoué. Réessayez.`
+          : `L’ajout aux albums ${failures.map((name) => `« ${name} »`).join(", ")} a échoué. Réessayez.`,
+      );
     } else {
       // État partiel : le dire, plutôt que de laisser croire à un succès total.
       toast.warning(
-        `${fileCount} fichier(s) ajouté(s) à ${succeeded} album(s). Échec : ${failures.join(", ")}`,
+        `${fileCount} fichier(s) ajouté(s) à ${succeeded} album(s). Échec pour ${failures.map((name) => `« ${name} »`).join(", ")}.`,
       );
     }
 
@@ -174,37 +189,37 @@ export function AddToAlbumDialog({
     name: string;
     description?: string;
   }) => {
-    try {
-      const response = await fetch("/api/albums", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(albumData),
-      });
+    const response = await fetch("/api/albums", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(albumData),
+    });
 
-      if (!response.ok) {
-        throw new Error("Erreur lors de la création de l'album");
-      }
-
-      const newAlbum = await response.json();
-      setAlbums([newAlbum, ...albums]);
-      setSelectedAlbums(new Set([newAlbum.id]));
-      setIsCreateDialogOpen(false);
-      toast.success(t("albums.create_success"));
-    } catch (error) {
-      console.error("Erreur:", error);
-      toast.error(t("albums.create_error"));
+    // Un échec remonte à `CreateAlbumDialog`, qui l'affiche dans sa fenêtre.
+    if (!response.ok) {
+      throw new Error(
+        await readApiError(response, "L’album n’a pas pu être créé. Réessayez."),
+      );
     }
+
+    // L'album apparaît en tête de liste, déjà coché : pas d'autre message.
+    const newAlbum = await response.json();
+    setAlbums([newAlbum, ...albums]);
+    setSelectedAlbums(new Set([newAlbum.id]));
+    setIsCreateDialogOpen(false);
   };
 
   const handleClose = () => {
     setSelectedAlbums(new Set());
     setSearchQuery("");
+    feedback.clear();
     onClose();
   };
 
   const toggleAlbum = (albumId: number) => {
+    feedback.clear();
     setSelectedAlbums((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(albumId)) {
@@ -263,6 +278,15 @@ export function AddToAlbumDialog({
                 size="md"
                 className="flex-1 py-6 sm:py-8"
               />
+            ) : loadFailed ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Les albums n’ont pas pu être chargés.
+                </p>
+                <Button variant="outline" size="sm" onClick={fetchAlbums}>
+                  Réessayer
+                </Button>
+              </div>
             ) : (
               <ScrollArea className="h-full min-h-0 flex-1 pr-1">
                 <div className="space-y-2 pb-1">
@@ -317,6 +341,10 @@ export function AddToAlbumDialog({
                 </div>
               </ScrollArea>
             )}
+          </div>
+
+          <div className="shrink-0">
+            <FormStatus state={feedback.state} className="px-5 pb-4 sm:px-6" />
           </div>
 
           <DialogFooter className="border-t border-border/60 bg-muted/20 px-5 py-4 sm:px-6">

@@ -20,7 +20,7 @@ import {
   languageAtom,
 } from "@/lib/atoms/preferences";
 import { Button } from "@/components/ui/button";
-import { CalendarSearch, Check, ChevronDown, ImageOff, Minus, RefreshCcw, Upload } from "lucide-react";
+import { CalendarSearch, Check, ChevronDown, CircleAlert, ImageOff, Minus, RefreshCcw, RotateCw, Upload } from "lucide-react";
 import { useSimpleSelection } from "@/hooks/use-simple-selection";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { SelectionToolbar } from "@/components/gallery/selection-toolbar";
@@ -50,6 +50,8 @@ import { formatMonthKey, monthKeyOf, type TimelineMonth } from "@/lib/timeline";
 import { useTranslation } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import { useRoutedFileViewer } from "@/hooks/use-routed-file-viewer";
+import { useFeedback } from "@/components/feedback";
+import { SelectionCopyStatus } from "@/app/(app)/_components/selection-copy-status";
 
 interface FileInfo {
   name: string;
@@ -125,6 +127,14 @@ export function GalleryClient({
     },
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  /**
+   * Le dernier chargement de fichiers a échoué. Le message s'affiche dans la
+   * galerie, là où les fichiers manquent (à la place de la liste vide, ou
+   * sous les derniers chargés), avec de quoi réessayer.
+   */
+  const [loadFailed, setLoadFailed] = useState(false);
+  /** Résultat de la copie des URL de la sélection, lu au-dessus de sa barre. */
+  const copyFeedback = useFeedback();
   /**
    * La liste se recharge depuis le début (filtre, tri, ou première page que le
    * serveur n'a pas fournie). Tant que c'est le cas, une liste vide ne veut
@@ -264,13 +274,14 @@ export function GalleryClient({
           cache: "no-store",
         });
         const data = await res.json();
+        setLoadFailed(false);
         return {
           files: data.files,
           hasMore: data.hasMore,
         };
       } catch (error) {
         console.error("Erreur lors du chargement des fichiers:", error);
-        toast.error(t("gallery.errors.loading_files"));
+        setLoadFailed(true);
         return {
           files: [],
           hasMore: false,
@@ -443,7 +454,8 @@ export function GalleryClient({
               prependItemRef.current(newFile);
             }
 
-            // Notification si activée
+            // Notification si activée. Un toast, à raison : l'événement vient
+            // de l'extérieur (un envoi ShareX), pas d'un geste sur la page.
             if (enableUploadNotificationsRef.current) {
               toast.success(
                 tRef.current("gallery.notifications.new_file", {
@@ -547,11 +559,11 @@ export function GalleryClient({
       applyReset(newFiles, newHasMore);
     } catch (error) {
       console.error("Erreur lors du rafraîchissement:", error);
-      toast.error(t("gallery.refresh.error"));
+      setLoadFailed(true);
     } finally {
       setIsRefreshing(false);
     }
-  }, [applyReset, t]);
+  }, [applyReset]);
 
   useEffect(() => {
     if (autoRefreshInterval === 0) return;
@@ -686,6 +698,7 @@ export function GalleryClient({
         }
 
         console.error("Erreur lors de la résolution du fichier viewer:", error);
+        // La visionneuse se referme : le message n'a plus d'autre place.
         toast.error(t("gallery.file_viewer.file_unavailable"));
         closeViewerFile();
       } finally {
@@ -760,6 +773,8 @@ export function GalleryClient({
           method: "DELETE",
         });
 
+        // Supprimé depuis la visionneuse, qui se referme : le toast est le seul
+        // endroit qui reste pour confirmer, ou pour dire l'échec.
         if (response.ok) {
           toast.success(t("gallery.file_actions.delete_success"));
           if (viewerFileName === filename) {
@@ -767,6 +782,9 @@ export function GalleryClient({
             setViewerFallbackFile(null);
           }
           handleRefresh();
+        } else {
+          // Un refus du serveur passait sous silence.
+          toast.error(t("gallery.file_actions.delete_error"));
         }
       } catch (error) {
         toast.error(t("gallery.file_actions.delete_error"));
@@ -775,6 +793,9 @@ export function GalleryClient({
     [closeViewerFile, handleRefresh, t, viewerFileName],
   );
 
+  // Copie lancée depuis un menu contextuel, la visionneuse ou un raccourci :
+  // le menu se referme et les boutons appartiennent à leurs composants, sans
+  // place pour un « Copié ». Le toast reste donc ici.
   const copyToClipboard = async (url: string) => {
     try {
       if (
@@ -838,14 +859,11 @@ export function GalleryClient({
       setViewerFallbackFile((prev) =>
         prev?.name === file.name ? { ...prev, isSecure: data.isSecure } : prev,
       );
-
-      toast.success(
-        file.isSecure
-          ? t("gallery.file_actions.now_public")
-          : t("gallery.file_actions.now_private"),
-      );
+      // Réussite : le cadenas de la vignette et de la visionneuse change.
     } catch (error) {
       console.error("Erreur lors de la modification de la sécurité:", error);
+      // Lancé d'un menu contextuel ou de la visionneuse, sans place pour un
+      // message : l'échec passe par un toast.
       toast.error(t("gallery.file_actions.error_occurred"));
     }
   };
@@ -878,20 +896,16 @@ export function GalleryClient({
       setViewerFallbackFile((prev) =>
         prev?.name === file.name ? { ...prev, isStarred: data.isStarred } : prev,
       );
-
-      toast.success(
-        file.isStarred
-          ? t("gallery.file_actions.removed_from_favorites")
-          : t("gallery.file_actions.added_to_favorites"),
-      );
+      // Réussite : l'étoile de la vignette et de la visionneuse change.
     } catch (error) {
       console.error("Erreur lors de la modification des favoris:", error);
+      // Même raison que pour le cadenas : pas de place pour le message.
       toast.error(t("gallery.file_actions.error_occurred"));
     }
   };
 
   // Actions de multi-sélection
-  const handleCopySelectedUrls = useCallback(() => {
+  const handleCopySelectedUrls = useCallback(async () => {
     const selectedFiles = getSelectedFiles();
     if (selectedFiles.length === 0) return;
 
@@ -902,9 +916,13 @@ export function GalleryClient({
       )
       .join("\n");
 
+    // Le retour se lit juste au-dessus de la barre de sélection, d'où la
+    // copie part (bouton ou Ctrl+C) : pas de toast au coin de l'écran.
+    copyFeedback.clear();
     try {
-      navigator.clipboard.writeText(urls);
-      toast.success(t("gallery.file_actions.copy_url"));
+      // Attendue, sinon un refus du presse-papiers passait pour une réussite.
+      await navigator.clipboard.writeText(urls);
+      copyFeedback.success(t("gallery.file_actions.copy_url"));
     } catch (error) {
       // Fallback pour les navigateurs plus anciens
       const textArea = document.createElement("textarea");
@@ -917,15 +935,15 @@ export function GalleryClient({
       textArea.select();
 
       try {
-        document.execCommand("copy");
-        toast.success(t("gallery.file_actions.copy_url"));
+        if (!document.execCommand("copy")) throw new Error("copy");
+        copyFeedback.success(t("gallery.file_actions.copy_url"));
       } catch (err) {
-        toast.error(t("gallery.file_actions.copy_error"));
+        copyFeedback.error(t("gallery.file_actions.copy_error"));
       }
 
       document.body.removeChild(textArea);
     }
-  }, [getSelectedFiles, t]);
+  }, [getSelectedFiles, t, copyFeedback]);
 
   const handleDeleteSelected = useCallback(async () => {
     const selectedFileNames = getSelectedFiles();
@@ -951,10 +969,13 @@ export function GalleryClient({
           closeViewerFile();
           setViewerFallbackFile(null);
         }
+        // Réussite : les vignettes disparaissent et la barre de sélection se
+        // referme, sans autre message.
         clearSelection();
-        toast.success(t("gallery.file_actions.delete_success"));
       }
 
+      // Lancé de la barre de sélection ou d'un raccourci, qui disparaissent
+      // avec la sélection : l'échec passe par un toast.
       if (successful < selectedFileNames.length) {
         toast.error(t("gallery.file_actions.delete_error"));
       }
@@ -1008,8 +1029,7 @@ export function GalleryClient({
           ? { ...prev, isStarred: !selectedViewerFile.isStarred }
           : prev;
       });
-
-      toast.success(t("gallery.file_actions.added_to_favorites"));
+      // Réussite : les étoiles des vignettes changent.
     } catch (error) {
       console.error("Erreur lors de la modification des favoris:", error);
       toast.error(t("gallery.file_actions.error_occurred"));
@@ -1053,8 +1073,7 @@ export function GalleryClient({
           ? { ...prev, isSecure: !selectedViewerFile.isSecure }
           : prev;
       });
-
-      toast.success(t("gallery.file_actions.now_private"));
+      // Réussite : les cadenas des vignettes changent.
     } catch (error) {
       console.error("Erreur lors de la modification de la sécurité:", error);
       toast.error(t("gallery.file_actions.error_occurred"));
@@ -1090,12 +1109,13 @@ export function GalleryClient({
           throw new Error("Erreur lors de l'ajout du fichier à l'album");
         }
 
-        const result = await response.json();
         const album = availableAlbums.find((a) => a.id === albumId);
-        toast.success(`Fichier ajouté à l'album "${album?.name || albumId}"`);
+        // Lancé d'un sous-menu contextuel qui se referme, et rien ne change
+        // sur la vignette : le toast est le seul retour possible.
+        toast.success(`Fichier ajouté à l’album « ${album?.name || albumId} ».`);
       } catch (error) {
         console.error("Erreur:", error);
-        toast.error("Erreur lors de l'ajout du fichier à l'album");
+        toast.error("Le fichier n’a pas pu être ajouté à l’album. Réessayez.");
       }
     },
     [availableAlbums],
@@ -1238,6 +1258,9 @@ export function GalleryClient({
 
         {files.length === 0 && (isReloading || isRefreshing || loading) ? (
           <MediaGridSkeleton size={thumbnailSize === "tiny" ? "small" : thumbnailSize} />
+        ) : files.length === 0 && loadFailed ? (
+          // Un échec ne doit pas se faire passer pour une galerie vide.
+          <LoadErrorNotice message={t("gallery.errors.loading_files")} onRetry={handleRefresh} retrying={isRefreshing} />
         ) : files.length === 0 ? (
           <div className="flex flex-col items-center justify-center space-y-4 py-12 sm:py-24 text-center px-4">
             <ImageOff className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground" />
@@ -1448,6 +1471,10 @@ export function GalleryClient({
 
             {/* La suite arrive : des cartes d'attente tiennent sa place. */}
             {loading && <MediaGridSkeleton count={8} size={thumbnailSize === "tiny" ? "small" : thumbnailSize} />}
+            {/* La suite n'a pas pu venir : le message se lit là où elle manque. */}
+            {loadFailed && !loading && (
+              <LoadErrorNotice message={t("gallery.errors.loading_files")} onRetry={handleRefresh} retrying={isRefreshing} />
+            )}
             {/* Sentinelle du chargement suivant. Tout chargé, elle ne garde plus ses 40 px :
                 sous le dernier jour, ils faisaient défiler la page pour ne montrer que du vide. */}
             <div ref={ref} className={hasMore ? "h-10" : "h-px"} />
@@ -1514,6 +1541,7 @@ export function GalleryClient({
           onShowHelp={handleShowHelp}
         />
       )}
+      {isSelectionMode && hasSelection && <SelectionCopyStatus state={copyFeedback.state} />}
 
       {/* Dialog d'ajout à un album */}
       <AddToAlbumDialog
@@ -1547,5 +1575,34 @@ export function GalleryClient({
         shortcuts={shortcuts}
       />
     </>
+  );
+}
+
+/**
+ * Échec du chargement des fichiers, dans la galerie même : à la place de la
+ * liste vide, ou sous les derniers fichiers chargés. Il reste jusqu'au
+ * prochain chargement réussi.
+ */
+function LoadErrorNotice({
+  message,
+  onRetry,
+  retrying,
+}: {
+  message: string;
+  onRetry: () => void;
+  retrying: boolean;
+}) {
+  return (
+    <div
+      role="alert"
+      className="my-6 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+    >
+      <CircleAlert aria-hidden className="size-4 shrink-0" />
+      <p className="min-w-0 flex-1 break-words">{message}</p>
+      <Button variant="outline" size="sm" onClick={onRetry} loading={retrying} className="shrink-0">
+        <RotateCw className="size-4" />
+        Réessayer
+      </Button>
+    </div>
   );
 }

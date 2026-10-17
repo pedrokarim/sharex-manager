@@ -4,8 +4,8 @@ import { BrandLogo } from "@/components/brand-logo";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Download, ExternalLink, Library, Pause, Play, Plus, Search, Telescope, Trash2 } from "lucide-react";
-import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { ActionStatus, FormStatus, errorMessage, useFeedback, type FeedbackState } from "@/components/feedback";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
@@ -41,10 +41,31 @@ export function musicSource(track: MusicEntry): MediaSource | null {
   };
 }
 
+/** Erreurs par morceau : chacune s'affiche sur la ligne qui l'a produite. */
+function useRowErrors() {
+  const [errors, setErrors] = useState<Record<string, FeedbackState>>({});
+  const counter = useRef(0);
+  const set = useCallback((id: string, message: string) => {
+    counter.current += 1;
+    const state: FeedbackState = { tone: "error", message, id: counter.current };
+    setErrors((current) => ({ ...current, [id]: state }));
+  }, []);
+  const clear = useCallback((id: string) => {
+    setErrors((current) => {
+      if (!(id in current)) return current;
+      const { [id]: _cleared, ...rest } = current;
+      return rest;
+    });
+  }, []);
+  return { of: (id: string): FeedbackState | null => errors[id] ?? null, set, clear };
+}
+
 /** Un seul extrait joué à la fois, arrêté en quittant le panneau. */
 function usePreview() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
+  const failures = useRowErrors();
+  const { set: setFailure, clear: clearFailure } = failures;
 
   const stop = useCallback(() => {
     audioRef.current?.pause();
@@ -55,23 +76,24 @@ function usePreview() {
   const toggle = useCallback(
     (id: string, url: string) => {
       if (playing === id) return stop();
+      clearFailure(id);
       audioRef.current?.pause();
       const audio = new Audio(url);
       audio.volume = 0.7;
       audio.onended = () => setPlaying((current) => (current === id ? null : current));
       audio.onerror = () => {
-        toast.error("Extrait illisible");
+        setFailure(id, "Extrait illisible. Ouvrez la page du morceau pour l’écouter.");
         setPlaying(null);
       };
       void audio.play().catch(() => undefined);
       audioRef.current = audio;
       setPlaying(id);
     },
-    [playing, stop]
+    [playing, stop, setFailure, clearFailure]
   );
 
   useEffect(() => stop, [stop]);
-  return { playing, toggle, stop };
+  return { playing, toggle, stop, failureOf: failures.of };
 }
 
 /**
@@ -153,6 +175,7 @@ function LibraryTab({
   onChanged: () => void;
 }) {
   const [mood, setMood] = useState<string | null>(null);
+  const rowErrors = useRowErrors();
   const moods = Object.keys(MOOD_LABELS).filter((key) => tracks?.some((track) => track.mood === key));
   const visible = (tracks ?? []).filter((track) => !mood || track.mood === mood);
   const ready = tracks?.filter((track) => track.state.status === "ready").length ?? 0;
@@ -193,6 +216,7 @@ function LibraryTab({
                 playing={preview.playing === track.id}
                 onPreview={() => preview.toggle(track.id, track.url ?? track.audioUrl)}
                 pageUrl={track.pageUrl}
+                status={rowErrors.of(track.id) ?? preview.failureOf(track.id)}
               >
                 {track.state.status === "ready" ? (
                   <RowButton
@@ -220,7 +244,10 @@ function LibraryTab({
                   <RowButton
                     title="Retirer de la banque"
                     onClick={async () => {
-                      await callModule("removeMusicFromLibrary", track.id).catch((error) => toast.error(error.message));
+                      rowErrors.clear(track.id);
+                      await callModule("removeMusicFromLibrary", track.id).catch((error) =>
+                        rowErrors.set(track.id, errorMessage(error, "Le morceau n’a pas pu être retiré. Réessayez."))
+                      );
                       onChanged();
                     }}
                   >
@@ -251,14 +278,18 @@ function DiscoverTab({ preview, onAdded }: { preview: ReturnType<typeof usePrevi
   const [onlyInstrumental, setOnlyInstrumental] = useState(true);
   const [adding, setAdding] = useState<string | null>(null);
   const [addMood, setAddMood] = useState("chill");
+  // L'échec d'une recherche se lit sous le champ ; celui d'un ajout, sur sa ligne.
+  const searchFeedback = useFeedback();
+  const rowErrors = useRowErrors();
 
   const search = async () => {
     if (query.trim().length < 2) return;
     setSearching(true);
+    searchFeedback.clear();
     try {
       setResults(await callModule<MusicCandidate[]>("searchMusic", { query }));
-    } catch (error: any) {
-      toast.error(error?.message ?? "Recherche impossible");
+    } catch (error) {
+      searchFeedback.error(errorMessage(error, "La recherche n’a pas abouti. Réessayez dans un instant."));
     } finally {
       setSearching(false);
     }
@@ -266,13 +297,14 @@ function DiscoverTab({ preview, onAdded }: { preview: ReturnType<typeof usePrevi
 
   const add = async (candidate: MusicCandidate) => {
     setAdding(candidate.id);
+    rowErrors.clear(candidate.id);
     try {
       await callModule("addMusicToLibrary", { id: candidate.id, mood: addMood });
+      // La coche qui remplace le bouton confirme l'ajout.
       setResults((current) => current?.map((entry) => (entry.id === candidate.id ? { ...entry, inLibrary: true } : entry)) ?? null);
-      toast.success(`« ${candidate.title} » rejoint la banque`);
       onAdded();
-    } catch (error: any) {
-      toast.error(error?.message ?? "Ajout impossible");
+    } catch (error) {
+      rowErrors.set(candidate.id, errorMessage(error, "Le morceau n’a pas pu rejoindre la banque. Réessayez."));
     } finally {
       setAdding(null);
     }
@@ -293,6 +325,7 @@ function DiscoverTab({ preview, onAdded }: { preview: ReturnType<typeof usePrevi
         <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="piano, epic, lofi, ukulele…" className="h-8 pr-8 pl-8 text-sm" />
         {searching && <Spinner className="absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" label="Recherche…" />}
       </form>
+      <FormStatus state={searchFeedback.state} />
 
       <div className="flex flex-col gap-2 text-[11px] text-muted-foreground">
         <label className="flex items-center gap-1.5">
@@ -332,6 +365,7 @@ function DiscoverTab({ preview, onAdded }: { preview: ReturnType<typeof usePrevi
                 playing={preview.playing === candidate.id}
                 onPreview={() => preview.toggle(candidate.id, candidate.audioUrl)}
                 pageUrl={candidate.pageUrl}
+                status={rowErrors.of(candidate.id) ?? preview.failureOf(candidate.id)}
               >
                 {candidate.inLibrary ? (
                   <span className="flex h-7 w-7 items-center justify-center" title="Déjà dans la banque">
@@ -389,6 +423,7 @@ function TrackRow({
   playing,
   onPreview,
   pageUrl,
+  status,
   children,
 }: {
   title: string;
@@ -397,6 +432,8 @@ function TrackRow({
   playing: boolean;
   onPreview: () => void;
   pageUrl?: string;
+  /** Échec d'une action de la ligne (écoute, ajout, retrait). */
+  status?: FeedbackState | null;
   children: React.ReactNode;
 }) {
   return (
@@ -417,6 +454,7 @@ function TrackRow({
         <p className="truncate text-[11px] text-muted-foreground">
           {artist} · {meta}
         </p>
+        <ActionStatus state={status ?? null} className="max-w-full text-[11px] empty:hidden" />
       </div>
       {pageUrl && (
         <a

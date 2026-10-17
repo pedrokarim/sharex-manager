@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { errorMessage, type Feedback } from "@/components/feedback";
 import type { PickedImage } from "../components/image-picker";
 import {
   readFileAsBase64,
@@ -19,6 +19,8 @@ interface ImageIntakeOptions {
   disabledReason?: string;
   /** Vrai pendant qu'une fenêtre (le sélecteur) gère elle-même ses dépôts. */
   paused?: boolean;
+  /** Messages du compositeur : un dépôt refusé ou illisible s'y explique. */
+  feedback: Feedback;
 }
 
 /**
@@ -35,6 +37,7 @@ export function useImageIntake({
   onImages,
   disabledReason,
   paused = false,
+  feedback,
 }: ImageIntakeOptions) {
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -42,8 +45,8 @@ export function useImageIntake({
 
   // Les écouteurs sont posés une seule fois : ils lisent l'état courant via
   // cette référence plutôt que de se réabonner à chaque rendu.
-  const latest = useRef({ enabled, capacity, onImages, disabledReason, paused });
-  latest.current = { enabled, capacity, onImages, disabledReason, paused };
+  const latest = useRef({ enabled, capacity, onImages, disabledReason, paused, feedback });
+  latest.current = { enabled, capacity, onImages, disabledReason, paused, feedback };
 
   useEffect(() => {
     const carriesImage = (event: DragEvent) => {
@@ -53,21 +56,24 @@ export function useImageIntake({
     };
 
     const ingest = async (task: () => Promise<PickedImage[]>) => {
-      const { enabled, capacity, disabledReason } = latest.current;
+      const { enabled, capacity, disabledReason, feedback } = latest.current;
       if (!enabled) {
-        toast.info(disabledReason ?? "Ce moteur n'accepte pas d'image de départ");
+        feedback.error(
+          `${disabledReason ?? "Ce moteur n’accepte pas d’image de départ"}. Choisissez un autre moteur pour joindre une image.`
+        );
         return;
       }
       if (capacity <= 0) {
-        toast.info("Le compositeur a déjà son maximum d'images");
+        feedback.error("Le compositeur a déjà son maximum d’images. Retirez-en une pour en joindre une autre.");
         return;
       }
       setBusy(true);
+      feedback.clear();
       try {
         const images = await task();
         if (images.length) latest.current.onImages(images.slice(0, capacity));
-      } catch (error: any) {
-        toast.error(error?.message ?? "Import de l'image impossible");
+      } catch (error) {
+        latest.current.feedback.error(errorMessage(error, "L’image n’a pas pu être importée. Essayez un autre fichier."));
       } finally {
         setBusy(false);
       }

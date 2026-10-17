@@ -10,7 +10,7 @@ import {
   ImageDown,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -51,6 +51,9 @@ export function ImageViewer({
 }: ImageViewerProps) {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Retour des boutons du panneau, juste au-dessus d'eux.
+  const feedback = useFeedback();
+  const clearFeedback = feedback.clear;
 
   const open = index !== null && index >= 0 && index < shots.length;
   const shot = open ? shots[index] : null;
@@ -77,7 +80,9 @@ export function ImageViewer({
 
   useEffect(() => {
     setCopied(false);
-  }, [index]);
+    // Le message concernait l'image précédente.
+    clearFeedback();
+  }, [index, clearFeedback]);
 
   if (!shot) return null;
 
@@ -92,16 +97,17 @@ export function ImageViewer({
 
   const handleSaveToGallery = async () => {
     setBusy(true);
+    feedback.clear();
     try {
       const result = await callModule<{ fileName?: string }>(
         "sendToGallery",
         item.id,
         file
       );
-      toast.success(`Ajoutée à la galerie : ${result?.fileName ?? file}`);
+      feedback.success(`Ajoutée à la galerie : ${result?.fileName ?? file}`);
       onMutate?.();
-    } catch (error: any) {
-      toast.error(error?.message ?? "Copie impossible");
+    } catch (error) {
+      feedback.error(errorMessage(error, "L’image n’a pas pu être ajoutée à la galerie. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -109,16 +115,18 @@ export function ImageViewer({
 
   const handleDelete = async () => {
     setBusy(true);
+    feedback.clear();
     try {
+      // L'image quitte la visionneuse (la suivante s'affiche, ou elle se
+      // ferme) : c'est le retour.
       await callModule("deleteImage", item.id, file);
-      toast.success("Image supprimée");
       // La liste rétrécit : rester sur le même index afficherait la suivante,
       // sauf si on était sur la dernière.
       const next = shots.length <= 1 ? null : Math.min(index!, shots.length - 2);
       onIndexChange(next);
       onMutate?.();
-    } catch (error: any) {
-      toast.error(error?.message ?? "Suppression impossible");
+    } catch (error) {
+      feedback.error(errorMessage(error, "L’image n’a pas pu être supprimée. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -276,6 +284,10 @@ export function ImageViewer({
             <ProvenancePanel file={file} />
 
             <div className="mt-auto flex flex-col gap-2 pt-2">
+              {/* La marge négative absorbe l’écart de la colonne tant qu’il n’y a pas de message. */}
+              <div className="-mb-2">
+                <FormStatus state={feedback.state} className="pb-2" />
+              </div>
               <Button
                 variant="outline"
                 onClick={handleSaveToGallery}

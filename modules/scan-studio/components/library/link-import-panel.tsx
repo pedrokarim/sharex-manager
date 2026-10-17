@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Download, Link2 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -80,6 +80,9 @@ export function LinkImportPanel({ chapter, initialLink, onChanged }: LinkImportP
   const [lostTrack, setLostTrack] = useState(false);
   const [filling, setFilling] = useState(false);
   const [filled, setFilled] = useState(false);
+  // Retours sur place : l'annulation à côté de son bouton, « Reprendre ce titre » sur sa ligne.
+  const cancelFeedback = useFeedback();
+  const fillFeedback = useFeedback({ successDuration: 4000 });
 
   /** Aperçus déjà lus : recoller le même lien ne redemande rien au site. */
   const previews = useRef(new Map<string, Lookup>());
@@ -123,14 +126,14 @@ export function LinkImportPanel({ chapter, initialLink, onChanged }: LinkImportP
             return;
           }
           setJob(next);
-        } catch (error) {
+        } catch {
           failures++;
           if (failures >= MAX_POLL_FAILURES) {
-            // L'import continue peut-être sur le serveur : on cesse seulement de demander.
+            // L'import continue peut-être sur le serveur : on cesse seulement de demander.
+            // La section le dit elle-même (« Le suivi de l'import ne répond plus… »).
             runningJobs.delete(jobKey);
             setLostTrack(true);
             setPhase("done");
-            toast.error(errorMessage(error, "Le suivi de l’import ne répond plus."));
             return;
           }
         }
@@ -171,7 +174,8 @@ export function LinkImportPanel({ chapter, initialLink, onChanged }: LinkImportP
         sourcesSnapshot = next;
         if (!cancelled) setSources(next);
       })
-      .catch((error) => toast.error(errorMessage(error, "Liste des sources indisponible.")));
+      // Sans la liste, le champ garde un exemple générique : rien d'autre n'en dépend, inutile d'alerter.
+      .catch(() => undefined);
     return () => {
       cancelled = true;
       stopPolling();
@@ -265,6 +269,7 @@ export function LinkImportPanel({ chapter, initialLink, onChanged }: LinkImportP
   const cancel = async () => {
     if (!job || cancelling) return;
     setCancelling(true);
+    cancelFeedback.clear();
     try {
       const next = await api.cancelLinkImport(job.id);
       if (!isActive(next)) {
@@ -272,7 +277,7 @@ export function LinkImportPanel({ chapter, initialLink, onChanged }: LinkImportP
         settle(next);
       }
     } catch (error) {
-      toast.error(errorMessage(error, "L’annulation n’a pas abouti."));
+      cancelFeedback.error(errorMessage(error, "L’annulation n’a pas abouti. Réessayez."));
     } finally {
       setCancelling(false);
     }
@@ -286,13 +291,14 @@ export function LinkImportPanel({ chapter, initialLink, onChanged }: LinkImportP
   const fill = async () => {
     if (!chapter || filling || (!offeredTitle && !offeredNumber)) return;
     setFilling(true);
+    fillFeedback.clear();
     try {
       await api.updateChapter(chapter.id, { ...(offeredTitle ? { title: offeredTitle } : {}), ...(offeredNumber ? { number: offeredNumber } : {}) });
       setFilled(true);
-      toast.success("Chapitre complété d’après le site");
+      fillFeedback.success("Chapitre complété d’après le site");
       onChangedRef.current?.();
     } catch (error) {
-      toast.error(errorMessage(error, "Le chapitre n’a pas pu être complété."));
+      fillFeedback.error(errorMessage(error, "Le chapitre n’a pas pu être complété. Réessayez."));
     } finally {
       setFilling(false);
     }
@@ -311,6 +317,8 @@ export function LinkImportPanel({ chapter, initialLink, onChanged }: LinkImportP
     setStartError(null);
     setLostTrack(false);
     setFilled(false);
+    cancelFeedback.clear();
+    fillFeedback.clear();
     wanted.current = "";
     setPhase("link");
   };
@@ -444,8 +452,11 @@ export function LinkImportPanel({ chapter, initialLink, onChanged }: LinkImportP
                     <Button type="button" variant="outline" size="sm" className="gap-2" loading={filling} onClick={() => void fill()}>
                       {offeredTitle && offeredNumber ? "Reprendre le numéro et le titre" : offeredTitle ? "Reprendre ce titre" : "Reprendre ce numéro"}
                     </Button>
+                    {fillFeedback.state?.tone === "error" && <ActionStatus state={fillFeedback.state} />}
                   </div>
                 )}
+                {/* La ligne de l'offre disparaît une fois le chapitre complété : la confirmation prend sa place. */}
+                {filled && fillFeedback.state && <ActionStatus state={fillFeedback.state} />}
               </>
             ) : job?.state === "cancelled" ? (
               <p>Import annulé. Rien n’a été ajouté au chapitre, et les pages déjà téléchargées ont été effacées.</p>
@@ -472,9 +483,12 @@ export function LinkImportPanel({ chapter, initialLink, onChanged }: LinkImportP
             </Button>
           )}
           {phase === "running" && (
-            <Button type="button" variant="outline" disabled={cancelling || job?.state === "importing"} onClick={() => void cancel()}>
-              {cancelling ? "Annulation…" : "Annuler l’import"}
-            </Button>
+            <>
+              <Button type="button" variant="outline" disabled={cancelling || job?.state === "importing"} onClick={() => void cancel()}>
+                {cancelling ? "Annulation…" : "Annuler l’import"}
+              </Button>
+              <ActionStatus state={cancelFeedback.state} />
+            </>
           )}
           {phase === "done" && !chapter && job?.state === "done" && (
             <Button asChild type="button">

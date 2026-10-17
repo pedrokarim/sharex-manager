@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Upload } from "lucide-react";
 import { LoadingState } from "@/components/loading";
 import { useUploadConfig } from "@/hooks/use-upload-config";
+import { ActionStatus, FormStatus, useFeedback, type FeedbackState } from "@/components/feedback";
 import { GeneralTab } from "../_components/general-tab";
 import { ThumbnailsTab } from "../_components/thumbnails-tab";
 import { StorageTab } from "../_components/storage-tab";
@@ -22,7 +23,11 @@ export function ConfigPageClient() {
   const { t } = useTranslation();
   // Onglet gardé dans l'adresse (?tab=) : un lien ou le bouton Retour rouvrent le même.
   const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(CONFIG_TABS).withDefault("general").withOptions({ history: "push" }));
-  const { config, isLoading, isSaving, saveConfig } = useUploadConfig();
+  const { config, isLoading, isSaving, loadError, saveConfig } = useUploadConfig();
+  // Enregistrement : l'erreur au-dessus du bouton, la réussite à côté.
+  const saveFeedback = useFeedback();
+  // Échec du chargement : un état durable de la page, en tête du formulaire.
+  const loadStatus: FeedbackState | null = loadError ? { tone: "error", message: loadError, id: 0 } : null;
 
   const form = useForm<UploadConfig>({
     resolver: zodResolver(uploadConfigSchema),
@@ -36,7 +41,10 @@ export function ConfigPageClient() {
   }, [config, form]);
 
   const onSubmit = async (data: UploadConfig) => {
-    await saveConfig(data);
+    saveFeedback.clear();
+    const result = await saveConfig(data);
+    if (result.ok) saveFeedback.success("Enregistré");
+    else saveFeedback.error(result.error);
   };
 
   if (isLoading) {
@@ -63,9 +71,13 @@ export function ConfigPageClient() {
         </div>
       </section>
 
+      <FormStatus state={loadStatus} />
+
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
+          // Corriger un réglage retire l'erreur d'enregistrement.
+          onChange={saveFeedback.state?.tone === "error" ? saveFeedback.clear : undefined}
           className="space-y-6 sm:space-y-8"
         >
           <Tabs value={tab} onValueChange={(next) => void setTab(next === "general" ? null : (next as (typeof CONFIG_TABS)[number]))} className="space-y-5">
@@ -119,19 +131,31 @@ export function ConfigPageClient() {
             </TabsContent>
           </Tabs>
 
-          <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium sm:text-base">
-                Validation des réglages
-              </p>
-              <p className="text-xs text-muted-foreground sm:text-sm">
-                Enregistrez une fois les trois onglets relus pour garder un
-                comportement cohérent sur l&apos;ensemble du service.
-              </p>
+          <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+            <FormStatus
+              state={saveFeedback.state?.tone === "error" ? saveFeedback.state : null}
+              className="pb-3"
+            />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <p className="text-sm font-medium sm:text-base">
+                  Validation des réglages
+                </p>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  Enregistrez une fois les trois onglets relus pour garder un
+                  comportement cohérent sur l&apos;ensemble du service.
+                </p>
+              </div>
+              {/* Le bouton reste à droite ; « Enregistré » apparaît à sa gauche. */}
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:flex-row-reverse">
+                <Button type="submit" loading={isSaving} className="text-sm">
+                  {t("common.save")}
+                </Button>
+                <ActionStatus
+                  state={saveFeedback.state?.tone === "success" ? saveFeedback.state : null}
+                />
+              </div>
             </div>
-            <Button type="submit" loading={isSaving} className="text-sm">
-              {t("common.save")}
-            </Button>
           </div>
         </form>
       </Form>

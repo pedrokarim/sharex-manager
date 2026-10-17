@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +43,10 @@ export function GalleryImportDialog({ files, folders, onClose, onLibraryChanged,
   const [number, setNumber] = useState("1");
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
+  /** Les chapitres du dossier choisi n'ont pas pu être lus : dit sous la liste des chapitres. */
+  const [chaptersError, setChaptersError] = useState<string | null>(null);
+  // L'échec de l'ajout s'affiche au-dessus du bouton ; la réussite ouvre le chapitre, qui montre les images.
+  const feedback = useFeedback();
 
   // À l'ouverture : le dossier le plus récent est proposé, s'il y en a un.
   useEffect(() => {
@@ -54,6 +59,7 @@ export function GalleryImportDialog({ files, folders, onClose, onLibraryChanged,
   useEffect(() => {
     if (!open) return;
     setChapterChoice(CREATE);
+    setChaptersError(null);
     if (folderChoice === CREATE) {
       setChapters([]);
       setNumber("1");
@@ -71,7 +77,7 @@ export function GalleryImportDialog({ files, folders, onClose, onLibraryChanged,
       .catch((error) => {
         if (cancelled) return;
         setChapters([]);
-        toast.error(errorMessage(error, "Chapitres du dossier indisponibles."));
+        setChaptersError(errorMessage(error, "Les chapitres de ce dossier n’ont pas pu être lus. Choisissez-le de nouveau, ou créez un chapitre."));
       });
     return () => {
       cancelled = true;
@@ -86,6 +92,7 @@ export function GalleryImportDialog({ files, folders, onClose, onLibraryChanged,
     event.preventDefault();
     if (!ready || !files) return;
     setBusy(true);
+    feedback.clear();
     try {
       let folderId = folderChoice;
       if (creatingFolder) {
@@ -101,11 +108,10 @@ export function GalleryImportDialog({ files, folders, onClose, onLibraryChanged,
         const chapter = await api.createChapter(folderId, { number: number.trim(), title: title.trim() || undefined });
         chapterId = chapter.id;
       }
-      const pages = await api.importGalleryFiles(chapterId, files);
-      toast.success(pages.length < 2 ? "Image ajoutée au chapitre" : `${pages.length} images ajoutées au chapitre`);
+      await api.importGalleryFiles(chapterId, files);
       onImported(chapterId);
     } catch (error) {
-      toast.error(errorMessage(error, "Ajout des images impossible."));
+      feedback.error(errorMessage(error, "Les images n’ont pas pu être ajoutées. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -114,7 +120,7 @@ export function GalleryImportDialog({ files, folders, onClose, onLibraryChanged,
   return (
     <Dialog open={open} onOpenChange={(next) => !next && !busy && onClose()}>
       <DialogContent className="sm:max-w-md">
-        <form onSubmit={submit} className="grid gap-4">
+        <form onSubmit={submit} onChange={feedback.state?.tone === "error" ? feedback.clear : undefined} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>Traduire dans Scan Studio</DialogTitle>
             <DialogDescription>
@@ -173,18 +179,22 @@ export function GalleryImportDialog({ files, folders, onClose, onLibraryChanged,
                 </SelectContent>
               </Select>
             )}
+            {chaptersError && <FieldError>{chaptersError}</FieldError>}
           </div>
 
           {creatingChapter && chapters !== null && <ChapterFields number={number} title={title} onNumberChange={setNumber} onTitleChange={setTitle} />}
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
-              Annuler
-            </Button>
-            <Button type="submit" disabled={!ready}>
-              {busy ? "Ajout en cours…" : "Ajouter au chapitre"}
-            </Button>
-          </DialogFooter>
+          <div>
+            <FormStatus state={feedback.state} className="pb-4" />
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={!ready}>
+                {busy ? "Ajout en cours…" : "Ajouter au chapitre"}
+              </Button>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

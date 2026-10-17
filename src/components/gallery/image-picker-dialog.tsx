@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { HardDrive, ImageOff, Images, Link2, Search, Upload, X, type LucideIcon } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -194,6 +194,8 @@ function TileBrowser({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [choosing, setChoosing] = useState<string | null>(null);
+  // Image choisie mais illisible : dit sous la recherche, au-dessus des vignettes.
+  const chooseFeedback = useFeedback();
   const offset = useRef(0);
   const ticket = useRef(0);
   // `load` change d'identité à chaque rendu du parent : on lit la version courante.
@@ -224,10 +226,11 @@ function TileBrowser({
 
   const choose = async (tile: Tile) => {
     setChoosing(tile.id);
+    chooseFeedback.clear();
     try {
       await onChoose(tile);
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : "Image illisible.");
+      chooseFeedback.error(errorMessage(reason, "Cette image n’a pas pu être lue. Choisissez-en une autre."));
     } finally {
       setChoosing(null);
     }
@@ -240,6 +243,9 @@ function TileBrowser({
           <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={placeholder} className="h-9 pl-8" />
         </div>
+      </div>
+      <div className="shrink-0">
+        <FormStatus state={chooseFeedback.state} className="px-4 pt-3" />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {error ? (

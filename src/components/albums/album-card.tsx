@@ -46,7 +46,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
-import { toast } from "sonner";
+import { ActionStatus, useFeedback } from "@/components/feedback";
 import type { Album } from "@/types/albums";
 import type { AlbumVisibility } from "@/lib/album-visibility";
 import {
@@ -87,6 +87,9 @@ export function AlbumCard({
   const [imageFiles, setImageFiles] = useState<string[]>([]);
   const [isTogglingPublic, setIsTogglingPublic] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  // Retour des actions du menu (visibilité, copie du lien), lu sur la carte :
+  // le menu se referme aussitôt et ne peut pas le porter.
+  const feedback = useFeedback();
 
   // Charger les fichiers de l'album et filtrer les images
   useEffect(() => {
@@ -135,6 +138,7 @@ export function AlbumCard({
 
   const handleVisibilityChange = async (visibility: AlbumVisibility) => {
     setIsTogglingPublic(true);
+    feedback.clear();
     try {
       const response = await fetch(`/api/albums/${album.id}`, {
         method: "PUT",
@@ -148,13 +152,12 @@ export function AlbumCard({
         throw new Error("Erreur lors de la mise à jour");
       }
 
-      toast.success(t(`albums.visibility.${visibility}.done`));
-
-      // Recharger la page pour mettre à jour l'état
+      // Recharger la page pour mettre à jour l'état : le badge de visibilité
+      // de la carte montre le résultat.
       window.location.reload();
     } catch (error) {
       console.error("Erreur:", error);
-      toast.error(t("albums.errors.toggle_visibility"));
+      feedback.error("Visibilité inchangée. Réessayez.");
     } finally {
       setIsTogglingPublic(false);
     }
@@ -168,11 +171,11 @@ export function AlbumCard({
     try {
       await navigator.clipboard.writeText(`${window.location.origin}${publicPath}`);
       setCopiedUrl(true);
-      toast.success(t("albums.url_copied"));
+      feedback.success("Lien public copié");
       setTimeout(() => setCopiedUrl(false), 2000);
     } catch (error) {
       console.error("Erreur lors de la copie:", error);
-      toast.error("Erreur lors de la copie de l'URL");
+      feedback.error("Copie impossible. Ouvrez l’album et copiez son adresse.");
     }
   };
 
@@ -284,11 +287,12 @@ export function AlbumCard({
                       </p>
                     )}
 
-                    <div className="flex items-center text-xs text-muted-foreground gap-2 sm:gap-4">
-                      <span className="flex items-center gap-1">
+                    <div className="flex min-w-0 items-center text-xs text-muted-foreground gap-2 sm:gap-4">
+                      <span className="flex shrink-0 items-center gap-1">
                         <Calendar className="h-3 w-3" />
                         {format(parseISO(album.createdAt), "PPP", { locale })}
                       </span>
+                      <ActionStatus state={feedback.state} />
                     </div>
                   </div>
 
@@ -401,9 +405,12 @@ export function AlbumCard({
                     </p>
                   )}
 
-                  <div className="flex items-center text-xs text-muted-foreground mt-2">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    {format(parseISO(album.createdAt), "PPP", { locale })}
+                  <div className="mt-2 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                    <span className="flex shrink-0 items-center">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      {format(parseISO(album.createdAt), "PPP", { locale })}
+                    </span>
+                    <ActionStatus state={feedback.state} />
                   </div>
                 </div>
 

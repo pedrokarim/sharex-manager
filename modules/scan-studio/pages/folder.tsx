@@ -25,6 +25,7 @@ import {
   ImageDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ActionStatus, useFeedback, type FeedbackState } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
@@ -96,6 +97,11 @@ function FolderChapters({ folderId }: { folderId: string }) {
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
+  // Retours sur place : sur la ligne de résumé de la liste pour ce qui touche tout le dossier
+  // (ordre, glossaire, visibilité des nouveaux chapitres), sur la ligne d'un chapitre pour son échec.
+  const listFeedback = useFeedback({ successDuration: 4000 });
+  const rowFeedback = useFeedback();
+  const [rowTarget, setRowTarget] = useState<string | null>(null);
 
   const store = useCallback(
     (next: FolderView) => {
@@ -113,7 +119,9 @@ function FolderChapters({ folderId }: { folderId: string }) {
       setFailed(false);
     } catch (error) {
       setFailed(true);
-      toast.error(errorMessage(error, "Dossier indisponible."));
+      // Sans liste affichée, la page dit elle-même que le dossier est indisponible. Une liste déjà là,
+      // relue en fond après un changement, n'a pas d'autre endroit pour dire qu'elle n'est plus à jour.
+      if (snapshots.has(folderId)) toast.error(errorMessage(error, "Le dossier n’a pas pu être relu : la liste n’est peut-être pas à jour."));
     }
   }, [folderId, store]);
 
@@ -128,11 +136,12 @@ function FolderChapters({ folderId }: { folderId: string }) {
 
   const commitOrder = async (ids: string[]) => {
     if (sameOrder(ids, savedOrder.current)) return;
+    listFeedback.clear();
     try {
       await api.reorderChapters(folderId, ids);
       savedOrder.current = ids;
     } catch (error) {
-      toast.error(errorMessage(error, "Le nouvel ordre n’a pas pu être enregistré."));
+      listFeedback.error(errorMessage(error, "Le nouvel ordre n’a pas pu être enregistré : la liste reprend l’ordre précédent."));
       void refresh();
     }
   };
@@ -157,20 +166,22 @@ function FolderChapters({ folderId }: { folderId: string }) {
     await refresh();
   };
 
+  // La ligne disparaît : c'est le retour ; un échec s'affiche sur elle.
   const deleteChapter = async (chapter: ChapterSummary) => {
+    rowFeedback.clear();
     try {
       await api.deleteChapter(chapter.id);
       setView((previous) => previous && { ...previous, chapters: previous.chapters.filter((entry) => entry.id !== chapter.id) });
-      toast.success("Chapitre supprimé");
       void refresh();
     } catch (error) {
-      toast.error(errorMessage(error, "Suppression du chapitre impossible."));
+      setRowTarget(chapter.id);
+      rowFeedback.error(errorMessage(error, "Le chapitre n’a pas pu être supprimé. Réessayez."));
     }
   };
 
+  // La ligne de résumé (« par défaut, … ») reprend aussitôt les nouveaux réglages.
   const saveDefaults = async (defaults: ChapterSettings) => {
     await api.updateFolder(folderId, { defaults });
-    toast.success("Réglages du dossier enregistrés");
     await refresh();
   };
 
@@ -183,18 +194,19 @@ function FolderChapters({ folderId }: { folderId: string }) {
       snapshots.set(folderId, next);
       return next;
     });
-    toast.success("Glossaire enregistré");
+    // Le glossaire ne se voit pas sur la page : la ligne de résumé confirme, un instant.
+    listFeedback.success("Glossaire enregistré");
   };
 
   const saveDefaultVisibility = async (defaultVisibility: ChapterVisibility) => {
     await api.updateFolder(folderId, { defaultVisibility });
-    toast.success("Visibilité des nouveaux chapitres enregistrée");
+    listFeedback.success("Visibilité des nouveaux chapitres enregistrée");
     await refresh();
   };
 
+  // La ligne du chapitre affiche sa nouvelle visibilité ; publier laisse la fenêtre ouverte sur l'adresse.
   const saveVisibility = async (chapter: ChapterSummary, visibility: ChapterVisibility) => {
-    const next = await api.setChapterVisibility(chapter.id, visibility);
-    toast.success(next.visibility === "private" ? "Chapitre repassé en privé" : `Chapitre publié : ${visibilityLabel(next.visibility).toLowerCase()}`);
+    await api.setChapterVisibility(chapter.id, visibility);
     await refresh();
   };
 
@@ -300,9 +312,12 @@ function FolderChapters({ folderId }: { folderId: string }) {
           </LibraryNotice>
         ) : (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground tabular-nums">
-              {countLabel(chapters.length, "chapitre", "chapitres")}, {countLabel(pageCount, "page", "pages")} · par défaut, {settingsSummary(view.folder.defaults)}
-            </p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <p className="min-w-0 text-sm text-muted-foreground tabular-nums">
+                {countLabel(chapters.length, "chapitre", "chapitres")}, {countLabel(pageCount, "page", "pages")} · par défaut, {settingsSummary(view.folder.defaults)}
+              </p>
+              <ActionStatus state={listFeedback.state} />
+            </div>
             <Reorder.Group as="ol" axis="y" values={chapters.map((chapter) => chapter.id)} onReorder={showOrder} className="flex flex-col">
               <AnimatePresence initial={false}>
                 {chapters.map((chapter, index) => (
@@ -317,6 +332,7 @@ function FolderChapters({ folderId }: { folderId: string }) {
                     onDelete={() => deleting.show(chapter)}
                     onShare={() => sharing.show(chapter)}
                     onArchive={() => void exportArchive(chapter)}
+                    status={rowTarget === chapter.id ? rowFeedback.state : null}
                   />
                 ))}
               </AnimatePresence>
@@ -414,9 +430,11 @@ interface ChapterRowProps {
   onShare: () => void;
   /** Télécharge l'archive `.cbz` du chapitre. */
   onArchive: () => void;
+  /** Échec d'une action sur ce chapitre : il prend la place de la ligne de décompte. */
+  status: FeedbackState | null;
 }
 
-function ChapterRow({ chapter, first, last, onDrop, onMove, onRename, onDelete, onShare, onArchive }: ChapterRowProps) {
+function ChapterRow({ chapter, first, last, onDrop, onMove, onRename, onDelete, onShare, onArchive, status }: ChapterRowProps) {
   const controls = useDragControls();
   const href = chapterHref(chapter.id);
   const label = chapterLabel(chapter);
@@ -470,11 +488,15 @@ function ChapterRow({ chapter, first, last, onDrop, onMove, onRename, onDelete, 
               {label}
               {chapter.title && <span className="font-normal text-muted-foreground"> · {chapter.title}</span>}
             </Link>
-            <p className="truncate text-xs text-muted-foreground tabular-nums">
-              {countLabel(chapter.pageCount, "page", "pages")}
-              {chapter.visibility && chapter.visibility !== "private" && ` · ${visibilityLabel(chapter.visibility).toLowerCase()}`}
-              <span className="md:hidden"> · {summary}</span>
-            </p>
+            {status ? (
+              <ActionStatus state={status} className="flex max-w-full" />
+            ) : (
+              <p className="truncate text-xs text-muted-foreground tabular-nums">
+                {countLabel(chapter.pageCount, "page", "pages")}
+                {chapter.visibility && chapter.visibility !== "private" && ` · ${visibilityLabel(chapter.visibility).toLowerCase()}`}
+                <span className="md:hidden"> · {summary}</span>
+              </p>
+            )}
           </div>
           <div className="hidden w-56 shrink-0 flex-col gap-1.5 md:flex">
             <Progress value={Math.round(progressRatio(chapter.progress, chapter.pageCount) * 100)} aria-label={`Avancement de ${label}`} className="h-1.5" />

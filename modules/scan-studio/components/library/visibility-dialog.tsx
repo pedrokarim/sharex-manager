@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Check, Copy, ExternalLink, ShieldCheck, TriangleAlert } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -36,12 +37,21 @@ export function VisibilityDialog({ open, onOpenChange, title, description, value
   const [draft, setDraft] = useState<ChapterVisibility>(value);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  // L'échec de l'enregistrement s'affiche au-dessus du bouton ; un autre choix l'efface.
+  const feedback = useFeedback();
+  const clearFeedback = feedback.clear;
 
   useEffect(() => {
     if (!open) return;
     setDraft(value);
     setCopied(false);
+    setCopyFailed(false);
   }, [open, value]);
+
+  useEffect(() => {
+    clearFeedback();
+  }, [draft, open, clearFeedback]);
 
   const forChapter = publishablePages !== undefined;
   const nothingToShow = forChapter && publishablePages === 0;
@@ -52,12 +62,13 @@ export function VisibilityDialog({ open, onOpenChange, title, description, value
     event.preventDefault();
     if (busy || blocked) return;
     setBusy(true);
+    feedback.clear();
     try {
       await onSave(draft);
-      // Devenu public : la fenêtre reste ouverte pour montrer l'adresse à partager.
+      // Devenu public : la fenêtre reste ouverte pour montrer l'adresse à partager.
       if (!forChapter || draft === "private") onOpenChange(false);
     } catch (error) {
-      toast.error(errorMessage(error, "Visibilité non enregistrée."));
+      feedback.error(errorMessage(error, "La visibilité n’a pas pu être enregistrée. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -65,12 +76,13 @@ export function VisibilityDialog({ open, onOpenChange, title, description, value
 
   const copy = async () => {
     if (!link) return;
+    // L'icône du bouton devient une coche : c'est le retour de la copie.
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
-      toast.success("Adresse copiée");
+      setCopyFailed(false);
     } catch {
-      toast.error("Copie impossible : sélectionnez l’adresse à la main.");
+      setCopyFailed(true);
     }
   };
 
@@ -143,17 +155,21 @@ export function VisibilityDialog({ open, onOpenChange, title, description, value
                   </a>
                 </Button>
               </div>
+              {copyFailed && <FieldError>Ce navigateur a refusé la copie. Sélectionnez l’adresse à la main.</FieldError>}
             </div>
           )}
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Fermer
-            </Button>
-            <Button type="submit" disabled={busy || blocked || draft === value}>
-              {!forChapter ? "Enregistrer" : draft === "private" ? "Rendre privé" : "Publier ainsi"}
-            </Button>
-          </DialogFooter>
+          <div>
+            <FormStatus state={feedback.state} className="pb-4" />
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                Fermer
+              </Button>
+              <Button type="submit" disabled={busy || blocked || draft === value}>
+                {!forChapter ? "Enregistrer" : draft === "private" ? "Rendre privé" : "Publier ainsi"}
+              </Button>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

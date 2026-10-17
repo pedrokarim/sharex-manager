@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "@/lib/i18n";
 import { albumVisibility, type AlbumVisibility } from "@/lib/album-visibility";
 import { AlbumVisibilityField } from "./album-visibility";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 
 interface Album {
   id: number;
@@ -35,6 +36,11 @@ export interface AlbumFormData {
 interface CreateAlbumDialogProps {
   open: boolean;
   onClose: () => void;
+  /**
+   * Crée ou modifie l'album. En cas d'échec, lever une `Error` dont le message
+   * s'adresse à l'utilisateur : la fenêtre l'affiche au-dessus de ses boutons
+   * et reste ouverte pour qu'il corrige ou réessaie.
+   */
   onSubmit: (data: AlbumFormData) => Promise<void>;
   album?: Album | null;
 }
@@ -52,6 +58,9 @@ export function CreateAlbumDialog({
   // Un nouvel album naît privé ; en modification, on part de son état.
   const [visibility, setVisibility] = useState<AlbumVisibility>("private");
   const [loading, setLoading] = useState(false);
+  // L'échec de l'envoi se lit dans la fenêtre, au-dessus des boutons.
+  const feedback = useFeedback();
+  const clearFeedback = feedback.clear;
 
   // Pré-remplir le formulaire en mode édition
   useEffect(() => {
@@ -64,7 +73,8 @@ export function CreateAlbumDialog({
       setDescription("");
       setVisibility("private");
     }
-  }, [open, album]);
+    if (open) clearFeedback();
+  }, [open, album, clearFeedback]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +84,7 @@ export function CreateAlbumDialog({
     }
 
     setLoading(true);
+    feedback.clear();
     try {
       await onSubmit({
         name: name.trim(),
@@ -85,7 +96,14 @@ export function CreateAlbumDialog({
       setName("");
       setDescription("");
     } catch (error) {
-      // L'erreur est gérée par le parent
+      feedback.error(
+        errorMessage(
+          error,
+          isEditMode
+            ? "L’album n’a pas pu être modifié. Réessayez."
+            : "L’album n’a pas pu être créé. Réessayez.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -102,7 +120,11 @@ export function CreateAlbumDialog({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[640px] sm:max-w-[640px] overflow-hidden rounded-2xl border border-border/70 p-0 shadow-2xl">
-        <form onSubmit={handleSubmit}>
+        <form
+          onSubmit={handleSubmit}
+          // Corriger sa saisie retire le message d'erreur.
+          onChange={feedback.state?.tone === "error" ? feedback.clear : undefined}
+        >
           <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
             <DialogTitle className="text-lg sm:text-xl">
               {isEditMode
@@ -152,6 +174,9 @@ export function CreateAlbumDialog({
               <AlbumVisibilityField value={visibility} onChange={setVisibility} disabled={loading} />
             </div>
           </div>
+
+          {/* Hors de la pile `space-y` : la marge s'ouvre avec le message. */}
+          <FormStatus state={feedback.state} className="px-5 pb-5 sm:px-6" />
 
           <DialogFooter className="gap-2 border-t border-border/60 bg-muted/20 px-5 py-4 sm:px-6">
             <Button

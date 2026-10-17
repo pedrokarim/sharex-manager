@@ -18,8 +18,10 @@ import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
   ArrowRight,
+  Check,
   Clapperboard,
   Copy,
+  CopyX,
   Download,
   FileVideo,
   History,
@@ -43,6 +45,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { ActionStatus, FormStatus, errorMessage, useFeedback } from "@/components/feedback";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Label } from "@/components/ui/label";
@@ -374,16 +378,27 @@ function ExportDetail({ id }: { id: string }) {
 
   const services = useMemo(() => (entry && targets ? serviceTargets(targets.connectors, entry, details?.hashtagRules ?? {}) : []), [entry, targets, details?.hashtagRules]);
 
+  // Retours de l'onglet Textes : l'enregistrement répond dans sa barre, la
+  // reprise de la marque au bout de la rangée de boutons.
+  const saveFeedback = useFeedback();
+  const toolbarFeedback = useFeedback();
+  const creditsCopy = useCopyToClipboard();
+  const editPost = (next: ExportPost) => {
+    setPost(next);
+    if (saveFeedback.state?.tone === "error") saveFeedback.clear();
+  };
+
   const save = async () => {
     if (!post || !entry) return;
     setSaving(true);
+    saveFeedback.clear();
     try {
       const next = await updateExportPost(entry.id, post, saved?.updatedAt || undefined);
       setPost(next);
       setSaved(next);
-      toast.success("Textes enregistrés");
+      saveFeedback.success("Textes enregistrés.");
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : "Enregistrement impossible");
+      saveFeedback.error(errorMessage(reason, "Les textes n’ont pas pu être enregistrés. Réessayez."));
     } finally {
       setSaving(false);
     }
@@ -393,16 +408,18 @@ function ExportDetail({ id }: { id: string }) {
   const fromBrand = async () => {
     if (!post || !entry) return;
     setBrandBusy(true);
+    toolbarFeedback.clear();
     try {
       const previous = post;
       const next = await defaultPostTexts(entry.id);
       setPost({ ...next, updatedAt: post.updatedAt });
-      toast.success(details?.brand ? `Textes repris de la marque « ${details.brand.name} »` : "Textes repris du projet", {
+      // Le toast reste : il porte « Annuler », qui rend les textes d'avant.
+      toast.success(details?.brand ? `Textes repris de la marque « ${details.brand.name} ».` : "Textes repris du projet.", {
         description: "Rien n’est enregistré tant que vous n’enregistrez pas.",
         action: { label: "Annuler", onClick: () => setPost(previous) },
       });
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : "Lecture de la marque impossible");
+      toolbarFeedback.error(errorMessage(reason, "La marque n’a pas pu être relue. Réessayez dans un instant."));
     } finally {
       setBrandBusy(false);
     }
@@ -434,9 +451,10 @@ function ExportDetail({ id }: { id: string }) {
         const keys = field ? result.unreviewed.filter((entryKey) => entryKey === `base.${field.kind}`) : result.unreviewed;
         return mergeDraft(current, { base: result.post.base, variants: result.post.variants, unreviewed: keys }, keys);
       });
-      toast.success(field ? "Proposition prête, à relire" : "Propositions prêtes, à relire", { description: "Rien n’est enregistré sans votre accord." });
+      // L'assistant rédige en fond (jusqu'à une minute) : sa fin se notifie, où que l'on soit.
+      toast.success(field ? "Proposition prête, à relire." : "Propositions prêtes, à relire.", { description: "Rien n’est enregistré sans votre accord." });
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : "L’assistant n’a pas pu rédiger");
+      toast.error(errorMessage(reason, "L’assistant n’a pas pu rédiger. Réessayez dans un instant."));
     } finally {
       setDrafting((current) => {
         const next = new Set(current);
@@ -447,14 +465,21 @@ function ExportDetail({ id }: { id: string }) {
   };
 
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // Un échec reste dans la fenêtre de confirmation, qui ne se ferme qu'une fois l'export supprimé.
+  const deleteFeedback = useFeedback();
   const remove = async () => {
     if (!entry) return;
+    setDeleting(true);
+    deleteFeedback.clear();
     try {
       await callModule("deleteExport", entry.id);
-      toast.success("Export supprimé");
+      // La fiche disparaît : le toast confirme sur la liste.
+      toast.success("Export supprimé.");
       router.push("/m/clip-studio/exports");
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : "Suppression impossible");
+      deleteFeedback.error(errorMessage(reason, "L’export n’a pas pu être supprimé. Réessayez."));
+      setDeleting(false);
     }
   };
 
@@ -620,12 +645,13 @@ function ExportDetail({ id }: { id: string }) {
                   </Button>
                 </PopoverContent>
               </Popover>
+              <ActionStatus state={toolbarFeedback.state} className="max-w-full" />
             </div>
 
             {post ? (
               <PostTextsEditor
                 post={post}
-                onChange={setPost}
+                onChange={editPost}
                 services={services}
                 showBase
                 tab={tab}
@@ -638,7 +664,8 @@ function ExportDetail({ id }: { id: string }) {
             ) : null}
 
             <AnimatePresence initial={false}>
-              {dirty ? (
+              {/* La barre reste le temps de dire « Textes enregistrés », puis s'en va. */}
+              {dirty || saveFeedback.state?.tone === "success" ? (
                 <motion.div
                   key="save"
                   initial={{ opacity: 0, y: 8 }}
@@ -646,16 +673,34 @@ function ExportDetail({ id }: { id: string }) {
                   exit={{ opacity: 0, y: 8 }}
                   className="sticky bottom-0 z-10 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t bg-background/95 py-3 backdrop-blur"
                 >
-                  <p className="text-sm text-muted-foreground">Modifications non enregistrées</p>
-                  <div className="flex shrink-0 gap-2">
-                    <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => setPost(saved)} disabled={saving}>
-                      <Undo2 className="size-4" />
-                      Annuler
-                    </Button>
-                    <Button size="sm" className="gap-1.5" onClick={() => void save()} loading={saving}>
-                      Enregistrer
-                    </Button>
+                  <div className="min-w-0 basis-full empty:hidden">
+                    <FormStatus state={saveFeedback.state?.tone === "error" ? saveFeedback.state : null} />
                   </div>
+                  {dirty ? (
+                    <>
+                      <p className="text-sm text-muted-foreground">Modifications non enregistrées</p>
+                      <div className="flex shrink-0 gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => {
+                            saveFeedback.clear();
+                            setPost(saved);
+                          }}
+                          disabled={saving}
+                        >
+                          <Undo2 className="size-4" />
+                          Annuler
+                        </Button>
+                        <Button size="sm" className="gap-1.5" onClick={() => void save()} loading={saving}>
+                          Enregistrer
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <ActionStatus state={saveFeedback.state} className="text-sm" />
+                  )}
                 </motion.div>
               ) : null}
             </AnimatePresence>
@@ -714,15 +759,17 @@ function ExportDetail({ id }: { id: string }) {
                     variant="outline"
                     size="sm"
                     className="gap-1.5"
-                    onClick={() =>
-                      void navigator.clipboard.writeText(creditsText(credits)).then(
-                        () => toast.success("Crédits copiés"),
-                        () => toast.error("Copie impossible")
-                      )
-                    }
+                    onClick={() => void creditsCopy.copyToClipboard(creditsText(credits))}
+                    aria-live="polite"
                   >
-                    <Copy className="size-3.5" />
-                    Copier
+                    {creditsCopy.hasCopied ? (
+                      <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                    ) : creditsCopy.copyFailed ? (
+                      <CopyX className="size-3.5 text-destructive" />
+                    ) : (
+                      <Copy className="size-3.5" />
+                    )}
+                    {creditsCopy.hasCopied ? "Copié" : creditsCopy.copyFailed ? "Copie impossible" : "Copier"}
                   </Button>
                 </div>
                 <ul className="grid min-w-0 gap-1.5 text-sm">
@@ -738,7 +785,14 @@ function ExportDetail({ id }: { id: string }) {
         </Tabs>
       </div>
 
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <AlertDialog
+        open={confirmDelete}
+        onOpenChange={(open) => {
+          if (deleting) return;
+          if (open) deleteFeedback.clear();
+          setConfirmDelete(open);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer cet export ?</AlertDialogTitle>
@@ -746,10 +800,19 @@ function ExportDetail({ id }: { id: string }) {
               La vidéo, sa couverture, ses sous-titres et ses textes disparaissent. Les publications déjà faites restent en ligne chez chaque service.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <FormStatus state={deleteFeedback.state} />
           <AlertDialogFooter>
-            <AlertDialogCancel>Garder</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void remove()} className="bg-destructive text-white hover:bg-destructive/90">
-              Supprimer
+            <AlertDialogCancel disabled={deleting}>Garder</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                // La fenêtre reste ouverte jusqu'à la fin : un échec s'y affiche.
+                event.preventDefault();
+                void remove();
+              }}
+              disabled={deleting}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deleting ? "Suppression…" : "Supprimer"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

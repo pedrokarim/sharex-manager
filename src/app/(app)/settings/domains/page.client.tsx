@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, useFeedback } from "@/components/feedback";
 import { Domain } from "@/lib/types/upload-config";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -78,6 +78,15 @@ export default function DomainsPage({
   const [domains, setDomains] = useState<Domain[]>(initialDomains);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingDomain, setEditingDomain] = useState<Domain | null>(null);
+  // Chaque zone a son message : l'erreur d'enregistrement dans la fenêtre,
+  // celle de la configuration au-dessus de son bouton (la réussite à côté),
+  // celle d'une suppression sur la ligne du domaine. Un ajout ou une
+  // suppression réussis se voient dans la liste.
+  const domainFeedback = useFeedback();
+  const configFeedback = useFeedback();
+  const deleteFeedback = useFeedback();
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const deleteStatusOf = (id: string) => (deleteTargetId === id ? deleteFeedback.state : null);
 
   const domainSchemaWithTranslation = z.object({
     id: z.string().min(1, t("settings.domains.form.errors.id_required")),
@@ -112,6 +121,7 @@ export default function DomainsPage({
   });
 
   const onSubmitDomain = async (values: DomainFormValues) => {
+    domainFeedback.clear();
     try {
       const response = await fetch("/api/settings/domains", {
         method: editingDomain ? "PUT" : "POST",
@@ -134,17 +144,13 @@ export default function DomainsPage({
       setIsAddDialogOpen(false);
       setEditingDomain(null);
       domainForm.reset();
-      toast.success(
-        editingDomain
-          ? t("settings.domains.messages.updated")
-          : t("settings.domains.messages.added"),
-      );
     } catch (error) {
-      toast.error(t("settings.domains.errors.generic"));
+      domainFeedback.error(t("settings.domains.errors.generic"));
     }
   };
 
   const onSubmitConfig = async (values: ConfigFormValues) => {
+    configFeedback.clear();
     try {
       const response = await fetch("/api/settings/domains/config", {
         method: "PUT",
@@ -154,13 +160,15 @@ export default function DomainsPage({
 
       if (!response.ok) throw new Error(t("settings.domains.errors.save"));
 
-      toast.success(t("settings.domains.messages.config_updated"));
+      configFeedback.success(t("settings.domains.messages.config_updated"));
     } catch (error) {
-      toast.error(t("settings.domains.errors.generic"));
+      configFeedback.error(t("settings.domains.errors.generic"));
     }
   };
 
   const handleDelete = async (id: string) => {
+    setDeleteTargetId(id);
+    deleteFeedback.clear();
     try {
       const response = await fetch(`/api/settings/domains/${id}`, {
         method: "DELETE",
@@ -169,16 +177,22 @@ export default function DomainsPage({
       if (!response.ok) throw new Error(t("settings.domains.errors.delete"));
 
       setDomains(domains.filter((d) => d.id !== id));
-      toast.success(t("settings.domains.messages.deleted"));
     } catch (error) {
-      toast.error(t("settings.domains.errors.generic"));
+      deleteFeedback.error(t("settings.domains.errors.generic"));
     }
   };
 
   const handleEdit = (domain: Domain) => {
     setEditingDomain(domain);
     domainForm.reset(domain);
+    domainFeedback.clear();
     setIsAddDialogOpen(true);
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    // Une fenêtre rouverte repart sans l'erreur de la fois précédente.
+    if (open) domainFeedback.clear();
+    setIsAddDialogOpen(open);
   };
 
   return (
@@ -211,6 +225,7 @@ export default function DomainsPage({
           <Form {...configForm}>
             <form
               onSubmit={configForm.handleSubmit(onSubmitConfig)}
+              onChange={configFeedback.state?.tone === "error" ? configFeedback.clear : undefined}
               className="space-y-4 sm:space-y-6"
             >
               <FormField
@@ -257,9 +272,25 @@ export default function DomainsPage({
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full text-sm sm:w-auto">
-                {t("settings.domains.config.save")}
-              </Button>
+              <div>
+                {/* L'erreur au-dessus du bouton, la réussite à côté. */}
+                <FormStatus
+                  state={configFeedback.state?.tone === "error" ? configFeedback.state : null}
+                  className="pb-3"
+                />
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+                  <Button
+                    type="submit"
+                    className="w-full text-sm sm:w-auto"
+                    loading={configForm.formState.isSubmitting}
+                  >
+                    {t("settings.domains.config.save")}
+                  </Button>
+                  <ActionStatus
+                    state={configFeedback.state?.tone === "success" ? configFeedback.state : null}
+                  />
+                </div>
+              </div>
             </form>
           </Form>
         </CardContent>
@@ -276,7 +307,7 @@ export default function DomainsPage({
                 {t("settings.domains.list.description")}
               </CardDescription>
             </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <Dialog open={isAddDialogOpen} onOpenChange={handleDialogOpenChange}>
               <DialogTrigger asChild>
                 <Button className="w-full sm:w-auto text-sm">
                   <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
@@ -299,6 +330,7 @@ export default function DomainsPage({
                 <Form {...domainForm}>
                   <form
                     onSubmit={domainForm.handleSubmit(onSubmitDomain)}
+                    onChange={domainFeedback.state ? domainFeedback.clear : undefined}
                     className="space-y-4 px-5 py-5 sm:px-6"
                   >
                     <FormField
@@ -389,14 +421,19 @@ export default function DomainsPage({
                         </FormItem>
                       )}
                     />
-                    <DialogFooter className="flex-col gap-2 border-t border-border/60 px-0 pt-4 sm:flex-row sm:justify-end">
-                      <Button
-                        type="submit"
-                        className="w-full sm:w-auto text-sm"
-                      >
-                        {editingDomain ? t("common.edit") : t("common.create")}
-                      </Button>
-                    </DialogFooter>
+                    {/* Enveloppe fixe : l'espacement du message s'ouvre avec lui. */}
+                    <div>
+                      <FormStatus state={domainFeedback.state} className="pb-4" />
+                      <DialogFooter className="flex-col gap-2 border-t border-border/60 px-0 pt-4 sm:flex-row sm:justify-end">
+                        <Button
+                          type="submit"
+                          className="w-full sm:w-auto text-sm"
+                          loading={domainForm.formState.isSubmitting}
+                        >
+                          {editingDomain ? t("common.edit") : t("common.create")}
+                        </Button>
+                      </DialogFooter>
+                    </div>
                   </form>
                 </Form>
               </DialogContent>
@@ -458,6 +495,9 @@ export default function DomainsPage({
                     <Trash2 className="mr-2 h-4 w-4" />
                     Supprimer
                   </Button>
+                  {deleteStatusOf(domain.id) ? (
+                    <ActionStatus state={deleteStatusOf(domain.id)} className="col-span-2 justify-center" />
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -501,6 +541,7 @@ export default function DomainsPage({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1 sm:gap-2">
+                        <ActionStatus state={deleteStatusOf(domain.id)} className="max-w-48" />
                         <Button
                           variant="ghost"
                           size="icon"

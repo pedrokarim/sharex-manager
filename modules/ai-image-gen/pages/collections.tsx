@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Anchor,
   ArrowLeft,
+  CircleAlert,
   Clapperboard,
   Layers,
   Pencil,
@@ -15,7 +16,8 @@ import {
 import Link from "next/link";
 import { useAccountPreference } from "@/hooks/use-account-preference";
 import { COMPOSER_PREFERENCE_SCOPE, type ComposerPreference } from "../lib/composer-preference";
-import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +97,8 @@ export default function CollectionsPage({ settings }: CollectionsPageProps) {
   const [loading, setLoading] = useState(true);
   const [viewerShots, setViewerShots] = useState<Shot[]>([]);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  // Échec de lecture des séries : un état durable de la page, en tête.
+  const [loadError, setLoadError] = useState(false);
 
   const { jobs, history, refresh } = useStudioState(200);
 
@@ -106,8 +110,9 @@ export default function CollectionsPage({ settings }: CollectionsPageProps) {
       ]);
       setCollections(cols);
       setCatalogue(cat);
+      setLoadError(false);
     } catch {
-      toast.error("Chargement des séries impossible");
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -135,16 +140,15 @@ export default function CollectionsPage({ settings }: CollectionsPageProps) {
     setViewerIndex(fileIndex);
   }, []);
 
+  /**
+   * Lève en cas d'échec : la fenêtre affiche l'erreur au-dessus de son bouton.
+   * En cas de réussite, elle se ferme sur la série ouverte : c'est le retour.
+   */
   const saveCollection = async (input: Partial<Collection>) => {
-    try {
-      const saved = await callModule<Collection>("saveCollection", input);
-      await load();
-      setEditing(null);
-      setSelectedId(saved.id);
-      toast.success("Série enregistrée");
-    } catch (error: any) {
-      toast.error(error?.message ?? "Enregistrement impossible");
-    }
+    const saved = await callModule<Collection>("saveCollection", input);
+    await load();
+    setEditing(null);
+    setSelectedId(saved.id);
   };
 
   return (
@@ -165,7 +169,20 @@ export default function CollectionsPage({ settings }: CollectionsPageProps) {
     >
       {loading && <Spinner className="h-5 w-5" />}
 
-      {!loading && !selected && collections.length === 0 && (
+      {loadError && (
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Séries indisponibles</AlertTitle>
+          <AlertDescription>
+            <p>Les séries n’ont pas pu être chargées. Vérifiez votre connexion, puis réessayez.</p>
+            <Button variant="outline" size="sm" className="mt-1" onClick={() => void load()}>
+              Réessayer
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!loading && !loadError && !selected && collections.length === 0 && (
         <Empty className="rounded-xl border border-dashed py-16">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -321,6 +338,8 @@ function CollectionDetail({
   );
   const [busy, setBusy] = useState(false);
   const [anchorPicker, setAnchorPicker] = useState(false);
+  // Retour de « Générer » : sous la saisie de la scène.
+  const sceneFeedback = useFeedback();
 
   const models = (catalogue?.models ?? []).filter((entry) => entry.available);
 
@@ -333,6 +352,7 @@ function CollectionDetail({
   const addScene = async () => {
     if (!scenePrompt.trim()) return;
     setBusy(true);
+    sceneFeedback.clear();
     try {
       const spec = models.find((entry) => entry.id === model);
       await callModule("enqueueGeneration", {
@@ -344,10 +364,11 @@ function CollectionDetail({
         collectionId: collection.id,
       });
       setScenePrompt("");
-      toast.success("Scène en file d'attente");
+      // La scène rejoint la file d'attente, plus bas : on le dit ici.
+      sceneFeedback.success("Scène en file d’attente : elle apparaîtra parmi les scènes une fois générée.");
       await onRefresh();
-    } catch (error: any) {
-      toast.error(error?.message ?? "Lancement impossible");
+    } catch (error) {
+      sceneFeedback.error(errorMessage(error, "La scène n’a pas pu être lancée. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -511,7 +532,10 @@ function CollectionDetail({
             rows={2}
             placeholder="La même héroïne, de nuit, sur les toits…"
             value={scenePrompt}
-            onChange={(event) => setScenePrompt(event.target.value)}
+            onChange={(event) => {
+              setScenePrompt(event.target.value);
+              if (sceneFeedback.state?.tone === "error") sceneFeedback.clear();
+            }}
             onKeyDown={(event) => {
               if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                 event.preventDefault();
@@ -547,6 +571,7 @@ function CollectionDetail({
             </Button>
           </div>
         </div>
+        <FormStatus state={sceneFeedback.state} className="pt-2" />
         <p className="mt-2 text-[11px] text-muted-foreground">
           La trame, le style et les {collection.anchors?.length ?? 0} repère(s)
           de la série sont ajoutés automatiquement.
@@ -580,10 +605,10 @@ function CollectionDetail({
         onClose={() => setAnchorPicker(false)}
         history={history}
         onPick={async (file, label) => {
+          // Le repère qui apparaît dans la série confirme l'ajout.
           await callModule("addCollectionAnchor", collection.id, file, label);
           await onRefresh();
           setAnchorPicker(false);
-          toast.success("Repère ajouté");
         }}
       />
     </div>
@@ -605,6 +630,21 @@ function AnchorPicker({
 }) {
   const [label, setLabel] = useState("");
   const [file, setFile] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const feedback = useFeedback();
+
+  const pin = async () => {
+    if (!file) return;
+    setBusy(true);
+    feedback.clear();
+    try {
+      await onPick(file, label || "Référence");
+    } catch (error) {
+      feedback.error(errorMessage(error, "Le repère n’a pas pu être épinglé. Réessayez."));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const shots = useMemo(
     () => history.flatMap((item) => item.imageFiles.map((entry) => entry)).slice(0, 60),
@@ -627,7 +667,10 @@ function AnchorPicker({
             <button
               key={entry}
               type="button"
-              onClick={() => setFile(entry)}
+              onClick={() => {
+                setFile(entry);
+                feedback.clear();
+              }}
               className={
                 file === entry
                   ? "aspect-square overflow-hidden rounded-md ring-2 ring-primary"
@@ -655,14 +698,14 @@ function AnchorPicker({
           />
         </Field>
 
-        <DialogFooter>
-          <Button
-            disabled={!file}
-            onClick={() => file && onPick(file, label || "Référence")}
-          >
-            Épingler
-          </Button>
-        </DialogFooter>
+        <div>
+          <FormStatus state={feedback.state} className="pb-3" />
+          <DialogFooter>
+            <Button disabled={!file} loading={busy} onClick={() => void pin()}>
+              Épingler
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -681,13 +724,31 @@ function CollectionDialog({
 }) {
   const [draft, setDraft] = useState<Partial<Collection>>({ name: "" });
   const [busy, setBusy] = useState(false);
+  // Échec de l'enregistrement : au-dessus du bouton, effacé à la saisie.
+  const feedback = useFeedback();
+  const clearFeedback = feedback.clear;
 
   useEffect(() => {
     if (value) setDraft(value);
-  }, [value]);
+    clearFeedback();
+  }, [value, clearFeedback]);
 
-  const patch = (next: Partial<Collection>) =>
+  const patch = (next: Partial<Collection>) => {
     setDraft((previous) => ({ ...previous, ...next }));
+    if (feedback.state) feedback.clear();
+  };
+
+  const save = async () => {
+    setBusy(true);
+    feedback.clear();
+    try {
+      await onSave(draft);
+    } catch (error) {
+      feedback.error(errorMessage(error, "La série n’a pas pu être enregistrée. Réessayez."));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Dialog open={Boolean(value)} onOpenChange={(next) => !next && onClose()}>
@@ -751,19 +812,15 @@ function CollectionDialog({
           </Field>
         </FieldGroup>
 
-        <DialogFooter>
-          <Button
-            disabled={busy || !draft.name?.trim()}
-            onClick={async () => {
-              setBusy(true);
-              await onSave(draft);
-              setBusy(false);
-            }}
-          >
-            {busy && <Spinner className="mr-2 h-4 w-4" />}
-            Enregistrer
-          </Button>
-        </DialogFooter>
+        <div>
+          <FormStatus state={feedback.state} className="pb-3" />
+          <DialogFooter>
+            <Button disabled={busy || !draft.name?.trim()} onClick={() => void save()}>
+              {busy && <Spinner className="mr-2 h-4 w-4" />}
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -6,15 +6,20 @@ import { toast } from "sonner";
 import {
   ChevronDown,
   ArrowLeft,
+  CircleAlert,
   Edit2,
   Trash2,
   Plus,
   Globe,
   GlobeLock,
   Copy,
+  CopyX,
   Check,
   ExternalLink,
+  RotateCw,
 } from "lucide-react";
+import { ActionStatus, useFeedback } from "@/components/feedback";
+import { SelectionCopyStatus } from "@/app/(app)/_components/selection-copy-status";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -52,7 +57,7 @@ import { TimelineNavigator, findScrollParent, timelineGroupProps } from "@/compo
 import { formatMonthKey, monthKeyOf, type TimelineMonth } from "@/lib/timeline";
 import { languageAtom } from "@/lib/atoms/preferences";
 import { useAtomValue } from "jotai";
-import { capitalize } from "@/lib/utils";
+import { capitalize, cn } from "@/lib/utils";
 
 interface AlbumViewClientProps {
   albumId: number;
@@ -81,6 +86,17 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   const [albumLoading, setAlbumLoading] = useState(true);
   const [isTogglingPublic, setIsTogglingPublic] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copyUrlFailed, setCopyUrlFailed] = useState(false);
+  /** Échec du chargement de l'album : la page le dit au lieu de rester vide. */
+  const [albumError, setAlbumError] = useState<string | null>(null);
+  /** Échec du chargement des fichiers : dit là où les fichiers manquent. */
+  const [filesError, setFilesError] = useState<string | null>(null);
+  // Échec d'une action de l'en-tête (visibilité, suppression de l'album),
+  // lu à côté de ses boutons. Une réussite se voit : le badge change, ou la
+  // page laisse place à la liste des albums.
+  const headerFeedback = useFeedback();
+  /** Résultat de la copie des URL de la sélection, lu au-dessus de sa barre. */
+  const copyFeedback = useFeedback();
 
   /**
    * L'origine n'est connue que côté navigateur. La lire pendant le rendu
@@ -149,12 +165,15 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   const fetchAlbumMetadata = useCallback(async () => {
     try {
       setAlbumLoading(true);
+      setAlbumError(null);
       const albumResponse = await fetch(`/api/albums/${albumId}`);
       if (!albumResponse.ok) {
         const errorData = await albumResponse.json().catch(() => ({}));
         const errorMessage =
           errorData.error || tRef.current("albums.errors.loading");
 
+        // Introuvable ou interdit : retour à la liste des albums. La page
+        // d'origine disparaît, le toast est le seul endroit pour l'expliquer.
         if (albumResponse.status === 404) {
           toast.error(tRef.current("albums.errors.not_found"));
           routerRef.current.push("/albums");
@@ -169,7 +188,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           routerRef.current.push("/albums");
           return;
         }
-        toast.error(errorMessage);
+        setAlbumError(errorMessage);
         return;
       }
 
@@ -177,7 +196,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       setAlbum(albumData);
     } catch (error) {
       console.error("Erreur lors du chargement de l'album:", error);
-      toast.error(tRef.current("albums.errors.loading"));
+      setAlbumError(tRef.current("albums.errors.loading"));
     } finally {
       setAlbumLoading(false);
     }
@@ -196,18 +215,20 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         );
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
-          toast.error(
+          setFilesError(
             errorData.error || tRef.current("albums.errors.loading_files")
           );
           return { files: [] as FileInfo[], hasMore: false };
         }
         const data = await res.json();
+        setFilesError(null);
         return {
           files: data.files as FileInfo[],
           hasMore: data.hasMore as boolean,
         };
       } catch (error) {
         console.error("Erreur lors du chargement des fichiers:", error);
+        setFilesError(tRef.current("albums.errors.loading_files"));
         return { files: [] as FileInfo[], hasMore: false };
       }
     },
@@ -407,6 +428,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         setViewerFallbackFile(metadata);
         const foundInAlbum = await hydrateViewerFileInList(viewerFileName);
 
+        // La visionneuse se referme : le message n'a plus d'autre place.
         if (!foundInAlbum && !cancelled && viewerResolutionIdRef.current === resolutionId) {
           toast.error(t("gallery.file_viewer.file_not_in_album"));
           closeViewerFile();
@@ -477,16 +499,20 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
 
       updateData((prev) => prev.filter((file) => file.name !== fileName));
       if (viewerFileName === fileName) {
+        // Retiré depuis la visionneuse, qui se referme : le toast confirme.
+        // Depuis la grille, la vignette qui disparaît suffit.
         closeViewerFile();
         setViewerFallbackFile(null);
+        toast.success(t("albums.file_removed"));
       }
-      toast.success(t("albums.file_removed"));
     } catch {
+      // Lancé d'une vignette ou de la visionneuse, sans place pour un message.
       toast.error(t("albums.errors.remove_file"));
     }
   };
 
   const handleDeleteAlbum = async () => {
+    headerFeedback.clear();
     try {
       const response = await fetch(`/api/albums/${albumId}`, {
         method: "DELETE",
@@ -496,15 +522,17 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         throw new Error();
       }
 
+      // Retour à la liste : la page disparaît, le toast confirme.
       toast.success(t("albums.deleted"));
       router.push("/albums");
     } catch {
-      toast.error(t("albums.errors.delete"));
+      headerFeedback.error(t("albums.errors.delete"));
     }
   };
 
   const handleVisibilityChange = async (visibility: AlbumVisibility) => {
     setIsTogglingPublic(true);
+    headerFeedback.clear();
     try {
       const response = await fetch(`/api/albums/${albumId}`, {
         method: "PUT",
@@ -518,29 +546,35 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         throw new Error();
       }
 
+      // Réussite : le badge de visibilité et la ligne du lien public changent.
       setAlbum(await response.json());
-      toast.success(t(`albums.visibility.${visibility}.done`));
     } catch {
-      toast.error(t("albums.errors.toggle_visibility"));
+      headerFeedback.error(t("albums.errors.toggle_visibility"));
     } finally {
       setIsTogglingPublic(false);
     }
   };
 
+  // Le bouton « Copier » du lien public dit lui-même le résultat ; il est
+  // affiché chaque fois que l'entrée du menu l'est.
   const handleCopyPublicUrl = async () => {
     if (!album?.publicSlug) return;
 
     const publicUrl = `${window.location.origin}/catalog/albums/${album.publicSlug}`;
     try {
       await navigator.clipboard.writeText(publicUrl);
+      setCopyUrlFailed(false);
       setCopiedUrl(true);
-      toast.success(t("albums.url_copied"));
       setTimeout(() => setCopiedUrl(false), 2000);
     } catch {
-      toast.error(t("albums.errors.copy_url"));
+      setCopiedUrl(false);
+      setCopyUrlFailed(true);
+      setTimeout(() => setCopyUrlFailed(false), 4000);
     }
   };
 
+  // Copie lancée d'un menu contextuel, de la visionneuse ou d'un raccourci,
+  // dont les boutons appartiennent à leurs composants : le toast reste.
   const copyToClipboard = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -574,13 +608,9 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       setViewerFallbackFile((prev) =>
         prev?.name === file.name ? { ...prev, isSecure: data.isSecure } : prev,
       );
-
-      toast.success(
-        file.isSecure
-          ? t("gallery.file_actions.now_public")
-          : t("gallery.file_actions.now_private")
-      );
+      // Réussite : le cadenas de la vignette et de la visionneuse change.
     } catch {
+      // Lancé d'un menu contextuel ou de la visionneuse : pas d'autre place.
       toast.error(t("gallery.file_actions.error_occurred"));
     }
   };
@@ -609,13 +639,9 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       setViewerFallbackFile((prev) =>
         prev?.name === file.name ? { ...prev, isStarred: data.isStarred } : prev,
       );
-
-      toast.success(
-        file.isStarred
-          ? t("gallery.file_actions.removed_from_favorites")
-          : t("gallery.file_actions.added_to_favorites")
-      );
+      // Réussite : l'étoile de la vignette et de la visionneuse change.
     } catch {
+      // Même raison que pour le cadenas : pas d'autre place.
       toast.error(t("gallery.file_actions.error_occurred"));
     }
   };
@@ -660,12 +686,11 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         closeViewerFile();
         setViewerFallbackFile(null);
       }
+      // Réussite : les vignettes disparaissent avec la barre de sélection.
       clearSelection();
       setIsSelectionMode(false);
-      toast.success(
-        t("albums.files_removed", { count: selectedFileNames.length }),
-      );
     } catch {
+      // Lancé de la barre de sélection : pas d'autre place pour le message.
       toast.error(t("albums.errors.remove_file"));
     }
   }, [getSelectedFiles, albumId, updateData, viewerFileName, closeViewerFile, clearSelection, t]);
@@ -694,11 +719,12 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           closeViewerFile();
           setViewerFallbackFile(null);
         }
+        // Réussite : les vignettes disparaissent avec la barre de sélection.
         clearSelection();
         setIsSelectionMode(false);
-        toast.success(t("gallery.file_actions.delete_success"));
       }
 
+      // Lancé de la barre de sélection ou d'un raccourci : pas d'autre place.
       if (successful < selectedFileNames.length) {
         toast.error(t("gallery.file_actions.delete_error"));
       }
@@ -708,7 +734,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
     }
   }, [getSelectedFiles, updateData, clearSelection, t, viewerFileName, closeViewerFile]);
 
-  const handleCopySelectedUrls = useCallback(() => {
+  const handleCopySelectedUrls = useCallback(async () => {
     const selectedFileNames = getSelectedFiles();
     if (selectedFileNames.length === 0) return;
 
@@ -719,13 +745,17 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       )
       .join("\n");
 
+    // Le retour se lit juste au-dessus de la barre de sélection, d'où la
+    // copie part (bouton ou Ctrl+C) : pas de toast au coin de l'écran.
+    copyFeedback.clear();
     try {
-      navigator.clipboard.writeText(urls);
-      toast.success(t("gallery.file_actions.copy_url"));
+      // Attendue, sinon un refus du presse-papiers passait pour une réussite.
+      await navigator.clipboard.writeText(urls);
+      copyFeedback.success(t("gallery.file_actions.copy_url"));
     } catch {
-      toast.error(t("gallery.file_actions.copy_error"));
+      copyFeedback.error(t("gallery.file_actions.copy_error"));
     }
-  }, [getSelectedFiles, t]);
+  }, [getSelectedFiles, t, copyFeedback]);
 
   const handleToggleStarSelected = useCallback(async () => {
     const selectedFilesData = getSelectedFilesData(uniqueFiles);
@@ -755,8 +785,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         const sel = selectedFilesData.find((file) => file.name === prev.name);
         return sel ? { ...prev, isStarred: !sel.isStarred } : prev;
       });
-
-      toast.success(t("gallery.file_actions.added_to_favorites"));
+      // Réussite : les étoiles des vignettes changent.
     } catch {
       toast.error(t("gallery.file_actions.error_occurred"));
     }
@@ -790,8 +819,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         const sel = selectedFilesData.find((file) => file.name === prev.name);
         return sel ? { ...prev, isSecure: !sel.isSecure } : prev;
       });
-
-      toast.success(t("gallery.file_actions.now_private"));
+      // Réussite : les cadenas des vignettes changent.
     } catch {
       toast.error(t("gallery.file_actions.error_occurred"));
     }
@@ -828,8 +856,9 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           closeViewerFile();
           setViewerFallbackFile(null);
         }
-        toast.success(t("albums.files_moved", { count: filesToAddToAlbum.length }));
+        // Réussite : les fichiers déplacés quittent la grille.
       } catch {
+        // La fenêtre d'ajout se ferme : pas d'autre place pour le message.
         toast.error(t("albums.errors.remove_file"));
       }
     }
@@ -863,8 +892,31 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   }
 
   if (!album) {
-    return null;
+    // Ni album ni redirection : la page dit pourquoi au lieu de rester vide.
+    return albumError ? (
+      <div className="flex flex-col items-center justify-center gap-4 px-4 py-12 text-center sm:py-24">
+        <CircleAlert className="h-8 w-8 text-destructive sm:h-10 sm:w-10" />
+        <p role="alert" className="max-w-md text-sm text-pretty break-words">
+          {albumError}
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.push("/albums")}>
+            <ArrowLeft className="h-4 w-4" />
+            Retour aux albums
+          </Button>
+          <Button size="sm" onClick={() => void fetchAlbumMetadata()}>
+            <RotateCw className="h-4 w-4" />
+            Réessayer
+          </Button>
+        </div>
+      </div>
+    ) : null;
   }
+
+  const retryFiles = async () => {
+    const { files: nextFiles, hasMore } = await fetchAlbumFiles(1);
+    applyReset(nextFiles, hasMore);
+  };
 
   const VisibilityIcon = VISIBILITY_ICONS[albumVisibility(album)];
 
@@ -904,6 +956,9 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+          {/* Posé avant les boutons : ils ne bougent pas quand le message
+              apparaît. Borné, un long message se tronque. */}
+          <ActionStatus state={headerFeedback.state} className="max-w-64" />
           <ViewSelector />
 
           <DropdownMenu>
@@ -991,19 +1046,27 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
             variant="ghost"
             size="sm"
             onClick={handleCopyPublicUrl}
-            className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+            className={cn("h-7 shrink-0 gap-1.5 px-2 text-xs", copyUrlFailed && "text-destructive")}
+            title={copyUrlFailed ? t("albums.errors.copy_url") : undefined}
           >
-            {copiedUrl ? (
-              <>
-                <Check className="h-3.5 w-3.5" />
-                Copié
-              </>
-            ) : (
-              <>
-                <Copy className="h-3.5 w-3.5" />
-                Copier
-              </>
-            )}
+            <span aria-live="polite" className="inline-flex items-center gap-1.5">
+              {copiedUrl ? (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  Copié
+                </>
+              ) : copyUrlFailed ? (
+                <>
+                  <CopyX className="h-3.5 w-3.5" />
+                  Copie impossible
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  Copier
+                </>
+              )}
+            </span>
           </Button>
           <Button
             variant="ghost"
@@ -1020,7 +1083,10 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       )}
 
       {/* Contenu de l'album */}
-      {files.length === 0 && !loading ? (
+      {files.length === 0 && !loading && filesError ? (
+        // Un échec ne doit pas se faire passer pour un album vide.
+        <FilesErrorNotice message={filesError} onRetry={() => void retryFiles()} />
+      ) : files.length === 0 && !loading ? (
         <div className="flex flex-col items-center justify-center py-12 sm:py-24 text-center px-4">
           <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg bg-primary/10 flex items-center justify-center mb-3 sm:mb-4">
             <Plus className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
@@ -1117,6 +1183,10 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
             </div>
           ))}
 
+          {/* La suite n'a pas pu venir : le message se lit là où elle manque. */}
+          {filesError && !loading && (
+            <FilesErrorNotice message={filesError} onRetry={() => void retryFiles()} />
+          )}
           <div ref={sentinelRef} className="h-10 flex items-center justify-center">
             {loading && <Skeleton className="h-2 w-40 rounded-full" />}
           </div>
@@ -1176,6 +1246,7 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
           onShowHelp={() => setIsShortcutsHelpOpen(true)}
         />
       )}
+      {isSelectionMode && hasSelection && <SelectionCopyStatus state={copyFeedback.state} />}
 
       {/* Dialog d'ajout/déplacement vers un album */}
       <AddToAlbumDialog
@@ -1196,6 +1267,26 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
         onClose={() => setIsShortcutsHelpOpen(false)}
         shortcuts={shortcuts}
       />
+    </div>
+  );
+}
+
+/**
+ * Échec du chargement des fichiers, dans l'album même : à la place de la
+ * liste vide, ou sous les derniers fichiers chargés.
+ */
+function FilesErrorNotice({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="my-6 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+    >
+      <CircleAlert aria-hidden className="size-4 shrink-0" />
+      <p className="min-w-0 flex-1 break-words">{message}</p>
+      <Button variant="outline" size="sm" onClick={onRetry} className="shrink-0">
+        <RotateCw className="size-4" />
+        Réessayer
+      </Button>
     </div>
   );
 }

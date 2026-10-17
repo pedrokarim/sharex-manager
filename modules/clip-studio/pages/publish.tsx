@@ -22,7 +22,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, CloudOff, Eye, FileVideo, Plus, RotateCcw, Send, Timer } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   AlertDialog,
@@ -317,6 +317,8 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
   postRef.current = post;
 
   const inflight = useRef<Promise<boolean> | null>(null);
+  // Raison du dernier échec d'enregistrement, lue sous l'en-tête « Textes » (état local : `saveTexts` garde son identité).
+  const [saveError, setSaveError] = useState<string | null>(null);
   const saveTexts = useCallback(async (): Promise<boolean> => {
     // Un enregistrement en cours d'abord : deux envois croisés se refuseraient l'un l'autre.
     if (inflight.current) await inflight.current;
@@ -331,10 +333,11 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
         // Une saisie arrivée pendant l'enregistrement est gardée : seul l'horodatage suit.
         setPost((latest) => (samePost(latest, current) ? next : { ...latest, updatedAt: next.updatedAt }));
         setSaveState(samePost(postRef.current, current) ? "saved" : "pending");
+        setSaveError(null);
         return true;
       } catch (reason) {
         setSaveState("error");
-        toast.error(reason instanceof Error ? reason.message : "Textes non enregistrés");
+        setSaveError(errorMessage(reason, "Les textes n’ont pas pu être enregistrés. Réessayez."));
         return false;
       }
     })();
@@ -501,6 +504,8 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
   const [submitting, setSubmitting] = useState(false);
   const [confirmPublic, setConfirmPublic] = useState(false);
   const [jobs, setJobs] = useState<PublishJobSummary[] | null>(null);
+  // Échecs de l'envoi : au-dessus du bouton Publier, ou en tête du suivi si d'autres comptes sont partis.
+  const submitFeedback = useFeedback();
 
   const pollJobs = useCallback(async (ids: string[]) => {
     const next = await callModule<PublishJobSummary[]>("getPublishJobs", ids).catch(() => null);
@@ -515,9 +520,13 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
   const submit = async () => {
     setConfirmPublic(false);
     setSubmitting(true);
+    submitFeedback.clear();
     try {
       // Les textes relus ici partent avec la publication : on les range d'abord dans l'export.
-      if (!(await saveTexts())) return;
+      if (!(await saveTexts())) {
+        submitFeedback.error("Les textes n’ont pas pu être enregistrés : rien n’a été publié. Réessayez.");
+        return;
+      }
       const list: PublishTarget[] = reviews.map((review) => {
         const time = times[review.account.id];
         const scheduleField = scheduleFieldOf(review.connector);
@@ -531,16 +540,18 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
         };
       });
       const result = await publishExport({ exportId: entry.id, targets: list });
-      for (const failure of result.failed) {
-        const account = accounts.find((item) => item.id === failure.accountId);
-        toast.error(`${account?.displayName ?? "Compte"} : ${failure.error}`);
+      if (result.failed.length > 0) {
+        const lines = result.failed.map((failure) => {
+          const account = accounts.find((item) => item.id === failure.accountId);
+          const text = `${account?.displayName ?? "Compte"} : ${failure.error}`;
+          return /[.!?…]$/.test(text) ? text : `${text}.`;
+        });
+        submitFeedback.error(lines.join(" "));
       }
-      if (result.jobs.length > 0) {
-        setJobs(result.jobs);
-        toast.success(result.jobs.length > 1 ? `${result.jobs.length} publications en file` : "Publication en file");
-      }
+      // Le suivi des envois remplace le formulaire : il tient lieu de confirmation.
+      if (result.jobs.length > 0) setJobs(result.jobs);
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : "Publication impossible");
+      submitFeedback.error(errorMessage(reason, "La publication n’a pas pu partir. Réessayez dans un instant."));
     } finally {
       setSubmitting(false);
     }
@@ -630,6 +641,7 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
         <h2 className="text-sm font-semibold">Textes</h2>
         <SaveIndicator state={saveState} onRetry={() => void saveTexts()} />
       </div>
+      <FormStatus state={saveState === "error" && saveError ? { tone: "error", message: saveError, id: 0 } : null} />
       <PostTextsEditor
         post={post}
         onChange={setPost}
@@ -751,6 +763,7 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
             </span>
           ) : null}
         </div>
+        <FormStatus state={submitFeedback.state} />
         <Button onClick={startSubmit} loading={submitting} disabled={reviews.length === 0 || blockerCount > 0} title={firstBlocker} className="w-full gap-2">
           <Send className="size-4" />
           {mode !== "now" ? "Programmer" : reviews.length > 1 ? `Publier sur ${reviews.length} comptes` : "Publier"}
@@ -780,6 +793,7 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
       {jobs ? (
         <section className="grid min-w-0 gap-4 lg:max-w-3xl" aria-label="Suivi des envois">
           <h2 className="text-sm font-semibold">Envois</h2>
+          <FormStatus state={submitFeedback.state} />
           <JobTimeline jobs={jobs} accounts={accounts} connectors={targets.connectors} onChanged={() => void pollJobs(jobs.map((job) => job.id))} authorizeReturn={exportHref(entry.id)} />
           <div className="flex min-w-0 flex-wrap gap-2">
             <Button asChild className="gap-2">
@@ -788,7 +802,13 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
                 Fiche de l’export
               </Link>
             </Button>
-            <Button variant="outline" onClick={() => setJobs(null)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                submitFeedback.clear();
+                setJobs(null);
+              }}
+            >
               Publier ailleurs
             </Button>
           </div>

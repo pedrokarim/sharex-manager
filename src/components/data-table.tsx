@@ -53,7 +53,7 @@ import {
   TrendingUpIcon,
 } from "lucide-react"
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
-import { toast } from "sonner"
+import { ActionStatus, useFeedback } from "@/components/feedback"
 import { z } from "zod"
 
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -139,6 +139,44 @@ function DragHandle({ id }: { id: number }) {
   )
 }
 
+/**
+ * Valeur modifiable sur place : Entrée enregistre, et « Enregistré » s'affiche
+ * à côté du champ plutôt que dans une notification au coin de l'écran.
+ */
+function InlineEditCell({
+  id,
+  label,
+  defaultValue,
+}: {
+  id: string
+  label: string
+  defaultValue: string
+}) {
+  const feedback = useFeedback()
+  return (
+    <form
+      className="flex min-w-0 items-center justify-end gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault()
+        feedback.clear()
+        // Enregistrement simulé, comme dans le gabarit d'origine.
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        feedback.success("Enregistré")
+      }}
+    >
+      <ActionStatus state={feedback.state} />
+      <Label htmlFor={id} className="sr-only">
+        {label}
+      </Label>
+      <Input
+        className="h-8 w-16 shrink-0 border-transparent bg-transparent text-right shadow-none hover:bg-input/30 focus-visible:border focus-visible:bg-background"
+        defaultValue={defaultValue}
+        id={id}
+      />
+    </form>
+  )
+}
+
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     id: "drag",
@@ -211,50 +249,22 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     accessorKey: "target",
     header: () => <div className="w-full text-right">Target</div>,
     cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-target`} className="sr-only">
-          Target
-        </Label>
-        <Input
-          className="h-8 w-16 border-transparent bg-transparent text-right shadow-none hover:bg-input/30 focus-visible:border focus-visible:bg-background"
-          defaultValue={row.original.target}
-          id={`${row.original.id}-target`}
-        />
-      </form>
+      <InlineEditCell
+        id={`${row.original.id}-target`}
+        label="Target"
+        defaultValue={row.original.target}
+      />
     ),
   },
   {
     accessorKey: "limit",
     header: () => <div className="w-full text-right">Limit</div>,
     cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
-          Limit
-        </Label>
-        <Input
-          className="h-8 w-16 border-transparent bg-transparent text-right shadow-none hover:bg-input/30 focus-visible:border focus-visible:bg-background"
-          defaultValue={row.original.limit}
-          id={`${row.original.id}-limit`}
-        />
-      </form>
+      <InlineEditCell
+        id={`${row.original.id}-limit`}
+        label="Limit"
+        defaultValue={row.original.limit}
+      />
     ),
   },
   {

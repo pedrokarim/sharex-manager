@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Check, ExternalLink, Globe, LayoutList, Link2, ListPlus, ListVideo, Lock, PencilLine, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, useFeedback } from "@/components/feedback";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -137,13 +137,20 @@ function HomeSections({
     if (account.status === "connected") void load();
   }, [account.status, load]);
 
-  const apply = async (key: string, task: () => Promise<{ ok: true; data: ProfileSection[] } | { ok: false; error: string }>, success: string) => {
+  // Une section ajoutée, déplacée ou retirée se voit dans la liste ; un échec
+  // s'affiche sur la section concernée, ou sous « Ajouter ».
+  const applyFeedback = useFeedback();
+  const [applyKey, setApplyKey] = useState<string | null>(null);
+  const applyStatusOf = (key: string) => (applyKey === key ? applyFeedback.state : null);
+
+  const apply = async (key: string, task: () => Promise<{ ok: true; data: ProfileSection[] } | { ok: false; error: string }>) => {
     setBusy(key);
+    setApplyKey(key);
+    applyFeedback.clear();
     const result = await task();
     setBusy(null);
-    if (!result.ok) return void toast.error(result.error);
+    if (!result.ok) return void applyFeedback.error(result.error);
     setSections({ status: "ready", data: result.data });
-    toast.success(success);
   };
 
   const list = sections.status === "ready" ? sections.data : [];
@@ -226,6 +233,7 @@ function HomeSections({
                         {detail}
                       </span>
                     ) : null}
+                    <ActionStatus state={applyStatusOf(section.id)} />
                   </span>
                   {canEdit ? (
                     <span className="flex shrink-0 items-center gap-0.5">
@@ -235,7 +243,7 @@ function HomeSections({
                         variant="ghost"
                         aria-label="Monter"
                         disabled={busy !== null || index === 0}
-                        onClick={() => void apply(section.id, () => moveSectionAction(account.id, section.id, list[index - 1].position), "Section déplacée")}
+                        onClick={() => void apply(section.id, () => moveSectionAction(account.id, section.id, list[index - 1].position))}
                       >
                         <ArrowUp />
                       </Button>
@@ -244,7 +252,7 @@ function HomeSections({
                         variant="ghost"
                         aria-label="Descendre"
                         disabled={busy !== null || index === list.length - 1}
-                        onClick={() => void apply(section.id, () => moveSectionAction(account.id, section.id, list[index + 1].position), "Section déplacée")}
+                        onClick={() => void apply(section.id, () => moveSectionAction(account.id, section.id, list[index + 1].position))}
                       >
                         <ArrowDown />
                       </Button>
@@ -304,7 +312,7 @@ function HomeSections({
               loading={busy === "add"}
               disabled={busy !== null || !type || (type.needsPlaylist && !addPlaylist)}
               onClick={() =>
-                void apply("add", () => addSectionAction(account.id, { type: addType, ...(type?.needsPlaylist ? { playlistId: addPlaylist } : {}) }), "Section ajoutée")
+                void apply("add", () => addSectionAction(account.id, { type: addType, ...(type?.needsPlaylist ? { playlistId: addPlaylist } : {}) }))
               }
             >
               <Plus />
@@ -313,6 +321,8 @@ function HomeSections({
           </div>
         )
       ) : null}
+      {/* Rendu seulement s'il y a un message : vide, il ajouterait un écart. */}
+      {applyStatusOf("add") ? <ActionStatus state={applyStatusOf("add")} /> : null}
 
       <AlertDialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
         <AlertDialogContent>
@@ -329,7 +339,7 @@ function HomeSections({
               onClick={() => {
                 const section = removing;
                 setRemoving(null);
-                if (section) void apply(section.id, () => removeSectionAction(account.id, section.id), "Section retirée");
+                if (section) void apply(section.id, () => removeSectionAction(account.id, section.id));
               }}
             >
               Retirer
@@ -485,6 +495,9 @@ function AddVideoButton({ accountId, playlist, onAdded }: { accountId: string; p
   const [open, setOpen] = useState(false);
   const [videos, setVideos] = useState<LoadState<PostSummary[]> | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
+  // Un échec s'affiche dans la liste, qui reste ouverte ; une réussite la
+  // ferme et le compteur de la playlist augmente.
+  const feedback = useFeedback();
 
   const load = async () => {
     setVideos({ status: "loading" });
@@ -494,11 +507,11 @@ function AddVideoButton({ accountId, playlist, onAdded }: { accountId: string; p
 
   const add = async (video: PostSummary) => {
     setAdding(video.id);
+    feedback.clear();
     const result = await addPlaylistVideoAction(accountId, playlist.id, video.id);
     setAdding(null);
-    if (!result.ok) return void toast.error(result.error);
+    if (!result.ok) return void feedback.error(result.error);
     setOpen(false);
-    toast.success(`« ${video.title} » ajoutée à « ${playlist.title} »`);
     onAdded();
   };
 
@@ -507,6 +520,7 @@ function AddVideoButton({ accountId, playlist, onAdded }: { accountId: string; p
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
+        if (next) feedback.clear();
         if (next && !videos) void load();
       }}
     >
@@ -518,6 +532,7 @@ function AddVideoButton({ accountId, playlist, onAdded }: { accountId: string; p
       <PopoverContent align="end" className="w-[min(26rem,calc(100vw-2rem))] p-0">
         <Command>
           <CommandInput placeholder="Chercher une vidéo…" />
+          <FormStatus state={feedback.state} className="px-2 pt-2" />
           <CommandList className="max-h-72">
             {!videos || videos.status === "loading" ? (
               <div className="grid gap-2 p-2" aria-hidden>
@@ -571,17 +586,23 @@ function PlaylistDialog({
   const creating = playlist === "new";
   const [input, setInput] = useState<PlaylistInput>({ title: "", description: "", privacy: "private" });
   const [busy, setBusy] = useState(false);
+  // L'erreur s'affiche dans la fenêtre ; une réussite la ferme et la
+  // playlist apparaît (ou change) dans la liste.
+  const feedback = useFeedback();
+  const { clear } = feedback;
 
   useEffect(() => {
     if (playlist === null) return;
     setInput(playlist === "new" ? { title: "", description: "", privacy: "private" } : { title: playlist.title, description: playlist.description, privacy: playlist.privacy });
-  }, [playlist]);
+    clear();
+  }, [playlist, clear]);
 
   const tooLong = Array.from(input.title).length > limits.titleMax || Array.from(input.description).length > limits.descriptionMax;
 
   const submit = async () => {
     if (playlist === null) return;
     setBusy(true);
+    feedback.clear();
     const result =
       playlist === "new"
         ? await createPlaylistAction(accountId, input)
@@ -591,8 +612,7 @@ function PlaylistDialog({
             ...(input.privacy !== playlist.privacy ? { privacy: input.privacy } : {}),
           });
     setBusy(false);
-    if (!result.ok) return void toast.error(result.error);
-    toast.success(creating ? "Playlist créée" : "Playlist modifiée");
+    if (!result.ok) return void feedback.error(result.error);
     onSaved(result.data, creating);
   };
 
@@ -612,6 +632,8 @@ function PlaylistDialog({
             event.preventDefault();
             void submit();
           }}
+          // Corriger la saisie retire le message d'erreur.
+          onChange={feedback.state ? feedback.clear : undefined}
         >
           <div className="grid min-w-0 gap-1.5">
             <div className="flex min-w-0 items-center justify-between gap-2">
@@ -650,6 +672,11 @@ function PlaylistDialog({
                 );
               })}
             </ToggleGroup>
+          </div>
+          {/* Enveloppe toujours présente : sa marge négative compense l'écart
+              de la grille, et l'espacement s'ouvre avec le message. */}
+          <div className="-mt-4">
+            <FormStatus state={feedback.state} className="pt-4" />
           </div>
         </form>
         <DialogFooter>

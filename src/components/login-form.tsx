@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { authClient, signIn } from "@/lib/auth-client";
-import { toast } from "sonner";
 
 import { DISPLAY } from "@/components/front/fonts";
 import { FIELD, PILL_SOLID } from "@/components/front/styles";
@@ -10,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormStatus, useFeedback } from "@/components/feedback";
 
 export function LoginForm({
   authProvider = "builtin",
@@ -19,11 +19,15 @@ export function LoginForm({
   authProvider?: "builtin" | "ascencia";
 }) {
   const [isLoading, setIsLoading] = useState(false);
+  // L'erreur s'affiche dans le formulaire, au-dessus du bouton : c'est là
+  // que l'utilisateur regarde quand il vient de valider.
+  const feedback = useFeedback();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (authProvider !== "builtin") return;
     setIsLoading(true);
+    feedback.clear();
 
     const formData = new FormData(e.currentTarget);
 
@@ -36,16 +40,16 @@ export function LoginForm({
       if (error) {
         // Ne pas tout réduire à « identifiants invalides » : une erreur de
         // configuration (origine refusée, 500…) doit rester diagnosticable.
-        toast.error(
+        feedback.error(
           error.status === 401
-            ? "Identifiants invalides"
-            : (error.message ?? `Échec de la connexion (${error.status})`)
+            ? "Nom d’utilisateur ou mot de passe incorrect."
+            : (error.message ?? `Échec de la connexion (${error.status}).`)
         );
       } else {
         window.location.href = "/gallery";
       }
     } catch (error) {
-      toast.error("Une erreur est survenue");
+      feedback.error("La connexion n’a pas abouti. Vérifiez votre réseau, puis réessayez.");
     } finally {
       setIsLoading(false);
     }
@@ -53,6 +57,7 @@ export function LoginForm({
 
   async function handleAscenciaSignIn() {
     setIsLoading(true);
+    feedback.clear();
 
     try {
       const { error } = await authClient.signIn.oauth2({
@@ -62,11 +67,11 @@ export function LoginForm({
       });
 
       if (error) {
-        toast.error(error.message ?? "Connexion avec Ascencia ID impossible");
+        feedback.error(error.message ?? "Connexion avec Ascencia ID impossible.");
         setIsLoading(false);
       }
     } catch {
-      toast.error("Connexion avec Ascencia ID impossible");
+      feedback.error("Connexion avec Ascencia ID impossible.");
       setIsLoading(false);
     }
   }
@@ -76,6 +81,8 @@ export function LoginForm({
       className={cn("flex flex-col gap-6", className)}
       {...props}
       onSubmit={handleSubmit}
+      // Corriger sa saisie retire le message d'erreur.
+      onChange={feedback.state?.tone === "error" ? feedback.clear : undefined}
     >
       <div>
         <h1 className={cn(DISPLAY, "text-5xl leading-[1.05]")}>Connexion</h1>
@@ -119,19 +126,25 @@ export function LoginForm({
                 className={FIELD}
               />
             </div>
-            <Button type="submit" className={cn(PILL_SOLID, "w-full justify-center")} loading={isLoading}>
-              Se connecter
-            </Button>
+            <div>
+              <FormStatus state={feedback.state} className="pb-3" />
+              <Button type="submit" className={cn(PILL_SOLID, "w-full justify-center")} loading={isLoading}>
+                Se connecter
+              </Button>
+            </div>
           </>
         ) : (
-          <Button
-            type="button"
-            className={cn(PILL_SOLID, "w-full justify-center")}
-            loading={isLoading}
-            onClick={handleAscenciaSignIn}
-          >
-            Continuer avec Ascencia ID
-          </Button>
+          <div>
+            <FormStatus state={feedback.state} className="pb-3" />
+            <Button
+              type="button"
+              className={cn(PILL_SOLID, "w-full justify-center")}
+              loading={isLoading}
+              onClick={handleAscenciaSignIn}
+            >
+              Continuer avec Ascencia ID
+            </Button>
+          </div>
         )}
       </div>
       {authProvider === "builtin" && (

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { BookOpenText, Cpu, Download, FolderOpen, FolderPlus, Pencil, RefreshCw, Trash2, Type } from "lucide-react";
 import { toast } from "sonner";
+import { ActionStatus, useFeedback, type FeedbackState } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { GalleryImportDialog } from "../components/library/gallery-import-dialog";
 import { ConfirmDeleteDialog, NameDialog } from "../components/library/library-dialogs";
@@ -30,6 +31,11 @@ export default function LibraryPage() {
   const naming = useDialogTarget<NameRequest>();
   const deleting = useDialogTarget<FolderSummary>();
   const [galleryFiles, setGalleryFiles] = useState<string[] | null>(null);
+  /** Pourquoi les dossiers n'ont pas pu être lus, dit dans la page quand il n'y a rien d'autre à montrer. */
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // L'échec d'une suppression s'affiche sur la carte du dossier ; une réussite la fait disparaître.
+  const cardFeedback = useFeedback();
+  const [cardTarget, setCardTarget] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -37,9 +43,13 @@ export default function LibraryPage() {
       snapshot = next;
       setFolders(next);
       setFailed(false);
+      setLoadError(null);
     } catch (error) {
       setFailed(true);
-      toast.error(errorMessage(error, "Bibliothèque indisponible."));
+      const message = errorMessage(error, "Les dossiers n’ont pas pu être chargés.");
+      setLoadError(message);
+      // Une liste déjà affichée, relue en fond après un changement, n'a pas d'autre endroit pour dire qu'elle n'est plus à jour.
+      if (snapshot) toast.error(`La bibliothèque n’a pas pu être relue : ${message}`);
     }
   }, []);
 
@@ -69,6 +79,7 @@ export default function LibraryPage() {
   };
 
   const deleteFolder = async (folder: FolderSummary) => {
+    cardFeedback.clear();
     try {
       await api.deleteFolder(folder.id);
       setFolders((previous) => {
@@ -76,9 +87,9 @@ export default function LibraryPage() {
         snapshot = next;
         return next;
       });
-      toast.success("Dossier supprimé");
     } catch (error) {
-      toast.error(errorMessage(error, "Suppression du dossier impossible."));
+      setCardTarget(folder.id);
+      cardFeedback.error(errorMessage(error, "Le dossier n’a pas pu être supprimé. Réessayez."));
     }
   };
 
@@ -115,7 +126,7 @@ export default function LibraryPage() {
       >
         {folders === null ? (
           failed ? (
-            <LibraryNotice icon={BookOpenText} title="Bibliothèque indisponible" text="Les dossiers n’ont pas pu être chargés.">
+            <LibraryNotice icon={BookOpenText} title="Bibliothèque indisponible" text={loadError ?? "Les dossiers n’ont pas pu être chargés."}>
               <Button variant="outline" size="sm" className="gap-2" onClick={() => void refresh()}>
                 <RefreshCw className="h-4 w-4" />
                 Réessayer
@@ -147,7 +158,12 @@ export default function LibraryPage() {
                   exit={{ opacity: 0, scale: 0.94 }}
                   transition={{ duration: 0.18 }}
                 >
-                  <FolderCard folder={folder} onRename={() => naming.show({ mode: "rename", folder })} onDelete={() => deleting.show(folder)} />
+                  <FolderCard
+                    folder={folder}
+                    status={cardTarget === folder.id ? cardFeedback.state : null}
+                    onRename={() => naming.show({ mode: "rename", folder })}
+                    onDelete={() => deleting.show(folder)}
+                  />
                 </motion.li>
               ))}
             </AnimatePresence>
@@ -199,7 +215,18 @@ export default function LibraryPage() {
   );
 }
 
-function FolderCard({ folder, onRename, onDelete }: { folder: FolderSummary; onRename: () => void; onDelete: () => void }) {
+function FolderCard({
+  folder,
+  status,
+  onRename,
+  onDelete,
+}: {
+  folder: FolderSummary;
+  /** Échec d'une action sur ce dossier : il prend la place du décompte. */
+  status: FeedbackState | null;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
   const href = folderHref(folder.id);
 
   /** Les mêmes entrées derrière « … » et au clic droit. */
@@ -235,9 +262,13 @@ function FolderCard({ folder, onRename, onDelete }: { folder: FolderSummary; onR
             <Link href={href} className="block truncate text-sm font-medium hover:underline" title={folder.name}>
               {folder.name}
             </Link>
-            <p className="truncate text-xs text-muted-foreground tabular-nums">
-              {countLabel(folder.chapterCount, "chapitre", "chapitres")} · {countLabel(folder.pageCount, "page", "pages")}
-            </p>
+            {status ? (
+              <ActionStatus state={status} className="flex max-w-full" />
+            ) : (
+              <p className="truncate text-xs text-muted-foreground tabular-nums">
+                {countLabel(folder.chapterCount, "chapitre", "chapitres")} · {countLabel(folder.pageCount, "page", "pages")}
+              </p>
+            )}
           </div>
           <ObjectMenuButton
             entries={entries}

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ActionStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Spinner } from "@/components/ui/spinner";
 import { LoadingState } from "@/components/loading";
 import { Input } from "@/components/ui/input";
@@ -135,6 +136,8 @@ function Editor({ initial }: { initial: ClipProject }) {
   }, []);
   const router = useRouter();
   const [exporting, setExporting] = useState(false);
+  // Un échec avant l'export s'écrit à gauche du bouton Exporter.
+  const exportFeedback = useFeedback();
 
   // ─── Lecteur ───────────────────────────────────────────────────
   useEffect(() => {
@@ -276,7 +279,8 @@ function Editor({ initial }: { initial: ClipProject }) {
       const current = playerRef.current?.frame ?? 0;
       const found = findItem(projectRef.current, itemId);
       if (!found || current <= found.item.start || current >= found.item.start + found.item.duration) {
-        toast.info("Placez la tête de lecture sur l'élément pour le scinder");
+        // Raccourci, menu contextuel ou barre de la frise : pas d'emplacement commun, le toast reste.
+        toast.info("Placez la tête de lecture sur l’élément pour le scinder.");
         return;
       }
       commit((project) => splitItem(project, itemId, current));
@@ -399,7 +403,9 @@ function Editor({ initial }: { initial: ClipProject }) {
         </Select>
         <SaveIndicator state={saveState} />
 
-        <div className="ml-auto flex shrink-0 items-center gap-1">
+        {/* Vide, il ne mesure rien ; rempli, il rétrécit avec le nom du clip au lieu de déborder. */}
+        <ActionStatus state={exportFeedback.state} className="ml-auto max-w-64 justify-end" />
+        <div className="flex shrink-0 items-center gap-1">
           <IconButton label="Annuler (Ctrl Z)" disabled={!canUndo} onClick={undo}>
             <Undo2 className="h-4 w-4" />
           </IconButton>
@@ -414,12 +420,13 @@ function Editor({ initial }: { initial: ClipProject }) {
               // L'écran Exporter relit le projet : il est enregistré d'abord, tel qu'on le voit.
               playerRef.current?.pause();
               setExporting(true);
+              exportFeedback.clear();
               try {
                 await callModule("saveProject", projectRef.current);
                 router.push(`/m/clip-studio/export?project=${encodeURIComponent(projectRef.current.id)}`);
               } catch (error) {
                 setExporting(false);
-                toast.error(error instanceof Error ? error.message : "Enregistrement impossible avant l’export");
+                exportFeedback.error(errorMessage(error, "Le projet n’a pas pu être enregistré avant l’export. Réessayez."));
               }
             }}
           >
@@ -548,7 +555,8 @@ function Editor({ initial }: { initial: ClipProject }) {
             try {
               addSource(JSON.parse(payload) as MediaSource, { trackId, frame: at });
             } catch {
-              toast.error("Média illisible");
+              // Glisser-déposer sur la frise : le toast reste, rien d'autre ne se trouve sous le pointeur.
+              toast.error("Ce média n’a pas pu être ajouté. Faites-le glisser de nouveau depuis le panneau.");
             }
           }}
           onChangeTrackVoice={setVoiceTrackId}
@@ -576,7 +584,7 @@ function warnMissingFonts(missing: string[], warned: Set<string>) {
   if (fresh.length === 0) return;
   for (const family of fresh) warned.add(family);
   toast.warning(
-    fresh.length > 1 ? `${fresh.length} polices de la marque n’ont pas pu être chargées` : "Une police de la marque n’a pas pu être chargée",
+    fresh.length > 1 ? `${fresh.length} polices de la marque n’ont pas pu être chargées.` : "Une police de la marque n’a pas pu être chargée.",
     { description: "Le texte s’affiche avec une police de repli." }
   );
 }

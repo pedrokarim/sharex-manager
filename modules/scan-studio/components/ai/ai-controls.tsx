@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSession } from "@/lib/auth-client";
+import { ActionStatus, FormStatus, useFeedback } from "@/components/feedback";
 import { EngineLogo } from "../../../ai-image-gen/components/engine-logo";
 import { api, formatDate } from "../../lib/client";
 import { errorMessage } from "../../lib/library-helpers";
@@ -48,6 +48,22 @@ export function ModelPicker({ action, catalogue, chapterId, value, onChange }: M
   const models = catalogue.models[action];
   const chosen = findModel(catalogue, action, value);
   const [kept, setKept] = useState(catalogue.defaults[action] ?? "");
+  // « Retenir ce modèle » répond sur place, là où l'on vient de cliquer.
+  const keepFeedback = useFeedback();
+  const [keeping, setKeeping] = useState(false);
+
+  const keep = async (key: string) => {
+    setKeeping(true);
+    keepFeedback.clear();
+    const failure = await keepChapterModel(chapterId, action, key);
+    setKeeping(false);
+    if (failure) {
+      keepFeedback.error(failure);
+      return;
+    }
+    setKept(key);
+    keepFeedback.success("Retenu pour le chapitre");
+  };
 
   if (models.length === 0) {
     return <p className="text-xs text-muted-foreground">La palette d’IA ne propose aucun modèle pour cela. Elle se règle dans le module AI Image Gen.</p>;
@@ -71,14 +87,20 @@ export function ModelPicker({ action, catalogue, chapterId, value, onChange }: M
         </SelectContent>
       </Select>
       {chosen && !chosen.available && chosen.reason && <p className="text-xs text-amber-700 dark:text-amber-300">{chosen.reason}</p>}
-      {chosen && chosen.available && kept !== chosen.key && (
-        <button
-          type="button"
-          className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-          onClick={() => void keepChapterModel(chapterId, action, chosen.key).then((saved) => saved && setKept(chosen.key))}
-        >
-          Retenir ce modèle pour le chapitre
-        </button>
+      {((chosen && chosen.available && kept !== chosen.key) || keepFeedback.state) && (
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          {chosen && chosen.available && kept !== chosen.key && (
+            <button
+              type="button"
+              disabled={keeping}
+              className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-60"
+              onClick={() => void keep(chosen.key)}
+            >
+              Retenir ce modèle pour le chapitre
+            </button>
+          )}
+          <ActionStatus state={keepFeedback.state} className="text-[11px]" />
+        </div>
       )}
       {models.every((model) => !model.available) && (
         <p className="text-xs text-muted-foreground">Aucun de ces modèles n’est utilisable pour l’instant : {models[0].reason ?? "raison inconnue"}</p>
@@ -176,6 +198,8 @@ export function UsageNote({ catalogue, onSaved }: { catalogue: AiCatalogue; onSa
   const [editing, setEditing] = useState(false);
   const [limit, setLimit] = useState(String(monthlyLimit));
   const [saving, setSaving] = useState(false);
+  // L'erreur s'affiche sous le champ, la réussite à côté du plafond mis à jour.
+  const feedback = useFeedback();
   const parsed = Number(limit);
   const valid = limit.trim() !== "" && Number.isInteger(parsed) && parsed >= 0;
 
@@ -183,13 +207,14 @@ export function UsageNote({ catalogue, onSaved }: { catalogue: AiCatalogue; onSa
     event.preventDefault();
     if (!valid || saving) return;
     setSaving(true);
+    feedback.clear();
     try {
       await api.saveAiSettings({ monthlyLimit: parsed });
       setEditing(false);
       onSaved();
-      toast.success("Plafond mensuel d’appels à l’IA enregistré");
+      feedback.success("Plafond enregistré");
     } catch (error) {
-      toast.error(errorMessage(error, "Le plafond n’a pas pu être enregistré."));
+      feedback.error(errorMessage(error, "Le plafond n’a pas pu être enregistré. Réessayez dans un instant."));
     } finally {
       setSaving(false);
     }
@@ -204,9 +229,10 @@ export function UsageNote({ catalogue, onSaved }: { catalogue: AiCatalogue; onSa
             Changer le plafond
           </button>
         )}
+        {!editing && <ActionStatus state={feedback.state} className="align-middle" />}
       </p>
       {editing && (
-        <form onSubmit={save}>
+        <form onSubmit={save} onChange={feedback.state?.tone === "error" ? feedback.clear : undefined}>
           <InputGroup className="h-8">
             <InputGroupAddon>
               <InputGroupText className="text-[11px]">Appels par mois</InputGroupText>
@@ -228,6 +254,7 @@ export function UsageNote({ catalogue, onSaved }: { catalogue: AiCatalogue; onSa
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
+          <FormStatus state={feedback.state} className="pt-1.5" />
         </form>
       )}
     </div>

@@ -21,8 +21,8 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ActionStatus, FormStatus, errorMessage, useFeedback, type FeedbackState } from "@/components/feedback";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -127,6 +127,8 @@ function MyMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
   const [uploads, setUploads] = useState<{ id: string; name: string; ratio: number }[]>([]);
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  // Un import refusé se dit sous la zone d'import, là où l'on vient de déposer.
+  const feedback = useFeedback();
 
   const refresh = useCallback(async () => {
     const list = await callModule<ClipAsset[]>("listAssets");
@@ -140,8 +142,9 @@ function MyMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
 
   const importFiles = async (files: FileList | File[]) => {
     const accepted = Array.from(files).filter((file) => /^(image|video|audio)\//.test(file.type));
+    feedback.clear();
     if (accepted.length === 0) {
-      toast.error("Seuls les images, vidéos et sons sont acceptés");
+      feedback.error("Seuls les images, vidéos et sons sont acceptés. Choisissez un autre fichier.");
       return;
     }
     for (const file of accepted) {
@@ -151,8 +154,8 @@ function MyMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
         await importLocalFile(file, (ratio) =>
           setUploads((current) => current.map((entry) => (entry.id === id ? { ...entry, ratio } : entry)))
         );
-      } catch (error: any) {
-        toast.error(`${file.name} : ${error?.message ?? "import impossible"}`);
+      } catch (error) {
+        feedback.error(`${file.name} : ${errorMessage(error, "l’import a échoué. Réessayez.")}`);
       } finally {
         setUploads((current) => current.filter((entry) => entry.id !== id));
       }
@@ -200,6 +203,7 @@ function MyMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
         <span className="text-xs font-medium">Importer des vidéos, images ou sons</span>
         <span className="text-[11px] text-muted-foreground">ou glissez-les ici, 500 Mo maximum</span>
       </button>
+      <FormStatus state={feedback.state} />
 
       <AnimatePresence initial={false}>
         {uploads.map((upload) => (
@@ -354,16 +358,20 @@ function GalleryMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const sentinel = useRef<HTMLDivElement>(null);
+  // Un état local plutôt que `useFeedback` : `load` doit garder la même
+  // identité, sinon l'effet qui l'appelle relancerait le chargement en boucle.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async (target: number, search: string) => {
     setLoading(true);
+    setLoadError(null);
     try {
       const result = await fetchGalleryImages(target, search);
       setItems((current) => (target === 1 ? result.items : [...current, ...result.items]));
       setHasMore(result.hasMore);
       setPage(target);
-    } catch (error: any) {
-      toast.error(error?.message ?? "Chargement impossible");
+    } catch (error) {
+      setLoadError(errorMessage(error, "La galerie n’a pas pu être chargée. Réessayez dans un instant."));
     } finally {
       setLoading(false);
     }
@@ -390,6 +398,7 @@ function GalleryMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
         <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher" className="h-8 pl-8 text-xs" />
       </div>
+      <FormStatus state={loadError ? { tone: "error", message: loadError, id: 0 } : null} />
       <MediaGrid items={items} loading={loading} onAdd={onAdd} empty="Aucune image dans la galerie." />
       <div ref={sentinel} className="h-1" />
     </div>
@@ -469,7 +478,10 @@ function FindMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
   const [error, setError] = useState<string | null>(null);
   /** Import en cours ou fait, par candidate : l'image importée sert aux clics suivants. */
   const [imports, setImports] = useState<Record<string, "pending" | ImportedImage>>({});
+  /** Import échoué, par candidate : le message s'affiche sur sa carte. */
+  const [importErrors, setImportErrors] = useState<Record<string, FeedbackState>>({});
   const searchId = useRef(0);
+  const errorId = useRef(0);
 
   const run = async (target: number) => {
     const text = query.replace(/\s+/g, " ").trim();
@@ -511,21 +523,23 @@ function FindMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
       return;
     }
     setImports((current) => ({ ...current, [image.id]: "pending" }));
+    setImportErrors(({ [image.id]: _cleared, ...rest }) => rest);
     try {
       const imported = await callModule<ImportedImage>("importFoundImage", { id: image.id });
       setImports((current) => ({ ...current, [image.id]: imported }));
       // « Mes médias » relira la liste à sa prochaine ouverture.
       assetsSnapshot = null;
+      // La coche sur la carte et l'image dans le clip suffisent ; la pastille de
+      // licence de la carte rappelle déjà les droits à vérifier.
       if (add) onAdd(importedToSource(imported));
-      toast.success(add ? "Image ajoutée au clip, avec sa mention" : "Image importée dans vos médias, avec sa mention", {
-        description: imported.rights === "unverified" ? "Droits à vérifier avant de publier." : undefined,
-      });
-    } catch (failure: any) {
+    } catch (failure) {
       setImports((current) => {
         const { [image.id]: _removed, ...rest } = current;
         return rest;
       });
-      toast.error(failure?.message ?? "Import impossible");
+      errorId.current += 1;
+      const message = errorMessage(failure, "L’import de cette image a échoué. Réessayez ou choisissez-en une autre.");
+      setImportErrors((current) => ({ ...current, [image.id]: { tone: "error", message, id: errorId.current } }));
     }
   };
 
@@ -632,6 +646,7 @@ function FindMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
                 index={index}
                 icon={icons || image.kind === "icon"}
                 state={imports[image.id]}
+                error={importErrors[image.id] ?? null}
                 onAdd={() => void importOne(image, true)}
                 onImport={() => void importOne(image, false)}
               />
@@ -655,6 +670,7 @@ function FoundCard({
   index,
   icon,
   state,
+  error,
   onAdd,
   onImport,
 }: {
@@ -662,6 +678,7 @@ function FoundCard({
   index: number;
   icon: boolean;
   state: "pending" | ImportedImage | undefined;
+  error: FeedbackState | null;
   onAdd: () => void;
   onImport: () => void;
 }) {
@@ -769,6 +786,7 @@ function FoundCard({
         )}
       </div>
       {image.creator && <p className="min-w-0 truncate text-[10px] text-muted-foreground" title={image.creator}>{image.creator}</p>}
+      <ActionStatus state={error} className="text-[10px] empty:hidden" />
     </motion.div>
   );
 }

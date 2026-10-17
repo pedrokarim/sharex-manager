@@ -21,6 +21,7 @@ import {
   Languages,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ActionStatus, useFeedback, type Feedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -72,13 +73,19 @@ let styleClipboard: { style: TextStyle; autoFit: boolean } | null = null;
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
-function download(url: string, name: string) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
+/**
+ * Un message d'information (et, sur la scène, l'erreur d'un geste) s'efface de
+ * lui-même : il ne doit pas rester affiché longtemps après le geste qui l'a
+ * produit. Une réussite s'efface déjà seule ; une erreur d'action reste jusqu'à
+ * la suivante.
+ */
+function useFadingFeedback(feedback: Feedback, delay: number, fadeErrors = false) {
+  const { state, clear } = feedback;
+  useEffect(() => {
+    if (!state || state.tone === "success" || (state.tone === "error" && !fadeErrors)) return;
+    const timer = window.setTimeout(clear, delay);
+    return () => window.clearTimeout(timer);
+  }, [state, clear, delay, fadeErrors]);
 }
 
 interface WorkshopProps {
@@ -124,6 +131,28 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
   const measureRef = useRef<Measure | null>(null);
   const [customFonts, setCustomFonts] = useState<CustomFont[]>([]);
   const [fontFailures, setFontFailures] = useState<FontLoadFailure[]>([]);
+  const [imageFailed, setImageFailed] = useState(false);
+  /** Adresse que l'on voulait rejoindre quand l'enregistrement a échoué : l'en-tête propose d'y aller quand même. */
+  const [pendingLeave, setPendingLeave] = useState<string | null>(null);
+
+  // Retours de l'atelier, chacun là où l'on regarde : l'en-tête pour les actions
+  // de la page (analyser, traduire, exporter, Ctrl+S), la bulle du bas de la
+  // scène pour les gestes, l'inspecteur pour les boutons de la zone.
+  const pageFeedback = useFeedback({ successDuration: 5000 });
+  const stageNotice = useFeedback({ successDuration: 3000 });
+  const zoneFeedback = useFeedback({ successDuration: 4000 });
+  const [zoneFeedbackTarget, setZoneFeedbackTarget] = useState<{ regionId: string; action: "read" | "translate" } | null>(null);
+  useFadingFeedback(pageFeedback, 8000);
+  useFadingFeedback(stageNotice, 4500, true);
+  // Tenus dans une référence : les rappels du clavier et des gestes s'en servent sans être recréés.
+  const feedbackRef = useRef({ page: pageFeedback, stage: stageNotice, zone: zoneFeedback });
+  feedbackRef.current = { page: pageFeedback, stage: stageNotice, zone: zoneFeedback };
+
+  /** Retour d'un bouton de la zone (lire, traduire), affiché sous ce bouton tant que la zone reste sélectionnée. */
+  const tellZone = useCallback((regionId: string, action: "read" | "translate", tone: "success" | "error" | "info", message: string) => {
+    setZoneFeedbackTarget({ regionId, action });
+    feedbackRef.current.zone[tone](message);
+  }, []);
 
   const selected = findRegion(regions, selectedId);
   const pageIndex = chapter.pageIds.indexOf(page.id);
@@ -142,7 +171,7 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
         if (!cancelled) setImage(element);
       })
       .catch(() => {
-        if (!cancelled) toast.error("L’image de cette page n’a pas pu être chargée");
+        if (!cancelled) setImageFailed(true);
       });
     // Un canevas dessine avec la police de repli tant que la vraie n'est pas
     // là : une fois prêtes, les mises en lignes sont à refaire.
@@ -265,7 +294,7 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
 
   const canAddRegion = useCallback(() => {
     if (regionsRef.current.length < MAX_REGIONS) return true;
-    toast.info(`Une page porte au plus ${MAX_REGIONS} zones`);
+    feedbackRef.current.stage.info(`Une page porte au plus ${MAX_REGIONS} zones. Supprimez-en une pour en ajouter une autre.`);
     return false;
   }, []);
 
@@ -318,7 +347,7 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
         if (!region) return;
         styleClipboard = { style: structuredClone(resolveStyle(region, settings)), autoFit: region.text.autoFit };
         setCanPasteStyle(true);
-        toast.success("Style copié");
+        feedbackRef.current.stage.success("Style copié. « Coller le style » le pose sur une autre zone.");
       },
       pasteStyle: (regionId) => {
         const copied = styleClipboard;
@@ -335,13 +364,13 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
   const pickColor = useCallback(
     (point: Point) => {
       if (!selectedId || !findRegion(regionsRef.current, selectedId)) {
-        toast.info("Sélectionnez d’abord la zone dont vous réglez le masque");
+        feedbackRef.current.stage.info("Sélectionnez d’abord la zone dont vous réglez le masque.");
         return;
       }
       const read = readPixels({ x: point.x - 2, y: point.y - 2, width: 5, height: 5 });
       const color = read ? sampleColorAt(read.pixels, point.x - read.offset.x, point.y - read.offset.y, 1) : null;
       if (!color) {
-        toast.error("Couleur illisible à cet endroit de la page");
+        feedbackRef.current.stage.error("Couleur illisible à cet endroit de la page. Cliquez un peu à côté.");
         return;
       }
       // Les retouches au pinceau suivent la nouvelle couleur ; un masque coupé repasse en aplat.
@@ -364,13 +393,12 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
       const hadChanges = !isSaved();
       await flush();
       if (!isSaved()) {
-        toast.error("Vos dernières modifications ne sont pas enregistrées", {
-          description: "L’enregistrement a échoué. Vous pouvez rester sur la page et réessayer.",
-          action: { label: "Quitter quand même", onClick: () => router.push(href) },
-          duration: 12_000,
-        });
+        // L'échec est déjà dit par le témoin d'enregistrement, dans l'en-tête : il propose aussi de partir quand même.
+        setPendingLeave(href);
         return;
       }
+      setPendingLeave(null);
+      // L'atelier disparaît : le toast est le seul endroit qui survit à la navigation.
       if (hadChanges) toast.success("Modifications enregistrées");
       router.push(href);
     },
@@ -393,6 +421,7 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
   const exportPage = async () => {
     if (exporting) return;
     setExporting(true);
+    pageFeedback.clear();
     try {
       if (!image) throw new Error("L’image de la page n’est pas encore chargée");
       await flush();
@@ -424,9 +453,10 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
       adoptStatus(summary.status);
       const url = URL.createObjectURL(blob);
       setExported({ url, name });
-      toast.success("Page exportée", { action: { label: "Télécharger", onClick: () => download(url, name) } });
+      // Le bouton « Télécharger » apparaît à côté d'« Exporter » ; le témoin de l'en-tête le confirme.
+      pageFeedback.success("Page exportée");
     } catch (error) {
-      toast.error(errorMessage(error, "Export impossible"));
+      pageFeedback.error(errorMessage(error, "L’export n’a pas abouti. Réessayez."));
     } finally {
       setExporting(false);
     }
@@ -463,7 +493,7 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
       if (ctrl && key === "s") {
         event.preventDefault();
         void flush().then(() => {
-          if (isSaved()) toast.success("Modifications enregistrées", { id: "scan-studio-saved" });
+          if (isSaved()) feedbackRef.current.page.success("Tout est enregistré");
         });
         return;
       }
@@ -569,7 +599,7 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
 
   // ─── Analyse automatique ───────────────────────────────────────
   const getRegions = useCallback(() => regionsRef.current, []);
-  const analysis = usePageAnalysis({ image, page: page.source, settings, commit, getRegions });
+  const analysis = usePageAnalysis({ image, page: page.source, settings, commit, getRegions, feedback: pageFeedback });
 
   /**
    * Lit le texte qui se trouve dans le contour d'une zone, avec le moteur de
@@ -588,27 +618,25 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
       readZoneOnSurface(image, page.source, boundsOf(outline), settings)
         .then((found) => {
           if (!found) {
-            if (!automatic) toast.info("Aucun texte lu dans cette zone", { description: "Resserrez le contour autour du texte, ou saisissez-le à la main." });
+            if (!automatic) tellZone(regionId, "read", "info", "Aucun texte lu dans cette zone. Resserrez le contour autour du texte, ou saisissez-le à la main.");
             return;
           }
-          let filled = false;
+          // Le texte lu apparaît dans le champ « Texte d'origine » de l'inspecteur : c'est le retour.
           patchRegion(regionId, (region) => {
             // Tracé à l'instant : ce qui a été saisi pendant la lecture n'est pas écrasé.
             if (automatic && region.reading.clean.trim() !== "") return region;
-            filled = true;
             return { ...region, direction: found.direction, reading: found.reading };
           });
-          if (filled) toast.success("Texte lu dans la zone", { description: found.reading.clean.slice(0, 80) });
         })
         .catch((error: unknown) => {
-          if (!automatic) toast.error(errorMessage(error, "Lecture de la zone impossible"));
+          if (!automatic) tellZone(regionId, "read", "error", errorMessage(error, "La lecture de la zone n’a pas abouti. Réessayez."));
         })
         .finally(() => {
           readingZoneRef.current = false;
           setReadingZoneId(null);
         });
     },
-    [image, analysis.blocker, page.source, settings, patchRegion],
+    [image, analysis.blocker, page.source, settings, patchRegion, tellZone],
   );
   readZoneRef.current = readZone;
 
@@ -632,22 +660,28 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
     if (items.length === 0 && onlyRegionId) {
       // Une traduction corrigée ou validée à la main n'est jamais remplacée : on le dit plutôt que de ne rien faire.
       if (scope.some(isLocked)) {
-        toast.info("Cette traduction a été corrigée à la main : elle n’est pas remplacée", { description: "Videz le champ « Traduction » si vous voulez une nouvelle proposition." });
+        tellZone(onlyRegionId, "translate", "info", "Cette traduction a été corrigée à la main : elle n’est pas remplacée. Videz le champ « Traduction » pour obtenir une nouvelle proposition.");
       } else {
-        toast.info("Cette zone n’a pas de texte d’origine à traduire", { description: "Saisissez-le, ou utilisez « Lire le texte de la zone »." });
+        tellZone(onlyRegionId, "translate", "info", "Cette zone n’a pas de texte d’origine à traduire. Saisissez-le, ou utilisez « Lire le texte de la zone ».");
       }
       return;
     }
     if (items.length === 0) {
       const any = regionsRef.current.length > 0;
-      toast.info(any ? "Rien à traduire sur cette page" : "Aucune zone sur cette page", {
-        description: any ? "Toutes les zones ont déjà une traduction, ou n’ont pas de texte d’origine." : "Lancez d’abord « Analyser », ou tracez une zone autour d’un texte.",
-      });
+      pageFeedback.info(
+        any
+          ? "Rien à traduire sur cette page : toutes les zones ont déjà une traduction, ou n’ont pas de texte d’origine."
+          : "Aucune zone sur cette page. Lancez d’abord « Analyser », ou tracez une zone autour d’un texte.",
+      );
       return;
     }
     translatingRef.current = true;
     setTranslating(true);
-    const pending = toast.loading(`Traduction de ${items.length} ${items.length < 2 ? "zone" : "zones"}…`);
+    // Une zone seule répond sous son bouton, dans l'inspecteur ; la page entière, dans l'en-tête.
+    const report = (tone: "success" | "error" | "info", message: string) =>
+      onlyRegionId ? tellZone(onlyRegionId, "translate", tone, message) : pageFeedback[tone](message);
+    if (onlyRegionId) zoneFeedback.clear();
+    else pageFeedback.clear();
     try {
       const batch = await api.translateTexts(chapter.id, items);
       let applied = 0;
@@ -661,32 +695,44 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
         setViewMode("translated");
       }
       const engine = batch.results.find((result) => result.engine)?.engine;
+      const translated = `${batch.results.length} ${batch.results.length < 2 ? "zone traduite" : "zones traduites"}`;
       if (batch.failed.length === 0) {
-        toast.success(`${batch.results.length} ${batch.results.length < 2 ? "zone traduite" : "zones traduites"}`, {
-          id: pending,
-          description: engine ? `Par ${ENGINE_NAMES[engine]}. Relisez les propositions : Ctrl+Z annule.` : "Depuis le glossaire, la mémoire ou le cache.",
-        });
+        report(
+          "success",
+          engine ? `${translated} par ${ENGINE_NAMES[engine]}. Relisez les propositions : Ctrl+Z annule.` : `${translated} depuis le glossaire, la mémoire ou le cache.`,
+        );
       } else if (batch.results.length > 0) {
-        toast.warning(`${batch.results.length} ${batch.results.length < 2 ? "zone traduite" : "zones traduites"}, ${batch.failed.length} sans réponse`, {
-          id: pending,
-          description: batch.failed[0].error,
-          duration: 10_000,
-        });
+        report("error", `${translated}, ${batch.failed.length} sans réponse : ${batch.failed[0].error}`);
       } else {
-        toast.error(enginesUnavailable(batch) ? "Aucun moteur de traduction ne répond" : "La traduction n’a rien rendu", {
-          id: pending,
-          description: batch.failed[0]?.error,
-          duration: 12_000,
-        });
+        const reason = batch.failed[0]?.error;
+        const title = enginesUnavailable(batch)
+          ? "Aucun moteur de traduction ne répond. Vérifiez leurs réglages dans « Moteurs »"
+          : "La traduction n’a rien rendu";
+        report("error", reason ? `${title} : ${reason}` : `${title}.`);
       }
       void applied;
     } catch (error) {
-      toast.error(errorMessage(error, "Traduction impossible"), { id: pending });
+      report("error", errorMessage(error, "La traduction n’a pas abouti. Réessayez."));
     } finally {
       translatingRef.current = false;
       setTranslating(false);
     }
-  }, [translateBlocker, chapter.id, commit]);
+  }, [translateBlocker, chapter.id, commit, tellZone, pageFeedback, zoneFeedback]);
+
+  // Le retour d'un bouton de la zone ne survit pas au changement de sélection.
+  const clearZoneFeedback = zoneFeedback.clear;
+  useEffect(() => {
+    clearZoneFeedback();
+    setZoneFeedbackTarget(null);
+  }, [selectedId, clearZoneFeedback]);
+
+  // L'enregistrement est revenu : plus besoin de proposer de partir sans lui.
+  useEffect(() => {
+    if (saveState === "saved") setPendingLeave(null);
+  }, [saveState]);
+
+  const zoneStatusFor = (action: "read" | "translate") =>
+    selected && zoneFeedbackTarget?.regionId === selected.id && zoneFeedbackTarget.action === action ? zoneFeedback.state : null;
 
   return (
     <div className={WORKSPACE_CLASS}>
@@ -752,8 +798,17 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
           ))}
         </div>
 
-        <SaveIndicator state={saveState} error={saveError} savedAt={savedAt} onRetry={() => void flush()} onReload={onReload} />
+        <SaveIndicator
+          state={saveState}
+          error={saveError}
+          savedAt={savedAt}
+          onRetry={() => void flush()}
+          onReload={onReload}
+          onLeaveAnyway={pendingLeave ? () => router.push(pendingLeave) : undefined}
+        />
         <AnalysisIndicator analysis={analysis} />
+        {/* Retour des actions de la page : analyse, traduction, export, Ctrl+S. Coupé au besoin, entier au survol. */}
+        <ActionStatus state={pageFeedback.state} className="max-w-[28rem]" />
 
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <ToggleButton
@@ -868,6 +923,9 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
           onPickColor={pickColor}
           onEditText={() => setFocusToken((token) => token + 1)}
           onZoomChange={setZoom}
+          notice={stageNotice.state}
+          onNotice={stageNotice.info}
+          failure={imageFailed ? "L’image de cette page n’a pas pu être chargée. Rechargez la page pour réessayer." : null}
           menu={
             selected ? <RegionMenuItems variant="context" regionId={selected.id} index={selectedIndex} count={regions.length} actions={actions} /> : null
           }
@@ -896,8 +954,10 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
             ai={ai}
             onTranslateZone={selected && !translateBlocker ? () => void translatePage(selected.id) : undefined}
             translatingZone={translating}
+            translateZoneStatus={zoneStatusFor("translate")}
             onReadZone={selected && canReadZone ? () => readZone(selected.id, false) : undefined}
             readingZone={selected ? readingZoneId === selected.id : false}
+            readZoneStatus={zoneStatusFor("read")}
           />
         </aside>
       </div>
@@ -914,6 +974,7 @@ function SaveIndicator({
   savedAt,
   onRetry,
   onReload,
+  onLeaveAnyway,
 }: {
   state: SaveState;
   error: string | null;
@@ -921,7 +982,14 @@ function SaveIndicator({
   savedAt: number | null;
   onRetry: () => void;
   onReload: () => void;
+  /** On a voulu quitter la page alors que l'enregistrement échouait : on peut partir sans lui. */
+  onLeaveAnyway?: () => void;
 }) {
+  const leaveAnyway = onLeaveAnyway ? (
+    <Button variant="ghost" size="sm" className="h-7 shrink-0 text-xs text-foreground" onClick={onLeaveAnyway}>
+      Quitter quand même
+    </Button>
+  ) : null;
   if (state === "conflict") {
     return (
       <span className="flex shrink-0 items-center gap-2 text-xs text-destructive" role="alert">
@@ -932,6 +1000,7 @@ function SaveIndicator({
         <Button variant="outline" size="sm" className="h-7 text-xs text-foreground" onClick={onReload}>
           Recharger la page
         </Button>
+        {leaveAnyway}
       </span>
     );
   }
@@ -945,6 +1014,7 @@ function SaveIndicator({
         <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs text-foreground" onClick={onRetry}>
           Réessayer
         </Button>
+        {leaveAnyway}
       </span>
     );
   }

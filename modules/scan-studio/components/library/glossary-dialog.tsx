@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { BookA, Plus, Search, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,9 @@ export function GlossaryDialog({ open, onOpenChange, folderName, value, onSave }
   const nextKey = useRef(0);
   /** Ligne tout juste ajoutée : elle prend le curseur et échappe à la recherche. */
   const [freshKey, setFreshKey] = useState<number | null>(null);
+  // Le bilan d'un enregistrement refusé s'affiche au-dessus du bouton ; chaque ligne fautive dit déjà pourquoi.
+  const feedback = useFeedback();
+  const clearFeedback = feedback.clear;
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +52,8 @@ export function GlossaryDialog({ open, onOpenChange, folderName, value, onSave }
     setSearch("");
     setFreshKey(null);
     setChecked(false);
-  }, [open, value]);
+    clearFeedback();
+  }, [open, value, clearFeedback]);
 
   const issues = useMemo(() => validateGlossary(rows), [rows]);
   const issueByKey = useMemo(() => new Map(rows.map((row, index) => [row.key, issues[index]])), [rows, issues]);
@@ -72,15 +76,20 @@ export function GlossaryDialog({ open, onOpenChange, folderName, value, onSave }
     if (busy) return;
     if (invalid > 0) {
       setChecked(true);
-      toast.error(invalid < 2 ? "Une ligne du glossaire est à corriger." : `${invalid} lignes du glossaire sont à corriger.`);
+      feedback.error(
+        invalid < 2
+          ? "Une ligne du glossaire est à corriger : elle est signalée dans la liste."
+          : `${invalid} lignes du glossaire sont à corriger : elles sont signalées dans la liste.`,
+      );
       return;
     }
     setBusy(true);
+    feedback.clear();
     try {
       await onSave(cleanGlossary(rows));
       onOpenChange(false);
     } catch (error) {
-      toast.error(errorMessage(error, "Enregistrement du glossaire impossible."));
+      feedback.error(errorMessage(error, "Le glossaire n’a pas pu être enregistré. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -89,7 +98,7 @@ export function GlossaryDialog({ open, onOpenChange, folderName, value, onSave }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-4xl">
-        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-4">
+        <form onSubmit={submit} onChange={feedback.state?.tone === "error" ? feedback.clear : undefined} className="flex min-h-0 flex-1 flex-col gap-4">
           <DialogHeader>
             <DialogTitle>Glossaire de « {folderName} »</DialogTitle>
             <DialogDescription>
@@ -218,14 +227,17 @@ export function GlossaryDialog({ open, onOpenChange, folderName, value, onSave }
             )}
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Annuler
-            </Button>
-            <Button type="submit" disabled={busy}>
-              Enregistrer le glossaire
-            </Button>
-          </DialogFooter>
+          <div>
+            <FormStatus state={feedback.state} className="pb-4" />
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={busy}>
+                Enregistrer le glossaire
+              </Button>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

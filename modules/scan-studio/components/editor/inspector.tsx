@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { AlignCenter, AlignLeft, AlignRight, MoreHorizontal, Pipette, ScanEye, TriangleAlert, Languages } from "lucide-react";
+import { FormStatus, type FeedbackState } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -84,10 +85,14 @@ interface InspectorProps {
   onTranslateZone?: () => void;
   /** Une traduction est en cours. */
   translatingZone?: boolean;
+  /** Retour du bouton « Traduire cette zone », affiché sous lui. */
+  translateZoneStatus?: FeedbackState | null;
   /** Lit le texte de la zone sur la page, avec le moteur de l'analyse ; absent : la lecture n'est pas possible ici. */
   onReadZone?: () => void;
   /** Une lecture de zone est en cours. */
   readingZone?: boolean;
+  /** Retour du bouton « Lire le texte de la zone », affiché sous lui. */
+  readZoneStatus?: FeedbackState | null;
 }
 
 export function Inspector(props: InspectorProps) {
@@ -232,17 +237,20 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
           className="resize-none text-sm"
         />
         {props.onReadZone && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 gap-1.5 text-xs"
-            loading={props.readingZone}
-            onClick={props.onReadZone}
-            title="Lit le texte qui se trouve dans le contour de la zone, sur cette machine, sans rien envoyer"
-          >
-            <ScanEye className="h-3.5 w-3.5" />
-            {props.readingZone ? "Lecture…" : region.reading.clean.trim() ? "Relire le texte de la zone" : "Lire le texte de la zone"}
-          </Button>
+          <div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              loading={props.readingZone}
+              onClick={props.onReadZone}
+              title="Lit le texte qui se trouve dans le contour de la zone, sur cette machine, sans rien envoyer"
+            >
+              <ScanEye className="h-3.5 w-3.5" />
+              {props.readingZone ? "Lecture…" : region.reading.clean.trim() ? "Relire le texte de la zone" : "Lire le texte de la zone"}
+            </Button>
+            <FormStatus state={props.readZoneStatus ?? null} className="pt-2" />
+          </div>
         )}
         {needsReview(region) && (
           <div className="space-y-1.5 text-xs text-amber-600 dark:text-amber-400">
@@ -265,33 +273,22 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
       </Section>
 
       <Section title="Traduction">
-
         {props.onTranslateZone && (
-
-          <Button
-
-            variant="outline"
-
-            size="sm"
-
-            className="h-7 gap-1.5 self-start text-xs"
-
-            loading={props.translatingZone}
-
-            disabled={region.reading.clean.trim() === ""}
-
-            onClick={props.onTranslateZone}
-
-            title={region.reading.clean.trim() === "" ? "Cette zone n’a pas de texte d’origine" : "Traduit le texte d’origine de cette zone par les moteurs de la page « Moteurs »"}
-
-          >
-
-            <Languages className="h-3.5 w-3.5" />
-
-            {props.translatingZone ? "Traduction…" : region.translation.text.trim() ? "Retraduire cette zone" : "Traduire cette zone"}
-
-          </Button>
-
+          <div className="flex flex-col">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 self-start text-xs"
+              loading={props.translatingZone}
+              disabled={region.reading.clean.trim() === ""}
+              onClick={props.onTranslateZone}
+              title={region.reading.clean.trim() === "" ? "Cette zone n’a pas de texte d’origine" : "Traduit le texte d’origine de cette zone par les moteurs de la page « Moteurs »"}
+            >
+              <Languages className="h-3.5 w-3.5" />
+              {props.translatingZone ? "Traduction…" : region.translation.text.trim() ? "Retraduire cette zone" : "Traduire cette zone"}
+            </Button>
+            <FormStatus state={props.translateZoneStatus ?? null} className="pt-2" />
+          </div>
         )}
         <Textarea
           ref={translationRef}

@@ -4,7 +4,7 @@ import { BrandLogo, type Brand } from "@/components/brand-logo";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, AudioLines, ExternalLink, Eye, EyeOff, Lock, TriangleAlert } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -128,16 +128,21 @@ function ProviderCard({
   const [busy, setBusy] = useState(false);
 
   const [regionDraft, setRegionDraft] = useState(provider.region ?? "");
+  // Chaque réglage répond sous sa propre ligne : la clé, la région, l'interrupteur d'Edge.
+  const keyFeedback = useFeedback();
+  const regionFeedback = useFeedback();
+  const edgeFeedback = useFeedback();
 
   const save = async () => {
     setBusy(true);
+    keyFeedback.clear();
     try {
       await callModule("saveTtsKey", { provider: provider.id, key: draft });
       setDraft("");
       await onSaved();
-      toast.success(draft ? "Clé enregistrée" : "Clé supprimée");
+      keyFeedback.success(draft ? "Clé enregistrée." : "Clé supprimée.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Enregistrement impossible");
+      keyFeedback.error(errorMessage(error, "La clé n’a pas pu être enregistrée. Vérifiez-la, puis réessayez."));
     } finally {
       setBusy(false);
     }
@@ -145,12 +150,13 @@ function ProviderCard({
 
   const saveRegion = async () => {
     setBusy(true);
+    regionFeedback.clear();
     try {
       await callModule("saveTtsKey", { provider: provider.id, region: regionDraft });
       await onSaved();
-      toast.success(regionDraft ? "Région enregistrée" : "Région supprimée");
+      regionFeedback.success(regionDraft ? "Région enregistrée." : "Région supprimée.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Enregistrement impossible");
+      regionFeedback.error(errorMessage(error, "La région n’a pas pu être enregistrée. Vérifiez son nom, puis réessayez."));
     } finally {
       setBusy(false);
     }
@@ -158,11 +164,12 @@ function ProviderCard({
 
   const toggleEdge = async (enabled: boolean) => {
     setBusy(true);
+    edgeFeedback.clear();
     try {
       await callModule("saveTtsKey", { provider: provider.id, enabled });
       await onSaved();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Enregistrement impossible");
+      edgeFeedback.error(errorMessage(error, "Le réglage n’a pas pu être enregistré. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -186,6 +193,7 @@ function ProviderCard({
           </div>
           <FieldDescription>{DESCRIPTIONS[provider.id]}</FieldDescription>
           {provider.error && <p className="text-xs break-words text-destructive">{provider.error}</p>}
+          <FormStatus state={edgeFeedback.state} />
         </Field>
       </section>
     );
@@ -252,30 +260,37 @@ function ProviderCard({
             gérer la clé depuis cette page.
           </FieldDescription>
         ) : (
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <InputGroup className="flex-1">
-              <InputGroupInput
-                id={`tts-key-${provider.id}`}
-                type={revealed ? "text" : "password"}
-                autoComplete="off"
-                placeholder={provider.configured ? "Nouvelle clé, pour remplacer l’actuelle" : "Coller la clé…"}
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                className="font-mono text-xs"
-              />
-              <InputGroupAddon align="inline-end">
-                <InputGroupButton
-                  aria-label={revealed ? "Masquer la clé" : "Afficher la clé"}
-                  onClick={() => setRevealed((previous) => !previous)}
-                >
-                  {revealed ? <EyeOff /> : <Eye />}
-                </InputGroupButton>
-              </InputGroupAddon>
-            </InputGroup>
-            <Button variant="outline" disabled={busy || (!draft && !provider.configured)} onClick={save}>
-              {busy && <Spinner className="mr-1.5 h-3 w-3" />}
-              {draft ? "Enregistrer" : provider.configured ? "Supprimer la clé" : "Enregistrer"}
-            </Button>
+          <div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <InputGroup className="flex-1">
+                <InputGroupInput
+                  id={`tts-key-${provider.id}`}
+                  type={revealed ? "text" : "password"}
+                  autoComplete="off"
+                  placeholder={provider.configured ? "Nouvelle clé, pour remplacer l’actuelle" : "Coller la clé…"}
+                  value={draft}
+                  onChange={(event) => {
+                    setDraft(event.target.value);
+                    if (keyFeedback.state?.tone === "error") keyFeedback.clear();
+                  }}
+                  className="font-mono text-xs"
+                />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    aria-label={revealed ? "Masquer la clé" : "Afficher la clé"}
+                    onClick={() => setRevealed((previous) => !previous)}
+                  >
+                    {revealed ? <EyeOff /> : <Eye />}
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
+              <Button variant="outline" disabled={busy || (!draft && !provider.configured)} onClick={save}>
+                {busy && <Spinner className="mr-1.5 h-3 w-3" />}
+                {draft ? "Enregistrer" : provider.configured ? "Supprimer la clé" : "Enregistrer"}
+              </Button>
+            </div>
+            {/* L'espacement s'ouvre avec le message : rien ne saute. */}
+            <FormStatus state={keyFeedback.state} className="pt-2" />
           </div>
         )}
         {provider.id === "azure" &&
@@ -284,18 +299,24 @@ function ProviderCard({
               Région définie par l’environnement du serveur ({provider.regionEnvVariable}) : {provider.region}.
             </FieldDescription>
           ) : (
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                aria-label="Région de la ressource Azure"
-                placeholder="Région, par exemple westeurope ou francecentral"
-                value={regionDraft}
-                onChange={(event) => setRegionDraft(event.target.value)}
-                className="flex-1 font-mono text-xs"
-                autoComplete="off"
-              />
-              <Button variant="outline" disabled={busy || regionDraft.trim() === (provider.region ?? "")} onClick={saveRegion}>
-                Enregistrer la région
-              </Button>
+            <div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  aria-label="Région de la ressource Azure"
+                  placeholder="Région, par exemple westeurope ou francecentral"
+                  value={regionDraft}
+                  onChange={(event) => {
+                    setRegionDraft(event.target.value);
+                    if (regionFeedback.state?.tone === "error") regionFeedback.clear();
+                  }}
+                  className="flex-1 font-mono text-xs"
+                  autoComplete="off"
+                />
+                <Button variant="outline" disabled={busy || regionDraft.trim() === (provider.region ?? "")} onClick={saveRegion}>
+                  Enregistrer la région
+                </Button>
+              </div>
+              <FormStatus state={regionFeedback.state} className="pt-2" />
             </div>
           ))}
       </Field>

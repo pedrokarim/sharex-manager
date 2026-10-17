@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { toast } from "sonner";
+import { ActionStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { UserDialog } from "@/components/user-dialog";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { FilterBar, FilterSearch, FilterSelect } from "@/components/filters/filter-bar";
@@ -65,6 +65,11 @@ export default function UsersPageClient({
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "user">("all");
+  // Une suppression réussie se voit (la ligne disparaît) ; un échec s'affiche
+  // sur la ligne concernée. Celui du rafraîchissement, à côté de son bouton.
+  const deleteFeedback = useFeedback();
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const refreshFeedback = useFeedback();
 
   const stats = {
     total: users.length,
@@ -85,6 +90,8 @@ export default function UsersPageClient({
   }, [users, searchQuery, roleFilter]);
 
   const handleDelete = async (userId: string) => {
+    setDeleteTargetId(userId);
+    deleteFeedback.clear();
     try {
       const response = await fetch(`/api/admin/users?id=${userId}`, {
         method: "DELETE",
@@ -98,25 +105,20 @@ export default function UsersPageClient({
       setUsers((currentUsers) =>
         currentUsers.filter((user) => user.id !== userId),
       );
-      toast.success(t("admin.users.messages.delete_success"));
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : t("admin.users.errors.generic"),
-      );
+      deleteFeedback.error(errorMessage(error, t("admin.users.errors.generic")));
     }
   };
 
   const refreshUsers = async () => {
     setIsLoading(true);
+    refreshFeedback.clear();
     try {
       const response = await fetch("/api/admin/users");
       const data = await response.json();
       setUsers(data);
-      toast.success(t("admin.users.messages.refresh_success"));
     } catch (error) {
-      toast.error(t("admin.users.errors.refresh"));
+      refreshFeedback.error(t("admin.users.errors.refresh"));
     } finally {
       setIsLoading(false);
     }
@@ -131,6 +133,7 @@ export default function UsersPageClient({
         description={`${stats.total} ${stats.total > 1 ? "comptes" : "compte"}, dont ${stats.admins} ${stats.admins > 1 ? "administrateurs" : "administrateur"}. Gérez les rôles et les accès.`}
         actions={
           <>
+            <ActionStatus state={refreshFeedback.state} className="max-w-64" />
             <Button variant="outline" onClick={refreshUsers} loading={isLoading} className="text-sm">
               <RefreshCw className="mr-2 h-4 w-4" />
               Rafraîchir
@@ -250,7 +253,11 @@ export default function UsersPageClient({
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex items-center justify-end gap-2">
+                          <ActionStatus
+                            state={deleteTargetId === user.id ? deleteFeedback.state : null}
+                            className="max-w-48"
+                          />
                           <UserDialog
                             user={user}
                             onSuccess={refreshUsers}

@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CircleCheck, CircleX, ExternalLink, Server } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -100,6 +100,10 @@ export function AppConfigForm({
   const [done, setDone] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState<"save" | "clear" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // « Enregistrée » ou « effacée », à côté des boutons, quand le formulaire
+  // reste affiché (tiroir des réglages) ; dans l'assistant, l'étape suivante
+  // s'ouvre et suffit.
+  const saved = useFeedback();
 
   useEffect(() => {
     setClientId(app?.source === "file" ? (app.clientId ?? "") : "");
@@ -140,6 +144,7 @@ export function AppConfigForm({
     if (problems.length > 0 || nothingToEnter) return;
     setBusy("save");
     setError(null);
+    saved.clear();
     const input: { clientId?: string; clientSecret?: string; settings?: Record<string, string> } = {};
     if (!fromEnv) {
       input.clientId = clientId.trim();
@@ -149,7 +154,7 @@ export function AppConfigForm({
     const result = await saveAppAction(connector.id, input);
     setBusy(null);
     if (!result.ok) return setError(result.error);
-    toast.success(`Application ${connector.label} enregistrée`);
+    saved.success("Enregistrée");
     onSaved(result.data);
   };
 
@@ -339,10 +344,12 @@ export function AppConfigForm({
               disabled={busy !== null}
               onClick={async () => {
                 setBusy("clear");
+                setError(null);
+                saved.clear();
                 const result = await clearAppAction(connector.id);
                 setBusy(null);
                 if (!result.ok) return setError(result.error);
-                toast.success("Configuration effacée");
+                saved.success("Configuration effacée");
                 onSaved(result.data);
               }}
             >
@@ -351,11 +358,14 @@ export function AppConfigForm({
           ) : (
             <span />
           )}
-          {nothingToEnter ? null : (
-            <Button type="submit" loading={busy === "save"} disabled={busy !== null || problems.length > 0} className="gap-2">
-              {submitLabel}
-            </Button>
-          )}
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
+            <ActionStatus state={saved.state} />
+            {nothingToEnter ? null : (
+              <Button type="submit" loading={busy === "save"} disabled={busy !== null || problems.length > 0} className="gap-2">
+                {submitLabel}
+              </Button>
+            )}
+          </div>
         </div>
       ) : null}
     </form>

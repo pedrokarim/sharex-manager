@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -36,11 +36,16 @@ export function ProvenancePanel({ file }: { file: string }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Retour des téléchargements, sous leurs boutons. Le bilan de la version
+  // propre se lit en entier : il reste un peu plus longtemps.
+  const feedback = useFeedback({ successDuration: 5000 });
+  const clearFeedback = feedback.clear;
 
   useEffect(() => {
     let cancelled = false;
     setDetail(null);
     setFailed(false);
+    clearFeedback();
     callModule<Detail>("inspectImageDetail", file)
       .then((result) => {
         if (!cancelled) setDetail(result);
@@ -51,29 +56,31 @@ export function ProvenancePanel({ file }: { file: string }) {
     return () => {
       cancelled = true;
     };
-  }, [file]);
+  }, [file, clearFeedback]);
 
   const report = detail?.report;
 
   const handleOriginal = async () => {
+    feedback.clear();
     try {
       await downloadImage(imageUrl(file), file);
     } catch {
-      toast.error("Téléchargement impossible");
+      feedback.error("Le téléchargement n’a pas abouti. Réessayez.");
     }
   };
 
   const handleClean = async () => {
     setBusy(true);
+    feedback.clear();
     try {
       const clean = await downloadCleanImage(file);
-      toast.success(
+      feedback.success(
         clean.savedBytes > 0
-          ? `Version propre : ${formatBytes(clean.savedBytes)} de métadonnées en moins, pixels identiques`
-          : "Version propre : rien à retirer, fichier identique"
+          ? `Version propre : ${formatBytes(clean.savedBytes)} de métadonnées en moins, pixels identiques.`
+          : "Version propre : rien à retirer, le fichier est identique."
       );
-    } catch (error: any) {
-      toast.error(error?.message ?? "Version propre indisponible");
+    } catch (error) {
+      feedback.error(errorMessage(error, "La version propre n’a pas pu être préparée. Téléchargez l’original."));
     } finally {
       setBusy(false);
     }
@@ -111,6 +118,10 @@ export function ProvenancePanel({ file }: { file: string }) {
           <Download className="h-4 w-4" />
           Télécharger une version propre
         </Button>
+        {/* La marge négative absorbe l'écart de la colonne tant qu'il n'y a pas de message. */}
+        <div className="-mt-2">
+          <FormStatus state={feedback.state} className="pt-2" />
+        </div>
         {cleanDisabledReason && <p className="text-xs text-muted-foreground">{cleanDisabledReason}</p>}
       </div>
     </section>

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { MotionConfig } from "framer-motion";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { EditorSkeleton } from "../components/editor/editor-skeleton";
 import { Workshop } from "../components/editor/workshop";
@@ -23,7 +22,7 @@ export default function EditorPage() {
   const pageId = params.get("page");
   /** Incrémenté pour relire la page après un conflit de révision. */
   const [reloadToken, setReloadToken] = useState(0);
-  const [loaded, setLoaded] = useState<{ key: string; view: PageView | null }>();
+  const [loaded, setLoaded] = useState<{ key: string; view: PageView | null; error?: string }>();
   const requestKey = `${pageId ?? ""}:${reloadToken}`;
   const valid = isId(pageId);
 
@@ -37,8 +36,8 @@ export default function EditorPage() {
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        toast.error(error instanceof Error && error.message ? error.message : "Lecture de la page impossible");
-        setLoaded({ key: requestKey, view: null });
+        // La raison s'affiche à la place de l'atelier, avec le lien de retour.
+        setLoaded({ key: requestKey, view: null, error: error instanceof Error && error.message ? error.message : undefined });
       });
     return () => {
       cancelled = true;
@@ -52,7 +51,9 @@ export default function EditorPage() {
   if (!current?.view) {
     return (
       <div className="flex flex-col items-center gap-3 py-24 text-center">
-        <p className="text-sm text-muted-foreground">Cette page est introuvable.</p>
+        <p className="max-w-md text-sm break-words text-muted-foreground" role={current?.error ? "alert" : undefined}>
+          {current?.error ? `Cette page n’a pas pu être lue : ${current.error}` : "Cette page est introuvable."}
+        </p>
         <Button asChild variant="outline" size="sm">
           <Link href={MODULE_PATH}>Retour à la bibliothèque</Link>
         </Button>

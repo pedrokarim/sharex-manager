@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ShieldCheck, TriangleAlert } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,10 @@ export function TranslateDialog({ open, onOpenChange, chapterId, pages }: Transl
   const [texts, setTexts] = useState<ChapterTexts | null>(null);
   const [estimate, setEstimate] = useState<TranslationEstimate | null>(null);
   const [estimating, setEstimating] = useState(false);
+  /** Pourquoi l'estimation a échoué : dit à la place de l'estimation. */
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+  // Le refus de lancer s'affiche dans la fenêtre, au-dessus du bouton.
+  const feedback = useFeedback();
   /** Pages lues pour l'estimation : changer une option ou une case ne les relit pas. */
   const pageCache = useRef(new Map<string, PageView>());
 
@@ -58,6 +62,8 @@ export function TranslateDialog({ open, onOpenChange, chapterId, pages }: Transl
     setRetranslate(false);
     setTexts(null);
     setEstimate(null);
+    setEstimateError(null);
+    feedback.clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- à l'ouverture seulement
   }, [open]);
 
@@ -74,6 +80,7 @@ export function TranslateDialog({ open, onOpenChange, chapterId, pages }: Transl
     }
     const abort = new AbortController();
     setEstimating(true);
+    setEstimateError(null);
     const getPage = async (pageId: string) => {
       const known = pageCache.current.get(pageId);
       if (known) return known;
@@ -95,7 +102,8 @@ export function TranslateDialog({ open, onOpenChange, chapterId, pages }: Transl
           if (abort.signal.aborted) return;
           setTexts(null);
           setEstimate(null);
-          toast.error(errorMessage(error, "Estimation impossible."));
+          const message = errorMessage(error, "L’estimation n’a pas pu être faite.");
+          setEstimateError(/[.!?…]$/.test(message) ? message : `${message}.`);
         } finally {
           if (!abort.signal.aborted) setEstimating(false);
         }
@@ -115,11 +123,11 @@ export function TranslateDialog({ open, onOpenChange, chapterId, pages }: Transl
     // Seules les pages qui ont quelque chose à envoyer partent, dans l'ordre de lecture.
     const ids = texts.pages.map((entry) => entry.pageId);
     if (!startTranslationJob(chapterId, ids, { retranslate }, translateChapter)) {
-      toast.info("Un traitement tourne déjà sur ce chapitre", { description: "Attendez sa fin, ou arrêtez-le depuis la planche." });
+      feedback.info("Un traitement tourne déjà sur ce chapitre. Attendez sa fin, ou arrêtez-le depuis la planche.");
       return;
     }
+    // La planche montre aussitôt où en est chaque page : pas d'autre message au lancement.
     onOpenChange(false);
-    toast.message(`Traduction lancée sur ${countLabel(ids.length, "page", "pages")}`, { description: "Elle tourne en arrière-plan : la planche montre où en est chaque page." });
   };
 
   return (
@@ -147,7 +155,13 @@ export function TranslateDialog({ open, onOpenChange, chapterId, pages }: Transl
                 <Skeleton className="h-4 w-full max-w-xs" />
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">L’estimation n’a pas pu être faite. Fermez cette fenêtre et réessayez.</p>
+              <FormStatus
+                state={{
+                  tone: "error",
+                  message: `${estimateError ?? "L’estimation n’a pas pu être faite."} Cochez ou décochez une page pour la relancer, ou fermez cette fenêtre et réessayez.`,
+                  id: 0,
+                }}
+              />
             )
           ) : nothingToDo ? (
             <p className={estimating ? "text-sm opacity-60 transition-opacity" : "text-sm transition-opacity"}>
@@ -217,14 +231,17 @@ export function TranslateDialog({ open, onOpenChange, chapterId, pages }: Transl
           </div>
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Annuler
-          </Button>
-          <Button type="button" disabled={estimating || texts === null || estimate === null || nothingToDo || noEngine} onClick={start}>
-            {texts && texts.pages.length > 0 ? `Traduire ${countLabel(texts.pages.length, "page", "pages")}` : "Traduire"}
-          </Button>
-        </DialogFooter>
+        <div>
+          <FormStatus state={feedback.state} className="pb-4" />
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Annuler
+            </Button>
+            <Button type="button" disabled={estimating || texts === null || estimate === null || nothingToDo || noEngine} onClick={start}>
+              {texts && texts.pages.length > 0 ? `Traduire ${countLabel(texts.pages.length, "page", "pages")}` : "Traduire"}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

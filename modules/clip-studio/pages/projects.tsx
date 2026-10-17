@@ -15,7 +15,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, errorMessage, useFeedback } from "@/components/feedback";
 import logo from "../branding/logo-96.png";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -259,17 +259,27 @@ export default function ProjectsPage() {
 function ProjectCard({ project, onChanged }: { project: ProjectSummary; onChanged: () => void }) {
   const href = `/m/clip-studio/edit?id=${project.id}`;
   const ratio = project.width / project.height;
+  // La copie qui apparaît ou la carte qui s'en va suffisent ; un échec s'écrit sur la carte.
+  const feedback = useFeedback();
 
   const actions = {
     duplicate: async () => {
-      await callModule("duplicateProject", project.id);
-      toast.success("Projet dupliqué");
-      onChanged();
+      feedback.clear();
+      try {
+        await callModule("duplicateProject", project.id);
+        onChanged();
+      } catch (error) {
+        feedback.error(errorMessage(error, "Le projet n’a pas pu être dupliqué. Réessayez."));
+      }
     },
     remove: async () => {
-      await callModule("deleteProject", project.id);
-      toast.success("Projet supprimé");
-      onChanged();
+      feedback.clear();
+      try {
+        await callModule("deleteProject", project.id);
+        onChanged();
+      } catch (error) {
+        feedback.error(errorMessage(error, "Le projet n’a pas pu être supprimé. Réessayez."));
+      }
     },
   };
 
@@ -306,6 +316,7 @@ function ProjectCard({ project, onChanged }: { project: ProjectSummary; onChange
                 {project.itemCount} élément(s) ·{" "}
                 {new Date(project.updatedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
               </p>
+              <ActionStatus state={feedback.state} className="max-w-full empty:hidden" />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import {
+  CircleAlert,
   Images,
   ImageDown,
   Search,
@@ -11,7 +13,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, errorMessage, useFeedback } from "@/components/feedback";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -79,6 +82,10 @@ export default function LibraryPage({}: LibraryPageProps) {
   const [collectionFilter, setCollectionFilter] = useState("all");
   const [collections, setCollections] = useState<Collection[]>([]);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  // Échec de lecture : un état durable de la page, avec de quoi réessayer.
+  const [loadError, setLoadError] = useState(false);
+  // Échec de « Tout vider » : à côté du bouton, qui reste affiché.
+  const clearFeedback = useFeedback();
 
   const load = useCallback(async () => {
     try {
@@ -90,8 +97,9 @@ export default function LibraryPage({}: LibraryPageProps) {
       setItems(history);
       setStats(moduleStats);
       setCollections(cols);
+      setLoadError(false);
     } catch {
-      toast.error("Chargement de la bibliothèque impossible");
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -144,53 +152,50 @@ export default function LibraryPage({}: LibraryPageProps) {
     [items]
   );
 
+  /** Lève en cas d'échec : la vignette affiche l'erreur sur elle-même. */
   const handleToggleFavorite = useCallback(
     async (item: HistoryItem, event: React.MouseEvent) => {
       event.stopPropagation();
-      try {
-        const res = await callModule<{ favorite: boolean }>(
-          "toggleFavorite",
-          item.id
-        );
-        setItems((prev) =>
-          prev.map((i) =>
-            i.id === item.id ? { ...i, favorite: res.favorite } : i
-          )
-        );
-      } catch {
-        toast.error("Modification impossible");
-      }
+      const res = await callModule<{ favorite: boolean }>(
+        "toggleFavorite",
+        item.id
+      );
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === item.id ? { ...i, favorite: res.favorite } : i
+        )
+      );
     },
     []
   );
 
+  /** Rend le nom du fichier en galerie ; lève en cas d'échec (affiché sur la vignette). */
   const handleSaveToGallery = useCallback(
     async (item: HistoryItem, file: string, event: React.MouseEvent) => {
       event.stopPropagation();
-      try {
-        const res = await callModule<{ fileName?: string }>(
-          "saveToGallery",
-          item.id,
-          file
-        );
-        toast.success(`Ajoutée à la galerie : ${res?.fileName}`);
-        load();
-      } catch (err: any) {
-        toast.error(err?.message ?? "Copie impossible");
-      }
+      const res = await callModule<{ fileName?: string }>(
+        "saveToGallery",
+        item.id,
+        file
+      );
+      load();
+      return res?.fileName;
     },
     [load]
   );
 
+  // La grille qui se vide (« La bibliothèque est vide ») confirme la
+  // suppression ; seul un échec s'affiche, à côté du bouton.
   const handleClearAll = useCallback(async () => {
+    clearFeedback.clear();
     try {
       await callModule("clearHistory");
       setItems([]);
       load();
-      toast.success("Bibliothèque vidée");
-    } catch {
-      toast.error("Suppression impossible");
+    } catch (error) {
+      clearFeedback.error(errorMessage(error, "La bibliothèque n’a pas pu être vidée. Réessayez."));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   const hasFilters = Boolean(query) || modelFilter !== "all" || favoritesOnly;
@@ -202,6 +207,9 @@ export default function LibraryPage({}: LibraryPageProps) {
       description="Toutes les images produites par le module, avec leurs réglages."
       actions={
         <>
+          {/* En tête de rangée : le message s'étend vers la gauche sans
+              déplacer les boutons. */}
+          <ActionStatus state={clearFeedback.state} className="max-w-[min(16rem,30vw)]" />
           <Button size="sm" asChild className="gap-2">
             <Link href="/m/ai-image-gen">
               <Sparkles className="h-4 w-4" />
@@ -241,6 +249,19 @@ export default function LibraryPage({}: LibraryPageProps) {
         </>
       }
     >
+      {loadError && (
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Bibliothèque indisponible</AlertTitle>
+          <AlertDescription>
+            <p>La bibliothèque n’a pas pu être chargée. Vérifiez votre connexion, puis réessayez.</p>
+            <Button variant="outline" size="sm" className="mt-1" onClick={() => void load()}>
+              Réessayer
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Compteurs */}
       {stats && stats.generations > 0 && (
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -346,81 +367,18 @@ export default function LibraryPage({}: LibraryPageProps) {
           {shots.map((shot, index) => {
             const inGallery = Boolean(shot.item.savedToGallery?.[shot.file]);
             return (
-              <figure
+              <LibraryTile
                 key={`${shot.item.id}-${shot.file}`}
-                className="group relative aspect-square overflow-hidden rounded-xl border bg-muted"
-              >
-                <button
-                  type="button"
-                  onClick={() => setViewerIndex(index)}
-                  className="block h-full w-full"
-                  aria-label={`Ouvrir : ${shot.item.prompt}`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={imageUrl(shot.file)}
-                    alt={shot.item.prompt}
-                    loading="lazy"
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                  />
-                </button>
-                <ProvenanceBadge file={shot.file} className="left-2 top-2" />
-
-                {/* Actions rapides, sans passer par la visionneuse */}
-                <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    aria-label={
-                      shot.item.favorite
-                        ? "Retirer des favoris"
-                        : "Ajouter aux favoris"
-                    }
-                    onClick={(e) => handleToggleFavorite(shot.item, e)}
-                    className="h-7 w-7"
-                  >
-                    <Star
-                      className={cn(
-                        "h-3.5 w-3.5",
-                        shot.item.favorite && "fill-amber-400 text-amber-400"
-                      )}
-                    />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    aria-label={
-                      inGallery ? "Déjà en galerie" : "Ajouter à la galerie"
-                    }
-                    disabled={inGallery}
-                    onClick={(e) => handleSaveToGallery(shot.item, shot.file, e)}
-                    className="h-7 w-7"
-                  >
-                    <ImageDown className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-
-                {/* L'étoile reste visible hors survol quand elle est active,
-                    sinon un favori ne se distingue pas dans la grille. */}
-                {shot.item.favorite && (
-                  <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-background/90 p-1 group-hover:opacity-0">
-                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                  </span>
-                )}
-
-                <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6 opacity-0 transition-opacity group-hover:opacity-100">
-                  <p className="line-clamp-2 text-[11px] leading-tight text-white">
-                    {shot.item.prompt}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-white/70">
-                    {timeAgo(shot.item.createdAt)}
-                  </p>
-                </figcaption>
-              </figure>
+                shot={shot}
+                inGallery={inGallery}
+                onOpen={() => setViewerIndex(index)}
+                onToggleFavorite={(event) => handleToggleFavorite(shot.item, event)}
+                onSaveToGallery={(event) => handleSaveToGallery(shot.item, shot.file, event)}
+              />
             );
           })}
         </div>
-      ) : hasFilters ? (
+      ) : loadError ? null : hasFilters ? (
         <Empty className="rounded-xl border border-dashed">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -487,5 +445,125 @@ export default function LibraryPage({}: LibraryPageProps) {
         onMutate={load}
       />
     </ModuleShell>
+  );
+}
+
+/** Une image de la bibliothèque ; le retour de ses actions rapides s'affiche sur elle. */
+function LibraryTile({
+  shot,
+  inGallery,
+  onOpen,
+  onToggleFavorite,
+  onSaveToGallery,
+}: {
+  shot: Shot;
+  inGallery: boolean;
+  onOpen: () => void;
+  onToggleFavorite: (event: React.MouseEvent) => Promise<void>;
+  onSaveToGallery: (event: React.MouseEvent) => Promise<string | undefined>;
+}) {
+  const feedback = useFeedback();
+
+  const act = async (task: () => Promise<void>) => {
+    feedback.clear();
+    try {
+      await task();
+    } catch (error) {
+      feedback.error(errorMessage(error, "L’action n’a pas abouti. Réessayez."));
+    }
+  };
+
+  return (
+    <figure className="group relative aspect-square overflow-hidden rounded-xl border bg-muted">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="block h-full w-full"
+        aria-label={`Ouvrir : ${shot.item.prompt}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl(shot.file)}
+          alt={shot.item.prompt}
+          loading="lazy"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+        />
+      </button>
+      <ProvenanceBadge file={shot.file} className="left-2 top-2" />
+
+      {/* Actions rapides, sans passer par la visionneuse */}
+      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        <Button
+          size="icon"
+          variant="secondary"
+          aria-label={
+            shot.item.favorite
+              ? "Retirer des favoris"
+              : "Ajouter aux favoris"
+          }
+          onClick={(event) => void act(async () => onToggleFavorite(event))}
+          className="h-7 w-7"
+        >
+          <Star
+            className={cn(
+              "h-3.5 w-3.5",
+              shot.item.favorite && "fill-amber-400 text-amber-400"
+            )}
+          />
+        </Button>
+        <Button
+          size="icon"
+          variant="secondary"
+          aria-label={
+            inGallery ? "Déjà en galerie" : "Ajouter à la galerie"
+          }
+          disabled={inGallery}
+          onClick={(event) =>
+            void act(async () => {
+              const fileName = await onSaveToGallery(event);
+              feedback.success(fileName ? `Ajoutée à la galerie : ${fileName}` : "Ajoutée à la galerie");
+            })
+          }
+          className="h-7 w-7"
+        >
+          <ImageDown className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      {/* L'étoile reste visible hors survol quand elle est active,
+          sinon un favori ne se distingue pas dans la grille. */}
+      {shot.item.favorite && (
+        <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-background/90 p-1 group-hover:opacity-0">
+          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+        </span>
+      )}
+
+      <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6 opacity-0 transition-opacity group-hover:opacity-100">
+        <p className="line-clamp-2 text-[11px] leading-tight text-white">
+          {shot.item.prompt}
+        </p>
+        <p className="mt-0.5 text-[10px] text-white/70">
+          {timeAgo(shot.item.createdAt)}
+        </p>
+      </figcaption>
+
+      {/* Retour des actions rapides, posé sur la vignette. */}
+      <div className="pointer-events-none absolute inset-x-2 bottom-2 z-10 flex justify-center">
+        <AnimatePresence>
+          {feedback.state && (
+            <motion.div
+              key="tile-feedback"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="flex min-w-0 max-w-full rounded-lg bg-background/90 px-2.5 py-1.5 shadow-sm backdrop-blur"
+            >
+              <ActionStatus state={feedback.state} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </figure>
   );
 }

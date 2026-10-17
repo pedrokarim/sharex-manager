@@ -20,9 +20,11 @@ import {
   ArrowRight,
   AudioLines,
   CircleAlert,
+  Check,
   CircleCheck,
   CircleDashed,
   Copy,
+  CopyX,
   Film,
   ImageIcon,
   Info,
@@ -35,6 +37,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { FormStatus, useFeedback, type FeedbackState } from "@/components/feedback";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Label } from "@/components/ui/label";
@@ -302,6 +306,9 @@ function ExportScreen({ project }: { project: ClipProject }) {
   // ─── Rendu ─────────────────────────────────────────────────────
   const [stage, setStage] = useState<Stage>({ kind: "ready" });
   const controller = useRef<AbortController | null>(null);
+  // « Rendu annulé » se lit dans le panneau de rendu, à la place du suivi.
+  const renderNotice = useFeedback();
+  const { clear: clearRenderNotice, info: showRenderNotice } = renderNotice;
   const busy = stage.kind === "running";
 
   // Quitter l'onglet pendant le rendu demande confirmation : tout serait perdu.
@@ -316,6 +323,7 @@ function ExportScreen({ project }: { project: ClipProject }) {
   }, [busy]);
 
   const start = useCallback(async () => {
+    clearRenderNotice();
     const unsupported = await canExportInBrowser();
     if (unsupported) {
       setStage({ kind: "error", message: unsupported });
@@ -342,7 +350,8 @@ function ExportScreen({ project }: { project: ClipProject }) {
       const missing = await ensureProjectFonts(project);
       stopIfCancelled();
       if (missing.length) {
-        toast.warning(missing.length > 1 ? `${missing.length} polices de la marque n’ont pas pu être chargées` : "Une police de la marque n’a pas pu être chargée", {
+        // Le rendu dure : l'avertissement doit rester lisible même si l'on est ailleurs.
+        toast.warning(missing.length > 1 ? `${missing.length} polices de la marque n’ont pas pu être chargées.` : "Une police de la marque n’a pas pu être chargée.", {
           description: "Le clip est exporté avec une police de repli.",
         });
       }
@@ -364,7 +373,8 @@ function ExportScreen({ project }: { project: ClipProject }) {
         ...(project.brandKitId ? { brandKitId: project.brandKitId } : {}),
         projectUpdatedAt: project.updatedAt,
       });
-      toast.success("Clip rendu", { description: "Voici sa fiche : couverture, textes et publication." });
+      // Fin d'un travail long, et l'écran change : le toast reste.
+      toast.success("Clip rendu.", { description: "Voici sa fiche : couverture, textes et publication." });
       router.replace(`/m/clip-studio/exports?id=${encodeURIComponent(result.id)}`);
     } catch (error) {
       // Annulé : « Annuler » a déjà rendu la main et prévenu (voir `cancel`).
@@ -373,7 +383,7 @@ function ExportScreen({ project }: { project: ClipProject }) {
     } finally {
       if (controller.current === run) controller.current = null;
     }
-  }, [project, partial, effectiveRange, normalize, credits, subtitles, srt, language, router]);
+  }, [project, partial, effectiveRange, normalize, credits, subtitles, srt, language, router, clearRenderNotice]);
 
   /**
    * Annuler rend la main tout de suite : la préparation des médias ne s'interrompt
@@ -385,8 +395,8 @@ function ExportScreen({ project }: { project: ClipProject }) {
     run.abort();
     controller.current = null;
     setStage({ kind: "ready" });
-    toast("Rendu annulé");
-  }, []);
+    showRenderNotice("Rendu annulé : rien n’a été enregistré.");
+  }, [showRenderNotice]);
 
   const editorHref = `/m/clip-studio/edit?id=${encodeURIComponent(project.id)}`;
   const blocked = !canRender(checks);
@@ -412,7 +422,7 @@ function ExportScreen({ project }: { project: ClipProject }) {
         </section>
 
         <div className="grid min-w-0 content-start gap-6">
-          <RenderPanel stage={stage} blocked={blocked} onStart={() => void start()} onCancel={cancel} frameCount={frameCount} fps={project.fps} />
+          <RenderPanel stage={stage} notice={renderNotice.state} blocked={blocked} onStart={() => void start()} onCancel={cancel} frameCount={frameCount} fps={project.fps} />
 
           <Separator />
 
@@ -562,6 +572,7 @@ function ExportScreen({ project }: { project: ClipProject }) {
 
 function RenderPanel({
   stage,
+  notice,
   blocked,
   onStart,
   onCancel,
@@ -569,6 +580,8 @@ function RenderPanel({
   fps,
 }: {
   stage: Stage;
+  /** Message du dernier geste sur le rendu (annulation). */
+  notice: FeedbackState | null;
   blocked: boolean;
   onStart: () => void;
   onCancel: () => void;
@@ -586,6 +599,7 @@ function RenderPanel({
   if (stage.kind !== "running") {
     return (
       <section className="grid min-w-0 gap-3" aria-label="Rendu">
+        <FormStatus state={notice} />
         {stage.kind === "error" ? (
           <Alert variant="destructive">
             <AlertTriangle />
@@ -713,6 +727,8 @@ const CREDIT_LABEL: Record<ProjectCredit["kind"], string> = {
 
 function CreditsSection({ credits }: { credits: ProjectCredit[] }) {
   const text = creditsText(credits.map((credit) => credit.text));
+  // Le bouton dit lui-même si la copie a réussi.
+  const { hasCopied, copyFailed, copyToClipboard } = useCopyToClipboard();
   return (
     <section className="grid min-w-0 gap-3" aria-labelledby="export-credits">
       <div className="flex min-w-0 items-center justify-between gap-2">
@@ -724,15 +740,17 @@ function CreditsSection({ credits }: { credits: ProjectCredit[] }) {
             variant="ghost"
             size="sm"
             className="h-7 gap-1.5 px-2 text-xs"
-            onClick={() =>
-              void navigator.clipboard.writeText(text).then(
-                () => toast.success("Crédits copiés"),
-                () => toast.error("Copie impossible")
-              )
-            }
+            onClick={() => void copyToClipboard(text)}
+            aria-live="polite"
           >
-            <Copy className="size-3.5" />
-            Copier
+            {hasCopied ? (
+              <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            ) : copyFailed ? (
+              <CopyX className="size-3.5 text-destructive" />
+            ) : (
+              <Copy className="size-3.5" />
+            )}
+            {hasCopied ? "Copié" : copyFailed ? "Copie impossible" : "Copier"}
           </Button>
         ) : null}
       </div>

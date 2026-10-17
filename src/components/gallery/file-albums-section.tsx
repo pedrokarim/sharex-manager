@@ -21,21 +21,30 @@ interface FileAlbumsSectionProps {
   fileName: string;
   onAddToAlbum?: () => void;
   onCreateAlbum?: () => void;
+  /**
+   * À incrémenter après un ajout à un album : la liste se recharge sans
+   * repasser par l'état de chargement, et le nouvel album y apparaît – c'est
+   * le retour de l'action.
+   */
+  version?: number;
 }
 
 export function FileAlbumsSection({
   fileName,
   onAddToAlbum,
   onCreateAlbum,
+  version = 0,
 }: FileAlbumsSectionProps) {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadedFile, setLoadedFile] = useState<string | null>(null);
   const { t } = useTranslation();
 
   useEffect(() => {
     const fetchAlbums = async () => {
       try {
-        setLoading(true);
+        // Le chargement visible ne vaut que pour un nouveau fichier.
+        if (loadedFile !== fileName) setLoading(true);
         const response = await fetch(
           `/api/files/${encodeURIComponent(fileName)}/albums`
         );
@@ -47,11 +56,14 @@ export function FileAlbumsSection({
         console.error("Erreur lors du chargement des albums:", error);
       } finally {
         setLoading(false);
+        setLoadedFile(fileName);
       }
     };
 
     fetchAlbums();
-  }, [fileName]);
+    // `loadedFile` ne sert qu'à choisir l'affichage : il ne relance rien.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileName, version]);
 
   if (loading) {
     return (

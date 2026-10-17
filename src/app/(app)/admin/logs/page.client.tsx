@@ -8,7 +8,7 @@ import { useInView } from "react-intersection-observer";
 import { useQueryState } from "nuqs";
 import { format } from "date-fns";
 import type { Log, LogAction, LogLevel } from "@/lib/types/logs";
-import { toast } from "sonner";
+import { ActionStatus, useFeedback } from "@/components/feedback";
 import { useTranslation } from "@/lib/i18n";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import { RowsSkeleton } from "@/components/skeletons/page-skeletons";
@@ -90,6 +90,10 @@ const ACTION_OPTIONS: { value: LogAction | "all"; label: string }[] = [
 export default function LogsPage() {
   const { t } = useTranslation();
   const locale = useDateLocale();
+  // La liste qui se vide suffit à confirmer l'effacement ; un échec se lit
+  // à côté du bouton.
+  const clearFeedback = useFeedback();
+  const [clearing, setClearing] = useState(false);
 
   const REFRESH_INTERVALS = {
     "0": t("admin.logs.refresh_intervals.none"),
@@ -170,6 +174,8 @@ export default function LogsPage() {
   };
 
   const handleClearLogs = async () => {
+    setClearing(true);
+    clearFeedback.clear();
     try {
       const response = await fetch("/api/admin/logs", {
         method: "DELETE",
@@ -179,10 +185,11 @@ export default function LogsPage() {
         throw new Error(t("admin.logs.clear_error"));
       }
 
-      toast.success(t("admin.logs.clear_success"));
       refetch();
     } catch (error) {
-      toast.error(t("admin.logs.clear_error"));
+      clearFeedback.error(t("admin.logs.clear_error"));
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -218,7 +225,8 @@ export default function LogsPage() {
                 label: REFRESH_INTERVALS[value],
               }))}
             />
-            <Button variant="ghost" size="sm" onClick={handleClearLogs} className="h-8 gap-1.5 rounded-lg px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive">
+            <ActionStatus state={clearFeedback.state} className="max-w-64" />
+            <Button variant="ghost" size="sm" onClick={handleClearLogs} loading={clearing} className="h-8 gap-1.5 rounded-lg px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive">
               <Trash2 className="size-3.5" />
               {t("admin.logs.clear_logs")}
             </Button>

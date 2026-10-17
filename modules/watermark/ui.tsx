@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Slider } from "@/components/ui/slider";
@@ -18,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HexColorPicker } from "react-colorful";
 import { Card } from "@/components/ui/card";
 import { useSession } from "@/lib/auth-client";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { useTranslation, useModuleTranslations } from "@/lib/i18n";
 import moduleTranslations from "./translations";
 
@@ -160,6 +160,10 @@ export default function WatermarkUI({
     margin: 3.5,
   });
   const [savingDefaults, setSavingDefaults] = useState(false);
+  // Le retour de « Utiliser pour chaque envoi » s'affiche au-dessus des
+  // boutons : la réussite explique à quelle condition les réglages servent,
+  // elle reste donc le temps d'être lue.
+  const defaultsFeedback = useFeedback({ successDuration: 6000 });
   /** Retouches enregistrées pour la marque des envois, appliquées une fois sa fiche lue. */
   const savedBrandRef = useRef<{ kitId: string; values: Partial<BrandValues> } | null>(null);
 
@@ -329,6 +333,7 @@ export default function WatermarkUI({
       : { source: "text", text, position, opacity: opacity / 100, fontSize, color, padding };
     if (!settings) return;
     setSavingDefaults(true);
+    defaultsFeedback.clear();
     try {
       const response = await fetch(`/api/modules/${MODULE_NAME}/settings`, {
         method: "PUT",
@@ -339,9 +344,9 @@ export default function WatermarkUI({
         const payload = await response.json().catch(() => null);
         throw new Error(payload?.error ?? `HTTP ${response.status}`);
       }
-      toast.success(t("modules.watermark.defaults.saved"));
+      defaultsFeedback.success(t("modules.watermark.defaults.saved"));
     } catch (error) {
-      toast.error(
+      defaultsFeedback.error(
         error instanceof Error
           ? `${t("modules.watermark.defaults.error")} (${error.message})`
           : t("modules.watermark.defaults.error")
@@ -667,21 +672,24 @@ export default function WatermarkUI({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {isAdmin && (
-          <Button
-            variant="outline"
-            onClick={handleSaveDefaults}
-            loading={savingDefaults}
-            disabled={!canApply}
-            title={t("modules.watermark.defaults.hint")}
-          >
-            {t("modules.watermark.defaults.save")}
+      <div>
+        <FormStatus state={defaultsFeedback.state} className="pb-3" />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {isAdmin && (
+            <Button
+              variant="outline"
+              onClick={handleSaveDefaults}
+              loading={savingDefaults}
+              disabled={!canApply}
+              title={t("modules.watermark.defaults.hint")}
+            >
+              {t("modules.watermark.defaults.save")}
+            </Button>
+          )}
+          <Button onClick={handleApply} disabled={!canApply}>
+            {t("modules.watermark.apply")}
           </Button>
-        )}
-        <Button onClick={handleApply} disabled={!canApply}>
-          {t("modules.watermark.apply")}
-        </Button>
+        </div>
       </div>
     </div>
   );

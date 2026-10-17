@@ -23,7 +23,7 @@ import {
   Wand2,
   ZoomIn,
 } from "lucide-react";
-import { toast } from "sonner";
+import { errorMessage, useFeedback, type Feedback } from "@/components/feedback";
 import {
   ContextMenuItem,
   ContextMenuLabel,
@@ -58,11 +58,15 @@ export interface StudioActions {
   onOpen: (item: HistoryItem, fileIndex: number) => void;
   /** Remet la demande dans le compositeur : tout, ou le prompt seul. */
   onRestore: (item: HistoryItem, mode: "full" | "prompt") => void;
-  /** Relance immédiatement la même demande, images de départ comprises. */
-  onRerun: (item: HistoryItem) => void;
+  /**
+   * Relance immédiatement la même demande, images de départ comprises. Lève
+   * en cas d'échec : passer par `rerunWithFeedback`.
+   */
+  onRerun: (item: HistoryItem) => Promise<void>;
   onEdit: (item: HistoryItem, file: string) => void;
   onInspire: (item: HistoryItem, file: string) => void;
-  onVariants: (item: HistoryItem, file: string) => void;
+  /** Décline une image ; lève en cas d'échec : passer par `variantsWithFeedback`. */
+  onVariants: (item: HistoryItem, file: string) => Promise<void>;
   onRetry: (job: Job) => void;
   onDismiss: (job: Job) => void;
   onMutate: () => void;
@@ -73,6 +77,11 @@ export interface StudioActions {
 export interface RenderActions {
   busy: boolean;
   favorite: boolean;
+  /**
+   * Retour des actions sur cette génération, affiché sur ses images (voir
+   * `ShotStrip`) : là où l'on vient de cliquer, pas au coin de l'écran.
+   */
+  feedback: Feedback;
   run: (task: () => Promise<void>) => Promise<void>;
   toggleFavorite: () => void;
 }
@@ -80,15 +89,17 @@ export interface RenderActions {
 export function useRenderActions(item: HistoryItem, onMutate: () => void): RenderActions {
   const [busy, setBusy] = useState(false);
   const [favorite, setFavorite] = useState(Boolean(item.favorite));
+  const feedback = useFeedback();
 
   useEffect(() => setFavorite(Boolean(item.favorite)), [item.favorite]);
 
   const run = async (task: () => Promise<void>) => {
     setBusy(true);
+    feedback.clear();
     try {
       await task();
-    } catch (error: any) {
-      toast.error(error?.message ?? "Action impossible");
+    } catch (error) {
+      feedback.error(errorMessage(error, "L’action n’a pas abouti. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -101,7 +112,27 @@ export function useRenderActions(item: HistoryItem, onMutate: () => void): Rende
       onMutate();
     });
 
-  return { busy, favorite, run, toggleFavorite };
+  // L'étoile qui se remplit suffit à confirmer le favori.
+  return { busy, favorite, feedback, run, toggleFavorite };
+}
+
+/**
+ * Variantes et relance partent en file d'attente : la nouvelle tuile peut
+ * apparaître hors de la vue (en haut du fil). Le retour s'affiche donc sur la
+ * génération d'où part l'action, réussite comme échec.
+ */
+export function variantsWithFeedback(actions: RenderActions, studio: StudioActions, item: HistoryItem, file: string) {
+  return actions.run(async () => {
+    await studio.onVariants(item, file);
+    actions.feedback.success("Variantes en file d’attente");
+  });
+}
+
+export function rerunWithFeedback(actions: RenderActions, studio: StudioActions, item: HistoryItem) {
+  return actions.run(async () => {
+    await studio.onRerun(item);
+    actions.feedback.success("Relancée, en file d’attente");
+  });
 }
 
 // ─── Kits : menu contextuel ou menu déroulant ────────────────────
@@ -161,7 +192,7 @@ export function GenerationMenuItems({
   studio: StudioActions;
 }) {
   const { Item, Separator, Sub, SubTrigger, SubContent } = kit;
-  const { run } = actions;
+  const { run, feedback } = actions;
   const index = file ? item.imageFiles.indexOf(file) : -1;
   const hasSources = Boolean(item.sourceImages?.length);
 
@@ -182,7 +213,7 @@ export function GenerationMenuItems({
             <Sparkles className="mr-2 h-4 w-4" />
             S&apos;en inspirer
           </Item>
-          <Item onClick={() => studio.onVariants(item, file)}>
+          <Item onClick={() => void variantsWithFeedback(actions, studio, item, file)}>
             <Wand2 className="mr-2 h-4 w-4" />
             Décliner en variantes
           </Item>
@@ -191,7 +222,7 @@ export function GenerationMenuItems({
             onClick={() =>
               run(async () => {
                 const result = await callModule<{ file?: string }>("upscale", item.id, file, 2);
-                toast.success(`Agrandie : ${result?.file}`);
+                feedback.success(result?.file ? `Agrandie ×2 : ${result.file}` : "Image agrandie ×2");
                 studio.onMutate();
               })
             }
@@ -200,7 +231,7 @@ export function GenerationMenuItems({
             Agrandir ×2
           </Item>
           <Separator />
-          <Item onClick={() => void copyImage(imageUrl(file))}>
+          <Item onClick={() => void copyImage(imageUrl(file), feedback)}>
             <ClipboardCopy className="mr-2 h-4 w-4" />
             Copier l&apos;image
           </Item>
@@ -213,10 +244,10 @@ export function GenerationMenuItems({
             onClick={() =>
               run(async () => {
                 const clean = await downloadCleanImage(file);
-                toast.success(
+                feedback.success(
                   clean.savedBytes > 0
-                    ? `Version propre : ${formatBytes(clean.savedBytes)} de métadonnées en moins, pixels identiques`
-                    : "Version propre : rien à retirer, fichier identique"
+                    ? `Version propre : ${formatBytes(clean.savedBytes)} de métadonnées en moins, pixels identiques.`
+                    : "Version propre : rien à retirer, le fichier est identique."
                 );
               })
             }
@@ -229,7 +260,7 @@ export function GenerationMenuItems({
             onClick={() =>
               run(async () => {
                 const result = await callModule<{ fileName?: string }>("sendToGallery", item.id, file);
-                toast.success(`Ajoutée à la galerie : ${result?.fileName ?? file}`);
+                feedback.success(`Ajoutée à la galerie : ${result?.fileName ?? file}`);
                 studio.onMutate();
               })
             }
@@ -242,8 +273,8 @@ export function GenerationMenuItems({
               variant="destructive"
               onClick={() =>
                 run(async () => {
+                  // L'image disparaît du lot : c'est le retour.
                   await callModule("deleteImage", item.id, file);
-                  toast.success("Image supprimée");
                   studio.onMutate();
                 })
               }
@@ -268,11 +299,11 @@ export function GenerationMenuItems({
         <Type className="mr-2 h-4 w-4" />
         Reprendre le texte seul
       </Item>
-      <Item onClick={() => studio.onRerun(item)}>
+      <Item onClick={() => void rerunWithFeedback(actions, studio, item)}>
         <Play className="mr-2 h-4 w-4" />
         Relancer à l&apos;identique
       </Item>
-      <Item onClick={() => copyText(item.prompt)}>
+      <Item onClick={() => copyText(item.prompt, feedback)}>
         <Copy className="mr-2 h-4 w-4" />
         Copier le prompt
       </Item>
@@ -296,7 +327,7 @@ export function GenerationMenuItems({
                 onClick={() =>
                   run(async () => {
                     await callModule("assignCollection", item.id, collection.id);
-                    toast.success(`Ajoutée à « ${collection.name} »`);
+                    feedback.success(`Ajoutée à « ${collection.name} »`);
                     studio.onMutate();
                   })
                 }
@@ -312,7 +343,7 @@ export function GenerationMenuItems({
                   onClick={() =>
                     run(async () => {
                       await callModule("assignCollection", item.id, null);
-                      toast.success("Retirée de la série");
+                      feedback.success("Retirée de la série");
                       studio.onMutate();
                     })
                   }
@@ -328,7 +359,7 @@ export function GenerationMenuItems({
         onClick={() =>
           run(async () => {
             await callModule("sendAllToGallery", item.id);
-            toast.success("Lot envoyé dans la galerie");
+            feedback.success(item.imageFiles.length > 1 ? "Lot envoyé dans la galerie" : "Envoyée dans la galerie");
             studio.onMutate();
           })
         }
@@ -343,8 +374,8 @@ export function GenerationMenuItems({
         variant="destructive"
         onClick={() =>
           run(async () => {
+            // La génération disparaît du fil : c'est le retour.
             await callModule("deleteHistoryItem", item.id);
-            toast.success("Génération supprimée");
             studio.onMutate();
           })
         }
@@ -362,10 +393,13 @@ export function JobMenuItems({
   kit,
   job,
   studio,
+  feedback,
 }: {
   kit: MenuKit;
   job: Job;
   studio: StudioActions;
+  /** Retour affiché sur la vignette du travail. */
+  feedback: Feedback;
 }) {
   const { Item, Separator } = kit;
   const failed = job.status === "error";
@@ -375,7 +409,7 @@ export function JobMenuItems({
         <RotateCcw className="mr-2 h-4 w-4" />
         Reprendre la demande
       </Item>
-      <Item onClick={() => copyText(job.request.prompt)}>
+      <Item onClick={() => copyText(job.request.prompt, feedback)}>
         <Copy className="mr-2 h-4 w-4" />
         Copier le prompt
       </Item>
@@ -388,11 +422,7 @@ export function JobMenuItems({
       ) : (
         <Item
           variant="destructive"
-          onClick={async () => {
-            await callModule("cancelGeneration", job.id);
-            toast.info("Génération annulée");
-            studio.onMutate();
-          }}
+          onClick={() => void cancelJob(job, studio.onMutate, feedback)}
         >
           <Ban className="mr-2 h-4 w-4" />
           Annuler la génération
@@ -402,18 +432,35 @@ export function JobMenuItems({
   );
 }
 
+/**
+ * Annule un travail. La vignette qui disparaît du fil confirme l'annulation ;
+ * seul un échec s'affiche, sur la vignette.
+ */
+export async function cancelJob(job: Job, onMutate: () => void, feedback: Feedback) {
+  feedback.clear();
+  try {
+    await callModule("cancelGeneration", job.id);
+    onMutate();
+  } catch (error) {
+    feedback.error(errorMessage(error, "L’annulation n’a pas abouti. Réessayez."));
+  }
+}
+
 // ─── Presse-papiers ──────────────────────────────────────────────
 
-export function copyText(text: string) {
-  void navigator.clipboard.writeText(text);
-  toast.success("Prompt copié");
+/** Copie un prompt ; le retour s'affiche sur la génération concernée. */
+export function copyText(text: string, feedback: Feedback) {
+  navigator.clipboard.writeText(text).then(
+    () => feedback.success("Prompt copié"),
+    () => feedback.error("Copie impossible dans ce navigateur.")
+  );
 }
 
 /**
  * Copie une image dans le presse-papiers. Les navigateurs n'y acceptent que
  * du PNG : un JPEG ou un WebP est redessiné au passage.
  */
-async function copyImage(url: string) {
+async function copyImage(url: string, feedback: Feedback) {
   try {
     const blob = await (await fetch(url)).blob();
     const png =
@@ -432,8 +479,8 @@ async function copyImage(url: string) {
             image.src = URL.createObjectURL(blob);
           });
     await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
-    toast.success("Image copiée");
+    feedback.success("Image copiée");
   } catch {
-    toast.error("Copie de l'image impossible dans ce navigateur");
+    feedback.error("Ce navigateur refuse la copie d’image. Téléchargez-la plutôt.");
   }
 }

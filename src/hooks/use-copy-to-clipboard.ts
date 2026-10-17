@@ -1,47 +1,37 @@
-import { useState } from "react";
-import { toast } from "@/hooks/use-toast";
+import { useEffect, useRef, useState } from "react";
 
-export function useCopyToClipboard() {
+/**
+ * Copie dans le presse-papiers. Le retour se lit sur le bouton lui-même
+ * (`hasCopied` : l'icône devient une coche, `copyFailed` : une croix),
+ * jamais dans une notification.
+ */
+export function useCopyToClipboard({ resetAfter = 2000 }: { resetAfter?: number } = {}) {
   const [isCopying, setIsCopying] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
 
-  const copyToClipboard = async (
-    text: string,
-    successMessage?: { title?: string; description?: string }
-  ) => {
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const copyToClipboard = async (text: string) => {
+    window.clearTimeout(timer.current);
+    setIsCopying(true);
     try {
-      setIsCopying(true);
       await navigator.clipboard.writeText(text);
+      setCopyFailed(false);
       setHasCopied(true);
-
-      if (successMessage) {
-        toast({
-          title: successMessage.title || "Copied to clipboard",
-          description:
-            successMessage.description ||
-            "Text has been copied to your clipboard",
-        });
-      }
-
-      // Reset copied state after 2 seconds
-      setTimeout(() => {
-        setHasCopied(false);
-      }, 2000);
     } catch (error) {
-      console.error("Failed to copy:", error);
-      toast({
-        title: "Copy failed",
-        description: "Could not copy to clipboard",
-        variant: "destructive",
-      });
+      console.error("Copie impossible :", error);
+      setHasCopied(false);
+      setCopyFailed(true);
     } finally {
       setIsCopying(false);
+      timer.current = window.setTimeout(() => {
+        setHasCopied(false);
+        setCopyFailed(false);
+      }, resetAfter);
     }
   };
 
-  return {
-    isCopying,
-    hasCopied,
-    copyToClipboard,
-  };
+  return { isCopying, hasCopied, copyFailed, copyToClipboard };
 }

@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/lib/auth-client";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
-import { toast } from "sonner";
 import { ApiKey } from "@/types/api-key";
+import { ActionStatus, useFeedback } from "@/components/feedback";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import { CreateApiKeyDialog } from "@/components/api-keys/create-api-key-dialog";
@@ -33,11 +35,14 @@ import {
 } from "@/components/ui/table";
 import {
   Copy,
+  CopyCheck,
+  CopyX,
   Eye,
   EyeOff,
   Info,
   KeyRound,
   Plus,
+  RotateCw,
   Trash2,
 } from "lucide-react";
 
@@ -54,6 +59,16 @@ export default function ApiKeysPage() {
   const [selectedKeyForDetails, setSelectedKeyForDetails] =
     useState<ApiKey | null>(null);
   const locale = useDateLocale();
+  // Un échec de chargement remplace la liste (avec de quoi réessayer) au lieu
+  // de laisser croire qu'il n'y a aucune clé.
+  const [loadFailed, setLoadFailed] = useState(false);
+  // Une suppression réussie se voit (la clé disparaît) ; un échec s'affiche
+  // sur la clé concernée.
+  const deleteFeedback = useFeedback();
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  // La copie se confirme sur le bouton de la clé copiée.
+  const { copyToClipboard, hasCopied, copyFailed } = useCopyToClipboard();
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSessionPending && !session) {
@@ -80,18 +95,21 @@ export default function ApiKeysPage() {
   const fetchKeys = async () => {
     try {
       setLoading(true);
+      setLoadFailed(false);
       const res = await fetch("/api/api-keys");
       if (!res.ok) throw new Error();
       const data = await res.json();
       setKeys(data);
     } catch (error) {
-      toast.error(t("settings.api_keys.errors.loading"));
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
+    setDeleteTargetId(id);
+    deleteFeedback.clear();
     try {
       const res = await fetch(`/api/api-keys/${id}`, {
         method: "DELETE",
@@ -99,19 +117,34 @@ export default function ApiKeysPage() {
 
       if (!res.ok) throw new Error();
 
-      toast.success(t("settings.api_keys.messages.delete_success"));
       fetchKeys();
     } catch (error) {
-      toast.error(t("settings.api_keys.errors.delete"));
+      deleteFeedback.error(t("settings.api_keys.errors.delete"));
     } finally {
       setSelectedKeyId(null);
     }
   };
 
-  const copyToClipboard = (key: string) => {
-    navigator.clipboard.writeText(key);
-    toast.success(t("settings.api_keys.messages.copy_success"));
+  const copyKey = (key: ApiKey) => {
+    setCopiedKeyId(key.id);
+    copyToClipboard(key.key);
   };
+
+  /** État de copie propre à une clé : seule celle copiée change d'icône. */
+  const copyStateOf = (id: string) =>
+    copiedKeyId === id ? (hasCopied ? "copied" : copyFailed ? "failed" : null) : null;
+
+  const deleteStatusOf = (id: string) => (deleteTargetId === id ? deleteFeedback.state : null);
+
+  const loadError = (
+    <div role="alert" className="flex flex-col items-center gap-3 px-4 py-10 text-center text-sm">
+      <p className="text-destructive">{t("settings.api_keys.errors.loading")}</p>
+      <Button variant="outline" size="sm" onClick={fetchKeys}>
+        <RotateCw className="mr-2 h-4 w-4" />
+        Réessayer
+      </Button>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -187,6 +220,8 @@ export default function ApiKeysPage() {
                 label={t("settings.api_keys.loading")}
                 className="rounded-xl border border-border/60 bg-muted/20"
               />
+            ) : loadFailed ? (
+              <div className="rounded-xl border border-border/60 bg-muted/20">{loadError}</div>
             ) : keys.length === 0 ? (
               <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
                 {t("settings.api_keys.no_keys.description")}
@@ -295,11 +330,23 @@ export default function ApiKeysPage() {
                     </Button>
                     <Button
                       variant="outline"
-                      className="col-span-2 text-sm"
-                      onClick={() => copyToClipboard(key.key)}
+                      className={cn("col-span-2 text-sm", copyStateOf(key.id) === "failed" && "text-destructive")}
+                      onClick={() => copyKey(key)}
                     >
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copier la clé
+                      {copyStateOf(key.id) === "copied" ? (
+                        <CopyCheck className="mr-2 h-4 w-4" />
+                      ) : copyStateOf(key.id) === "failed" ? (
+                        <CopyX className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Copy className="mr-2 h-4 w-4" />
+                      )}
+                      <span aria-live="polite">
+                        {copyStateOf(key.id) === "copied"
+                          ? "Clé copiée"
+                          : copyStateOf(key.id) === "failed"
+                            ? "Copie impossible"
+                            : "Copier la clé"}
+                      </span>
                     </Button>
                     <Button
                       variant="outline"
@@ -309,6 +356,11 @@ export default function ApiKeysPage() {
                       <Trash2 className="mr-2 h-4 w-4" />
                       Supprimer la clé
                     </Button>
+                    {/* Rendu seulement s'il y a un message : vide, il ajouterait
+                        un écart de grille sous les boutons. */}
+                    {deleteStatusOf(key.id) ? (
+                      <ActionStatus state={deleteStatusOf(key.id)} className="col-span-2 justify-center" />
+                    ) : null}
                   </div>
                 </div>
               ))
@@ -348,6 +400,10 @@ export default function ApiKeysPage() {
                     <TableCell colSpan={7}>
                       <LoadingState size="md" label={t("settings.api_keys.loading")} />
                     </TableCell>
+                  </TableRow>
+                ) : loadFailed ? (
+                  <TableRow>
+                    <TableCell colSpan={7}>{loadError}</TableCell>
                   </TableRow>
                 ) : keys.length === 0 ? (
                   <TableRow>
@@ -392,10 +448,30 @@ export default function ApiKeysPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
-                            onClick={() => copyToClipboard(key.key)}
+                            className={cn("h-8 w-8", copyStateOf(key.id) === "failed" && "text-destructive")}
+                            onClick={() => copyKey(key)}
+                            title={
+                              copyStateOf(key.id) === "copied"
+                                ? "Clé copiée"
+                                : copyStateOf(key.id) === "failed"
+                                  ? "Copie impossible"
+                                  : "Copier la clé"
+                            }
                           >
-                            <Copy className="h-4 w-4" />
+                            {copyStateOf(key.id) === "copied" ? (
+                              <CopyCheck className="h-4 w-4" />
+                            ) : copyStateOf(key.id) === "failed" ? (
+                              <CopyX className="h-4 w-4" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                            <span className="sr-only" aria-live="polite">
+                              {copyStateOf(key.id) === "copied"
+                                ? "Clé copiée"
+                                : copyStateOf(key.id) === "failed"
+                                  ? "Copie impossible"
+                                  : "Copier la clé"}
+                            </span>
                           </Button>
                         </div>
                       </TableCell>
@@ -439,6 +515,7 @@ export default function ApiKeysPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <ActionStatus state={deleteStatusOf(key.id)} className="max-w-48" />
                           <Button
                             variant="ghost"
                             size="icon"

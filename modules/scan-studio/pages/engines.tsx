@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { CheckCircle2, Languages, RefreshCw, XCircle } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, useFeedback, type FeedbackState } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -50,6 +50,10 @@ export default function EnginesPage() {
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
+  // L'échec d'« Actualiser » s'affiche à côté du bouton ; sans état du tout, la page le dit à sa place.
+  const [refreshError, setRefreshError] = useState<FeedbackState | null>(null);
+  // Le choix de l'ordre se voit dans la liste des moteurs ; son échec s'affiche dans la carte.
+  const orderFeedback = useFeedback();
 
   const store = useCallback((next: EngineCatalogue) => {
     snapshot = next;
@@ -60,11 +64,12 @@ export default function EnginesPage() {
   /** Lit l'état des moteurs sur ce serveur : aucun service de traduction n'est appelé. */
   const refresh = useCallback(async () => {
     setRefreshing(true);
+    setRefreshError(null);
     try {
       store(await api.getEngines());
     } catch (error) {
       setFailed(true);
-      toast.error(errorMessage(error, "État des moteurs indisponible."));
+      setRefreshError({ tone: "error", message: errorMessage(error, "L’état des moteurs n’a pas pu être lu. Réessayez."), id: Date.now() });
     } finally {
       setRefreshing(false);
     }
@@ -78,11 +83,12 @@ export default function EnginesPage() {
     const choice = ORDER_CHOICES.find((entry) => entry.primary === primary);
     if (!choice || savingOrder) return;
     setSavingOrder(true);
+    orderFeedback.clear();
     try {
+      // La liste des moteurs se range aussitôt dans le nouvel ordre : c'est le retour.
       store(await api.saveEngineSettings({ order: [choice.primary, choice.fallback] }));
-      toast.success(`${ENGINE_NAMES[choice.primary]} est maintenant le moteur principal`);
     } catch (error) {
-      toast.error(errorMessage(error, "L’ordre des moteurs n’a pas pu être enregistré."));
+      orderFeedback.error(errorMessage(error, "L’ordre des moteurs n’a pas pu être enregistré. Réessayez."));
     } finally {
       setSavingOrder(false);
     }
@@ -98,10 +104,13 @@ export default function EnginesPage() {
       <ModuleShell
         crumbs={[{ label: "Moteurs" }]}
         actions={
-          <Button variant="outline" className="gap-2" loading={refreshing} onClick={() => void refresh()}>
-            <RefreshCw className="h-4 w-4" />
-            Actualiser
-          </Button>
+          <>
+            {catalogue !== null && <ActionStatus state={refreshError} className="max-w-40 sm:max-w-64" />}
+            <Button variant="outline" className="gap-2" loading={refreshing} onClick={() => void refresh()}>
+              <RefreshCw className="h-4 w-4" />
+              Actualiser
+            </Button>
+          </>
         }
       >
         <div className="flex flex-col gap-6">
@@ -121,7 +130,9 @@ export default function EnginesPage() {
           {catalogue === null ? (
             failed ? (
               <div className="flex flex-col items-start gap-3">
-                <p className="text-sm text-muted-foreground">L’état des moteurs n’a pas pu être chargé.</p>
+                <p className="text-sm break-words text-muted-foreground" role="alert">
+                  {refreshError?.message ?? "L’état des moteurs n’a pas pu être chargé."}
+                </p>
                 <Button variant="outline" size="sm" className="gap-2" onClick={() => void refresh()}>
                   <RefreshCw className="h-4 w-4" />
                   Réessayer
@@ -177,6 +188,7 @@ export default function EnginesPage() {
                       ) : (
                         <p className="text-sm text-muted-foreground">Aucun ordre n’est enregistré.</p>
                       )}
+                      {isAdmin && <FormStatus state={orderFeedback.state} />}
                       {!isAdmin && <p className="text-xs text-muted-foreground">Les clés, les plafonds et l’ordre des moteurs sont réglés par un administrateur.</p>}
                     </CardContent>
                   </Card>
@@ -382,6 +394,8 @@ function MyMemoryForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (cat
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
+  // Le retour d'« Enregistrer » s'affiche au bout de la rangée des boutons, à la place de celui de l'essai.
+  const feedback = useFeedback({ successDuration: 4000 });
 
   useEffect(() => setEmail(saved), [saved]);
   const dirty = email.trim() !== saved;
@@ -390,12 +404,13 @@ function MyMemoryForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (cat
     event.preventDefault();
     if (!dirty || saving) return;
     setSaving(true);
+    setTest(null);
+    feedback.clear();
     try {
       onSaved(await api.saveEngineSettings({ myMemoryEmail: email.trim() }));
-      setTest(null);
-      toast.success(email.trim() ? "Adresse de contact enregistrée" : "Adresse de contact retirée");
+      feedback.success(email.trim() ? "Adresse enregistrée" : "Adresse retirée");
     } catch (error) {
-      toast.error(errorMessage(error, "Ces réglages n’ont pas pu être enregistrés."));
+      feedback.error(errorMessage(error, "Ces réglages n’ont pas pu être enregistrés. Réessayez."));
     } finally {
       setSaving(false);
     }
@@ -405,10 +420,12 @@ function MyMemoryForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (cat
     if (testing) return;
     setTesting(true);
     setTest(null);
+    feedback.clear();
     try {
       setTest(await api.testEngine(engine.id));
     } catch (error) {
-      toast.error(errorMessage(error, "Essai impossible."));
+      // L'essai n'a pas pu partir : la raison prend la place de son résultat.
+      setTest({ ok: false, message: errorMessage(error, "L’essai n’a pas pu être lancé. Réessayez.") });
     } finally {
       setTesting(false);
     }
@@ -416,7 +433,7 @@ function MyMemoryForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (cat
 
   const id = `scan-studio-engine-${engine.id}`;
   return (
-    <form onSubmit={submit} className="flex max-w-xl flex-col gap-4">
+    <form onSubmit={submit} onChange={feedback.state?.tone === "error" ? feedback.clear : undefined} className="flex max-w-xl flex-col gap-4">
       <p className="text-xs leading-relaxed text-muted-foreground">
         Service public de Translated, utilisable sans clé : c’est lui qui traduit tant qu’aucun autre moteur n’est réglé. Il ne prend qu’une phrase par
         requête : une page part donc bulle après bulle, avec une seconde entre deux. Le texte des bulles est envoyé à ce service.
@@ -445,11 +462,13 @@ function MyMemoryForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (cat
         <Button type="button" variant="outline" size="sm" loading={testing} disabled={dirty} onClick={() => void runTest()} title="Envoie une courte phrase d’essai à ce moteur">
           Tester
         </Button>
-        {test && (
+        {test ? (
           <p className={cn("flex items-center gap-1.5 text-xs", test.ok ? "text-emerald-700 dark:text-emerald-300" : "text-destructive")} aria-live="polite">
             {test.ok ? <CheckCircle2 aria-hidden className="h-3.5 w-3.5 shrink-0" /> : <XCircle aria-hidden className="h-3.5 w-3.5 shrink-0" />}
             {test.message}
           </p>
+        ) : (
+          <ActionStatus state={feedback.state} />
         )}
       </div>
     </form>
@@ -470,6 +489,8 @@ function KeyedEngineForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
+  // Le retour d'« Enregistrer » ou de « Retirer la clé » s'affiche au bout de la rangée des boutons.
+  const feedback = useFeedback({ successDuration: 4000 });
 
   // Ce que le serveur vient de rendre remplace les champs qui ne portent pas de secret.
   useEffect(() => {
@@ -486,13 +507,14 @@ function KeyedEngineForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (
   const save = async (patch: EngineSettingsPatch, message: string) => {
     if (saving) return;
     setSaving(true);
+    setTest(null);
+    feedback.clear();
     try {
       onSaved(await api.saveEngineSettings(patch));
       setKey("");
-      setTest(null);
-      toast.success(message);
+      feedback.success(message);
     } catch (error) {
-      toast.error(errorMessage(error, "Enregistrement impossible."));
+      feedback.error(errorMessage(error, "Ces réglages n’ont pas pu être enregistrés. Réessayez."));
     } finally {
       setSaving(false);
     }
@@ -506,19 +528,21 @@ function KeyedEngineForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (
     if (key.trim()) patch[isDeepl ? "deeplKey" : "libreTranslateKey"] = key.trim();
     if (urlChanged) patch.libreTranslateUrl = url.trim();
     if (limitChanged) patch.monthlyLimits = { [engine.id]: parsedLimit };
-    void save(patch, `Réglages de ${engine.label} enregistrés`);
+    void save(patch, "Enregistré");
   };
 
-  const clearKey = () => void save(isDeepl ? { deeplKey: "" } : { libreTranslateKey: "" }, `Clé ${engine.label} retirée`);
+  const clearKey = () => void save(isDeepl ? { deeplKey: "" } : { libreTranslateKey: "" }, "Clé retirée");
 
   const runTest = async () => {
     if (testing) return;
     setTesting(true);
     setTest(null);
+    feedback.clear();
     try {
       setTest(await api.testEngine(engine.id));
     } catch (error) {
-      toast.error(errorMessage(error, "Essai impossible."));
+      // L'essai n'a pas pu partir : la raison prend la place de son résultat.
+      setTest({ ok: false, message: errorMessage(error, "L’essai n’a pas pu être lancé. Réessayez.") });
     } finally {
       setTesting(false);
     }
@@ -529,10 +553,11 @@ function KeyedEngineForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (
     if (testing) return;
     setTesting(true);
     setTest(null);
+    feedback.clear();
     try {
       setTest(await api.readEngineUsage(engine.id));
     } catch (error) {
-      toast.error(errorMessage(error, "Lecture du quota impossible."));
+      setTest({ ok: false, message: errorMessage(error, "Le quota n’a pas pu être lu. Réessayez.") });
     } finally {
       setTesting(false);
     }
@@ -541,7 +566,7 @@ function KeyedEngineForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (
   const id = `scan-studio-engine-${engine.id}`;
 
   return (
-    <form onSubmit={submit} className="flex max-w-xl flex-col gap-4">
+    <form onSubmit={submit} onChange={feedback.state?.tone === "error" ? feedback.clear : undefined} className="flex max-w-xl flex-col gap-4">
       {!isDeepl && (
         <div className="grid gap-2">
           <Label htmlFor={`${id}-url`}>Adresse du service</Label>
@@ -630,11 +655,13 @@ function KeyedEngineForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (
             Lire le quota
           </Button>
         )}
-        {test && (
+        {test ? (
           <p className={cn("flex items-center gap-1.5 text-xs", test.ok ? "text-emerald-700 dark:text-emerald-300" : "text-destructive")} aria-live="polite">
             {test.ok ? <CheckCircle2 aria-hidden className="h-3.5 w-3.5 shrink-0" /> : <XCircle aria-hidden className="h-3.5 w-3.5 shrink-0" />}
             {test.message}
           </p>
+        ) : (
+          <ActionStatus state={feedback.state} />
         )}
       </div>
     </form>

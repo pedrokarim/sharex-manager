@@ -14,7 +14,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { MotionConfig, motion } from "framer-motion";
-import { toast } from "sonner";
+import { errorMessage, useFeedback } from "@/components/feedback";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -136,6 +136,9 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
     source: "uploads",
   });
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  // Messages du compositeur (lancement refusé, image non reprise, moteur
+  // changé…) : affichés dans le dock, sous le prompt, là où l'on écrit.
+  const dock = useFeedback();
   const [view, setView] = useFeedView();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -245,11 +248,12 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
           ].slice(0, MAX_REFERENCES),
         };
       });
-      toast.success(
-        images.length > 1 ? `${images.length} images jointes` : "Image jointe"
-      );
+      // L'image qui apparaît dans le plateau du dock confirme la jonction.
+      dock.clear();
       promptRef.current?.focus();
     },
+    // `dock.clear` est stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
@@ -261,6 +265,7 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
       ? `${model.label} ne prend pas d'image de départ`
       : undefined,
     paused: picker.open,
+    feedback: dock,
   });
 
   // Jonction des fichiers reçus, une fois le catalogue connu : il faut un
@@ -276,11 +281,13 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
         (entry) => entry.available && entry.supportsReference
       );
       if (!fallback) {
-        toast.error("Aucun moteur disponible ne prend d'image de départ");
+        dock.error(
+          "Aucun moteur disponible ne prend d’image de départ. Configurez-en un dans les réglages du module."
+        );
         return;
       }
       patch({ model: fallback.id });
-      toast.info(`Moteur ${fallback.label} choisi : il accepte une image de départ`);
+      dock.info(`Moteur ${fallback.label} choisi : il accepte une image de départ.`);
     }
 
     Promise.all(
@@ -303,16 +310,13 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
             })),
           ].slice(0, MAX_REFERENCES),
         }));
-        toast.success(
-          request.role === "edit-target"
-            ? "Image prête à être retouchée : décrivez ce qui doit changer"
-            : images.length > 1
-              ? `${images.length} images jointes comme inspiration`
-              : "Image jointe comme inspiration"
-        );
+        // Le plateau du dock montre les images ; en retouche, le prompt vide
+        // invite déjà à décrire ce qui doit changer.
         promptRef.current?.focus();
       })
-      .catch((error) => toast.error(error?.message ?? "Import des fichiers impossible"));
+      .catch((error) =>
+        dock.error(errorMessage(error, "Les images envoyées depuis la galerie n’ont pas pu être jointes. Réessayez."))
+      );
     // Seule l'arrivée de fichiers déclenche la jonction.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incoming, catalogue]);
@@ -327,6 +331,7 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
   const submit = useCallback(async () => {
     if (!state.prompt.trim() || submitting) return;
     setSubmitting(true);
+    dock.clear();
     try {
       await callModule("enqueueGeneration", {
         prompt: state.prompt,
@@ -351,33 +356,33 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
         setState((prev) => ({ ...prev, prompt: "", references: [] }));
       }
       await refresh();
-    } catch (error: any) {
-      toast.error(error?.message ?? "Lancement impossible");
+    } catch (error) {
+      dock.error(errorMessage(error, "La génération n’a pas pu être lancée. Réessayez."));
     } finally {
       setSubmitting(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, submitting, refresh, settings.clear_after_submit]);
 
+  /**
+   * Décline une image en variantes. Lève en cas d'échec : le fil affiche
+   * l'erreur, comme la réussite, sur l'image d'où part l'action.
+   */
   const handleVariants = useCallback(
     async (item: HistoryItem, file: string) => {
-      try {
-        const reference = await fileToReference(file);
-        await callModule("enqueueGeneration", {
-          prompt: item.prompt,
-          negativePrompt: item.negativePrompt,
-          model: item.model,
-          size: item.size,
-          quality: item.quality,
-          n: 2,
-          collectionId: item.collectionId,
-          parentId: item.id,
-          references: [{ ...reference, role: "reference" }],
-        });
-        toast.success("Variantes en file d'attente");
-        await refresh();
-      } catch (error: any) {
-        toast.error(error?.message ?? "Impossible de décliner cette image");
-      }
+      const reference = await fileToReference(file);
+      await callModule("enqueueGeneration", {
+        prompt: item.prompt,
+        negativePrompt: item.negativePrompt,
+        model: item.model,
+        size: item.size,
+        quality: item.quality,
+        n: 2,
+        collectionId: item.collectionId,
+        parentId: item.id,
+        references: [{ ...reference, role: "reference" }],
+      });
+      await refresh();
     },
     [refresh]
   );
@@ -385,7 +390,7 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
   const handleEdit = useCallback(
     async (item: HistoryItem, file: string) => {
       if (model && !model.supportsReference) {
-        toast.info(`${model.label} ne sait pas retoucher une image. Changez de moteur.`);
+        dock.error(`${model.label} ne sait pas retoucher une image. Choisissez un autre moteur, puis recommencez.`);
         return;
       }
       try {
@@ -403,12 +408,15 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
           ],
           prompt: "",
         }));
+        // L'image dans le plateau et le prompt vide (« Décrivez ce qui doit
+        // changer… ») disent la suite.
+        dock.clear();
         promptRef.current?.focus();
-        toast.success("Décrivez maintenant ce qui doit changer");
       } catch {
-        toast.error("Reprise de l'image impossible");
+        dock.error("L’image n’a pas pu être reprise dans le compositeur. Réessayez.");
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [model]
   );
 
@@ -435,10 +443,12 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
    */
   const handleRestore = useCallback(
     async (item: HistoryItem, mode: "full" | "prompt") => {
+      // Le texte et les réglages qui apparaissent dans le dock confirment la
+      // reprise.
+      dock.clear();
       if (mode === "prompt") {
         patch({ prompt: item.prompt });
         promptRef.current?.focus();
-        toast.success("Texte repris dans le compositeur");
         return;
       }
 
@@ -458,48 +468,41 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
         });
         promptRef.current?.focus();
         if (item.usedReference && references.length === 0) {
-          toast.info(
-            "Texte et réglages repris. Les images de départ de cette ancienne génération n'ont pas été conservées."
-          );
-        } else {
-          toast.success(
-            references.length
-              ? "Demande reprise avec ses images de départ"
-              : "Demande reprise dans le compositeur"
+          dock.info(
+            "Texte et réglages repris. Les images de départ de cette ancienne génération n’ont pas été conservées."
           );
         }
       } catch {
-        toast.error("Reprise de la demande impossible");
+        dock.error("La demande n’a pas pu être reprise dans le compositeur. Réessayez.");
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [patch, loadSources]
   );
 
-  /** Relance immédiatement la même demande, images de départ comprises. */
+  /**
+   * Relance immédiatement la même demande, images de départ comprises. Lève
+   * en cas d'échec : le fil affiche l'erreur sur la génération relancée.
+   */
   const handleRerun = useCallback(
     async (item: HistoryItem) => {
-      try {
-        const references = await loadSources(item);
-        await callModule("enqueueGeneration", {
-          prompt: item.prompt,
-          negativePrompt: item.negativePrompt,
-          model: item.model,
-          size: item.size,
-          quality: item.quality,
-          n: Math.max(1, Math.min(4, item.count)),
-          seed: item.seed,
-          collectionId: item.collectionId,
-          references: references.map((reference) => ({
-            b64: reference.b64,
-            mimeType: reference.mimeType,
-            role: reference.role,
-          })),
-        });
-        toast.success("Génération relancée");
-        await refresh();
-      } catch (error: any) {
-        toast.error(error?.message ?? "Relance impossible");
-      }
+      const references = await loadSources(item);
+      await callModule("enqueueGeneration", {
+        prompt: item.prompt,
+        negativePrompt: item.negativePrompt,
+        model: item.model,
+        size: item.size,
+        quality: item.quality,
+        n: Math.max(1, Math.min(4, item.count)),
+        seed: item.seed,
+        collectionId: item.collectionId,
+        references: references.map((reference) => ({
+          b64: reference.b64,
+          mimeType: reference.mimeType,
+          role: reference.role,
+        })),
+      });
+      await refresh();
     },
     [loadSources, refresh]
   );
@@ -508,11 +511,11 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
   const handleInspire = useCallback(
     async (item: HistoryItem, file: string) => {
       if (model && !model.supportsReference) {
-        toast.info(`${model.label} ne prend pas d'image de départ. Changez de moteur.`);
+        dock.error(`${model.label} ne prend pas d’image de départ. Choisissez un autre moteur, puis recommencez.`);
         return;
       }
       if (freeSlots <= 0) {
-        toast.info("Le compositeur a déjà quatre images");
+        dock.error("Le compositeur a déjà quatre images. Retirez-en une pour en joindre une autre.");
         return;
       }
       try {
@@ -528,9 +531,10 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
           "reference"
         );
       } catch {
-        toast.error("Reprise de l'image impossible");
+        dock.error("L’image n’a pas pu être jointe au compositeur. Réessayez.");
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [model, freeSlots, attach]
   );
 
@@ -546,9 +550,11 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
         collectionId: job.request.collectionId ?? "",
         pipelineId: job.request.pipelineId ?? "",
       });
+      // La demande qui apparaît dans le dock confirme la reprise.
+      dock.clear();
       promptRef.current?.focus();
-      toast.info("Demande reprise dans le compositeur");
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [patch]
   );
 
@@ -666,6 +672,7 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
               onOpenPicker={openPicker}
               importing={intake.busy}
               textareaRef={promptRef}
+              feedback={dock}
             />
           </div>
         </div>

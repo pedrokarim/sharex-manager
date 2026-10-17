@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { MoreHorizontal, Pencil, Trash2, TriangleAlert, Upload } from "lucide-react";
-import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -88,6 +88,8 @@ export function CustomFontList({ fonts, sample, isAdmin, onChange: report }: Fon
   const [failures, setFailures] = useState<FontLoadFailure[]>([]);
   const [renaming, setRenaming] = useState<CustomFont | null>(null);
   const [removing, setRemoving] = useState<CustomFont | null>(null);
+  // Les fichiers refusés sont dits sous l'en-tête de la liste ; une police acceptée y apparaît, ce qui suffit.
+  const addFeedback = useFeedback();
 
   // Chaque police est chargée pour sa phrase d'essai : c'est aussi là qu'on apprend que le navigateur n'en veut pas.
   const families = (fonts ?? []).map((font) => font.family).join("\n");
@@ -105,11 +107,13 @@ export function CustomFontList({ fonts, sample, isAdmin, onChange: report }: Fon
   const addFiles = async (files: File[]) => {
     if (files.length === 0 || adding) return;
     setAdding(true);
+    addFeedback.clear();
+    const problems: string[] = [];
     let list = fonts ?? [];
     try {
       for (const file of files) {
         if (file.size > MAX_FONT_BYTES) {
-          toast.error(`« ${file.name} » est trop lourde : 5 Mo au plus.`);
+          problems.push(`« ${file.name} » est trop lourde : 5 Mo au plus.`);
           continue;
         }
         try {
@@ -121,53 +125,56 @@ export function CustomFontList({ fonts, sample, isAdmin, onChange: report }: Fon
           if (unreadable) {
             await api.removeFont(font.id).catch(() => undefined);
             setCustomFonts(list);
-            toast.error(`« ${file.name} » a passé le contrôle du serveur, mais ce navigateur ne sait pas la dessiner : elle n’a pas été gardée.`);
+            problems.push(`« ${file.name} » a passé le contrôle du serveur, mais ce navigateur ne sait pas la dessiner : elle n’a pas été gardée.`);
             continue;
           }
           list = extended;
           onChange(list);
-          toast.success(`« ${font.name} » ajoutée`);
         } catch (error) {
-          toast.error(errorMessage(error, `« ${file.name} » n’a pas pu être ajoutée.`));
+          problems.push(errorMessage(error, `« ${file.name} » n’a pas pu être ajoutée.`));
         }
       }
     } finally {
       setAdding(false);
+      if (problems.length > 0) addFeedback.error(problems.join(" "));
     }
   };
 
   return (
     <section className="flex flex-col gap-3" aria-labelledby="scan-studio-fonts-added">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1">
-          <h3 id="scan-studio-fonts-added" className="text-sm font-semibold">
-            Polices ajoutées
-          </h3>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            Vos polices de lettrage, en TTF, OTF ou WOFF2, 5 Mo au plus. Elles restent dans les données du module et ne sont servies qu’aux comptes
-            connectés. N’ajoutez que des polices dont vous avez la licence.
-          </p>
+      <div>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="space-y-1">
+            <h3 id="scan-studio-fonts-added" className="text-sm font-semibold">
+              Polices ajoutées
+            </h3>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              Vos polices de lettrage, en TTF, OTF ou WOFF2, 5 Mo au plus. Elles restent dans les données du module et ne sont servies qu’aux comptes
+              connectés. N’ajoutez que des polices dont vous avez la licence.
+            </p>
+          </div>
+          {isAdmin && (
+            <>
+              <input
+                ref={inputRef}
+                type="file"
+                accept={FONT_ACCEPT}
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  const files = [...(event.target.files ?? [])];
+                  event.target.value = "";
+                  void addFiles(files);
+                }}
+              />
+              <Button className="gap-2" loading={adding} disabled={fonts === null} onClick={() => inputRef.current?.click()}>
+                <Upload className="h-4 w-4" />
+                Ajouter une police
+              </Button>
+            </>
+          )}
         </div>
-        {isAdmin && (
-          <>
-            <input
-              ref={inputRef}
-              type="file"
-              accept={FONT_ACCEPT}
-              multiple
-              className="hidden"
-              onChange={(event) => {
-                const files = [...(event.target.files ?? [])];
-                event.target.value = "";
-                void addFiles(files);
-              }}
-            />
-            <Button className="gap-2" loading={adding} disabled={fonts === null} onClick={() => inputRef.current?.click()}>
-              <Upload className="h-4 w-4" />
-              Ajouter une police
-            </Button>
-          </>
-        )}
+        <FormStatus state={addFeedback.state} className="pt-3" />
       </div>
 
       {fonts === null ? (
@@ -271,16 +278,18 @@ export function CustomFontList({ fonts, sample, isAdmin, onChange: report }: Fon
 function RenameDialog({ font, onClose, onRenamed }: { font: CustomFont; onClose: () => void; onRenamed: (font: CustomFont) => void }) {
   const [name, setName] = useState(font.name);
   const [saving, setSaving] = useState(false);
+  const feedback = useFeedback();
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (saving || !name.trim()) return;
     setSaving(true);
+    feedback.clear();
     try {
       onRenamed(await api.renameFont(font.id, name));
       onClose();
     } catch (error) {
-      toast.error(errorMessage(error, "La police n’a pas pu être renommée."));
+      feedback.error(errorMessage(error, "La police n’a pas pu être renommée. Réessayez."));
     } finally {
       setSaving(false);
     }
@@ -289,7 +298,7 @@ function RenameDialog({ font, onClose, onRenamed }: { font: CustomFont; onClose:
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
-        <form onSubmit={submit} className="flex flex-col gap-4">
+        <form onSubmit={submit} onChange={feedback.state?.tone === "error" ? feedback.clear : undefined} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>Renommer la police</DialogTitle>
             <DialogDescription>Seul le nom affiché change : les pages qui portent cette police ne sont pas touchées.</DialogDescription>
@@ -298,14 +307,17 @@ function RenameDialog({ font, onClose, onRenamed }: { font: CustomFont; onClose:
             <Label htmlFor="scan-studio-font-name">Nom</Label>
             <Input id="scan-studio-font-name" value={name} maxLength={80} autoFocus onChange={(event) => setName(event.target.value)} />
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Annuler
-            </Button>
-            <Button type="submit" loading={saving} disabled={!name.trim() || name.trim() === font.name}>
-              Renommer
-            </Button>
-          </DialogFooter>
+          <div>
+            <FormStatus state={feedback.state} className="pb-4" />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Annuler
+              </Button>
+              <Button type="submit" loading={saving} disabled={!name.trim() || name.trim() === font.name}>
+                Renommer
+              </Button>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
@@ -317,6 +329,7 @@ function RemoveDialog({ font, others, onClose, onRemoved }: { font: CustomFont; 
   const [failed, setFailed] = useState(false);
   const [replacement, setReplacement] = useState(BUNDLED_FONTS[0].family);
   const [removing, setRemoving] = useState(false);
+  const feedback = useFeedback();
 
   useEffect(() => {
     let cancelled = false;
@@ -338,14 +351,14 @@ function RemoveDialog({ font, others, onClose, onRemoved }: { font: CustomFont; 
   const remove = async () => {
     if (removing || usage === null) return;
     setRemoving(true);
+    feedback.clear();
     try {
-      const { replaced } = await api.removeFont(font.id, used ? { replaceWith: replacement } : undefined);
+      // La police disparaît de la liste quand la fenêtre se ferme : c'est le retour.
+      await api.removeFont(font.id, used ? { replaceWith: replacement } : undefined);
       onRemoved();
-      const moved = usageText(replaced);
-      toast.success(moved ? `« ${font.name} » retirée ; ${moved} passent à la police de remplacement` : `« ${font.name} » retirée`);
       onClose();
     } catch (error) {
-      toast.error(errorMessage(error, "La police n’a pas pu être retirée."));
+      feedback.error(errorMessage(error, "La police n’a pas pu être retirée. Réessayez."));
     } finally {
       setRemoving(false);
     }
@@ -397,20 +410,23 @@ function RemoveDialog({ font, others, onClose, onRemoved }: { font: CustomFont; 
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Annuler</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={usage === null || removing}
-            onClick={(event) => {
-              // La fenêtre se ferme quand le serveur a répondu, pas avant.
-              event.preventDefault();
-              void remove();
-            }}
-          >
-            {removing && <Spinner className="size-4" />}
-            {used ? "Remplacer et retirer" : "Retirer"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
+        <div>
+          <FormStatus state={feedback.state} className="pb-4" />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={usage === null || removing}
+              onClick={(event) => {
+                // La fenêtre se ferme quand le serveur a répondu, pas avant.
+                event.preventDefault();
+                void remove();
+              }}
+            >
+              {removing && <Spinner className="size-4" />}
+              {used ? "Remplacer et retirer" : "Retirer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </div>
       </AlertDialogContent>
     </AlertDialog>
   );

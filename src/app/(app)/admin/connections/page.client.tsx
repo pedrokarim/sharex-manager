@@ -20,7 +20,7 @@ import {
   TriangleAlert,
   Unplug,
 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, useFeedback, type FeedbackState } from "@/components/feedback";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -59,6 +59,10 @@ export function ConnectionsPageClient({ initial }: { initial: ConnectionsOvervie
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "name", desc: false });
   const [extending, setExtending] = useState<string | null>(null);
+  // Le résultat d'une vérification ou d'une prolongation s'affiche sur la
+  // ligne du compte, sous son nom, là où l'état vient de changer.
+  const rowFeedback = useFeedback();
+  const [rowFeedbackId, setRowFeedbackId] = useState<string | null>(null);
 
   // Retour d'une connexion par redirection : le parcours se rouvre à la bonne étape.
   const { start: returned, clear } = useConnectionReturn();
@@ -100,19 +104,23 @@ export function ConnectionsPageClient({ initial }: { initial: ConnectionsOvervie
     },
     extend: async (account) => {
       setExtending(account.id);
+      setRowFeedbackId(account.id);
+      rowFeedback.clear();
       const result = await verifyAccountAction(account.id);
       setExtending(null);
-      if (!result.ok) return void toast.error(result.error, { description: "Si le problème persiste, reconnectez le compte." });
+      if (!result.ok) return void rowFeedback.error(`${result.error} Si le problème persiste, reconnectez le compte.`);
       replaceAccount(result.data);
-      toast.success(result.data.tokenState === "ok" ? "Accès prolongé" : "Compte vérifié", { description: result.data.tokenStateReason });
+      rowFeedback.success(result.data.tokenState === "ok" ? "Accès prolongé" : "Compte vérifié");
     },
     verify: async (account) => {
       setExtending(account.id);
+      setRowFeedbackId(account.id);
+      rowFeedback.clear();
       const result = await verifyAccountAction(account.id);
       setExtending(null);
-      if (!result.ok) return void toast.error(result.error);
+      if (!result.ok) return void rowFeedback.error(result.error);
       replaceAccount(result.data);
-      toast.success("Compte vérifié");
+      rowFeedback.success("Compte vérifié");
     },
     rename: (account) => setRenaming(account),
     disconnect: (account) => setDisconnecting(account),
@@ -279,7 +287,14 @@ export function ConnectionsPageClient({ initial }: { initial: ConnectionsOvervie
                           <span className="font-normal text-muted-foreground">{attention.length}</span>
                         </span>
                       </GroupRow>
-                      <AccountRows accounts={attention} actions={actions} highlight={highlight} extending={extending} withService />
+                      <AccountRows
+                        accounts={attention}
+                        actions={actions}
+                        highlight={highlight}
+                        extending={extending}
+                        status={{ accountId: rowFeedbackId, state: rowFeedback.state }}
+                        withService
+                      />
                     </>
                   ) : null}
                   {groups.map(({ connector, accounts }) => (
@@ -294,7 +309,13 @@ export function ConnectionsPageClient({ initial }: { initial: ConnectionsOvervie
                           onSettings={() => setSettingsOf(connector.id)}
                         />
                       </GroupRow>
-                      <AccountRows accounts={accounts} actions={actions} highlight={highlight} extending={extending} />
+                      <AccountRows
+                        accounts={accounts}
+                        actions={actions}
+                        highlight={highlight}
+                        extending={extending}
+                        status={{ accountId: rowFeedbackId, state: rowFeedback.state }}
+                      />
                     </Fragment>
                   ))}
                 </TableBody>
@@ -423,18 +444,29 @@ function AccountRows({
   actions,
   highlight,
   extending,
+  status,
   withService = false,
 }: {
   accounts: AccountSummary[];
   actions: RowActions;
   highlight: Set<string>;
   extending: string | null;
+  /** Le dernier message d'action, et le compte qu'il concerne. */
+  status: { accountId: string | null; state: FeedbackState | null };
   withService?: boolean;
 }) {
   return (
     <AnimatePresence initial={false}>
       {accounts.map((account) => (
-        <AccountRow key={account.id} account={account} actions={actions} highlighted={highlight.has(account.id)} busy={extending === account.id} withService={withService} />
+        <AccountRow
+          key={account.id}
+          account={account}
+          actions={actions}
+          highlighted={highlight.has(account.id)}
+          busy={extending === account.id}
+          status={status.accountId === account.id ? status.state : null}
+          withService={withService}
+        />
       ))}
     </AnimatePresence>
   );
@@ -445,12 +477,14 @@ function AccountRow({
   actions,
   highlighted,
   busy,
+  status,
   withService,
 }: {
   account: AccountSummary;
   actions: RowActions;
   highlighted: boolean;
   busy: boolean;
+  status: FeedbackState | null;
   withService: boolean;
 }) {
   const health = accountHealth(account);
@@ -496,6 +530,7 @@ function AccountRow({
                   <span className="truncate font-mono text-xs text-muted-foreground md:hidden">{account.handle ?? account.externalId}</span>
                 )}
                 <StatusDot tone={health.tone} label={health.label} reason={health.reason} className="mt-0.5 sm:hidden" />
+                <ActionStatus state={status} />
               </div>
             </div>
           </TableCell>

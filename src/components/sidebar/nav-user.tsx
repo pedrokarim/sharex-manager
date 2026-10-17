@@ -30,7 +30,6 @@ import {
 } from "../ui/dropdown-menu";
 import { ThemeOptions, useThemeIcon } from "../theme-toggle";
 import { Avatar, AvatarImage, AvatarFallback } from "@radix-ui/react-avatar";
-import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
 
 export interface NavUserData {
@@ -54,7 +53,8 @@ export function NavUser({ user: initialUser }: { user: NavUserData }) {
 
   const handleSignOut = async () => {
     await signOut();
-    toast.success(t("common.logout_success"));
+    // La page d'accueil, déconnectée, est le retour : un toast disparaîtrait
+    // aussitôt avec le rechargement.
     window.location.href = "/";
   };
 

@@ -20,7 +20,7 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus, type Feedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
@@ -119,6 +119,11 @@ interface PromptDockProps {
   /** Vrai pendant la lecture d'une image déposée ou collée. */
   importing: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  /**
+   * Messages du compositeur, affichés sous le prompt : lancement refusé,
+   * image non reprise, pièce jointe retirée… Écrire les efface.
+   */
+  feedback: Feedback;
 }
 
 /**
@@ -140,6 +145,7 @@ export function PromptDock({
   onOpenPicker,
   importing,
   textareaRef,
+  feedback,
 }: PromptDockProps) {
   const models = catalogue?.models ?? [];
   const model = models.find((entry) => entry.id === state.model);
@@ -167,10 +173,12 @@ export function PromptDock({
   useEffect(() => {
     if (model && !model.supportsReference && state.references.length) {
       onChange({ references: [] });
-      toast.info(
-        `${model.label} ne gère pas l'image de départ, la pièce jointe a été retirée.`
+      feedback.info(
+        `${model.label} ne gère pas l’image de départ : la pièce jointe a été retirée.`
       );
     }
+    // Seul le changement de moteur (ou de pièces jointes) déclenche le retrait.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model, state.references.length, onChange]);
 
   const disabledReason = !state.prompt.trim()
@@ -221,7 +229,11 @@ export function PromptDock({
               : "Décrivez l'image à créer : un phare isolé au crépuscule, mer d'huile, lumière rasante…"
           }
           value={state.prompt}
-          onChange={(event) => onChange({ prompt: event.target.value })}
+          onChange={(event) => {
+            onChange({ prompt: event.target.value });
+            // Reprendre l'écriture efface le message du compositeur.
+            if (feedback.state) feedback.clear();
+          }}
           onKeyDown={(event) => {
             if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
               event.preventDefault();
@@ -231,6 +243,8 @@ export function PromptDock({
           className="max-h-56 min-h-12 resize-none border-0 bg-transparent px-0 py-1 text-[15px] leading-6 shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
       </div>
+
+      <FormStatus state={feedback.state} className="px-3 pt-1 pb-1.5" />
 
       {disabledReason && (
         <p className="px-4 pb-1 text-xs text-destructive">{disabledReason}</p>
@@ -279,6 +293,7 @@ export function PromptDock({
         <PromptEnhancer
           prompt={state.prompt}
           onChange={(prompt) => onChange({ prompt })}
+          feedback={feedback}
         />
         <AdvancedSettings
           state={state}

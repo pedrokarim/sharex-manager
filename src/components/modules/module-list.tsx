@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { ModuleConfig } from "@/types/modules";
 import { ModuleCard } from "./module-card";
 import { ModuleUpload } from "./module-upload";
-import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,10 +22,13 @@ export const ModuleList = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Échec du chargement : dit à la place de la liste, avec « Réessayer ».
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const fetchModules = async () => {
     try {
       setIsLoading(true);
+      setLoadFailed(false);
       const response = await fetch("/api/modules");
 
       if (!response.ok) {
@@ -37,7 +39,7 @@ export const ModuleList = () => {
       setModules(data.modules || []);
     } catch (error) {
       console.error("Erreur lors de la récupération des modules:", error);
-      toast.error("Erreur lors de la récupération des modules");
+      setLoadFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -179,7 +181,23 @@ export const ModuleList = () => {
         </div>
       )}
 
-      {Array.isArray(modules) && modules.length > 0 ? (
+      {loadFailed ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Puzzle />
+            </EmptyMedia>
+            <EmptyTitle>Modules indisponibles</EmptyTitle>
+            <EmptyDescription>
+              La liste des modules n’a pas pu être chargée.
+            </EmptyDescription>
+          </EmptyHeader>
+          <Button variant="outline" onClick={handleRefresh} loading={isRefreshing}>
+            <RefreshCw className="h-4 w-4 mr-1.5" />
+            Réessayer
+          </Button>
+        </Empty>
+      ) : Array.isArray(modules) && modules.length > 0 ? (
         filteredModules.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {filteredModules.map((module) => (

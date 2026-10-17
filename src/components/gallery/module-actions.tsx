@@ -17,7 +17,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import {
   Dialog,
   DialogContent,
@@ -93,6 +93,14 @@ export function ModuleActions({
     useState<React.ComponentType<ModuleUIProps> | null>(null);
   const [moduleError, setModuleError] = useState<Error | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  // Les modules n'ont pas pu être chargés : dit dans la section des détails.
+  const [fetchFailed, setFetchFailed] = useState(false);
+  // Retour d'un module appliqué, lu à côté de la liste des modules (bandeau
+  // ou section des détails), là où l'utilisateur l'a lancé.
+  const actionFeedback = useFeedback();
+  // Échec de l'application depuis l'interface d'un module : la fenêtre reste
+  // ouverte et le dit au-dessus de ses boutons.
+  const dialogFeedback = useFeedback();
   const router = useRouter();
   // Actions « ouvrir dans un module » (ex. retoucher dans le studio), à côté
   // des traitements qui s'appliquent sur place.
@@ -136,6 +144,8 @@ export function ModuleActions({
 
       try {
         setProcessingModule(selectedModule.name);
+        dialogFeedback.clear();
+        actionFeedback.clear();
 
         console.log(
           `Envoi des données pour le module ${selectedModule.name}:`,
@@ -162,11 +172,9 @@ export function ModuleActions({
           );
         }
 
-        toast.success(
-          t("gallery.file_viewer.modules.apply_success", {
-            module: selectedModule.name,
-          })
-        );
+        // La fenêtre se ferme : la réussite se lit à côté des modules, d'où
+        // l'interface a été ouverte.
+        actionFeedback.success(`${selectedModule.name} appliqué`);
 
         setModuleUIOpen(false);
 
@@ -175,10 +183,8 @@ export function ModuleActions({
         }
       } catch (error) {
         console.error("Erreur lors de l'application du module:", error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : t("gallery.file_viewer.modules.apply_error")
+        dialogFeedback.error(
+          errorMessage(error, "Le module n’a pas pu être appliqué. Réessayez.")
         );
       } finally {
         setProcessingModule(null);
@@ -192,6 +198,7 @@ export function ModuleActions({
     async (moduleName: string) => {
       try {
         setProcessingModule(moduleName);
+        actionFeedback.clear();
 
         const response = await fetch("/api/modules/apply", {
           method: "POST",
@@ -212,19 +219,15 @@ export function ModuleActions({
           );
         }
 
-        toast.success(
-          t("gallery.file_viewer.modules.apply_success", { module: moduleName })
-        );
+        actionFeedback.success(`${moduleName} appliqué`);
 
         if (onProcessComplete) {
           onProcessComplete();
         }
       } catch (error) {
         console.error("Erreur lors de l'application du module:", error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : t("gallery.file_viewer.modules.apply_error")
+        actionFeedback.error(
+          errorMessage(error, `${moduleName} n’a pas pu être appliqué. Réessayez.`)
         );
       } finally {
         setProcessingModule(null);
@@ -256,6 +259,7 @@ export function ModuleActions({
         setSelectedModule(modules.find((m) => m.name === moduleName) || null);
         setModuleComponent(null);
         setModuleError(null);
+        dialogFeedback.clear();
 
         // Trouver le module sélectionné
         const selectedModuleConfig = modules.find((m) => m.name === moduleName);
@@ -274,10 +278,8 @@ export function ModuleActions({
           "Erreur lors du chargement de l'interface utilisateur:",
           error
         );
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : t("gallery.file_viewer.modules.ui_load_error")
+        actionFeedback.error(
+          errorMessage(error, `L’interface de ${moduleName} n’a pas pu s’ouvrir.`)
         );
       }
     },
@@ -333,6 +335,7 @@ export function ModuleActions({
     const fetchModules = async () => {
       try {
         setIsLoading(true);
+        setFetchFailed(false);
         const response = await fetch(
           `/api/modules/by-type?fileType=${fileExtension}`
         );
@@ -345,7 +348,7 @@ export function ModuleActions({
         setModules(data?.modules || []);
       } catch (error) {
         console.error("Erreur lors de la récupération des modules:", error);
-        toast.error(t("gallery.file_viewer.modules.fetch_error"));
+        setFetchFailed(true);
       } finally {
         setIsLoading(false);
       }
@@ -389,6 +392,20 @@ export function ModuleActions({
   }
 
   if ((!modules || modules.length === 0) && links.length === 0) {
+    // Échec du chargement : la section des détails le dit, à sa place ; en
+    // surimpression, le déclencheur ne s'affiche simplement pas.
+    if (fetchFailed && variant === "details") {
+      return (
+        <div className="space-y-1">
+          <h3 className="text-sm font-medium">
+            {t("gallery.file_viewer.modules.title")}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Les modules n’ont pas pu être chargés. Rouvrez le fichier pour réessayer.
+          </p>
+        </div>
+      );
+    }
     return null;
   }
 
@@ -518,6 +535,8 @@ export function ModuleActions({
                     {t("gallery.file_viewer.modules.title")}
                   </p>
                 )}
+
+                <ActionStatus state={actionFeedback.state} className="max-w-[50%]" />
 
                 <Button
                   variant="ghost"
@@ -650,6 +669,7 @@ export function ModuleActions({
               setModuleUIOpen(false);
               setModuleComponent(null);
               setModuleError(null);
+              dialogFeedback.clear();
             }
           }}
         >
@@ -682,6 +702,10 @@ export function ModuleActions({
               </div>
             )}
 
+            {/* Marge annulée : l'écart de la grille s'ouvre avec le message. */}
+            <div className="-mt-4">
+              <FormStatus state={dialogFeedback.state} className="pt-4" />
+            </div>
             <DialogFooter>
               <Button
                 variant="outline"
@@ -689,6 +713,7 @@ export function ModuleActions({
                   setModuleUIOpen(false);
                   setModuleComponent(null);
                   setModuleError(null);
+                  dialogFeedback.clear();
                 }}
               >
                 {t("common.cancel")}
@@ -704,9 +729,12 @@ export function ModuleActions({
   return (
     <>
       <div className="space-y-3">
-        <h3 className="text-sm font-medium">
-          {t("gallery.file_viewer.modules.title")}
-        </h3>
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <h3 className="shrink-0 text-sm font-medium">
+            {t("gallery.file_viewer.modules.title")}
+          </h3>
+          <ActionStatus state={actionFeedback.state} />
+        </div>
 
         {categories.length > 1 && (
           <div className="flex flex-wrap gap-1 mb-2">
@@ -815,6 +843,7 @@ export function ModuleActions({
             setModuleUIOpen(false);
             setModuleComponent(null);
             setModuleError(null);
+            dialogFeedback.clear();
           }
         }}
       >
@@ -847,6 +876,10 @@ export function ModuleActions({
             </div>
           )}
 
+          {/* Marge annulée : l'écart de la grille s'ouvre avec le message. */}
+          <div className="-mt-4">
+            <FormStatus state={dialogFeedback.state} className="pt-4" />
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
@@ -854,6 +887,7 @@ export function ModuleActions({
                 setModuleUIOpen(false);
                 setModuleComponent(null);
                 setModuleError(null);
+                dialogFeedback.clear();
               }}
             >
               {t("common.cancel")}

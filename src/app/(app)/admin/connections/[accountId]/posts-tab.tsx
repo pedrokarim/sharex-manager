@@ -30,7 +30,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, useFeedback, type FeedbackState } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -74,7 +74,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { AccountSummary, PostPatch, PostPrivacy, PostSummary, PublishField } from "@/lib/connections/types";
-import { DateTimePicker, formatSchedule } from "@/components/connections/date-time-picker";
+import { DateTimePicker } from "@/components/connections/date-time-picker";
 import { PublishFieldInput, defaultFieldValue, fieldProblem, type FieldValue } from "@/components/connections/publish-field-input";
 import { formatDateTime, formatRelative } from "@/components/connections/shared";
 import type { ConnectorView } from "@/components/connections/types";
@@ -95,6 +95,9 @@ function privacyChoices(connector: ConnectorView): { value: PostPrivacy; label: 
   return choices.filter((choice): choice is { value: PostPrivacy; label: string } => choice.value in PRIVACY_LABELS);
 }
 
+/** Cible d'un message d'action qui porte sur un lot, et non sur une ligne. */
+const BULK = "bulk";
+
 const numberText = (value: number | undefined) => (value === undefined ? "–" : value.toLocaleString("fr-FR", { notation: value >= 100_000 ? "compact" : "standard" }));
 
 export function PostsTab({ account, connector }: { account: AccountSummary; connector: ConnectorView }) {
@@ -113,6 +116,15 @@ export function PostsTab({ account, connector }: { account: AccountSummary; conn
   const [removing, setRemoving] = useState<PostSummary[] | null>(null);
   const [goingPublic, setGoingPublic] = useState<PostSummary[] | null>(null);
   const [bulkBusy, setBulkBusy] = useState<string | null>(null);
+  // Avancement d'une action en lot, lu dans la barre de sélection.
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  // Une action réussie sur une publication se voit sur sa ligne (visibilité,
+  // programmation, ligne retirée) ; un échec s'y affiche. Le bilan d'une
+  // action en lot, qui touche aussi des lignes d'autres pages, s'affiche
+  // au-dessus du tableau, là où était la barre de sélection.
+  const actionFeedback = useFeedback({ successDuration: 4000 });
+  const [actionTarget, setActionTarget] = useState<string | null>(null);
+  const bulkStatus = actionTarget === BULK ? actionFeedback.state : null;
 
   const canManage = account.capabilities.includes("posts.manage") && account.status === "connected";
   const canUpdate = canManage && (connector.postActions?.update ?? false);
@@ -173,21 +185,31 @@ export function PostsTab({ account, connector }: { account: AccountSummary; conn
   const toggleSort = (key: SortKey) => setSort((now) => (now.key === key ? { key, desc: !now.desc } : { key, desc: key !== "title" }));
 
   /** Une action sur une ou plusieurs publications, l'une après l'autre (le service compte chaque appel). */
-  const runOn = async (targets: PostSummary[], label: string, action: (post: PostSummary) => Promise<boolean>) => {
+  const runOn = async (targets: PostSummary[], label: string, action: (post: PostSummary) => Promise<string | null>) => {
     if (targets.length === 0) return;
+    const bulk = targets.length > 1;
     setBulkBusy(label);
+    setActionTarget(bulk ? BULK : targets[0].id);
+    actionFeedback.clear();
+    if (bulk) setProgress({ done: 0, total: targets.length });
     let done = 0;
-    const toastId = targets.length > 1 ? toast.loading(`${label} : 0/${targets.length}`) : undefined;
+    let failure: string | null = null;
     for (const post of targets) {
-      const ok = await action(post);
-      if (!ok) break;
+      const error = await action(post);
+      if (error) {
+        // Sur un lot, le message dit quelle publication a bloqué.
+        failure = bulk ? `« ${post.title} » : ${error}` : error;
+        break;
+      }
       done += 1;
-      if (toastId) toast.loading(`${label} : ${done}/${targets.length}`, { id: toastId });
+      if (bulk) setProgress({ done, total: targets.length });
     }
     setBulkBusy(null);
-    if (toastId) {
-      if (done === targets.length) toast.success(`${label} : ${done} publication${done > 1 ? "s" : ""}`, { id: toastId });
-      else toast.dismiss(toastId);
+    setProgress(null);
+    if (failure) {
+      actionFeedback.error(bulk && done > 0 ? `${failure} Les ${done} premières ont été traitées.` : failure);
+    } else if (bulk) {
+      actionFeedback.success(`${label} : ${done} publication${done > 1 ? "s" : ""} traitée${done > 1 ? "s" : ""}.`);
     }
     setSelected(new Set());
   };
@@ -195,13 +217,9 @@ export function PostsTab({ account, connector }: { account: AccountSummary; conn
   const applyPrivacy = (targets: PostSummary[], privacy: PostPrivacy) =>
     runOn(targets, "Visibilité", async (post) => {
       const result = await updatePostAction(account.id, post.id, { privacy });
-      if (!result.ok) {
-        toast.error(`« ${post.title} » : ${result.error}`);
-        return false;
-      }
+      if (!result.ok) return result.error;
       replace(result.data);
-      if (targets.length === 1) toast.success(`Visibilité : ${PRIVACY_LABELS[privacy].toLowerCase()}`);
-      return true;
+      return null;
     });
 
   const askPrivacy = (targets: PostSummary[], privacy: PostPrivacy) => {
@@ -224,13 +242,9 @@ export function PostsTab({ account, connector }: { account: AccountSummary; conn
       ? (post) =>
           void runOn([post], "Programmation", async (target) => {
             const result = await updatePostAction(account.id, target.id, { publishAt: null });
-            if (!result.ok) {
-              toast.error(result.error);
-              return false;
-            }
+            if (!result.ok) return result.error;
             replace(result.data);
-            toast.success("Programmation retirée");
-            return true;
+            return null;
           })
       : undefined,
     remove: canRemove ? (post) => setRemoving([post]) : undefined,
@@ -331,7 +345,12 @@ export function PostsTab({ account, connector }: { account: AccountSummary; conn
                   Supprimer
                 </Button>
               ) : null}
-              {bulkBusy ? <Spinner className="size-4 text-muted-foreground" /> : null}
+              {bulkBusy ? (
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
+                  <Spinner className="size-4" />
+                  {progress ? `${bulkBusy} : ${progress.done}/${progress.total}` : null}
+                </span>
+              ) : null}
               <Button size="sm" variant="ghost" className="ml-auto h-7" onClick={() => setSelected(new Set())}>
                 Désélectionner
               </Button>
@@ -339,6 +358,11 @@ export function PostsTab({ account, connector }: { account: AccountSummary; conn
           </motion.div>
         ) : null}
       </AnimatePresence>
+      {/* Hors de la grille (`gap-3`) qu'il ferait sauter : l'enveloppe
+          compense l'écart, l'espacement s'ouvre avec le message. */}
+      <div className="-mt-3">
+        <FormStatus state={bulkStatus} className="pt-3" />
+      </div>
 
       <div className="min-w-0 overflow-hidden rounded-xl border">
         <Table className="table-fixed">
@@ -422,6 +446,7 @@ export function PostsTab({ account, connector }: { account: AccountSummary; conn
                   connector={connector}
                   choices={choices}
                   menu={menu}
+                  status={actionTarget === post.id ? actionFeedback.state : null}
                   selectable={canManage}
                   selected={selected.has(post.id)}
                   onSelect={(value) =>
@@ -475,24 +500,26 @@ export function PostsTab({ account, connector }: { account: AccountSummary; conn
         connector={connector}
         onOpenChange={(open) => !open && setEditing(null)}
         onSubmit={async (patch) => {
-          if (!editing) return;
+          if (!editing) return null;
           const result = await updatePostAction(account.id, editing.id, patch);
-          if (!result.ok) return void toast.error(result.error);
+          if (!result.ok) return result.error;
+          // Le tiroir se ferme et la ligne montre le nouveau titre.
           replace(result.data);
           setEditing(null);
-          toast.success("Publication modifiée");
+          return null;
         }}
       />
       <ScheduleDialog
         post={scheduling}
         onOpenChange={(open) => !open && setScheduling(null)}
         onSubmit={async (publishAt) => {
-          if (!scheduling) return;
+          if (!scheduling) return null;
           const result = await updatePostAction(account.id, scheduling.id, { publishAt, privacy: "private" });
-          if (!result.ok) return void toast.error(result.error);
+          if (!result.ok) return result.error;
+          // La fenêtre se ferme et la ligne passe à « Programmée ».
           replace(result.data);
           setScheduling(null);
-          toast.success(`Programmée pour le ${formatSchedule(publishAt)}`);
+          return null;
         }}
       />
       <AlertDialog open={Boolean(goingPublic)} onOpenChange={(open) => !open && setGoingPublic(null)}>
@@ -539,13 +566,9 @@ export function PostsTab({ account, connector }: { account: AccountSummary; conn
                 setRemoving(null);
                 void runOn(targets, "Suppression", async (post) => {
                   const result = await removePostAction(account.id, post.id, post.title);
-                  if (!result.ok) {
-                    toast.error(`« ${post.title} » : ${result.error}`);
-                    return false;
-                  }
+                  if (!result.ok) return result.error;
                   setPosts((list) => list?.filter((entry) => entry.id !== post.id) ?? null);
-                  if (targets.length === 1) toast.success("Publication supprimée");
-                  return true;
+                  return null;
                 });
               }}
             >
@@ -716,6 +739,7 @@ function PostRow({
   connector,
   choices,
   menu,
+  status,
   selectable,
   selected,
   onSelect,
@@ -724,6 +748,8 @@ function PostRow({
   connector: ConnectorView;
   choices: { value: PostPrivacy; label: string }[];
   menu: PostMenu;
+  /** Échec de la dernière action sur cette publication. */
+  status: FeedbackState | null;
   selectable: boolean;
   selected: boolean;
   onSelect: (value: boolean) => void;
@@ -766,6 +792,7 @@ function PostRow({
                 <span className="lg:hidden">{formatDateTime(scheduled ? post.publishAt : post.publishedAt)}</span>
                 {post.views !== undefined ? <span className="tabular-nums">{`${numberText(post.views)} vue${(post.views ?? 0) > 1 ? "s" : ""}`}</span> : null}
               </span>
+              {status ? <ActionStatus state={status} /> : null}
             </div>
           </TableCell>
           <TableCell className="hidden md:table-cell">
@@ -809,7 +836,8 @@ function EditPostSheet({
   post: PostSummary | null;
   connector: ConnectorView;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (patch: PostPatch) => Promise<void>;
+  /** Renvoie le message d'erreur, ou `null` si l'envoi a réussi. */
+  onSubmit: (patch: PostPatch) => Promise<string | null>;
 }) {
   const fields = useMemo(
     // Le texte d'une publication est la « description » (YouTube) ou la « caption » (message Facebook).
@@ -818,9 +846,13 @@ function EditPostSheet({
   );
   const [values, setValues] = useState<Record<string, FieldValue>>({});
   const [busy, setBusy] = useState(false);
+  // L'erreur d'envoi s'affiche au-dessus du pied du tiroir, près du bouton.
+  const feedback = useFeedback();
+  const { clear } = feedback;
 
   useEffect(() => {
     if (!post) return;
+    clear();
     const next: Record<string, FieldValue> = {};
     for (const field of fields) {
       if (field.role === "title") next[field.key] = post.title;
@@ -829,7 +861,7 @@ function EditPostSheet({
       else if (field.role === "category") next[field.key] = post.categoryId ?? defaultFieldValue(field);
     }
     setValues(next);
-  }, [post, fields]);
+  }, [post, fields, clear]);
 
   const valueOf = (role: PublishField["role"]) => {
     const field = fields.find((entry) => entry.role === role);
@@ -858,6 +890,7 @@ function EditPostSheet({
             event.preventDefault();
             if (problems.length > 0) return;
             setBusy(true);
+            feedback.clear();
             const patch: PostPatch = {};
             const title = valueOf("title");
             const description = valueOf("description") ?? valueOf("caption");
@@ -867,8 +900,9 @@ function EditPostSheet({
             if (typeof description === "string") patch.description = description;
             if (Array.isArray(tags)) patch.tags = tags;
             if (typeof category === "string" && category) patch.categoryId = category;
-            await onSubmit(patch);
+            const error = await onSubmit(patch);
             setBusy(false);
+            if (error) feedback.error(error);
           }}
         >
           {post?.thumbnailUrl ? <Thumbnail post={post} className="max-w-xs" /> : null}
@@ -879,10 +913,14 @@ function EditPostSheet({
               idPrefix="edit-post"
               value={values[field.key]}
               textCount={connector.limits?.text?.count}
-              onChange={(value) => setValues((now) => ({ ...now, [field.key]: value }))}
+              onChange={(value) => {
+                setValues((now) => ({ ...now, [field.key]: value }));
+                feedback.clear();
+              }}
             />
           ))}
         </form>
+        <FormStatus state={feedback.state} className="px-5 pb-3" />
         <SheetFooter className="flex-row items-center justify-between gap-2 border-t px-5 py-3">
           <span className="min-w-0 truncate text-xs text-destructive" title={problems[0]}>
             {problems[0] ?? ""}
@@ -897,12 +935,25 @@ function EditPostSheet({
 }
 
 /** Programmer ou reprogrammer : calendrier et heure ; la publication reste privée jusque-là. */
-function ScheduleDialog({ post, onOpenChange, onSubmit }: { post: PostSummary | null; onOpenChange: (open: boolean) => void; onSubmit: (publishAt: string) => Promise<void> }) {
+function ScheduleDialog({
+  post,
+  onOpenChange,
+  onSubmit,
+}: {
+  post: PostSummary | null;
+  onOpenChange: (open: boolean) => void;
+  /** Renvoie le message d'erreur, ou `null` si la programmation a réussi. */
+  onSubmit: (publishAt: string) => Promise<string | null>;
+}) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  // L'erreur s'affiche dans la fenêtre, au-dessus du bouton.
+  const feedback = useFeedback();
+  const { clear } = feedback;
   useEffect(() => {
     if (post) setValue(post.publishAt && isScheduled(post) ? post.publishAt : "");
-  }, [post]);
+    clear();
+  }, [post, clear]);
   return (
     <Dialog open={Boolean(post)} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
@@ -912,7 +963,22 @@ function ScheduleDialog({ post, onOpenChange, onSubmit }: { post: PostSummary | 
             « {post?.title} » reste privée jusqu’à cette date, puis devient publique.
           </DialogDescription>
         </DialogHeader>
-        <DateTimePicker value={value} onChange={setValue} aria-label="Date de publication" clearable={false} inline className="mx-auto" />
+        <DateTimePicker
+          value={value}
+          onChange={(next) => {
+            setValue(next);
+            feedback.clear();
+          }}
+          aria-label="Date de publication"
+          clearable={false}
+          inline
+          className="mx-auto"
+        />
+        {/* Enveloppe toujours présente : sa marge négative compense l'écart
+            de la grille, et l'espacement s'ouvre avec le message. */}
+        <div className="-mt-4">
+          <FormStatus state={feedback.state} className="pt-4" />
+        </div>
         <DialogFooter>
           <Button
             loading={busy}
@@ -920,8 +986,10 @@ function ScheduleDialog({ post, onOpenChange, onSubmit }: { post: PostSummary | 
             className="gap-2"
             onClick={async () => {
               setBusy(true);
-              await onSubmit(value);
+              feedback.clear();
+              const error = await onSubmit(value);
               setBusy(false);
+              if (error) feedback.error(error);
             }}
           >
             <CalendarClock className="size-4" />

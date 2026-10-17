@@ -30,7 +30,8 @@ import {
   Clock,
 } from "lucide-react";
 import { HistoryEntry } from "@/lib/types/history";
-import { toast } from "sonner";
+import { ActionStatus, useFeedback } from "@/components/feedback";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -58,6 +59,11 @@ export const HistoryList = () => {
     defaultValue: "desc",
   });
   const [totalItems, setTotalItems] = useState(0);
+  // Échec du chargement : un état durable de la page, dit au-dessus du tableau.
+  const [loadFailed, setLoadFailed] = useState(false);
+  // Échec d'une suppression : dit sur la ligne concernée, à côté de son menu.
+  const deleteFeedback = useFeedback();
+  const [failedEntryId, setFailedEntryId] = useState<string | null>(null);
   const locale = useDateLocale();
 
   // Les filtres vivent dans l'adresse, écrits par `HistoryFilters` : la liste
@@ -71,6 +77,7 @@ export const HistoryList = () => {
   const loadHistory = async () => {
     try {
       setIsLoading(true);
+      setLoadFailed(false);
       const params = new URLSearchParams();
       if (searchQuery) params.set("q", searchQuery);
       if (uploadMethod) params.set("uploadMethod", uploadMethod);
@@ -92,7 +99,7 @@ export const HistoryList = () => {
       setEntries(data.items);
       setTotalItems(data.total);
     } catch (error) {
-      toast.error(t("uploads.history.list.error"));
+      setLoadFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -147,6 +154,8 @@ export const HistoryList = () => {
   };
 
   const handleDelete = async (id: string) => {
+    deleteFeedback.clear();
+    setFailedEntryId(null);
     try {
       const response = await fetch(`/api/history/${id}`, {
         method: "DELETE",
@@ -157,10 +166,11 @@ export const HistoryList = () => {
       }
 
       setEntries(entries.filter((entry) => entry.id !== id));
+      // La ligne disparaît : c'est le retour de la suppression.
       setTotalItems((prev) => prev - 1);
-      toast.success(t("uploads.history.list.actions.delete_success"));
     } catch (error) {
-      toast.error(t("uploads.history.list.actions.delete_error"));
+      setFailedEntryId(id);
+      deleteFeedback.error("Suppression impossible. Réessayez.");
     }
   };
 
@@ -184,6 +194,16 @@ export const HistoryList = () => {
 
   return (
     <div className="flex flex-col gap-3 sm:gap-4">
+      {loadFailed ? (
+        <Alert variant="destructive">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>L’historique n’a pas pu être chargé.</span>
+            <Button variant="outline" size="sm" onClick={() => void loadHistory()}>
+              Réessayer
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
@@ -303,6 +323,10 @@ export const HistoryList = () => {
                     {entry.userName || t("uploads.history.list.anonymous")}
                   </TableCell>
                   <TableCell className="text-right">
+                    <div className="flex min-w-0 items-center justify-end gap-2">
+                    {failedEntryId === entry.id ? (
+                      <ActionStatus state={deleteFeedback.state} className="max-w-40" />
+                    ) : null}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -346,6 +370,7 @@ export const HistoryList = () => {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

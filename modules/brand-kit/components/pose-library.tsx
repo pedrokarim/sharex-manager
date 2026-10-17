@@ -10,8 +10,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Loader2, Plus, Sparkles, Tags, Trash2, X } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ActionStatus, FormStatus, useFeedback } from "@/components/feedback";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -257,6 +257,8 @@ function EmotionChip({ label, count, active, onClick }: { label: string; count: 
 
 function PoseJobPanel({ kit, job, runOperation, onChanged }: { kit: BrandKit; job: PoseJob; runOperation: FileSectionProps["runOperation"]; onChanged: () => void }) {
   const [canceling, setCanceling] = useState(false);
+  // Un arrêt refusé s'écrit à côté du bouton « Arrêter ».
+  const cancelFeedback = useFeedback();
   const total = job.candidates.length;
   const finished = job.candidates.filter((candidate) => candidate.state !== "pending" && candidate.state !== "running").length;
   const waiting = job.candidates.filter((candidate) => candidate.state === "ready").length;
@@ -265,10 +267,11 @@ function PoseJobPanel({ kit, job, runOperation, onChanged }: { kit: BrandKit; jo
 
   const cancel = async () => {
     setCanceling(true);
+    cancelFeedback.clear();
     try {
       await api.cancelPoseJob(job.id);
     } catch (error) {
-      toast.error(errorMessage(error, "Annulation impossible."));
+      cancelFeedback.error(errorMessage(error, "La génération n’a pas pu être arrêtée. Réessayez."));
     } finally {
       setCanceling(false);
       onChanged();
@@ -297,6 +300,7 @@ function PoseJobPanel({ kit, job, runOperation, onChanged }: { kit: BrandKit; jo
             Arrêter
           </Button>
         )}
+        <ActionStatus state={cancelFeedback.state} className="max-w-full empty:hidden" />
       </div>
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
         <AnimatePresence initial={false}>
@@ -327,19 +331,21 @@ function CandidateTile({
   const [tags, setTags] = useState<PoseTags>(candidate.tags);
   const [busy, setBusy] = useState<"accept" | "reject" | null>(null);
   const ready = candidate.state === "ready" && candidate.file;
+  // La pose qui quitte la file (et rejoint la bibliothèque) est le retour ; un échec s'écrit sous ses boutons.
+  const feedback = useFeedback();
 
   const decide = async (choice: "accept" | "reject") => {
     setBusy(choice);
+    feedback.clear();
     try {
       if (choice === "accept") {
         await runOperation(() => api.acceptPoseCandidate(kit.id, job.id, candidate.id, tags));
-        toast.success(`« ${tagSummary(tags)} » ajoutée à la bibliothèque`);
       } else {
         await api.rejectPoseCandidate(kit.id, job.id, candidate.id);
       }
       onChanged();
     } catch (error) {
-      toast.error(errorMessage(error, choice === "accept" ? "La pose n’a pas pu être ajoutée." : "La pose n’a pas pu être rejetée."));
+      feedback.error(errorMessage(error, choice === "accept" ? "La pose n’a pas pu être ajoutée. Réessayez." : "La pose n’a pas pu être rejetée. Réessayez."));
     } finally {
       setBusy(null);
     }
@@ -374,6 +380,7 @@ function CandidateTile({
               Accepter
             </Button>
           </div>
+          <ActionStatus state={feedback.state} className="max-w-full text-[11px] empty:hidden" />
         </>
       ) : (
         <p className="truncate px-1 text-[11px] text-muted-foreground" title={tagDetails(candidate.tags)}>
@@ -425,6 +432,8 @@ function GeneratePosesForm({ kit, missing, onCancel, onStarted }: { kit: BrandKi
     (missing.length > 0 ? missing : (["joy"] as PoseEmotion[])).slice(0, Math.max(1, max)).map((emotion, index) => rowFor(emotion, index))
   );
   const [starting, setStarting] = useState(false);
+  // Un lancement refusé reste dans la fenêtre, au-dessus de ses boutons.
+  const feedback = useFeedback();
   const newKey = () => {
     nextKey.current += 1;
     return 1000 + nextKey.current;
@@ -439,15 +448,16 @@ function GeneratePosesForm({ kit, missing, onCancel, onStarted }: { kit: BrandKi
 
   const start = async () => {
     setStarting(true);
+    feedback.clear();
     try {
       await api.startPoseGeneration(
         kit.id,
         rows.map((row) => ({ emotion: row.emotion, gesture: row.gesture, framing: row.framing, facing: row.facing }))
       );
-      toast.success("Génération lancée : les poses arrivent sous la bibliothèque.");
+      // La fenêtre se ferme et le suivi de la génération apparaît sous la bibliothèque : il tient lieu de confirmation.
       onStarted();
     } catch (error) {
-      toast.error(errorMessage(error, "La génération n’a pas pu démarrer."));
+      feedback.error(errorMessage(error, "La génération n’a pas pu démarrer. Réessayez dans un instant."));
     } finally {
       setStarting(false);
     }
@@ -523,6 +533,7 @@ function GeneratePosesForm({ kit, missing, onCancel, onStarted }: { kit: BrandKi
           </p>
         </div>
       )}
+      <FormStatus state={feedback.state} />
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onCancel}>
           Annuler

@@ -3,9 +3,9 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Moon, Palette, RotateCcw, Sun } from "lucide-react";
-import { toast } from "sonner";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { ActionStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { ColorPaletteEditor, ColorPalettePreview } from "@/components/theme/color-palette-editor";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,8 @@ export default function ThemeAdminPageClient({ initialGlobalTheme }: { initialGl
   const [palette, setPalette] = useState<Palette>("light");
   const [saving, setSaving] = useState(false);
   const [allPalettes, setAllPalettes] = useState(false);
+  // Le résultat de la publication se lit à côté du bouton Publier.
+  const publishFeedback = useFeedback();
 
   const dirty = mode !== published.mode || !sameColors(styles, published.styles);
   const isDefault = useMemo(() => sameColors(styles, defaultThemeState.styles as ThemeStyles), [styles]);
@@ -103,6 +105,7 @@ export default function ThemeAdminPageClient({ initialGlobalTheme }: { initialGl
 
   const publish = async () => {
     setSaving(true);
+    publishFeedback.clear();
     try {
       const response = await fetch("/api/admin/theme", {
         method: "PUT",
@@ -117,9 +120,9 @@ export default function ThemeAdminPageClient({ initialGlobalTheme }: { initialGl
       setStyles(data.globalTheme.styles);
       replaceResolvedTheme(data.payload, { animate: false });
       router.refresh();
-      toast.success("Le thème global est publié.");
+      publishFeedback.success("Thème publié");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Erreur lors de la publication");
+      publishFeedback.error(errorMessage(error, "La publication a échoué. Réessayez."));
     } finally {
       setSaving(false);
     }
@@ -133,6 +136,9 @@ export default function ThemeAdminPageClient({ initialGlobalTheme }: { initialGl
         description="Le mode et les couleurs du site, pour tous les visiteurs."
         actions={
           <>
+            {/* Posé avant les boutons : ils ne bougent pas quand le message
+                apparaît. Borné, un long message d'erreur se tronque. */}
+            <ActionStatus state={publishFeedback.state} className="max-w-64" />
             <Button variant="outline" onClick={resetColors} disabled={saving || isDefault} className="text-sm">
               <RotateCcw className="mr-2 h-4 w-4" />
               Couleurs d’origine

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ShieldCheck, TriangleAlert } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -86,6 +86,9 @@ export function FolderBatchDialog({ action, onClose, chapters, analyze, analysis
   const [tasks, setTasks] = useState<PageTask[]>([]);
   const [result, setResult] = useState<BatchResult | null>(null);
   const [stopping, setStopping] = useState(false);
+  /** Pourquoi l'estimation, ou le lot lui-même, n'a pas abouti : dit dans la fenêtre, à la place du résultat. */
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
   const runLock = useRef(false);
 
@@ -105,6 +108,8 @@ export function FolderBatchDialog({ action, onClose, chapters, analyze, analysis
     setTasks([]);
     setResult(null);
     setStopping(false);
+    setEstimateError(null);
+    setRunError(null);
   }, [action]);
 
   // Estimation d'une traduction : les pages sont lues sur ce serveur, qui dit
@@ -113,6 +118,7 @@ export function FolderBatchDialog({ action, onClose, chapters, analyze, analysis
     if (action !== "translate" || phase !== "confirm") return;
     const abort = new AbortController();
     setEstimating(true);
+    setEstimateError(null);
     void (async () => {
       try {
         const next = await estimateFolderTranslation(
@@ -124,7 +130,8 @@ export function FolderBatchDialog({ action, onClose, chapters, analyze, analysis
       } catch (error) {
         if (abort.signal.aborted) return;
         setEstimate(null);
-        toast.error(errorMessage(error, "Estimation impossible."));
+        const message = errorMessage(error, "L’estimation n’a pas pu être faite.");
+        setEstimateError(/[.!?…]$/.test(message) ? message : `${message}.`);
       } finally {
         if (!abort.signal.aborted) setEstimating(false);
       }
@@ -161,11 +168,12 @@ export function FolderBatchDialog({ action, onClose, chapters, analyze, analysis
     controller.current = new AbortController();
     setTasks(batch.map((chapter) => ({ id: chapter.id, label: chapter.label, state: "waiting" })));
     setStopping(false);
+    setRunError(null);
     setPhase("running");
     try {
       setResult(await runBatch(batch, runner, { signal: controller.current.signal, onProgress }));
     } catch (error) {
-      toast.error(errorMessage(error, "Le lot s’est interrompu."));
+      setRunError(errorMessage(error, "Le lot s’est interrompu. Ce qui a été fait reste fait ; relancez-le pour la suite."));
     } finally {
       controller.current = null;
       runLock.current = false;
@@ -236,7 +244,9 @@ export function FolderBatchDialog({ action, onClose, chapters, analyze, analysis
                   <Skeleton className="h-4 w-full max-w-xs" />
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">L’estimation n’a pas pu être faite. Fermez cette fenêtre et réessayez.</p>
+                <FormStatus
+                  state={{ tone: "error", message: `${estimateError ?? "L’estimation n’a pas pu être faite."} Fermez cette fenêtre et réessayez.`, id: 0 }}
+                />
               )
             ) : nothingToTranslate ? (
               <p className="text-sm">
@@ -343,6 +353,7 @@ export function FolderBatchDialog({ action, onClose, chapters, analyze, analysis
                 )}
               </div>
             )}
+            {phase === "done" && runError && <FormStatus state={{ tone: "error", message: runError, id: 0 }} />}
             <PageTaskList tasks={tasks} label="Avancement chapitre par chapitre" />
           </div>
         )}

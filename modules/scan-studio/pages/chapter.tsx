@@ -46,6 +46,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ActionStatus, FormStatus, useFeedback, type FeedbackState } from "@/components/feedback";
 import { ImagePickerDialog, type PickedImage } from "@/components/gallery/image-picker-dialog";
 import { Orb } from "@/components/loading";
 import { Button } from "@/components/ui/button";
@@ -161,6 +162,31 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const importLock = useRef(false);
 
+  // Retours sur place : l'import sous sa file d'envoi, l'action d'une vignette sur la vignette,
+  // « Les laisser telles quelles » dans la barre du traitement.
+  const importFeedback = useFeedback({ successDuration: 4000 });
+  const tileFeedback = useFeedback();
+  const [tileTarget, setTileTarget] = useState<string | null>(null);
+  const skipFeedback = useFeedback();
+  const tellTile = (pageId: string, message: string) => {
+    setTileTarget(pageId);
+    tileFeedback.error(message);
+  };
+  // Un import peut finir quand on a quitté la planche : il le dit alors par un toast, le seul endroit qui reste.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  const importFeedbackRef = useRef(importFeedback);
+  importFeedbackRef.current = importFeedback;
+  const tellImport = useCallback((tone: "success" | "error" | "info", message: string) => {
+    if (mountedRef.current) importFeedbackRef.current[tone](message);
+    else toast[tone](message);
+  }, []);
+
   const store = useCallback(
     (next: ChapterView) => {
       const ordered = { ...next, pages: orderByIds(next.pages, next.chapter.pageIds) };
@@ -176,7 +202,9 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
       setFailed(false);
     } catch (error) {
       setFailed(true);
-      toast.error(errorMessage(error, "Chapitre indisponible."));
+      // Sans planche affichée, la page dit elle-même que le chapitre est indisponible. Une planche déjà là,
+      // relue en fond (après un traitement), n'a pas d'autre endroit pour signaler qu'elle n'est plus à jour.
+      if (snapshots.has(chapterId)) toast.error(errorMessage(error, "Le chapitre n’a pas pu être relu : la planche n’est peut-être pas à jour."));
     }
   }, [chapterId, store]);
 
@@ -209,6 +237,7 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
       const ready = uploaded.filter((file): file is UploadedFile => file !== null);
       const failures = sources.length - ready.length;
       let attached = true;
+      const problems: string[] = [];
       if (ready.length > 0) {
         // Le serveur rattache 300 images au plus par appel : une grosse archive
         // part en plusieurs paquets, dans l'ordre, pour ne pas être refusée d'un bloc.
@@ -222,48 +251,53 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
           }
         } catch (error) {
           attached = false;
-          toast.error(errorMessage(error, "Les images envoyées n’ont pas pu être rattachées au chapitre."));
+          problems.push(errorMessage(error, "Les images envoyées n’ont pas pu être rattachées au chapitre."));
           // Ce qui n'est devenu la page de rien ne reste pas sur le serveur.
           for (const batch of batches.slice(done)) void api.discardUploads(batch).catch(() => undefined);
         }
         if (added > 0) {
-          toast.success(added < 2 ? "Page ajoutée au chapitre" : `${added} pages ajoutées au chapitre`);
+          // Les pages apparaissent sur la planche ; si on l'a quittée, un toast le dit.
+          if (!mountedRef.current) tellImport("success", added < 2 ? "Page ajoutée au chapitre" : `${added} pages ajoutées au chapitre`);
           await refresh();
         }
       }
-      if (failures > 0) toast.error(failures < 2 ? "Une image n’a pas pu être envoyée." : `${failures} images n’ont pas pu être envoyées.`);
+      if (failures > 0) problems.push(failures < 2 ? "Une image n’a pas pu être envoyée : la raison est dans la liste." : `${failures} images n’ont pas pu être envoyées : la raison est dans la liste.`);
+      if (problems.length > 0) tellImport("error", problems.join(" "));
       // Sans échec, la liste a fini de servir ; sinon elle reste pour être lue.
       if (failures === 0 && attached) setQueue([]);
     },
-    [chapterId, refresh]
+    [chapterId, refresh, tellImport]
   );
 
   const importFiles = useCallback(
     async (files: File[]) => {
       if (files.length === 0) return;
       if (importLock.current) {
-        toast.error("Un import est déjà en cours. Attendez sa fin avant d’en lancer un autre.");
+        tellImport("info", "Un import est déjà en cours. Attendez sa fin avant d’en lancer un autre.");
         return;
       }
       importLock.current = true;
       setImporting(true);
+      importFeedbackRef.current.clear();
       try {
         const { sources, ignored, unreadable } = await collectSources(files);
-        for (const name of unreadable) toast.error(`L’archive « ${name} » n’a pas pu être lue.`);
+        // Ce qui est écarté avant l'envoi est dit au même endroit que le reste de l'import, en une fois.
+        const notes = unreadable.map((name) => `L’archive « ${name} » n’a pas pu être lue.`);
         if (ignored > 0) {
-          toast.warning(
-            `${ignored < 2 ? "Un fichier ignoré" : `${ignored} fichiers ignorés`} : seules les images png, jpg et webp de moins de 40 Mo sont acceptées.`
+          notes.push(
+            `${ignored < 2 ? "Un fichier ignoré" : `${ignored} fichiers ignorés`} : seules les images png, jpg et webp de moins de 40 Mo sont acceptées.`
           );
         }
+        if (notes.length > 0) tellImport(sources.length > 0 ? "info" : "error", notes.join(" "));
         if (sources.length > 0) await importSources(sources);
       } catch (error) {
-        toast.error(errorMessage(error, "Import impossible."));
+        tellImport("error", errorMessage(error, "L’import n’a pas abouti. Réessayez."));
       } finally {
         importLock.current = false;
         setImporting(false);
       }
     },
-    [importSources]
+    [importSources, tellImport]
   );
 
   /** Image venue du sélecteur commun : galerie, autre module, ordinateur ou lien. */
@@ -273,6 +307,7 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
       void importFiles([image.file]);
       return;
     }
+    importFeedback.clear();
     try {
       if (image.kind === "gallery") {
         await api.importGalleryFiles(chapterId, [image.name]);
@@ -291,10 +326,10 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
           throw error;
         }
       }
-      toast.success("Page ajoutée au chapitre");
+      // La page apparaît sur la planche : c'est le retour.
       await refresh();
     } catch (error) {
-      toast.error(errorMessage(error, "Cette image n’a pas pu être ajoutée."));
+      tellImport("error", errorMessage(error, "Cette image n’a pas pu être ajoutée."));
     }
   };
 
@@ -367,23 +402,26 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
 
   /** Écarte les pages que l'analyse dit sans texte à traduire (couvertures, bannières). */
   const skipUntranslatable = async (ids: string[]) => {
+    skipFeedback.clear();
     try {
       for (const id of ids) await api.setPageSkipped(id, true);
-      toast.success(ids.length === 1 ? "Page laissée telle quelle" : "Pages laissées telles quelles");
+      // Les vignettes passent à « Laissée telle quelle » et la barre se referme : c'est le retour.
       dismissChapterJob(chapterId);
       await refresh();
     } catch (error) {
-      toast.error(errorMessage(error, "Réglage des pages impossible."));
+      skipFeedback.error(errorMessage(error, "Les pages n’ont pas pu être réglées. Réessayez."));
     }
   };
   const pageIds = pages.map((page) => page.id);
 
-  const applyOrder = async (ids: string[]) => {
+  /** `movedId` : la page déplacée, sur laquelle s'affiche un échec. */
+  const applyOrder = async (ids: string[], movedId: string) => {
     setView((previous) => previous && { ...previous, chapter: { ...previous.chapter, pageIds: ids }, pages: orderByIds(previous.pages, ids) });
+    tileFeedback.clear();
     try {
       await api.reorderPages(chapterId, ids);
     } catch (error) {
-      toast.error(errorMessage(error, "Le nouvel ordre n’a pas pu être enregistré."));
+      tellTile(movedId, errorMessage(error, "Le nouvel ordre n’a pas pu être enregistré."));
       void refresh();
     }
   };
@@ -391,7 +429,7 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
   const movePage = (pageId: string, to: number) => {
     const from = pageIds.indexOf(pageId);
     if (from < 0 || from === to) return;
-    void applyOrder(moveItem(pageIds, from, to));
+    void applyOrder(moveItem(pageIds, from, to), pageId);
   };
 
   /** La mise en page animée reprend à l'image suivante : le dépôt lui-même ne glisse pas deux fois. */
@@ -403,24 +441,25 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
     movePage(String(active.id), pageIds.indexOf(String(over.id)));
   };
 
+  // La vignette change (« Laissée telle quelle », ou elle disparaît) : c'est le retour ; un échec s'affiche sur elle.
   const skipPage = async (page: PageSummary, skipped: boolean) => {
+    tileFeedback.clear();
     try {
       const updated = await api.setPageSkipped(page.id, skipped);
       setView((previous) => previous && { ...previous, pages: previous.pages.map((entry) => (entry.id === updated.id ? updated : entry)) });
-      toast.success(skipped ? "Page laissée telle quelle" : "Page remise à traduire");
     } catch (error) {
-      toast.error(errorMessage(error, "Réglage de la page impossible."));
+      tellTile(page.id, errorMessage(error, "La page n’a pas pu être réglée. Réessayez."));
     }
   };
 
   const deletePage = async (page: PageSummary) => {
+    tileFeedback.clear();
     try {
       await api.deletePage(page.id);
       setView((previous) => previous && { ...previous, pages: previous.pages.filter((entry) => entry.id !== page.id) });
-      toast.success("Page supprimée");
       void refresh();
     } catch (error) {
-      toast.error(errorMessage(error, "Suppression de la page impossible."));
+      tellTile(page.id, errorMessage(error, "La page n’a pas pu être supprimée. Réessayez."));
     }
   };
 
@@ -489,15 +528,15 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
     }
   };
 
+  // Publier laisse la fenêtre ouverte sur l'adresse à partager ; rendre privé la ferme. L'un et l'autre se voient.
   const saveVisibility = async (visibility: ChapterVisibility) => {
-    const next = await api.setChapterVisibility(chapterId, visibility);
-    toast.success(next.visibility === "private" ? "Chapitre repassé en privé" : `Chapitre publié : ${visibilityLabel(next.visibility).toLowerCase()}`);
+    await api.setChapterVisibility(chapterId, visibility);
     await refresh();
   };
 
+  // La ligne de résumé, au-dessus des vignettes, reprend aussitôt les nouveaux réglages.
   const saveSettings = async (settings: ChapterSettings) => {
     await api.updateChapter(chapterId, { settings });
-    toast.success("Réglages du chapitre enregistrés");
     await refresh();
   };
 
@@ -626,6 +665,10 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
         />
 
         <UploadQueue items={queue} finished={!importing} onDismiss={() => setQueue([])} />
+        {/* Retour de l'import, sous sa file. La marge négative compense l'écart du cadre : rien ne bouge quand il est vide. */}
+        <div className="-mt-4">
+          <FormStatus state={importFeedback.state} className="pt-4" />
+        </div>
 
         {view === null ? (
           failed ? (
@@ -665,6 +708,7 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
                     onStop={() => stopChapterJob(chapterId)}
                     onDismiss={() => dismissChapterJob(chapterId)}
                     onSkip={(ids) => void skipUntranslatable(ids)}
+                    skipStatus={skipFeedback.state}
                   />
                 </motion.div>
               )}
@@ -707,6 +751,7 @@ function ChapterBoard({ chapterId }: { chapterId: string }) {
                         onMove={(to) => movePage(page.id, to)}
                         onDelete={() => deleting.show({ page, number: index + 1 })}
                         onSkip={(skipped) => void skipPage(page, skipped)}
+                        status={tileTarget === page.id ? tileFeedback.state : null}
                       />
                     ))}
                   </AnimatePresence>
@@ -845,13 +890,15 @@ interface ChapterJobBarProps {
   onDismiss: () => void;
   /** Écarte les pages que l'analyse dit sans texte à traduire. */
   onSkip: (pageIds: string[]) => void;
+  /** Échec de « Les laisser telles quelles », affiché à côté du bouton. */
+  skipStatus: FeedbackState | null;
 }
 
 /**
  * Ce qui tourne sur le chapitre, ou ce qui vient de finir : l'avancement, de
  * quoi arrêter, puis le compte rendu. Le détail par page est sur les vignettes.
  */
-function ChapterJobBar({ job, pageNumbers, onStop, onDismiss, onSkip }: ChapterJobBarProps) {
+function ChapterJobBar({ job, pageNumbers, onStop, onDismiss, onSkip, skipStatus }: ChapterJobBarProps) {
   const { settled, total } = jobProgress(job);
   const name = job.kind === "analyze" ? "Analyse" : "Traduction";
   const candidates = (job.untranslatable ?? []).filter((id) => pageNumbers.has(id));
@@ -903,6 +950,7 @@ function ChapterJobBar({ job, pageNumbers, onStop, onDismiss, onSkip }: ChapterJ
             <ImageOff className="h-4 w-4" />
             {candidates.length === 1 ? "La laisser telle quelle" : "Les laisser telles quelles"}
           </Button>
+          <ActionStatus state={skipStatus} />
         </div>
       )}
     </div>
@@ -924,9 +972,11 @@ interface PageTileProps {
   onDelete: () => void;
   /** Marque la page « à laisser telle quelle », ou lève cette marque. */
   onSkip: (skipped: boolean) => void;
+  /** Échec d'une action sur cette page (déplacer, régler, supprimer) : il prend la place de la ligne d'état. */
+  status: FeedbackState | null;
 }
 
-function PageTile({ page, index, total, sorting, job, jobKind, onOpen, onMove, onDelete, onSkip }: PageTileProps) {
+function PageTile({ page, index, total, sorting, job, jobKind, onOpen, onMove, onDelete, onSkip, status }: PageTileProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: page.id });
   const number = index + 1;
 
@@ -999,13 +1049,17 @@ function PageTile({ page, index, total, sorting, job, jobKind, onOpen, onMove, o
               <p className="truncate text-sm font-medium tabular-nums" title={page.name}>
                 Page {number}
               </p>
-              <p className="truncate text-xs text-muted-foreground tabular-nums" title={job?.detail}>
-                {job && jobKind && job.state !== "skipped"
-                  ? jobLabel(job, jobKind)
-                  : page.skipped
-                    ? "Laissée telle quelle"
-                    : `${PAGE_STATUS_LABELS[page.status]} · ${countLabel(page.regionCount, "zone", "zones")}`}
-              </p>
+              {status ? (
+                <ActionStatus state={status} className="flex max-w-full" />
+              ) : (
+                <p className="truncate text-xs text-muted-foreground tabular-nums" title={job?.detail}>
+                  {job && jobKind && job.state !== "skipped"
+                    ? jobLabel(job, jobKind)
+                    : page.skipped
+                      ? "Laissée telle quelle"
+                      : `${PAGE_STATUS_LABELS[page.status]} · ${countLabel(page.regionCount, "zone", "zones")}`}
+                </p>
+              )}
             </div>
             <ObjectMenuButton
               entries={entries}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Check, Mic } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
@@ -54,6 +55,9 @@ export function TrackVoiceDialog({
   const stopRef = useRef(false);
   /** Réglages de la dernière relecture : relancer avec les mêmes ne refait que les échecs. */
   const lastRunRef = useRef("");
+  // Bilan d'une relecture incomplète : la fenêtre reste ouverte, il s'y lit.
+  const feedback = useFeedback();
+  const { clear: clearFeedback } = feedback;
 
   // À l'ouverture : réglages de la voix actuelle de la piste, états remis à zéro.
   useEffect(() => {
@@ -64,6 +68,7 @@ export function TrackVoiceDialog({
     setStatuses({});
     stopRef.current = false;
     lastRunRef.current = "";
+    clearFeedback();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, trackId]);
 
@@ -78,6 +83,7 @@ export function TrackVoiceDialog({
     const retryOnly = lastRunRef.current === runKey && failed.length > 0;
     const targets = retryOnly ? failed : items;
     lastRunRef.current = runKey;
+    feedback.clear();
     setRunning(true);
     stopRef.current = false;
     setStatuses((current) => ({
@@ -107,7 +113,7 @@ export function TrackVoiceDialog({
     }
     setRunning(false);
     if (replacements.length === 0) {
-      if (errors) toast.error("Aucun extrait n’a pu être relu : la piste garde sa voix.");
+      if (errors) feedback.error("Aucun extrait n’a pu être relu : la piste garde sa voix. Réessayez, ou choisissez une autre voix.");
       return;
     }
     const { overlaps } = onApply(trackId, replacements);
@@ -117,9 +123,12 @@ export function TrackVoiceDialog({
       stopRef.current ? "arrêt demandé avant la fin" : "",
       overlaps ? `${overlaps} extrait${overlaps > 1 ? "s" : ""} empiète${overlaps > 1 ? "nt" : ""} désormais sur le suivant` : "",
     ].filter(Boolean);
-    if (errors || overlaps || stopRef.current) toast.warning(notes.join(", "));
-    else {
-      toast.success(`${notes[0]}. Ctrl Z pour revenir à l’ancienne voix.`);
+    if (errors || overlaps || stopRef.current) {
+      const summary = `${notes.join(", ")}.`;
+      (errors ? feedback.error : feedback.info)(summary.charAt(0).toUpperCase() + summary.slice(1));
+    } else {
+      // La fenêtre se ferme : le toast porte le rappel d'annulation.
+      toast.success(`${notes[0]}. Ctrl Z pour revenir à l’ancienne voix.`);
       onOpenChange(false);
     }
   };
@@ -203,6 +212,11 @@ export function TrackVoiceDialog({
             )}
           </div>
         )}
+        </div>
+
+        {/* Vide, l'emplacement disparaît : pas d'écart de plus au-dessus des boutons. */}
+        <div className="shrink-0 empty:hidden">
+          <FormStatus state={feedback.state} />
         </div>
 
         <DialogFooter className="shrink-0 gap-2 sm:gap-2">

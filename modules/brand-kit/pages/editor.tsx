@@ -21,8 +21,8 @@ import {
   Type,
   type LucideIcon,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Spinner } from "@/components/ui/spinner";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Kbd } from "@/components/ui/kbd";
@@ -139,27 +139,32 @@ export default function EditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- seule la liste des polices compte
   }, [fontKey]);
 
+  // Gestes de l'en-tête (et de la palette de commandes) : l'étoile « par défaut »
+  // et le téléchargement se voient ; un échec s'écrit sous l'en-tête.
+  const headerFeedback = useFeedback();
+
   const makeDefault = async () => {
     if (!kit) return;
+    headerFeedback.clear();
     try {
       await editor.flush();
       await api.setDefaultKit(kit.id);
       await editor.reload();
-      toast.success(`« ${kit.name} » est la marque par défaut`);
     } catch (error) {
-      toast.error(errorMessage(error, "Changement impossible."));
+      headerFeedback.error(errorMessage(error, "Cette marque n’a pas pu devenir la marque par défaut. Réessayez."));
     }
   };
 
   const exportZip = async () => {
     if (!kit) return;
     setExportingZip(true);
+    headerFeedback.clear();
     try {
       await editor.flush();
       const archive = await api.exportKit(kit.id);
       downloadBase64(archive.fileName, archive.data);
     } catch (error) {
-      toast.error(errorMessage(error, "Export impossible."));
+      headerFeedback.error(errorMessage(error, "L’archive n’a pas pu être préparée. Réessayez."));
     } finally {
       setExportingZip(false);
     }
@@ -285,6 +290,7 @@ export default function EditorPage() {
           </>
         }
       >
+        <FormStatus state={headerFeedback.state} />
         <AnimatePresence initial={false}>
           {editor.saveState === "conflict" && (
             <motion.div key="conflict" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="shrink-0 overflow-hidden">

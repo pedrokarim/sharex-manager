@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { MotionConfig } from "framer-motion";
 import { RefreshCw, Type } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, type FeedbackState } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { useSession } from "@/lib/auth-client";
@@ -40,13 +40,16 @@ export default function FontsPage() {
     setFailed(false);
   }, []);
 
+  // L'échec d'« Actualiser » s'affiche à côté du bouton ; sans liste du tout, la page le dit à sa place.
+  const [refreshError, setRefreshError] = useState<FeedbackState | null>(null);
   const refresh = useCallback(async () => {
     setRefreshing(true);
+    setRefreshError(null);
     try {
       store(await fetchCustomFonts(true));
     } catch (error) {
       setFailed(true);
-      toast.error(errorMessage(error, "La liste des polices n’a pas pu être lue."));
+      setRefreshError({ tone: "error", message: errorMessage(error, "La liste des polices n’a pas pu être lue. Réessayez."), id: Date.now() });
     } finally {
       setRefreshing(false);
     }
@@ -64,10 +67,13 @@ export default function FontsPage() {
       <ModuleShell
         crumbs={[{ label: "Polices" }]}
         actions={
-          <Button variant="outline" className="gap-2" loading={refreshing} onClick={() => void refresh()}>
-            <RefreshCw className="h-4 w-4" />
-            Actualiser
-          </Button>
+          <>
+            {fonts !== null && <ActionStatus state={refreshError} className="max-w-40 sm:max-w-64" />}
+            <Button variant="outline" className="gap-2" loading={refreshing} onClick={() => void refresh()}>
+              <RefreshCw className="h-4 w-4" />
+              Actualiser
+            </Button>
+          </>
         }
       >
         <div className="flex flex-col gap-8">
@@ -93,7 +99,9 @@ export default function FontsPage() {
 
           {failed && fonts === null ? (
             <div className="flex flex-col items-start gap-3">
-              <p className="text-sm text-muted-foreground">Les polices ajoutées n’ont pas pu être lues.</p>
+              <p className="text-sm break-words text-muted-foreground" role="alert">
+                {refreshError?.message ?? "Les polices ajoutées n’ont pas pu être lues."}
+              </p>
               <Button variant="outline" size="sm" className="gap-2" onClick={() => void refresh()}>
                 <RefreshCw className="h-4 w-4" />
                 Réessayer

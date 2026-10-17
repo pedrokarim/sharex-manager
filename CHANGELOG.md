@@ -688,6 +688,16 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   avertissement. Une marque neuve et l’assistant de marque ne proposent plus
   que des polices de texte pour les rôles de texte, à des couleurs lisibles
   sur leur fond.
+- Messages d’action affichés là où l’on regarde, au lieu de toasts au coin
+  de l’écran : l’erreur d’un formulaire ou d’une fenêtre s’ouvre au-dessus
+  de son bouton d’envoi et s’efface quand on corrige la saisie (connexion,
+  contact, albums, réglages, moteurs…) ; « Enregistré » apparaît à côté
+  du bouton qui a enregistré ; l’erreur d’une carte ou d’une ligne
+  s’affiche sur elle ; une copie se lit sur l’icône du bouton. Socle commun
+  `src/components/feedback/` (`useFeedback`, `FormStatus`, `ActionStatus`).
+  Le toast reste pour ce qui se passe hors de vue : travail de fond qui se
+  termine, fichier reçu en direct, écran fermé après l’action, annulation
+  proposée.
 - Chargements refaits dans toute l’application, sur un socle commun
   (`src/components/loading/`) : orbes de points animées (moteur de
   `thinking-orbs`, encre aux couleurs du thème) pour les pages, les modules et
@@ -695,9 +705,7 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   d’attente scintillant ; squelettes traversés d’un reflet ; boutons
   `loading` qui gardent leur libellé lisible. L’ouverture d’un module montre
   l’orbe au centre de la zone de contenu au lieu d’un petit spinner en haut,
-  et l’icône d’un lien de la barre latérale indique la page qui arrive. Une
-  image en cours de génération dans AI Image Gen se développe en mosaïque
-  de pixels (`img-fx`). Le
+  et l’icône d’un lien de la barre latérale indique la page qui arrive. Le
   mouvement réduit est respecté partout.
 - Comptes connectés, écran Publier : un service peut lire chez lui les
   réglages d’un compte à l’affichage (identité, choix permis, déclarations à

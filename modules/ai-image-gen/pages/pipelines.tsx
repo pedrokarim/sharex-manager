@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  CircleAlert,
   ImageDown,
   Pencil,
   Plus,
@@ -12,7 +13,8 @@ import {
   Workflow,
   ZoomIn,
 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, errorMessage, useFeedback } from "@/components/feedback";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,6 +141,23 @@ export default function PipelinesPage({}: PipelinesPageProps) {
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
   const [editing, setEditing] = useState<Partial<Pipeline> | null>(null);
   const [loading, setLoading] = useState(true);
+  // Échec de lecture : un état durable de la page, avec de quoi réessayer.
+  const [loadError, setLoadError] = useState(false);
+  // Échec d'une suppression : affiché sur la carte du pipeline concerné.
+  const deleteFeedback = useFeedback();
+  const [failedDeleteId, setFailedDeleteId] = useState<string | null>(null);
+
+  const removePipeline = async (id: string) => {
+    deleteFeedback.clear();
+    setFailedDeleteId(id);
+    try {
+      // La carte qui disparaît confirme la suppression.
+      await callModule("deletePipeline", id);
+      await load();
+    } catch (error) {
+      deleteFeedback.error(errorMessage(error, "Suppression impossible. Réessayez."));
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -148,8 +167,9 @@ export default function PipelinesPage({}: PipelinesPageProps) {
       ]);
       setPipelines(list);
       setCatalogue(cat);
+      setLoadError(false);
     } catch {
-      toast.error("Chargement des pipelines impossible");
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -179,7 +199,20 @@ export default function PipelinesPage({}: PipelinesPageProps) {
     >
       {loading && <Spinner className="h-5 w-5" />}
 
-      {!loading && pipelines.length === 0 && (
+      {loadError && (
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Pipelines indisponibles</AlertTitle>
+          <AlertDescription>
+            <p>Les pipelines n’ont pas pu être chargés. Vérifiez votre connexion, puis réessayez.</p>
+            <Button variant="outline" size="sm" className="mt-1" onClick={() => void load()}>
+              Réessayer
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!loading && !loadError && pipelines.length === 0 && (
         <div className="space-y-5">
           <Empty className="rounded-xl border border-dashed py-12">
             <EmptyHeader>
@@ -253,11 +286,7 @@ export default function PipelinesPage({}: PipelinesPageProps) {
                     size="icon"
                     className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                     aria-label="Supprimer"
-                    onClick={async () => {
-                      await callModule("deletePipeline", pipeline.id);
-                      await load();
-                      toast.success("Pipeline supprimé");
-                    }}
+                    onClick={() => void removePipeline(pipeline.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -291,6 +320,11 @@ export default function PipelinesPage({}: PipelinesPageProps) {
                   </li>
                 ))}
               </ol>
+              {failedDeleteId === pipeline.id && deleteFeedback.state && (
+                <div className="mt-2 flex min-w-0">
+                  <ActionStatus state={deleteFeedback.state} />
+                </div>
+              )}
             </article>
           ))}
         </div>
@@ -333,10 +367,15 @@ function PipelineEditor({
 }) {
   const [draft, setDraft] = useState<Partial<Pipeline>>({ name: "", steps: [] });
   const [busy, setBusy] = useState(false);
+  // Échec de l'enregistrement : au-dessus du bouton, effacé à la saisie. La
+  // réussite ferme la fenêtre sur la liste mise à jour.
+  const feedback = useFeedback();
+  const clearFeedback = feedback.clear;
 
   useEffect(() => {
     if (value) setDraft(value);
-  }, [value]);
+    clearFeedback();
+  }, [value, clearFeedback]);
 
   const steps = draft.steps ?? [];
   const models = (catalogue?.models ?? []).filter((model) => model.available);
@@ -360,6 +399,7 @@ function PipelineEditor({
 
   const save = async () => {
     setBusy(true);
+    feedback.clear();
     try {
       await callModule("savePipeline", {
         id: draft.id,
@@ -367,10 +407,9 @@ function PipelineEditor({
         description: draft.description,
         steps: draft.steps,
       });
-      toast.success("Pipeline enregistré");
       await onSaved();
-    } catch (error: any) {
-      toast.error(error?.message ?? "Enregistrement impossible");
+    } catch (error) {
+      feedback.error(errorMessage(error, "Le pipeline n’a pas pu être enregistré. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -390,7 +429,7 @@ function PipelineEditor({
           </DialogDescription>
         </DialogHeader>
 
-        <FieldGroup className="gap-4">
+        <FieldGroup className="gap-4" onChange={feedback.state ? feedback.clear : undefined}>
           <Field>
             <FieldLabel htmlFor="pipeline-name">Nom</FieldLabel>
             <Input
@@ -622,15 +661,18 @@ function PipelineEditor({
           )}
         </div>
 
-        <DialogFooter>
-          <Button
-            onClick={save}
-            disabled={busy || !draft.name?.trim() || steps.length === 0}
-          >
-            {busy && <Spinner className="mr-2 h-4 w-4" />}
-            Enregistrer
-          </Button>
-        </DialogFooter>
+        <div>
+          <FormStatus state={feedback.state} className="pb-3" />
+          <DialogFooter>
+            <Button
+              onClick={save}
+              disabled={busy || !draft.name?.trim() || steps.length === 0}
+            >
+              {busy && <Spinner className="mr-2 h-4 w-4" />}
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Ghost, History, ImagePlus, Link2, Plus, Trophy, Upload } from "lucide-react";
-import { toast } from "sonner";
 import { BrandLogo } from "@/components/brand-logo";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { ImagePickerDialog } from "@/components/gallery/image-picker-dialog";
 import { Orb } from "@/components/loading";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,11 @@ export default function SearchPage() {
   const [dragging, setDragging] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [recent, setRecent] = useState<HistoryEntry[]>([]);
+  // Échec du lancement d'une recherche (fichier refusé, adresse illisible,
+  // recherche introuvable) : sous la zone de dépôt, ou en tête des résultats.
+  const startFeedback = useFeedback();
+  // Échec de préparation d'un lien « Ouvrir sur » : sous ces boutons.
+  const linksFeedback = useFeedback();
   const dragDepth = useRef(0);
   const pickerOpenRef = useRef(false);
   const current = useRef<SearchView | null>(null);
@@ -110,6 +115,7 @@ export default function SearchPage() {
   const start = useCallback(
     async (input: SearchInput) => {
       setStarting(true);
+      startFeedback.clear();
       try {
         const view = await callModule<SearchView>("startSearch", { ...input, ephemeral: prefs.ephemeral });
         release(current.current);
@@ -122,21 +128,28 @@ export default function SearchPage() {
           if (selected.has(engine.id) && engine.inline !== "none") void run(view.id, engine.id);
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Recherche impossible.");
+        startFeedback.error(errorMessage(error, "La recherche n’a pas pu démarrer. Réessayez avec une autre image."));
       } finally {
         setStarting(false);
       }
     },
+    // `startFeedback.clear` / `.error` gardent le même effet d'un rendu à l'autre.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [prefs.ephemeral, selected, run, release]
   );
 
   const startFromFile = useCallback(
     async (file: File | undefined) => {
       if (!file) return;
-      if (!file.type.startsWith("image/")) return void toast.error("Ce fichier n’est pas une image.");
-      if (file.size > MAX_BYTES) return void toast.error("Image trop lourde (20 Mo maximum).");
+      if (!file.type.startsWith("image/")) {
+        return void startFeedback.error("Ce fichier n’est pas une image. Choisissez un fichier PNG, JPEG, WebP ou GIF.");
+      }
+      if (file.size > MAX_BYTES) {
+        return void startFeedback.error("Cette image dépasse 20 Mo. Choisissez-en une plus légère.");
+      }
       await start({ image: { b64: await fileToBase64(file), name: file.name || "image" } });
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [start]
   );
 
@@ -190,7 +203,9 @@ export default function SearchPage() {
           setLinks(null);
           setResults(view.results);
         })
-        .catch((error) => toast.error(error instanceof Error ? error.message : "Recherche introuvable."));
+        .catch((error) =>
+          startFeedback.error(errorMessage(error, "Cette recherche est introuvable : elle a peut-être été effacée de l’historique."))
+        );
     } else if (file) {
       void start({ galleryFile: file });
     }
@@ -265,6 +280,7 @@ export default function SearchPage() {
   const openExternal = useCallback(
     async (engine: EngineId) => {
       if (!search) return;
+      linksFeedback.clear();
       if (links) return void window.open(links.links[engine], "_blank", "noopener,noreferrer");
       const tab = window.open("about:blank", "_blank");
       try {
@@ -276,9 +292,10 @@ export default function SearchPage() {
         }
       } catch (error) {
         tab?.close();
-        toast.error(error instanceof Error ? error.message : "Lien indisponible.");
+        linksFeedback.error(errorMessage(error, "Le lien vers ce site n’a pas pu être préparé. Réessayez."));
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [search, links]
   );
 
@@ -366,8 +383,15 @@ export default function SearchPage() {
               </span>
             </button>
 
+            {/* La marge négative absorbe l'écart de la colonne tant qu'il n'y a
+                pas de message : il s'ouvre sans à-coup. */}
+            <div className="-mb-4">
+              <FormStatus state={startFeedback.state} className="pb-4" />
+            </div>
+
             <form
               className="flex gap-2"
+              onChange={startFeedback.state ? startFeedback.clear : undefined}
               onSubmit={(event) => {
                 event.preventDefault();
                 if (url.trim()) void start({ url: url.trim() }).then(() => setUrl(""));
@@ -506,19 +530,22 @@ export default function SearchPage() {
 
             <div className="space-y-2">
               <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ouvrir sur</h2>
-              <div className="grid grid-cols-2 gap-1.5">
-                {ENGINES.map((engine) => (
-                  <button
-                    key={engine.id}
-                    type="button"
-                    onClick={() => void openExternal(engine.id)}
-                    title={`Ouvrir sur ${engine.name}`}
-                    className="flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted"
-                  >
-                    <BrandLogo brand={engine.brand} className="size-4 rounded-sm" />
-                    <span className="min-w-0 flex-1 truncate">{engine.name}</span>
-                  </button>
-                ))}
+              <div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {ENGINES.map((engine) => (
+                    <button
+                      key={engine.id}
+                      type="button"
+                      onClick={() => void openExternal(engine.id)}
+                      title={`Ouvrir sur ${engine.name}`}
+                      className="flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted"
+                    >
+                      <BrandLogo brand={engine.brand} className="size-4 rounded-sm" />
+                      <span className="min-w-0 flex-1 truncate">{engine.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <FormStatus state={linksFeedback.state} className="pt-2" />
               </div>
               <p className="text-xs leading-5 text-muted-foreground">
                 {links?.expiresAt
@@ -532,6 +559,9 @@ export default function SearchPage() {
 
           {/* ─── Résultats ─── */}
           <div className="flex min-w-0 flex-col gap-6">
+            <div className="-mb-6">
+              <FormStatus state={startFeedback.state} className="pb-6" />
+            </div>
             <AnimatePresence>
               {best && bestEngine && (
                 <motion.div

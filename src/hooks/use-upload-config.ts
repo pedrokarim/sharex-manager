@@ -1,17 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import type { UploadConfig } from "@/lib/types/upload-config";
 import { defaultConfig } from "@/lib/defaultConfig";
 
+/** Issue d'un enregistrement : l'appelant l'affiche là où il a été demandé. */
+export type SaveConfigResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Configuration des envois. Le crochet n'affiche rien lui-même : l'échec du
+ * chargement est exposé dans `loadError`, et `saveConfig` rend son issue, pour
+ * que chaque écran la dise à sa place (à côté du bouton Enregistrer, en tête
+ * de page…).
+ */
 export function useUploadConfig() {
   const [config, setConfig] = useState<UploadConfig>(defaultConfig);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadConfig = async () => {
     try {
+      setLoadError(null);
       const response = await fetch("/api/settings/config");
       if (!response.ok)
         throw new Error("Erreur lors du chargement de la configuration");
@@ -19,13 +29,17 @@ export function useUploadConfig() {
       setConfig(data);
     } catch (error) {
       console.error("Erreur lors du chargement de la configuration:", error);
-      toast.error("Impossible de charger la configuration");
+      setLoadError(
+        "La configuration des envois n’a pas pu être chargée ; les valeurs par défaut s’appliquent."
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const saveConfig = async (newConfig: Partial<UploadConfig>) => {
+  const saveConfig = async (
+    newConfig: Partial<UploadConfig>
+  ): Promise<SaveConfigResult> => {
     try {
       setIsSaving(true);
       const response = await fetch("/api/settings/config", {
@@ -41,14 +55,16 @@ export function useUploadConfig() {
       }
 
       setConfig(data);
-      toast.success("Configuration mise à jour");
+      return { ok: true };
     } catch (error) {
       console.error("Erreur lors de la sauvegarde:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Impossible de sauvegarder la configuration",
-      );
+      return {
+        ok: false,
+        error:
+          error instanceof Error && error.message
+            ? error.message
+            : "La configuration n’a pas pu être enregistrée. Réessayez.",
+      };
     } finally {
       setIsSaving(false);
     }
@@ -117,6 +133,7 @@ export function useUploadConfig() {
     config,
     isLoading,
     isSaving,
+    loadError,
     loadConfig,
     saveConfig,
     isFileAllowed,

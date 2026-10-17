@@ -12,20 +12,23 @@ import {
 import { useTranslation } from "@/lib/i18n";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { ActionStatus, useFeedback } from "@/components/feedback";
 
 export default function SecurityPageClient() {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
+  // Le résultat de l'analyse s'affiche à côté de son bouton.
+  const scanFeedback = useFeedback({ successDuration: 6000 });
 
   const handleSecurityScan = async () => {
     setIsLoading(true);
+    scanFeedback.clear();
     try {
       // Simulation d'une analyse de sécurité
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      toast.success(t("admin.security.scan.success"));
+      scanFeedback.success(t("admin.security.scan.success"));
     } catch (error) {
-      toast.error(t("admin.security.scan.error"));
+      scanFeedback.error(t("admin.security.scan.error"));
     } finally {
       setIsLoading(false);
     }
@@ -50,16 +53,19 @@ export default function SecurityPageClient() {
             <p className="text-sm sm:text-base">
               {t("admin.security.scan.description")}
             </p>
-            <Button
-              onClick={handleSecurityScan}
-              loading={isLoading}
-              className="text-sm"
-            >
-              <Shield />
-              {isLoading
-                ? t("admin.security.scan.running")
-                : t("admin.security.scan.button")}
-            </Button>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+              <Button
+                onClick={handleSecurityScan}
+                loading={isLoading}
+                className="text-sm"
+              >
+                <Shield />
+                {isLoading
+                  ? t("admin.security.scan.running")
+                  : t("admin.security.scan.button")}
+              </Button>
+              <ActionStatus state={scanFeedback.state} />
+            </div>
           </div>
         </CardContent>
       </Card>

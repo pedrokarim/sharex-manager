@@ -8,8 +8,8 @@
  */
 
 import { useState } from "react";
-import { Check, Copy, Link2 } from "lucide-react";
-import { toast } from "sonner";
+import { Check, Copy, Link2, X } from "lucide-react";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { BrandLogo, isBrand } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -212,7 +212,10 @@ export function formatBytes(bytes: number): string {
  * champ se recopie mal à la main.
  */
 export function CopyField({ value, label = "Copier" }: { value: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
+  // Le retour se lit sur le bouton : une coche, ou une croix si le navigateur
+  // refuse (la valeur reste sélectionnable d'un clic pour la copier à la main).
+  const { hasCopied, copyFailed, copyToClipboard } = useCopyToClipboard({ resetAfter: 1500 });
+  const failedLabel = "Copie impossible : sélectionnez le texte et copiez-le à la main.";
   return (
     <div className="flex min-h-9 w-full min-w-0 items-start gap-1 rounded-md border border-input py-0.5 pr-0.5 pl-3 dark:bg-input/30">
       <code className="min-w-0 flex-1 py-1.5 font-mono text-xs leading-5 break-all select-all">{value}</code>
@@ -221,19 +224,17 @@ export function CopyField({ value, label = "Copier" }: { value: string; label?: 
         variant="ghost"
         size="icon"
         className="size-8 shrink-0"
-        aria-label={label}
-        title={label}
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(value);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          } catch {
-            toast.error("Copie impossible : sélectionnez le texte et copiez-le à la main.");
-          }
-        }}
+        aria-label={copyFailed ? failedLabel : label}
+        title={copyFailed ? failedLabel : label}
+        onClick={() => void copyToClipboard(value)}
       >
-        {copied ? <Check className="size-4 text-emerald-600 dark:text-emerald-400" /> : <Copy className="size-4" />}
+        {hasCopied ? (
+          <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
+        ) : copyFailed ? (
+          <X className="size-4 text-destructive" />
+        ) : (
+          <Copy className="size-4" />
+        )}
       </Button>
     </div>
   );

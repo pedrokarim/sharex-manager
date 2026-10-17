@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { RefreshCw, Send } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -85,6 +85,14 @@ export function ChannelTab({
   const [sending, setSending] = useState<string[]>([]);
   const [busyImage, setBusyImage] = useState<string | null>(null);
   const [choices, setChoices] = useState<Record<string, LoadState<ProfileChoice[]>>>({});
+  // Résultat d'un envoi : sur la ligne de l'élément envoyé seul, à côté de
+  // « Tout envoyer » pour un envoi groupé. Celui d'une image (envoi ou
+  // téléchargement) au bout de ses boutons.
+  const sendFeedback = useFeedback();
+  const [sentKeys, setSentKeys] = useState<string[]>([]);
+  const imageFeedback = useFeedback();
+  const [imageFeedbackKey, setImageFeedbackKey] = useState<string | null>(null);
+  const imageStatusOf = (key: string) => (imageFeedbackKey === key ? imageFeedback.state : null);
 
   // Image de marque complète : de quoi préremplir et rendre les formats.
   useEffect(() => {
@@ -172,9 +180,11 @@ export function ChannelTab({
     if (keys.length === 0) return;
     const changes = Object.fromEntries(keys.map((key) => [key, proposedOf(fields.find((field) => field.key === key)!)]));
     setSending(keys);
+    setSentKeys(keys);
+    sendFeedback.clear();
     const result = await updateProfileAction(account.id, changes);
     setSending([]);
-    if (!result.ok) return void toast.error(result.error);
+    if (!result.ok) return void sendFeedback.error(result.error);
     setProfile({ status: "ready", data: result.data });
     // Ce qui vient de partir devient la proposition : la ligne revient « À jour ».
     setDrafts((current) => {
@@ -186,8 +196,7 @@ export function ChannelTab({
       }
       return next;
     });
-    const label = keys.length === 1 ? fields.find((field) => field.key === keys[0])?.label : null;
-    toast.success(label ? `${label} : envoyé à ${connector.label}` : `${keys.length} éléments envoyés à ${connector.label}`);
+    sendFeedback.success(keys.length === 1 ? `Envoyé à ${connector.label}` : `${keys.length} éléments envoyés à ${connector.label}`);
     onPushed();
   };
 
@@ -195,28 +204,32 @@ export function ChannelTab({
     const format = field.imageFormat;
     if (brand?.status !== "ready" || (format !== "banner" && format !== "watermark")) return;
     setBusyImage(field.key);
+    setImageFeedbackKey(field.key);
+    imageFeedback.clear();
     try {
       await renderBrandFormat(brand.data.kit, format);
     } catch (error) {
       setBusyImage(null);
-      return void toast.error(error instanceof Error ? error.message : "Le format n’a pas pu être rendu depuis la marque.");
+      return void imageFeedback.error(errorMessage(error, "Le format n’a pas pu être rendu depuis la marque."));
     }
     const result = await pushBrandAction(account.id, brand.data.kit.id, format);
     setBusyImage(null);
     onPushed();
-    if (!result.ok) return void toast.error(result.error);
-    toast.success(`${field.label} : mise à jour chez ${connector.label}`);
+    if (!result.ok) return void imageFeedback.error(result.error);
+    imageFeedback.success(`Mis à jour chez ${connector.label}`);
   };
 
   // Ce que l'API ne permet pas : l'image est rendue depuis la marque au clic, puis téléchargée.
   const downloadImage = async (field: ProfileField) => {
     if (brand?.status !== "ready" || !field.imageFormat) return;
     setBusyImage(field.key);
+    setImageFeedbackKey(field.key);
+    imageFeedback.clear();
     try {
       const png = await renderBrandFormat(brand.data.kit, field.imageFormat);
       downloadBlob(`${field.key}.png`, png);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "L’image n’a pas pu être rendue depuis la marque.");
+      imageFeedback.error(errorMessage(error, "L’image n’a pas pu être rendue depuis la marque."));
     } finally {
       setBusyImage(null);
     }
@@ -296,12 +309,17 @@ export function ChannelTab({
             </h3>
             <p className="text-xs text-pretty text-muted-foreground">Envoyé par l’API de {connector.label}. Chaque proposition se modifie avant l’envoi.</p>
           </div>
-          {ready.length > 1 ? (
-            <Button size="sm" className="gap-1.5" loading={sending.length > 1} disabled={sending.length > 0} onClick={() => void send(ready.map((row) => row.field.key))}>
-              <Send />
-              Tout envoyer ({ready.length})
-            </Button>
-          ) : null}
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            {/* Hors de la condition : après un envoi groupé réussi, le bouton
+                disparaît mais son bilan reste lisible. */}
+            <ActionStatus state={sentKeys.length > 1 ? sendFeedback.state : null} />
+            {ready.length > 1 ? (
+              <Button size="sm" className="gap-1.5" loading={sending.length > 1} disabled={sending.length > 0} onClick={() => void send(ready.map((row) => row.field.key))}>
+                <Send />
+                Tout envoyer ({ready.length})
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {editableFields.length === 0 && imageFields.length === 0 ? (
@@ -323,6 +341,7 @@ export function ChannelTab({
                 error={row.error}
                 access={row.access}
                 sending={sending.includes(row.field.key)}
+                sendStatus={sentKeys.length === 1 && sentKeys[0] === row.field.key ? sendFeedback.state : null}
                 choices={choices[row.field.key]}
                 onLoadChoices={() => void loadChoices(row.field.key)}
                 onChange={(value) => setDrafts((current) => ({ ...current, [row.field.key]: value }))}
@@ -388,6 +407,7 @@ export function ChannelTab({
                         {access.state === "reconnect" ? "Compte à reconnecter." : `Le rôle de ce compte chez ${connector.label} ne le permet pas.`}
                       </span>
                     )}
+                    <ActionStatus state={imageStatusOf(field.key)} />
                   </div>
                 </div>
               );
@@ -422,6 +442,7 @@ export function ChannelTab({
                   brandImage={brand?.status === "ready" && field.imageFormat ? brand.data.exports[field.imageFormat] : undefined}
                   link={/^https:\/\//.test(url) ? url : null}
                   downloading={busyImage === field.key}
+                  downloadStatus={imageStatusOf(field.key)}
                   onDownload={brand?.status === "ready" && field.imageFormat ? () => void downloadImage(field) : undefined}
                 />
               );

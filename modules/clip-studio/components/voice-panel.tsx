@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Captions, Mic, TextCursorInput } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { ClipAsset, MediaSource } from "../engine/types";
@@ -39,6 +39,9 @@ export function VoicePanel({
   const [tone, setTone] = useState("balanced");
   const [busy, setBusy] = useState(false);
   const [captions, setCaptions] = useState(true);
+  // Chaque bouton répond juste au-dessus de lui, dans le panneau.
+  const generateFeedback = useFeedback();
+  const captionFeedback = useFeedback();
 
   // Voix, vitesse et sous-titres suivent le compte, d'une visite et d'un
   // appareil à l'autre.
@@ -61,12 +64,14 @@ export function VoicePanel({
     const content = text.trim();
     if (!content) return;
     setBusy(true);
+    generateFeedback.clear();
     try {
       const result = await callModule<{ asset: ClipAsset; durationMs: number }>("speak", { text: content, voice, speed, tone });
       onAdd(assetToSource(result.asset), captions);
-      toast.success(`Voix ajoutée, ${(result.durationMs / 1000).toFixed(1)} s`);
-    } catch (error: any) {
-      toast.error(error?.message ?? "La synthèse vocale a échoué");
+      const seconds = (result.durationMs / 1000).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      generateFeedback.success(`Voix ajoutée à la tête de lecture (${seconds} s).`);
+    } catch (error) {
+      generateFeedback.error(errorMessage(error, "La synthèse vocale a échoué. Réessayez, ou choisissez une autre voix."));
     } finally {
       setBusy(false);
     }
@@ -169,29 +174,38 @@ export function VoicePanel({
         />
       </label>
 
-      <Button onClick={generate} loading={busy} disabled={!text.trim()} className="gap-2">
-        <Mic className="h-4 w-4" />
-        {busy ? "Enregistrement…" : "Générer à la tête de lecture"}
-      </Button>
+      <div className="flex flex-col">
+        <FormStatus state={generateFeedback.state} className="pb-2" />
+        <Button onClick={generate} loading={busy} disabled={!text.trim()} className="gap-2">
+          <Mic className="h-4 w-4" />
+          {busy ? "Enregistrement…" : "Générer à la tête de lecture"}
+        </Button>
+      </div>
       {engineMissing && (
         <p className="text-[11px] text-muted-foreground">
           Le moteur de synthèse sera téléchargé à la première génération (environ 25 Mo).
         </p>
       )}
 
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-2"
-        onClick={() => {
-          const count = onCaptionAll();
-          if (count) toast.success(`${count} voix sous-titrée(s)`);
-          else toast.info("Toutes les voix du projet sont déjà sous-titrées");
-        }}
-      >
-        <Captions className="h-4 w-4" />
-        Sous-titrer les voix du projet
-      </Button>
+      <div className="flex flex-col">
+        <FormStatus state={captionFeedback.state} className="pb-2" />
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => {
+            const count = onCaptionAll();
+            captionFeedback.success(
+              count
+                ? `${count} voix sous-titrée${count > 1 ? "s" : ""}.`
+                : "Toutes les voix du projet sont déjà sous-titrées."
+            );
+          }}
+        >
+          <Captions className="h-4 w-4" />
+          Sous-titrer les voix du projet
+        </Button>
+      </div>
 
       <div className="mt-auto">
         <VoiceCredit voice={selected} />

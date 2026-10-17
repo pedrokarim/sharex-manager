@@ -23,6 +23,7 @@ import {
   ChevronDown,
   Clock,
   Copy,
+  CopyX,
   ExternalLink,
   Lightbulb,
   Newspaper,
@@ -43,6 +44,8 @@ import { useSession } from "@/lib/auth-client";
 import { BrandLogo, isBrand } from "@/components/brand-logo";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ActionStatus, FormStatus, errorMessage, useFeedback } from "@/components/feedback";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
@@ -204,27 +207,34 @@ export default function IdeasPage() {
     return next;
   }, [kitId, accountId]);
 
+  // Travaux de fond (idées, étude, propositions de chaînes, accroches) : leur
+  // fin se notifie par un toast, l'utilisateur a pu changer d'écran entre-temps.
   const { tasks, track, running } = useTasks((task) => {
-    if (task.status === "error") toast.error(task.error ?? "Travail impossible");
+    if (task.status === "error") toast.error(task.error ?? "Le travail n’a pas abouti. Réessayez dans un instant.");
     else if (task.kind === "ideas") {
       setLastNotes(task.notes ?? []);
       setTab("new");
-      toast.success(task.notes?.[0] ?? "Idées trouvées");
-    } else if (task.kind === "study") toast.success(task.notes?.[0] ?? "Étude terminée");
-    else if (task.kind === "channels") toast.success(task.notes?.[0] ?? "Chaînes proposées");
+      toast.success(task.notes?.[0] ?? "Idées trouvées.");
+    } else if (task.kind === "study") toast.success(task.notes?.[0] ?? "Étude terminée.");
+    else if (task.kind === "channels") toast.success(task.notes?.[0] ?? "Chaînes proposées.");
     void refresh().catch(() => undefined);
   });
 
+  // Un état local plutôt que `useFeedback` : l'effet de chargement ne doit dépendre d'aucune fonction qui change.
+  const [loadError, setLoadError] = useState<string | null>(null);
   useEffect(() => {
     if (!kitReady) return;
     let alive = true;
     void callModule<IdeasBoard>("getIdeasBoard", { kitId, ...(accountId ? { accountId } : {}) })
       .then((next) => {
         if (!alive) return;
+        setLoadError(null);
         setBoard(next);
         for (const task of next.tasks) track(task);
       })
-      .catch((error) => toast.error(error?.message ?? "Idées illisibles"));
+      .catch((error) => {
+        if (alive) setLoadError(errorMessage(error, "Les idées n’ont pas pu être chargées. Rechargez la page dans un instant."));
+      });
     return () => {
       alive = false;
     };
@@ -236,13 +246,16 @@ export default function IdeasPage() {
   const counts = useMemo(() => Object.fromEntries(TABS.map((entry) => [entry.id, ideas?.filter((idea) => idea.status === entry.id).length ?? 0])) as Record<IdeaStatus, number>, [ideas]);
   const shown = ideas?.filter((idea) => idea.status === tab) ?? null;
 
+  // Un lancement refusé s'écrit là où la recherche aurait affiché son avancement.
+  const searchFeedback = useFeedback();
   const findIdeas = async () => {
+    searchFeedback.clear();
     try {
       const task = await callModule<IdeaTask>("startIdeaSearch", settings);
       track(task);
       setLastNotes([]);
-    } catch (error: any) {
-      toast.error(error?.message ?? "Recherche impossible");
+    } catch (error) {
+      searchFeedback.error(errorMessage(error, "La recherche d’idées n’a pas pu démarrer. Réessayez dans un instant."));
     }
   };
 
@@ -275,6 +288,7 @@ export default function IdeasPage() {
 
         <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
           <section className="flex min-w-0 flex-col gap-4">
+            <FormStatus state={loadError ? { tone: "error", message: loadError, id: 0 } : null} />
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
               {/* Une seule ligne : sur un téléphone, les quatre onglets se partagent la largeur. */}
               <Tabs value={tab} onValueChange={(value) => setTab(value as IdeaStatus)} className="w-full min-w-0 sm:w-auto">
@@ -289,6 +303,7 @@ export default function IdeasPage() {
               </Tabs>
             </div>
 
+            <FormStatus state={searchFeedback.state} />
             <AnimatePresence initial={false}>
               {searching ? (
                 <motion.div key="searching" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
@@ -553,44 +568,40 @@ function IdeaCard({ idea, hooksTask, onChanged, onTask }: { idea: Idea; hooksTas
   const kind = KIND_INFO[idea.kind];
   const KindIcon = kind.icon;
   const brief = ideaBrief(idea);
+  // La carte qui change d'onglet ou d'accroche est le retour ; un échec s'écrit au bout de ses boutons.
+  const feedback = useFeedback();
+  const { hasCopied, copyFailed, copyToClipboard } = useCopyToClipboard();
 
   const setStatus = async (status: IdeaStatus) => {
     setBusy(status);
+    feedback.clear();
     try {
       onChanged(await callModule<Idea>("setIdeaStatus", { id: idea.id, status }));
-      toast.success(status === "kept" ? "Idée gardée" : status === "dismissed" ? "Idée écartée\u00a0: elle ne sera plus proposée" : "Idée remise parmi les nouvelles");
-    } catch (error: any) {
-      toast.error(error?.message ?? "Modification impossible");
+    } catch (error) {
+      feedback.error(errorMessage(error, "L’idée n’a pas pu être modifiée. Réessayez."));
     } finally {
       setBusy(null);
     }
   };
 
   const moreHooks = async () => {
+    feedback.clear();
     try {
       onTask(await callModule<IdeaTask>("startIdeaHooks", idea.id));
-    } catch (error: any) {
-      toast.error(error?.message ?? "Accroches impossibles");
+    } catch (error) {
+      feedback.error(errorMessage(error, "Les accroches n’ont pas pu être demandées. Réessayez."));
     }
   };
 
   const chooseHook = async (hook: string) => {
     setBusy("hook");
+    feedback.clear();
     try {
       onChanged(await callModule<Idea>("chooseIdeaHook", { id: idea.id, hook }));
-    } catch (error: any) {
-      toast.error(error?.message ?? "Accroche impossible");
+    } catch (error) {
+      feedback.error(errorMessage(error, "Cette accroche n’a pas pu être choisie. Réessayez."));
     } finally {
       setBusy(null);
-    }
-  };
-
-  const copyPrompt = async () => {
-    try {
-      await navigator.clipboard.writeText(brief);
-      toast.success("Prompt copié");
-    } catch {
-      toast.error("Copie impossible dans ce navigateur");
     }
   };
 
@@ -693,9 +704,15 @@ function IdeaCard({ idea, hooksTask, onChanged, onTask }: { idea: Idea; hooksTas
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-2 space-y-2">
           <p className="rounded-md bg-muted/60 p-2.5 text-xs leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{brief}</p>
-          <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={copyPrompt}>
-            <Copy className="size-3.5" />
-            Copier
+          <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => void copyToClipboard(brief)} aria-live="polite">
+            {hasCopied ? (
+              <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            ) : copyFailed ? (
+              <CopyX className="size-3.5 text-destructive" />
+            ) : (
+              <Copy className="size-3.5" />
+            )}
+            {hasCopied ? "Copié" : copyFailed ? "Copie impossible dans ce navigateur" : "Copier"}
           </Button>
         </CollapsibleContent>
       </Collapsible>
@@ -739,6 +756,7 @@ function IdeaCard({ idea, hooksTask, onChanged, onTask }: { idea: Idea; hooksTas
             )}
           </>
         )}
+        <ActionStatus state={feedback.state} className="max-w-full" />
       </div>
     </article>
   );
@@ -764,12 +782,17 @@ function ConceptPanel({
   onStudy: () => void;
   onChanged: (bank: ConceptBank) => void;
 }) {
+  // Le concept qui s'en va suffit ; un échec s'écrit sur sa ligne.
+  const feedback = useFeedback();
+  const [failedConcept, setFailedConcept] = useState<string | null>(null);
   const remove = async (conceptId: string) => {
     if (!bank) return;
+    feedback.clear();
     try {
       onChanged(await callModule<ConceptBank>("removeConcept", { kitId: bank.kitId === "none" ? null : bank.kitId, conceptId }));
-    } catch (error: any) {
-      toast.error(error?.message ?? "Retrait impossible");
+    } catch (error) {
+      setFailedConcept(conceptId);
+      feedback.error(errorMessage(error, "Ce concept n’a pas pu être retiré. Réessayez."));
     }
   };
   return (
@@ -810,6 +833,7 @@ function ConceptPanel({
                             {" · "}
                             {concept.proofs.length} succès, {channels} chaîne{channels > 1 ? "s" : ""} · {concept.rhythm === "news" ? "actualité" : "intemporel"}
                           </span>
+                          <ActionStatus state={failedConcept === concept.id ? feedback.state : null} className="max-w-full empty:hidden" />
                         </span>
                       </CollapsibleTrigger>
                       <Tooltip>
@@ -909,14 +933,18 @@ function NicheSheet({
   const pending = bank?.channels.filter((channel) => channel.state === "pending") ?? [];
   const estimate = board?.estimate;
   const account = board?.accounts.find((entry) => entry.id === accountId);
+  // Les gestes sur les chaînes répondent sous le champ d'ajout ; le lancement de l'étude, au-dessus de son bouton.
+  const channelsFeedback = useFeedback();
+  const studyFeedback = useFeedback();
 
   const run = async (call: () => Promise<ConceptBank>) => {
     setBusy(true);
+    channelsFeedback.clear();
     try {
       onBank(await call());
       return true;
-    } catch (error: any) {
-      toast.error(error?.message ?? "Modification impossible");
+    } catch (error) {
+      channelsFeedback.error(errorMessage(error, "La liste des chaînes n’a pas pu être modifiée. Réessayez."));
       return false;
     } finally {
       setBusy(false);
@@ -929,19 +957,21 @@ function NicheSheet({
   };
 
   const suggest = async () => {
+    channelsFeedback.clear();
     try {
       onTask(await callModule<IdeaTask>("suggestReferenceChannels", { kitId, topic }));
-    } catch (error: any) {
-      toast.error(error?.message ?? "Propositions impossibles");
+    } catch (error) {
+      channelsFeedback.error(errorMessage(error, "Les propositions de chaînes n’ont pas pu démarrer. Réessayez dans un instant."));
     }
   };
 
   const launch = async () => {
     if (!accountId) return;
+    studyFeedback.clear();
     try {
       onTask(await callModule<IdeaTask>("startNicheStudy", { kitId, accountId }));
-    } catch (error: any) {
-      toast.error(error?.message ?? "Étude impossible");
+    } catch (error) {
+      studyFeedback.error(errorMessage(error, "L’étude n’a pas pu démarrer. Réessayez dans un instant."));
     }
   };
 
@@ -1016,12 +1046,22 @@ function NicheSheet({
                 void add();
               }}
             >
-              <Input value={handle} onChange={(event) => setHandle(event.target.value)} placeholder="@chaine ou adresse youtube.com/@…" className="min-w-0 flex-1" aria-label="Chaîne à ajouter" />
+              <Input
+                value={handle}
+                onChange={(event) => {
+                  setHandle(event.target.value);
+                  if (channelsFeedback.state?.tone === "error") channelsFeedback.clear();
+                }}
+                placeholder="@chaine ou adresse youtube.com/@…"
+                className="min-w-0 flex-1"
+                aria-label="Chaîne à ajouter"
+              />
               <Button type="submit" variant="secondary" className="shrink-0 gap-1.5" disabled={busy || !handle.trim()}>
                 <Plus className="size-4" />
                 Ajouter
               </Button>
             </form>
+            <FormStatus state={channelsFeedback.state} />
             {suggesting ? <TaskLine task={suggesting} /> : null}
             <AnimatePresence initial={false}>
               {pending.map((channel) => (
@@ -1112,6 +1152,7 @@ function NicheSheet({
         </div>
 
         <SheetFooter className="border-t p-4">
+          <FormStatus state={studyFeedback.state} />
           {study ? <TaskLine task={study} /> : null}
           <Button className="gap-2" onClick={launch} loading={Boolean(study)} disabled={!isAdmin || !accountId || active.length === 0} title={adminOnly}>
             <Telescope className="size-4" />

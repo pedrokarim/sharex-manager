@@ -10,8 +10,8 @@
 
 import { useState } from "react";
 import { Camera, ImagePlus, Trash2 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Spinner } from "@/components/ui/spinner";
 import { ImagePickerDialog, type PickedImage } from "@/components/gallery/image-picker-dialog";
 import type { ClipExport } from "../engine/types";
@@ -46,16 +46,19 @@ export function ExportCover({
 }) {
   const [busy, setBusy] = useState<"frame" | "pick" | "remove" | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // La nouvelle couverture et sa légende confirment d'elles-mêmes ; seul un
+  // échec s'écrit, sous les boutons.
+  const feedback = useFeedback();
   const cover = entry.cover;
   const ratio = cover ? cover.width / cover.height : entry.width && entry.height ? entry.width / entry.height : 16 / 9;
 
-  const run = async (kind: "frame" | "pick" | "remove", action: () => Promise<ClipExport>, success: string) => {
+  const run = async (kind: "frame" | "pick" | "remove", action: () => Promise<ClipExport>) => {
     setBusy(kind);
+    feedback.clear();
     try {
       onChanged(await action());
-      toast.success(success);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couverture impossible");
+      feedback.error(errorMessage(error, "La couverture n’a pas pu être enregistrée. Réessayez."));
     } finally {
       setBusy(null);
     }
@@ -66,7 +69,7 @@ export function ExportCover({
     if (!element) return;
     element.pause();
     const atMs = Math.round(element.currentTime * 1000);
-    void run("frame", async () => setExportCoverFromImage(entry.id, await captureFrame(element), atMs), "Couverture prise dans le clip");
+    void run("frame", async () => setExportCoverFromImage(entry.id, await captureFrame(element), atMs));
   };
 
   const fromPicked = (image: PickedImage) => {
@@ -79,8 +82,7 @@ export function ExportCover({
         const response = await fetch(image.url).catch(() => null);
         if (!response?.ok) throw new Error("Cette image ne peut pas être lue depuis ce lien : enregistrez-la dans la galerie d’abord.");
         return setExportCoverFromImage(entry.id, await response.blob());
-      },
-      "Couverture choisie"
+      }
     );
   };
 
@@ -120,13 +122,14 @@ export function ExportCover({
               variant="ghost"
               size="sm"
               className="h-auto min-h-8 justify-start gap-2 py-1.5 text-left whitespace-normal text-muted-foreground"
-              onClick={() => void run("remove", () => removeExportCover(entry.id), "Couverture retirée")}
+              onClick={() => void run("remove", () => removeExportCover(entry.id))}
               disabled={disabled || busy !== null}
             >
               <Trash2 className="size-4" />
               Retirer
             </Button>
           ) : null}
+          <FormStatus state={feedback.state} />
         </div>
       </div>
       <p className="text-xs text-pretty text-muted-foreground">Recadrée au format de la vidéo ; utilisée comme miniature ou couverture par les services qui l’acceptent.</p>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, Undo2, WandSparkles } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus, errorMessage, useFeedback, type Feedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -30,9 +30,12 @@ import {
 export function PromptEnhancer({
   prompt,
   onChange,
+  feedback,
 }: {
   prompt: string;
   onChange: (prompt: string) => void;
+  /** Messages du compositeur : l'échec d'une amélioration lancée depuis la barre s'y affiche. */
+  feedback: Feedback;
 }) {
   const { value: saved, update } = useAccountPreference<WritingPreference>(WRITING_PREFERENCE_SCOPE, {});
   const level: EnhanceLevel = saved.level === 1 || saved.level === 3 ? saved.level : 2;
@@ -43,6 +46,9 @@ export function PromptEnhancer({
   const [open, setOpen] = useState(false);
   /** Texte d'avant la dernière amélioration, pour revenir en arrière. */
   const [previous, setPrevious] = useState<string | null>(null);
+  // Échec d'une amélioration lancée depuis les réglages : dans la fenêtre,
+  // au-dessus de son bouton, puisqu'elle reste ouverte.
+  const panelFeedback = useFeedback();
 
   const current = ENHANCE_LEVELS.find((entry) => entry.level === level)!;
   const canRun = !busy && (prompt.trim().length > 0 || instruction.trim().length > 0);
@@ -50,6 +56,8 @@ export function PromptEnhancer({
   const run = async () => {
     if (!canRun) return;
     setBusy(true);
+    panelFeedback.clear();
+    feedback.clear();
     try {
       const result = await callModule<{ prompt: string }>("enhancePrompt", {
         prompt,
@@ -62,7 +70,9 @@ export function PromptEnhancer({
       setInstruction("");
       setOpen(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Amélioration impossible");
+      const message = errorMessage(error, "Le prompt n’a pas pu être amélioré. Réessayez dans un instant.");
+      if (open) panelFeedback.error(message);
+      else feedback.error(message);
     } finally {
       setBusy(false);
     }
@@ -167,7 +177,10 @@ export function PromptEnhancer({
               id="enhance-instruction"
               value={instruction}
               maxLength={MAX_ENHANCE_INSTRUCTION}
-              onChange={(event) => setInstruction(event.target.value)}
+              onChange={(event) => {
+                setInstruction(event.target.value);
+                if (panelFeedback.state) panelFeedback.clear();
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
@@ -179,12 +192,15 @@ export function PromptEnhancer({
             />
           </div>
 
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] leading-4 text-muted-foreground">Ces choix sont retenus dans votre compte.</p>
-            <Button size="sm" className="h-8 gap-1.5" disabled={!canRun} onClick={run}>
-              {busy ? <Spinner className="h-3.5 w-3.5" /> : <WandSparkles className="h-3.5 w-3.5" />}
-              Améliorer
-            </Button>
+          <div>
+            <FormStatus state={panelFeedback.state} className="pb-3" />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] leading-4 text-muted-foreground">Ces choix sont retenus dans votre compte.</p>
+              <Button size="sm" className="h-8 gap-1.5" disabled={!canRun} onClick={run}>
+                {busy ? <Spinner className="h-3.5 w-3.5" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                Améliorer
+              </Button>
+            </div>
           </div>
         </PopoverContent>
       </Popover>

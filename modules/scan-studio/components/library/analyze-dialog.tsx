@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -34,12 +34,15 @@ export function AnalyzeDialog({ open, onOpenChange, chapterId, pages, analyze }:
   const candidates = useMemo(() => pages.map((page, index) => ({ page, number: index + 1 })).filter((entry) => !entry.page.skipped), [pages]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [replace, setReplace] = useState(false);
+  // Le refus de lancer s'affiche dans la fenêtre, au-dessus du bouton.
+  const feedback = useFeedback();
 
   // Ouverture : tout est coché, rien n'est remplacé.
   useEffect(() => {
     if (!open) return;
     setSelected(new Set(candidates.map((entry) => entry.page.id)));
     setReplace(false);
+    feedback.clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- à l'ouverture seulement : cocher une page ne doit pas tout recocher
   }, [open]);
 
@@ -48,11 +51,11 @@ export function AnalyzeDialog({ open, onOpenChange, chapterId, pages, analyze }:
     const ids = candidates.filter((entry) => selected.has(entry.page.id)).map((entry) => entry.page.id);
     if (ids.length === 0) return;
     if (!startAnalysisJob(chapterId, ids, { replace }, analyze)) {
-      toast.info("Un traitement tourne déjà sur ce chapitre", { description: "Attendez sa fin, ou arrêtez-le depuis la planche." });
+      feedback.info("Un traitement tourne déjà sur ce chapitre. Attendez sa fin, ou arrêtez-le depuis la planche.");
       return;
     }
+    // La planche montre aussitôt où en est chaque page : pas d'autre message au lancement.
     onOpenChange(false);
-    toast.message(`Analyse lancée sur ${countLabel(ids.length, "page", "pages")}`, { description: "Elle tourne en arrière-plan : la planche montre où en est chaque page." });
   };
 
   return (
@@ -87,14 +90,17 @@ export function AnalyzeDialog({ open, onOpenChange, chapterId, pages, analyze }:
           </p>
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Annuler
-          </Button>
-          <Button type="button" disabled={selected.size === 0} onClick={start}>
-            {selected.size === 0 ? "Analyser" : `Analyser ${countLabel(selected.size, "page", "pages")}`}
-          </Button>
-        </DialogFooter>
+        <div>
+          <FormStatus state={feedback.state} className="pb-4" />
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Annuler
+            </Button>
+            <Button type="button" disabled={selected.size === 0} onClick={start}>
+              {selected.size === 0 ? "Analyser" : `Analyser ${countLabel(selected.size, "page", "pages")}`}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

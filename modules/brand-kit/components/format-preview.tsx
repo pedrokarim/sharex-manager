@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, Check, Download, FileImage, ImagePlus, ImageUp, Pause, Play, RotateCcw, Undo2 } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, useFeedback } from "@/components/feedback";
 import { ImagePickerDialog, type PickedImage } from "@/components/gallery/image-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -278,6 +278,13 @@ export function FormatsPanel({
   const [exporting, setExporting] = useState<FormatId | null>(null);
   const [batch, setBatch] = useState<Partial<Record<FormatId, ExportState>> | null>(null);
   const [sending, setSending] = useState<FormatId | null>(null);
+  // Deux zones de retour : l'export de tous les formats (sous sa barre d'avancement)
+  // et les boutons du format affiché (au bout de leur rangée).
+  const batchFeedback = useFeedback();
+  const formatFeedback = useFeedback();
+  const { clear: clearFormatFeedback } = formatFeedback;
+  // Un autre format affiché : le message du précédent ne le concerne plus.
+  useEffect(() => clearFormatFeedback(), [selected, clearFormatFeedback]);
 
   const built = useMemo(() => {
     const map = new Map<FormatId, BuiltFormat>();
@@ -299,12 +306,13 @@ export function FormatsPanel({
 
   const exportSelected = async () => {
     setExporting(selected);
+    formatFeedback.clear();
     try {
       await beforeExport();
       await exportOne(selected);
-      toast.success(`${spec.label} exporté en PNG`);
+      formatFeedback.success("Exporté en PNG.");
     } catch (error) {
-      toast.error(errorMessage(error, "Export impossible."));
+      formatFeedback.error(errorMessage(error, "L’export de ce format a échoué. Réessayez."));
     } finally {
       setExporting(null);
     }
@@ -313,6 +321,7 @@ export function FormatsPanel({
   const exportAll = async () => {
     const states: Partial<Record<FormatId, ExportState>> = Object.fromEntries(FORMATS.map((format) => [format.id, "waiting"]));
     setBatch({ ...states });
+    batchFeedback.clear();
     const failures: string[] = [];
     try {
       await beforeExport();
@@ -325,14 +334,15 @@ export function FormatsPanel({
           states[format.id] = "done";
         } catch (error) {
           states[format.id] = "error";
-          failures.push(`${format.label} : ${errorMessage(error, "échec")}`);
+          failures.push(`${format.label} : ${errorMessage(error, "échec")}`);
         }
         setBatch({ ...states });
       }
-      if (failures.length === 0) toast.success("Tous les formats sont exportés");
-      else toast.error(failures.join("\n"));
+      // Le bilan s'écrit sous la barre d'avancement ; chaque vignette garde sa coche ou son alerte.
+      if (failures.length === 0) batchFeedback.success("Tous les formats sont exportés en PNG.");
+      else batchFeedback.error(`${failures.length > 1 ? `${failures.length} formats n’ont pas pu être exportés` : "Un format n’a pas pu être exporté"} : ${failures.join(" ; ")}.`);
     } catch (error) {
-      toast.error(errorMessage(error, "Export impossible."));
+      batchFeedback.error(errorMessage(error, "L’export n’a pas pu démarrer. Réessayez."));
     } finally {
       setExporting(null);
       // L'état de chaque format reste lisible un instant après la fin.
@@ -342,11 +352,12 @@ export function FormatsPanel({
 
   const sendToGallery = async (id: FormatId) => {
     setSending(id);
+    formatFeedback.clear();
     try {
       await api.sendFormatToGallery(kit.id, id);
-      toast.success("Ajouté à la galerie");
+      formatFeedback.success("Ajouté à la galerie.");
     } catch (error) {
-      toast.error(errorMessage(error, "Envoi impossible."));
+      formatFeedback.error(errorMessage(error, "L’envoi dans la galerie a échoué. Réessayez."));
     } finally {
       setSending(null);
     }
@@ -354,14 +365,14 @@ export function FormatsPanel({
 
   /** L'image finie choisie remplace le rendu composé du format affiché. */
   const applyFinishedImage = async (format: FormatId, picked: PickedImage) => {
-    const label = FORMATS.find((entry) => entry.id === format)?.label ?? format;
     setReplacing(format);
+    formatFeedback.clear();
     try {
       const reference = await uploadPicked(picked);
+      // L'aperçu et la note du format changent : ils confirment d'eux-mêmes.
       await runOperation(() => api.setFormatImage(kit.id, format, reference.kind === "gallery" ? { gallery: reference.name } : { file: reference.name }));
-      toast.success(`${label} : l’image finie remplace le rendu composé`);
     } catch (error) {
-      toast.error(errorMessage(error, "Cette image n’a pas pu être utilisée."));
+      formatFeedback.error(errorMessage(error, "Cette image n’a pas pu être utilisée. Essayez-en une autre."));
     } finally {
       setReplacing(null);
     }
@@ -369,11 +380,11 @@ export function FormatsPanel({
 
   const backToComposed = async (format: FormatId) => {
     setReplacing(format);
+    formatFeedback.clear();
     try {
       await runOperation(() => api.clearFormatImage(kit.id, format));
-      toast.success("Retour au rendu composé");
     } catch (error) {
-      toast.error(errorMessage(error, "Retour impossible."));
+      formatFeedback.error(errorMessage(error, "Le rendu composé n’a pas pu être rétabli. Réessayez."));
     } finally {
       setReplacing(null);
     }
@@ -415,6 +426,7 @@ export function FormatsPanel({
           </motion.div>
         )}
       </AnimatePresence>
+      <FormStatus state={batchFeedback.state} />
 
       <div role="tablist" aria-label="Formats" className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-1.5">
         {FORMATS.map((format) => (
@@ -490,7 +502,7 @@ export function FormatsPanel({
               )}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             {current.supplied ? (
               <Button variant="outline" size="sm" className="gap-2" onClick={() => void backToComposed(selected)} loading={replacing === selected} disabled={busy || replacing !== null}>
                 <Undo2 className="size-4" />
@@ -520,6 +532,7 @@ export function FormatsPanel({
                 </Button>
               </>
             )}
+            <ActionStatus state={formatFeedback.state} className="max-w-full" />
           </div>
         </div>
         <ImagePickerDialog

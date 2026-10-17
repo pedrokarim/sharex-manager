@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MotionConfig } from "framer-motion";
 import { ArrowLeft, CircleAlert, ExternalLink, Link2, MoreHorizontal, PencilLine, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, useFeedback } from "@/components/feedback";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,6 +33,9 @@ export function AccountPageClient({ initial }: { initial: AccountPageData }) {
   const [disconnecting, setDisconnecting] = useState<AccountSummary | null>(null);
   const [flow, setFlow] = useState<ConnectFlowStart | null>(null);
   const [verifying, setVerifying] = useState(false);
+  // Le résultat d'une vérification s'affiche sur la ligne d'état du compte,
+  // à côté de « Vérifié il y a… » qu'elle vient de mettre à jour.
+  const verifyFeedback = useFeedback();
   const connector = initial.connector;
   const caps = account.capabilities;
   const health = accountHealth(account);
@@ -69,15 +72,16 @@ export function AccountPageClient({ initial }: { initial: AccountPageData }) {
 
   const verify = async (extend = false) => {
     setVerifying(true);
+    verifyFeedback.clear();
     const result = await verifyAccountAction(account.id);
     setVerifying(false);
     if (!result.ok) {
-      toast.error(result.error, extend ? { description: "Si le problème persiste, reconnectez le compte." } : undefined);
+      verifyFeedback.error(extend ? `${result.error} Si le problème persiste, reconnectez le compte.` : result.error);
       void refreshActivity();
       return;
     }
     setAccount(result.data);
-    toast.success(extend && result.data.tokenState === "ok" ? "Accès prolongé" : "Compte vérifié");
+    verifyFeedback.success(extend && result.data.tokenState === "ok" ? "Accès prolongé" : "Compte vérifié");
   };
 
   const openJobs = jobs.filter(isOpenJob).length;
@@ -120,6 +124,7 @@ export function AccountPageClient({ initial }: { initial: AccountPageData }) {
               </span>
               <StatusDot tone={health.tone} label={health.label} reason={health.reason} />
               <RelativeTime value={account.lastCheckedAt} prefix="Vérifié " />
+              <ActionStatus state={verifyFeedback.state} />
             </span>
           }
           actions={

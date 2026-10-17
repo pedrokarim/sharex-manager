@@ -8,6 +8,7 @@ import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { ArrowDownAZ, ArrowUpDown, Clock, Copy, Download, FolderOpen, LayoutGrid, List, Plus, RefreshCw, Search, SearchX, Sparkles, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
@@ -55,6 +56,11 @@ export default function KitsPage() {
   const params = useSearchParams();
   const [kits, setKits] = useState<KitSummary[] | null>(snapshot);
   const [failed, setFailed] = useState(false);
+  /** Raison d'un rechargement manqué alors que la liste est déjà affichée. */
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Gestes des menus d'une marque (dupliquer, par défaut, supprimer) : la carte
+  // qui apparaît, change ou s'en va est le retour ; un échec s'écrit au-dessus de la liste.
+  const listFeedback = useFeedback();
   const [sheet, setSheet] = useState<{ open: boolean; tab: CreateTab; duplicateFrom?: string }>({ open: false, tab: "manual" });
   const [doomed, setDoomed] = useState<KitSummary | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<string[] | null>(null);
@@ -83,9 +89,10 @@ export default function KitsPage() {
       snapshot = next;
       setKits(next);
       setFailed(false);
+      setLoadError(null);
     } catch (error) {
       setFailed(true);
-      toast.error(errorMessage(error, "Images de marque indisponibles."));
+      setLoadError(errorMessage(error, "La liste des images de marque n’a pas pu être rechargée. Réessayez dans un instant."));
     }
   }, []);
 
@@ -117,38 +124,41 @@ export default function KitsPage() {
   const openSheet = (tab: CreateTab, duplicateFrom?: string) => setSheet({ open: true, tab, duplicateFrom });
 
   const duplicate = async (kit: KitSummary) => {
+    listFeedback.clear();
     try {
       await api.createKit({ name: `${kit.name} (copie)`.slice(0, 80), from: kit.id });
-      toast.success("Image de marque dupliquée");
       await refresh();
     } catch (error) {
-      toast.error(errorMessage(error, "Duplication impossible."));
+      listFeedback.error(errorMessage(error, `« ${kit.name} » n’a pas pu être dupliquée. Réessayez.`));
     }
   };
 
   const makeDefault = async (kit: KitSummary) => {
+    listFeedback.clear();
     try {
       const next = await api.setDefaultKit(kit.id);
       snapshot = next;
       setKits(next);
-      toast.success(`« ${kit.name} » est la marque par défaut`);
     } catch (error) {
-      toast.error(errorMessage(error, "Changement impossible."));
+      listFeedback.error(errorMessage(error, `« ${kit.name} » n’a pas pu devenir la marque par défaut. Réessayez.`));
     }
   };
 
+  // Lancé depuis un menu, sans bouton qui puisse montrer l'attente : le toast
+  // suit la préparation de l'archive, puis dit si elle est partie.
   const exportZip = async (kit: KitSummary) => {
     const pending = toast.loading("Préparation de l’archive…");
     try {
       const archive = await api.exportKit(kit.id);
       downloadBase64(archive.fileName, archive.data);
-      toast.success("Archive téléchargée", { id: pending });
+      toast.success("Archive téléchargée.", { id: pending });
     } catch (error) {
-      toast.error(errorMessage(error, "Export impossible."), { id: pending });
+      toast.error(errorMessage(error, "L’archive n’a pas pu être préparée. Réessayez."), { id: pending });
     }
   };
 
   const remove = async (kit: KitSummary) => {
+    listFeedback.clear();
     try {
       await api.deleteKit(kit.id);
       setKits((previous) => {
@@ -156,11 +166,10 @@ export default function KitsPage() {
         snapshot = next;
         return next;
       });
-      toast.success("Image de marque supprimée");
       // Une autre marque a pu devenir celle par défaut.
       void refresh();
     } catch (error) {
-      toast.error(errorMessage(error, "Suppression impossible."));
+      listFeedback.error(errorMessage(error, `« ${kit.name} » n’a pas pu être supprimée. Réessayez.`));
     }
   };
 
@@ -236,6 +245,8 @@ export default function KitsPage() {
               </ToggleGroup>
             </div>
           )}
+
+          <FormStatus state={kits && loadError ? { tone: "error", message: loadError, id: 0 } : listFeedback.state} />
 
           {visible === null ? (
             failed ? (

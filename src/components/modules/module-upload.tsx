@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useDropzone } from "react-dropzone";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { FileArchive, Upload, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,12 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [iconUrl, setIconUrl] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
+  // L'aperçu de l'icône n'a pas pu se charger : dit sous le champ.
+  const [iconFailed, setIconFailed] = useState(false);
+  // Échec de l'installation : au-dessus du bouton.
+  const feedback = useFeedback();
+  // « Module installé », à côté du bouton : le formulaire reste affiché.
+  const installed = useFeedback();
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -34,6 +40,8 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
     maxFiles: 1,
     onDrop: (acceptedFiles) => {
       if (acceptedFiles.length > 0) {
+        feedback.clear();
+        installed.clear();
         setFile(acceptedFiles[0]);
       }
     },
@@ -44,6 +52,8 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
 
     try {
       setIsUploading(true);
+      feedback.clear();
+      installed.clear();
 
       const formData = new FormData();
       formData.append("module", file);
@@ -66,16 +76,15 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
         );
       }
 
-      toast.success("Module installé avec succès");
+      installed.success("Module installé");
       setFile(null);
       setIconUrl("");
+      setIconFailed(false);
       onUploadSuccess();
     } catch (error) {
       console.error("Erreur lors de l'installation du module:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Erreur lors de l'installation du module"
+      feedback.error(
+        errorMessage(error, "Le module n’a pas pu être installé. Vérifiez l’archive, puis réessayez.")
       );
     } finally {
       setIsUploading(false);
@@ -83,6 +92,7 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
   };
 
   const handleRemoveFile = () => {
+    feedback.clear();
     setFile(null);
   };
 
@@ -150,12 +160,23 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
                 id="icon-url"
                 placeholder="https://exemple.com/icone.png"
                 value={iconUrl}
-                onChange={(e) => setIconUrl(e.target.value)}
+                onChange={(e) => {
+                  setIconUrl(e.target.value);
+                  setIconFailed(false);
+                  if (feedback.state?.tone === "error") feedback.clear();
+                }}
+                aria-invalid={iconFailed || undefined}
               />
-              <p className="text-xs text-muted-foreground">
-                URL d&apos;une image carrée. Sans elle, le module reçoit une
-                icône générique.
-              </p>
+              {iconFailed ? (
+                <p className="text-xs text-destructive">
+                  Cette adresse ne mène pas à une image lisible. Vérifiez-la, ou laissez le champ vide.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  URL d&apos;une image carrée. Sans elle, le module reçoit une
+                  icône générique.
+                </p>
+              )}
             </div>
 
             {iconUrl && (
@@ -165,18 +186,25 @@ export const ModuleUpload = ({ onUploadSuccess }: ModuleUploadProps) => {
                   src={iconUrl}
                   alt="Aperçu de l'icône"
                   className="h-full w-full object-cover"
-                  onError={() => toast.error("Impossible de charger l'image")}
+                  onError={() => setIconFailed(true)}
+                  onLoad={() => setIconFailed(false)}
                 />
               </div>
             )}
           </div>
         )}
 
+        {/* Toujours présent, marge annulée : l'écart de `space-y-4` s'ouvre avec le message. */}
+        <div className="-mt-4">
+          <FormStatus state={feedback.state} className="pt-4" />
+        </div>
       </CardContent>
-      <CardFooter className="justify-end">
+      <CardFooter className="flex-wrap justify-end gap-3">
+        <ActionStatus state={installed.state} />
         <Button
           onClick={handleUpload}
           disabled={!file || isUploading}
+          loading={isUploading}
           className="w-full sm:w-auto"
         >
           {isUploading ? "Installation en cours…" : "Installer le module"}

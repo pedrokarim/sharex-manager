@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScanText } from "lucide-react";
 import { toast } from "sonner";
+import type { Feedback } from "@/components/feedback";
 import { ThinkingStatus } from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -41,12 +42,14 @@ interface PageAnalysisOptions {
   commit: (update: (document: PageDocument) => PageDocument) => void;
   /** Zones actuelles de la page, pour annoncer ce que l'analyse ajoute. */
   getRegions: () => ScanRegion[];
+  /** Témoin de l'en-tête de l'atelier, où l'analyse dit ce qu'elle a trouvé, à côté de son bouton. */
+  feedback: Feedback;
 }
 
 const plural = (count: number, word: string) => `${count} ${word}${count > 1 ? "s" : ""}`;
 
 /** Lance l'analyse de la page et pose ses zones dans l'historique. */
-export function usePageAnalysis({ image, page, settings, commit, getRegions }: PageAnalysisOptions): PageAnalysis {
+export function usePageAnalysis({ image, page, settings, commit, getRegions, feedback }: PageAnalysisOptions): PageAnalysis {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const runningRef = useRef(false);
@@ -66,6 +69,7 @@ export function usePageAnalysis({ image, page, settings, commit, getRegions }: P
     runningRef.current = true;
     setRunning(true);
     setProgress(0);
+    feedback.clear();
     let shown = 0;
     analyzeSurface(image, page, settings, (value) => {
       // Un pour cent à la fois : inutile de redessiner l'en-tête plus souvent.
@@ -82,12 +86,11 @@ export function usePageAnalysis({ image, page, settings, commit, getRegions }: P
         const replace = lastDetectionReport().used === "detector";
         const { added } = mergeRegions(getRegions(), found, { format: settings.format, replace });
         if (added === 0) {
-          toast.info(found.length === 0 ? "Aucun texte repéré sur cette page" : "Aucune nouvelle zone : celles de la page sont déjà en place", {
-            description:
-              found.length === 0
-                ? "L’analyse trouve les bulles et les cartouches nets. Un texte posé sur le dessin se trace à la main."
-                : undefined,
-          });
+          feedback.info(
+            found.length === 0
+              ? "Aucun texte repéré sur cette page. Un texte posé sur le dessin se trace à la main."
+              : "Aucune nouvelle zone : celles de la page sont déjà en place.",
+          );
           return;
         }
         // La fusion est refaite sur l'état courant : la page a pu changer pendant la lecture.
@@ -96,19 +99,20 @@ export function usePageAnalysis({ image, page, settings, commit, getRegions }: P
           if (merged.regions === current.regions) return current;
           return { regions: merged.regions, status: current.status === "imported" ? "analyzed" : current.status };
         });
+        // Les zones apparaissent sur la page ; le témoin de l'en-tête en donne le compte (la phrase entière au survol).
         const doubtful = found.filter(needsReview).length;
-        toast.success(`${plural(added, "zone")} ${added > 1 ? "trouvées" : "trouvée"}`, {
-          description: `${doubtful > 0 ? `${plural(doubtful, "lecture")} à vérifier. ` : ""}${detectionNote()} Ctrl+Z annule l’analyse.`,
-        });
+        feedback.success(
+          `${plural(added, "zone")} ${added > 1 ? "trouvées" : "trouvée"}${doubtful > 0 ? `, ${plural(doubtful, "lecture")} à vérifier` : ""}. ${detectionNote()} Ctrl+Z annule l’analyse.`,
+        );
       })
       .catch((error: unknown) => {
-        if (mountedRef.current) toast.error(errorMessage(error, "Analyse impossible"));
+        if (mountedRef.current) feedback.error(errorMessage(error, "L’analyse n’a pas abouti. Réessayez."));
       })
       .finally(() => {
         runningRef.current = false;
         if (mountedRef.current) setRunning(false);
       });
-  }, [image, blocker, page, settings, commit, getRegions]);
+  }, [image, blocker, page, settings, commit, getRegions, feedback]);
 
   return { running, progress, blocker, ready: image !== null, start };
 }
@@ -116,7 +120,9 @@ export function usePageAnalysis({ image, page, settings, commit, getRegions }: P
 /**
  * Le détecteur de bulles est choisi mais son modèle manque : l'analyse vient de
  * tourner avec l'ancien repérage, moins sûr. On le dit une fois par visite,
- * avec le chemin pour l'installer.
+ * avec le chemin pour l'installer. Reste un toast : c'est un avis sur le
+ * réglage de l'instance, avec un lien vers une autre page, pas le résultat de
+ * l'analyse (que le témoin de l'en-tête donne).
  */
 let missingDetectorTold = false;
 function tellMissingDetector() {

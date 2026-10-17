@@ -2,23 +2,28 @@
 
 import { useState } from "react";
 import { Mail, MessageSquare, Send, User } from "lucide-react";
-import { toast } from "sonner";
 
 import { FIELD, FIELD_AREA, PILL_SOLID } from "@/components/front/styles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { cn } from "@/lib/utils";
 
 export function ContactForm() {
   const [isSending, setIsSending] = useState(false);
   const [isSent, setIsSent] = useState(false);
+  // Erreur comme confirmation s'affichent dans le formulaire, au-dessus du
+  // bouton : c'est là que l'utilisateur regarde quand il vient d'envoyer. La
+  // confirmation reste jusqu'à la saisie suivante, le temps d'être lue.
+  const feedback = useFeedback({ successDuration: 10 * 60_000 });
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
     setIsSending(true);
+    feedback.clear();
 
     try {
       const response = await fetch("/api/contact", {
@@ -38,22 +43,27 @@ export function ContactForm() {
       if (!response.ok) {
         // Remonter le motif réel plutôt qu'un message générique : une erreur
         // de configuration ou de validation doit rester diagnosticable.
-        toast.error(result?.error ?? `Échec de l'envoi (${response.status})`);
+        feedback.error(result?.error ?? `L’envoi a échoué (${response.status}). Réessayez dans un instant.`);
         return;
       }
 
       form.reset();
       setIsSent(true);
-      toast.success("Message envoyé. Vous recevrez une confirmation par email.");
+      feedback.success("Message envoyé. Vous recevrez une confirmation par e-mail.");
     } catch {
-      toast.error("Impossible de joindre le serveur. Réessayez plus tard.");
+      feedback.error("Impossible de joindre le serveur. Vérifiez votre réseau, puis réessayez.");
     } finally {
       setIsSending(false);
     }
   }
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit}>
+    <form
+      className="space-y-6"
+      onSubmit={handleSubmit}
+      // Reprendre la saisie retire le message précédent.
+      onChange={feedback.state ? feedback.clear : undefined}
+    >
       <div className="space-y-2">
         <label
           htmlFor="name"
@@ -149,14 +159,17 @@ export function ContactForm() {
         />
       </div>
 
-      <Button type="submit" className={cn(PILL_SOLID, "justify-center")} loading={isSending}>
-        <Send className="h-4 w-4" />
-        {isSending
-          ? "Envoi en cours…"
-          : isSent
-            ? "Envoyer un autre message"
-            : "Envoyer le message"}
-      </Button>
+      <div>
+        <FormStatus state={feedback.state} className="pb-3" />
+        <Button type="submit" className={cn(PILL_SOLID, "justify-center")} loading={isSending}>
+          <Send className="h-4 w-4" />
+          {isSending
+            ? "Envoi en cours…"
+            : isSent
+              ? "Envoyer un autre message"
+              : "Envoyer le message"}
+        </Button>
+      </div>
     </form>
   );
 }

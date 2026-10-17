@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarClock, ExternalLink, Hourglass, RotateCcw, X } from "lucide-react";
-import { toast } from "sonner";
+import { ActionStatus, useFeedback, type FeedbackState } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -82,14 +82,21 @@ export function QueueTab({ jobs, connector, onChanged }: { jobs: PublishJobSumma
   const [busy, setBusy] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
-  const act = async (id: string, action: typeof retryJobAction, done: string) => {
+  // Une reprise ou une annulation réussie se voit à l'état de l'envoi ; un
+  // échec s'affiche sur l'envoi concerné.
+  const feedback = useFeedback();
+  const [feedbackJobId, setFeedbackJobId] = useState<string | null>(null);
+
+  const act = async (id: string, action: typeof retryJobAction) => {
     setBusy(id);
+    setFeedbackJobId(id);
+    feedback.clear();
     const result = await action(id);
     setBusy(null);
-    if (!result.ok) toast.error(result.error);
-    else toast.success(done);
+    if (!result.ok) feedback.error(result.error);
     onChanged();
   };
+  const status = { jobId: feedbackJobId, state: feedback.state };
 
   if (jobs.length === 0) {
     return <p className="text-sm text-muted-foreground">Aucun envoi pour ce compte. Les publications lancées depuis Clip Studio apparaissent ici, avec leur progression.</p>;
@@ -105,7 +112,7 @@ export function QueueTab({ jobs, connector, onChanged }: { jobs: PublishJobSumma
       {open.length > 0 ? (
         <section className="grid min-w-0 gap-3">
           <h2 className="text-sm font-semibold">En cours et à venir</h2>
-          <JobTimeline jobs={open} connector={connector} busy={busy} act={act} />
+          <JobTimeline jobs={open} connector={connector} busy={busy} act={act} status={status} />
         </section>
       ) : (
         <p className="text-sm text-muted-foreground">Rien en cours.</p>
@@ -113,7 +120,7 @@ export function QueueTab({ jobs, connector, onChanged }: { jobs: PublishJobSumma
       {history.length > 0 ? (
         <section className="grid min-w-0 gap-3">
           <h2 className="text-sm font-semibold">Terminés</h2>
-          <JobTimeline jobs={shownHistory} connector={connector} busy={busy} act={act} />
+          <JobTimeline jobs={shownHistory} connector={connector} busy={busy} act={act} status={status} />
           {history.length > HISTORY_SHOWN ? (
             <div>
               <Button variant="ghost" size="sm" onClick={() => setShowAll((value) => !value)}>
@@ -132,11 +139,14 @@ function JobTimeline({
   connector,
   busy,
   act,
+  status,
 }: {
   jobs: PublishJobSummary[];
   connector: ConnectorView;
   busy: string | null;
-  act: (id: string, action: typeof retryJobAction, done: string) => void;
+  act: (id: string, action: typeof retryJobAction) => void;
+  /** Le dernier message d'action, et l'envoi qu'il concerne. */
+  status: { jobId: string | null; state: FeedbackState | null };
 }) {
   return (
     <StepTimeline>
@@ -182,19 +192,21 @@ function JobTimeline({
                         </Button>
                       ) : null}
                       {canRetry ? (
-                        <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2" loading={busy === job.id} onClick={() => act(job.id, retryJobAction, "Envoi relancé")}>
+                        <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2" loading={busy === job.id} onClick={() => act(job.id, retryJobAction)}>
                           <RotateCcw className="size-3.5" />
                           Reprendre
                         </Button>
                       ) : null}
                       {canCancel ? (
-                        <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2" disabled={busy === job.id} onClick={() => act(job.id, cancelJobAction, "Envoi annulé")}>
+                        <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2" disabled={busy === job.id} onClick={() => act(job.id, cancelJobAction)}>
                           <X className="size-3.5" />
                           Annuler
                         </Button>
                       ) : null}
                     </div>
                   </div>
+                  {/* Rendu seulement s'il y a un message : vide, il ajouterait un écart. */}
+                  {status.jobId === job.id && status.state ? <ActionStatus state={status.state} /> : null}
                   {job.state === "uploading" ? (
                     <div className="flex min-w-0 items-center gap-3 pt-1">
                       <Progress value={percent} className="h-1.5 min-w-0 flex-1" aria-label="Progression de l’envoi" />

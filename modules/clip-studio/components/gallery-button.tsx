@@ -3,14 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, ImageUp } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ActionStatus, errorMessage, useFeedback } from "@/components/feedback";
 import type { ClipExport } from "../engine/types";
 import { sendExportToGallery } from "../lib/client";
 
 /**
  * Envoie un clip exporté dans la galerie. Une fois envoyé, le bouton mène à
- * la galerie, où le clip se lit comme n'importe quel fichier.
+ * la galerie, où le clip se lit comme n'importe quel fichier : ce changement
+ * de bouton suffit comme confirmation ; un échec s'affiche à côté de lui.
  */
 export function SendToGalleryButton({
   entry,
@@ -23,6 +24,7 @@ export function SendToGalleryButton({
 }) {
   const [sending, setSending] = useState(false);
   const [sentFile, setSentFile] = useState(entry.galleryFile);
+  const feedback = useFeedback();
 
   if (sentFile) {
     return (
@@ -36,26 +38,30 @@ export function SendToGalleryButton({
   }
 
   return (
-    <Button
-      variant={variant}
-      className="gap-2"
-      loading={sending}
-      onClick={async () => {
-        setSending(true);
-        try {
-          const { fileName } = await sendExportToGallery(entry.id);
-          setSentFile(fileName);
-          onSent?.(fileName);
-          toast.success("Clip ajouté à la galerie");
-        } catch (error) {
-          toast.error(error instanceof Error ? error.message : "Envoi impossible");
-        } finally {
-          setSending(false);
-        }
-      }}
-    >
-      <ImageUp className="h-4 w-4" />
-      Envoyer dans la galerie
-    </Button>
+    <span className="inline-flex min-w-0 items-center gap-2">
+      <Button
+        variant={variant}
+        className="gap-2"
+        loading={sending}
+        onClick={async () => {
+          setSending(true);
+          feedback.clear();
+          try {
+            const { fileName } = await sendExportToGallery(entry.id);
+            setSentFile(fileName);
+            onSent?.(fileName);
+          } catch (error) {
+            feedback.error(errorMessage(error, "L’envoi dans la galerie a échoué. Réessayez."));
+          } finally {
+            setSending(false);
+          }
+        }}
+      >
+        <ImageUp className="h-4 w-4" />
+        Envoyer dans la galerie
+      </Button>
+      {/* Vide, l'emplacement disparaît : pas d'écart parasite dans la rangée. */}
+      <ActionStatus state={feedback.state} className="max-w-56 empty:hidden" />
+    </span>
   );
 }

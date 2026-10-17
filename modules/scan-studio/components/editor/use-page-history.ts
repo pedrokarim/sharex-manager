@@ -123,9 +123,9 @@ export function usePageHistory(pageId: string, initial: PageDocument, initialRev
         } catch (error) {
           const message = error instanceof Error && error.message ? error.message : "Enregistrement impossible";
           if (isRevisionConflict(message)) blockedRef.current = true;
+          // Le témoin d'enregistrement de l'en-tête affiche l'erreur, avec « Réessayer ».
           setSaveError(message);
           setSaveState(blockedRef.current ? "conflict" : "error");
-          toast.error(message);
           return;
         }
       }
@@ -169,9 +169,12 @@ export function usePageHistory(pageId: string, initial: PageDocument, initialRev
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("beforeunload", onBeforeUnload);
       // On quitte l'atelier avec des modifications pas encore envoyées : elles partent, et on le dit.
+      // L'atelier n'est plus là pour l'afficher : c'est le rôle du toast.
       const pending = !blockedRef.current && presentRef.current !== savedRef.current;
       void flush().then(() => {
-        if (pending && !blockedRef.current && presentRef.current === savedRef.current) toast.success("Modifications enregistrées");
+        if (!pending) return;
+        if (!blockedRef.current && presentRef.current === savedRef.current) toast.success("Modifications enregistrées");
+        else toast.error("Vos dernières modifications n’ont pas pu être enregistrées. Rouvrez la page pour les vérifier.");
       });
     };
   }, [flush]);

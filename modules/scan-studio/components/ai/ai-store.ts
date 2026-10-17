@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { toast } from "sonner";
 import { api } from "../../lib/client";
 import { errorMessage } from "../../lib/library-helpers";
 import type { AiAction, AiCatalogue, AiModelOption } from "../../lib/types";
@@ -107,17 +106,19 @@ export function findModel(catalogue: AiCatalogue | null, action: AiAction, key: 
   return catalogue?.models[action].find((model) => model.key === key);
 }
 
-/** Retient un modèle comme défaut du chapitre pour une action. Les réglages sont relus juste avant, pour ne rien écraser. */
-export async function keepChapterModel(chapterId: string, action: AiAction, key: string): Promise<boolean> {
+/**
+ * Retient un modèle comme défaut du chapitre pour une action. Les réglages sont
+ * relus juste avant, pour ne rien écraser. Rend `null` si c'est fait, sinon le
+ * message d'erreur, que l'appelant affiche à côté de son bouton.
+ */
+export async function keepChapterModel(chapterId: string, action: AiAction, key: string): Promise<string | null> {
   try {
     const { chapter } = await api.getChapter(chapterId);
     await api.updateChapter(chapterId, { settings: { ...chapter.settings, aiModels: { ...chapter.settings.aiModels, [action]: key } } });
     const known = catalogues.get(chapterId);
     if (known) catalogues.set(chapterId, { ...known, defaults: { ...known.defaults, [action]: key } });
-    toast.success("Modèle retenu pour ce chapitre");
-    return true;
+    return null;
   } catch (error) {
-    toast.error(errorMessage(error, "Le modèle n’a pas pu être retenu pour ce chapitre."));
-    return false;
+    return errorMessage(error, "Le modèle n’a pas pu être retenu pour ce chapitre. Réessayez dans un instant.");
   }
 }

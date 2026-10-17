@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ImageGeneration } from "img-fx";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
+  Check,
+  CircleAlert,
   Copy,
   Download,
   EyeOff,
@@ -25,7 +26,12 @@ import {
   X,
   ZoomIn,
 } from "lucide-react";
-import { toast } from "sonner";
+import {
+  ActionStatus,
+  useFeedback,
+  type Feedback,
+  type FeedbackState,
+} from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -44,8 +50,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { cn } from "@/lib/utils";
-import { ShimmerText } from "@/components/loading";
 import {
   aspectRatioOf,
   callModule,
@@ -64,10 +70,12 @@ import { ProvenanceBadge } from "./provenance";
 import {
   GenerationMenuItems,
   JobMenuItems,
+  cancelJob,
   contextMenuKit,
-  copyText,
   dropdownMenuKit,
+  rerunWithFeedback,
   useRenderActions,
+  variantsWithFeedback,
   type RenderActions,
   type StudioActions,
 } from "./generation-menu";
@@ -161,6 +169,7 @@ export function StudioFeed({ view, history, jobs, ...handlers }: StudioFeedProps
 
   return (
     <div ref={container}>
+      <FeedKeyframes />
       {width > 0 && (
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -262,12 +271,14 @@ function MosaicTile({
   context: FeedHandlers;
 }) {
   const width = stripWidth(entry.ratios, height);
+  // Retour des actions sur un travail (copie, annulation) : sur sa vignette.
+  const jobFeedback = useFeedback();
 
   if (entry.kind === "failed") {
     return (
-      <JobContextMenu job={entry.job} context={context}>
+      <JobContextMenu job={entry.job} context={context} feedback={jobFeedback}>
         <article className="flex flex-col gap-2" style={{ width }}>
-          <FailedCard job={entry.job} height={height} context={context} />
+          <FailedCard job={entry.job} height={height} context={context} feedback={jobFeedback.state} />
           <Caption
             title={entry.job.request.prompt}
             meta={[entry.job.modelLabel, clock(entry.job.createdAt)]}
@@ -280,14 +291,14 @@ function MosaicTile({
 
   if (entry.kind === "pending") {
     return (
-      <JobContextMenu job={entry.job} context={context}>
+      <JobContextMenu job={entry.job} context={context} feedback={jobFeedback}>
       <article className="flex flex-col gap-2" style={{ width }}>
-        <PendingStrip job={entry.job} ratios={entry.ratios} height={height} />
+        <PendingStrip job={entry.job} ratios={entry.ratios} height={height} feedback={jobFeedback.state} />
         <div className="flex min-w-0 items-start gap-1 px-0.5">
           <Caption title={entry.job.request.prompt} meta={[pendingLabel(entry.job)]} muted />
           <div className="-mt-0.5 flex shrink-0 items-center">
             <JobLog job={entry.job} />
-            <CancelButton job={entry.job} onMutate={context.onMutate} />
+            <CancelButton job={entry.job} onMutate={context.onMutate} feedback={jobFeedback} />
           </div>
         </div>
       </article>
@@ -413,6 +424,8 @@ function ListRow({
   sideBySide: boolean;
   context: FeedHandlers;
 }) {
+  // Retour des actions sur un travail (copie, annulation) : sur sa vignette.
+  const jobFeedback = useFeedback();
   const layout = (media: React.ReactNode, side: React.ReactNode) => (
     <article
       className={cn(
@@ -429,11 +442,11 @@ function ListRow({
 
   if (entry.kind === "failed") {
     return (
-      <JobContextMenu job={entry.job} context={context}>
+      <JobContextMenu job={entry.job} context={context} feedback={jobFeedback}>
         <div>
           {layout(
             <div style={{ width: stripWidth(entry.ratios, height) }}>
-              <FailedCard job={entry.job} height={height} context={context} />
+              <FailedCard job={entry.job} height={height} context={context} feedback={jobFeedback.state} />
             </div>,
             <PromptBlock prompt={entry.job.request.prompt} meta={[entry.job.modelLabel, clock(entry.job.createdAt)]} muted />
           )}
@@ -444,14 +457,14 @@ function ListRow({
 
   if (entry.kind === "pending") {
     return (
-      <JobContextMenu job={entry.job} context={context}>
+      <JobContextMenu job={entry.job} context={context} feedback={jobFeedback}>
         <div>
           {layout(
-            <PendingStrip job={entry.job} ratios={entry.ratios} height={height} />,
+            <PendingStrip job={entry.job} ratios={entry.ratios} height={height} feedback={jobFeedback.state} />,
             <div className="flex flex-col gap-3">
               <PromptBlock prompt={entry.job.request.prompt} meta={[pendingLabel(entry.job)]} muted />
               <div className="flex items-center gap-1">
-                <CancelButton job={entry.job} onMutate={context.onMutate} withLabel />
+                <CancelButton job={entry.job} onMutate={context.onMutate} feedback={jobFeedback} withLabel />
                 <JobLog job={entry.job} />
               </div>
             </div>
@@ -530,7 +543,7 @@ function ListRender({
           <Undo2 className="h-3.5 w-3.5" />
           Reprendre
         </Button>
-        <IconAction label="Relancer à l'identique" size="md" onClick={() => context.onRerun(item)}>
+        <IconAction label="Relancer à l’identique" size="md" onClick={() => void rerunWithFeedback(actions, context, item)}>
           <Play className="h-4 w-4" />
         </IconAction>
         <FavoriteButton actions={actions} size="md" />
@@ -732,14 +745,12 @@ function ChatRenderExchange({
                   variant="ghost"
                   size="sm"
                   className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
-                  onClick={() => context.onRerun(item)}
+                  onClick={() => void rerunWithFeedback(actions, context, item)}
                 >
                   <Play className="h-3.5 w-3.5" />
                   Relancer
                 </Button>
-                <IconAction label="Copier le prompt" onClick={() => copyText(item.prompt)}>
-                  <Copy className="h-3.5 w-3.5" />
-                </IconAction>
+                <CopyPromptAction prompt={item.prompt} />
               </>
             }
           />
@@ -786,9 +797,11 @@ function ChatJobExchange({
 }) {
   const { job } = entry;
   const meta = [job.modelLabel, ratioLabel(job.request.size), `×${job.request.n}`, clock(job.createdAt)].join(" · ");
+  // Retour des actions sur ce travail (copie, annulation) : sur sa réponse.
+  const jobFeedback = useFeedback();
 
   return (
-    <JobContextMenu job={job} context={context}>
+    <JobContextMenu job={job} context={context} feedback={jobFeedback}>
       <div className="flex flex-col gap-3">
         <UserBubble
           prompt={job.request.prompt}
@@ -804,9 +817,7 @@ function ChatJobExchange({
                 <Undo2 className="h-3.5 w-3.5" />
                 Reprendre
               </Button>
-              <IconAction label="Copier le prompt" onClick={() => copyText(job.request.prompt)}>
-                <Copy className="h-3.5 w-3.5" />
-              </IconAction>
+              <CopyPromptAction prompt={job.request.prompt} />
             </>
           }
         />
@@ -815,11 +826,11 @@ function ChatJobExchange({
           <div className="min-w-0 flex-1">
             {entry.kind === "pending" ? (
               <div className="flex flex-col gap-2">
-                <PendingStrip job={job} ratios={entry.ratios} height={height} />
+                <PendingStrip job={job} ratios={entry.ratios} height={height} feedback={jobFeedback.state} />
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <span className="mr-1">{pendingLabel(job)}</span>
                   <JobLog job={job} />
-                  <CancelButton job={job} onMutate={context.onMutate} />
+                  <CancelButton job={job} onMutate={context.onMutate} feedback={jobFeedback} />
                 </div>
               </div>
             ) : (
@@ -839,6 +850,7 @@ function ChatJobExchange({
                   <IconAction label="Masquer cet échec" onClick={() => context.onDismiss(job)}>
                     <EyeOff className="h-3.5 w-3.5" />
                   </IconAction>
+                  <ActionStatus state={jobFeedback.state} className="ml-1 flex-1" />
                 </div>
               </div>
             )}
@@ -904,7 +916,7 @@ function ShotStrip({
   // Sous 190 px de large, la barre d'actions déborderait : on n'y garde que
   // l'essentiel, le reste passe par la visionneuse.
   const compact = shotWidth < 190;
-  const { busy, run } = actions;
+  const { busy, run, feedback } = actions;
 
   return (
     <div className="relative flex" style={{ gap: SHOT_GAP }}>
@@ -941,7 +953,7 @@ function ShotStrip({
 
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0 opacity-0 transition-opacity duration-200 group-hover/shot:opacity-100" />
           <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 opacity-0 transition-opacity duration-200 group-hover/shot:pointer-events-auto group-hover/shot:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
-            <ShotAction label="Décliner en variantes" onClick={() => context.onVariants(item, file)}>
+            <ShotAction label="Décliner en variantes" onClick={() => void variantsWithFeedback(actions, context, item, file)}>
               <Wand2 className="h-3.5 w-3.5" />
             </ShotAction>
             <ShotAction label="Retoucher cette image" onClick={() => context.onEdit(item, file)}>
@@ -954,7 +966,7 @@ function ShotStrip({
                 onClick={() =>
                   run(async () => {
                     const result = await callModule<{ file?: string }>("upscale", item.id, file, 2);
-                    toast.success(`Agrandie : ${result?.file}`);
+                    feedback.success(result?.file ? `Agrandie ×2 : ${result.file}` : "Image agrandie ×2");
                     context.onMutate();
                   })
                 }
@@ -969,7 +981,7 @@ function ShotStrip({
                 onClick={() =>
                   run(async () => {
                     const result = await callModule<{ fileName?: string }>("sendToGallery", item.id, file);
-                    toast.success(`Ajoutée à la galerie : ${result?.fileName ?? file}`);
+                    feedback.success(`Ajoutée à la galerie : ${result?.fileName ?? file}`);
                     context.onMutate();
                   })
                 }
@@ -988,13 +1000,51 @@ function ShotStrip({
       {actions.favorite && (
         <Star className="pointer-events-none absolute top-2.5 left-2.5 h-4 w-4 fill-amber-400 text-amber-400 drop-shadow" />
       )}
+
+      {/* Retour des actions sur ces images (barre au survol, menus), juste
+          au-dessus de la barre d'actions : là où l'on vient de cliquer. */}
+      <ShotFeedback state={feedback.state} className="bottom-12" />
     </div>
   );
 }
 
-function PendingStrip({ job, ratios, height }: { job: Job; ratios: number[]; height: number }) {
+/**
+ * Retour d'une action posé sur une image : une pastille lisible sur n'importe
+ * quel fond, qui apparaît et s'efface en fondu sans rien déplacer.
+ */
+function ShotFeedback({ state, className }: { state: FeedbackState | null; className?: string }) {
+  return (
+    <div className={cn("pointer-events-none absolute inset-x-2 z-10 flex justify-center", className)}>
+      <AnimatePresence>
+        {state && (
+          <motion.div
+            key="shot-feedback"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="flex min-w-0 max-w-full rounded-lg bg-background/90 px-2.5 py-1.5 shadow-sm backdrop-blur"
+          >
+            <ActionStatus state={state} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function PendingStrip({
+  job,
+  ratios,
+  height,
+  feedback = null,
+}: {
+  job: Job;
+  ratios: number[];
+  height: number;
+  feedback?: FeedbackState | null;
+}) {
   const running = job.status === "running";
-  const reducedMotion = useReducedMotion();
   const elapsed = useElapsed(job.startedAt ?? job.createdAt);
   const shotWidth = Math.floor(height * ratios[0]);
   const percent =
@@ -1002,33 +1052,43 @@ function PendingStrip({ job, ratios, height }: { job: Job; ratios: number[]; hei
 
   return (
     <div className="relative flex" style={{ gap: SHOT_GAP }}>
-      {ratios.map((_, index) =>
-        running ? (
-          // Mosaïque de pixels qui « développe » l'image (img-fx, Jakub
-          // Antalik) : elle remplace le voile qui respirait. Figée si le
-          // mouvement est réduit.
-          <ImageGeneration
-            key={index}
-            preset="pixels-organic"
-            paused={reducedMotion ?? false}
-            className={cn("shrink-0", shotCorners(index, ratios.length))}
-          >
-            <div className={shotCorners(index, ratios.length)} style={{ width: shotWidth, height }} />
-          </ImageGeneration>
-        ) : (
-          <div
-            key={index}
-            className={cn("relative shrink-0 overflow-hidden bg-muted", shotCorners(index, ratios.length))}
-            style={{ width: shotWidth, height }}
-          >
+      {ratios.map((_, index) => (
+        <div
+          key={index}
+          className={cn("relative shrink-0 overflow-hidden bg-muted", shotCorners(index, ratios.length))}
+          style={{ width: shotWidth, height }}
+        >
+          {running ? (
+            <>
+              {/* Voile lumineux qui respire et reflet qui traverse : l'image
+                  « se développe », sans fausse barre de progression. */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "radial-gradient(120% 90% at 15% 110%, color-mix(in oklch, var(--primary) 40%, transparent), transparent 60%), radial-gradient(90% 70% at 95% -10%, color-mix(in oklch, var(--primary) 22%, transparent), transparent 55%)",
+                  animation: `studio-breathe 3.2s ease-in-out ${index * 0.4}s infinite`,
+                }}
+              />
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "linear-gradient(105deg, transparent 35%, color-mix(in oklch, var(--foreground) 10%, transparent) 50%, transparent 65%)",
+                  backgroundSize: "250% 100%",
+                  animation: `studio-sheen 2.4s linear ${index * 0.3}s infinite`,
+                }}
+              />
+            </>
+          ) : (
             <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,transparent_0_10px,color-mix(in_oklch,var(--foreground)_5%,transparent)_10px_20px)]" />
-          </div>
-        )
-      )}
+          )}
+        </div>
+      ))}
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center">
-        <span className="relative z-10 flex items-center rounded-full bg-background/80 px-3 py-1 text-xs font-medium shadow-sm backdrop-blur">
-          {running ? <ShimmerText>Génération</ShimmerText> : "En file d’attente"}
+        <span className="rounded-full bg-background/80 px-3 py-1 text-xs font-medium shadow-sm backdrop-blur">
+          {running ? "Génération" : "En file d'attente"}
           {elapsed && <span className="ml-1.5 text-muted-foreground tabular-nums">{elapsed}</span>}
         </span>
         {percent !== null && (
@@ -1040,11 +1100,23 @@ function PendingStrip({ job, ratios, height }: { job: Job; ratios: number[]; hei
           </span>
         )}
       </div>
+
+      <ShotFeedback state={feedback} className="bottom-2" />
     </div>
   );
 }
 
-function FailedCard({ job, height, context }: { job: Job; height: number; context: FeedHandlers }) {
+function FailedCard({
+  job,
+  height,
+  context,
+  feedback = null,
+}: {
+  job: Job;
+  height: number;
+  context: FeedHandlers;
+  feedback?: FeedbackState | null;
+}) {
   // Carte basse (mobile, écran étroit) : message court et boutons en icônes.
   const compact = height < 230;
   return (
@@ -1080,6 +1152,9 @@ function FailedCard({ job, height, context }: { job: Job; height: number; contex
         <IconAction label="Masquer cet échec" onClick={() => context.onDismiss(job)}>
           <EyeOff className="h-3.5 w-3.5" />
         </IconAction>
+        {/* Base nulle : le retour prend la place restante sans faire passer
+            la rangée à la ligne, et se tronque au besoin. */}
+        <ActionStatus state={feedback} className="ml-1 flex-1" />
       </div>
     </div>
   );
@@ -1222,6 +1297,25 @@ function IconAction({
   );
 }
 
+/** Copie un prompt : l'icône devient une coche, ou une alerte si la copie échoue. */
+function CopyPromptAction({ prompt }: { prompt: string }) {
+  const { hasCopied, copyFailed, copyToClipboard } = useCopyToClipboard();
+  return (
+    <IconAction
+      label={hasCopied ? "Prompt copié" : copyFailed ? "Copie impossible dans ce navigateur" : "Copier le prompt"}
+      onClick={() => void copyToClipboard(prompt)}
+    >
+      {hasCopied ? (
+        <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+      ) : copyFailed ? (
+        <CircleAlert className="h-3.5 w-3.5 text-destructive" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" />
+      )}
+    </IconAction>
+  );
+}
+
 function FavoriteButton({ actions, size = "sm" }: { actions: RenderActions; size?: "sm" | "md" }) {
   return (
     <IconAction
@@ -1309,17 +1403,19 @@ function GenerationContextMenu({
 function JobContextMenu({
   job,
   context,
+  feedback,
   children,
 }: {
   job: Job;
   context: FeedHandlers;
+  feedback: Feedback;
   children: React.ReactNode;
 }) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="w-60">
-        <JobMenuItems kit={contextMenuKit} job={job} studio={context} />
+        <JobMenuItems kit={contextMenuKit} job={job} studio={context} feedback={feedback} />
       </ContextMenuContent>
     </ContextMenu>
   );
@@ -1328,17 +1424,16 @@ function JobContextMenu({
 function CancelButton({
   job,
   onMutate,
+  feedback,
   withLabel,
 }: {
   job: Job;
   onMutate: () => void;
+  /** Un échec s'affiche sur la vignette ; la réussite, c'est la vignette qui disparaît. */
+  feedback: Feedback;
   withLabel?: boolean;
 }) {
-  const cancel = async () => {
-    await callModule("cancelGeneration", job.id);
-    toast.info("Génération annulée");
-    onMutate();
-  };
+  const cancel = () => void cancelJob(job, onMutate, feedback);
   if (withLabel) {
     return (
       <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-muted-foreground" onClick={cancel}>
@@ -1494,6 +1589,19 @@ function clock(ts: number) {
   return new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
+
+/** Animations propres au fil, déclarées une fois. */
+function FeedKeyframes() {
+  return (
+    <style>{`
+      @keyframes studio-sheen { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+      @keyframes studio-breathe { 0%, 100% { opacity: .35; } 50% { opacity: .85; } }
+      @media (prefers-reduced-motion: reduce) {
+        [style*="studio-sheen"], [style*="studio-breathe"] { animation: none !important; }
+      }
+    `}</style>
+  );
+}
 
 const DISMISSED_KEY = "ai-image-gen:dismissed-failures";
 

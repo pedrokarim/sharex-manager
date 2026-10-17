@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { ActionStatus, FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,10 @@ export function StyleTable({ fonts, sample }: StyleTableProps) {
   const [choices, setChoices] = useState<Record<StyleRow["id"], string> | null>(null);
   const [spread, setSpread] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Une lecture qui échoue s'affiche à la place de la table ; l'enregistrement répond à côté de son bouton.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const saveFeedback = useFeedback({ successDuration: 4000 });
+  const clearSaveFeedback = saveFeedback.clear;
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +60,7 @@ export function StyleTable({ fonts, sample }: StyleTableProps) {
       .catch((error) => {
         if (cancelled) return;
         setFolders([]);
-        toast.error(errorMessage(error, "La liste des dossiers n’a pas pu être lue."));
+        setLoadError(errorMessage(error, "La liste des dossiers n’a pas pu être lue. Rechargez la page pour réessayer."));
       });
     return () => {
       cancelled = true;
@@ -68,6 +72,8 @@ export function StyleTable({ fonts, sample }: StyleTableProps) {
     let cancelled = false;
     setView(null);
     setChoices(null);
+    setLoadError(null);
+    clearSaveFeedback();
     api
       .getFolder(folderId)
       .then((next) => {
@@ -76,12 +82,12 @@ export function StyleTable({ fonts, sample }: StyleTableProps) {
         setChoices(choicesOf(next.folder.defaults.styles));
       })
       .catch((error) => {
-        if (!cancelled) toast.error(errorMessage(error, "Ce dossier n’a pas pu être lu."));
+        if (!cancelled) setLoadError(errorMessage(error, "Ce dossier n’a pas pu être lu. Choisissez-le de nouveau ou rechargez la page."));
       });
     return () => {
       cancelled = true;
     };
-  }, [folderId]);
+  }, [folderId, clearSaveFeedback]);
 
   const saved = view ? choicesOf(view.folder.defaults.styles) : null;
   const dirty = Boolean(choices && saved && STYLE_ROWS.some((row) => choices[row.id] !== saved[row.id]));
@@ -89,6 +95,7 @@ export function StyleTable({ fonts, sample }: StyleTableProps) {
   const save = async () => {
     if (!view || !choices || saving) return;
     setSaving(true);
+    saveFeedback.clear();
     try {
       const folder = await api.updateFolder(view.folder.id, { defaults: { ...view.folder.defaults, styles: applyRows(view.folder.defaults.styles, choices) } });
       let updated = 0;
@@ -102,13 +109,13 @@ export function StyleTable({ fonts, sample }: StyleTableProps) {
       }
       setView({ ...view, folder });
       setChoices(choicesOf(folder.defaults.styles));
-      toast.success(
+      saveFeedback.success(
         updated > 0
-          ? `Styles enregistrés pour le dossier et ${countLabel(updated, "chapitre", "chapitres")}`
-          : "Styles enregistrés : ils habilleront les prochains chapitres du dossier",
+          ? `Enregistrés pour le dossier et ${countLabel(updated, "chapitre", "chapitres")}`
+          : "Enregistrés : ils habilleront les prochains chapitres du dossier",
       );
     } catch (error) {
-      toast.error(errorMessage(error, "Les styles n’ont pas pu être enregistrés."));
+      saveFeedback.error(errorMessage(error, "Les styles n’ont pas pu être enregistrés. Réessayez."));
     } finally {
       setSaving(false);
     }
@@ -147,7 +154,7 @@ export function StyleTable({ fonts, sample }: StyleTableProps) {
         )}
       </div>
 
-      {folders === null || (folderId && !choices) ? (
+      {folders === null || (folderId && !choices && !loadError) ? (
         <div className="grid gap-3 xl:grid-cols-2" aria-hidden>
           {STYLE_ROWS.map((row) => (
             <div key={row.id} className="flex items-center gap-4 rounded-md border p-4">
@@ -159,6 +166,8 @@ export function StyleTable({ fonts, sample }: StyleTableProps) {
             </div>
           ))}
         </div>
+      ) : loadError ? (
+        <FormStatus state={{ tone: "error", message: loadError, id: 0 }} />
       ) : folders.length === 0 || !choices ? (
         <p className="text-sm text-muted-foreground">Aucun dossier pour l’instant : créez-en un dans la bibliothèque, ses styles se régleront ici.</p>
       ) : (
@@ -220,6 +229,7 @@ export function StyleTable({ fonts, sample }: StyleTableProps) {
                 Reporter aussi sur les {countLabel(view.chapters.length, "chapitre déjà créé", "chapitres déjà créés")}
               </label>
             )}
+            <ActionStatus state={saveFeedback.state} />
           </div>
         </>
       )}

@@ -51,7 +51,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
 import {
   Tooltip,
   TooltipContent,
@@ -60,6 +59,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
 import { useTranslation } from "@/lib/i18n";
+import { ActionStatus, useFeedback } from "@/components/feedback";
 import { GALLERY_DISPLAY_DEFAULTS, useGalleryDisplay } from "@/hooks/use-gallery-display";
 import { cn } from "@/lib/utils";
 
@@ -90,6 +90,8 @@ export function PreferencesPageClient() {
 
   const { t } = useTranslation();
   const galleryDisplay = useGalleryDisplay();
+  // La réinitialisation se confirme à côté de son bouton.
+  const resetFeedback = useFeedback();
 
   const handleReset = () => {
     setPreferences({
@@ -110,7 +112,7 @@ export function PreferencesPageClient() {
       enableUploadNotifications: true,
     });
     galleryDisplay.update(GALLERY_DISPLAY_DEFAULTS);
-    toast.success(t("settings.save_success"));
+    resetFeedback.success(t("settings.save_success"));
   };
 
   const viewModeIcons = {
@@ -157,14 +159,17 @@ export function PreferencesPageClient() {
               {t("settings.preferences_description")}
             </p>
           </div>
-          <Button
-            variant="outline"
-            onClick={handleReset}
-            className="w-full text-xs sm:w-auto sm:text-sm"
-          >
-            <RotateCcw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-            {t("settings.reset")}
-          </Button>
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row-reverse sm:items-center">
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              className="w-full text-xs sm:w-auto sm:text-sm"
+            >
+              <RotateCcw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              {t("settings.reset")}
+            </Button>
+            <ActionStatus state={resetFeedback.state} />
+          </div>
         </div>
       </section>
 
