@@ -10,7 +10,6 @@ import {
   CloudOff,
   Film,
   FolderOpen,
-  Loader2,
   Mic,
   Music,
   Redo2,
@@ -19,6 +18,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { LoadingState } from "@/components/loading";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -94,9 +95,7 @@ export default function EditorPage() {
 
   if (project === undefined) {
     return (
-      <div className="flex flex-1 items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      <LoadingState label="Ouverture du projet…" state="shaping" fill />
     );
   }
   if (project === null) {
@@ -410,7 +409,7 @@ function Editor({ initial }: { initial: ClipProject }) {
           <Button
             size="sm"
             className="ml-2 h-8 gap-2"
-            disabled={exporting}
+            loading={exporting}
             onClick={async () => {
               // L'écran Exporter relit le projet : il est enregistré d'abord, tel qu'on le voit.
               playerRef.current?.pause();
@@ -424,7 +423,7 @@ function Editor({ initial }: { initial: ClipProject }) {
               }
             }}
           >
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Film className="h-4 w-4" />}
+            <Film className="h-4 w-4" />
             <span className="max-sm:sr-only">Exporter</span>
           </Button>
         </div>
@@ -586,7 +585,7 @@ function SaveIndicator({ state }: { state: SaveState }) {
   return (
     <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
       {state === "saved" && <Check className="h-3.5 w-3.5 text-emerald-500" />}
-      {(state === "saving" || state === "pending") && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+      {(state === "saving" || state === "pending") && <Spinner className="size-3.5" aria-hidden />}
       {state === "error" && <CloudOff className="h-3.5 w-3.5 text-destructive" />}
       <span className={cn("max-sm:sr-only", state === "error" && "text-destructive")}>
         {state === "saved" ? "Enregistré" : state === "error" ? "Enregistrement impossible" : "Enregistrement…"}

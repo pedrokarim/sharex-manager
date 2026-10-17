@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ComponentType } from "react";
-import { Loader2 } from "lucide-react";
+import { LoadingState } from "@/components/loading";
 import type { ModuleConfig } from "@/types/modules";
 
 interface ModulePageProps {
@@ -147,12 +147,9 @@ export function ModulePageLoader({
   }
 
   if (!Component) {
-    // Premier affichage seulement : rien d'autre à montrer à cet endroit.
-    return (
-      <div className="flex items-center justify-center py-12" aria-busy="true">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/60" />
-      </div>
-    );
+    // Premier affichage seulement. Même état que `(app)/loading.tsx`, sans
+    // délai : il prend la suite de celui de la route sans clignoter.
+    return <LoadingState fill delayed={false} />;
   }
 
   return (

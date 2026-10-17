@@ -3,9 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { AlertCircle, ExternalLink, EyeOff, KeyRound, Loader2, Play, RotateCw, SearchX } from "lucide-react";
+import { AlertCircle, ExternalLink, EyeOff, KeyRound, Play, RotateCw, SearchX } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { Orb } from "@/components/loading";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { MODULE_PATH } from "../lib/client";
 import { formatSimilarity, type EngineInfo, type EngineResult, type Match } from "../lib/types";
@@ -167,8 +169,8 @@ export function EngineSection({ engine, result, showWeak, onRetry, onOpenExterna
             done?.status === "error" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
           )}
         >
-          {loading && <Loader2 className="h-3 w-3 animate-spin" />}
-          {status}
+          {loading && <Orb size="xs" state="searching" className="shrink-0 text-primary" />}
+          <span className={cn(loading && "shimmer")}>{status}</span>
         </span>
         {done?.status === "ok" && done.message && <span className="text-xs text-muted-foreground">{done.message}</span>}
         {/* Sans clé, le moteur tient sur une ligne : il reste ouvrable dans un onglet. */}
@@ -197,10 +199,10 @@ export function EngineSection({ engine, result, showWeak, onRetry, onOpenExterna
 
       {loading && (
         <div className="flex gap-3 rounded-xl border p-2.5">
-          <div className="h-24 w-24 shrink-0 animate-pulse rounded-lg bg-muted sm:w-36" />
+          <Skeleton className="h-24 w-24 shrink-0 rounded-lg sm:w-36" />
           <div className="flex flex-1 flex-col gap-2 py-1">
-            <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
-            <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+            <Skeleton className="h-4 w-2/3 rounded" />
+            <Skeleton className="h-3 w-1/3 rounded" />
           </div>
         </div>
       )}

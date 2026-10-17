@@ -48,6 +48,13 @@ import {
   startKitAssistant as launchAssistant,
   type KitAssistantRequest,
 } from "./lib/server/assistant";
+import {
+  acceptPoseCandidate as acceptPose,
+  cancelPoseJob as cancelPoses,
+  listPoseJobs as readPoseJobs,
+  rejectPoseCandidate as rejectPose,
+  startPoseGeneration as launchPoses,
+} from "./lib/server/poses";
 
 // ─── Fiches ──────────────────────────────────────────────────────
 
@@ -165,6 +172,30 @@ export async function listAssistantJobs() {
 
 export async function regenerateAsset(kitId: string, assetId: string, note?: string) {
   return redo(kitId, assetId, note);
+}
+
+// ─── Poses de la mascotte (07 sexies, D2) ────────────────────────
+
+/** Génère des poses (émotion, geste, cadrage, côté) d'après la fiche de modèle ; chacune attend d'être acceptée. */
+export async function startPoseGeneration(kitId: string, requests: unknown) {
+  return launchPoses(kitId, requests);
+}
+
+export async function listPoseJobs(kitId: string) {
+  return readPoseJobs(kitId);
+}
+
+export async function cancelPoseJob(jobId: string) {
+  cancelPoses(jobId);
+  return { success: true };
+}
+
+export async function acceptPoseCandidate(kitId: string, jobId: string, candidateId: string, tags?: unknown): Promise<BrandKit> {
+  return acceptPose(kitId, jobId, candidateId, tags);
+}
+
+export async function rejectPoseCandidate(kitId: string, jobId: string, candidateId: string) {
+  return rejectPose(kitId, jobId, candidateId);
 }
 
 // ─── Comptes connectés (cœur) ────────────────────────────────────

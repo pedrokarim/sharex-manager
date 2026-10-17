@@ -11,13 +11,14 @@
  */
 
 import { CAPTION_STYLE, TEXT_PRESETS, uid } from "./edit";
+import { backdropOf, legibleKaraoke, legibleStyle, opaqueHex, type Backdrop } from "./legibility";
 import { getPreset } from "./motion/registry";
 import { projectDuration } from "./timeline";
-import type { ClipItem, ClipProject, ImageItem, MediaSource, ShapeItem, TextItem, TextRole, TextStyle, ThemeHint, Track } from "./types";
+import type { ClipItem, ClipProject, ImageItem, MediaSource, ShapeItem, ShapePattern, TextItem, TextRole, TextStyle, ThemeHint, Track } from "./types";
 
 /** Rôles de couleur, et non une liste anonyme : le moteur sait où mettre chacune. */
 export interface BrandPalette {
-  /** Fond des plans sans image, voile posé sur les images, fond du projet. */
+  /** Fond des plans sans image, fond du projet ; jamais un voile sur une image. */
   background: string;
   /** Texte posé sur le fond (titres, légendes). */
   ink: string;
@@ -42,6 +43,11 @@ export interface BrandTheme {
   name: string;
   palette: BrandPalette;
   textStyles: Record<TextRole, TextStyle>;
+  /**
+   * Trame Riso légère (points d'encre) sur les aplats unis : fond des plans
+   * sans image et carton de fin. Jamais sur une image.
+   */
+  halftone?: boolean;
   /** Polices importées de la marque, à charger avant de dessiner. */
   fonts: { family: string; kitId: string; fontId: string }[];
   watermark?: {
@@ -143,7 +149,11 @@ export function paintFill(theme: BrandTheme | null, hint: ThemeHint): string | n
     case "plate":
       return theme ? theme.palette.background : shade(accentOf(null, hint.accent ?? 0), -0.55);
     case "veil":
-      return theme ? theme.palette.background : "#000000";
+      // Une marque ne voile plus les images : elles restent éclatantes, et
+      // chaque texte porte sa propre étiquette ou son contour (`legibility.ts`).
+      return theme ? TRANSPARENT : "#000000";
+    case "shadow":
+      return "#000000";
     case "surface":
       return theme ? theme.palette.surface : "#ffffff";
     case "highlight":
@@ -182,6 +192,15 @@ export function themedTextStyle(theme: BrandTheme | null, hint: ThemeHint, keep:
   return style;
 }
 
+/** Couleur d'un voile retiré : la forme reste dans la timeline, sans rien couvrir. */
+const TRANSPARENT = "rgba(0,0,0,0)";
+
+/** Trame d'une marque qui en veut une, sur un aplat uni ; `null` sinon. */
+export function halftoneOf(theme: BrandTheme | null): ShapePattern | null {
+  if (!theme?.halftone) return null;
+  return { kind: "dots", color: theme.palette.ink, opacity: 0.07, spacing: 0.024 };
+}
+
 // ─── Application ─────────────────────────────────────────────────
 
 function restyle(item: ClipItem, theme: BrandTheme | null): ClipItem {
@@ -195,13 +214,57 @@ function restyle(item: ClipItem, theme: BrandTheme | null): ClipItem {
   }
   if (!item.theme) return item;
   if (item.type === "text" && item.theme.role) {
-    return { ...item, style: themedTextStyle(theme, item.theme, item.style) };
+    // `fit` vient de la lisibilité d'une marque (`applyLegibility`) : sans marque, le texte reprend sa mise en page d'origine.
+    const { fit: _fit, ...rest } = item;
+    return { ...rest, style: themedTextStyle(theme, item.theme, item.style) };
   }
   if (item.type === "shape") {
     const fill = paintFill(theme, item.theme);
-    return fill ? { ...item, fill } : item;
+    const pattern = item.theme.paint === "plate" ? halftoneOf(theme) : null;
+    if (!fill && !pattern && !item.pattern) return item;
+    const next: ShapeItem = { ...item, ...(fill ? { fill } : {}) };
+    if (pattern) next.pattern = pattern;
+    else delete next.pattern;
+    return next;
   }
   return item;
+}
+
+/** Arrondi des étiquettes de la marque, repris par celles que pose le moteur. */
+function labelRadius(theme: BrandTheme): number | undefined {
+  return theme.textStyles.label?.background?.radius;
+}
+
+/**
+ * Lisibilité garantie de chaque texte habillé par la marque (rôle d'un
+ * modèle ou sous-titres karaoké) : étiquette, contour ou couleur, selon ce
+ * qu'il y a dessous (`legibility.ts`). Les textes posés à la main et ceux de
+ * la marque (carton de fin, déjà traités) ne bougent pas.
+ */
+export function applyLegibility(project: ClipProject, theme: BrandTheme): ClipProject {
+  const tracks = project.tracks.map((track, trackIndex) => {
+    if (track.kind !== "visual") return track;
+    let changed = false;
+    const items = track.items.map((item) => {
+      if (item.type !== "text" || item.origin === "brand") return item;
+      if (item.karaoke) {
+        const fixed = legibleKaraoke(item.style, item.karaoke.highlight, theme.palette);
+        changed = true;
+        return { ...item, style: fixed.style, karaoke: { ...item.karaoke, highlight: fixed.highlight } };
+      }
+      if (!item.theme?.role) return item;
+      changed = true;
+      const backdrop: Backdrop = backdropOf(project, trackIndex, item);
+      const keepColor = item.theme.paint === "success" || item.theme.paint === "highlight";
+      const style = legibleStyle(item.style, backdrop, theme.palette, { role: item.theme.role, labelRadius: labelRadius(theme), keepColor });
+      // Un titre dans une police de marque plus large, avec la marge de son étiquette, ne déborde jamais de
+      // sa place (il chevaucherait le texte suivant). Les autres textes gardent leur taille : un texte courant
+      // rétréci se lirait moins bien qu'un texte qui prend une ligne de plus.
+      return item.theme.role === "title" ? { ...item, style, fit: "shrink" as const } : { ...item, style };
+    });
+    return changed ? { ...track, items } : track;
+  });
+  return { ...project, tracks };
 }
 
 /** Retire ce qu'une marque a ajouté : éléments, puis pistes devenues vides. */
@@ -277,6 +340,7 @@ export function endCardTracks(project: ClipProject, theme: BrandTheme, start: nu
     shape: "rect",
     fill: theme.palette.background,
     radius: 0,
+    ...(halftoneOf(theme) ? { pattern: halftoneOf(theme)! } : {}),
     label: "Fond du carton de fin",
     transform: { x: 0.5, y: 0.5, width: 1, height: 1, rotation: 0, opacity: 1 },
     animIn: fade(8),
@@ -288,7 +352,7 @@ export function endCardTracks(project: ClipProject, theme: BrandTheme, start: nu
     id: uid("x-"),
     type: "text",
     text: content,
-    style: themedTextStyle(theme, { role, ...hint }, { size, align: "center" }),
+    style: cardTextStyle(theme, role, hint, { size, align: "center" }),
     // Nom, accroche et appel viennent de la marque : un texte long rétrécit au lieu de déborder.
     fit: "shrink",
     transform: { x: 0.5, y, width: 0.86, height: role === "title" ? 0.2 : 0.12, rotation: 0, opacity: 1 },
@@ -376,6 +440,13 @@ export function endCardTracks(project: ClipProject, theme: BrandTheme, start: nu
   return layers.map((layer) => brandTrack(layer.name, [layer.item]));
 }
 
+/** Texte du carton de fin : posé sur l'aplat du fond, lisible sur lui. */
+function cardTextStyle(theme: BrandTheme, role: TextRole, hint: ThemeHint, keep: Pick<TextStyle, "size" | "align">): TextStyle {
+  const style = themedTextStyle(theme, { role, ...hint }, keep);
+  const plate: Backdrop = { kind: "flat", colors: [opaqueHex(theme.palette.background) ?? "#000000"] };
+  return legibleStyle(style, plate, theme.palette, { role, labelRadius: labelRadius(theme) });
+}
+
 /**
  * Nom coupé sur deux lignes, pour le bloc du carton de fin : à l'espace la
  * plus proche du milieu, sinon au milieu du mot. Un nom court reste entier.
@@ -404,7 +475,7 @@ function posedEndCardLayers(project: ClipProject, theme: BrandTheme, card: NonNu
     id: uid("x-"),
     type: "text",
     text: content,
-    style: themedTextStyle(theme, { role, ...hint }, { size, align: "left" }),
+    style: cardTextStyle(theme, role, hint, { size, align: "left" }),
     fit: "shrink",
     transform: { x: left + width / 2, y, width, height, rotation: 0, opacity: 1 },
     animIn: { kind: "pop", frames: 10 },
@@ -657,7 +728,9 @@ export function mascotTracks(project: ClipProject, theme: BrandTheme, contentEnd
  * suivent la marque.
  */
 export function applyBrandTheme(project: ClipProject, theme: BrandTheme | null): ClipProject {
-  const tracks = stripBrand(project.tracks).map((track) => ({ ...track, items: track.items.map((item) => restyle(item, theme)) }));
+  const restyled = stripBrand(project.tracks).map((track) => ({ ...track, items: track.items.map((item) => restyle(item, theme)) }));
+  // Avec une marque, chaque texte reçoit une lisibilité garantie ; sans, il garde exactement son rendu.
+  const tracks = theme ? applyLegibility({ ...project, tracks: restyled, background: theme.palette.background }, theme).tracks : restyled;
   const base: ClipProject = {
     ...project,
     tracks,

@@ -26,7 +26,6 @@ import {
   Film,
   ImageIcon,
   Info,
-  Loader2,
   Mic,
   Music,
   ShieldAlert,
@@ -45,6 +44,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
+import { Spinner } from "@/components/ui/spinner";
 import {
   StepTimeline,
   StepTimelineContent,
@@ -437,7 +437,7 @@ function ExportScreen({ project }: { project: ClipProject }) {
               </AnimatePresence>
               {linksPending ? (
                 <li className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <Spinner className="size-3.5" aria-hidden />
                   Lecture des comptes liés à la marque…
                 </li>
               ) : !kit && project.brandKitId === undefined ? (

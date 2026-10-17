@@ -112,7 +112,7 @@ function JobRow({ job, onMutate }: { job: Job; onMutate: () => void }) {
     >
       <div className="flex items-start gap-2">
         <span className="mt-0.5 shrink-0">
-          {job.status === "running" && <Spinner className="h-3.5 w-3.5" />}
+          {job.status === "running" && <Spinner className="size-3.5" />}
           {job.status === "queued" && (
             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
           )}

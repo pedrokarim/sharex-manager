@@ -52,17 +52,13 @@ export default function SecurityPageClient() {
             </p>
             <Button
               onClick={handleSecurityScan}
-              disabled={isLoading}
+              loading={isLoading}
               className="text-sm"
             >
-              {isLoading ? (
-                <>
-                  <span className="animate-spin mr-2">⚙️</span>
-                  {t("admin.security.scan.running")}
-                </>
-              ) : (
-                t("admin.security.scan.button")
-              )}
+              <Shield />
+              {isLoading
+                ? t("admin.security.scan.running")
+                : t("admin.security.scan.button")}
             </Button>
           </div>
         </CardContent>

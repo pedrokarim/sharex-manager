@@ -5,7 +5,8 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FileCard } from "@/components/file-card";
-import { Loader2 } from "lucide-react";
+import { LoadingState } from "@/components/loading";
+import { Spinner } from "@/components/ui/spinner";
 import { useInView } from "react-intersection-observer";
 import { useEffect } from "react";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -85,9 +86,7 @@ export function SecureGalleryClient() {
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-8 sm:py-12">
-            <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin" />
-          </div>
+          <LoadingState />
         ) : (
           <>
             <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -102,7 +101,7 @@ export function SecureGalleryClient() {
 
             <div ref={ref} className="flex justify-center p-4">
               {isFetchingNextPage && (
-                <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" />
+                <Spinner className="size-5 sm:size-6" />
               )}
             </div>
           </>

@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useDropzone } from "react-dropzone";
-import { ArrowLeft, Camera, HelpCircle, Loader2, Sparkles, Upload } from "lucide-react";
+import { ArrowLeft, Camera, HelpCircle, Sparkles, Upload } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FRONT_CONTAINER, FRONT_NARROW } from "@/components/front/container";
 import { DISPLAY } from "@/components/front/fonts";
 import { PhotoHeader } from "@/components/front/photo-header";
+import { Orb } from "@/components/loading";
 import { ACCENT, PILL_SOLID } from "@/components/front/styles";
 import { ProvenanceDetails } from "@/components/provenance/provenance-view";
 import { useTranslation } from "@/lib/i18n";
@@ -113,13 +114,16 @@ export function ImageOriginTool() {
           )}
         >
           <input {...getInputProps()} />
-          {loading ? (
-            <Loader2 className={cn("size-9 animate-spin", ACCENT)} />
-          ) : (
-            <Upload className={cn("size-9", isDragActive ? ACCENT : "text-muted-foreground")} strokeWidth={1.5} />
-          )}
+          {/* Même case pour l'icône et l'orbe : le texte ne bouge pas pendant la lecture. */}
+          <span className="flex size-10 items-center justify-center">
+            {loading ? (
+              <Orb state="solving" size="md" className={ACCENT} />
+            ) : (
+              <Upload className={cn("size-9", isDragActive ? ACCENT : "text-muted-foreground")} strokeWidth={1.5} />
+            )}
+          </span>
           <div className="space-y-1.5">
-            <p className={cn(DISPLAY, "text-2xl sm:text-3xl")}>{loading ? t("tools.origin.reading") : t("tools.origin.drop")}</p>
+            <p className={cn(DISPLAY, "text-2xl sm:text-3xl", loading && "shimmer")}>{loading ? t("tools.origin.reading") : t("tools.origin.drop")}</p>
             <p className="text-sm text-muted-foreground">{t("tools.origin.drop_hint")}</p>
           </div>
           <button type="button" onClick={open} disabled={loading} className={cn(PILL_SOLID, "disabled:opacity-50")}>

@@ -17,7 +17,6 @@ import {
   Copy,
   ExternalLink,
   Info,
-  Loader2,
   Lock,
   Star,
   Trash2,
@@ -26,6 +25,7 @@ import {
   Download,
 } from "lucide-react";
 import Image from "next/image";
+import { LoadingState } from "@/components/loading";
 import { isVideoFile } from "@/lib/media-kind";
 import { format, parseISO } from "date-fns";
 import { useDateLocale } from "@/lib/i18n/date-locales";
@@ -222,17 +222,15 @@ function FileViewerBody({
 
         <div className="relative flex flex-1 min-h-0 overflow-hidden">
           {isLoading && !file ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-              <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium sm:text-base">
+            <LoadingState
+              fill
+              label={
+                <span className="[overflow-wrap:anywhere]">
                   {loadingName ?? t("common.loading")}
-                </p>
-                <p className="text-xs text-muted-foreground sm:text-sm">
-                  {t("common.loading")}
-                </p>
-              </div>
-            </div>
+                </span>
+              }
+              description={loadingName ? t("common.loading") : undefined}
+            />
           ) : file ? (
             <>
               <div

@@ -9,7 +9,6 @@ import {
   ArrowUp,
   CircleAlert,
   Link2,
-  Loader2,
   MoreHorizontal,
   PencilLine,
   Plus,
@@ -519,8 +518,8 @@ function AccountRow({
           <TableCell className="pr-3">
             <div className="flex items-center justify-end gap-1">
               {inline ? (
-                <Button size="sm" variant={health.tone === "error" ? "default" : "outline"} className="h-8 gap-1.5 px-2.5" disabled={busy} onClick={() => inline.run(account)}>
-                  {busy ? <Loader2 className="size-3.5 animate-spin" /> : <inline.icon className="size-3.5" />}
+                <Button size="sm" variant={health.tone === "error" ? "default" : "outline"} className="h-8 gap-1.5 px-2.5" loading={busy} onClick={() => inline.run(account)}>
+                  <inline.icon className="size-3.5" />
                   <span className="hidden sm:inline">{inline.label}</span>
                   <span className="sr-only sm:hidden">{inline.label}</span>
                 </Button>

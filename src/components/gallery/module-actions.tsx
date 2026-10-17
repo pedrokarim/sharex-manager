@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { LoadingState } from "@/components/loading";
 import { FileInfo } from "@/types/files";
 import { ModuleConfig } from "@/types/modules";
 import { moduleLogoUrl } from "@/lib/modules/branding";
 import {
   Wand2,
-  Loader2,
   Sparkles,
   Settings2,
   ChevronLeft,
@@ -371,7 +372,7 @@ export function ModuleActions({
       return (
         <div className="pointer-events-none p-4">
           <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-background/80 shadow-lg backdrop-blur">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <Spinner className="size-4 text-muted-foreground" />
           </div>
         </div>
       );
@@ -379,7 +380,7 @@ export function ModuleActions({
 
     return (
       <div className="flex items-center justify-center p-1">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin text-muted-foreground" />
+        <Spinner aria-hidden className="mr-2 size-4 text-muted-foreground" />
         <span className="text-xs text-muted-foreground">
           {t("gallery.file_viewer.modules.loading")}
         </span>
@@ -425,9 +426,12 @@ export function ModuleActions({
 
     if (!moduleComponent) {
       return (
-        <div className="flex justify-center p-8">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
+        <LoadingState
+          label={t("modules.common.loading")}
+          state="shaping"
+          size="md"
+          className="py-8"
+        />
       );
     }
 
@@ -435,9 +439,12 @@ export function ModuleActions({
     return (
       <Suspense
         fallback={
-          <div className="flex justify-center p-8">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
+          <LoadingState
+            label={t("modules.common.loading")}
+            state="shaping"
+            size="md"
+            className="py-8"
+          />
         }
       >
         <ModuleUIComponent
@@ -574,7 +581,7 @@ export function ModuleActions({
                           >
                             <span className="flex h-4 w-4 items-center justify-center">
                               {processingModule === module.name ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <Spinner className="size-4" />
                               ) : (
                                 renderModuleIcon(module)
                               )}
@@ -775,7 +782,7 @@ export function ModuleActions({
               <div className="flex items-center gap-2 w-full">
                 <div className="flex-shrink-0">
                   {processingModule === module.name ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Spinner className="size-4" />
                   ) : module.icon ? (
                     <img
                       src={module.icon}

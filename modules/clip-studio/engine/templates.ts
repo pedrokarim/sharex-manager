@@ -292,7 +292,7 @@ function box(
   };
 }
 
-/** Fond d'un segment : l'image fournie sous un voile, sinon un aplat de la teinte du segment. */
+/** Fond d'un segment : l'image fournie sous un voile (retiré par une marque), sinon un aplat de la teinte du segment. */
 function background(b: Builder, start: number, duration: number, image: MediaSource | undefined, accent: number, motionIndex: number) {
   if (image) {
     const item: ImageItem = {
@@ -309,7 +309,8 @@ function background(b: Builder, start: number, duration: number, image: MediaSou
       animOut: { kind: "none", frames: 10 },
     };
     b.add("Principale", item);
-    // Voile : le texte reste lisible sur n'importe quelle image.
+    // Voile sombre du thème par défaut. Une marque le rend transparent : l'image
+    // reste éclatante et chaque texte reçoit sa propre étiquette ou son contour.
     b.add("Voile", box(b, start, duration, { y: 0.5, height: 1, width: 1 }, { paint: "veil" }, { opacity: 0.42, radius: 0, animIn: "none" }));
   } else {
     b.add("Principale", box(b, start, duration, { y: 0.5, height: 1, width: 1 }, { paint: "plate", accent }, { radius: 0, animIn: "fade" }));
@@ -337,8 +338,8 @@ const ICON_RADIUS = 0.22;
  * Icône ou logo officiel d'un sujet, posé à côté de son nom : coins
  * arrondis, petite ombre, apparition en éclosion. Une icône carrée (icône
  * d'appli) remplit sa carte ; un logo plus large ou plus haut est posé dans
- * une carte claire à sa mesure. Ombre et carte suivent le thème (voile et
- * surface) comme les autres cadres. Sans icône, rien n'est posé : le rendu
+ * une carte claire à sa mesure. La carte suit le thème (surface), l'ombre reste
+ * noire et légère. Sans icône, rien n'est posé : le rendu
  * reste celui d'avant.
  */
 function iconSlot(b: Builder, icon: MediaSource | undefined, start: number, duration: number, place: IconPlace) {
@@ -359,7 +360,7 @@ function iconSlot(b: Builder, icon: MediaSource | undefined, start: number, dura
   const y = place.bottom !== undefined ? place.bottom - height / 2 : place.y ?? 0.5;
   const animIn = { kind: ICON_ANIM_IN.kind, frames: Math.max(1, Math.round(ICON_ANIM_IN.seconds * b.fps)) };
   const animOut = { kind: "fade", frames: 6 };
-  const card = (paint: "veil" | "surface", dy: number, opacity: number): ShapeItem => ({
+  const card = (paint: "shadow" | "surface", dy: number, opacity: number): ShapeItem => ({
     id: uid("s-"),
     type: "shape",
     shape: "rect",
@@ -390,7 +391,7 @@ function iconSlot(b: Builder, icon: MediaSource | undefined, start: number, dura
   } satisfies ImageItem);
   if (logo) b.add("Icônes", card("surface", 0, 1));
   // Ombre portée : la même carte, sombre et décalée vers le bas, sous les autres cadres.
-  b.add("Cadres", card("veil", (side * 0.06) / H, 0.35));
+  b.add("Cadres", card("shadow", (side * 0.06) / H, 0.35));
 }
 
 // ─── Quiz ────────────────────────────────────────────────────────

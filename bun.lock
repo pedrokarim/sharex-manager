@@ -71,6 +71,7 @@
         "fflate": "^0.8.3",
         "framer-motion": "^12.43.0",
         "idb-keyval": "^6.3.0",
+        "img-fx": "0.5.1",
         "input-otp": "^1.4.2",
         "jotai": "^2.20.2",
         "lru-cache": "^11.5.2",
@@ -106,6 +107,7 @@
         "streamdown": "^2.5.0",
         "tailwind-merge": "^3.6.0",
         "tesseract.js": "^7.0.0",
+        "thinking-orbs": "0.3.2",
         "three": "^0.185.1",
         "tippy.js": "^6.3.7",
         "ts-command-line-args": "^2.5.1",
@@ -2049,6 +2051,8 @@
 
     "ignore": ["ignore@5.3.2", "", {}, "sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g=="],
 
+    "img-fx": ["img-fx@0.5.1", "", { "peerDependencies": { "react": ">=18.0.0", "react-dom": ">=18.0.0", "three": ">=0.149.0" } }, "sha512-CXIFGoGgK5F80d8I+VXZ96dmfkWqb4EGpecAIVXVXhuUVqCe1571Xhf5oGZ4qmTce0UoTfNMKLQDOgSAbIbH0w=="],
+
     "immer": ["immer@11.1.15", "", {}, "sha512-VrNANlmnWQnh5COXIIOQXM9oOJw7naGKlBT74ZOOR6lpVXc3gFEu9FJLDFcpCJ2j+NWr8TIwtWD//T6ZX6TKiQ=="],
 
     "import-fresh": ["import-fresh@3.3.1", "", { "dependencies": { "parent-module": "^1.0.0", "resolve-from": "^4.0.0" } }, "sha512-TR3KfrTZTYLPB6jUjfx6MF9WcWrHL9su5TObK4ZkYgBdWKPOFoSoQIdEuTuR82pmtxH2spWG9h6etwfr1pLBqQ=="],
@@ -2892,6 +2896,8 @@
     "tesseract.js": ["tesseract.js@7.0.0", "", { "dependencies": { "bmp-js": "^0.1.0", "idb-keyval": "^6.2.0", "is-url": "^1.2.4", "node-fetch": "^2.6.9", "opencollective-postinstall": "^2.0.3", "regenerator-runtime": "^0.13.3", "tesseract.js-core": "^7.0.0", "wasm-feature-detect": "^1.8.0", "zlibjs": "^0.3.1" } }, "sha512-exPBkd+z+wM1BuMkx/Bjv43OeLBxhL5kKWsz/9JY+DXcXdiBjiAch0V49QR3oAJqCaL5qURE0vx9Eo+G5YE7mA=="],
 
     "tesseract.js-core": ["tesseract.js-core@7.0.0", "", {}, "sha512-WnNH518NzmbSq9zgTPeoF8c+xmilS8rFIl1YKbk/ptuuc7p6cLNELNuPAzcmsYw450ca6bLa8j3t0VAtq435Vw=="],
+
+    "thinking-orbs": ["thinking-orbs@0.3.2", "", { "peerDependencies": { "react": ">=18.0.0" } }, "sha512-QZFeBaPEzqhjiZoXy961EvDgaXk2WgXacF3Rbz+Sj5IfzDzBvTC86vdREUHniBffYibJFKSwbfllxLUdI/Xv6g=="],
 
     "three": ["three@0.185.1", "", {}, "sha512-5aojFCXKwnjBRZvUnt3WFfEcvUJgkN5LlijRFN95hMy8WVkG4I0QNcJE+OuWvuJ0bOdStrbfXn0pkd6/QyiAlg=="],
 

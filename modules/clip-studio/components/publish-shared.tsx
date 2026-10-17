@@ -13,7 +13,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CircleAlert, CircleCheck, CircleDashed, ExternalLink, KeyRound, Loader2, RotateCcw, ShieldAlert, SquareArrowOutUpRight, X } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleDashed, ExternalLink, KeyRound, RotateCcw, ShieldAlert, SquareArrowOutUpRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -408,8 +408,8 @@ export function JobTimeline({
                   </a>
                 ) : null}
                 {canRetry ? (
-                  <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" disabled={busy === job.id} onClick={() => void act(job.id, retryJobAction)}>
-                    {busy === job.id ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
+                  <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" loading={busy === job.id} onClick={() => void act(job.id, retryJobAction)}>
+                    <RotateCcw className="size-3.5" />
                     Reprendre
                   </Button>
                 ) : null}

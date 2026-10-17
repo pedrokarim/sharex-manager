@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown, ArrowUp, Check, ExternalLink, Globe, LayoutList, Link2, ListPlus, ListVideo, Loader2, Lock, PencilLine, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ExternalLink, Globe, LayoutList, Link2, ListPlus, ListVideo, Lock, PencilLine, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { CharacterCount } from "@/components/ui/character-count";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,7 +32,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { cn } from "@/lib/utils";
 import { resolveManualUrl } from "@/lib/connections/profile";
 import type { AccountSummary, ConnectionCapability, PlaylistInput, PlaylistSummary, PostPrivacy, PostSummary, ProfileSection } from "@/lib/connections/types";
 import type { ConnectorView } from "@/components/connections/types";
@@ -183,8 +183,8 @@ function HomeSections({
               </a>
             </Button>
           ) : null}
-          <Button size="sm" variant="ghost" className="gap-1.5" disabled={sections.status === "loading"} onClick={() => void load()}>
-            <RefreshCw className={cn(sections.status === "loading" && "animate-spin")} />
+          <Button size="sm" variant="ghost" className="gap-1.5" loading={sections.status === "loading"} onClick={() => void load()}>
+            <RefreshCw />
             Relire
           </Button>
         </div>
@@ -229,7 +229,7 @@ function HomeSections({
                   </span>
                   {canEdit ? (
                     <span className="flex shrink-0 items-center gap-0.5">
-                      {busy === section.id ? <Loader2 className="size-4 animate-spin text-muted-foreground" /> : null}
+                      {busy === section.id ? <Spinner className="size-4 text-muted-foreground" /> : null}
                       <Button
                         size="icon-sm"
                         variant="ghost"
@@ -301,12 +301,13 @@ function HomeSections({
             <Button
               size="sm"
               className="gap-1.5"
+              loading={busy === "add"}
               disabled={busy !== null || !type || (type.needsPlaylist && !addPlaylist)}
               onClick={() =>
                 void apply("add", () => addSectionAction(account.id, { type: addType, ...(type?.needsPlaylist ? { playlistId: addPlaylist } : {}) }), "Section ajoutée")
               }
             >
-              {busy === "add" ? <Loader2 className="animate-spin" /> : <Plus />}
+              <Plus />
               Ajouter
             </Button>
           </div>
@@ -381,8 +382,8 @@ function Playlists({
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <AccessButton access={access} serviceLabel={connector.label} />
-          <Button size="sm" variant="ghost" className="gap-1.5" disabled={playlists?.status === "loading"} onClick={onReload}>
-            <RefreshCw className={cn(playlists?.status === "loading" && "animate-spin")} />
+          <Button size="sm" variant="ghost" className="gap-1.5" loading={playlists?.status === "loading"} onClick={onReload}>
+            <RefreshCw />
             Relire
           </Button>
           {canEdit ? (
@@ -531,7 +532,7 @@ function AddVideoButton({ accountId, playlist, onAdded }: { accountId: string; p
                 <CommandGroup>
                   {videos.data.map((video) => (
                     <CommandItem key={video.id} value={video.id} keywords={[video.title]} disabled={adding !== null} onSelect={() => void add(video)} className="min-w-0 gap-2">
-                      {adding === video.id ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Check className="size-4 shrink-0 opacity-0" />}
+                      {adding === video.id ? <Spinner className="size-4 shrink-0" /> : <Check className="size-4 shrink-0 opacity-0" />}
                       {video.thumbnailUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element -- miniature servie par le service
                         <img src={video.thumbnailUrl} alt="" referrerPolicy="no-referrer" className="aspect-video w-16 shrink-0 rounded-sm bg-muted object-cover" />
@@ -652,8 +653,7 @@ function PlaylistDialog({
           </div>
         </form>
         <DialogFooter>
-          <Button type="submit" form="playlist-form" disabled={busy || !input.title.trim() || tooLong || unchanged} className="gap-2">
-            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+          <Button type="submit" form="playlist-form" loading={busy} disabled={!input.title.trim() || tooLong || unchanged} className="gap-2">
             {creating ? "Créer" : "Enregistrer"}
           </Button>
         </DialogFooter>

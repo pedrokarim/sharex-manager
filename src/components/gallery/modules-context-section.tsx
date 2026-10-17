@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Loader2, Puzzle, SlidersHorizontal } from "lucide-react";
+import { Puzzle, SlidersHorizontal } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import {
   ContextMenuItem,
   ContextMenuLabel,
@@ -59,7 +60,7 @@ export function ModulesContextSection({ files }: ModulesContextSectionProps) {
         <ContextMenuSubContent className="w-64">
           {loading && (
             <ContextMenuItem disabled>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner aria-hidden className="mr-2 size-4" />
               Chargement…
             </ContextMenuItem>
           )}

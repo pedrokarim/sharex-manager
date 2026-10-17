@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Mail, MessageSquare, Send, User } from "lucide-react";
+import { Mail, MessageSquare, Send, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { FIELD, FIELD_AREA, PILL_SOLID } from "@/components/front/styles";
@@ -149,18 +149,13 @@ export function ContactForm() {
         />
       </div>
 
-      <Button type="submit" className={cn(PILL_SOLID, "justify-center")} disabled={isSending}>
-        {isSending ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Envoi en cours…
-          </>
-        ) : (
-          <>
-            <Send className="h-4 w-4" />
-            {isSent ? "Envoyer un autre message" : "Envoyer le message"}
-          </>
-        )}
+      <Button type="submit" className={cn(PILL_SOLID, "justify-center")} loading={isSending}>
+        <Send className="h-4 w-4" />
+        {isSending
+          ? "Envoi en cours…"
+          : isSent
+            ? "Envoyer un autre message"
+            : "Envoyer le message"}
       </Button>
     </form>
   );

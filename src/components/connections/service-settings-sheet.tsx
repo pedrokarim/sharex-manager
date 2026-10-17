@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { CircleAlert, Loader2, X } from "lucide-react";
+import { CircleAlert, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
@@ -103,8 +103,7 @@ export function BudgetSection({ connector, billing, onChange }: { connector: Con
               </InputGroupAddon>
             </InputGroup>
           </div>
-          <Button type="submit" variant="outline" disabled={busy || invalid || unchanged} className="gap-2">
-            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+          <Button type="submit" variant="outline" loading={busy} disabled={invalid || unchanged} className="gap-2">
             Enregistrer
           </Button>
         </form>

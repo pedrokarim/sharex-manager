@@ -3,10 +3,12 @@
 import { BrandLogo, type Brand } from "@/components/brand-logo";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { AudioLines, Download, HardDrive, Loader2, Mars, Play, Search, Settings2, Square, Venus } from "lucide-react";
+import { AudioLines, Download, HardDrive, Mars, Play, Search, Settings2, Square, Venus } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { callModule } from "../lib/client";
 import type { VoiceSource, VoiceStatus } from "../lib/tts";
@@ -159,7 +161,7 @@ export function VoiceListenButton({ request, provider, className }: { request: S
         className
       )}
     >
-      {mine === "loading" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : mine === "playing" ? <Square className="h-3 w-3 fill-current" /> : <Play className="h-3.5 w-3.5" />}
+      {mine === "loading" ? <Spinner className="size-3.5" aria-hidden /> : mine === "playing" ? <Square className="h-3 w-3 fill-current" /> : <Play className="h-3.5 w-3.5" />}
     </button>
   );
 }
@@ -324,9 +326,9 @@ export function VoicePicker({
   if (!voices) {
     return (
       <div className="space-y-2">
-        <div className="h-7 w-2/3 animate-pulse rounded-md bg-muted" />
+        <Skeleton className="h-7 w-2/3 rounded-md" />
         {[0, 1, 2].map((index) => (
-          <div key={index} className="h-11 animate-pulse rounded-lg bg-muted" />
+          <Skeleton key={index} className="h-11 rounded-lg" />
         ))}
       </div>
     );
@@ -483,7 +485,7 @@ export function VoicePicker({
                               : voice.description}
                         </span>
                       </span>
-                      {state.status === "downloading" && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />}
+                      {state.status === "downloading" && <Spinner className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
                       {(state.status === "missing" || state.status === "error") && (
                         <span title="Téléchargée au premier usage">
                           <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

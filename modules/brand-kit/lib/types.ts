@@ -59,6 +59,49 @@ export type FormatId = (typeof FORMAT_IDS)[number];
 export const MASCOT_FORMAT_IDS = ["banner", "avatar", "x-header", "short-cover"] as const;
 export type MascotFormatId = (typeof MASCOT_FORMAT_IDS)[number];
 
+// ─── Bibliothèque de poses (dossier 07 sexies, D2) ───────────────
+
+/** Émotion qu'exprime une pose ; libellés français dans `mascot.ts`. */
+export const POSE_EMOTIONS = ["joy", "excitement", "surprise", "shock", "thinking", "doubt", "disappointment", "sadness", "anger", "mischief", "pride", "neutral"] as const;
+export type PoseEmotion = (typeof POSE_EMOTIONS)[number];
+
+/** Geste de la pose. `idle` : aucun geste marqué. */
+export const POSE_GESTURES = [
+  "pointing",
+  "leaning",
+  "arms-raised",
+  "hands-on-cheeks",
+  "thumbs-up",
+  "chin-in-hand",
+  "waving",
+  "showing-object",
+  "presenting",
+  "shrugging",
+  "arms-crossed",
+  "hands-on-hips",
+  "facepalm",
+  "finger-on-lips",
+  "recoiling",
+  "idle",
+] as const;
+export type PoseGesture = (typeof POSE_GESTURES)[number];
+
+/** Cadrage : en pied, buste, visage. */
+export const POSE_FRAMINGS = ["full", "bust", "face"] as const;
+export type PoseFraming = (typeof POSE_FRAMINGS)[number];
+
+/** Côté de l'image vers lequel la pose regarde ou pointe : on la place en regard du contenu. */
+export const POSE_FACINGS = ["left", "front", "right"] as const;
+export type PoseFacing = (typeof POSE_FACINGS)[number];
+
+/** Étiquettes d'une pose de la mascotte, qui servent à la choisir (`pickPose`). */
+export interface PoseTags {
+  emotion: PoseEmotion;
+  gesture: PoseGesture;
+  framing: PoseFraming;
+  facing: PoseFacing;
+}
+
 export interface BrandAsset {
   id: string;
   /** Nom de fichier dans data/kits/<kitId>/assets/. */
@@ -66,6 +109,8 @@ export interface BrandAsset {
   kind: AssetKind;
   label: string;
   note?: string;
+  /** Pose de la mascotte seulement : ses étiquettes (proposées d'après le libellé pour une pose d'avant). */
+  pose?: PoseTags;
   width: number;
   height: number;
   /** Image générée : consigne, collection et travail d'AI Image Gen, pour la refaire. */
@@ -196,6 +241,13 @@ export interface BrandKit {
   palette: BrandPalette;
   fonts: BrandFont[];
   textStyles: Record<TextRole, TextStyle>;
+  /**
+   * Avertissement de lecture (jamais enregistré) : la police monospace d'un
+   * rôle de texte a été remplacée par une police de texte lisible.
+   */
+  typographyNotice?: string;
+  /** Trame Riso légère (points d'encre) sur les aplats unis des vidéos, jamais sur une image. */
+  halftone?: boolean;
   assets: BrandAsset[];
   logoAssetId?: string;
   markAssetId?: string;
@@ -240,6 +292,10 @@ export const KIT_LIMITS = {
   scriptTone: 600,
   identityPrompt: 1500,
   assets: 120,
+  /** Poses de la bibliothèque de la mascotte. */
+  poses: 60,
+  /** Poses demandées en une seule génération. */
+  poseRequests: 12,
   fonts: 12,
   extras: 8,
   tags: 30,

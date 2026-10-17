@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Download, Link2, Loader2 } from "lucide-react";
+import { CheckCircle2, Download, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -441,8 +441,7 @@ export function LinkImportPanel({ chapter, initialLink, onChanged }: LinkImportP
                       {offeredNumber && offeredTitle ? " et " : ""}
                       {offeredTitle ? `le titre « ${offeredTitle} »` : ""}. Le vôtre n’en a pas encore.
                     </p>
-                    <Button type="button" variant="outline" size="sm" className="gap-2" disabled={filling} onClick={() => void fill()}>
-                      {filling && <Loader2 className="h-4 w-4 animate-spin" />}
+                    <Button type="button" variant="outline" size="sm" className="gap-2" loading={filling} onClick={() => void fill()}>
                       {offeredTitle && offeredNumber ? "Reprendre le numéro et le titre" : offeredTitle ? "Reprendre ce titre" : "Reprendre ce numéro"}
                     </Button>
                   </div>
@@ -467,8 +466,8 @@ export function LinkImportPanel({ chapter, initialLink, onChanged }: LinkImportP
 
         <CardFooter className="flex-wrap gap-2 border-t">
           {phase === "link" && (
-            <Button type="button" className="gap-2" disabled={lookup.state !== "ready" || starting} onClick={() => void start()}>
-              {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            <Button type="button" className="gap-2" loading={starting} disabled={lookup.state !== "ready"} onClick={() => void start()}>
+              <Download className="h-4 w-4" />
               {lookup.state === "ready" ? `Récupérer ${countLabel(lookup.preview.pageCount, "page", "pages")}` : "Récupérer"}
             </Button>
           )}

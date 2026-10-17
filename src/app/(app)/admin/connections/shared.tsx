@@ -7,9 +7,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -61,8 +61,7 @@ export function RenameDialog({
           <Input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={account?.name} maxLength={100} autoFocus />
         </form>
         <DialogFooter>
-          <Button type="submit" form="rename-account-form" disabled={busy} className="gap-2">
-            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+          <Button type="submit" form="rename-account-form" loading={busy} className="gap-2">
             Enregistrer
           </Button>
         </DialogFooter>
@@ -112,7 +111,7 @@ export function DisconnectDialog({
               onDisconnected(account.id);
             }}
           >
-            {busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+            {busy ? <Spinner className="mr-2 size-4" /> : null}
             Déconnecter
           </AlertDialogAction>
         </AlertDialogFooter>

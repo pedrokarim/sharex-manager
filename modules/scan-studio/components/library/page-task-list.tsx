@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, Clock3, Loader2, Minus, TriangleAlert } from "lucide-react";
+import { Check, Clock3, Minus, TriangleAlert } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
 export type PageTaskState = "waiting" | "running" | "done" | "skipped" | "error";
@@ -27,7 +28,7 @@ const STATE_LABELS: Record<PageTaskState, string> = {
 
 function StateIcon({ state }: { state: PageTaskState }) {
   const className = "h-3.5 w-3.5 shrink-0";
-  if (state === "running") return <Loader2 aria-hidden className={cn(className, "animate-spin text-primary")} />;
+  if (state === "running") return <Spinner aria-hidden className="size-3.5 shrink-0 text-primary" />;
   if (state === "done") return <Check aria-hidden className={cn(className, "text-emerald-600 dark:text-emerald-400")} />;
   if (state === "error") return <TriangleAlert aria-hidden className={cn(className, "text-destructive")} />;
   if (state === "skipped") return <Minus aria-hidden className={cn(className, "text-muted-foreground/60")} />;

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -136,10 +136,11 @@ export function SendButton({ action, scope, model, label, disabled, onSend }: Se
           variant="outline"
           size="sm"
           className="h-7 w-full gap-1.5 text-[11px]"
+          loading={running === action}
           disabled={!usable}
           onClick={() => (model && wasAcknowledged(action, model.provider) ? send() : setConfirming(true))}
         >
-          {running === action && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          <Sparkles className="size-3.5" />
           {running === action ? "Réponse attendue…" : label}
         </Button>
       )}
@@ -222,8 +223,8 @@ export function UsageNote({ catalogue, onSaved }: { catalogue: AiCatalogue; onSa
               onChange={(event) => setLimit(event.target.value)}
             />
             <InputGroupAddon align="inline-end">
-              <InputGroupButton type="submit" disabled={!valid || saving}>
-                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Enregistrer"}
+              <InputGroupButton type="submit" loading={saving} disabled={!valid}>
+                Enregistrer
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>

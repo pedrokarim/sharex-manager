@@ -1,9 +1,4 @@
-import { Loader2 } from "lucide-react";
 import { siDiscord, siGithub, siX } from "simple-icons";
-
-export const Icons = {
-	spinner: Loader2,
-};
 
 // lucide-react v1 a retiré les icônes de marque. On reprend le tracé de
 // simple-icons en gardant l'API des icônes lucide (size, className, ...props).

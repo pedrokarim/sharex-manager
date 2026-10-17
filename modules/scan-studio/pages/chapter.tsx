@@ -35,7 +35,6 @@ import {
   Images,
   Languages,
   Link2,
-  Loader2,
   PackageOpen,
   PenLine,
   RefreshCw,
@@ -48,11 +47,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImagePickerDialog, type PickedImage } from "@/components/gallery/image-picker-dialog";
+import { Orb } from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { Spinner } from "@/components/ui/spinner";
 import { AnalyzeDialog } from "../components/library/analyze-dialog";
 import { dismissChapterJob, jobProgress, stopChapterJob, useChapterJob, type ChapterJob, type ChapterJobKind, type PageJob } from "../lib/chapter-jobs";
 import { buildChapterArchive, saveBlob } from "../components/library/archive-export";
@@ -860,7 +861,7 @@ function ChapterJobBar({ job, pageNumbers, onStop, onDismiss, onSkip }: ChapterJ
     <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 px-4 py-3" role="status" aria-live="polite">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         {job.running ? (
-          <Loader2 aria-hidden className="h-4 w-4 shrink-0 animate-spin text-amber-600 dark:text-amber-400" />
+          <Orb size="sm" state={job.kind === "analyze" ? "solving" : "weaving"} className="shrink-0 text-primary" />
         ) : job.failure ? (
           <TriangleAlert aria-hidden className="h-4 w-4 shrink-0 text-destructive" />
         ) : (
@@ -869,7 +870,7 @@ function ChapterJobBar({ job, pageNumbers, onStop, onDismiss, onSkip }: ChapterJ
         <p className="min-w-0 flex-1 text-sm">
           {job.running ? (
             <>
-              <span className="font-medium">{job.stopping ? `${name} : arrêt après la page en cours…` : `${name} en cours, en arrière-plan`}</span>
+              <span className="font-medium shimmer">{job.stopping ? `${name} : arrêt après la page en cours…` : `${name} en cours, en arrière-plan`}</span>
               <span className="tabular-nums text-muted-foreground">
                 {" "}
                 · {settled} sur {total}
@@ -984,7 +985,7 @@ function PageTile({ page, index, total, sorting, job, jobKind, onOpen, onMove, o
                 {job.state === "queued" ? (
                   <Clock3 className="size-3.5" />
                 ) : job.state === "running" ? (
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <Spinner className="size-3.5" />
                 ) : job.state === "done" ? (
                   <Check className="size-3.5" />
                 ) : (

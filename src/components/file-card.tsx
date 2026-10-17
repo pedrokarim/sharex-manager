@@ -25,6 +25,7 @@ import {
   showThumbnailsAtom,
 } from "@/lib/atoms/preferences";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   AlertDialog,
@@ -240,7 +241,7 @@ export function FileCard({
           {isImage ? (
             showThumbnails ? (
               <>
-              {!thumbLoaded && <div aria-hidden className="absolute inset-0 animate-pulse bg-foreground/10" />}
+              {!thumbLoaded && <Skeleton aria-hidden className="absolute inset-0 rounded-none bg-foreground/10" />}
               <Image
                 src={previewUrl}
                 alt={file.name}

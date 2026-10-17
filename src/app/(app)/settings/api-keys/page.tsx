@@ -11,6 +11,7 @@ import { useDateLocale } from "@/lib/i18n/date-locales";
 import { CreateApiKeyDialog } from "@/components/api-keys/create-api-key-dialog";
 import { ApiKeyDetailsDialog } from "@/components/api-keys/api-key-details-dialog";
 import { Button } from "@/components/ui/button";
+import { LoadingState } from "@/components/loading";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -36,7 +37,6 @@ import {
   EyeOff,
   Info,
   KeyRound,
-  Loader2,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -182,12 +182,11 @@ export default function ApiKeysPage() {
         <div>
           <div className="space-y-3 sm:hidden">
             {loading ? (
-              <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border/60 bg-muted/20 py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">
-                  {t("settings.api_keys.loading")}
-                </p>
-              </div>
+              <LoadingState
+                size="md"
+                label={t("settings.api_keys.loading")}
+                className="rounded-xl border border-border/60 bg-muted/20"
+              />
             ) : keys.length === 0 ? (
               <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
                 {t("settings.api_keys.no_keys.description")}
@@ -347,12 +346,7 @@ export default function ApiKeysPage() {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={7}>
-                      <div className="flex flex-col items-center justify-center gap-2 py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        <p className="text-sm text-muted-foreground">
-                          {t("settings.api_keys.loading")}
-                        </p>
-                      </div>
+                      <LoadingState size="md" label={t("settings.api_keys.loading")} />
                     </TableCell>
                   </TableRow>
                 ) : keys.length === 0 ? (

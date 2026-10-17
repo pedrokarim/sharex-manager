@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, lazy, Suspense } from "react";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { LoadingState } from "@/components/loading";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useTranslation } from "@/lib/i18n";
 import { TopIpsChart } from "./top-ips-chart";
@@ -46,9 +47,7 @@ export function StatsNetworkTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <LoadingState fill />
     );
   }
 
@@ -79,9 +78,8 @@ export function StatsNetworkTab() {
       {data.geoMarkers.length > 0 && (
         <Suspense
           fallback={
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
+            // Même boîte que la carte : rien ne saute à son arrivée.
+            <LoadingState size="md" className="aspect-[2/1] w-full rounded-xl border" />
           }
         >
           <IPWorldMap markers={data.geoMarkers} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, CircleDashed, ExternalLink, ImagePlus, Loader2, Pencil, RefreshCw, Trash2, Circle, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -92,6 +92,12 @@ interface AssetGalleryProps extends FileSectionProps {
   emptyText: string;
   /** Titre du sélecteur d'image. */
   pickerTitle: string;
+  /** Filtre de la grille (bibliothèque de poses) ; l'ajout reste toujours possible. */
+  filter?: (asset: BrandAsset) => boolean;
+  /** Phrase quand le filtre ne laisse rien. */
+  filteredEmptyText?: string;
+  /** Contenu ajouté sous le libellé de chaque vignette (étiquettes d'une pose). */
+  renderExtra?: (asset: BrandAsset) => ReactNode;
 }
 
 /**
@@ -100,7 +106,7 @@ interface AssetGalleryProps extends FileSectionProps {
  * supprimer) et dépôt de fichiers par glisser. L'ajout passe par le
  * sélecteur commun ; le dépôt reste un raccourci.
  */
-export function AssetGallery({ kit, update, runOperation, kinds, addKind, roles = [], emptyText, pickerTitle }: AssetGalleryProps) {
+export function AssetGallery({ kit, update, runOperation, kinds, addKind, roles = [], emptyText, pickerTitle, filter, filteredEmptyText, renderExtra }: AssetGalleryProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [adding, setAdding] = useState(0);
   const [busyAsset, setBusyAsset] = useState<string | null>(null);
@@ -108,7 +114,8 @@ export function AssetGallery({ kit, update, runOperation, kinds, addKind, roles 
   const [doomed, setDoomed] = useState<BrandAsset | null>(null);
   const [redoing, setRedoing] = useState<BrandAsset | null>(null);
 
-  const assets = kit.assets.filter((asset) => kinds.includes(asset.kind));
+  const ofKind = kit.assets.filter((asset) => kinds.includes(asset.kind));
+  const assets = filter ? ofKind.filter(filter) : ofKind;
   const full = kit.assets.length >= KIT_LIMITS.assets;
 
   const add = async (task: () => Promise<BrandKit>) => {
@@ -183,6 +190,7 @@ export function AssetGallery({ kit, update, runOperation, kinds, addKind, roles 
                 onRole={(role) => update((draft) => assignRole(draft, asset, role))}
                 onDelete={() => setDoomed(asset)}
                 onRedo={() => setRedoing(asset)}
+                extra={renderExtra?.(asset)}
               />
             </motion.li>
           ))}
@@ -212,7 +220,9 @@ export function AssetGallery({ kit, update, runOperation, kinds, addKind, roles 
           </li>
         )}
       </ul>
-      {assets.length === 0 && adding === 0 && <p className="pt-2 text-xs text-muted-foreground">{emptyText}</p>}
+      {assets.length === 0 && adding === 0 && (
+        <p className="pt-2 text-xs text-muted-foreground">{ofKind.length > 0 ? (filteredEmptyText ?? "Aucune image pour ce filtre.") : emptyText}</p>
+      )}
 
       <ImagePickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={addPicked} title={pickerTitle} description={ASSET_KIND_LABELS[addKind]} />
 
@@ -253,6 +263,7 @@ function AssetTile({
   onRole,
   onDelete,
   onRedo,
+  extra,
 }: {
   kit: BrandKit;
   asset: BrandAsset;
@@ -265,6 +276,7 @@ function AssetTile({
   onRole: (role: AssetRole) => void;
   onDelete: () => void;
   onRedo: () => void;
+  extra?: ReactNode;
 }) {
   const url = kitAssetUrl(kit.id, asset.file);
   const held = (["logo", "mark", "watermark", "end-pose"] as AssetRole[]).filter((role) => holds(kit, asset, role));
@@ -349,6 +361,7 @@ function AssetTile({
               {check.label}
             </span>
           )}
+          {extra}
         </AttachmentContent>
         <AttachmentActions>
           <ObjectMenuButton

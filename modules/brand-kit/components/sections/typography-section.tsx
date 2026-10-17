@@ -2,9 +2,10 @@
 
 import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Trash2, Upload } from "lucide-react";
+import { Loader2, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DropZone } from "@/components/ui/drop-zone";
 import { FontPicker } from "@/components/ui/font-picker";
@@ -12,22 +13,18 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TEXT_ROLES, themedTextStyle } from "@/modules/clip-studio/engine/brand";
+import { legibleStyle } from "@/modules/clip-studio/engine/legibility";
 import type { ClipProject, ClipItem, TextRole, TextStyle, Track, Transform } from "@/modules/clip-studio/engine/types";
-import { FONTS } from "@/modules/clip-studio/lib/font-catalog";
+import { FONTS, nearestCatalogWeight } from "@/modules/clip-studio/lib/font-catalog";
 import { api, errorMessage } from "../../lib/client";
 import { toBrandTheme } from "../../lib/theme";
 import { KIT_LIMITS, kitAssetUrl, type BrandFont, type BrandKit } from "../../lib/types";
+import { isMonospaceFamily, TEXT_FONT_ROLES, TEXT_ROLE_LABELS, textFontOf, typographyWarnings } from "../../lib/typography";
 import { ColorField, ConfirmDialog, Field, FieldGroup, SectionHeading, SliderField, SteppedSliderField, formatNumber, formatPercent } from "../fields";
 import { FormatCanvas } from "../format-preview";
 import type { FileSectionProps } from "./types";
 
-export const ROLE_LABELS: Record<TextRole, string> = {
-  title: "Titre",
-  subtitle: "Sous-titre",
-  caption: "Légende",
-  label: "Étiquette",
-  body: "Texte sur carte",
-};
+export const ROLE_LABELS: Record<TextRole, string> = TEXT_ROLE_LABELS;
 
 const ROLE_SAMPLES: Record<TextRole, string> = {
   title: "Top 5 des sorties",
@@ -61,21 +58,28 @@ const still = { start: 0, duration: 30, animIn: { kind: "none" as const, frames:
 const box = (x: number, y: number, width: number, height: number, opacity = 1): Transform => ({ x, y, width, height, rotation: 0, opacity });
 const track = (id: string, item: ClipItem): Track => ({ id, kind: "visual", name: id, items: [item] });
 
-/** Aperçu d'un rôle : à gauche sur une image voilée, à droite sur un aplat (une carte pour le texte sur carte). */
+/**
+ * Aperçu d'un rôle, tel que les vidéos le dessinent : à gauche sur une image
+ * (étiquette ou contour posés par le moteur, sans voile), à droite sur un
+ * aplat (une carte pour le texte sur carte).
+ */
 function rolePreviewProject(kit: BrandKit, role: TextRole): ClipProject {
   const theme = toBrandTheme(kit);
   const background = kit.assets.find((asset) => asset.kind === "background");
   const photo = background ? kitAssetUrl(kit.id, background.file) : FALLBACK_PHOTO;
-  const style = themedTextStyle(theme, role === "label" ? { role, accent: 0 } : { role }, { size: ROLE_SIZES[role], align: "center" });
-  const text = (id: string, x: number) =>
-    track(id, { ...still, id, type: "text", text: ROLE_SAMPLES[role], style, fit: "shrink", transform: box(x, 0.5, 0.44, 0.8) });
+  const base = themedTextStyle(theme, role === "label" ? { role, accent: 0 } : { role }, { size: ROLE_SIZES[role], align: "center" });
   const plate = role === "body" ? theme.palette.surface : theme.palette.background;
+  const labelRadius = theme.textStyles.label?.background?.radius;
+  // Le texte sur carte est toujours sur sa carte ; les autres rôles, sur l'image à gauche.
+  const onImage = legibleStyle(base, role === "body" ? { kind: "flat", colors: [plate] } : { kind: "busy" }, theme.palette, { role, labelRadius });
+  const onPlate = legibleStyle(base, { kind: "flat", colors: [plate] }, theme.palette, { role, labelRadius });
+  const text = (id: string, x: number, style: TextStyle) =>
+    track(id, { ...still, id, type: "text", text: ROLE_SAMPLES[role], style, fit: "shrink", transform: box(x, 0.5, 0.44, 0.8) });
   const tracks: Track[] = [
-    text("text-image", 0.25),
-    text("text-plate", 0.75),
+    text("text-image", 0.25, onImage),
+    text("text-plate", 0.75, onPlate),
     ...(role === "body" ? [track("card", { ...still, id: "card", type: "shape", shape: "rect", fill: theme.palette.surface, radius: 0.1, transform: box(0.25, 0.5, 0.42, 0.5) } as ClipItem)] : []),
     track("plate", { ...still, id: "plate", type: "shape", shape: "rect", fill: plate, radius: 0, transform: box(0.75, 0.5, 0.5, 1) }),
-    track("veil", { ...still, id: "veil", type: "shape", shape: "rect", fill: theme.palette.background, radius: 0, transform: box(0.25, 0.5, 0.5, 1, 0.42) }),
     track("photo", {
       ...still,
       id: "photo",
@@ -88,6 +92,29 @@ function rolePreviewProject(kit: BrandKit, role: TextRole): ClipProject {
     }),
   ];
   return { version: 1, id: `role-${role}`, name: role, aspect: "16:9", ...PREVIEW, fps: 30, background: theme.palette.background, tracks, createdAt: 0, updatedAt: 0 };
+}
+
+/**
+ * Familles dont toutes les lettres ont la même largeur, mesurées une fois les
+ * polices chargées : une police de code que son nom ne trahit pas.
+ */
+function useMeasuredMonospace(kit: BrandKit, fontsReady: boolean, fontsVersion: number): ReadonlySet<string> {
+  const families = kit.fonts.map((font) => font.family).join("|");
+  return useMemo(() => {
+    const found = new Set<string>();
+    if (!fontsReady || typeof document === "undefined" || !families) return found;
+    const context = document.createElement("canvas").getContext("2d");
+    if (!context) return found;
+    for (const family of families.split("|")) {
+      context.font = `48px "${family}", serif`;
+      const narrow = context.measureText("iiiiiiii").width;
+      const wide = context.measureText("MMMMMMMM").width;
+      if (narrow > 0 && Math.abs(wide - narrow) / wide < 0.02) found.add(family);
+    }
+    return found;
+    // `fontsVersion` change quand une police importée finit de charger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [families, fontsReady, fontsVersion]);
 }
 
 /** Nom affiché d'une famille : catalogue, police importée, ou la famille telle quelle. */
@@ -130,9 +157,73 @@ export function TypographySection({ kit, update, runOperation, fontsVersion, fon
   const setStyle = (role: TextRole, patch: Partial<TextStyle>) =>
     update((draft) => ({ ...draft, textStyles: { ...draft.textStyles, [role]: { ...draft.textStyles[role], ...patch } } }));
 
+  /** Police de texte : posée d'un coup sur le sous-titre, la légende, l'étiquette et le texte sur carte. */
+  const setTextFont = (font: string) =>
+    update((draft) => ({
+      ...draft,
+      textStyles: Object.fromEntries(
+        Object.entries(draft.textStyles).map(([role, style]) =>
+          TEXT_FONT_ROLES.includes(role as TextRole) ? [role, { ...style, font, weight: nearestCatalogWeight(font, style.weight) }] : [role, style]
+        )
+      ) as BrandKit["textStyles"],
+    }));
+
+  const measured = useMeasuredMonospace(kit, fontsReady, fontsVersion);
+  const warnings = typographyWarnings(kit, measured);
+  const textFont = textFontOf(kit);
+  const fontGroups = (forText: boolean) => [
+    {
+      label: "Clip Studio",
+      fonts: FONTS.filter((font) => !forText || font.text).map((font) => ({ value: font.family, label: font.label, family: font.family, hint: font.weights.join(", ") })),
+    },
+    {
+      label: "Importées",
+      fonts: kit.fonts.map((font) => ({
+        value: font.family,
+        label: font.name,
+        family: font.family,
+        hint: isMonospaceFamily(kit, font.family) || measured.has(font.family) ? "Code seulement" : font.format.toUpperCase(),
+      })),
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeading title="Typographie" text="Polices de la marque et style de chaque rôle de texte, tels que les vidéos les dessinent : sur une image voilée à gauche, sur un aplat à droite." />
+      <SectionHeading title="Typographie" text="Une police de titre, une police de texte lisible, et le style de chaque rôle tel que les vidéos le dessinent : sur une image à gauche (étiquette ou contour posés d’office, contraste garanti), sur un aplat à droite." />
+
+      {(kit.typographyNotice || warnings.length > 0) && (
+        <Alert>
+          <TriangleAlert />
+          <AlertTitle>Police de texte</AlertTitle>
+          <AlertDescription className="min-w-0 break-words">
+            {kit.typographyNotice && <p>{kit.typographyNotice}</p>}
+            {warnings.map((warning) => (
+              <p key={warning}>{warning}</p>
+            ))}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <FieldGroup title="Polices des vidéos" text="Le titre garde sa police ; le sous-titre, la légende, l’étiquette et le texte sur carte prennent la police de texte. Une police monospace ne sert qu’au code.">
+        <div className="grid gap-4 @md/form:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <Field label="Police des titres" className="min-w-0">
+            <FontPicker
+              label="Police des titres"
+              value={kit.textStyles.title.font}
+              sample={ROLE_SAMPLES.title}
+              groups={fontGroups(false)}
+              onValueChange={(font) => setStyle("title", { font, weight: nearestCatalogWeight(font, kit.textStyles.title.weight) })}
+            />
+          </Field>
+          <Field label="Police de texte" className="min-w-0" hint="Poppins, Inter, Montserrat ou une police importée lisible.">
+            <FontPicker label="Police de texte" value={textFont} sample={ROLE_SAMPLES.caption} groups={fontGroups(true)} onValueChange={setTextFont} />
+          </Field>
+        </div>
+        <label className="flex items-center gap-2.5 text-sm">
+          <Switch checked={kit.halftone === true} onCheckedChange={(halftone) => update((draft) => ({ ...draft, halftone }))} />
+          Trame d’imprimerie légère sur les aplats unis (jamais sur une image)
+        </label>
+      </FieldGroup>
 
       <FieldGroup title="Polices importées" text={`TTF, OTF ou WOFF2, ${KIT_LIMITS.fonts} au plus, à déposer ici ou à importer. Elles s’ajoutent aux polices de Clip Studio.`}>
         <DropZone onFiles={(files) => void importFonts(files)} accept={(file) => FONT_FILE.test(file.name)} disabled={roomLeft <= 0 || importing} label="Déposer pour importer la police" className="grid gap-2 rounded-lg">
@@ -255,7 +346,15 @@ function RoleEditor({
   ];
   const groups = [
     { label: "Clip Studio", fonts: FONTS.map((font) => ({ value: font.family, label: font.label, family: font.family, hint: font.weights.join(", ") })) },
-    { label: "Importées", fonts: kit.fonts.map((font) => ({ value: font.family, label: font.name, family: font.family, hint: font.format.toUpperCase() })) },
+    {
+      label: "Importées",
+      fonts: kit.fonts.map((font) => ({
+        value: font.family,
+        label: font.name,
+        family: font.family,
+        hint: role !== "title" && isMonospaceFamily(kit, font.family) ? "Code seulement" : font.format.toUpperCase(),
+      })),
+    },
   ];
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Download, ExternalLink, Loader2, ScanSearch, Trash2 } from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, ScanSearch, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -150,8 +150,8 @@ export function DetectorSettings({ isAdmin }: { isAdmin: boolean }) {
                         )}
                       </>
                     ) : isAdmin ? (
-                      <Button type="button" variant="outline" size="sm" className="gap-2" disabled={busy !== null} onClick={() => void download(variant.id, variant.size)}>
-                        {busy === variant.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                      <Button type="button" variant="outline" size="sm" className="gap-2" loading={busy === variant.id} disabled={busy !== null} onClick={() => void download(variant.id, variant.size)}>
+                        <Download className="h-4 w-4" />
                         Télécharger ({megabytes(variant.size)})
                       </Button>
                     ) : (

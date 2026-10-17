@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Icons } from "./ui/icons";
 
 export function LoginForm({
   authProvider = "builtin",
@@ -120,10 +119,7 @@ export function LoginForm({
                 className={FIELD}
               />
             </div>
-            <Button type="submit" className={cn(PILL_SOLID, "w-full justify-center")} disabled={isLoading}>
-              {isLoading && (
-                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-              )}
+            <Button type="submit" className={cn(PILL_SOLID, "w-full justify-center")} loading={isLoading}>
               Se connecter
             </Button>
           </>
@@ -131,12 +127,9 @@ export function LoginForm({
           <Button
             type="button"
             className={cn(PILL_SOLID, "w-full justify-center")}
-            disabled={isLoading}
+            loading={isLoading}
             onClick={handleAscenciaSignIn}
           >
-            {isLoading && (
-              <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-            )}
             Continuer avec Ascencia ID
           </Button>
         )}

@@ -19,7 +19,7 @@ import { FRONT_FULL } from "@/components/front/container";
 import { DISPLAY } from "@/components/front/fonts";
 import { PhotoHeader } from "@/components/front/photo-header";
 import { ACCENT, CHIP, CHIP_ACTIVE, CHIP_IDLE } from "@/components/front/styles";
-import { Loading } from "@/components/ui/loading";
+import { Spinner } from "@/components/ui/spinner";
 import { TimelineNavigator, timelineGroupProps } from "@/components/timeline/timeline-navigator";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { formatMonthKey, monthKeyOf, type TimelineMonth } from "@/lib/timeline";
@@ -225,7 +225,7 @@ export function CatalogGalleryPage() {
         {/* Après un saut à une date, ce qui précède se recharge en remontant. */}
         {firstPage > 1 ? (
           <div ref={topRef} className="flex h-10 items-center justify-center">
-            {loadingPrevious ? <Loading variant="spinner" size="sm" /> : null}
+            {loadingPrevious ? <Spinner className="size-5 text-muted-foreground" /> : null}
           </div>
         ) : null}
 

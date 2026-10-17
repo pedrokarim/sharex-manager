@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Captions, Loader2, Mic, TextCursorInput } from "lucide-react";
+import { Captions, Mic, TextCursorInput } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -169,8 +169,8 @@ export function VoicePanel({
         />
       </label>
 
-      <Button onClick={generate} disabled={busy || !text.trim()} className="gap-2">
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+      <Button onClick={generate} loading={busy} disabled={!text.trim()} className="gap-2">
+        <Mic className="h-4 w-4" />
         {busy ? "Enregistrement…" : "Générer à la tête de lecture"}
       </Button>
       {engineMissing && (

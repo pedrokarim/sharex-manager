@@ -22,7 +22,6 @@ import {
   Eye,
   Globe,
   Link2,
-  Loader2,
   Lock,
   MoreHorizontal,
   PencilLine,
@@ -33,6 +32,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -276,8 +276,8 @@ export function PostsTab({ account, connector }: { account: AccountSummary; conn
               Liste {formatRelative(fetchedAt)}
             </span>
           ) : null}
-          <Button variant="outline" size="sm" className="gap-2" disabled={loading} onClick={() => void load(true)}>
-            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+          <Button variant="outline" size="sm" className="gap-2" loading={loading} onClick={() => void load(true)}>
+            <RefreshCw className="size-4" />
             Actualiser
           </Button>
         </div>
@@ -331,7 +331,7 @@ export function PostsTab({ account, connector }: { account: AccountSummary; conn
                   Supprimer
                 </Button>
               ) : null}
-              {bulkBusy ? <Loader2 className="size-4 animate-spin text-muted-foreground" /> : null}
+              {bulkBusy ? <Spinner className="size-4 text-muted-foreground" /> : null}
               <Button size="sm" variant="ghost" className="ml-auto h-7" onClick={() => setSelected(new Set())}>
                 Désélectionner
               </Button>
@@ -887,8 +887,7 @@ function EditPostSheet({
           <span className="min-w-0 truncate text-xs text-destructive" title={problems[0]}>
             {problems[0] ?? ""}
           </span>
-          <Button type="submit" form="edit-post-form" disabled={busy || problems.length > 0} className="gap-2">
-            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+          <Button type="submit" form="edit-post-form" loading={busy} disabled={problems.length > 0} className="gap-2">
             Enregistrer
           </Button>
         </SheetFooter>
@@ -916,7 +915,8 @@ function ScheduleDialog({ post, onOpenChange, onSubmit }: { post: PostSummary | 
         <DateTimePicker value={value} onChange={setValue} aria-label="Date de publication" clearable={false} inline className="mx-auto" />
         <DialogFooter>
           <Button
-            disabled={busy || !value}
+            loading={busy}
+            disabled={!value}
             className="gap-2"
             onClick={async () => {
               setBusy(true);
@@ -924,7 +924,7 @@ function ScheduleDialog({ post, onOpenChange, onSubmit }: { post: PostSummary | 
               setBusy(false);
             }}
           >
-            {busy ? <Loader2 className="size-4 animate-spin" /> : <CalendarClock className="size-4" />}
+            <CalendarClock className="size-4" />
             Programmer
           </Button>
         </DialogFooter>

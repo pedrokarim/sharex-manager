@@ -4,7 +4,11 @@
  */
 
 import { defaultRoleStyles } from "@/modules/clip-studio/engine/brand";
+import { minContrast, paletteCandidates, readableOn, TEXT_CONTRAST } from "@/modules/clip-studio/engine/legibility";
+import { DEFAULT_TEXT_FONT, isCatalogTextFont, nearestCatalogWeight } from "@/modules/clip-studio/lib/font-catalog";
 import { cleanVoiceSettings } from "@/modules/clip-studio/lib/voice-settings";
+import { upgradePoseAssets } from "./mascot";
+import { repairNotice, repairTypography, TEXT_FONT_ROLES } from "./typography";
 import type { BrandKit, BrandPalette, BrandPublishing, TextRole, TextStyle } from "./types";
 
 export const DEFAULT_PALETTE: BrandPalette = {
@@ -18,12 +22,24 @@ export const DEFAULT_PALETTE: BrandPalette = {
   extras: ["#0ea5e9", "#f97316", "#10b981", "#ec4899"],
 };
 
-/** Styles de la maquette : ceux des modèles de Clip Studio, à l'encre de la palette. */
+/**
+ * Styles de la maquette : ceux des modèles de Clip Studio, à l'encre de la
+ * palette. Les rôles de texte gardent une police de texte du catalogue (jamais
+ * une monospace ni une police de titre), et chaque couleur est lisible sur
+ * son fond (4,5:1) : une encre qui ne l'est pas cède la place à la couleur de
+ * la palette qui l'est, sinon au noir ou au blanc.
+ */
 export function defaultTextStyles(palette: BrandPalette = DEFAULT_PALETTE): Record<TextRole, TextStyle> {
   const styles = defaultRoleStyles();
-  for (const role of ["title", "subtitle", "caption"] as const) styles[role].color = palette.ink;
-  styles.label.color = palette.onAccent;
-  styles.body.color = palette.onSurface;
+  const candidates = paletteCandidates(palette);
+  for (const role of ["title", "subtitle", "caption"] as const) {
+    styles[role].color = readableOn([palette.background], palette.ink, candidates, minContrast(role, styles[role].size));
+  }
+  styles.label.color = readableOn([palette.accent], palette.onAccent, candidates, TEXT_CONTRAST);
+  styles.body.color = readableOn([palette.surface], palette.onSurface, candidates, TEXT_CONTRAST);
+  for (const role of TEXT_FONT_ROLES) {
+    if (!isCatalogTextFont(styles[role].font)) styles[role] = { ...styles[role], font: DEFAULT_TEXT_FONT, weight: nearestCatalogWeight(DEFAULT_TEXT_FONT, styles[role].weight) };
+  }
   return styles;
 }
 
@@ -114,9 +130,21 @@ export function upgradePublishing(input: unknown): BrandPublishing {
 /**
  * Fiche lue sur le disque, mise à la forme actuelle. La voix est lue avec
  * tolérance : une marque d'avant la voix, ou une voix abîmée, n'en a pas.
+ * Une police monospace dans un rôle de texte (D1) est remplacée par une
+ * police de texte lisible, avec un avertissement pour l'éditeur.
  */
 export function upgradeKit(kit: BrandKit): BrandKit {
-  const { voice: stored, ...rest } = kit;
+  const { voice: stored, typographyNotice: _stale, ...rest } = kit;
   const voice = cleanVoiceSettings(stored);
-  return { ...rest, ...(voice ? { voice } : {}), publishing: upgradePublishing(kit.publishing) };
+  const typography = kit.textStyles ? repairTypography(kit) : null;
+  const notice = typography ? repairNotice(kit, typography) : undefined;
+  // Poses d'avant la bibliothèque (D2) : étiquettes proposées d'après leur libellé et leur note.
+  return {
+    ...rest,
+    ...(voice ? { voice } : {}),
+    ...(typography ? { textStyles: typography.textStyles } : {}),
+    ...(notice ? { typographyNotice: notice } : {}),
+    assets: upgradePoseAssets(kit.assets),
+    publishing: upgradePublishing(kit.publishing),
+  };
 }

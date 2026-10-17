@@ -7,6 +7,17 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Image de marque, mascotte : bibliothèque de poses étiquetées (dossier 07f,
+  D2, partie marque). Chaque pose porte une émotion, un geste, un cadrage et le
+  côté vers lequel elle regarde, modifiables sous sa vignette ; compteur par
+  émotion et filtre par geste. Les poses d’avant reçoivent des étiquettes
+  proposées d’après leur libellé. Une pose ajoutée sur fond vert (ou sur fond
+  transparent avec une lueur) est détourée et recadrée d’office. « Générer des
+  poses » dessine les poses manquantes d’après la fiche de modèle et
+  l’identité de la mascotte, sur fond vert puis détourées, chacune à accepter
+  ou à rejeter, avec le suivi de la génération. `pickPose` choisit la pose d’un
+  segment (émotion exacte, voisine, puis neutre, jamais deux fois la même
+  d’affilée), prête pour le moteur.
 - Comptes connectés : connecteur TikTok (dossier 07e). Connexion par Login Kit
   (`TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, ou saisie dans « Comptes
   connectés »), jetons renouvelés et révoqués à la déconnexion. Publication
@@ -658,6 +669,36 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Clip Studio, images de marque : lisibilité garantie des textes (dossier
+  07f, D1). Aucun texte n’est plus posé nu sur une image : le moteur regarde
+  ce qu’il y a dessous et pose une étiquette aux couleurs de la palette, garde
+  le contour épais que la marque dessine, ou se contente de l’aplat uni quand
+  il suffit ; le contraste texte / fond atteint toujours 4,5:1 (3:1 pour un
+  titre de plus de 7 % de la hauteur), en dernier recours en noir ou en blanc.
+  Le titre garde son ombre colorée décalée. Les sous-titres mot à mot reçoivent
+  un contour épais et un mot prononcé lisible. Le voile clair qui délavait les
+  images disparaît : elles restent éclatantes. Trame d’imprimerie légère en
+  option sur les aplats unis (« Trame d’imprimerie » dans la typographie de la
+  marque). Les clips sans marque gardent exactement leur rendu.
+- Image de marque, typographie : une police de titre et une police de texte
+  lisible (nouveau choix « Polices des vidéos »). Une police monospace
+  (Courier, « Mono », « Code »…) ne sert plus de police de texte : l’éditeur
+  l’annonce, les vidéos prennent la police de texte de la marque (Poppins par
+  défaut), et une marque qui en avait une est corrigée à la lecture, avec un
+  avertissement. Une marque neuve et l’assistant de marque ne proposent plus
+  que des polices de texte pour les rôles de texte, à des couleurs lisibles
+  sur leur fond.
+- Chargements refaits dans toute l’application, sur un socle commun
+  (`src/components/loading/`) : orbes de points animées (moteur de
+  `thinking-orbs`, encre aux couleurs du thème) pour les pages, les modules et
+  les travaux de fond ; matrice de points à la place des spinners ; texte
+  d’attente scintillant ; squelettes traversés d’un reflet ; boutons
+  `loading` qui gardent leur libellé lisible. L’ouverture d’un module montre
+  l’orbe au centre de la zone de contenu au lieu d’un petit spinner en haut,
+  et l’icône d’un lien de la barre latérale indique la page qui arrive. Une
+  image en cours de génération dans AI Image Gen se développe en mosaïque
+  de pixels (`img-fx`). Le
+  mouvement réduit est respecté partout.
 - Comptes connectés, écran Publier : un service peut lire chez lui les
   réglages d’un compte à l’affichage (identité, choix permis, déclarations à
   montrer avant l’envoi) ; un choix peut n’avoir aucune valeur d’avance et

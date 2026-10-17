@@ -107,8 +107,8 @@ export default function SourcesPage() {
       <ModuleShell
         crumbs={target ? [{ label: chapterLabel(target), href: chapterHref(target.id) }, { label: "Import par lien" }] : [{ label: "Import par lien" }]}
         actions={
-          <Button variant="outline" className="gap-2" disabled={refreshing} onClick={() => void refresh()}>
-            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+          <Button variant="outline" className="gap-2" loading={refreshing} onClick={() => void refresh()}>
+            <RefreshCw className="h-4 w-4" />
             Actualiser
           </Button>
         }

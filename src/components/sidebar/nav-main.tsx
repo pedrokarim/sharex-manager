@@ -19,6 +19,7 @@ import {
   CollapsibleTrigger,
 } from "../ui/collapsible";
 import { useTranslation } from "@/lib/i18n";
+import { LinkPendingIcon } from "@/components/loading";
 
 interface SubItem {
   title: string;
@@ -54,12 +55,14 @@ export function NavMain({
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip={item.title}>
                 <Link href={item.url}>
-                  {item.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- logo servi par le module
-                    <img src={item.image} alt="" className="size-5 shrink-0 object-contain" />
-                  ) : (
-                    <item.icon />
-                  )}
+                  <LinkPendingIcon className={item.image ? "size-5" : undefined}>
+                    {item.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- logo servi par le module
+                      <img src={item.image} alt="" className="size-5 shrink-0 object-contain" />
+                    ) : (
+                      <item.icon />
+                    )}
+                  </LinkPendingIcon>
                   <span>{item.title}</span>
                 </Link>
               </SidebarMenuButton>
@@ -78,7 +81,9 @@ export function NavMain({
                           <SidebarMenuSubButton asChild>
                             <Link href={subItem.url}>
                               {subItem.icon && (
-                                <subItem.icon className="h-4 w-4" />
+                                <LinkPendingIcon>
+                                  <subItem.icon className="h-4 w-4" />
+                                </LinkPendingIcon>
                               )}
                               <span>{subItem.title}</span>
                             </Link>

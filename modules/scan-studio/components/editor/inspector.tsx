@@ -236,11 +236,11 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
             variant="outline"
             size="sm"
             className="h-7 gap-1.5 text-xs"
-            disabled={props.readingZone}
+            loading={props.readingZone}
             onClick={props.onReadZone}
             title="Lit le texte qui se trouve dans le contour de la zone, sur cette machine, sans rien envoyer"
           >
-            <ScanEye className={cn("h-3.5 w-3.5", props.readingZone && "animate-pulse")} />
+            <ScanEye className="h-3.5 w-3.5" />
             {props.readingZone ? "Lecture…" : region.reading.clean.trim() ? "Relire le texte de la zone" : "Lire le texte de la zone"}
           </Button>
         )}
@@ -276,7 +276,9 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
 
             className="h-7 gap-1.5 self-start text-xs"
 
-            disabled={props.translatingZone || region.reading.clean.trim() === ""}
+            loading={props.translatingZone}
+
+            disabled={region.reading.clean.trim() === ""}
 
             onClick={props.onTranslateZone}
 
@@ -284,7 +286,7 @@ function RegionFields(props: InspectorProps & { region: ScanRegion; servedFocusR
 
           >
 
-            <Languages className={cn("h-3.5 w-3.5", props.translatingZone && "animate-pulse")} />
+            <Languages className="h-3.5 w-3.5" />
 
             {props.translatingZone ? "Traduction…" : region.translation.text.trim() ? "Retraduire cette zone" : "Traduire cette zone"}
 

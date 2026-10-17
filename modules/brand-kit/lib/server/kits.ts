@@ -16,7 +16,7 @@ import { announceNewUpload } from "@/lib/gallery-events";
 import { FONT_FILE_LIMITS, inspectFont } from "@/lib/fonts/inspect";
 import { createDefaultKit, newItemId } from "../defaults";
 import { FORMATS } from "../formats";
-import { formatImageAsset } from "../mascot";
+import { formatImageAsset, proposePoseTags, sanitizePoseTags } from "../mascot";
 import { toBrandTheme, watermarkAsset } from "../theme";
 import { sanitizeKit } from "../validate";
 import {
@@ -36,6 +36,7 @@ import {
   type FormatId,
   type KitSummary,
 } from "../types";
+import { cutOutImage } from "./cutout-image";
 import { isFileName, kitArea, kitDir, listKitFiles, readKit, removeKitDir, uploadsDir, writeKit } from "./store";
 
 /** Au-delà, une image n'a rien à faire dans une marque : un logo pèse quelques centaines de kilo-octets. */
@@ -203,10 +204,18 @@ function adoptAsset(kit: BrandKit, asset: BrandAsset): BrandKit {
   return next;
 }
 
+/**
+ * Range une image dans la marque. Une pose de la mascotte est d'abord
+ * détourée (fond vert, ou lueur d'un fond transparent) puis recadrée, et
+ * reçoit des étiquettes : celles fournies, sinon proposées d'après son libellé.
+ */
 export async function addImageToKit(kitId: unknown, buffer: Buffer, kind: unknown, label: string, extra: Partial<BrandAsset> = {}): Promise<{ kit: BrandKit; asset: BrandAsset }> {
   assertKind(kind);
   const kit = requireKit(kitId);
-  const asset = await storeImage(kit, buffer, kind, label, extra);
+  if (kind === "mascot-pose" && (kit.mascot?.poseAssetIds.length ?? 0) >= KIT_LIMITS.poses) throw new Error(`Une mascotte garde ${KIT_LIMITS.poses} poses au plus.`);
+  const image = kind === "mascot-pose" && buffer.length <= MAX_IMAGE_BYTES ? await cutOutImage(buffer).then((result) => result.buffer, () => buffer) : buffer;
+  const stored = await storeImage(kit, image, kind, label, extra);
+  const asset: BrandAsset = kind === "mascot-pose" ? { ...stored, pose: sanitizePoseTags(extra.pose, proposePoseTags(stored)) } : stored;
   return { kit: touch(adoptAsset(kit, asset)), asset };
 }
 
@@ -595,6 +604,8 @@ export async function importKit(archive: unknown): Promise<BrandKit> {
       const stored = await storeImage(kit, Buffer.from(bytes), asset.kind, String(asset.label ?? "Image"), {
         note: typeof asset.note === "string" ? asset.note.slice(0, KIT_LIMITS.note) : undefined,
       });
+      // Une pose garde ses étiquettes (contrôlées), sinon en reçoit d'après son libellé.
+      if (stored.kind === "mascot-pose") stored.pose = sanitizePoseTags(asset.pose, proposePoseTags(stored));
       kit = { ...kit, assets: [...kit.assets, stored] };
       assetIds.set(asset.id, stored.id);
     }

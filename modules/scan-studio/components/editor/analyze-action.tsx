@@ -11,8 +11,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, ScanText } from "lucide-react";
+import { ScanText } from "lucide-react";
 import { toast } from "sonner";
+import { ThinkingStatus } from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { analysisBlocker, analyzeSurface, mergeRegions, needsReview, lastDetectionReport } from "../../lib/analysis";
@@ -138,14 +139,14 @@ function detectionNote(): string {
 
 /** Bouton « Analyser » de l'en-tête. Coupé, avec la raison en infobulle, quand le chapitre l'interdit. */
 export function AnalyzeButton({ analysis }: { analysis: PageAnalysis }) {
-  const disabled = analysis.running || !analysis.ready || analysis.blocker !== null;
+  const disabled = !analysis.ready || analysis.blocker !== null;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         {/* Un bouton coupé ne reçoit pas le survol : l'enveloppe porte l'infobulle. */}
         <span className="ml-2 inline-flex" tabIndex={analysis.blocker ? 0 : undefined}>
-          <Button variant="outline" size="sm" className="h-8 gap-2" disabled={disabled} onClick={analysis.start}>
-            {analysis.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanText className="h-4 w-4" />}
+          <Button variant="outline" size="sm" className="h-8 gap-2" loading={analysis.running} disabled={disabled} onClick={analysis.start}>
+            <ScanText className="h-4 w-4" />
             Analyser<span className="hidden min-[1800px]:inline"> la page</span>
           </Button>
         </span>
@@ -162,10 +163,11 @@ export function AnalysisIndicator({ analysis }: { analysis: PageAnalysis }) {
   if (!analysis.running) return null;
   const percent = Math.round(analysis.progress * 100);
   return (
-    <span className="flex shrink-0 items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground" role="status" aria-live="polite">
-      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      {/* Le premier lancement charge le moteur de lecture : quelques secondes sans avancement. */}
-      {percent < 10 ? "Préparation de la lecture…" : `Lecture de la page… ${percent} %`}
-    </span>
+    <ThinkingStatus
+      state="solving"
+      className="shrink-0 gap-1.5 text-xs whitespace-nowrap text-muted-foreground"
+      // Le premier lancement charge le moteur de lecture : quelques secondes sans avancement.
+      messages={percent < 10 ? "Préparation de la lecture…" : `Lecture de la page… ${percent} %`}
+    />
   );
 }

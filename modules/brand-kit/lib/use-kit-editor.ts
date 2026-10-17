@@ -34,7 +34,8 @@ function mergeServerKit(local: BrandKit, server: BrandKit): BrandKit {
   const fonts = server.fonts.map((font) => ({ ...font, name: local.fonts.find((entry) => entry.id === font.id)?.name ?? font.name }));
   const assets = server.assets.map((asset) => {
     const mine = local.assets.find((entry) => entry.id === asset.id);
-    return mine ? { ...asset, label: mine.label, note: mine.note } : asset;
+    // Libellé, note et étiquettes d'une pose sont réglés dans l'éditeur.
+    return mine ? { ...asset, label: mine.label, note: mine.note, ...(mine.pose ? { pose: mine.pose } : {}) } : asset;
   });
   return {
     ...local,

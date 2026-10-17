@@ -5,7 +5,7 @@ import { useQueryState } from "nuqs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MotionConfig } from "framer-motion";
-import { ArrowLeft, CircleAlert, ExternalLink, Link2, Loader2, MoreHorizontal, PencilLine, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
+import { ArrowLeft, CircleAlert, ExternalLink, Link2, MoreHorizontal, PencilLine, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
 import { toast } from "sonner";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
@@ -168,8 +168,8 @@ export function AccountPageClient({ initial }: { initial: AccountPageData }) {
               <CircleAlert className="mt-0.5 size-4 shrink-0" />
               <span className="min-w-0">{health.reason ?? (health.tone === "error" ? "Ce compte doit être reconnecté." : "L’accès expire bientôt.")}</span>
             </p>
-            <Button size="sm" variant={health.tone === "error" ? "default" : "outline"} disabled={verifying} onClick={() => (health.action === "extend" ? void verify(true) : reconnect())} className="gap-2">
-              {verifying ? <Loader2 className="size-4 animate-spin" /> : health.action === "extend" ? <ShieldCheck className="size-4" /> : <RefreshCw className="size-4" />}
+            <Button size="sm" variant={health.tone === "error" ? "default" : "outline"} loading={verifying} onClick={() => (health.action === "extend" ? void verify(true) : reconnect())} className="gap-2">
+              {health.action === "extend" ? <ShieldCheck className="size-4" /> : <RefreshCw className="size-4" />}
               {health.action === "extend" ? "Prolonger" : "Reconnecter"}
             </Button>
           </div>

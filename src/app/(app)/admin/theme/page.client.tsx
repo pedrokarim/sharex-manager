@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Moon, Palette, RotateCcw, Sun } from "lucide-react";
+import { Check, Moon, Palette, RotateCcw, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -137,8 +137,7 @@ export default function ThemeAdminPageClient({ initialGlobalTheme }: { initialGl
               <RotateCcw className="mr-2 h-4 w-4" />
               Couleurs d’origine
             </Button>
-            <Button onClick={publish} disabled={saving || !dirty} className="text-sm">
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            <Button onClick={publish} loading={saving} disabled={!dirty} className="text-sm">
               {dirty ? "Publier" : "Publié"}
             </Button>
           </>

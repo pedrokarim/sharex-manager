@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   ProvenanceBadgeView,
   ProvenanceDisclosure,
@@ -86,7 +87,7 @@ export function ProvenancePanel({ file }: { file: string }) {
 
       {!detail && !failed && (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <Spinner aria-hidden className="size-3.5" />
           Lecture du fichier…
         </p>
       )}
@@ -102,11 +103,12 @@ export function ProvenancePanel({ file }: { file: string }) {
         <Button
           variant="outline"
           onClick={handleClean}
-          disabled={busy || Boolean(cleanDisabledReason)}
+          loading={busy}
+          disabled={Boolean(cleanDisabledReason)}
           title={cleanDisabledReason}
           className="w-full gap-2"
         >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          <Download className="h-4 w-4" />
           Télécharger une version propre
         </Button>
         {cleanDisabledReason && <p className="text-xs text-muted-foreground">{cleanDisabledReason}</p>}

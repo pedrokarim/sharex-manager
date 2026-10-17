@@ -23,7 +23,6 @@ import {
   Download,
   FileVideo,
   History,
-  Loader2,
   MoreHorizontal,
   RefreshCw,
   Send,
@@ -51,6 +50,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -238,7 +238,7 @@ function ExportsList() {
           ) : null}
           {isAdmin && !publications && exports && exports.length > 0 ? (
             <span className="flex items-center gap-1.5 pb-2 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
+              <Spinner className="size-3.5" aria-hidden />
               Lecture des publications…
             </span>
           ) : null}
@@ -595,14 +595,14 @@ function ExportDetail({ id }: { id: string }) {
 
           <TabsContent value="texts" className="grid min-w-0 content-start gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => void fromBrand()} disabled={brandBusy || saving}>
-                {brandBusy ? <Loader2 className="size-4 animate-spin" /> : <History className="size-4" />}
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => void fromBrand()} loading={brandBusy} disabled={saving}>
+                <History className="size-4" />
                 Reprendre la marque
               </Button>
               <Popover open={draftOpen} onOpenChange={setDraftOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2" disabled={allDrafting || saving}>
-                    {allDrafting ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+                  <Button variant="outline" size="sm" className="gap-2" loading={allDrafting} disabled={saving}>
+                    <Wand2 className="size-4" />
                     {allDrafting ? "Rédaction…" : "Rédiger avec l’assistant"}
                   </Button>
                 </PopoverTrigger>
@@ -652,8 +652,7 @@ function ExportDetail({ id }: { id: string }) {
                       <Undo2 className="size-4" />
                       Annuler
                     </Button>
-                    <Button size="sm" className="gap-1.5" onClick={() => void save()} disabled={saving}>
-                      {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+                    <Button size="sm" className="gap-1.5" onClick={() => void save()} loading={saving}>
                       Enregistrer
                     </Button>
                   </div>

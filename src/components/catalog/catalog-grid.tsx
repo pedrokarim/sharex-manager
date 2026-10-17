@@ -11,6 +11,7 @@ import { DISPLAY } from "@/components/front/fonts";
 import { CHIP, CHIP_ACTIVE, CHIP_IDLE } from "@/components/front/styles";
 import { isVideoFile } from "@/lib/media-kind";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Pièces communes aux grilles du catalogue – la galerie et le détail d'un
@@ -144,7 +145,7 @@ export function MediaGridSkeleton({ density, count = 28 }: { density: Density; c
   return (
     <div className={cn("grid", DENSITY[density])} aria-hidden>
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="aspect-square animate-pulse rounded-lg bg-foreground/[0.06]" />
+        <Skeleton key={index} className="aspect-square rounded-lg bg-foreground/[0.06]" />
       ))}
     </div>
   );

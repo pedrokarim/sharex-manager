@@ -3,9 +3,11 @@
 import { BrandLogo } from "@/components/brand-logo";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Download, ExternalLink, Library, Loader2, Pause, Play, Plus, Search, Telescope, Trash2 } from "lucide-react";
+import { Check, Download, ExternalLink, Library, Pause, Play, Plus, Search, Telescope, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import type { MediaSource } from "../engine/types";
 import { callModule } from "../lib/client";
@@ -159,7 +161,7 @@ function LibraryTab({
     return (
       <div className="space-y-2 p-3">
         {[0, 1, 2, 3, 4].map((index) => (
-          <div key={index} className="h-12 animate-pulse rounded-lg bg-muted" />
+          <Skeleton key={index} className="h-12 rounded-lg" />
         ))}
       </div>
     );
@@ -204,7 +206,7 @@ function LibraryTab({
                   </RowButton>
                 ) : track.state.status === "downloading" ? (
                   <span className="flex h-7 w-7 items-center justify-center" title="Téléchargement en cours">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                    <Spinner className="size-3.5 text-muted-foreground" label="Téléchargement en cours" />
                   </span>
                 ) : (
                   <RowButton
@@ -289,7 +291,7 @@ function DiscoverTab({ preview, onAdded }: { preview: ReturnType<typeof usePrevi
       >
         <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="piano, epic, lofi, ukulele…" className="h-8 pr-8 pl-8 text-sm" />
-        {searching && <Loader2 className="absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />}
+        {searching && <Spinner className="absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" label="Recherche…" />}
       </form>
 
       <div className="flex flex-col gap-2 text-[11px] text-muted-foreground">
@@ -337,7 +339,7 @@ function DiscoverTab({ preview, onAdded }: { preview: ReturnType<typeof usePrevi
                   </span>
                 ) : (
                   <RowButton title="Ajouter à la banque" onClick={() => void add(candidate)}>
-                    {adding === candidate.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    {adding === candidate.id ? <Spinner className="size-4" aria-hidden /> : <Plus className="h-4 w-4" />}
                   </RowButton>
                 )}
               </TrackRow>

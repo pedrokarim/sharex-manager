@@ -204,9 +204,11 @@ export interface ThemeHint {
   role?: TextRole;
   /**
    * Couleur : teinte du segment, aplat d'un plan sans image, voile sur une
-   * image, carte, mise en avant, ou vert d'une bonne réponse (qui ne suit pas la marque).
+   * image (une marque le retire : l'image reste éclatante), ombre portée
+   * d'une carte, carte, mise en avant, ou vert d'une bonne réponse (qui ne
+   * suit pas la marque).
    */
-  paint?: "accent" | "plate" | "veil" | "surface" | "highlight" | "success";
+  paint?: "accent" | "plate" | "veil" | "shadow" | "surface" | "highlight" | "success";
   /** Rang du segment, pour la teinte tournante. */
   accent?: number;
 }
@@ -316,6 +318,21 @@ export interface ShapeItem extends VisualBase {
   radius: number;
   /** Barre de progression : couleur du fond et sens du remplissage. */
   progress?: { track: string; reverse: boolean };
+  /** Trame d’imprimerie posée sur l’aplat (rectangle seulement) ; absente : l’aplat reste uni. */
+  pattern?: ShapePattern;
+}
+
+/**
+ * Trame en points sur un aplat, à la façon d’une impression Riso : des
+ * points d’une encre de la marque, à faible opacité, en quinconce.
+ */
+export interface ShapePattern {
+  kind: "dots";
+  color: string;
+  /** Opacité des points, de 0 à 1. */
+  opacity: number;
+  /** Pas de la trame, relatif au petit côté de l’aplat. */
+  spacing: number;
 }
 
 export interface AudioItem extends ItemBase {

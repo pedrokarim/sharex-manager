@@ -9,6 +9,7 @@ import {
   SidebarMenuItem,
 } from "../ui/sidebar";
 import { useTranslation } from "@/lib/i18n";
+import { LinkPendingIcon } from "@/components/loading";
 export function NavSecondary({
   items,
   ...props
@@ -29,7 +30,9 @@ export function NavSecondary({
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton asChild size="sm">
                 <Link href={item.url}>
-                  <item.icon />
+                  <LinkPendingIcon>
+                    <item.icon />
+                  </LinkPendingIcon>
                   <span>{item.title}</span>
                 </Link>
               </SidebarMenuButton>

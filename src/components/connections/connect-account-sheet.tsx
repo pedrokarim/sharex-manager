@@ -35,7 +35,6 @@ import {
   CircleAlert,
   CircleCheck,
   ExternalLink,
-  Loader2,
   Minus,
   Palette,
   Plus,
@@ -52,6 +51,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Orb, ShimmerText } from "@/components/loading";
 import { cn } from "@/lib/utils";
 import {
   CAPABILITY_LABELS,
@@ -784,13 +784,15 @@ function AuthorizeStep({
                 className="grid gap-3"
                 aria-live="polite"
               >
-                <p className="flex items-center gap-2 text-sm font-medium">
-                  <Loader2 className="size-4 animate-spin text-primary" />
-                  {phase === "redirecting"
-                    ? `Fenêtre bloquée par le navigateur : passage par ${connector.label} dans cet onglet…`
-                    : phase === "finishing"
-                      ? "Enregistrement…"
-                      : `En attente de ${connector.label}…`}
+                <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                  <Orb size="sm" state="connecting" className="text-primary" />
+                  <ShimmerText className="min-w-0">
+                    {phase === "redirecting"
+                      ? `Fenêtre bloquée par le navigateur : passage par ${connector.label} dans cet onglet…`
+                      : phase === "finishing"
+                        ? "Enregistrement…"
+                        : `En attente de ${connector.label}…`}
+                  </ShimmerText>
                 </p>
                 {phase === "waiting" ? (
                   <>
@@ -1035,6 +1037,7 @@ function AccountsStep({
           Ne rien relier
         </Button>
         <Button
+          loading={busy === "keep"}
           disabled={kept.size === 0 || busy !== null}
           className="gap-2"
           onClick={async () => {
@@ -1046,7 +1049,7 @@ function AccountsStep({
             await onKept(result.data.accounts);
           }}
         >
-          {busy === "keep" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+          <Check className="size-4" />
           {kept.size > 1 ? `Relier ces ${kept.size} comptes` : "Relier ce compte"}
         </Button>
       </div>

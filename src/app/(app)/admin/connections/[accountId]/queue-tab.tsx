@@ -9,7 +9,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarClock, ExternalLink, Hourglass, Loader2, RotateCcw, X } from "lucide-react";
+import { CalendarClock, ExternalLink, Hourglass, RotateCcw, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -182,8 +182,8 @@ function JobTimeline({
                         </Button>
                       ) : null}
                       {canRetry ? (
-                        <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2" disabled={busy === job.id} onClick={() => act(job.id, retryJobAction, "Envoi relancé")}>
-                          {busy === job.id ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
+                        <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2" loading={busy === job.id} onClick={() => act(job.id, retryJobAction, "Envoi relancé")}>
+                          <RotateCcw className="size-3.5" />
                           Reprendre
                         </Button>
                       ) : null}

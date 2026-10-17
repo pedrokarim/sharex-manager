@@ -8,7 +8,8 @@ import { uploadConfigSchema, type UploadConfig } from "@/schemas/upload-config";
 import { Form } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Loader2, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
+import { LoadingState } from "@/components/loading";
 import { useUploadConfig } from "@/hooks/use-upload-config";
 import { GeneralTab } from "../_components/general-tab";
 import { ThumbnailsTab } from "../_components/thumbnails-tab";
@@ -40,8 +41,8 @@ export function ConfigPageClient() {
 
   if (isLoading) {
     return (
-      <main className="flex items-center justify-center flex-1 p-4 sm:p-6 lg:p-8">
-        <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin" />
+      <main className="flex flex-1 flex-col p-4 sm:p-6 lg:p-8">
+        <LoadingState fill />
       </main>
     );
   }
@@ -128,10 +129,7 @@ export function ConfigPageClient() {
                 comportement cohérent sur l&apos;ensemble du service.
               </p>
             </div>
-            <Button type="submit" disabled={isSaving} className="text-sm">
-              {isSaving && (
-                <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-              )}
+            <Button type="submit" loading={isSaving} className="text-sm">
               {t("common.save")}
             </Button>
           </div>

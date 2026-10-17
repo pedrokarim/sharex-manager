@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Loader2, BarChart3, TrendingUp, Network, LayoutDashboard, CalendarIcon, X } from "lucide-react";
+import { BarChart3, TrendingUp, Network, LayoutDashboard, CalendarIcon, X } from "lucide-react";
+import { LoadingState } from "@/components/loading";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -166,8 +167,8 @@ export function StatsPageClient() {
 
   if (isLoading) {
     return (
-      <main className="flex items-center justify-center flex-1">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <main className="flex flex-1 flex-col">
+        <LoadingState fill />
       </main>
     );
   }
@@ -175,7 +176,7 @@ export function StatsPageClient() {
   if (!stats) return null;
 
   return (
-    <main className="flex flex-col gap-6">
+    <main className="flex min-h-full shrink-0 flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div className="flex flex-col gap-1">
@@ -286,7 +287,7 @@ export function StatsPageClient() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={tab} onValueChange={setTab} className="gap-4">
+      <Tabs value={tab} onValueChange={setTab} className="flex-1 gap-4">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview" className="gap-1.5">
             <LayoutDashboard className="h-3.5 w-3.5 hidden sm:block" />
@@ -318,7 +319,7 @@ export function StatsPageClient() {
           <StatsGrowthTab stats={stats} />
         </TabsContent>
 
-        <TabsContent value="network">
+        <TabsContent value="network" className="flex flex-col">
           <StatsNetworkTab />
         </TabsContent>
       </Tabs>

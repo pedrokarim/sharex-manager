@@ -13,7 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { albumVisibility, type AlbumVisibility } from "@/lib/album-visibility";
 import { AlbumVisibilityField } from "./album-visibility";
@@ -166,12 +165,10 @@ export function CreateAlbumDialog({
             </Button>
             <Button
               type="submit"
-              disabled={loading || !name.trim()}
+              loading={loading}
+              disabled={!name.trim()}
               className="text-sm"
             >
-              {loading && (
-                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
-              )}
               {isEditMode ? t("common.save") : t("albums.create")}
             </Button>
           </DialogFooter>

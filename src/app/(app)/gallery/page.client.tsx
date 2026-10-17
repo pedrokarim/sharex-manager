@@ -1215,9 +1215,9 @@ export function GalleryClient({
               aria-label={t("gallery.toolbar.refresh")}
               title={t("gallery.toolbar.refresh")}
               className="h-9 w-9 rounded-xl"
-              disabled={isRefreshing}
+              loading={isRefreshing}
             >
-              <RefreshCcw className={cn("h-4 w-4", isRefreshing && "animate-spin text-primary")} />
+              <RefreshCcw className="h-4 w-4" />
             </Button>
             <GalleryDisplayMenu />
             <Button

@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ComponentType } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { LoadingState } from "@/components/loading";
 import {
   Dialog,
   DialogContent,
@@ -123,13 +124,16 @@ export function ModuleSettingsHost() {
               onComplete={apply}
             />
           ) : (
-            <div className="flex justify-center py-10">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
+            <LoadingState
+              label="Chargement de l’interface…"
+              state="shaping"
+              size="md"
+              className="py-10"
+            />
           )}
           {applying && (
             <div className="absolute inset-0 flex items-center justify-center rounded-md bg-background/60">
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <Spinner className="size-6" />
             </div>
           )}
         </div>

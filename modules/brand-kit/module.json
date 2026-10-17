@@ -41,6 +41,11 @@
     "listAssistantJobs": "user",
     "cancelKitAssistantJob": "user",
     "regenerateAsset": "user",
+    "startPoseGeneration": "user",
+    "listPoseJobs": "user",
+    "cancelPoseJob": "user",
+    "acceptPoseCandidate": "user",
+    "rejectPoseCandidate": "user",
     "listPublishAccounts": "user",
     "listPublishServices": "user",
     "getWatermarkImage": "public"

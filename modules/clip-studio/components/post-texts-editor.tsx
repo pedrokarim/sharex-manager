@@ -15,7 +15,7 @@
 
 import { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CircleAlert, KeyRound, Loader2, RotateCcw, Sparkles, Undo2 } from "lucide-react";
+import { CircleAlert, KeyRound, RotateCcw, Sparkles, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -389,8 +389,8 @@ function TextField({
           {onRegenerate ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button type="button" variant="ghost" size="icon" className="size-7" onClick={onRegenerate} disabled={disabled || regenerating} aria-label={`Rédiger à nouveau : ${KIND_LABELS[kind].toLowerCase()}`}>
-                  {regenerating ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
+                <Button type="button" variant="ghost" size="icon" className="size-7" onClick={onRegenerate} loading={regenerating} disabled={disabled} aria-label={`Rédiger à nouveau : ${KIND_LABELS[kind].toLowerCase()}`}>
+                  <RotateCcw className="size-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Rédiger à nouveau avec l’assistant</TooltipContent>

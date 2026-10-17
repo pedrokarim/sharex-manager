@@ -93,7 +93,8 @@ describe("applyBrandTheme", () => {
 
     const label = byText(project, "Question 1/3");
     expect(label.style.font).toBe("Poppins");
-    expect(label.style.color).toBe("#ffffff");
+    // Blanc sur ce rose : 3,1:1 seulement. Le fond de l'étiquette (la teinte du segment) reste, le texte prend l'encre (4,9:1).
+    expect(label.style.color).toBe("#1d1d6b");
     expect(label.style.background).toEqual({ color: "#ff4f9a", padding: 0.5, radius: 0.2 });
     expect(byText(project, "Question 2/3").style.background?.color).toBe("#2f6bff");
     expect(byText(project, "Question 3/3").style.background?.color).toBe("#ffb000");

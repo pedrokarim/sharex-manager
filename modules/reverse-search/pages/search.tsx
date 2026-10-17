@@ -4,10 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Ghost, History, ImagePlus, Link2, Loader2, Plus, Trophy, Upload } from "lucide-react";
+import { Check, Ghost, History, ImagePlus, Link2, Plus, Trophy, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/brand-logo";
 import { ImagePickerDialog } from "@/components/gallery/image-picker-dialog";
+import { Orb } from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -346,9 +347,12 @@ export default function SearchPage() {
                 dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/40"
               )}
             >
-              {starting ? <Loader2 className="h-12 w-12 animate-spin text-primary" /> : <ImagePlus className="h-12 w-12 text-muted-foreground" />}
+              {/* Même case pour l'icône et l'orbe : le texte ne bouge pas au départ. */}
+              <span className="flex size-12 items-center justify-center">
+                {starting ? <Orb size="md" state="shaping" className="text-primary" /> : <ImagePlus className="size-12 text-muted-foreground" />}
+              </span>
               <span className="space-y-1.5">
-                <span className="block text-xl font-semibold">{starting ? "Préparation de l’image…" : "Quelle image voulez-vous retrouver ?"}</span>
+                <span className={cn("block text-xl font-semibold", starting && "shimmer")}>{starting ? "Préparation de l’image…" : "Quelle image voulez-vous retrouver ?"}</span>
                 <span className="block text-sm text-muted-foreground">
                   Déposez-la n’importe où sur la page, collez-la (Ctrl + V), ou cliquez pour la choisir.
                 </span>

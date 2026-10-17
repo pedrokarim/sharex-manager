@@ -1,7 +1,7 @@
 "use client";
 
 import type { PublishField, TextCount } from "@/lib/connections/types";
-import type { BrandKit, BrandTheme, HashtagRule, KitSummary } from "./types";
+import type { BrandKit, BrandTheme, HashtagRule, KitSummary, PoseTags } from "./types";
 import { MODULE_NAME, MODULE_PATH } from "./types";
 
 export { MODULE_NAME, MODULE_PATH };
@@ -23,6 +23,33 @@ export interface KitAssistantJob {
   error?: string;
   createdAt: number;
   finishedAt?: number;
+}
+
+/** Pose générée en attente de décision (`lib/server/poses.ts`). */
+export interface PoseCandidate {
+  id: string;
+  tags: PoseTags;
+  state: "pending" | "running" | "ready" | "error" | "accepted" | "rejected";
+  file?: string;
+  width?: number;
+  height?: number;
+  notCutOut?: boolean;
+  error?: string;
+}
+
+export interface PoseJob {
+  id: string;
+  kitId: string;
+  status: "running" | "done" | "error" | "canceled";
+  candidates: PoseCandidate[];
+  error?: string;
+  createdAt: number;
+  finishedAt?: number;
+}
+
+/** Adresse d'une pose générée, gardée de côté jusqu'à la décision. */
+export function pendingPoseUrl(kitId: string, file: string): string {
+  return `/api/modules/${MODULE_NAME}/data/kits/${kitId}/pending/${file}`;
 }
 
 export interface PublishAccount {
@@ -104,6 +131,11 @@ export const api = {
   listAssistantJobs: () => call<KitAssistantJob[]>("listAssistantJobs"),
   cancelKitAssistantJob: (id: string) => call<{ success: boolean }>("cancelKitAssistantJob", id),
   regenerateAsset: (kitId: string, assetId: string, note?: string) => call<BrandKit>("regenerateAsset", kitId, assetId, note),
+  startPoseGeneration: (kitId: string, requests: PoseTags[]) => call<PoseJob>("startPoseGeneration", kitId, requests),
+  listPoseJobs: (kitId: string) => call<PoseJob[]>("listPoseJobs", kitId),
+  cancelPoseJob: (jobId: string) => call<{ success: boolean }>("cancelPoseJob", jobId),
+  acceptPoseCandidate: (kitId: string, jobId: string, candidateId: string, tags?: PoseTags) => call<BrandKit>("acceptPoseCandidate", kitId, jobId, candidateId, tags),
+  rejectPoseCandidate: (kitId: string, jobId: string, candidateId: string) => call<{ success: boolean }>("rejectPoseCandidate", kitId, jobId, candidateId),
   listPublishAccounts: () => call<PublishAccount[]>("listPublishAccounts"),
   listPublishServices: () => call<PublishService[]>("listPublishServices"),
 };

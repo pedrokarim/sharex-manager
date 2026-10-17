@@ -10,7 +10,7 @@ export const metadata = {
 
 export default function ModulesPage() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-h-full shrink-0 flex-col gap-6">
       <AdminPageHeader
         icon={Package}
         title="Gestion des modules"

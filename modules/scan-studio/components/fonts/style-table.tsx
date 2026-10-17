@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemTitle } from "@/components/ui/item";
@@ -212,8 +211,7 @@ export function StyleTable({ fonts, sample }: StyleTableProps) {
           </ItemGroup>
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <Button disabled={!dirty || saving} onClick={() => void save()}>
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Button loading={saving} disabled={!dirty} onClick={() => void save()}>
               Enregistrer les styles
             </Button>
             {view && view.chapters.length > 0 && (

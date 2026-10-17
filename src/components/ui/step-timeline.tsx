@@ -1,7 +1,8 @@
 import * as React from "react"
-import { CheckIcon, Loader2Icon, MinusIcon, XIcon } from "lucide-react"
+import { CheckIcon, MinusIcon, XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { Spinner } from "@/components/ui/spinner"
 
 /**
  * Frise d'un travail en plusieurs étapes (création par l'assistant, file
@@ -68,7 +69,7 @@ function StepTimelineIndicator({ className, children, ...props }: React.Componen
     >
       {children ?? (
         <>
-          <Loader2Icon aria-hidden className="hidden animate-spin group-data-[state=running]/step:block" />
+          <Spinner aria-hidden className="hidden size-3.5 group-data-[state=running]/step:grid" />
           <CheckIcon aria-hidden className="hidden group-data-[state=done]/step:block" />
           <XIcon aria-hidden className="hidden group-data-[state=error]/step:block" />
           <MinusIcon aria-hidden className="hidden group-data-[state=skipped]/step:block" />

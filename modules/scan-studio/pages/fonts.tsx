@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { useSession } from "@/lib/auth-client";
-import { cn } from "@/lib/utils";
 import { BundledFontList, CustomFontList } from "../components/fonts/font-list";
 import { StyleTable } from "../components/fonts/style-table";
 import { ModuleShell } from "../components/module-shell";
@@ -65,8 +64,8 @@ export default function FontsPage() {
       <ModuleShell
         crumbs={[{ label: "Polices" }]}
         actions={
-          <Button variant="outline" className="gap-2" disabled={refreshing} onClick={() => void refresh()}>
-            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+          <Button variant="outline" className="gap-2" loading={refreshing} onClick={() => void refresh()}>
+            <RefreshCw className="h-4 w-4" />
             Actualiser
           </Button>
         }

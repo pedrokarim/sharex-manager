@@ -9,9 +9,10 @@
  */
 
 import { useState } from "react";
-import { Camera, ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { Camera, ImagePlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { ImagePickerDialog, type PickedImage } from "@/components/gallery/image-picker-dialog";
 import type { ClipExport } from "../engine/types";
 import { exportUrl, removeExportCover, setExportCoverFromGallery, setExportCoverFromImage } from "../lib/client";
@@ -96,7 +97,7 @@ export function ExportCover({
       <div className="flex min-w-0 flex-wrap items-start gap-4">
         <div className="flex w-32 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted" style={{ aspectRatio: `${ratio}` }}>
           {busy && busy !== "remove" ? (
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            <Spinner className="size-5 text-muted-foreground" />
           ) : cover ? (
             // eslint-disable-next-line @next/next/no-img-element -- fichier du module, déjà à la bonne taille
             <img src={exportUrl(cover.file)} alt="Couverture de l’export" className="size-full object-cover" />

@@ -25,7 +25,6 @@ import {
   Copy,
   ExternalLink,
   Lightbulb,
-  Loader2,
   Newspaper,
   Plus,
   Repeat,
@@ -57,6 +56,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { ThinkingStatus, type OrbState } from "@/components/loading";
 import { ScreenHeader } from "../components/screen-header";
 import { BrandKitMark } from "../components/inspector";
 import { callModule, useBrandKits, type BrandKitChoice } from "../lib/client";
@@ -75,6 +75,7 @@ import {
   type IdeaSettings,
   type IdeaStatus,
   type IdeaTask,
+  type IdeaTaskKind,
   type IdeaTemplate,
 } from "../lib/idea-types";
 import type { IdeasBoard } from "../lib/idea-service";
@@ -262,8 +263,8 @@ export default function IdeasPage() {
                 Étudier la niche
                 {board?.studyDue ? <span className="size-2 rounded-full bg-primary" aria-label="Étude conseillée" /> : null}
               </Button>
-              <Button className="gap-2" onClick={findIdeas} disabled={!kitReady || Boolean(searching) || settings.templates.length === 0}>
-                {searching ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+              <Button className="gap-2" onClick={findIdeas} loading={Boolean(searching)} disabled={!kitReady || settings.templates.length === 0}>
+                <Sparkles className="size-4" />
                 Trouver des idées
               </Button>
             </>
@@ -318,8 +319,8 @@ export default function IdeasPage() {
                 {tab === "new" ? (
                   <EmptyContent>
                     <div className="flex flex-wrap justify-center gap-2">
-                      <Button className="gap-2" onClick={findIdeas} disabled={!kitReady || Boolean(searching) || settings.templates.length === 0}>
-                        {searching ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                      <Button className="gap-2" onClick={findIdeas} loading={Boolean(searching)} disabled={!kitReady || settings.templates.length === 0}>
+                        <Sparkles className="size-4" />
                         Trouver des idées
                       </Button>
                       {board && board.bank.concepts.length === 0 ? (
@@ -501,6 +502,14 @@ function SettingsBar({
   );
 }
 
+/** L'orbe dit la nature du travail : écrire des idées, lire des chaînes, étudier la niche. */
+const TASK_ORB: Record<IdeaTaskKind, OrbState> = {
+  ideas: "composing",
+  hooks: "composing",
+  channels: "searching",
+  study: "solving",
+};
+
 function TaskLine({ task }: { task: IdeaTask }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -509,9 +518,9 @@ function TaskLine({ task }: { task: IdeaTask }) {
   }, []);
   const seconds = Math.max(0, Math.round((now - task.startedAt) / 1000));
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-lg bg-muted/50 px-3 py-2.5 text-sm" aria-live="polite">
-      <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
-      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{task.step}</span>
+    <div className="flex min-w-0 items-center gap-3 rounded-lg bg-muted/50 px-3 py-2.5 text-sm">
+      {/* La ligne d'état annonce l'étape ; le compteur de secondes reste muet. */}
+      <ThinkingStatus messages={task.step} state={TASK_ORB[task.kind]} className="flex-1" />
       <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{seconds}&nbsp;s</span>
     </div>
   );
@@ -703,8 +712,8 @@ function IdeaCard({ idea, hooksTask, onChanged, onTask }: { idea: Idea; hooksTas
           ) : null
         ) : (
           <>
-            <Button size="sm" className="gap-1.5" onClick={() => router.push(createHref(prefillFromIdea(idea)))} disabled={Boolean(idea.jobId)}>
-              {idea.jobId ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+            <Button size="sm" className="gap-1.5" onClick={() => router.push(createHref(prefillFromIdea(idea)))} loading={Boolean(idea.jobId)}>
+              <Wand2 className="size-4" />
               {idea.jobId ? "Création en cours" : "Créer cette vidéo"}
             </Button>
             {idea.status === "dismissed" ? (
@@ -718,8 +727,8 @@ function IdeaCard({ idea, hooksTask, onChanged, onTask }: { idea: Idea; hooksTas
                   <BookMarked className="size-4" />
                   {idea.status === "kept" ? "Gardée" : "Garder"}
                 </Button>
-                <Button size="sm" variant="ghost" className="gap-1.5" disabled={Boolean(hooksTask)} onClick={moreHooks}>
-                  {hooksTask ? <Loader2 className="size-4 animate-spin" /> : <Repeat className="size-4" />}
+                <Button size="sm" variant="ghost" className="gap-1.5" loading={Boolean(hooksTask)} onClick={moreHooks}>
+                  <Repeat className="size-4" />
                   Autres accroches
                 </Button>
                 <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" disabled={busy !== null} onClick={() => setStatus("dismissed")}>
@@ -995,8 +1004,8 @@ function NicheSheet({
               <h3 className="text-sm font-semibold">
                 Chaînes de référence <span className="font-normal text-muted-foreground tabular-nums">({active.length})</span>
               </h3>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={suggest} disabled={Boolean(suggesting) || !isAdmin} title={adminOnly}>
-                {suggesting ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={suggest} loading={Boolean(suggesting)} disabled={!isAdmin} title={adminOnly}>
+                <Sparkles className="size-4" />
                 Proposer des chaînes
               </Button>
             </div>
@@ -1104,8 +1113,8 @@ function NicheSheet({
 
         <SheetFooter className="border-t p-4">
           {study ? <TaskLine task={study} /> : null}
-          <Button className="gap-2" onClick={launch} disabled={!isAdmin || !accountId || active.length === 0 || Boolean(study)} title={adminOnly}>
-            {study ? <Loader2 className="size-4 animate-spin" /> : <Telescope className="size-4" />}
+          <Button className="gap-2" onClick={launch} loading={Boolean(study)} disabled={!isAdmin || !accountId || active.length === 0} title={adminOnly}>
+            <Telescope className="size-4" />
             Lancer l&apos;étude
           </Button>
         </SheetFooter>

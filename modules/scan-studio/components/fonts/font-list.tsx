@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, MoreHorizontal, Pencil, Trash2, TriangleAlert, Upload } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -161,8 +162,8 @@ export function CustomFontList({ fonts, sample, isAdmin, onChange: report }: Fon
                 void addFiles(files);
               }}
             />
-            <Button className="gap-2" disabled={adding || fonts === null} onClick={() => inputRef.current?.click()}>
-              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            <Button className="gap-2" loading={adding} disabled={fonts === null} onClick={() => inputRef.current?.click()}>
+              <Upload className="h-4 w-4" />
               Ajouter une police
             </Button>
           </>
@@ -301,8 +302,7 @@ function RenameDialog({ font, onClose, onRenamed }: { font: CustomFont; onClose:
             <Button type="button" variant="outline" onClick={onClose}>
               Annuler
             </Button>
-            <Button type="submit" disabled={saving || !name.trim() || name.trim() === font.name}>
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Button type="submit" loading={saving} disabled={!name.trim() || name.trim() === font.name}>
               Renommer
             </Button>
           </DialogFooter>
@@ -407,7 +407,7 @@ function RemoveDialog({ font, others, onClose, onRemoved }: { font: CustomFont; 
               void remove();
             }}
           >
-            {removing && <Loader2 className="h-4 w-4 animate-spin" />}
+            {removing && <Spinner className="size-4" />}
             {used ? "Remplacer et retirer" : "Retirer"}
           </AlertDialogAction>
         </AlertDialogFooter>

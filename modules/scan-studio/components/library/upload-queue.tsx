@@ -1,9 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Clock3, Loader2, TriangleAlert } from "lucide-react";
+import { Check, Clock3, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
 export type UploadStatus = "waiting" | "uploading" | "done" | "error";
@@ -24,7 +25,7 @@ const STATUS_LABELS: Record<UploadStatus, string> = {
 
 function StatusIcon({ status }: { status: UploadStatus }) {
   const className = "h-3.5 w-3.5 shrink-0";
-  if (status === "uploading") return <Loader2 aria-hidden className={cn(className, "animate-spin text-primary")} />;
+  if (status === "uploading") return <Spinner aria-hidden className="size-3.5 shrink-0 text-primary" />;
   if (status === "done") return <Check aria-hidden className={cn(className, "text-emerald-600 dark:text-emerald-400")} />;
   if (status === "error") return <TriangleAlert aria-hidden className={cn(className, "text-destructive")} />;
   return <Clock3 aria-hidden className={cn(className, "text-muted-foreground/60")} />;

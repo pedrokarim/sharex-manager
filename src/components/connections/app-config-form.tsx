@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { CircleCheck, CircleX, ExternalLink, Loader2, Server } from "lucide-react";
+import { CircleCheck, CircleX, ExternalLink, Server } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -335,6 +335,7 @@ export function AppConfigForm({
               type="button"
               variant="ghost"
               className="text-destructive hover:text-destructive"
+              loading={busy === "clear"}
               disabled={busy !== null}
               onClick={async () => {
                 setBusy("clear");
@@ -345,15 +346,13 @@ export function AppConfigForm({
                 onSaved(result.data);
               }}
             >
-              {busy === "clear" ? <Loader2 className="size-4 animate-spin" /> : null}
               Effacer la configuration
             </Button>
           ) : (
             <span />
           )}
           {nothingToEnter ? null : (
-            <Button type="submit" disabled={busy !== null || problems.length > 0} className="gap-2">
-              {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : null}
+            <Button type="submit" loading={busy === "save"} disabled={busy !== null || problems.length > 0} className="gap-2">
               {submitLabel}
             </Button>
           )}

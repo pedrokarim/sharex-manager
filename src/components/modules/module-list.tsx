@@ -16,6 +16,7 @@ import {
   EmptyDescription,
 } from "@/components/ui/empty";
 import { Puzzle, RefreshCw } from "lucide-react";
+import { LoadingState } from "@/components/loading";
 
 export const ModuleList = () => {
   const [modules, setModules] = useState<ModuleConfig[]>([]);
@@ -126,9 +127,7 @@ export const ModuleList = () => {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-48 sm:h-64">
-        <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-primary"></div>
-      </div>
+      <LoadingState label="Chargement des modules…" fill />
     );
   }
 
@@ -172,11 +171,9 @@ export const ModuleList = () => {
             variant="outline"
             size="sm"
             onClick={handleRefresh}
-            disabled={isRefreshing}
+            loading={isRefreshing}
           >
-            <RefreshCw
-              className={`h-4 w-4 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className="h-4 w-4 mr-1.5" />
             Rafraîchir
           </Button>
         </div>

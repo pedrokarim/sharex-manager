@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { AlertTriangle, Check, Download, FileImage, ImagePlus, ImageUp, Loader2, Pause, Play, RotateCcw, Undo2 } from "lucide-react";
+import { AlertTriangle, Check, Download, FileImage, ImagePlus, ImageUp, Pause, Play, RotateCcw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { ImagePickerDialog, type PickedImage } from "@/components/gallery/image-picker-dialog";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -109,7 +110,7 @@ export function FormatCanvas({
       {showSafeArea && <SafeArea spec={spec} />}
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted/60">
-          <Loader2 aria-label="Chargement des polices" className="size-4 animate-spin text-muted-foreground" />
+          <Spinner label="Chargement des polices" className="size-4 text-muted-foreground" />
         </div>
       )}
     </div>
@@ -193,7 +194,7 @@ export function AnimatedFormatCanvas({
         <canvas ref={canvas} className="absolute inset-0 h-full w-full" aria-hidden />
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center bg-muted/60">
-            <Loader2 aria-label="Chargement des polices" className="size-4 animate-spin text-muted-foreground" />
+            <Spinner label="Chargement des polices" className="size-4 text-muted-foreground" />
           </div>
         )}
       </div>
@@ -396,8 +397,8 @@ export function FormatsPanel({
           <Switch checked={kit.registrationMarks === true} onCheckedChange={(checked) => update((draft) => ({ ...draft, registrationMarks: checked }))} />
           Croix de repérage
         </label>
-        <Button size="sm" className="ml-auto gap-2" onClick={() => void exportAll()} disabled={busy}>
-          {batch && busy ? <Loader2 className="size-4 animate-spin" /> : <FileImage className="size-4" />}
+        <Button size="sm" className="ml-auto gap-2" onClick={() => void exportAll()} loading={Boolean(batch && busy)} disabled={busy}>
+          <FileImage className="size-4" />
           Tout exporter en PNG
         </Button>
       </div>
@@ -491,18 +492,18 @@ export function FormatsPanel({
           </div>
           <div className="flex flex-wrap gap-2">
             {current.supplied ? (
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => void backToComposed(selected)} disabled={busy || replacing !== null}>
-                {replacing === selected ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => void backToComposed(selected)} loading={replacing === selected} disabled={busy || replacing !== null}>
+                <Undo2 className="size-4" />
                 Revenir au rendu composé
               </Button>
             ) : (
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => setPickerOpen(true)} disabled={busy || replacing !== null}>
-                {replacing === selected ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setPickerOpen(true)} loading={replacing === selected} disabled={busy || replacing !== null}>
+                <ImagePlus className="size-4" />
                 Utiliser une image finie…
               </Button>
             )}
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => void exportSelected()} disabled={busy}>
-              {exporting === selected && !batch ? <Loader2 className="size-4 animate-spin" /> : <FileImage className="size-4" />}
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => void exportSelected()} loading={exporting === selected && !batch} disabled={busy}>
+              <FileImage className="size-4" />
               {exported ? "Réexporter" : "Exporter"}
             </Button>
             {exported && (
@@ -513,8 +514,8 @@ export function FormatsPanel({
                     Télécharger
                   </a>
                 </Button>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => void sendToGallery(selected)} disabled={sending === selected}>
-                  {sending === selected ? <Loader2 className="size-4 animate-spin" /> : <ImageUp className="size-4" />}
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => void sendToGallery(selected)} loading={sending === selected}>
+                  <ImageUp className="size-4" />
                   Vers la galerie
                 </Button>
               </>
@@ -605,7 +606,7 @@ function FormatTab({
         />
         {(state === "running" || state === "waiting") && (
           <span className="absolute inset-0 flex items-center justify-center rounded-md bg-background/60">
-            {state === "running" ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <span className="size-1.5 rounded-full bg-muted-foreground" />}
+            {state === "running" ? <Spinner aria-hidden className="size-4" /> : <span className="size-1.5 rounded-full bg-muted-foreground" />}
           </span>
         )}
       </span>

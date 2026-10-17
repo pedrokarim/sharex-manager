@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, CloudOff, Eye, FileVideo, Loader2, Plus, RotateCcw, Send, Timer } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, CloudOff, Eye, FileVideo, Plus, RotateCcw, Send, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
@@ -42,6 +42,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ConnectAccountSheet, useConnectionReturn, type ConnectFlowStart } from "@/components/connections/connect-account-sheet";
@@ -750,8 +751,8 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
             </span>
           ) : null}
         </div>
-        <Button onClick={startSubmit} disabled={submitting || reviews.length === 0 || blockerCount > 0} title={firstBlocker} className="w-full gap-2">
-          {submitting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+        <Button onClick={startSubmit} loading={submitting} disabled={reviews.length === 0 || blockerCount > 0} title={firstBlocker} className="w-full gap-2">
+          <Send className="size-4" />
           {mode !== "now" ? "Programmer" : reviews.length > 1 ? `Publier sur ${reviews.length} comptes` : "Publier"}
         </Button>
       </section>
@@ -945,7 +946,7 @@ function SaveIndicator({ state, onRetry }: { state: "saved" | "pending" | "savin
   }
   return (
     <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-      {state === "saved" ? <Check className="size-3.5 text-emerald-500" /> : <Loader2 className="size-3.5 animate-spin" />}
+      {state === "saved" ? <Check className="size-3.5 text-emerald-500" /> : <Spinner className="size-3.5" aria-hidden />}
       {state === "saved" ? "Rangés avec l’export" : "Enregistrement…"}
     </span>
   );

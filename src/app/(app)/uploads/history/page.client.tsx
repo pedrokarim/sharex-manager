@@ -25,7 +25,8 @@ export function HistoryPageClient() {
         </div>
       </div>
 
-      <div className="space-y-4 sm:space-y-6">
+      {/* La liste prend la hauteur restante : son attente s'y centre. */}
+      <div className="flex flex-1 flex-col gap-4 sm:gap-6">
         <HistoryFilters />
         <HistoryList />
       </div>

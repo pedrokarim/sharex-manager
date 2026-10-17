@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Check, Loader2, Mic } from "lucide-react";
+import { AlertTriangle, Check, Mic } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Spinner } from "@/components/ui/spinner";
+import { ThinkingStatus } from "@/components/loading";
 import { cn } from "@/lib/utils";
 import type { AudioItem, ClipAsset, ClipProject } from "../engine/types";
 import { voiceItemsOf, type VoiceReplacement } from "../engine/revoice";
@@ -158,7 +160,11 @@ export function TrackVoiceDialog({
         {Object.keys(statuses).length > 0 && (
           <div className="flex min-w-0 flex-col gap-2" aria-live="polite">
             <div className="flex items-center justify-between gap-3 text-xs">
-              <span className="text-muted-foreground">{running ? "Relecture en cours…" : "Relecture terminée"}</span>
+              {running ? (
+                <ThinkingStatus messages="Relecture en cours…" state="listening" className="text-xs text-muted-foreground" />
+              ) : (
+                <span className="text-muted-foreground">Relecture terminée</span>
+              )}
               <span className="tabular-nums">
                 {finished} / {items.length}
               </span>
@@ -171,7 +177,7 @@ export function TrackVoiceDialog({
                   <li key={item.id} className="flex min-w-0 items-start gap-2">
                     <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
                       {status?.state === "running" ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                        <Spinner className="size-3.5 text-muted-foreground" aria-hidden />
                       ) : status?.state === "done" ? (
                         <Check className="h-3.5 w-3.5 text-primary" />
                       ) : status?.state === "error" ? (
@@ -214,8 +220,8 @@ export function TrackVoiceDialog({
               Fermer
             </Button>
           )}
-          <Button onClick={run} disabled={running || items.length === 0 || !voice} className="gap-2">
-            {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+          <Button onClick={run} loading={running} disabled={items.length === 0 || !voice} className="gap-2">
+            <Mic className="h-4 w-4" />
             {running ? `Relecture ${Math.min(finished + 1, items.length)} / ${items.length}…` : `Relire ${items.length} extrait${items.length > 1 ? "s" : ""}`}
           </Button>
         </DialogFooter>

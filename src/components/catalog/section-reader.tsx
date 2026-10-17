@@ -112,7 +112,7 @@ function ReaderImage({ page, alt, eager, className }: { page: ReaderPage; alt: s
 
   return (
     <div
-      className={cn("relative mx-auto w-full overflow-hidden bg-foreground/[0.045]", state === "loading" && "animate-pulse", className)}
+      className={cn("relative mx-auto w-full overflow-hidden bg-foreground/[0.045]", state === "loading" && "sxm-skeleton", className)}
       style={{ aspectRatio: known ? `${page.width} / ${page.height}` : "2 / 3", maxWidth: known ? page.width : undefined }}
     >
       {state === "missing" ? (

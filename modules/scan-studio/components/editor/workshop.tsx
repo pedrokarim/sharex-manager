@@ -13,7 +13,6 @@ import {
   Eye,
   EyeOff,
   ImageDown,
-  Loader2,
   Maximize,
   Minus,
   Plus,
@@ -23,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { api, newId, uploadImage } from "../../lib/client";
@@ -791,8 +791,8 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
             <TooltipTrigger asChild>
               {/* Un bouton coupé ne reçoit pas le survol : l'enveloppe porte l'infobulle. */}
               <span className="inline-flex" tabIndex={translateBlocker ? 0 : undefined}>
-                <Button variant="outline" size="sm" className="h-8 gap-2" disabled={translating || translateBlocker !== null} onClick={() => void translatePage()}>
-                  {translating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Languages className="h-4 w-4" />}
+                <Button variant="outline" size="sm" className="h-8 gap-2" loading={translating} disabled={translateBlocker !== null} onClick={() => void translatePage()}>
+                  <Languages className="h-4 w-4" />
                   Traduire<span className="hidden min-[1800px]:inline"> la page</span>
                 </Button>
               </span>
@@ -801,8 +801,8 @@ export function Workshop({ view: pageView, onReload }: WorkshopProps) {
               {translateBlocker ?? "Traduit les zones qui n’ont pas encore de traduction, par les moteurs de la page « Moteurs ». Le texte des bulles part chez le moteur utilisé."}
             </TooltipContent>
           </Tooltip>
-          <Button size="sm" className="ml-2 h-8 gap-2" disabled={exporting || !image} onClick={() => void exportPage()}>
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageDown className="h-4 w-4" />}
+          <Button size="sm" className="ml-2 h-8 gap-2" loading={exporting} disabled={!image} onClick={() => void exportPage()}>
+            <ImageDown className="h-4 w-4" />
             Exporter<span className="hidden min-[1800px]:inline"> la page</span>
           </Button>
           {exported && (
@@ -954,7 +954,7 @@ function SaveIndicator({
       aria-live="polite"
       title="Chaque modification est enregistrée toute seule, une seconde après. Ctrl+S enregistre tout de suite."
     >
-      {state === "saved" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+      {state === "saved" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Spinner aria-hidden className="size-3.5" />}
       {state !== "saved"
         ? "Enregistrement…"
         : savedAt

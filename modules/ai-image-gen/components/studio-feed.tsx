@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ImageGeneration } from "img-fx";
 import {
   AlertTriangle,
   Copy,
@@ -44,6 +45,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { ShimmerText } from "@/components/loading";
 import {
   aspectRatioOf,
   callModule,
@@ -159,7 +161,6 @@ export function StudioFeed({ view, history, jobs, ...handlers }: StudioFeedProps
 
   return (
     <div ref={container}>
-      <FeedKeyframes />
       {width > 0 && (
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -993,6 +994,7 @@ function ShotStrip({
 
 function PendingStrip({ job, ratios, height }: { job: Job; ratios: number[]; height: number }) {
   const running = job.status === "running";
+  const reducedMotion = useReducedMotion();
   const elapsed = useElapsed(job.startedAt ?? job.createdAt);
   const shotWidth = Math.floor(height * ratios[0]);
   const percent =
@@ -1000,43 +1002,33 @@ function PendingStrip({ job, ratios, height }: { job: Job; ratios: number[]; hei
 
   return (
     <div className="relative flex" style={{ gap: SHOT_GAP }}>
-      {ratios.map((_, index) => (
-        <div
-          key={index}
-          className={cn("relative shrink-0 overflow-hidden bg-muted", shotCorners(index, ratios.length))}
-          style={{ width: shotWidth, height }}
-        >
-          {running ? (
-            <>
-              {/* Voile lumineux qui respire et reflet qui traverse : l'image
-                  « se développe », sans fausse barre de progression. */}
-              <div
-                className="absolute inset-0"
-                style={{
-                  background:
-                    "radial-gradient(120% 90% at 15% 110%, color-mix(in oklch, var(--primary) 40%, transparent), transparent 60%), radial-gradient(90% 70% at 95% -10%, color-mix(in oklch, var(--primary) 22%, transparent), transparent 55%)",
-                  animation: `studio-breathe 3.2s ease-in-out ${index * 0.4}s infinite`,
-                }}
-              />
-              <div
-                className="absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(105deg, transparent 35%, color-mix(in oklch, var(--foreground) 10%, transparent) 50%, transparent 65%)",
-                  backgroundSize: "250% 100%",
-                  animation: `studio-sheen 2.4s linear ${index * 0.3}s infinite`,
-                }}
-              />
-            </>
-          ) : (
+      {ratios.map((_, index) =>
+        running ? (
+          // Mosaïque de pixels qui « développe » l'image (img-fx, Jakub
+          // Antalik) : elle remplace le voile qui respirait. Figée si le
+          // mouvement est réduit.
+          <ImageGeneration
+            key={index}
+            preset="pixels-organic"
+            paused={reducedMotion ?? false}
+            className={cn("shrink-0", shotCorners(index, ratios.length))}
+          >
+            <div className={shotCorners(index, ratios.length)} style={{ width: shotWidth, height }} />
+          </ImageGeneration>
+        ) : (
+          <div
+            key={index}
+            className={cn("relative shrink-0 overflow-hidden bg-muted", shotCorners(index, ratios.length))}
+            style={{ width: shotWidth, height }}
+          >
             <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,transparent_0_10px,color-mix(in_oklch,var(--foreground)_5%,transparent)_10px_20px)]" />
-          )}
-        </div>
-      ))}
+          </div>
+        )
+      )}
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center">
-        <span className="rounded-full bg-background/80 px-3 py-1 text-xs font-medium shadow-sm backdrop-blur">
-          {running ? "Génération" : "En file d'attente"}
+        <span className="relative z-10 flex items-center rounded-full bg-background/80 px-3 py-1 text-xs font-medium shadow-sm backdrop-blur">
+          {running ? <ShimmerText>Génération</ShimmerText> : "En file d’attente"}
           {elapsed && <span className="ml-1.5 text-muted-foreground tabular-nums">{elapsed}</span>}
         </span>
         {percent !== null && (
@@ -1502,19 +1494,6 @@ function clock(ts: number) {
   return new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
-
-/** Animations propres au fil, déclarées une fois. */
-function FeedKeyframes() {
-  return (
-    <style>{`
-      @keyframes studio-sheen { from { background-position: 150% 0; } to { background-position: -100% 0; } }
-      @keyframes studio-breathe { 0%, 100% { opacity: .35; } 50% { opacity: .85; } }
-      @media (prefers-reduced-motion: reduce) {
-        [style*="studio-sheen"], [style*="studio-breathe"] { animation: none !important; }
-      }
-    `}</style>
-  );
-}
 
 const DISMISSED_KEY = "ai-image-gen:dismissed-failures";
 

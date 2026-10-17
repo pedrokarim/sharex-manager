@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -491,7 +491,7 @@ export default function WatermarkUI({
               )}
               {brandLoading && (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Spinner aria-hidden className="size-3.5" />
                   {t("modules.watermark.brand.loading")}
                 </p>
               )}
@@ -672,10 +672,10 @@ export default function WatermarkUI({
           <Button
             variant="outline"
             onClick={handleSaveDefaults}
-            disabled={savingDefaults || !canApply}
+            loading={savingDefaults}
+            disabled={!canApply}
             title={t("modules.watermark.defaults.hint")}
           >
-            {savingDefaults && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t("modules.watermark.defaults.save")}
           </Button>
         )}

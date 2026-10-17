@@ -5,6 +5,7 @@
 
 import type { MediaSource } from "@/modules/clip-studio/engine/types";
 import { formatImageAsset, mascotPoses, openingPose } from "./mascot";
+import { repairTypography } from "./typography";
 import { MODULE_NAME, kitAssetUrl, type BrandAsset, type BrandKit, type BrandTheme } from "./types";
 
 export function assetSource(kit: BrandKit, asset: BrandAsset): MediaSource {
@@ -35,7 +36,9 @@ export function toBrandTheme(kit: BrandKit): BrandTheme {
     kitId: kit.id,
     name: kit.name,
     palette: structuredClone(kit.palette),
-    textStyles: structuredClone(kit.textStyles),
+    // Jamais de monospace dans un rôle de texte, même choisie dans l'éditeur sans être enregistrée.
+    textStyles: structuredClone(repairTypography(kit).textStyles),
+    ...(kit.halftone ? { halftone: true } : {}),
     fonts: kit.fonts.map((font) => ({ family: font.family, kitId: kit.id, fontId: font.id })),
     watermark:
       kit.watermark && mark

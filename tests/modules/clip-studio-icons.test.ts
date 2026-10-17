@@ -206,7 +206,7 @@ describe("icônes : emplacement dans les modèles", () => {
       expect(icon.duration).toBe(name.duration);
       if (name.type !== "audio") expect(icon.transform.y + icon.transform.height / 2).toBeLessThanOrEqual(name.transform.y - name.transform.height / 2);
 
-      const shadow = items(withIcon).find((item): item is ShapeItem => item.type === "shape" && item.theme?.paint === "veil" && item.start === icon.start && item.transform.opacity < 1)!;
+      const shadow = items(withIcon).find((item): item is ShapeItem => item.type === "shape" && item.theme?.paint === "shadow" && item.start === icon.start && item.transform.opacity < 1)!;
       expect(shadow.transform.y).toBeGreaterThan(icon.transform.y);
       expect(shadow.animIn.kind).toBe("pop-in");
     }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { CheckCircle2, Languages, Loader2, RefreshCw, XCircle } from "lucide-react";
+import { CheckCircle2, Languages, RefreshCw, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,8 +98,8 @@ export default function EnginesPage() {
       <ModuleShell
         crumbs={[{ label: "Moteurs" }]}
         actions={
-          <Button variant="outline" className="gap-2" disabled={refreshing} onClick={() => void refresh()}>
-            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+          <Button variant="outline" className="gap-2" loading={refreshing} onClick={() => void refresh()}>
+            <RefreshCw className="h-4 w-4" />
             Actualiser
           </Button>
         }
@@ -439,12 +439,10 @@ function MyMemoryForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (cat
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" size="sm" className="gap-2" disabled={!dirty || saving}>
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+        <Button type="submit" size="sm" className="gap-2" loading={saving} disabled={!dirty}>
           Enregistrer
         </Button>
-        <Button type="button" variant="outline" size="sm" disabled={testing || dirty} onClick={() => void runTest()} title="Envoie une courte phrase d’essai à ce moteur">
-          {testing && <Loader2 className="h-4 w-4 animate-spin" />}
+        <Button type="button" variant="outline" size="sm" loading={testing} disabled={dirty} onClick={() => void runTest()} title="Envoie une courte phrase d’essai à ce moteur">
           Tester
         </Button>
         {test && (
@@ -606,19 +604,18 @@ function KeyedEngineForm({ engine, onSaved }: { engine: EngineStatus; onSaved: (
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" size="sm" disabled={!dirty || !limitValid || saving}>
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+        <Button type="submit" size="sm" loading={saving} disabled={!dirty || !limitValid}>
           Enregistrer
         </Button>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          disabled={!engine.configured || testing || dirty}
+          loading={testing}
+          disabled={!engine.configured || dirty}
           onClick={() => void runTest()}
           title={dirty ? "Enregistrez d’abord vos changements" : "Envoie une courte phrase d’essai à ce moteur"}
         >
-          {testing && <Loader2 className="h-4 w-4 animate-spin" />}
           Tester
         </Button>
         {isDeepl && (

@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2, RefreshCw, Send } from "lucide-react";
+import { RefreshCw, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -239,8 +239,8 @@ export function ChannelTab({
           </div>
           <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
             {connector.profileRead && connected ? (
-              <Button size="sm" variant="ghost" className="gap-1.5" disabled={profile?.status === "loading"} onClick={() => void loadProfile()}>
-                <RefreshCw className={cn(profile?.status === "loading" && "animate-spin")} />
+              <Button size="sm" variant="ghost" className="gap-1.5" loading={profile?.status === "loading"} onClick={() => void loadProfile()}>
+                <RefreshCw />
                 Relire
               </Button>
             ) : null}
@@ -297,8 +297,8 @@ export function ChannelTab({
             <p className="text-xs text-pretty text-muted-foreground">Envoyé par l’API de {connector.label}. Chaque proposition se modifie avant l’envoi.</p>
           </div>
           {ready.length > 1 ? (
-            <Button size="sm" className="gap-1.5" disabled={sending.length > 0} onClick={() => void send(ready.map((row) => row.field.key))}>
-              {sending.length > 1 ? <Loader2 className="animate-spin" /> : <Send />}
+            <Button size="sm" className="gap-1.5" loading={sending.length > 1} disabled={sending.length > 0} onClick={() => void send(ready.map((row) => row.field.key))}>
+              <Send />
               Tout envoyer ({ready.length})
             </Button>
           ) : null}
@@ -375,8 +375,8 @@ export function ChannelTab({
                   {field.help ? <p className="text-xs text-pretty text-muted-foreground">{field.help}</p> : null}
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     {access.state === "ok" ? (
-                      <Button size="sm" className="gap-1.5" disabled={brand?.status !== "ready" || busyImage !== null} onClick={() => void pushImage(field)}>
-                        {busyImage === field.key ? <Loader2 className="animate-spin" /> : <Send />}
+                      <Button size="sm" className="gap-1.5" loading={busyImage === field.key} disabled={brand?.status !== "ready" || busyImage !== null} onClick={() => void pushImage(field)}>
+                        <Send />
                         Envoyer depuis la marque
                       </Button>
                     ) : access.state === "authorize" ? (

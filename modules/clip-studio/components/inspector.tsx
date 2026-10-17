@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AlignCenter, AlignLeft, AlignRight, Check, Loader2, Mic, Palette, X } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, Check, Mic, Palette, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -604,7 +605,7 @@ export function ProjectInspector({
                         {kit.name}
                       </span>
                       {pending === kit.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                        <Spinner className="size-3.5 text-muted-foreground" />
                       ) : (
                         active && <Check className="h-3.5 w-3.5 text-primary" />
                       )}
@@ -623,21 +624,21 @@ export function ProjectInspector({
                     variant="outline"
                     size="sm"
                     className="h-7 gap-1.5 text-[11px]"
+                    loading={pending === current}
                     disabled={!known || pending !== null}
                     onClick={() => void apply(current)}
                     title="Reprend les dernières modifications de la marque"
                   >
-                    {pending === current && <Loader2 className="h-3 w-3 animate-spin" />}
                     Actualiser
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-7 gap-1.5 text-[11px]"
+                    loading={pending === "none"}
                     disabled={pending !== null}
                     onClick={() => void apply(null)}
                   >
-                    {pending === "none" && <Loader2 className="h-3 w-3 animate-spin" />}
                     Retirer
                   </Button>
                 </div>

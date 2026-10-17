@@ -131,8 +131,8 @@ export default function UsersPageClient({
         description={`${stats.total} ${stats.total > 1 ? "comptes" : "compte"}, dont ${stats.admins} ${stats.admins > 1 ? "administrateurs" : "administrateur"}. Gérez les rôles et les accès.`}
         actions={
           <>
-            <Button variant="outline" onClick={refreshUsers} disabled={isLoading} className="text-sm">
-              <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            <Button variant="outline" onClick={refreshUsers} loading={isLoading} className="text-sm">
+              <RefreshCw className="mr-2 h-4 w-4" />
               Rafraîchir
             </Button>
             <UserDialog

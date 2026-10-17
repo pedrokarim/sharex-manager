@@ -368,3 +368,133 @@
 @media (prefers-reduced-motion: reduce) {
   .sxm-mosaic .sxm-cell > span { transition: none; }
 }
+
+/* ── Chargements ──────────────────────────────────────────────────────────
+   Socle de `src/components/loading/` et des composants `Spinner` et
+   `Skeleton`. Les motifs viennent de transitions.dev (Jakub Antalik) ; tout
+   suit `currentColor` ou les jetons du thème. */
+
+/* Texte d'attente traversé par un reflet, pur CSS : la bande claire est un
+   dégradé découpé sur les lettres. S'emploie seul ou avec une variante. */
+@utility shimmer {
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--shimmer-base, var(--muted-foreground)) 0%,
+    var(--shimmer-base, var(--muted-foreground)) 40%,
+    var(--shimmer-highlight, var(--foreground)) 50%,
+    var(--shimmer-base, var(--muted-foreground)) 60%,
+    var(--shimmer-base, var(--muted-foreground)) 100%
+  );
+  background-size: 400% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: sxm-shimmer 2s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background-image: none;
+    color: var(--shimmer-base, var(--muted-foreground));
+  }
+}
+
+@keyframes sxm-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+@layer components {
+  /* Matrice de 4 × 4 points du `Spinner`. La boîte prend sa taille d'une
+     classe `size-*` ; la grille intérieure s'y place en pourcentages de cette
+     boîte (et non du parent). À 16 px : marge de 1 px, points et écarts de
+     2 px – des pixels entiers, donc nets. */
+  .sxm-matrix {
+    --sxm-matrix-cycle: 1200ms;
+    position: relative;
+    display: inline-block;
+    flex-shrink: 0;
+    vertical-align: middle;
+  }
+  .sxm-matrix > span {
+    position: absolute;
+    inset: 6.25%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 14.2857%;
+  }
+  .sxm-matrix i {
+    display: block;
+    border-radius: 0.5px;
+    background: currentColor;
+    opacity: 0.22;
+    animation: sxm-matrix-pulse var(--sxm-matrix-cycle) ease-in-out infinite;
+    /* Retard négatif : la matrice tourne déjà quand elle apparaît. */
+    animation-delay: calc(var(--d, 0) * 1ms - var(--sxm-matrix-cycle));
+  }
+  .sxm-matrix i[data-still] {
+    animation: none;
+  }
+  .sxm-matrix i[data-gap] {
+    visibility: hidden;
+    animation: none;
+  }
+
+  /* Case de squelette : un reflet la traverse lentement. */
+  .sxm-skeleton {
+    --sxm-sheen: rgb(255 255 255 / 0.55);
+    background-color: var(--accent);
+    background-image: linear-gradient(
+      100deg,
+      transparent 30%,
+      var(--sxm-sheen) 50%,
+      transparent 70%
+    );
+    background-size: 250% 100%;
+    background-repeat: no-repeat;
+    animation: sxm-skeleton-sheen 1.8s ease-in-out infinite;
+  }
+  .dark .sxm-skeleton {
+    --sxm-sheen: rgb(255 255 255 / 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    .theme-system .sxm-skeleton {
+      --sxm-sheen: rgb(255 255 255 / 0.06);
+    }
+  }
+}
+
+@keyframes sxm-matrix-pulse {
+  0%,
+  45%,
+  100% {
+    opacity: 0.22;
+  }
+  15% {
+    opacity: 1;
+  }
+}
+
+@keyframes sxm-skeleton-sheen {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sxm-matrix i {
+    animation-duration: calc(var(--sxm-matrix-cycle) * 2);
+  }
+  .sxm-skeleton {
+    animation: none;
+    background-image: none;
+  }
+}

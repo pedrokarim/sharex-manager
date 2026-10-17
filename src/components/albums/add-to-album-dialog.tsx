@@ -13,7 +13,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, FolderOpen, Plus, Loader2, Check } from "lucide-react";
+import { Search, FolderOpen, Plus, Check } from "lucide-react";
+import { LoadingState } from "@/components/loading";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
 import { CreateAlbumDialog } from "./create-album-dialog";
@@ -257,9 +258,11 @@ export function AddToAlbumDialog({
 
             {/* Liste des albums */}
             {loading ? (
-              <div className="flex flex-1 items-center justify-center py-6 sm:py-8">
-                <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" />
-              </div>
+              <LoadingState
+                label="Chargement des albums…"
+                size="md"
+                className="flex-1 py-6 sm:py-8"
+              />
             ) : (
               <ScrollArea className="h-full min-h-0 flex-1 pr-1">
                 <div className="space-y-2 pb-1">
@@ -337,12 +340,10 @@ export function AddToAlbumDialog({
                 </Button>
                 <Button
                   onClick={handleAddToAlbums}
-                  disabled={selectedAlbums.size === 0 || adding}
+                  loading={adding}
+                  disabled={selectedAlbums.size === 0}
                   className="text-sm"
                 >
-                  {adding && (
-                    <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
-                  )}
                   {progress
                     ? `Ajout… ${progress.done}/${progress.total}`
                     : selectedAlbums.size === 1

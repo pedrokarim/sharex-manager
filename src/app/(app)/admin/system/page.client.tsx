@@ -5,7 +5,6 @@ import {
   Upload,
   Database,
   Package,
-  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -94,17 +93,13 @@ export default function SystemPageClient() {
               </p>
               <Button
                 onClick={installAllModuleDependencies}
-                disabled={isInstallingDependencies}
+                loading={isInstallingDependencies}
                 className="text-sm"
               >
-                {isInstallingDependencies ? (
-                  <>
-                    <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-                    Installation en cours...
-                  </>
-                ) : (
-                  "Installer toutes les dépendances"
-                )}
+                <Package />
+                {isInstallingDependencies
+                  ? "Installation en cours…"
+                  : "Installer toutes les dépendances"}
               </Button>
 
               {dependencyResults.length > 0 && (

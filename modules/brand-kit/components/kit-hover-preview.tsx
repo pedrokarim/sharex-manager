@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { FONTS } from "@/modules/clip-studio/lib/font-catalog";
 import { api } from "../lib/client";
 import { buildFormat, type FormatId } from "../lib/formats";
@@ -60,7 +60,7 @@ export function KitHoverPreview({ summary }: { summary: KitSummary }) {
   if (!kit) {
     return (
       <div className="flex h-40 items-center justify-center">
-        <Loader2 aria-label="Chargement de l’aperçu" className="size-4 animate-spin text-muted-foreground" />
+        <Spinner label="Chargement de l’aperçu" className="size-4 text-muted-foreground" />
       </div>
     );
   }

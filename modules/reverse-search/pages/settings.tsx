@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ExternalLink, KeyRound, Loader2 } from "lucide-react";
+import { Check, ExternalLink, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo, type Brand } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
@@ -97,8 +97,8 @@ function KeyCard({
           placeholder={status?.fromEnv ? "Définie par une variable d’environnement" : status?.configured ? "Remplacer la clé" : "Coller la clé"}
           className="h-9 font-mono text-xs"
         />
-        <Button type="submit" size="sm" className="h-9" disabled={!value.trim() || saving || status?.fromEnv}>
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enregistrer"}
+        <Button type="submit" size="sm" className="h-9" loading={saving} disabled={!value.trim() || status?.fromEnv}>
+          Enregistrer
         </Button>
         {status?.configured && !status.fromEnv && (
           <Button type="button" variant="ghost" size="sm" className="h-9" disabled={saving} onClick={() => void save("")}>

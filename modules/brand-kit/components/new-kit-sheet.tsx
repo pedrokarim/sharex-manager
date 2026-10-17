@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Copy, FileArchive, FilePlus2, ImagePlus, Loader2, Sparkles, Star, X } from "lucide-react";
+import { Copy, FileArchive, FilePlus2, ImagePlus, Sparkles, Star, X } from "lucide-react";
 import { toast } from "sonner";
+import { ThinkingStatus } from "@/components/loading";
+import { Spinner } from "@/components/ui/spinner";
 import { ImagePickerDialog, type PickedImage } from "@/components/gallery/image-picker-dialog";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentMedia, AttachmentTitle } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
@@ -195,10 +197,7 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
               job ? (
                 <AssistantJobProgress job={job} onCancel={() => onCancelJob(job.id)} onOpen={() => onOpenChange(false)} />
               ) : (
-                <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 aria-hidden className="size-4 animate-spin" />
-                  Démarrage de l’assistant…
-                </p>
+                <ThinkingStatus messages="Démarrage de l’assistant…" state="composing" />
               )
             ) : (
               <Tabs value={tab} onValueChange={(value) => setTab(value as CreateTab)} className="gap-4">
@@ -379,7 +378,7 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
                               <motion.li key={`uploading-${index}`} layout className="min-w-0">
                                 <Attachment state="uploading" className="w-full">
                                   <AttachmentMedia>
-                                    <Loader2 aria-hidden className="animate-spin" />
+                                    <Spinner aria-hidden />
                                   </AttachmentMedia>
                                   <AttachmentContent>
                                     <AttachmentTitle>Envoi de l’image…</AttachmentTitle>
@@ -421,13 +420,12 @@ export function NewKitSheet({ open, onOpenChange, tab: initialTab, kits, duplica
                   Annuler
                 </Button>
                 {tab === "manual" ? (
-                  <Button type="submit" form="brand-kit-manual" disabled={!manualReady || busy} className="gap-2">
-                    {busy && <Loader2 className="size-4 animate-spin" />}
+                  <Button type="submit" form="brand-kit-manual" loading={busy} disabled={!manualReady} className="gap-2">
                     {start === "archive" ? "Importer" : "Créer et ouvrir"}
                   </Button>
                 ) : (
-                  <Button type="submit" form="brand-kit-assistant" disabled={!assistantReady || busy} className="gap-2">
-                    {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                  <Button type="submit" form="brand-kit-assistant" loading={busy} disabled={!assistantReady} className="gap-2">
+                    <Sparkles className="size-4" />
                     Lancer l’assistant
                   </Button>
                 )}

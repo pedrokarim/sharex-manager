@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/select";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import { useTranslation } from "@/lib/i18n";
+import { LoadingState } from "@/components/loading";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -165,9 +166,7 @@ export const HistoryList = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-6 sm:p-8">
-        <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-gray-900"></div>
-      </div>
+      <LoadingState label={t("uploads.history.list.loading")} size="md" fill />
     );
   }
 

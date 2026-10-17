@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -135,8 +135,10 @@ export function GalleryAssetsDialog({
           <Button variant="ghost" onClick={onClose} disabled={progress !== null}>
             Annuler
           </Button>
-          <Button onClick={() => void submit()} disabled={!ready || progress !== null} className="gap-2">
-            {progress !== null && <Loader2 className="size-4 animate-spin" />}
+          {/* Le spinner prend la place de l'icône, le compteur reste lisible ; la
+              largeur minimale évite que le bouton rétrécisse en passant au compteur. */}
+          <Button onClick={() => void submit()} loading={progress !== null} disabled={!ready} className="min-w-28 gap-2">
+            <Plus className="size-4" />
             {progress !== null ? `${progress}/${count}` : "Ajouter"}
           </Button>
         </DialogFooter>

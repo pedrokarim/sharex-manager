@@ -91,7 +91,9 @@ export function readKit(id: unknown): BrandKit | null {
 
 export function writeKit(kit: BrandKit) {
   for (const area of ["assets", "fonts", "exports"] as const) fs.mkdirSync(kitArea(kit.id, area), { recursive: true });
-  writeJson(kitFile(kit.id), kit);
+  // L'avertissement de typographie n'existe qu'à la lecture : la réparation, elle, est enregistrée.
+  const { typographyNotice: _notice, ...stored } = kit;
+  writeJson(kitFile(kit.id), stored);
 }
 
 export function listKitFiles(): BrandKit[] {

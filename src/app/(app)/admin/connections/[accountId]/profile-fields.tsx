@@ -9,7 +9,7 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronsUpDown, Copy, Download, ExternalLink, KeyRound, Loader2, Plus, RotateCcw, Send, Undo2, X } from "lucide-react";
+import { Check, ChevronsUpDown, Copy, Download, ExternalLink, KeyRound, Plus, RotateCcw, Send, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -586,8 +586,8 @@ export function EditableFieldRow(props: EditableRowProps) {
             </Button>
           ) : null}
           {access.state === "ok" ? (
-            <Button type="button" size="sm" className="gap-1.5" disabled={!canSend} onClick={props.onSend}>
-              {sending ? <Loader2 className="animate-spin" /> : <Send />}
+            <Button type="button" size="sm" className="gap-1.5" loading={sending} disabled={!canSend} onClick={props.onSend}>
+              <Send />
               Envoyer
             </Button>
           ) : (
@@ -699,8 +699,8 @@ export function ManualFieldRow({
         <h4 className="min-w-0 text-sm font-medium break-words">{field.label}</h4>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {isImage && onDownload ? (
-            <Button type="button" size="sm" variant="outline" className="gap-1.5" disabled={downloading} onClick={onDownload}>
-              {downloading ? <Loader2 className="animate-spin" /> : <Download />}
+            <Button type="button" size="sm" variant="outline" className="gap-1.5" loading={downloading} onClick={onDownload}>
+              <Download />
               Télécharger
             </Button>
           ) : null}

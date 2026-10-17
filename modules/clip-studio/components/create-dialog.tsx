@@ -9,7 +9,6 @@ import {
   Images,
   LayoutTemplate,
   ListOrdered,
-  Loader2,
   PenLine,
   RotateCcw,
   Plus,
@@ -21,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Orb } from "@/components/loading";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -638,17 +638,18 @@ export function CreateDialog({
                 Annuler
               </Button>
               {mode === "assistant" ? (
-                <Button onClick={startAssistant} disabled={busy || brief.trim().length < 3} className="gap-2">
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                <Button onClick={startAssistant} loading={busy} disabled={brief.trim().length < 3} className="gap-2">
+                  <Sparkles className="h-4 w-4" />
                   Créer avec l&apos;IA
                 </Button>
               ) : (
                 <Button
                   onClick={createBlankOrTemplate}
-                  disabled={busy || (fromGallery && recipe === "before-after" && request!.files.filter((file) => !isVideoFile(file)).length < 2)}
+                  loading={busy}
+                  disabled={fromGallery && recipe === "before-after" && request!.files.filter((file) => !isVideoFile(file)).length < 2}
                   className="gap-2"
                 >
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  <Plus className="h-4 w-4" />
                   Créer
                 </Button>
               )}
@@ -834,7 +835,7 @@ export function AssistantProgress({ job, onCancel }: { job: AssistantJob; onCanc
         {job.steps.map((step) => (
           <motion.li key={step.id} layout className="flex items-start gap-3 rounded-lg border px-3 py-2.5">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-              {step.state === "running" && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+              {step.state === "running" && <Orb size="xs" state="composing" className="text-primary" />}
               {step.state === "done" && (
                 <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 20 }}>
                   <Check className="h-4 w-4 text-emerald-500" />

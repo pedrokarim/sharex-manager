@@ -11,6 +11,7 @@ import { AssetChooser } from "../asset-chooser";
 import { AssetGallery } from "../asset-gallery";
 import { CountedInput, CountedTextarea, Field, FieldGroup, SectionHeading } from "../fields";
 import { FormatCanvas } from "../format-preview";
+import { PoseLibrary } from "../pose-library";
 import type { FileSectionProps } from "./types";
 
 const EMPTY_MASCOT: BrandMascot = { identityPrompt: "", sheetAssetIds: [], poseAssetIds: [] };
@@ -77,8 +78,11 @@ export function MascotSection(props: MascotSectionProps) {
       <FieldGroup title="Feuilles de modèle" text="Le personnage de face, de profil et de dos : la référence de toutes ses images. Survolez une feuille pour la voir en grand.">
         <AssetGallery {...props} kinds={["mascot-sheet"]} addKind="mascot-sheet" emptyText="Aucune feuille de modèle." pickerTitle="Feuille de modèle" />
       </FieldGroup>
-      <FieldGroup title="Poses" text="Poses détourées, sur fond transparent : les formats et les vidéos les mettent en scène. Leur note dit à quoi elles servent.">
-        <AssetGallery {...props} kinds={["mascot-pose"]} addKind="mascot-pose" roles={["end-pose"]} emptyText="Aucune pose." pickerTitle="Pose de la mascotte" />
+      <FieldGroup
+        title="Bibliothèque de poses"
+        text="Chaque pose porte une émotion, un geste, un cadrage et le côté vers lequel elle regarde : les vidéos choisissent celle qui va avec ce que dit chaque segment. Une pose importée sur fond vert est détourée d’office."
+      >
+        <PoseLibrary {...props} />
       </FieldGroup>
 
       <FieldGroup

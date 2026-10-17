@@ -12,7 +12,6 @@ import {
   Download,
   IdCard,
   Image as ImageIcon,
-  Loader2,
   Palette,
   RefreshCw,
   Send,
@@ -24,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Kbd } from "@/components/ui/kbd";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -277,8 +277,8 @@ export default function EditorPage() {
                 </Button>
               ))}
             {kit && (
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => void exportZip()} disabled={exportingZip}>
-                {exportingZip ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => void exportZip()} loading={exportingZip}>
+                <Download className="size-4" />
                 Exporter
               </Button>
             )}
@@ -402,7 +402,7 @@ function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => vo
   return (
     <span aria-live="polite" className={cn("flex items-center gap-1.5 text-xs", state === "error" || state === "conflict" ? "text-destructive" : "text-muted-foreground")}>
       {state === "saved" && <Check aria-hidden className="size-3.5" />}
-      {(state === "pending" || state === "saving") && <Loader2 aria-hidden className="size-3.5 animate-spin" />}
+      {(state === "pending" || state === "saving") && <Spinner aria-hidden className="size-3.5" />}
       {(state === "error" || state === "conflict") && <AlertTriangle aria-hidden className="size-3.5" />}
       {SAVE_LABELS[state]}
       {state === "error" && (

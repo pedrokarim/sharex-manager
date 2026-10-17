@@ -109,7 +109,7 @@ function sheetPrompt(request: KitAssistantRequest, referenceCount: number): stri
     referenceCount ? `${referenceCount} image(s) de référence seront jointes aux générations : décris un style qui leur reste fidèle.` : "",
     "Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour ni bloc de code. N'utilise aucun outil.",
     'Schéma : {"name": string, "tagline": string, "language": "fr"|"en", "tone": string, "scriptTone": string, "rules": {"always": [string], "never": [string]}, "palette": {"background": "#rrggbb", "ink": "#rrggbb", "surface": "#rrggbb", "onSurface": "#rrggbb", "accent": "#rrggbb", "accentSecondary": "#rrggbb", "onAccent": "#rrggbb", "extras": ["#rrggbb"]}, "fonts": {"title": string, "subtitle": string, "caption": string, "label": string, "body": string}, "uppercaseTitles": boolean, "styleNotes": string, "callToAction": string, "tags": [string], "categoryId": string, "mascot": {"name": string, "identityPrompt": string} | null, "prompts": {"logo": string, "banner": string, "mascotSheet": string, "mascotPose": string}}',
-    `Polices : choisis uniquement parmi ${FONTS.map((font) => `"${font.family}"`).join(", ")}.`,
+    `Polices : choisis uniquement parmi ${FONTS.map((font) => `"${font.family}"`).join(", ")}. Hors titre (subtitle, caption, label, body), seulement une police de texte : ${FONTS.filter((font) => font.text).map((font) => `"${font.family}"`).join(", ")}.`,
     "Palette : ink doit être lisible sur background, onSurface sur surface, onAccent sur accent (contraste d'au moins 4,5). 2 à 4 extras.",
     "tone : 2 à 4 phrases sur la voix de la chaîne. scriptTone : une phrase de consigne pour l'écriture des scripts. rules : 3 à 5 règles « toujours » et « jamais », courtes.",
     "styleNotes : en anglais, la direction artistique des illustrations (technique, lumière, matières, cadrage), sans nommer d'artiste vivant ni de marque existante.",
@@ -128,7 +128,8 @@ function applySheet(kit: BrandKit, raw: RawSheet): BrandKit {
   const styles = defaultTextStyles(palette);
   for (const role of TEXT_ROLES) {
     const family = raw.fonts?.[role];
-    if (family && FONTS.some((font) => font.family === family)) {
+    // Hors titre, seulement une police de texte : une police de titre ne se lit pas en phrases.
+    if (family && FONTS.some((font) => font.family === family && (role === "title" || font.text))) {
       const font = FONTS.find((entry) => entry.family === family)!;
       styles[role].font = family;
       styles[role].weight = font.weights[font.weights.length - 1];
@@ -384,7 +385,8 @@ export async function regenerateAsset(kitId: unknown, assetId: unknown, note?: u
   // Même identifiant, nouveau fichier : les réglages qui le désignent restent valables.
   const { asset: fresh } = await addImageToKit(kit.id, fs.readFileSync(image.path), asset.kind, asset.label);
   const current = requireKit(kit.id);
-  const replaced: BrandAsset = { ...fresh, id: asset.id, generated: { ...asset.generated, prompt, jobId: image.jobId, check } };
+  // Une pose refaite garde ses étiquettes.
+  const replaced: BrandAsset = { ...fresh, id: asset.id, ...(asset.pose ? { pose: asset.pose } : {}), generated: { ...asset.generated, prompt, jobId: image.jobId, check } };
   fs.rmSync(path.join(kitArea(kit.id, "assets"), asset.file), { force: true });
   const next: BrandKit = {
     ...current,

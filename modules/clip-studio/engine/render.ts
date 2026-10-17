@@ -1833,6 +1833,33 @@ function drawShape(ctx: Ctx, item: ShapeItem, frame: number, w: number, h: numbe
   roundedRect(ctx, -w / 2, -h / 2, w, h, radius);
   ctx.fillStyle = fill;
   ctx.fill();
+  if (item.pattern && !color) paintDots(ctx, item, w, h, radius);
+}
+
+/**
+ * Trame en points d'un aplat : une seule forme, des points en quinconce,
+ * coupée aux bords de l'aplat. Le pas suit le petit côté de l'aplat : la
+ * vignette et le rendu plein format montrent la même trame.
+ */
+function paintDots(ctx: Ctx, item: ShapeItem, w: number, h: number, radius: number) {
+  const pattern = item.pattern!;
+  const step = Math.max(4, pattern.spacing * Math.min(w, h));
+  const dot = step * 0.28;
+  ctx.save();
+  roundedRect(ctx, -w / 2, -h / 2, w, h, radius);
+  ctx.clip();
+  ctx.globalAlpha *= Math.min(1, Math.max(0, pattern.opacity));
+  ctx.fillStyle = pattern.color;
+  ctx.beginPath();
+  let row = 0;
+  for (let y = -h / 2; y <= h / 2 + step; y += step * 0.866, row++) {
+    for (let x = -w / 2 - (row % 2 ? step / 2 : 0); x <= w / 2 + step; x += step) {
+      ctx.moveTo(x + dot, y);
+      ctx.arc(x, y, dot, 0, Math.PI * 2);
+    }
+  }
+  ctx.fill();
+  ctx.restore();
 }
 
 function roundedRect(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {

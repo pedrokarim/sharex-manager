@@ -12,6 +12,7 @@ import { TEXT_ROLES } from "@/modules/clip-studio/engine/brand";
 import { HASHTAG_RULES } from "@/modules/clip-studio/lib/post-types";
 import { cleanVoiceSettings } from "@/modules/clip-studio/lib/voice-settings";
 import { DEFAULT_PALETTE, defaultTextStyles, upgradePublishing } from "./defaults";
+import { proposePoseTags, sanitizePoseTags } from "./mascot";
 import {
   FORMAT_IDS,
   KIT_LIMITS,
@@ -246,7 +247,11 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
   const assets: BrandAsset[] = stored.assets.map((asset) => {
     const incoming = incomingAssets.get(asset.id);
     if (!incoming) return asset;
-    return { ...asset, label: line(incoming.label, KIT_LIMITS.label) || asset.label, note: optional(incoming.note, KIT_LIMITS.note) };
+    const label = line(incoming.label, KIT_LIMITS.label) || asset.label;
+    const note = optional(incoming.note, KIT_LIMITS.note);
+    // Étiquettes d'une pose : listes fermées ; une valeur inconnue garde celle de la fiche enregistrée.
+    if (asset.kind !== "mascot-pose") return { ...asset, label, note };
+    return { ...asset, label, note, pose: sanitizePoseTags(incoming.pose, asset.pose ?? proposePoseTags(asset)) };
   });
   const incomingFonts = new Map<string, Record<string, unknown>>(
     (Array.isArray(kit.fonts) ? kit.fonts : []).filter((entry: any) => entry && typeof entry.id === "string").map((entry: any) => [entry.id, entry])
@@ -262,7 +267,9 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
 
   const mascotInput = kit.mascot && typeof kit.mascot === "object" ? kit.mascot : null;
   const keepAssets = (value: unknown, kind: BrandAsset["kind"]) =>
-    (Array.isArray(value) ? value : []).filter((id) => assets.some((asset) => asset.id === id && asset.kind === kind)).slice(0, 20) as string[];
+    (Array.isArray(value) ? value : [])
+      .filter((id, index, ids) => ids.indexOf(id) === index && assets.some((asset) => asset.id === id && asset.kind === kind))
+      .slice(0, kind === "mascot-pose" ? KIT_LIMITS.poses : 20) as string[];
   const poseAssetIds = mascotInput ? keepAssets(mascotInput.poseAssetIds, "mascot-pose") : [];
   const formatPoses = mascotInput ? sanitizeFormatPoses(mascotInput.formatPoses, poseAssetIds) : undefined;
   const presence = mascotInput ? sanitizePresence(mascotInput.presence, poseAssetIds) : undefined;
@@ -310,6 +317,8 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
     },
     ...(formatImages ? { formatImages } : {}),
     ...(typeof kit.registrationMarks === "boolean" ? { registrationMarks: kit.registrationMarks } : stored.registrationMarks !== undefined ? { registrationMarks: stored.registrationMarks } : {}),
+    // Trame Riso des aplats (D1) ; l'avertissement de typographie, lui, n'est jamais enregistré.
+    ...(typeof kit.halftone === "boolean" ? { halftone: kit.halftone } : stored.halftone !== undefined ? { halftone: stored.halftone } : {}),
     ai: {
       styleNotes: text(ai.styleNotes, KIT_LIMITS.styleNotes),
       collectionId: typeof ai.collectionId === "string" && /^col-[A-Za-z0-9-]{1,60}$/.test(ai.collectionId) ? ai.collectionId : undefined,

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, ImageUp, Loader2 } from "lucide-react";
+import { Check, ImageUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { ClipExport } from "../engine/types";
@@ -39,7 +39,7 @@ export function SendToGalleryButton({
     <Button
       variant={variant}
       className="gap-2"
-      disabled={sending}
+      loading={sending}
       onClick={async () => {
         setSending(true);
         try {
@@ -54,7 +54,7 @@ export function SendToGalleryButton({
         }
       }}
     >
-      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageUp className="h-4 w-4" />}
+      <ImageUp className="h-4 w-4" />
       Envoyer dans la galerie
     </Button>
   );
