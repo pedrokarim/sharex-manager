@@ -191,7 +191,8 @@ function patchJob(id: string, patch: Partial<PublishJob>): PublishJob | null {
   changeJobs((jobs) => {
     const job = jobs.find((entry) => entry.id === id);
     if (!job) return;
-    Object.assign(job, patch, { updatedAt: Date.now() });
+    // `updatedAt` peut venir du patch : une échéance (`checkAt`) et sa date de départ partent alors du même instant.
+    Object.assign(job, patch, { updatedAt: patch.updatedAt ?? Date.now() });
     for (const key of Object.keys(patch) as (keyof PublishJob)[]) if (patch[key] === undefined) delete job[key];
     updated = { ...job };
   });
@@ -612,6 +613,7 @@ function settle(job: PublishJob, connector: Connector, outcome: PublishOutcome, 
     patchJob(job.id, {
       state: "processing",
       checkAt: now + delay,
+      updatedAt: now,
       // Une suite d'attentes compte depuis la première : l'abandon du suivi la borne.
       processingSince: job.state === "processing" ? (job.processingSince ?? now) : now,
       note: typeof outcome.note === "string" && outcome.note ? outcome.note.slice(0, 200) : undefined,

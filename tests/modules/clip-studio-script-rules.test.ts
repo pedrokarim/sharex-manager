@@ -61,6 +61,7 @@ describe("règles d'écriture : nettoyage", () => {
   it("applique la typographie française", () => {
     expect(frenchTypography("Pourquoi ? Parce que : « oui » à 50 %")).toBe("Pourquoi\u00a0? Parce que\u00a0: «\u00a0oui\u00a0» à 50\u00a0%");
     expect(frenchTypography("Le magma — très chaud — remonte")).toBe("Le magma – très chaud – remonte");
+    expect(frenchTypography("Le café de 16 h, 72 km/h, 3 ans, 2 heures")).toBe("Le café de 16 h, 72 km/h, 3 ans, 2 heures");
     // Pas d'espace ajoutée là où il n'y en avait pas.
     expect(frenchTypography("Départ à 10:30")).toBe("Départ à 10:30");
   });

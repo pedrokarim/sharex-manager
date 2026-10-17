@@ -194,6 +194,8 @@ export function frenchTypography(text: string): string {
     .replace(/[ \u00a0\u202f]*\u2014[ \u00a0\u202f]*/g, " – ")
     .replace(/[ \u00a0\u202f]+([;:!?%»])/g, "\u00a0$1")
     .replace(/«[ \u00a0\u202f]*/g, "«\u00a0")
+    // Un nombre et son unité ne se séparent jamais en fin de ligne (« 16 h », « 72 km/h »).
+    .replace(/(\d)[  ]+(h|min|s|ms|km\/h|km|m|cm|mm|kg|g|°C|°|€|ans?|mois|jours?|fps|Go|Mo|Ko|Hz)(?![\p{L}\d])/gu, "$1 $2")
     .trim();
 }
 
