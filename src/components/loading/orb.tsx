@@ -65,9 +65,10 @@ function startPainting(paint: (seconds: number) => void) {
 }
 
 /*
- * La couleur de l'encre change avec le thème : classe `.dark` sur <html>,
- * feuille de thème réinjectée, préférence du système. Un seul observateur
- * prévient toutes les orbes.
+ * La couleur de l'encre change avec le thème : classe `.dark` ou style posé
+ * sur <html>, préférence du système. Un seul observateur prévient toutes les
+ * orbes, au plus une fois par image. Le <head> n'est pas observé : chaque
+ * balise ajoutée y relancerait un `getComputedStyle` par orbe.
  */
 const inkListeners = new Set<() => void>();
 let stopWatchingInk: (() => void) | null = null;
@@ -75,13 +76,19 @@ let stopWatchingInk: (() => void) | null = null;
 function watchInk(listener: () => void) {
   inkListeners.add(listener);
   if (!stopWatchingInk) {
-    const notify = () => inkListeners.forEach((fn) => fn());
+    let pending = 0;
+    const notify = () => {
+      if (pending) return;
+      pending = requestAnimationFrame(() => {
+        pending = 0;
+        inkListeners.forEach((fn) => fn());
+      });
+    };
     const observer = new MutationObserver(notify);
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["class", "style", "data-theme"],
     });
-    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
     // Absent de certains environnements (jsdom, vieux navigateurs).
     const scheme =
       typeof window.matchMedia === "function"
@@ -91,6 +98,7 @@ function watchInk(listener: () => void) {
     stopWatchingInk = () => {
       observer.disconnect();
       scheme?.removeEventListener("change", notify);
+      cancelAnimationFrame(pending);
     };
   }
   return () => {
@@ -154,6 +162,10 @@ export function Orb({
   const pixels = ORB_PIXELS[size];
 
   useEffect(() => {
+    // Sans moyen de savoir si l'orbe est visible (jsdom, navigateurs d'avant
+    // 2019), elle reste vide : on ne crée même pas de contexte de dessin,
+    // ce qui sous jsdom chargerait la bibliothèque native `canvas`.
+    if (typeof IntersectionObserver === "undefined") return;
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -191,13 +203,6 @@ export function Orb({
 
     now();
     let stopPainting: (() => void) | null = null;
-    if (typeof IntersectionObserver === "undefined") {
-      stopPainting = startPainting(paint);
-      return () => {
-        stopPainting?.();
-        stopInk();
-      };
-    }
     // Hors de l'écran, l'orbe ne coûte rien.
     const visibility = new IntersectionObserver(([entry]) => {
       if (entry?.isIntersecting) stopPainting ??= startPainting(paint);
