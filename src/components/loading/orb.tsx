@@ -82,11 +82,15 @@ function watchInk(listener: () => void) {
       attributeFilter: ["class", "style", "data-theme"],
     });
     observer.observe(document.head, { childList: true, subtree: true, characterData: true });
-    const scheme = window.matchMedia("(prefers-color-scheme: dark)");
-    scheme.addEventListener("change", notify);
+    // Absent de certains environnements (jsdom, vieux navigateurs).
+    const scheme =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-color-scheme: dark)")
+        : null;
+    scheme?.addEventListener("change", notify);
     stopWatchingInk = () => {
       observer.disconnect();
-      scheme.removeEventListener("change", notify);
+      scheme?.removeEventListener("change", notify);
     };
   }
   return () => {
@@ -187,6 +191,13 @@ export function Orb({
 
     now();
     let stopPainting: (() => void) | null = null;
+    if (typeof IntersectionObserver === "undefined") {
+      stopPainting = startPainting(paint);
+      return () => {
+        stopPainting?.();
+        stopInk();
+      };
+    }
     // Hors de l'écran, l'orbe ne coûte rien.
     const visibility = new IntersectionObserver(([entry]) => {
       if (entry?.isIntersecting) stopPainting ??= startPainting(paint);
