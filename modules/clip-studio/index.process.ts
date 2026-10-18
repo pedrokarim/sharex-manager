@@ -62,8 +62,43 @@ import {
   type AssistantJob,
   type AssistantRequest,
 } from "./lib/assistant";
+import {
+  cancelTranscriptionJob,
+  getTranscriptionJob as readTranscriptionJob,
+  startTranscriptionJob,
+  type TranscriptionJob,
+  type TranscriptionRequest,
+} from "./lib/transcription-jobs";
+import {
+  cancelClipJob as abandonClipJob,
+  createClipsFromMoments as makeClipsFromMoments,
+  getClipJob as readClipJob,
+  noteUploadedAsset,
+  startClipping as launchClipping,
+  startSubtitleClip as launchSubtitleClip,
+  type ClipJob,
+} from "./lib/clip-jobs";
+import {
+  cancelRemoteImportJob,
+  getRemoteImportJob as readRemoteImportJob,
+  listRemoteImportJobs,
+  probeRemote,
+  startRemoteImport as launchRemoteImport,
+  type RemoteImportJob,
+  type RemoteProbe,
+} from "./lib/remote-import";
+import {
+  clearYoutubeCookies,
+  pexelsApiKey,
+  savePexelsKey as storePexelsKey,
+  saveYoutubeCookies as storeYoutubeCookies,
+  videoSourcesStatus,
+  type VideoSourcesStatus,
+} from "./lib/video-sources";
+import { startWorkDirSweeper } from "./lib/job-safety";
 import { cleanFoundImages, importFoundImageById, searchFoundImages } from "./lib/image-search";
 import type { FoundImage, ImportedImage } from "./lib/image-search-types";
+import { importFoundVideoById, pexelsUsageReport, searchFoundVideos, type FoundVideo, type ImportedVideo } from "./lib/video-search";
 import {
   enqueuePublish,
   listAccounts,
@@ -345,9 +380,13 @@ export async function registerAsset(asset: ClipAsset): Promise<ClipAsset> {
     width: Number(asset.width) || undefined,
     height: Number(asset.height) || undefined,
     durationMs: Number(asset.durationMs) || undefined,
+    // Vidéo : présence d'une piste son, lue par le navigateur (absente : inconnue).
+    ...(asset.kind === "video" && typeof asset.hasAudio === "boolean" ? { hasAudio: asset.hasAudio } : {}),
     createdAt: Date.now(),
   };
   writeAssets([clean, ...readAssets().filter((entry) => entry.file !== clean.file)]);
+  // Vidéo reçue à l'instant : une création (découpe) pourra la réclamer comme la sienne, côté serveur.
+  if (clean.kind === "video") noteUploadedAsset(clean.file);
   return clean;
 }
 
@@ -829,6 +868,57 @@ export async function cancelAssistant(id: string): Promise<{ success: boolean }>
   return { success: true };
 }
 
+// ─── Transcription (Whisper d’OpenAI) ────────────────────────────
+
+/**
+ * Lance la transcription de la parole d’une vidéo ou d’un son, une fois par
+ * média : les mots sont rangés avec lui et réutilisés. Suivi par
+ * `getTranscriptionJob`.
+ */
+export async function startTranscription(request: TranscriptionRequest): Promise<TranscriptionJob> {
+  if (!request || typeof request !== "object") throw new Error("Demande de transcription invalide");
+  return startTranscriptionJob(request);
+}
+
+export async function getTranscriptionJob(id: string): Promise<TranscriptionJob | null> {
+  return readTranscriptionJob(String(id ?? ""));
+}
+
+export async function cancelTranscription(id: string): Promise<{ success: boolean }> {
+  return { success: cancelTranscriptionJob(String(id ?? "")) };
+}
+
+// ─── Créations à partir d’une vidéo (dossier 01, V4) ─────────────
+
+/**
+ * « Sous-titrer un clip » : une adresse ou un média du module → récupération,
+ * transcription, projet sous-titré à la marque. Suivi par `getClipJob`.
+ */
+export async function startSubtitleClip(options: unknown): Promise<ClipJob> {
+  return launchSubtitleClip(options);
+}
+
+/**
+ * « Découper une vidéo » : récupération (2 h au plus), transcription, puis
+ * passages forts proposés par Codex ; le travail attend le choix (`review`).
+ */
+export async function startClipping(options: unknown): Promise<ClipJob> {
+  return launchClipping(options);
+}
+
+/** Crée un clip sous-titré par passage choisi (titres et bornes retouchés compris). */
+export async function createClipsFromMoments(input: { jobId: string; moments: unknown; keepSource?: boolean }): Promise<ClipJob> {
+  return makeClipsFromMoments(input);
+}
+
+export async function getClipJob(id: string): Promise<ClipJob | null> {
+  return readClipJob(id);
+}
+
+export async function cancelClipJob(id: string): Promise<{ success: boolean }> {
+  return { success: abandonClipJob(id) };
+}
+
 // ─── Idées de vidéos ─────────────────────────────────────────────
 
 const LANGUAGE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
@@ -971,6 +1061,8 @@ export async function getAiLimits(): Promise<AiModuleReport> {
     openai: { access: openAiVoiceAccess(), settingsHref: "/m/clip-studio/voices" },
     codex: {},
     openverse: { access: "open" },
+    // Vidéos de l'assistant et de l'onglet « Trouver » : solde relevé dans les réponses, appels de l'heure comptés ici.
+    pexels: pexelsUsageReport(),
   };
 }
 
@@ -1090,6 +1182,85 @@ export async function importFoundImage(input: { id: string }): Promise<ImportedI
   return importFoundImageById(String(input?.id ?? ""));
 }
 
+// ─── Vidéos trouvées (onglet « Trouver », source « Vidéos ») ─────
+
+/** La recherche de vidéos est-elle possible (clé Pexels enregistrée) ? Rien d'autre n'en sort. */
+export async function getVideoSearchStatus(): Promise<{ pexels: boolean }> {
+  return { pexels: Boolean(pexelsApiKey()) };
+}
+
+/** Cherche des vidéos libres sur Pexels, par page, dans l'orientation du projet. */
+export async function searchVideos(input: { query: string; orientation?: string; page?: number }): Promise<FoundVideo[]> {
+  return searchFoundVideos({ query: String(input?.query ?? ""), orientation: input?.orientation, page: input?.page });
+}
+
+/**
+ * Importe une vidéo de Pexels dans les médias du module (le fichier dont la
+ * hauteur va au format du projet), avec sa mention. Seul l'identifiant vient
+ * du navigateur, jamais une adresse.
+ */
+export async function importFoundVideo(input: { id: string; aspect?: string }): Promise<ImportedVideo> {
+  const aspect = (["9:16", "16:9", "1:1", "4:5"] as const).find((entry) => entry === input?.aspect);
+  return importFoundVideoById(String(input?.id ?? ""), aspect ? { aspect } : {});
+}
+
+// ─── Vidéos récupérées par adresse (onglet « Adresse ») ──────────
+
+/**
+ * Lit une adresse YouTube, Twitch ou un lien direct vers une vidéo : titre,
+ * auteur, durée et vignette (lue par le serveur). Rien n'est téléchargé.
+ */
+export async function probeRemoteVideo(input: { url: string }): Promise<RemoteProbe> {
+  return probeRemote(input?.url);
+}
+
+/**
+ * Récupère un passage (en secondes) d'une vidéo et le range parmi les médias
+ * du module. Le suivi se fait par `getRemoteImportJob`.
+ */
+export async function startRemoteImport(input: { url: string; start?: number; end?: number }): Promise<RemoteImportJob> {
+  return launchRemoteImport({ url: input?.url, start: input?.start, end: input?.end });
+}
+
+export async function getRemoteImportJob(id: string): Promise<RemoteImportJob | null> {
+  assertId(id, "Identifiant de travail");
+  return readRemoteImportJob(id);
+}
+
+export async function listRemoteImports(): Promise<RemoteImportJob[]> {
+  // Une longue vidéo à découper (V4) ne se pose pas sur la timeline : l'onglet « Adresse » ne la montre pas.
+  return listRemoteImportJobs().filter((job) => job.purpose !== "clipping");
+}
+
+export async function cancelRemoteImport(id: string): Promise<{ success: boolean }> {
+  assertId(id, "Identifiant de travail");
+  cancelRemoteImportJob(id);
+  return { success: true };
+}
+
+/**
+ * Réglages des sources vidéo : cookies YouTube et clé Pexels, jamais
+ * renvoyés (seulement leur état). Absentes de `functions` dans module.json :
+ * réservées aux admins, comme `getTtsProviders`.
+ */
+export async function getVideoSources(): Promise<VideoSourcesStatus> {
+  return videoSourcesStatus();
+}
+
+/** Enregistre les cookies YouTube (texte au format Netscape) ; `null` ou vide les efface. Réservée aux admins. */
+export async function saveYoutubeCookies(input: { cookies?: string | null }): Promise<VideoSourcesStatus> {
+  const cookies = input?.cookies;
+  if (cookies === null || cookies === undefined || (typeof cookies === "string" && !cookies.trim())) clearYoutubeCookies();
+  else storeYoutubeCookies(cookies);
+  return videoSourcesStatus();
+}
+
+/** Enregistre (ou efface, avec une chaîne vide) la clé de l'API Pexels. Réservée aux admins. */
+export async function savePexelsKey(input: { key: string }): Promise<VideoSourcesStatus> {
+  storePexelsKey(input?.key ?? "");
+  return videoSourcesStatus();
+}
+
 // ─── Cycle de vie ────────────────────────────────────────────────
 
 const moduleHooks: ModuleHooks = {
@@ -1103,6 +1274,8 @@ export function initModule() {
   prefetchTts();
   // Banque de musique : les morceaux manquants arrivent un par un.
   prefetchMusic();
+  // Dossiers de travail laissés par un arrêt brutal (plus de six heures) : au démarrage, puis toutes les heures.
+  startWorkDirSweeper();
   // Candidates du web plus vieilles que vingt-quatre heures, jamais importées.
   try {
     cleanFoundImages();

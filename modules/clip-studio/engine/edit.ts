@@ -18,6 +18,7 @@ import {
   type TextStyle,
   type TimedWord,
   type Track,
+  type TranscriptInfo,
   type VideoItem,
   type VisualItem,
 } from "./types";
@@ -222,17 +223,68 @@ export function createCaptionItem(words: TimedWord[], start: number, fps: number
   };
 }
 
-/** Sous-titres d'un élément audio de voix, calés sur sa place et son rognage. */
-export function captionForVoice(project: ClipProject, voice: AudioItem): TextItem | null {
-  const words = voice.source.words;
-  if (!words?.length) return null;
-  const caption = createCaptionItem(words, voice.start, project.fps, project.height > project.width);
-  caption.duration = voice.duration;
-  caption.karaoke = { ...caption.karaoke!, offset: voice.trimStart, voiceId: voice.id };
+/**
+ * Élément dont on entend la parole : une voix ou un son, une vidéo qui garde
+ * son son, ou le son détaché d'une vidéo (qui porte la même source). `null`
+ * pour une vidéo muette.
+ */
+export function spokenItem(project: ClipProject, item: AudioItem | VideoItem): AudioItem | VideoItem | null {
+  if (item.type === "audio") return item;
+  const partner = linkedItem(project, item);
+  if (partner) return partner.item;
+  return item.muted || item.audioLinkId ? null : item;
+}
+
+/**
+ * Sous-titres d'une voix, d'un son ou d'une vidéo transcrite, calés sur sa
+ * place, son rognage et sa vitesse. Les mots sont en temps de la source : à
+ * une vitesse autre que 1, ils sont ramenés au temps du projet (une vitesse
+ * changée après coup ne recale pas des sous-titres déjà posés). D'un média
+ * transcrit, seuls les mots du passage lu sont gardés.
+ */
+export function captionForVoice(project: ClipProject, voice: AudioItem | VideoItem): TextItem | null {
+  const target = spokenItem(project, voice);
+  if (!target) return null;
+  const all = target.source.words;
+  if (!all?.length) return null;
+  const fps = project.fps;
+  const speed = speedOf(target);
+  let words = all;
+  if (target.type === "video" || target.source.transcript) {
+    const fromMs = (target.trimStart / fps) * 1000 - 1000;
+    const toMs = ((target.trimStart + target.duration * speed) / fps) * 1000 + 1000;
+    words = all.filter((word) => word.endMs >= fromMs && word.startMs <= toMs);
+    if (!words.length) return null;
+  }
+  if (speed !== 1) words = words.map((word) => ({ ...word, startMs: Math.round(word.startMs / speed), endMs: Math.round(word.endMs / speed) }));
+  const caption = createCaptionItem(words, target.start, fps, project.height > project.width);
+  caption.duration = target.duration;
+  caption.karaoke = { ...caption.karaoke!, offset: speed === 1 ? target.trimStart : target.trimStart / speed, voiceId: target.id };
   return caption;
 }
 
-/** Sous-titre toutes les voix du projet qui ne le sont pas encore. */
+/**
+ * Range les mots d'une transcription dans tous les éléments qui lisent ce
+ * média (`source.ref`), vidéos et sons détachés compris.
+ */
+export function setSourceTranscript(project: ClipProject, ref: string, words: TimedWord[], transcript: TranscriptInfo): ClipProject {
+  let changed = false;
+  const tracks = project.tracks.map((track) => ({
+    ...track,
+    items: track.items.map((item) => {
+      if ((item.type !== "video" && item.type !== "audio") || item.source.ref !== ref) return item;
+      changed = true;
+      return { ...item, source: { ...item.source, words, transcript } };
+    }),
+  }));
+  return changed ? touch(project, tracks) : project;
+}
+
+/**
+ * Sous-titre toutes les voix et les vidéos transcrites du projet qui ne le
+ * sont pas encore. Une vidéo muette est passée ; celle dont le son est
+ * détaché l'est par son élément audio.
+ */
 export function captionAllVoices(project: ClipProject): { project: ClipProject; count: number } {
   const captioned = new Set(
     project.tracks.flatMap((track) => track.items).flatMap((item) => (item.type === "text" && item.karaoke?.voiceId ? [item.karaoke.voiceId] : []))
@@ -240,7 +292,8 @@ export function captionAllVoices(project: ClipProject): { project: ClipProject; 
   let next = project;
   let count = 0;
   for (const item of project.tracks.flatMap((track) => track.items)) {
-    if (item.type !== "audio" || captioned.has(item.id)) continue;
+    if ((item.type !== "audio" && item.type !== "video") || captioned.has(item.id)) continue;
+    if (item.type === "video" && (item.muted || item.audioLinkId)) continue;
     const caption = captionForVoice(project, item);
     if (!caption) continue;
     next = addItem(next, caption, undefined, "Sous-titres");
@@ -378,12 +431,17 @@ export function mainTrackEnd(project: ClipProject): number {
   return track ? Math.max(0, ...track.items.map((item) => item.start + item.duration)) : 0;
 }
 
+/**
+ * Modifie un élément. Une vidéo et son son détaché gardent la même place, la
+ * même durée, le même rognage et la même vitesse : un changement de l'un est
+ * reporté sur l'autre.
+ */
 export function updateItem(
   project: ClipProject,
   itemId: string,
   patch: Partial<ClipItem> | ((item: ClipItem) => ClipItem)
 ): ClipProject {
-  return touch(
+  const next = touch(
     project,
     project.tracks.map((track) => ({
       ...track,
@@ -396,16 +454,157 @@ export function updateItem(
       ),
     }))
   );
+  return syncLinked(next, itemId);
 }
 
+/** Retire un élément ; une vidéo et son son détaché partent ensemble. */
 export function removeItem(project: ClipProject, itemId: string): ClipProject {
+  const found = findItem(project, itemId);
+  const partnerId = found ? linkedItem(project, found.item)?.item.id : undefined;
   return touch(
     project,
     project.tracks.map((track) => ({
       ...track,
-      items: track.items.filter((item) => item.id !== itemId),
+      items: track.items.filter((item) => item.id !== itemId && item.id !== partnerId),
     }))
   );
+}
+
+// ─── Son détaché d'une vidéo ─────────────────────────────────────
+
+/** Piste audio où se range le son détaché des vidéos. */
+export const VIDEO_SOUND_TRACK = "Son des vidéos";
+
+/**
+ * Élément lié à `item` : le son détaché d'une vidéo, ou la vidéo d'un son
+ * détaché. `null` si le lien manque ou ne vaut pas dans les deux sens.
+ */
+export function linkedItem(
+  project: ClipProject,
+  item: ClipItem
+): { track: Track; item: AudioItem | VideoItem } | null {
+  const otherId = item.type === "video" ? item.audioLinkId : item.type === "audio" ? item.linkedVideoId : undefined;
+  if (!otherId) return null;
+  const found = findItem(project, otherId);
+  if (!found) return null;
+  const other = found.item;
+  if (item.type === "video" && other.type === "audio" && other.linkedVideoId === item.id) return { track: found.track, item: other };
+  if (item.type === "audio" && other.type === "video" && other.audioLinkId === item.id) return { track: found.track, item: other };
+  return null;
+}
+
+/** `target` calé sur la place, la durée, le rognage et la vitesse de `from`. */
+function withTimingOf<T extends AudioItem | VideoItem>(target: T, from: AudioItem | VideoItem): T {
+  const next = { ...target, start: from.start, duration: from.duration, trimStart: from.trimStart };
+  if (speedOf(from) === 1) delete next.speed;
+  else next.speed = speedOf(from);
+  return next;
+}
+
+/** Recale l'élément lié à `itemId` sur lui, s'il a bougé. */
+function syncLinked(project: ClipProject, itemId: string): ClipProject {
+  const found = findItem(project, itemId);
+  if (!found || (found.item.type !== "video" && found.item.type !== "audio")) return project;
+  const partner = linkedItem(project, found.item);
+  if (!partner) return project;
+  const item = found.item;
+  const other = partner.item;
+  if (other.start === item.start && other.duration === item.duration && other.trimStart === item.trimStart && speedOf(other) === speedOf(item)) {
+    return project;
+  }
+  return {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id !== partner.track.id
+        ? track
+        : {
+            ...track,
+            items: track.items
+              .map((entry) => (entry.id === other.id ? withTimingOf(other, item) : entry))
+              .sort((a, b) => a.start - b.start),
+          }
+    ),
+  };
+}
+
+/**
+ * Détache le son d'une vidéo sur une piste audio (« Son des vidéos » de
+ * préférence, créée au besoin) : même source, même place, même rognage, même
+ * vitesse, mêmes volume, fondus et creux sous la voix. La vidéo devient
+ * muette tant que le lien dure. Rend le projet tel quel pour une vidéo sans
+ * son ou déjà détachée.
+ */
+export function detachVideoAudio(project: ClipProject, videoId: string): { project: ClipProject; audioId: string | null } {
+  const found = findItem(project, videoId);
+  if (!found || found.item.type !== "video") return { project, audioId: null };
+  const video = found.item;
+  if (video.source.hasAudio === false || linkedItem(project, video)) return { project, audioId: null };
+  const audio: AudioItem = {
+    id: uid("a-"),
+    type: "audio",
+    start: video.start,
+    duration: video.duration,
+    source: video.source,
+    trimStart: video.trimStart,
+    volume: video.volume,
+    fadeIn: video.fadeIn ?? 0,
+    fadeOut: video.fadeOut ?? 0,
+    linkedVideoId: video.id,
+  };
+  if (video.duck !== undefined) audio.duck = video.duck;
+  if (speedOf(video) !== 1) audio.speed = speedOf(video);
+  if (video.label) audio.label = video.label;
+  // Le son détaché s'entend : la coupure éventuelle de la vidéo ne le suit pas.
+  const linked = updateItem(project, videoId, (item) => {
+    const { muted: _muted, ...rest } = item as VideoItem;
+    return { ...rest, audioLinkId: audio.id };
+  });
+  return { project: addItem(linked, audio, undefined, VIDEO_SOUND_TRACK), audioId: audio.id };
+}
+
+/**
+ * Rattache le son détaché d'une vidéo (depuis la vidéo ou depuis le son) : la
+ * vidéo reprend le volume, les fondus et le creux réglés sur le son, et
+ * l'élément audio disparaît, avec sa piste si elle reste vide. Un lien
+ * orphelin (son déjà supprimé) est simplement effacé.
+ */
+export function reattachVideoAudio(project: ClipProject, itemId: string): ClipProject {
+  const found = findItem(project, itemId);
+  if (!found) return project;
+  const partner = linkedItem(project, found.item);
+  const video = found.item.type === "video" ? found.item : partner?.item.type === "video" ? partner.item : null;
+  const audio = found.item.type === "audio" ? found.item : partner?.item.type === "audio" ? partner.item : null;
+  if (!video) {
+    // Son dont la vidéo a disparu : il redevient un son ordinaire.
+    if (found.item.type !== "audio" || !found.item.linkedVideoId) return project;
+    return updateItem(project, itemId, (item) => {
+      const { linkedVideoId: _link, ...rest } = item as AudioItem;
+      return rest;
+    });
+  }
+  if (!audio || !partner) {
+    if (!video.audioLinkId) return project;
+    return updateItem(project, video.id, (item) => {
+      const { audioLinkId: _link, ...rest } = item as VideoItem;
+      return rest;
+    });
+  }
+  const audioTrack = found.item.type === "audio" ? found.track : partner.track;
+  const { audioLinkId: _link, duck: _duck, ...rest } = video;
+  const restored: VideoItem = { ...rest, volume: audio.volume, fadeIn: audio.fadeIn, fadeOut: audio.fadeOut };
+  if (audio.duck !== undefined) restored.duck = audio.duck;
+  const others = project.tracks.filter((track) => track.kind === "audio" && track.id !== audioTrack.id);
+  const tracks = project.tracks
+    .map((track) => ({
+      ...track,
+      items: track.items.flatMap((item) => (item.id === audio.id ? [] : item.id === video.id ? [restored] : [item])),
+    }))
+    // La piste « Son des vidéos », vidée, s'en va s'il reste une autre piste audio.
+    .filter(
+      (track) =>
+        !(track.id === audioTrack.id && track.name.startsWith(VIDEO_SOUND_TRACK) && track.items.length === 0 && others.length > 0)
+    );
+  return touch(project, tracks);
 }
 
 /**
@@ -421,22 +620,41 @@ export function moveItem(
 ): ClipProject {
   const found = findItem(project, itemId);
   if (!found) return project;
-  const target = project.tracks.find((track) => track.id === (trackId ?? found.track.id));
-  if (!target || target.locked) return project;
-  const kind = found.item.type === "audio" ? "audio" : "visual";
-  if (target.kind !== kind) return project;
+  const targetId = trackId ?? found.track.id;
+  if (!canMoveItem(project, itemId, start, targetId)) return project;
   const nextStart = Math.max(0, Math.round(start));
-  if (overlaps(target.items, nextStart, found.item.duration, itemId)) return project;
+  // Le son détaché suit la vidéo (et inversement), sur sa propre piste.
+  const partner = linkedItem(project, found.item);
 
   const moved = { ...found.item, start: nextStart };
   return touch(
     project,
     project.tracks.map((track) => {
       let items = track.items.filter((item) => item.id !== itemId);
-      if (track.id === target.id) items = [...items, moved].sort((a, b) => a.start - b.start);
+      if (track.id === targetId) items = [...items, moved].sort((a, b) => a.start - b.start);
+      if (partner && track.id === partner.track.id) {
+        items = items.map((item) => (item.id === partner.item.id ? { ...item, start: nextStart } : item)).sort((a, b) => a.start - b.start);
+      }
       return { ...track, items };
     })
   );
+}
+
+/**
+ * Le déplacement de `itemId` à `start`, sur `trackId`, est-il possible ? Mêmes
+ * règles que `moveItem` (aucun chevauchement, son détaché compris) : la
+ * timeline s'en sert pour dessiner le fantôme d'un glissement.
+ */
+export function canMoveItem(project: ClipProject, itemId: string, start: number, trackId: string): boolean {
+  const found = findItem(project, itemId);
+  if (!found) return false;
+  const target = project.tracks.find((track) => track.id === trackId);
+  if (!target || target.locked) return false;
+  if (target.kind !== (found.item.type === "audio" ? "audio" : "visual")) return false;
+  const nextStart = Math.max(0, Math.round(start));
+  if (overlaps(target.items, nextStart, found.item.duration, itemId)) return false;
+  const partner = linkedItem(project, found.item);
+  return !partner || (!partner.track.locked && !overlaps(partner.track.items, nextStart, partner.item.duration, partner.item.id));
 }
 
 /**
@@ -458,9 +676,14 @@ export function trimItem(
       ? msToFrames(item.source.durationMs, project.fps)
       : Infinity;
   const trim = "trimStart" in item ? item.trimStart : 0;
-  // Une vidéo accélérée consomme plus d'une image de source par image de timeline.
-  const speed = item.type === "video" ? speedOf(item) : 1;
-  const neighbours = found.track.items.filter((other) => other.id !== itemId);
+  // Une vidéo accélérée (ou son son détaché) consomme plus d'une image de source par image de timeline.
+  const speed = item.type === "video" || item.type === "audio" ? speedOf(item) : 1;
+  // Le son détaché se rogne avec sa vidéo (`updateItem`) : ses voisins bornent aussi le geste.
+  const partner = linkedItem(project, item);
+  const neighbours = [
+    ...found.track.items.filter((other) => other.id !== itemId),
+    ...(partner ? partner.track.items.filter((other) => other.id !== partner.item.id) : []),
+  ];
 
   if (edge === "start") {
     const previousEnd = Math.max(0, ...neighbours.filter((o) => o.start < item.start).map((o) => o.start + o.duration));
@@ -493,6 +716,37 @@ export function splitItem(project: ClipProject, itemId: string, frame: number): 
   const cut = Math.round(frame);
   if (cut <= item.start || cut >= item.start + item.duration) return project;
 
+  const [left, right] = splitParts(item, cut);
+  // Une vidéo et son son détaché se scindent ensemble ; les deux moitiés de droite sont liées entre elles.
+  const partner = linkedItem(project, item);
+  const parts = new Map<string, ClipItem[]>([[itemId, [left, right]]]);
+  if (partner) {
+    const [otherLeft, otherRight] = splitParts(partner.item, cut);
+    if (right.type === "video" && otherRight.type === "audio") {
+      right.audioLinkId = otherRight.id;
+      otherRight.linkedVideoId = right.id;
+    } else if (right.type === "audio" && otherRight.type === "video") {
+      right.linkedVideoId = otherRight.id;
+      otherRight.audioLinkId = right.id;
+    }
+    parts.set(partner.item.id, [otherLeft, otherRight]);
+  }
+
+  return touch(
+    project,
+    project.tracks.map((track) =>
+      track.items.some((entry) => parts.has(entry.id))
+        ? {
+            ...track,
+            items: track.items.flatMap((entry) => parts.get(entry.id) ?? [entry]).sort((a, b) => a.start - b.start),
+          }
+        : track
+    )
+  );
+}
+
+/** Les deux moitiés d'un élément coupé à l'image `cut` (comprise dans l'élément). */
+function splitParts(item: ClipItem, cut: number): [ClipItem, ClipItem] {
   const left = { ...item, duration: cut - item.start } as ClipItem;
   const right = {
     ...structuredClone(item),
@@ -500,7 +754,7 @@ export function splitItem(project: ClipProject, itemId: string, frame: number): 
     start: cut,
     duration: item.start + item.duration - cut,
     ...("trimStart" in item
-      ? { trimStart: item.trimStart + Math.round((cut - item.start) * (item.type === "video" ? speedOf(item) : 1)) }
+      ? { trimStart: item.trimStart + Math.round((cut - item.start) * speedOf(item)) }
       : {}),
     ...(item.type === "text" && item.karaoke
       ? { karaoke: { ...structuredClone(item.karaoke), offset: item.karaoke.offset + (cut - item.start) } }
@@ -512,13 +766,10 @@ export function splitItem(project: ClipProject, itemId: string, frame: number): 
     (right as VisualItem).animIn = { kind: "none", frames: 10 };
     delete (right as VisualItem).transition;
   }
-
-  return mapTrack(project, found.track.id, (track) => ({
-    ...track,
-    items: track.items
-      .flatMap((entry) => (entry.id === itemId ? [left, right] : [entry]))
-      .sort((a, b) => a.start - b.start),
-  }));
+  // Le son non plus ne s'éteint ni ne renaît à la coupe : chaque moitié garde son seul fondu extérieur.
+  if (left.type === "audio" || (left.type === "video" && left.fadeOut !== undefined)) left.fadeOut = 0;
+  if (right.type === "audio" || (right.type === "video" && right.fadeIn !== undefined)) right.fadeIn = 0;
+  return [left, right];
 }
 
 /**
@@ -537,8 +788,14 @@ export function videoSpeedPatch(project: ClipProject, itemId: string, speed: num
   const item = found.item;
   const next = speedOf({ speed });
   const sourceSpan = item.duration * speedOf(item);
+  // Le son détaché change de vitesse avec la vidéo (`updateItem`) : il ne déborde pas non plus.
+  const partner = linkedItem(project, item);
+  const following = [
+    ...found.track.items.filter((other) => other.id !== itemId),
+    ...(partner ? partner.track.items.filter((other) => other.id !== partner.item.id) : []),
+  ];
   const nextStart = Math.min(
-    ...found.track.items.filter((other) => other.id !== itemId && other.start >= item.start + item.duration).map((other) => other.start),
+    ...following.filter((other) => other.start >= item.start + item.duration).map((other) => other.start),
     Infinity
   );
   const duration = Math.max(1, Math.min(Math.round(sourceSpan / next), nextStart - item.start));
@@ -554,6 +811,19 @@ export function duplicateItem(project: ClipProject, itemId: string): { project: 
     id: uid(found.item.id.split("-")[0] + "-"),
     start: found.item.start + found.item.duration,
   } as ClipItem;
+  // Une vidéo au son détaché se duplique avec lui : la nouvelle paire a ses propres liens.
+  const partner = linkedItem(project, found.item);
+  if (partner) {
+    const other = { ...structuredClone(partner.item), id: uid(partner.item.id.split("-")[0] + "-"), start: copy.start } as AudioItem | VideoItem;
+    if (copy.type === "video" && other.type === "audio") {
+      copy.audioLinkId = other.id;
+      other.linkedVideoId = copy.id;
+    } else if (copy.type === "audio" && other.type === "video") {
+      copy.linkedVideoId = other.id;
+      other.audioLinkId = copy.id;
+    }
+    return { project: addItem(addItem(project, copy, found.track.id), other, partner.track.id), id: copy.id };
+  }
   return { project: addItem(project, copy, found.track.id), id: copy.id };
 }
 

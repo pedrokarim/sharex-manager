@@ -7,7 +7,7 @@
  * même quand une vidéo peine à suivre.
  */
 
-import { applyGainPoints, ducks, gainPoints, voiceWindows } from "./mix";
+import { applyGainPoints, ducks, gainPoints, isAudible, voiceWindows } from "./mix";
 import { drawFrame, heldFrameOf, type VisualResolver } from "./render";
 import { isActive, projectDuration, sourceTimeAt, speedOf, transitionAt } from "./timeline";
 import {
@@ -135,7 +135,8 @@ export class PreviewPlayer {
   prefetchAudio() {
     for (const track of this.getProject().tracks) {
       for (const item of track.items) {
-        if (hasAudio(item)) void this.library.audioBuffer(item.source.url);
+        // Une vidéo sans piste son n'a rien à décoder.
+        if (hasAudio(item) && item.source.hasAudio !== false) void this.library.audioBuffer(item.source.url);
       }
     }
   }
@@ -274,14 +275,15 @@ export class PreviewPlayer {
     for (const track of project.tracks) {
       if (track.muted || (track.kind === "visual" && track.hidden)) continue;
       for (const item of track.items) {
-        if (!hasAudio(item)) continue;
+        if (!hasAudio(item) || !isAudible(item)) continue;
         const end = item.start + item.duration;
         if (end <= fromFrame) continue;
         const buffer = this.library.decodedAudio(item.source.url);
         if (!buffer) continue;
 
         const fps = project.fps;
-        const rate = item.type === "video" ? speedOf(item) : 1;
+        // Le son détaché d'une vidéo accélérée suit sa vitesse, comme la vidéo elle-même.
+        const rate = speedOf(item);
         const delay = Math.max(0, (item.start - fromFrame) / fps);
         const skip = Math.max(0, (fromFrame - item.start) / fps);
         // Décalage et longueur se comptent en temps de source.
@@ -325,15 +327,21 @@ export function applyGainEnvelope(
   fps: number,
   voices?: [number, number][]
 ) {
-  // Musique qui s'efface sous la voix (`mix.ts`) : son enveloppe propre ; tout autre son, celle d'avant.
+  // Son coupé ou détaché d'une vidéo : rien ne doit s'entendre, même programmé par erreur.
+  if (!isAudible(item)) {
+    param.setValueAtTime(0, Math.max(0, itemStartTime));
+    return;
+  }
+  // Musique ou vidéo qui s'efface sous la voix (`mix.ts`) : son enveloppe propre ; tout autre son, celle d'avant.
   if (voices && ducks(item)) {
     applyGainPoints(param, gainPoints(item, fps, voices), itemStartTime);
     return;
   }
   const volume = item.volume;
   const duration = item.duration / fps;
-  const fadeIn = item.type === "audio" ? item.fadeIn / fps : 0;
-  const fadeOut = item.type === "audio" ? item.fadeOut / fps : 0;
+  // Les fondus valent pour les sons comme pour les vidéos (absents : 0).
+  const fadeIn = (item.fadeIn ?? 0) / fps;
+  const fadeOut = (item.fadeOut ?? 0) / fps;
   param.setValueAtTime(fadeIn > 0 ? 0 : volume, Math.max(0, itemStartTime));
   if (fadeIn > 0) param.linearRampToValueAtTime(volume, Math.max(0, itemStartTime + fadeIn));
   if (fadeOut > 0) {

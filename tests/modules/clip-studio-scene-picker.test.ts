@@ -55,7 +55,7 @@ describe("catalogue des plans", () => {
     }
     expect(sceneEntries("transition")).toHaveLength(34);
     // « Fixe » (none) est l'entrée « rien » du sélecteur, pas un mouvement.
-    expect(sceneEntries("camera")).toHaveLength(19);
+    expect(sceneEntries("camera")).toHaveLength(20);
     expect(sceneEntries("shotfx")).toHaveLength(8);
   });
 

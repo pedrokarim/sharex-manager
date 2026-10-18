@@ -7,6 +7,58 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Clip Studio, l’assistant illustre en vidéo : avec une clé Pexels, le
+  script choisit pour chaque segment une image ou un plan filmé de Pexels,
+  posé muet sous la voix, pris en son milieu, bouclé s’il est trop court et
+  coupé en plans qui sautent d’un moment à l’autre (ou alternent avec un
+  second plan du même sujet). Une vidéo introuvable laisse la place à une
+  image. Pexels apparaît au registre des IA, avec ses limites.
+- Clip Studio, « Vidéo source » dans l’assistant (monter par-dessus une
+  vidéo) : une vidéo de Mes médias ou récupérée par son adresse est
+  transcrite, le script s’appuie sur ce qui s’y dit et place des extraits,
+  cités avec leur son et sous-titrés (la voix off parle après eux) ou muets
+  sous la voix off. Sans transcription (crédit OpenAI épuisé), le clip se
+  fait quand même et le suivi le dit.
+- Clip Studio, onglet « Trouver » des médias : source « Vidéos »
+  (Pexels, au format du clip, aperçu au survol), quand une clé est
+  enregistrée.
+
+- Clip Studio, « Sous-titrer un clip » : nouveau mode de la fenêtre de
+  création. Une adresse (clip ou VOD Twitch, YouTube, lien direct), une
+  vidéo de Mes médias ou un fichier envoyé est récupérée, transcrite (une
+  seule fois par média), puis montée au format choisi : la vidéo avec son
+  son, recadrée au centre ou posée entière sur son propre fond flou et
+  assombri, les sous-titres mot à mot de la marque, une accroche facultative
+  au début, le filigrane et le carton de fin. Les étapes se suivent dans la
+  fenêtre ; une erreur (crédit OpenAI épuisé, par exemple) s’affiche à
+  l’étape qui échoue.
+- Clip Studio, « Découper une vidéo » : une longue vidéo (2 heures au plus,
+  récupérée en 720p) est transcrite, puis Codex y repère 3 à 8 passages forts
+  de 15 à 60 secondes, calés sur des phrases entières. Chaque passage se
+  relit dans un lecteur, se coche, se renomme et se décale d’une seconde ;
+  « Créer N clips » coupe chaque extrait à l’image près (H.264 et AAC, avec
+  la provenance et la mention de la source) et en fait un clip sous-titré à
+  ouvrir dans l’éditeur. La vidéo source est effacée ensuite, sauf si l’on
+  coche « Garder la vidéo source ».
+- Clip Studio, mouvement de caméra « Fond flou » : l’image floue, assombrie
+  et légèrement agrandie, pour poser une vidéo entière sur elle-même.
+- Clip Studio, onglet « Adresse » des médias : une vidéo YouTube, un clip ou
+  une VOD Twitch, ou un lien direct se récupère par son adresse (passage de
+  20 minutes au plus, en H.264 et AAC, avec sa provenance et ses droits à
+  vérifier), par yt-dlp épinglé et vérifié ; les cookies YouTube d’un compte
+  dédié et la clé Pexels se règlent dans « Sources vidéo ».
+- Clip Studio, transcription : « Transcrire et sous-titrer » envoie la parole
+  d’une vidéo à Whisper d’OpenAI (une fois par média, mots horodatés et
+  ponctués, rangés avec le média), puis pose des sous-titres animés calés sur
+  son placement, son rognage et sa vitesse ; « Sous-titrer les voix du projet »
+  prend aussi les vidéos transcrites, et le son détaché d’une vidéo à sa place.
+- Clip Studio, son des vidéos : chaque vidéo garde son son, ou le coupe sans
+  perdre le volume réglé ; elle a ses fondus d’entrée et de sortie, peut
+  s’effacer sous la voix off, et son son se détache sur une piste audio
+  (« Son des vidéos ») qui bouge, se rogne, se scinde, change de vitesse et
+  se supprime avec elle, puis se rattache. La timeline montre l’onde du son
+  des vidéos et signale un son coupé, baissé ou détaché ; une vidéo sans
+  piste son le dit et n’offre aucun réglage.
 - Image de marque, « Style de référence » : une marque adopte le montage
   d’un short qu’elle aime. La vidéo déposée est mesurée par ffmpeg, sans IA
   (durée des plans, part de plans animés et zooms, place et taille des
@@ -1004,6 +1056,19 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   basse, ses cartes touchaient le pied de page.
 
 ### Security
+
+- Clip Studio, vidéos récupérées par adresse et découpes : l’annulation, le
+  délai ou le dépassement de taille arrêtent vraiment yt-dlp et le ffmpeg
+  qu’il lance (groupe de processus) ; ffmpeg borne lui-même la taille écrite ;
+  lectures d’adresse limitées (deux à la fois, vingt par minute) ; place
+  libre contrôlée avant une récupération, une découpe ou un import de Pexels,
+  et budget de 20 Go pour les vidéos venues d’ailleurs ; un lien direct n’est
+  lu que comme fichier MP4, MOV, Matroska ou WebM local ; seuls les cookies
+  de youtube.com sont gardés d’un export ; la vidéo source d’une découpe
+  n’est effacée que si le serveur l’a reçue pour elle ; les erreurs rangées
+  ne montrent plus de chemin du serveur. Transcription : trois heures au plus
+  par média, et pas de nouvelle transcription d’un média transcrit depuis
+  moins de 24 h.
 
 > Aucun tag de release serveur n'existe encore. Les versions historiques ne
 > doivent pas être déduites du seul champ `version` de `package.json`.

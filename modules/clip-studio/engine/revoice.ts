@@ -12,7 +12,9 @@ import type { AudioItem, ClipItem, ClipProject, MediaSource, Track } from "./typ
 
 /** Extrait d'une voix de synthèse (texte gardé, mots horodatés ou nom « Voix … »). */
 export function isVoiceItem(item: ClipItem): item is AudioItem {
-  return item.type === "audio" && Boolean(item.source.speech || item.source.words?.length || /^Voix\s/.test(item.source.name));
+  // Un son transcrit (parole d'une vidéo) a des mots mais n'est pas une voix à relire.
+  const spoken = Boolean(item.type === "audio" && item.source.words?.length && !item.source.transcript);
+  return item.type === "audio" && Boolean(item.source.speech || spoken || /^Voix\s/.test(item.source.name));
 }
 
 /** Piste qui porte au moins une voix de synthèse. */

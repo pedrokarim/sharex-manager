@@ -9,6 +9,7 @@ import {
   EyeOff,
   Film,
   Image as ImageIcon,
+  Link2,
   Lock,
   Mic,
   Minus,
@@ -19,8 +20,11 @@ import {
   Shapes,
   Trash2,
   Type,
+  Unlink2,
   Unlock,
+  Volume1,
   Volume2,
+  VolumeOff,
   VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +38,7 @@ import {
 } from "@/components/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { canMoveItem, linkedItem } from "../engine/edit";
 import { formatTimecode, projectDuration } from "../engine/timeline";
 import { Waveform } from "./waveform";
 import { MotionPickerDialog, useMotionFavorites } from "./motion-picker";
@@ -93,6 +98,10 @@ interface TimelineProps {
   onDropMedia: (payload: string, trackId: string, frame: number) => void;
   /** Relit tous les extraits d'une piste de voix avec une autre voix. */
   onChangeTrackVoice?: (trackId: string) => void;
+  /** Détache le son d'une vidéo sur une piste audio. */
+  onDetachAudio?: (videoId: string) => void;
+  /** Rattache un son détaché à sa vidéo (depuis l'un ou l'autre). */
+  onReattachAudio?: (itemId: string) => void;
 }
 
 type Drag =
@@ -253,12 +262,6 @@ export function Timeline(props: TimelineProps) {
   const trackOf = (itemId: string) =>
     project.tracks.find((track) => track.items.some((item) => item.id === itemId));
 
-  const overlaps = (trackId: string, itemId: string, start: number, length: number) =>
-    project.tracks
-      .find((track) => track.id === trackId)
-      ?.items.some((item) => item.id !== itemId && start < item.start + item.duration && item.start < start + length) ??
-    true;
-
   // ─── Gestes ────────────────────────────────────────────────────
   const onItemPointerDown = (event: React.PointerEvent, item: ClipItem, track: Track) => {
     if (event.button !== 0) return;
@@ -330,7 +333,8 @@ export function Timeline(props: TimelineProps) {
       0,
       Math.round(Math.abs(snappedStart - raw) <= Math.abs(snappedEnd - raw) ? snappedStart : snappedEnd)
     );
-    setDrag({ ...drag, start, trackId, valid: !overlaps(trackId, item.id, start, item.duration) });
+    // Mêmes règles que le moteur : le son détaché d'une vidéo ne doit rien chevaucher non plus.
+    setDrag({ ...drag, start, trackId, valid: canMoveItem(project, item.id, start, trackId) });
   };
 
   const onPointerUp = () => {
@@ -421,6 +425,22 @@ export function Timeline(props: TimelineProps) {
   const selectedItem = selectedId
     ? project.tracks.flatMap((track) => track.items).find((item) => item.id === selectedId)
     : null;
+
+  // Son tout juste détaché : sa piste s'ajoute en bas, souvent hors de vue. On
+  // fait défiler les pistes jusqu'à lui, sans toucher au reste de la page.
+  const linkedAudioId = selectedItem?.type === "video" ? selectedItem.audioLinkId : undefined;
+  useEffect(() => {
+    const box = scroller.current;
+    if (!linkedAudioId || !box) return;
+    const block = box.querySelector<HTMLElement>(`[data-item-id="${CSS.escape(linkedAudioId)}"]`);
+    if (!block) return;
+    const view = box.getBoundingClientRect();
+    const rect = block.getBoundingClientRect();
+    const top = view.top + RULER_HEIGHT;
+    const bottom = view.top + box.clientHeight;
+    if (rect.bottom > bottom) box.scrollTop += rect.bottom - bottom + 4;
+    else if (rect.top < top) box.scrollTop -= top - rect.top + 4;
+  }, [linkedAudioId]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -801,6 +821,34 @@ const ITEM_ICON: Record<ClipItem["type"], typeof ImageIcon> = {
   audio: AudioLines,
 };
 
+/**
+ * Pictogrammes du son d'un bloc : vidéo sans son, son coupé, effacé sous la
+ * voix, détaché (ou, sur un son, lié à sa vidéo).
+ */
+function SoundBadges({ item, linked }: { item: ClipItem; linked: boolean }) {
+  const badges: { key: string; label: string; Icon: typeof Link2 }[] = [];
+  if (item.type === "audio") {
+    if (linked) badges.push({ key: "link", label: "Son d’une vidéo, lié à elle", Icon: Link2 });
+  } else if (item.type === "video") {
+    if (item.source.hasAudio === false) badges.push({ key: "none", label: "Sans son", Icon: VolumeOff });
+    else if (item.audioLinkId) badges.push({ key: "link", label: "Son détaché sur une piste audio", Icon: Link2 });
+    else {
+      if (item.muted) badges.push({ key: "muted", label: "Son coupé", Icon: VolumeX });
+      if (item.duck !== undefined && item.duck < 1) badges.push({ key: "duck", label: "S’efface sous la voix", Icon: Volume1 });
+    }
+  }
+  if (badges.length === 0) return null;
+  return (
+    <span className="relative ml-auto flex shrink-0 items-center gap-0.5 opacity-80">
+      {badges.map(({ key, label, Icon }) => (
+        <span key={key} role="img" aria-label={label} title={label} className="flex">
+          <Icon aria-hidden className="h-3 w-3" />
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function itemLabel(item: ClipItem) {
   if (item.label) return item.label;
   if (item.type === "text") return item.text;
@@ -857,6 +905,10 @@ function TimelineItem({
   };
   // Le menu se ferme avant que la fenêtre s'ouvre : sinon le focus rendu au menu la referme aussitôt.
   const openPicker = (phase: PickerPhase) => () => window.setTimeout(() => onOpenPicker(phase), 0);
+  // Vidéo et son détaché : même teinte, et l'un se signale quand l'autre est sélectionné.
+  const partner = item.type === "video" || item.type === "audio" ? linkedItem(props.project, item) : null;
+  const linkedAudio = item.type === "audio" && partner !== null;
+  const videoSound = item.type === "video" && item.source.hasAudio !== false && !item.audioLinkId;
 
   return (
     <ContextMenu>
@@ -865,10 +917,12 @@ function TimelineItem({
           layout="position"
           transition={{ type: "spring", stiffness: 500, damping: 40 }}
           onPointerDown={onPointerDown}
+          data-item-id={item.id}
           className={cn(
             "group absolute top-1 bottom-1 flex cursor-grab items-center gap-1.5 overflow-hidden rounded-md border px-2 text-xs select-none active:cursor-grabbing",
-            ITEM_STYLE[item.type],
+            ITEM_STYLE[linkedAudio ? "video" : item.type],
             selected && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+            !selected && partner && partner.item.id === props.selectedId && "ring-1 ring-primary/60",
             dimmed && "opacity-40",
             track.locked && "cursor-not-allowed opacity-70"
           )}
@@ -882,6 +936,10 @@ function TimelineItem({
             />
           )}
           {item.type === "audio" && <Waveform item={item} fps={props.project.fps} />}
+          {/* Son d'une vidéo : son onde dans la moitié basse du bloc, pâlie quand il est coupé. */}
+          {item.type === "video" && videoSound && (
+            <Waveform item={item} fps={props.project.fps} className={cn("top-1/2 h-1/2", item.muted ? "opacity-15" : "opacity-30")} />
+          )}
           {item.type !== "audio" && item.transition && (
             // Étendue de la transition d'entrée, au début du plan.
             <span
@@ -924,6 +982,7 @@ function TimelineItem({
           <span className="relative min-w-0 truncate font-medium" title={itemLabel(item)}>
             {itemLabel(item)}
           </span>
+          {(item.type === "video" || linkedAudio) && <SoundBadges item={item} linked={partner !== null} />}
           {showAnimHandles && inWidth > 0 && (
             <span
               data-anim-edge="in"
@@ -1025,6 +1084,24 @@ function TimelineItem({
             <ContextMenuItem onClick={() => window.setTimeout(() => props.onChangeTrackVoice?.(track.id), 0)}>
               <Mic className="mr-2 h-4 w-4" />
               Changer la voix de la piste…
+            </ContextMenuItem>
+          </>
+        )}
+        {item.type === "video" && videoSound && props.onDetachAudio && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={() => props.onDetachAudio?.(item.id)}>
+              <Unlink2 className="mr-2 h-4 w-4" />
+              Détacher le son
+            </ContextMenuItem>
+          </>
+        )}
+        {partner && props.onReattachAudio && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={() => props.onReattachAudio?.(item.id)}>
+              <Link2 className="mr-2 h-4 w-4" />
+              {item.type === "audio" ? "Rattacher à la vidéo" : "Rattacher le son"}
             </ContextMenuItem>
           </>
         )}

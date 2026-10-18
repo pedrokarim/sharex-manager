@@ -81,6 +81,10 @@ export function assetToSource(asset: ClipAsset): MediaSource {
     ...(rightsOf(asset) ? { rights: rightsOf(asset) } : {}),
     words: asset.words,
     ...(asset.speech ? { speech: asset.speech } : {}),
+    ...(asset.transcript ? { transcript: asset.transcript } : {}),
+    // Vidéo récupérée par adresse : présence du son et provenance.
+    ...(typeof asset.hasAudio === "boolean" ? { hasAudio: asset.hasAudio } : {}),
+    ...(asset.origin ? { origin: asset.origin } : {}),
   };
 }
 
@@ -96,10 +100,40 @@ export interface MediaProbe {
   width?: number;
   height?: number;
   durationMs?: number;
+  /** Vidéo : elle a une piste son ; absent quand on n'a pas pu le lire. */
+  hasAudio?: boolean;
 }
 
-/** Dimensions et durée d'un média, lues par le navigateur. */
-export function probeMedia(url: string, kind: MediaSource["kind"]): Promise<MediaProbe> {
+/**
+ * Dimensions et durée d'un média, lues par le navigateur ; pour une vidéo,
+ * la présence d'une piste son, lue dans le conteneur par Mediabunny.
+ */
+export async function probeMedia(url: string, kind: MediaSource["kind"]): Promise<MediaProbe> {
+  if (kind !== "video") return probeElement(url, kind);
+  const [probe, hasAudio] = await Promise.all([probeElement(url, kind), probeHasAudio(url)]);
+  return hasAudio === undefined ? probe : { ...probe, hasAudio };
+}
+
+/**
+ * La vidéo a-t-elle une piste son ? Les indices de l'élément `<video>`
+ * (`audioTracks`, `mozHasAudio`…) varient d'un navigateur à l'autre ; le
+ * conteneur, lui, le dit sûrement. `undefined` si on n'a pas pu le lire.
+ */
+async function probeHasAudio(url: string): Promise<boolean | undefined> {
+  try {
+    const { ALL_FORMATS, Input, UrlSource } = await import("mediabunny");
+    const input = new Input({ formats: ALL_FORMATS, source: new UrlSource(new URL(url, window.location.href)) });
+    try {
+      return (await input.getPrimaryAudioTrack()) !== null;
+    } finally {
+      input.dispose();
+    }
+  } catch {
+    return undefined;
+  }
+}
+
+function probeElement(url: string, kind: MediaSource["kind"]): Promise<MediaProbe> {
   return new Promise((resolve) => {
     if (kind === "image") {
       const image = new Image();
@@ -449,3 +483,144 @@ export function useBrandFonts(kitId: string | undefined): BrandFontChoice[] {
 }
 
 const NO_FONTS: BrandFontChoice[] = [];
+
+// ─── Vidéos récupérées par adresse ───────────────────────────────
+
+export type { RemoteImportJob, RemoteProbe } from "./remote-import";
+export type { VideoSourcesStatus } from "./video-sources";
+
+/** Titre, auteur, durée et vignette d'une adresse YouTube, Twitch ou d'un lien direct. */
+export function probeRemoteVideo(url: string): Promise<import("./remote-import").RemoteProbe> {
+  return callModule("probeRemoteVideo", { url });
+}
+
+/** Lance la récupération d'un passage (en secondes) ; suivi par `getRemoteImportJob`. */
+export function startRemoteImport(input: { url: string; start?: number; end?: number }): Promise<import("./remote-import").RemoteImportJob> {
+  return callModule("startRemoteImport", input);
+}
+
+export function getRemoteImportJob(id: string): Promise<import("./remote-import").RemoteImportJob | null> {
+  return callModule("getRemoteImportJob", id);
+}
+
+export function listRemoteImports(): Promise<import("./remote-import").RemoteImportJob[]> {
+  return callModule("listRemoteImports");
+}
+
+export function cancelRemoteImport(id: string): Promise<{ success: boolean }> {
+  return callModule("cancelRemoteImport", id);
+}
+
+/** État des sources vidéo (administrateurs) : cookies YouTube et clé Pexels, jamais leur contenu. */
+export function getVideoSources(): Promise<import("./video-sources").VideoSourcesStatus> {
+  return callModule("getVideoSources");
+}
+
+export function saveYoutubeCookies(cookies: string | null): Promise<import("./video-sources").VideoSourcesStatus> {
+  return callModule("saveYoutubeCookies", { cookies });
+}
+
+export function savePexelsKey(key: string): Promise<import("./video-sources").VideoSourcesStatus> {
+  return callModule("savePexelsKey", { key });
+}
+
+// ─── Vidéos trouvées (Pexels) ────────────────────────────────────
+
+export type { FoundVideo, ImportedVideo } from "./video-search";
+
+/** La recherche de vidéos est-elle possible ? Une clé Pexels est enregistrée (son contenu ne sort jamais). */
+export function getVideoSearchStatus(): Promise<{ pexels: boolean }> {
+  return callModule("getVideoSearchStatus");
+}
+
+export function searchVideos(input: { query: string; orientation?: "portrait" | "landscape" | "square"; page?: number }): Promise<import("./video-search").FoundVideo[]> {
+  return callModule("searchVideos", input);
+}
+
+/** Importe une vidéo de Pexels dans Mes médias, au fichier qui va au format du projet. */
+export function importFoundVideo(input: { id: string; aspect?: import("../engine/types").AspectPreset }): Promise<import("./video-search").ImportedVideo> {
+  return callModule("importFoundVideo", input);
+}
+
+/** Média du projet tiré d'une vidéo importée : la mention et les droits la suivent jusqu'à la publication. */
+export function importedVideoSource(video: import("./video-search").ImportedVideo): MediaSource {
+  return {
+    url: video.url,
+    ref: video.ref,
+    name: video.name,
+    kind: "video",
+    ...(video.width ? { width: video.width } : {}),
+    ...(video.height ? { height: video.height } : {}),
+    ...(video.durationMs ? { durationMs: video.durationMs } : {}),
+    credit: video.credit,
+    rights: "free",
+    hasAudio: video.hasAudio,
+  };
+}
+
+// ─── Transcription ───────────────────────────────────────────────
+
+export type { TranscriptionJob } from "./transcription-jobs";
+
+/** Lance (ou retrouve) la transcription d’une vidéo ou d’un son, par sa référence. */
+export function startTranscription(request: { ref: string; force?: boolean; language?: string }): Promise<import("./transcription-jobs").TranscriptionJob> {
+  return callModule("startTranscription", request);
+}
+
+export function getTranscriptionJob(id: string): Promise<import("./transcription-jobs").TranscriptionJob | null> {
+  return callModule("getTranscriptionJob", id);
+}
+
+export function cancelTranscription(id: string): Promise<{ success: boolean }> {
+  return callModule("cancelTranscription", id);
+}
+
+// ─── Créations à partir d’une vidéo ──────────────────────────────
+
+export type { ClipJob, ClipJobClip, ClipJobRequest } from "./clip-jobs";
+export type { ClipMoment } from "./clip-moments";
+
+/** Source d'une création : une adresse (et le passage voulu) ou un média du module. */
+export interface ClipSourceInput {
+  url?: string;
+  start?: number;
+  end?: number;
+  assetFile?: string;
+  /** Fichier envoyé depuis la fenêtre de création : effaçable après la découpe. */
+  uploaded?: boolean;
+}
+
+export interface ClipOptions {
+  source: ClipSourceInput;
+  aspect: import("../engine/types").AspectPreset;
+  framing: "crop" | "blur";
+  brandKitId?: string;
+  /** Sous-titrer : accroche du début ; vide, aucune. */
+  hook?: string;
+}
+
+/** « Sous-titrer un clip » ; suivi par `getClipJob`. */
+export function startSubtitleClip(options: ClipOptions): Promise<import("./clip-jobs").ClipJob> {
+  return callModule("startSubtitleClip", options);
+}
+
+/** « Découper une vidéo » : le travail s'arrête sur les passages proposés (`review`). */
+export function startClipping(options: ClipOptions): Promise<import("./clip-jobs").ClipJob> {
+  return callModule("startClipping", options);
+}
+
+export function createClipsFromMoments(input: {
+  jobId: string;
+  moments: { id: string; startMs: number; endMs: number; title: string }[];
+  keepSource: boolean;
+}): Promise<import("./clip-jobs").ClipJob> {
+  return callModule("createClipsFromMoments", input);
+}
+
+export function getClipJob(id: string): Promise<import("./clip-jobs").ClipJob | null> {
+  return callModule("getClipJob", id);
+}
+
+export function cancelClipJob(id: string): Promise<{ success: boolean }> {
+  return callModule("cancelClipJob", id);
+}

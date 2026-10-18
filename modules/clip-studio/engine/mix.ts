@@ -34,8 +34,21 @@ export function decibelsToDuck(decibels: number): number {
 }
 
 /** Un son peut-il s'effacer sous la voix ? Tout son, sauf une voix off elle-même. */
-export function canDuck(item: ClipItem, trackName: string): item is AudioItem {
+export function canDuck(item: ClipItem, trackName: string): item is AudioItem | VideoItem {
+  // Une vidéo n'est jamais une voix off : son son peut toujours s'effacer.
+  if (item.type === "video") return true;
   return item.type === "audio" && !item.source.words?.length && !item.source.speech && !/^Voix\b/.test(trackName);
+}
+
+/**
+ * Le son d'un élément s'entend-il ? Pas pour un volume nul, ni pour une vidéo
+ * coupée (`muted`), sans piste son (`hasAudio` faux) ou dont le son est
+ * détaché (`audioLinkId`) : l'élément audio lié le joue à sa place.
+ */
+export function isAudible(item: AudioItem | VideoItem): boolean {
+  if (!(item.volume > 0)) return false;
+  if (item.type === "video") return !item.muted && !item.audioLinkId && item.source.hasAudio !== false;
+  return true;
 }
 
 /**
@@ -80,7 +93,19 @@ export function audioSignature(project: ClipProject): string {
         Boolean(track.hidden),
         track.items
           .filter(hasAudio)
-          .map((item) => [item.id, item.source.url, item.start, item.duration, item.trimStart, item.volume, item.type === "audio" ? [item.fadeIn, item.fadeOut, item.duck ?? null] : item.speed ?? 1]),
+          .map((item) => [
+            item.id,
+            item.source.url,
+            item.start,
+            item.duration,
+            item.trimStart,
+            item.volume,
+            item.speed ?? 1,
+            item.fadeIn ?? 0,
+            item.fadeOut ?? 0,
+            item.duck ?? null,
+            isAudible(item),
+          ]),
       ])
   );
 }
@@ -117,11 +142,11 @@ export function voiceWindows(project: ClipProject): [number, number][] {
  * sortie, puis creux sous chaque fenêtre de voix (`windows`, en secondes sur
  * la timeline).
  */
-export function gainPoints(item: AudioItem, fps: number, windows: [number, number][]): [number, number][] {
+export function gainPoints(item: AudioItem | VideoItem, fps: number, windows: [number, number][]): [number, number][] {
   const volume = item.volume;
   const duration = item.duration / fps;
-  const fadeIn = item.fadeIn / fps;
-  const fadeOut = item.fadeOut / fps;
+  const fadeIn = (item.fadeIn ?? 0) / fps;
+  const fadeOut = (item.fadeOut ?? 0) / fps;
   const duck = Math.max(0, Math.min(1, item.duck ?? 1));
   const start = item.start / fps;
   // Gain de base (fondus) à un instant du son.
@@ -154,8 +179,8 @@ export function gainPoints(item: AudioItem, fps: number, windows: [number, numbe
 }
 
 /** Le son a-t-il une enveloppe propre (creux sous la voix) ? Sinon, l'enveloppe d'avant s'applique telle quelle. */
-export function ducks(item: AudioItem | VideoItem): item is AudioItem {
-  return item.type === "audio" && item.duck !== undefined && item.duck < 1;
+export function ducks(item: AudioItem | VideoItem): boolean {
+  return item.duck !== undefined && item.duck < 1;
 }
 
 /** Programme les points sur un paramètre de gain ; `itemStartTime` comme dans `applyGainEnvelope`. */

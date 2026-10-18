@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
+  Captions,
   Check,
   FileVideo,
   Images,
@@ -12,6 +13,7 @@ import {
   PenLine,
   RotateCcw,
   Plus,
+  Scissors,
   Sparkles,
   SquareSplitHorizontal,
   Trophy,
@@ -49,7 +51,7 @@ import {
 } from "../engine/templates";
 import { applyBrandTheme } from "../engine/brand";
 import { ASPECTS, type AspectPreset, type MediaSource } from "../engine/types";
-import { callModule, fetchBrandTheme, probeMedia, useBrandKits, type BrandKitChoice } from "../lib/client";
+import { callModule, fetchBrandTheme, getVideoSearchStatus, probeMedia, useBrandKits, type BrandKitChoice } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
 import { IMAGE_SOURCE_MODES, type ImageSourceMode } from "../lib/image-search-types";
 import {
@@ -65,12 +67,17 @@ import type { CreatePrefill } from "../lib/idea-prefill";
 import { lastPickedVoice, SpeedControl, ToneControl, useVoices, VoiceCredit, VoicePicker } from "./voice-picker";
 import { MOOD_LABELS } from "./music-panel";
 import { BrandKitMark } from "./inspector";
+import { SourceVideoField } from "./source-video-field";
+import { BrandLogo } from "@/components/brand-logo";
+import { ClipModePanel } from "./clip-modes";
 
-type Mode = "blank" | "template" | "assistant";
+type Mode = "blank" | "template" | "assistant" | "subtitle" | "clipping";
 
 const MODES: { id: Mode; label: string; icon: typeof Plus }[] = [
   { id: "assistant", label: "Assistant IA", icon: Sparkles },
   { id: "template", label: "Modèle", icon: LayoutTemplate },
+  { id: "subtitle", label: "Sous-titrer", icon: Captions },
+  { id: "clipping", label: "Découper", icon: Scissors },
   { id: "blank", label: "Vide", icon: FileVideo },
 ];
 
@@ -206,6 +213,22 @@ export function CreateDialog({
     setWebSearch(next);
     writeImagePrefs({ source: imageSource, web: next });
   };
+  // Assistant en vidéo (V4) : une vidéo source à commenter, et des plans filmés de Pexels quand une clé est enregistrée.
+  const [sourceVideo, setSourceVideo] = useState<MediaSource | null>(null);
+  const [stockVideos, setStockVideos] = useState(true);
+  const [videoSearch, setVideoSearch] = useState(false);
+  useEffect(() => {
+    if (!request) return;
+    // Chaque ouverture repart sans vidéo source.
+    setSourceVideo(null);
+    let alive = true;
+    getVideoSearchStatus()
+      .then((status) => alive && setVideoSearch(status.pexels))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [request]);
   const [withVoice, setWithVoice] = useState(true);
   const [voice, setVoice] = useState("siwis");
   const [speed, setSpeed] = useState(() => readVoicePrefs().speed);
@@ -259,6 +282,10 @@ export function CreateDialog({
     setBrandKitId(wanted !== undefined && (wanted === null || brandKits?.some((kit) => kit.id === wanted)) ? wanted : defaultKitId);
   }, [request, defaultKitId, brandKits]);
 
+  // Sous-titrer ou découper une vidéo : le panneau porte son parcours, ses boutons et le format.
+  const clipMode = mode === "subtitle" || mode === "clipping";
+  const [clipActive, setClipActive] = useState(false);
+  const clipBusy = clipMode && clipActive;
   // Un projet vide n'a rien à habiller : la marque vaut pour l'assistant, les modèles et les recettes.
   const brandable = mode !== "blank" || fromGallery;
   const showBrands = brandable && Boolean(brandKits?.length);
@@ -363,6 +390,8 @@ export function CreateDialog({
         targetSeconds,
         music: music === "none" ? undefined : music,
         brandKitId: chosenKitId ?? undefined,
+        ...(videoSearch && stockVideos && (imageSource === "find" || imageSource === "find-then-generate") ? { videos: true } : {}),
+        ...(sourceVideo ? { sourceVideo: { ref: sourceVideo.ref } } : {}),
         ...(request?.prefill?.ideaId ? { ideaId: request.prefill.ideaId } : {}),
       });
       setJob(started);
@@ -386,7 +415,7 @@ export function CreateDialog({
               ? `${mediaCountLabel(request!.files)} ${request!.files.every((file) => file.startsWith(GENERATED_PREFIX)) ? "d'AI Image Gen" : "de la galerie"}, à monter en diaporama, en clip rythmé ou en avant / après.`
               : request?.prefill
                 ? "Préremplie depuis une idée : relisez la demande, ajustez si besoin, puis lancez l'assistant."
-                : "Laissez l'assistant monter un short, partez d'un modèle, ou commencez à vide."}
+                : "Laissez l'assistant monter un short, sous-titrez ou découpez une vidéo, partez d'un modèle, ou commencez à vide."}
           </DialogDescription>
         </DialogHeader>
 
@@ -394,8 +423,8 @@ export function CreateDialog({
           <AssistantProgress job={job} onCancel={() => void callModule("cancelAssistant", job.id)} />
         ) : (
           <div className="space-y-5">
-            {!fromGallery && (
-              <div className="inline-flex rounded-lg bg-muted p-1">
+            {!fromGallery && !clipBusy && (
+              <div className="flex max-w-full flex-wrap gap-0.5 rounded-lg bg-muted p-1 sm:inline-flex">
                 {MODES.map((entry) => {
                   const Icon = entry.icon;
                   const active = entry.id === mode;
@@ -420,7 +449,7 @@ export function CreateDialog({
 
             {/* La marque oriente tout le clip (ton, images, couleurs) : on la choisit d'abord. */}
             <AnimatePresence initial={false}>
-              {showBrands && (
+              {showBrands && !clipBusy && (
                 <motion.div
                   key="brand"
                   initial={{ height: 0, opacity: 0 }}
@@ -455,6 +484,7 @@ export function CreateDialog({
                         ))}
                       </div>
                     </div>
+                    <SourceVideoField value={sourceVideo} onChange={setSourceVideo} />
                     <TemplatePicker value={template} onChange={setTemplate} only={ASSISTANT_TEMPLATE_IDS} />
                     <div className="grid min-w-0 gap-4 sm:grid-cols-2">
                       <label className="block min-w-0 space-y-1.5">
@@ -519,13 +549,27 @@ export function CreateDialog({
                         </span>
                         <Switch checked={webSearch} onCheckedChange={chooseWebSearch} />
                       </label>
+                      {videoSearch && (imageSource === "find" || imageSource === "find-then-generate") && (
+                        <label className="flex items-start justify-between gap-3 border-t pt-3">
+                          <span className="min-w-0 text-sm">
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <BrandLogo brand="pexels" className="size-3.5" />
+                              Illustrer aussi en vidéo
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              Le script choisit, segment par segment, une image ou un plan filmé de Pexels, posé sans son et coupé en plans. Licence Pexels, auteur cité.
+                            </span>
+                          </span>
+                          <Switch checked={stockVideos} onCheckedChange={setStockVideos} />
+                        </label>
+                      )}
                     </div>
                     <div className="space-y-3 rounded-lg border p-3">
                       <label className="flex items-start justify-between gap-3">
                         <span className="text-sm">
                           Voix off
                           <span className="block text-xs text-muted-foreground">
-                            Chaque segment est lu à voix haute ; sa durée s&apos;adapte à la lecture.
+                            Chaque segment est lu à voix haute ; sa durée s&apos;adapte à la lecture.
                           </span>
                         </span>
                         <Switch checked={withVoice} onCheckedChange={setWithVoice} />
@@ -610,6 +654,18 @@ export function CreateDialog({
                   <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nom du clip" autoFocus />
                 )}
 
+                {clipMode && (
+                  <ClipModePanel
+                    kind={mode}
+                    aspect={aspect}
+                    brandKitId={chosenKitId}
+                    aspectPicker={<AspectPicker value={aspect} onChange={setAspect} />}
+                    onCreated={onCreated}
+                    onClose={onClose}
+                    onActiveChange={setClipActive}
+                  />
+                )}
+
                 {mode === "blank" && fromGallery && (
                   <RecipePicker
                     value={recipe}
@@ -624,10 +680,11 @@ export function CreateDialog({
               </motion.div>
             </AnimatePresence>
 
-            <AspectPicker value={aspect} onChange={setAspect} />
+            {!clipMode && <AspectPicker value={aspect} onChange={setAspect} />}
           </div>
         )}
 
+        {(job || !clipMode) && (
         <DialogFooter>
           {job ? (
             <Button variant="ghost" onClick={onClose}>
@@ -657,6 +714,7 @@ export function CreateDialog({
             </>
           )}
         </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

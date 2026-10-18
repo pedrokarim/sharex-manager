@@ -103,7 +103,7 @@ function internalRefused() {
  * publiques (un nom qui mélange une adresse publique et une privée est
  * refusé), et c'est l'une d'elles qui sert à se connecter.
  */
-const safeLookup: LookupFunction = (hostname, options, callback) => {
+export const safeLookup: LookupFunction = (hostname, options, callback) => {
   dnsLookup(hostname, { all: true }, (error, addresses) => {
     if (error) return callback(new Error("Nom de domaine introuvable"), "", 4);
     const list = addresses as { address: string; family: number }[];

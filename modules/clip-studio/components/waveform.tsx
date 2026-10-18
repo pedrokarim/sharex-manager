@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { AudioItem } from "../engine/types";
+import { cn } from "@/lib/utils";
+import { speedOf } from "../engine/timeline";
+import type { MediaSource } from "../engine/types";
 
 /** Crêtes par seconde de son : assez fin pour la timeline, léger à calculer. */
 const PEAKS_PER_SECOND = 50;
@@ -50,11 +52,20 @@ function loadPeaks(url: string): Promise<Peaks | null> {
   return pending;
 }
 
+/** Ce qu'il faut d'un élément sonore (son, vidéo) pour dessiner son onde. */
+export interface WaveformItem {
+  source: MediaSource;
+  trimStart: number;
+  duration: number;
+  speed?: number;
+}
+
 /**
  * Forme d'onde de la partie du son réellement utilisée par l'élément
- * (après la coupe de début), dessinée sur toute la largeur du bloc.
+ * (après la coupe de début, à sa vitesse), dessinée sur toute la largeur du
+ * bloc. Sert aux sons comme aux vidéos.
  */
-export function Waveform({ item, fps }: { item: AudioItem; fps: number }) {
+export function Waveform({ item, fps, className }: { item: WaveformItem; fps: number; className?: string }) {
   const [peaks, setPeaks] = useState<Peaks | null>(null);
 
   useEffect(() => {
@@ -69,7 +80,8 @@ export function Waveform({ item, fps }: { item: AudioItem; fps: number }) {
 
   if (!peaks) return null;
   const from = Math.floor((item.trimStart / fps) * peaks.perSecond);
-  const count = Math.max(1, Math.round((item.duration / fps) * peaks.perSecond));
+  // Une vidéo accélérée lit plus de source que sa durée sur la timeline.
+  const count = Math.max(1, Math.round((item.duration / fps) * speedOf(item) * peaks.perSecond));
   const slice = peaks.values.subarray(from, Math.min(peaks.values.length, from + count));
   if (slice.length === 0) return null;
 
@@ -84,7 +96,7 @@ export function Waveform({ item, fps }: { item: AudioItem; fps: number }) {
       aria-hidden
       viewBox={`0 0 ${count} 100`}
       preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-0 h-full w-full text-current opacity-40"
+      className={cn("pointer-events-none absolute inset-0 h-full w-full text-current opacity-40", className)}
     >
       <path d={path} stroke="currentColor" strokeWidth={0.7} vectorEffect="non-scaling-stroke" fill="none" />
     </svg>

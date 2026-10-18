@@ -34,6 +34,8 @@ export const AI_PROVIDERS: AiProviderEntry[] = [
   { id: "saucenao", label: "SauceNAO", brand: "saucenao", kind: "api", remote: false },
   { id: "tracemoe", label: "trace.moe", brand: "tracemoe", kind: "free", remote: true },
   { id: "openverse", label: "Openverse", brand: "openverse", kind: "free", remote: false },
+  // Pexels publie son solde dans les en-têtes de chaque réponse : relevé au passage, sans appel de plus.
+  { id: "pexels", label: "Pexels", brand: "pexels", kind: "api", remote: false },
 ];
 
 const BY_ID = new Map(AI_PROVIDERS.map((entry) => [entry.id, entry]));

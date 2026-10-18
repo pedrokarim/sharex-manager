@@ -17,7 +17,7 @@ import { uid } from "./edit";
 import { fittedPan, measuredBeatCount, measuredShotCount, MEASURED_BEAT_GAP_SECONDS, type MeasuredPlan } from "./measured-style";
 import { sfxItem, isSfxSource, type SfxId } from "./sfx";
 import { cameraAt, projectDuration } from "./timeline";
-import type { ClipItem, ClipProject, ImageItem, SegmentCue, Track, VisualItem } from "./types";
+import type { ClipItem, ClipProject, ImageItem, MediaSource, SegmentCue, Track, VideoItem, VisualItem } from "./types";
 
 /**
  * Rythme du montage réglé par une marque : « calm » n'ajoute rien, « lively »
@@ -59,7 +59,9 @@ const isMainTrack = (track: Track) => track.kind === "visual" && track.origin !=
  * rythme vif) : le même visuel, chaque plan avec un autre mouvement de
  * caméra (zoom avant, panoramique, zoom arrière…), qui part d'un autre
  * cadrage. La coupe est franche ; le premier plan garde l'entrée du fond.
- * Seuls les fonds de modèle (`cue`) sont découpés.
+ * Seuls les fonds de modèle (`cue`) sont découpés. Un fond vidéo muet est
+ * découpé en plans qui sautent d'un moment à l'autre de la vidéo, ou alternent
+ * avec un autre plan du même sujet (`videoShots`).
  *
  * Avec un style mesuré (`plan`, D4) : autant de plans qu'il faut pour rester
  * au plus près de la durée visée sans jamais dépasser la durée au plus, et
@@ -80,7 +82,22 @@ export function cutShots(project: ClipProject, pace: EditPace, plan?: MeasuredPl
   const tracks = project.tracks.map((track) => {
     if (!isMainTrack(track)) return track;
     let changed = false;
-    const items = track.items.flatMap((item): ClipItem[] => {
+    // Plans vidéo d'un même segment (une vidéo, sa boucle, ses autres plans) : découpés ensemble.
+    const grouped: (ClipItem | VideoItem[])[] = [];
+    for (const item of track.items) {
+      const last = grouped[grouped.length - 1];
+      const group = Array.isArray(last) ? last : null;
+      const previous = group?.[group.length - 1];
+      if (!isCuttableVideo(item)) grouped.push(item);
+      else if (group && previous && previous.cue!.index === item.cue!.index && previous.start + previous.duration === item.start) group.push(item);
+      else grouped.push([item]);
+    }
+    const items = grouped.flatMap((item): ClipItem[] => {
+      if (Array.isArray(item)) {
+        const shots = videoShots(item, target, project.fps, plan);
+        if (shots !== item) changed = true;
+        return shots;
+      }
       if (item.type !== "image" || !item.cue) return [item];
       if (item.duration <= target) {
         if (!plan?.motion) return [item];
@@ -123,6 +140,130 @@ export function cutShots(project: ClipProject, pace: EditPace, plan?: MeasuredPl
 
 /** Agrandissement d'un plan fixe « serré », pour qu'une coupe entre deux plans fixes se voie. */
 const STILL_CLOSE = 1.15;
+
+// ─── Plans vidéo ─────────────────────────────────────────────────
+
+/**
+ * Fond vidéo que le rythme peut découper : posé par un modèle (`cue`), muet
+ * (un plan d'illustration). Un extrait de la vidéo source n'est jamais
+ * découpé : il a été choisi pour ce qu'il montre, et un extrait cité garde son
+ * son d'un seul tenant.
+ */
+function isCuttableVideo(item: ClipItem): item is VideoItem {
+  return item.type === "video" && Boolean(item.cue) && item.muted === true && !/^Extrait\b/.test(item.label ?? "");
+}
+
+/** Longueur d'une vidéo, en images du projet ; inconnue : sans fin. */
+export function sourceFrames(source: Pick<MediaSource, "durationMs">, fps: number): number {
+  return source.durationMs && source.durationMs > 0 ? Math.max(1, Math.floor((source.durationMs / 1000) * fps)) : Infinity;
+}
+
+/** Images sautées au début d'une vidéo assez longue (3 s ou plus) : ses premiers 10 %, souvent une mise en place. */
+export function introSkip(length: number, fps: number): number {
+  return Number.isFinite(length) && length >= 3 * fps ? Math.round(length * 0.1) : 0;
+}
+
+/**
+ * Début d'un passage de `duration` images dans une vidéo : le milieu de la
+ * vidéo, après ses premiers 10 % quand elle est assez longue ; 0 si elle est
+ * plus courte que le passage.
+ */
+export function middleStart(length: number, duration: number, fps: number): number {
+  if (!Number.isFinite(length)) return 0;
+  if (length <= duration) return 0;
+  const skip = introSkip(length, fps);
+  return Math.min(length - duration, Math.max(skip, Math.round((length - duration) / 2)));
+}
+
+/**
+ * Morceaux consécutifs d'une vidéo qui couvrent `total` images : la vidéo
+ * depuis `first` jusqu'à sa fin, puis reprise à `restart`, autant de fois
+ * qu'il faut. Une vidéo trop courte boucle : jamais d'image figée.
+ */
+export function loopSpans(length: number, total: number, first: number, restart = first): { trimStart: number; duration: number }[] {
+  if (!Number.isFinite(length)) return [{ trimStart: Math.max(0, first), duration: total }];
+  const spans: { trimStart: number; duration: number }[] = [];
+  // Une reprise trop près de la fin ferait des morceaux d'une image : on repart du début.
+  const from = (value: number) => (length - value >= Math.min(length, 10) ? Math.max(0, value) : 0);
+  let at = from(first);
+  let left = total;
+  while (left > 0 && spans.length < 200) {
+    const duration = Math.min(left, length - at);
+    spans.push({ trimStart: at, duration });
+    left -= duration;
+    at = from(restart);
+  }
+  return spans;
+}
+
+const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+
+/**
+ * Débuts de `count` plans de `shot` images pris dans une vidéo de `length`
+ * images : des fenêtres réparties sur toute la vidéo (après ses premiers
+ * 10 %), prises dans un ordre qui saute d'un moment à un autre éloigné ; deux
+ * plans qui se suivent ne reprennent jamais au même endroit tant que la vidéo
+ * offre deux fenêtres. Plus de plans que de fenêtres : l'ordre recommence,
+ * comme une boucle.
+ */
+export function jumpStarts(length: number, shot: number, count: number, fps: number): number[] {
+  if (count <= 0) return [];
+  if (!Number.isFinite(length)) return Array.from({ length: count }, (_, index) => index * shot);
+  const room = Math.max(0, length - shot);
+  const skip = Math.min(introSkip(length, fps), room);
+  const slots = Math.max(1, Math.min(12, Math.floor((length - skip) / Math.max(1, shot))));
+  const positions = Array.from({ length: slots }, (_, index) => (slots === 1 ? skip : skip + Math.round((index * (room - skip)) / (slots - 1))));
+  let step = 1;
+  if (slots > 2) {
+    step = Math.ceil(slots / 2);
+    while (gcd(step, slots) !== 1) step++;
+  }
+  return Array.from({ length: count }, (_, index) => positions[(index * step) % slots]);
+}
+
+/**
+ * Découpe le fond vidéo d'un segment en plans de la durée visée : chaque plan
+ * reprend la vidéo à un autre moment (`jumpStarts`), et alterne avec les autres
+ * vidéos trouvées pour le même sujet quand il y en a. Aucun plan n'est plus
+ * long que la vidéo qu'il montre : une vidéo courte boucle, elle ne fige pas.
+ */
+function videoShots(group: VideoItem[], target: number, fps: number, plan?: MeasuredPlan | null): VideoItem[] {
+  const first = group[0];
+  const last = group[group.length - 1];
+  const total = last.start + last.duration - first.start;
+  if (total <= target) return group;
+  const sources: VideoItem[] = [];
+  for (const item of group) if (!sources.some((known) => known.source.ref === item.source.ref)) sources.push(item);
+  const lengths = sources.map((item) => sourceFrames(item.source, fps));
+  let count = plan?.shots ? measuredShotCount(total, fps, plan.shots) : Math.ceil(total / target);
+  const shortest = Math.min(...lengths);
+  if (Number.isFinite(shortest)) count = Math.max(count, Math.ceil(total / Math.max(1, shortest)));
+  const base = Math.floor(total / count);
+  const extra = total - base * count;
+  const perSource = sources.map((_, index) => Math.ceil((count - index) / sources.length));
+  const starts = sources.map((_, index) => jumpStarts(lengths[index], base + (extra ? 1 : 0), perSource[index], fps));
+  const used = sources.map(() => 0);
+  let start = first.start;
+  return Array.from({ length: count }, (_, index) => {
+    const which = index % sources.length;
+    const model = sources[which];
+    const duration = base + (index < extra ? 1 : 0);
+    const shot: VideoItem = {
+      ...model,
+      id: index === 0 ? first.id : uid("v-"),
+      start,
+      duration,
+      trimStart: starts[which][used[which]++] ?? 0,
+      cue: { ...first.cue! },
+      label: `Plan ${index + 1}/${count}`,
+      animIn: index === 0 ? first.animIn : { kind: "none", frames: 1 },
+      animOut: index === count - 1 ? last.animOut : { kind: "none", frames: 1 },
+    };
+    if (index > 0) delete shot.transition;
+    start += duration;
+    return shot;
+  });
+}
 
 interface Framing {
   zoom: number;
@@ -380,7 +521,8 @@ function staggerEndCard(tracks: Track[], fps: number): Track[] {
 /**
  * Comble les moments encore immobiles (un aplat sans image, un carton) :
  * un zoom bref sur le texte ou l'image principale de l'instant, assez
- * souvent pour qu'aucun plan ne dépasse la durée visée.
+ * souvent pour qu'aucun plan ne dépasse la durée visée. Une vidéo plein cadre
+ * qui joue n'est pas un moment immobile : elle ne reçoit aucun zoom.
  */
 export function fillStills(project: ClipProject, pace: EditPace, plan?: MeasuredPlan | null): ClipProject {
   if (pace === "calm") return project;
@@ -393,7 +535,10 @@ export function fillStills(project: ClipProject, pace: EditPace, plan?: Measured
     const gap = points[index] - points[index - 1];
     if (gap <= limit) continue;
     const parts = Math.ceil(gap / limit);
-    for (let part = 1; part < parts; part++) additions.push(points[index - 1] + Math.round((gap * part) / parts));
+    for (let part = 1; part < parts; part++) {
+      const at = points[index - 1] + Math.round((gap * part) / parts);
+      if (!videoPlaysAt(project, at)) additions.push(at);
+    }
   }
   if (additions.length === 0) return project;
   const frames = Math.max(1, Math.round(0.3 * project.fps));
@@ -404,6 +549,24 @@ export function fillStills(project: ClipProject, pace: EditPace, plan?: Measured
     tracks[index] = { ...tracks[index], effects: [...(tracks[index].effects ?? []), { kind: STILL_EFFECT, at, frames }] };
   }
   return { ...project, tracks };
+}
+
+/** Une vidéo plein cadre, visible, joue-t-elle à cette image ? */
+function videoPlaysAt(project: ClipProject, frame: number): boolean {
+  return project.tracks.some(
+    (track) =>
+      track.kind === "visual" &&
+      !track.hidden &&
+      track.items.some(
+        (item) =>
+          item.type === "video" &&
+          frame >= item.start &&
+          frame < item.start + item.duration &&
+          item.transform.width >= 0.95 &&
+          item.transform.height >= 0.95 &&
+          item.transform.opacity > 0.02
+      )
+  );
 }
 
 /** Piste qui reçoit le zoom : celle du texte de l'instant, sinon d'une image posée, sinon du fond. */

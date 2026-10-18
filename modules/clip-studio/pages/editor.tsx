@@ -43,13 +43,16 @@ import {
   createShapeItem,
   createTextItem,
   createVideoItem,
+  detachVideoAudio,
   duplicateItem,
   findItem,
   mainTrackEnd,
   mainTrackId,
   moveItem,
   pruneTracks,
+  reattachVideoAudio,
   removeItem,
+  setSourceTranscript,
   splitItem,
   trimItem,
   updateItem,
@@ -309,6 +312,17 @@ function Editor({ initial }: { initial: ClipProject }) {
     [commit]
   );
 
+  const reattachAudio = useCallback(
+    (itemId: string) => {
+      // Rattaché depuis le son, qui disparaît : la sélection passe à sa vidéo.
+      const found = findItem(projectRef.current, itemId);
+      const videoId = found?.item.type === "audio" ? found.item.linkedVideoId : undefined;
+      commit((current) => reattachVideoAudio(current, itemId));
+      if (videoId && findItem(projectRef.current, videoId)) setSelectedId(videoId);
+    },
+    [commit]
+  );
+
   // ─── Clavier ───────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -474,7 +488,7 @@ function Editor({ initial }: { initial: ClipProject }) {
               className={cn("shrink-0 overflow-hidden border-r", narrow && "absolute inset-y-0 left-14 z-20 bg-background shadow-lg")}
             >
               <div className="h-full w-[300px] max-w-[calc(100vw-3.5rem)]">
-                {panel === "media" && <MediaPanel onAdd={(source) => addSource(source)} />}
+                {panel === "media" && <MediaPanel onAdd={(source) => addSource(source)} aspect={project.aspect} />}
                 {panel === "text" && <TextPanel onAddText={addText} onAddShape={addShape} />}
                 {panel === "music" && <MusicPanel onAdd={addMusic} />}
                 {panel === "voice" && (
@@ -523,7 +537,7 @@ function Editor({ initial }: { initial: ClipProject }) {
                     onClose={() => setSelectedId(null)}
                     onCaption={(itemId) => {
                       const found = findItem(projectRef.current, itemId);
-                      if (found?.item.type !== "audio") return;
+                      if (found?.item.type !== "audio" && found?.item.type !== "video") return;
                       const caption = captionForVoice(projectRef.current, found.item);
                       if (!caption) return;
                       commit((current) => addItem(current, caption, undefined, "Sous-titres"));
@@ -534,6 +548,21 @@ function Editor({ initial }: { initial: ClipProject }) {
                     }
                     onChangeTrackVoice={setVoiceTrackId}
                     onSetTrackDuck={(trackId, duck, key) => commit((current) => setTrackDuck(current, trackId, duck), `track-${trackId}-${key}`)}
+                    onDetachAudio={(videoId) => commit((current) => detachVideoAudio(current, videoId).project)}
+                    onReattachAudio={reattachAudio}
+                    onTranscribed={(itemId, ref, words, transcript) => {
+                      // Tous les éléments qui lisent ce média reçoivent les mots ; la vidéo demandée est sous-titrée.
+                      const next = setSourceTranscript(projectRef.current, ref, words, transcript);
+                      const found = findItem(next, itemId);
+                      let caption = found && (found.item.type === "video" || found.item.type === "audio") ? captionForVoice(next, found.item) : null;
+                      const voiceId = caption?.karaoke?.voiceId;
+                      if (voiceId && next.tracks.some((track) => track.items.some((other) => other.type === "text" && other.karaoke?.voiceId === voiceId))) caption = null;
+                      commit((current) => {
+                        const updated = setSourceTranscript(current, ref, words, transcript);
+                        return caption ? addItem(updated, caption, undefined, "Sous-titres") : updated;
+                      });
+                      return Boolean(caption);
+                    }}
                   />
                 ) : (
                   <ProjectInspector project={project} kits={brandKits ?? []} onApplyBrand={applyBrand} />
@@ -571,6 +600,8 @@ function Editor({ initial }: { initial: ClipProject }) {
             }
           }}
           onChangeTrackVoice={setVoiceTrackId}
+          onDetachAudio={(videoId) => commit((current) => detachVideoAudio(current, videoId).project)}
+          onReattachAudio={reattachAudio}
         />
       </div>
       <TrackVoiceDialog

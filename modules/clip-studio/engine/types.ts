@@ -96,6 +96,31 @@ export interface MediaSource {
   words?: TimedWord[];
   /** Voix de synthèse : texte lu et réglages, pour la relire avec une autre voix. */
   speech?: SpeechInfo;
+  /** Vidéo transcrite : moteur, langue et date ; les mots sont dans `words`, en temps de la source. */
+  transcript?: TranscriptInfo;
+  /** Vidéo : elle a une piste son (absent : inconnu, on la suppose sonore). */
+  hasAudio?: boolean;
+  /** Média récupéré par adresse (YouTube, Twitch, lien direct) : d'où il vient. */
+  origin?: MediaOrigin;
+}
+
+/** Transcription d'une vidéo : moteur, langue reconnue, date. */
+export interface TranscriptInfo {
+  provider: "openai";
+  language?: string;
+  at: number;
+}
+
+/** Provenance d'un média récupéré par adresse. */
+export interface MediaOrigin {
+  site: "youtube" | "twitch" | "web";
+  /** Adresse d'origine, telle que collée. */
+  url: string;
+  title?: string;
+  /** Chaîne ou auteur. */
+  author?: string;
+  /** Passage récupéré dans la source, en secondes ; absent : la vidéo entière. */
+  section?: { start: number; end: number };
 }
 
 /** Texte d'une voix de synthèse et réglages qui l'ont produite. */
@@ -279,6 +304,19 @@ export interface VideoItem extends VisualBase {
   speed?: number;
   /** Mouvement de caméra sur la vidéo (secousse, zoom de frappe…) ; aucun par défaut. */
   motion?: Motion;
+  /** Son de la vidéo coupé, sans perdre le volume réglé. */
+  muted?: boolean;
+  /** Fondus du son de la vidéo, en images (absents : 0). */
+  fadeIn?: number;
+  fadeOut?: number;
+  /** Son qui s'efface sous la voix off : gain de 0 à 1, comme `AudioItem.duck`. */
+  duck?: number;
+  /**
+   * Son détaché : identifiant de l'élément audio qui le porte désormais. La
+   * vidéo reste alors muette ; les deux bougent, se rognent et se scindent
+   * ensemble.
+   */
+  audioLinkId?: string;
 }
 
 export interface TextStyle {
@@ -369,6 +407,14 @@ export interface AudioItem extends ItemBase {
    * voix off parle (`engine/mix.ts`). Absent : le volume ne bouge pas.
    */
   duck?: number;
+  /** Son détaché d'une vidéo : identifiant de cette vidéo (voir `VideoItem.audioLinkId`). */
+  linkedVideoId?: string;
+  /**
+   * Vitesse de lecture (1 par défaut), comme `VideoItem.speed`. Le son
+   * détaché d'une vidéo accélérée suit sa vitesse ; `trimStart` reste compté
+   * en images de la source.
+   */
+  speed?: number;
 }
 
 export type VisualItem = ImageItem | VideoItem | TextItem | ShapeItem;
@@ -424,5 +470,15 @@ export interface ClipAsset {
   words?: TimedWord[];
   /** Voix de synthèse : texte lu et réglages. */
   speech?: SpeechInfo;
+  /** Vidéo ou son transcrit (`lib/transcription-jobs.ts`) : les mots sont dans `words`. */
+  transcript?: TranscriptInfo;
+  /** Vidéo : elle a une piste son (absent : inconnu, on la suppose sonore). */
+  hasAudio?: boolean;
+  /** Média trouvé ou récupéré par adresse : état de ses droits (voir `MediaSource.rights`). */
+  rights?: "free" | "unverified";
+  /** Média récupéré par adresse (`lib/remote-import.ts`) : sa provenance. */
+  origin?: MediaOrigin;
+  /** Média récupéré par adresse : dernière fois qu'un projet s'en servait (ménage à 30 jours). */
+  lastUsedAt?: number;
   createdAt: number;
 }

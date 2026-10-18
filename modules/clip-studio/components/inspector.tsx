@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AlignCenter, AlignLeft, AlignRight, AudioLines, Check, FlipHorizontal2, Mic, Palette, X } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, AudioLines, Check, FlipHorizontal2, Link2, Mic, Palette, Unlink2, X } from "lucide-react";
 import { FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { TEXT_PRESETS, videoSpeedPatch } from "../engine/edit";
+import { TEXT_PRESETS, linkedItem, videoSpeedPatch } from "../engine/edit";
 import { DEFAULT_DUCK, DUCK_DB_MAX, DUCK_DB_MIN, canDuck, decibelsToDuck, duckToDecibels, voiceWindows } from "../engine/mix";
 import { isVoiceItem } from "../engine/revoice";
 import { MAX_SPEED, MIN_SPEED, speedOf } from "../engine/timeline";
@@ -37,6 +37,7 @@ import type { BrandFontChoice, BrandKitChoice } from "../lib/client";
 import { cameraPatch, transitionPatch } from "../lib/scene-catalog";
 import { AnimationFields } from "./motion-fields";
 import { SceneField } from "./scene-picker";
+import { VideoCaptionsField, type TranscribedHandler } from "./video-captions-field";
 
 interface InspectorProps {
   project: ClipProject;
@@ -55,9 +56,15 @@ interface InspectorProps {
    * retire). Absent : seul le son sélectionné change.
    */
   onSetTrackDuck?: (trackId: string, duck: number | undefined, key: string) => void;
+  /** Détache le son d'une vidéo sur une piste audio. */
+  onDetachAudio?: (videoId: string) => void;
+  /** Rattache un son détaché à sa vidéo (depuis l'un ou l'autre). */
+  onReattachAudio?: (itemId: string) => void;
+  /** Range la transcription d'une vidéo dans le projet et pose ses sous-titres. */
+  onTranscribed?: TranscribedHandler;
 }
 
-export function Inspector({ project, item, onPatch, onClose, onCaption, brandFonts = [], onChangeTrackVoice, onSetTrackDuck }: InspectorProps) {
+export function Inspector({ project, item, onPatch, onClose, onCaption, brandFonts = [], onChangeTrackVoice, onSetTrackDuck, onDetachAudio, onReattachAudio, onTranscribed }: InspectorProps) {
   const fps = project.fps;
   const track = project.tracks.find((entry) => entry.items.some((other) => other.id === item.id));
   const title =
@@ -76,8 +83,14 @@ export function Inspector({ project, item, onPatch, onClose, onCaption, brandFon
         {item.type === "image" && <ImageFields item={item} onPatch={onPatch} />}
         {item.type === "video" && <VideoFields item={item} project={project} onPatch={onPatch} />}
         {item.type === "shape" && <ShapeFields item={item} onPatch={onPatch} />}
+        {item.type === "video" && (
+          <VideoSoundFields item={item} project={project} fps={fps} onPatch={onPatch} onDetach={onDetachAudio} onReattach={onReattachAudio} />
+        )}
+        {item.type === "video" && <VideoCaptionsField key={item.id} project={project} item={item} onTranscribed={onTranscribed} />}
         {item.type === "audio" && <AudioFields item={item} fps={fps} onPatch={onPatch} />}
-        {track && canDuck(item, track.name) && (
+        {item.type === "audio" && <LinkedSoundNote item={item} project={project} onReattach={onReattachAudio} />}
+        {/* Le creux d'une vidéo se règle dans son groupe « Son » ; celui d'un son, pour toute sa piste. */}
+        {track && item.type === "audio" && canDuck(item, track.name) && (
           <DuckField
             duck={item.duck}
             trackName={track.name}
@@ -494,6 +507,7 @@ export function DuckField({
   shared,
   hasVoice,
   onChange,
+  title = "Creux sous la voix",
 }: {
   duck: number | undefined;
   trackName: string;
@@ -501,11 +515,13 @@ export function DuckField({
   shared: boolean;
   hasVoice: boolean;
   onChange: (duck: number | undefined, key: string) => void;
+  /** Titre du groupe (« Creux sous la voix » par défaut). */
+  title?: string;
 }) {
   const on = duck !== undefined;
   const depth = on ? duckToDecibels(duck) : duckToDecibels(DEFAULT_DUCK);
   return (
-    <Section title="Creux sous la voix">
+    <Section title={title}>
       <Row label="Baisser ce son quand la voix parle">
         <Switch checked={on} onCheckedChange={(next) => onChange(next ? DEFAULT_DUCK : undefined, "duck")} aria-label="Creux sous la voix" />
       </Row>
@@ -557,8 +573,117 @@ function VideoFields({ item, project, onPatch }: { item: VideoItem; project: Cli
           </Button>
         ))}
       </div>
-      <Slider label="Volume" unit="%" min={0} max={200} step={1} value={item.volume * 100} onChange={(value) => onPatch({ volume: value / 100 } as Partial<ClipItem>, "volume")} />
       <Slider label="Coins arrondis" min={0} max={200} step={1} value={item.radius} onChange={(radius) => onPatch({ radius } as Partial<ClipItem>, "radius")} />
+    </Section>
+  );
+}
+
+/**
+ * Son d'une vidéo, comme dans un logiciel de montage : gardé ou coupé (le
+ * volume réglé reste), fondus, creux sous la voix off, et détaché sur une
+ * piste audio. Une vidéo sans piste son n'offre aucun réglage.
+ */
+function VideoSoundFields({
+  item,
+  project,
+  fps,
+  onPatch,
+  onDetach,
+  onReattach,
+}: {
+  item: VideoItem;
+  project: ClipProject;
+  fps: number;
+  onPatch: InspectorProps["onPatch"];
+  onDetach?: (videoId: string) => void;
+  onReattach?: (itemId: string) => void;
+}) {
+  if (item.source.hasAudio === false) {
+    return (
+      <Section title="Son">
+        <p className="text-xs text-muted-foreground">Cette vidéo n’a pas de son.</p>
+      </Section>
+    );
+  }
+
+  if (item.audioLinkId) {
+    const partner = linkedItem(project, item);
+    return (
+      <Section title="Son">
+        <p className="flex gap-1.5 text-[11px] leading-4 text-muted-foreground">
+          <Link2 aria-hidden className="mt-px size-3.5 shrink-0" />
+          <span className="min-w-0 break-words">
+            {partner
+              ? <>Le son est détaché sur la piste «&nbsp;{partner.track.name}&nbsp;»&nbsp;: il se règle là-bas et suit la vidéo quand elle bouge.</>
+              : <>Le son détaché de cette vidéo a disparu&nbsp;: rattachez-le pour la rendre sonore.</>}
+          </span>
+        </p>
+        {onReattach && (
+          <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => onReattach(item.id)}>
+            <Link2 className="h-4 w-4" />
+            Rattacher le son
+          </Button>
+        )}
+      </Section>
+    );
+  }
+
+  return (
+    <>
+      <Section title="Son">
+        <Row label="Son de la vidéo">
+          <span className="text-[11px] text-muted-foreground">{item.muted ? "Coupé" : "Gardé"}</span>
+          <Switch
+            checked={!item.muted}
+            onCheckedChange={(on) => onPatch({ muted: on ? undefined : true } as Partial<ClipItem>, "muted")}
+            aria-label="Son de la vidéo"
+          />
+        </Row>
+        <Slider label="Volume" unit="%" min={0} max={200} step={1} value={item.volume * 100} onChange={(value) => onPatch({ volume: value / 100 } as Partial<ClipItem>, "volume")} />
+        <Slider label="Fondu d’entrée" unit="s" min={0} max={5} step={0.1} value={(item.fadeIn ?? 0) / fps} onChange={(value) => onPatch({ fadeIn: Math.round(value * fps) } as Partial<ClipItem>, "fade-in")} />
+        <Slider label="Fondu de sortie" unit="s" min={0} max={5} step={0.1} value={(item.fadeOut ?? 0) / fps} onChange={(value) => onPatch({ fadeOut: Math.round(value * fps) } as Partial<ClipItem>, "fade-out")} />
+        {item.muted && (
+          <p className="text-[11px] leading-4 text-muted-foreground">Le son est coupé&nbsp;; le volume et les fondus réglés sont gardés.</p>
+        )}
+        {onDetach && (
+          <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => onDetach(item.id)}>
+            <Unlink2 className="h-4 w-4" />
+            Détacher le son
+          </Button>
+        )}
+      </Section>
+      <DuckField
+        title="S’efface sous la voix"
+        duck={item.duck}
+        trackName=""
+        shared={false}
+        hasVoice={voiceWindows(project).length > 0}
+        onChange={(duck, key) => onPatch({ duck } as Partial<ClipItem>, key)}
+      />
+    </>
+  );
+}
+
+/** Son détaché d'une vidéo : on le dit, et on peut le rattacher. */
+function LinkedSoundNote({ item, project, onReattach }: { item: AudioItem; project: ClipProject; onReattach?: (itemId: string) => void }) {
+  if (!item.linkedVideoId) return null;
+  const partner = linkedItem(project, item);
+  return (
+    <Section title="Son d’une vidéo">
+      <p className="flex gap-1.5 text-[11px] leading-4 text-muted-foreground">
+        <Link2 aria-hidden className="mt-px size-3.5 shrink-0" />
+        <span className="min-w-0 break-words">
+          {partner
+            ? <>C’est le son de la vidéo «&nbsp;{partner.item.label ?? partner.item.source.name}&nbsp;»&nbsp;: les deux bougent, se rognent et se scindent ensemble.</>
+            : <>La vidéo de ce son a disparu.</>}
+        </span>
+      </p>
+      {onReattach && (
+        <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => onReattach(item.id)}>
+          <Link2 className="h-4 w-4" />
+          {partner ? "Rattacher à la vidéo" : "En faire un son ordinaire"}
+        </Button>
+      )}
     </Section>
   );
 }

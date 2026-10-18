@@ -26,7 +26,7 @@ import {
   canEncodeVideo,
   type WrappedCanvas,
 } from "mediabunny";
-import { voiceWindows } from "./mix";
+import { isAudible, voiceWindows } from "./mix";
 import { applyGainEnvelope } from "./preview";
 import { drawFrame } from "./render";
 import { isActive, projectDuration, sourceTimeAt, speedOf, transitionAt } from "./timeline";
@@ -352,10 +352,10 @@ export function normalizeLoudness(buffer: AudioBuffer): number {
 
 async function mixAudio(project: ClipProject, totalFrames: number): Promise<AudioBuffer | null> {
   const fps = project.fps;
+  // Une vidéo coupée, sans son ou au son détaché ne joue rien (`isAudible`) ;
+  // le son détaché passe par son élément audio lié.
   const sounding = project.tracks.flatMap((track) =>
-    track.muted || (track.kind === "visual" && track.hidden)
-      ? []
-      : track.items.filter(hasAudio).filter((item) => item.volume > 0)
+    track.muted || (track.kind === "visual" && track.hidden) ? [] : track.items.filter(hasAudio).filter(isAudible)
   );
   if (sounding.length === 0) return null;
 
@@ -382,7 +382,8 @@ async function mixAudio(project: ClipProject, totalFrames: number): Promise<Audi
     if (!buffer) continue;
     const offset = item.trimStart / fps;
     if (offset >= buffer.duration) continue;
-    const rate = item.type === "video" ? speedOf(item) : 1;
+    // Vidéo, ou son détaché d'une vidéo accélérée : la source se lit à sa vitesse.
+    const rate = speedOf(item);
     const source = offline.createBufferSource();
     source.buffer = buffer;
     source.playbackRate.value = rate;

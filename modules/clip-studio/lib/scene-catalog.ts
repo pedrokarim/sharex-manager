@@ -76,7 +76,7 @@ export const SCENE_CATEGORIES: Record<SceneKind, readonly CategoryDef[]> = {
       ids: ["pan-left", "pan-right", "pan-up", "pan-down", "ken-burns", "ken-burns-out", "drift", "crane-up"],
     },
     { key: "impacts", label: "Impacts", ids: ["punch-zoom", "shake", "impact-shake", "roll-hit", "whip-in"] },
-    { key: "mood", label: "Mise au point et ambiance", ids: ["focus-in", "handheld"] },
+    { key: "mood", label: "Mise au point et ambiance", ids: ["focus-in", "handheld", "backdrop-blur"] },
   ],
   shotfx: [
     { key: "flashes", label: "Flashs et lumière", ids: ["impact-flash", "dark-flash", "exposure-pop"] },

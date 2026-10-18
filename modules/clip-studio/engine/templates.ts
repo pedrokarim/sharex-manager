@@ -11,6 +11,7 @@ import { captionCenterBounds, captionLineCount, measuredPlan, type MeasuredPlan 
 import { ASPECTS } from "./types";
 import {
   appendSequence,
+  captionForVoice,
   createCaptionItem,
   createImageItem,
   createProject,
@@ -19,7 +20,7 @@ import {
   uid,
 } from "./edit";
 import type { PoseEmotion, PoseGesture } from "./poses";
-import { addBeats, cutShots, fillStills, type EditPace } from "./rhythm";
+import { addBeats, cutShots, fillStills, introSkip, loopSpans, middleStart, sourceFrames, type EditPace } from "./rhythm";
 import { wordGroups } from "./render";
 import type {
   AspectPreset,
@@ -60,7 +61,31 @@ export interface SegmentDirection {
   iconName?: string;
 }
 
-export interface QuizQuestion {
+/**
+ * Extrait d'une vidéo source posé sur un segment (« Monter par-dessus une
+ * vidéo », dossier 01 vidéo, V4.3).
+ */
+export interface SegmentExcerpt {
+  source: MediaSource;
+  /** Début et fin dans la source, en secondes. */
+  start: number;
+  end: number;
+  /**
+   * L'extrait est cité : on entend sa parole, sous-titrée, et la voix off du
+   * segment attend sa fin. Sinon il illustre, muet, sous la voix off.
+   */
+  keepAudio: boolean;
+}
+
+/** Visuels d'un segment en plus de son image : autres plans vidéo du sujet, extrait de la vidéo source. */
+export interface SegmentVisuals {
+  /** Autres vidéos du même sujet : quand `image` est une vidéo, les plans alternent entre elles. */
+  alternates?: MediaSource[];
+  /** Extrait de la vidéo source : il remplace l'image du segment pendant qu'il passe. */
+  excerpt?: SegmentExcerpt;
+}
+
+export interface QuizQuestion extends SegmentVisuals {
   question: string;
   choices: string[];
   /** Index de la bonne réponse dans `choices`. */
@@ -85,7 +110,7 @@ export interface QuizData {
   outroEmotion?: PoseEmotion;
 }
 
-export interface TopEntry {
+export interface TopEntry extends SegmentVisuals {
   title: string;
   detail?: string;
   image?: MediaSource;
@@ -108,7 +133,7 @@ export interface TopData {
 
 export interface SlideshowData {
   title?: string;
-  slides: {
+  slides: (SegmentVisuals & {
     caption?: string;
     image?: MediaSource;
     /** Icône ou logo officiel du sujet, posé à côté de son nom ; absent, rien ne change. */
@@ -117,14 +142,14 @@ export interface SlideshowData {
     emotion?: PoseEmotion;
     gesture?: PoseGesture;
     iconName?: string;
-  }[];
+  })[];
   outro?: string;
   voice?: { intro?: VoiceClip; outro?: VoiceClip };
   outroEmotion?: PoseEmotion;
 }
 
 /** Une séquence du modèle libre : un titre, un texte, ou les deux. */
-export interface FreeScene {
+export interface FreeScene extends SegmentVisuals {
   heading?: string;
   text?: string;
   image?: MediaSource;
@@ -215,6 +240,11 @@ class Builder {
   /** Durée d'un segment : au moins `base`, et assez pour la narration plus une marge. */
   fit(base: number, voice: VoiceClip | undefined, margin: number) {
     return Math.max(this.seconds(base), voice ? this.seconds(voice.durationMs / 1000 + margin) : 0);
+  }
+
+  /** Durée de l'extrait cité d'un segment (son gardé), en images ; 0 sans extrait cité. */
+  quoteFrames(excerpt: SegmentExcerpt | undefined) {
+    return excerpt?.keepAudio ? Math.max(1, this.seconds(excerpt.end - excerpt.start)) : 0;
   }
 
   /** Pose la narration d'un segment sur la piste Voix. */
@@ -354,9 +384,142 @@ function box(
   };
 }
 
-/** Fond d'un segment : l'image fournie sous un voile (retiré par une marque), sinon un aplat de la teinte du segment. */
-function background(b: Builder, start: number, duration: number, image: MediaSource | undefined, accent: number, motionIndex: number, cue?: SegmentCue) {
+/** Voile sombre du thème par défaut, sur tout le cadre. */
+function veil(b: Builder, start: number, duration: number) {
+  // Une marque le rend transparent : l'image reste éclatante et chaque texte reçoit sa propre étiquette ou son contour.
+  b.add("Voile", box(b, start, duration, { y: 0.5, height: 1, width: 1 }, { paint: "veil" }, { opacity: 0.42, radius: 0, animIn: "none" }));
+}
+
+/** « 1:05 » : instant d'un extrait, dans son nom sur la timeline. */
+const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+
+/**
+ * Fond vidéo plein cadre, muet (un plan d'illustration sous la voix off) :
+ * les vidéos se partagent la durée du segment, chacune prise en son milieu
+ * (ou depuis `from`), et bouclée si elle est plus courte que sa part, jamais
+ * figée sur sa dernière image. Le rythme du montage (`cutShots`) la découpe
+ * ensuite en plans.
+ */
+function videoBackground(
+  b: Builder,
+  start: number,
+  duration: number,
+  sources: MediaSource[],
+  extra: { cue?: SegmentCue },
+  options: { from?: number; label?: string } = {}
+) {
+  let at = start;
+  let first = true;
+  sources.forEach((source, index) => {
+    const share = index === sources.length - 1 ? start + duration - at : Math.floor(duration / sources.length);
+    if (share <= 0) return;
+    const length = sourceFrames(source, b.fps);
+    const from = options.from ?? middleStart(length, share, b.fps);
+    for (const span of loopSpans(length, share, from, options.from ?? introSkip(length, b.fps))) {
+      b.add("Principale", {
+        ...extra,
+        id: uid("v-"),
+        type: "video",
+        start: at,
+        duration: span.duration,
+        source,
+        fit: "cover",
+        trimStart: span.trimStart,
+        volume: 1,
+        // Le son d'une vidéo d'illustration est presque toujours hors sujet : coupé, il reste réglable.
+        muted: true,
+        motion: "none",
+        radius: 0,
+        transform: { x: 0.5, y: 0.5, width: 1, height: 1, rotation: 0, opacity: 1 },
+        animIn: first ? { kind: "fade", frames: 8 } : { kind: "none", frames: 1 },
+        animOut: { kind: "none", frames: 10 },
+        ...(options.label ? { label: options.label } : {}),
+      } satisfies VideoItem);
+      first = false;
+      at += span.duration;
+    }
+  });
+}
+
+/**
+ * Extrait cité de la vidéo source : posé avec son son, sans creux sous la
+ * voix (la voix off attend sa fin), sous-titré d'après la transcription de la
+ * source quand elle existe.
+ */
+function quotedExcerpt(b: Builder, start: number, duration: number, excerpt: SegmentExcerpt, extra: { cue?: SegmentCue }) {
+  const item = b.add("Principale", {
+    ...extra,
+    id: uid("v-"),
+    type: "video",
+    start,
+    duration,
+    source: excerpt.source,
+    fit: "cover",
+    trimStart: Math.max(0, b.seconds(excerpt.start)),
+    volume: 1,
+    radius: 0,
+    motion: "none",
+    transform: { x: 0.5, y: 0.5, width: 1, height: 1, rotation: 0, opacity: 1 },
+    animIn: { kind: "fade", frames: 6 },
+    animOut: { kind: "none", frames: 1 },
+    label: `Extrait ${clock(excerpt.start)} – ${clock(excerpt.end)}`,
+  } satisfies VideoItem);
+  const caption = captionForVoice(b.project, item);
+  if (!caption) return;
+  caption.transform = { ...caption.transform, y: captionY(b) };
+  if (b.layout.caption) {
+    caption.style = { ...caption.style, size: b.layout.caption.size };
+    caption.karaoke = { ...caption.karaoke!, groupSize: b.layout.caption.groupSize };
+  }
+  b.add("Sous-titres", caption);
+}
+
+/**
+ * Fond d'un segment : l'image fournie sous un voile (retiré par une marque),
+ * sinon un aplat de la teinte du segment. Une vidéo (trouvée sur Pexels) est
+ * posée muette et bouclée, en alternance avec ses autres plans
+ * (`visuals.alternates`). Un extrait de la vidéo source (`visuals.excerpt`)
+ * passe d'abord : cité, avec son son, puis l'image du segment (ou la suite de
+ * la source, muette) le temps de la voix off ; sinon il illustre tout le
+ * segment, muet.
+ */
+function background(
+  b: Builder,
+  start: number,
+  duration: number,
+  image: MediaSource | undefined,
+  accent: number,
+  motionIndex: number,
+  cue?: SegmentCue,
+  visuals: SegmentVisuals = {}
+) {
   const cued = cue && (b.layout.captions || b.layout.mascot || b.layout.onWord) ? { cue } : {};
+  const excerpt = visuals.excerpt;
+  if (excerpt) {
+    const quote = Math.min(duration, b.quoteFrames(excerpt));
+    if (quote === 0) {
+      videoBackground(b, start, duration, [excerpt.source], cued, { from: b.seconds(excerpt.start), label: `Extrait ${clock(excerpt.start)} – ${clock(excerpt.end)}` });
+      veil(b, start, duration);
+      return;
+    }
+    quotedExcerpt(b, start, quote, excerpt, cued);
+    veil(b, start, quote);
+    if (duration - quote <= 0) return;
+    // Après la citation : l'illustration du segment, sinon la suite de la source, muette et d'un seul tenant.
+    if (image) {
+      background(b, start + quote, duration - quote, image, accent, motionIndex, cue, { alternates: visuals.alternates });
+    } else {
+      videoBackground(b, start + quote, duration - quote, [excerpt.source], cued, { from: b.seconds(excerpt.end), label: `Extrait ${clock(excerpt.end)} – suite` });
+      veil(b, start + quote, duration - quote);
+    }
+    return;
+  }
+  if (image?.kind === "video") {
+    const others = (visuals.alternates ?? []).filter((source) => source.kind === "video" && source.ref !== image.ref).slice(0, 2);
+    videoBackground(b, start, duration, [image, ...others], cued);
+    veil(b, start, duration);
+    return;
+  }
   if (image) {
     const item: ImageItem = {
       ...cued,
@@ -373,9 +536,7 @@ function background(b: Builder, start: number, duration: number, image: MediaSou
       animOut: { kind: "none", frames: 10 },
     };
     b.add("Principale", item);
-    // Voile sombre du thème par défaut. Une marque le rend transparent : l'image
-    // reste éclatante et chaque texte reçoit sa propre étiquette ou son contour.
-    b.add("Voile", box(b, start, duration, { y: 0.5, height: 1, width: 1 }, { paint: "veil" }, { opacity: 0.42, radius: 0, animIn: "none" }));
+    veil(b, start, duration);
   } else {
     b.add("Principale", { ...box(b, start, duration, { y: 0.5, height: 1, width: 1 }, { paint: "plate", accent }, { radius: 0, animIn: "fade" }), ...cued });
   }
@@ -589,7 +750,9 @@ export function buildQuiz(
     const total = think + reveal;
     // La révélation de la dernière question est le temps fort du quiz.
     const last = index === data.questions.length - 1;
-    background(b, cursor, total, question.image, accent, index + 1, cueOf(index + 1, question, last ? "reveal" : undefined, last ? think : undefined));
+    // Un extrait n'est jamais cité dans un quiz : le compte à rebours garde son minutage.
+    const visuals: SegmentVisuals = { alternates: question.alternates, ...(question.excerpt ? { excerpt: { ...question.excerpt, keepAudio: false } } : {}) };
+    background(b, cursor, total, question.image, accent, index + 1, cueOf(index + 1, question, last ? "reveal" : undefined, last ? think : undefined), visuals);
     b.narrate(question.voice?.question, cursor + 4);
     const revealVoice = b.narrate(question.voice?.reveal, cursor + think + 2);
 
@@ -710,9 +873,11 @@ export function buildTop(name: string, aspect: AspectPreset, data: TopData, layo
   data.entries.forEach((entry, index) => {
     const rank = count - index;
     const accent = index;
-    const duration = b.fit(rank === 1 ? 4.5 : 3.5, entry.voice, 0.6);
-    background(b, cursor, duration, entry.image, accent, index + 1, cueOf(index + 1, entry, rank === 1 ? "reveal" : undefined));
-    const voice = b.narrate(entry.voice, cursor + 4);
+    // Un extrait cité passe d'abord : la voix off attend sa fin.
+    const quote = b.quoteFrames(entry.excerpt);
+    const duration = quote + b.fit(quote && entry.voice ? 0.5 : rank === 1 ? 4.5 : 3.5, entry.voice, 0.6);
+    background(b, cursor, duration, entry.image, accent, index + 1, cueOf(index + 1, entry, rank === 1 ? "reveal" : undefined), entry);
+    const voice = b.narrate(entry.voice, cursor + quote + 4);
     b.add("Textes", text(b, `#${rank}`, cursor, duration, {
       role: "title",
       y: vertical ? 0.2 : 0.22,
@@ -726,7 +891,7 @@ export function buildTop(name: string, aspect: AspectPreset, data: TopData, layo
     const iconAt = iconStart(b, voice, entry.iconName ?? entry.title, cursor + 6, cursor + duration);
     iconSlot(b, entry.icon, iconAt, cursor + duration - iconAt, { bottom: (vertical ? 0.72 : 0.7) - 0.08 - 0.01, side: 0.16 });
     if (entry.detail) {
-      b.add("Textes", text(b, entry.detail, cursor + 12, duration - 12, { role: "caption", y: vertical ? 0.82 : 0.84, height: 0.12, size: vertical ? 0.03 : 0.042, animIn: "fade" }));
+      b.add("Textes", text(b, entry.detail, cursor + quote + 12, duration - quote - 12, { role: "caption", y: vertical ? 0.82 : 0.84, height: 0.12, size: vertical ? 0.03 : 0.042, animIn: "fade" }));
     }
     cursor += duration;
   });
@@ -755,15 +920,16 @@ export function buildSlideshow(name: string, aspect: AspectPreset, data: Slidesh
     cursor += intro;
   }
   data.slides.forEach((slide, index) => {
-    const duration = b.fit(3.5, slide.voice, 0.6);
-    background(b, cursor, duration, slide.image, index, index + 1, cueOf(index + 1, slide));
-    const voice = b.narrate(slide.voice, cursor + 4);
+    const quote = b.quoteFrames(slide.excerpt);
+    const duration = quote + b.fit(quote && slide.voice ? 0.5 : 3.5, slide.voice, 0.6);
+    background(b, cursor, duration, slide.image, index, index + 1, cueOf(index + 1, slide), slide);
+    const voice = b.narrate(slide.voice, cursor + quote + 4);
     // La légende lue devient des sous-titres mot à mot ; sans mots horodatés, elle reste affichée.
     const caption = slide.caption ? spokenCaption(b, voice, captionY(b)) : null;
     if (slide.caption && !caption) {
-      b.add("Textes", text(b, slide.caption, cursor + 6, duration - 6, { role: "caption", y: vertical ? 0.8 : 0.84, height: 0.16, size: vertical ? 0.038 : 0.05, animIn: "slide-up" }));
+      b.add("Textes", text(b, slide.caption, cursor + quote + 6, duration - quote - 6, { role: "caption", y: vertical ? 0.8 : 0.84, height: 0.16, size: vertical ? 0.038 : 0.05, animIn: "slide-up" }));
     }
-    const iconAt = iconStart(b, voice, slide.iconName, cursor + 6, cursor + duration);
+    const iconAt = iconStart(b, voice, slide.iconName, cursor + quote + 6, cursor + duration);
     const place: IconPlace = caption
       ? { x: reserve ? 0.66 : 0.5, y: reserve ? 0.4 : vertical ? 0.44 : 0.42, side: vertical ? 0.26 : 0.2 }
       : slide.caption
@@ -806,9 +972,11 @@ export function buildFree(name: string, aspect: AspectPreset, data: FreeData, la
 
   data.scenes.forEach((scene, index) => {
     const accent = index;
-    const duration = b.fit(scene.text ? 4 : 3, scene.voice, 0.6);
-    background(b, cursor, duration, scene.image, accent, index + 1, cueOf(index + 1, scene));
-    const voice = b.narrate(scene.voice, cursor + 4);
+    // Un extrait cité passe d'abord : la voix off attend sa fin, le texte lu aussi.
+    const quote = b.quoteFrames(scene.excerpt);
+    const duration = quote + b.fit(quote && scene.voice ? 0.5 : scene.text ? 4 : 3, scene.voice, 0.6);
+    background(b, cursor, duration, scene.image, accent, index + 1, cueOf(index + 1, scene), scene);
+    const voice = b.narrate(scene.voice, cursor + quote + 4);
     // Le texte lu devient des sous-titres mot à mot ; sans mots horodatés, il reste affiché.
     const caption = scene.text ? spokenCaption(b, voice, captionY(b)) : null;
     const shownText = scene.text && !caption ? scene.text : undefined;
@@ -822,7 +990,7 @@ export function buildFree(name: string, aspect: AspectPreset, data: FreeData, la
       }));
     }
     if (shownText) {
-      b.add("Textes", text(b, shownText, cursor + 6, duration - 6, {
+      b.add("Textes", text(b, shownText, cursor + quote + 6, duration - quote - 6, {
         role: "caption",
         y: scene.heading ? (vertical ? 0.74 : 0.76) : 0.5,
         height: vertical ? 0.24 : 0.2,
@@ -834,7 +1002,7 @@ export function buildFree(name: string, aspect: AspectPreset, data: FreeData, la
     const anchorTop = scene.text
       ? (scene.heading ? (vertical ? 0.74 : 0.76) : 0.5) - (vertical ? 0.24 : 0.2) / 2
       : 0.46 - 0.18 / 2;
-    const iconAt = iconStart(b, voice, scene.iconName, cursor + 6, cursor + duration);
+    const iconAt = iconStart(b, voice, scene.iconName, cursor + quote + 6, cursor + duration);
     const place: IconPlace = caption ? { x: reserve ? 0.66 : 0.5, y: reserve ? 0.4 : vertical ? 0.44 : 0.48, side: vertical ? 0.26 : 0.2 } : { bottom: anchorTop - 0.01, side: 0.15 };
     iconSlot(b, scene.icon, iconAt, cursor + duration - iconAt, place);
     cursor += duration;

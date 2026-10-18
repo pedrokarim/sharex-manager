@@ -330,6 +330,14 @@ export function openAiVoiceAccess(): "env" | "key" | "none" {
   return keyAccess("openai");
 }
 
+/**
+ * Clé OpenAI des voix, reprise par la transcription (`transcribe.ts`). Usage
+ * serveur seulement : elle ne doit jamais être journalisée ni renvoyée.
+ */
+export function openAiApiKey(): string {
+  return apiKey("openai");
+}
+
 /** Solde ElevenLabs lu chez le service, sans rien dépenser. */
 export async function readElevenLabsBalance(): Promise<AiLimit[]> {
   const key = apiKey("elevenlabs");

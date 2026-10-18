@@ -468,6 +468,9 @@ const NEW_CAMERA: CameraPreset[] = [
       rotate: sway([[1, 0.6, 1.1], [3, 0.4, 0.2]], 0.35),
     },
   },
+  // Fond flou : l'image floue et assombrie, agrandie pour que le flou ne ronge pas les bords. Sert de fond à une
+  // vidéo posée en entier par-dessus (« Image entière sur fond flou » de « Sous-titrer un clip »).
+  { id: "backdrop-blur", label: "Fond flou", timing: "span", durationMs: 0, ease: "linear", tracks: { zoom: keys([0, 1.12], [1, 1.12]), blur: keys([0, 0.035], [1, 0.035]), brightness: keys([0, 0.55], [1, 0.55]) } },
 ];
 
 const cameras = new Map<string, CameraPreset>();

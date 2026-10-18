@@ -28,7 +28,8 @@ export type AiProviderId =
   | "serpapi"
   | "saucenao"
   | "tracemoe"
-  | "openverse";
+  | "openverse"
+  | "pexels";
 
 /** Unité de ce qui est consommé ; un même fournisseur peut en compter plusieurs. */
 export type AiUnit = "calls" | "characters" | "images" | "tokens" | "seconds";
