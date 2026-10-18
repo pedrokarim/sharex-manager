@@ -15,7 +15,7 @@ import type { FeedbackState, FeedbackTone } from "./use-feedback";
  */
 
 const TONES: Record<FeedbackTone, string> = {
-  error: "bg-destructive/10 text-destructive",
+  error: "bg-destructive/10 text-red-700 dark:text-red-400",
   success: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   info: "bg-muted text-foreground",
 };
