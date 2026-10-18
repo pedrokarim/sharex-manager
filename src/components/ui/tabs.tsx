@@ -72,7 +72,7 @@ function TabsList({
       className={cn(
         tabsListVariants({ variant }),
         liquid &&
-          "relative isolate [--tabs-indicator:var(--background)] dark:[--tabs-indicator:color-mix(in_oklab,var(--input)_30%,var(--muted))]",
+          "relative isolate [--tabs-indicator:var(--background)] dark:[--tabs-indicator:color-mix(in_oklab,var(--foreground)_14%,var(--muted))]",
         className
       )}
       {...props}
