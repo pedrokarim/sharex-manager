@@ -7,6 +7,15 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Banc des chargements (`/loading-bench`, réservé à l’administration) : tous les visuels
+  d’attente de l’application en direct (orbes, Spinner, boutons en attente,
+  textes scintillants, retours d’action, squelettes et écran d’attente de
+  chaque route), avec un aperçu « Animations réduites ».
+- Clip Studio, page « Animations » : les 305 animations intégrées (éléments,
+  texte, effets, mises en avant, transitions, caméra, effets de plan) en
+  vignettes vivantes, avec recherche, catégories, favoris partagés avec
+  l’éditeur, « Tout lire », et une fiche par animation (aperçu réglable,
+  détails, chemin pour la poser dans l’éditeur).
 - Réglages de sécurité de l’instance (`data/security.json`), modifiables par
   l’API d’administration : longueur minimale des mots de passe et refus des
   plus courants, durée des sessions, blocage après des échecs de connexion,

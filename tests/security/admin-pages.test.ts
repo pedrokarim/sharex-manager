@@ -15,6 +15,7 @@ const ADMIN_PAGES = [
   "src/app/(app)/modules/page.tsx",
   "src/app/(app)/uploads/config/page.tsx",
   "src/app/(app)/settings/domains/page.tsx",
+  "src/app/(app)/loading-bench/page.tsx",
 ];
 
 describe("pages d'administration", () => {
