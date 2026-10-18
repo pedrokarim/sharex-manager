@@ -33,6 +33,7 @@ const MODULE_PAGES: Record<string, Record<string, PageLoader>> = {
     export: () => import("@/modules/clip-studio/pages/export"),
     exports: () => import("@/modules/clip-studio/pages/exports"),
     publish: () => import("@/modules/clip-studio/pages/publish"),
+    animations: () => import("@/modules/clip-studio/pages/animations"),
   },
   "reverse-search": {
     "": () => import("@/modules/reverse-search/pages/search"),

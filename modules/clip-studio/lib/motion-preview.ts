@@ -9,7 +9,7 @@
 
 import { naturalFrames } from "../engine/motion/interpret";
 import { countUnits } from "../engine/motion/text-layout";
-import type { MotionPreset } from "../engine/motion/types";
+import type { MotionParamValues, MotionPreset } from "../engine/motion/types";
 import type { ClipProject, ShapeItem, TextItem, VisualItem } from "../engine/types";
 import { isSplitPreset, type PickerItemType, type PickerPhase } from "./motion-catalog";
 
@@ -35,6 +35,10 @@ export interface PreviewOptions {
   color: string;
   /** Type de l'élément animé : un texte montre un mot, le reste un rectangle. */
   itemType: PickerItemType;
+  /** Réglages du préréglage (intensité, direction…) ; absents : ses défauts. */
+  params?: MotionParamValues;
+  /** Texte du témoin, à la place de `PREVIEW_WORD` (un nombre pour un compteur, un titre dans la galerie). */
+  text?: string;
 }
 
 export interface PreviewScene {
@@ -51,9 +55,9 @@ export function previewShowsText(preset: MotionPreset, itemType: PickerItemType)
 }
 
 /** Durée d'une phase dans la vignette, en images. */
-export function previewPhaseFrames(preset: MotionPreset, showsText: boolean): number {
+export function previewPhaseFrames(preset: MotionPreset, showsText: boolean, text: string = PREVIEW_WORD): number {
   const split = showsText && preset.split ? preset.split : "whole";
-  const count = split === "whole" ? 1 : countUnits(PREVIEW_WORD, split);
+  const count = split === "whole" ? 1 : countUnits(text, split);
   const frames = naturalFrames(preset, count, PREVIEW_FPS);
   return Math.min(MAX_PHASE_FRAMES, Math.max(MIN_PHASE_FRAMES, frames));
 }
@@ -72,7 +76,7 @@ function witness(preset: MotionPreset, options: PreviewOptions, showsText: boole
     const text: TextItem = {
       ...base,
       type: "text",
-      text: PREVIEW_WORD,
+      text: options.text || PREVIEW_WORD,
       transform: { x: 0.5, y: 0.5, width: 0.9, height: 0.6, rotation: 0, opacity: 1 },
       style: {
         font: "Inter",
@@ -109,8 +113,8 @@ function witness(preset: MotionPreset, options: PreviewOptions, showsText: boole
  */
 export function buildPreviewScene(preset: MotionPreset, phase: PickerPhase, options: PreviewOptions): PreviewScene {
   const showsText = previewShowsText(preset, options.itemType);
-  const frames = previewPhaseFrames(preset, showsText);
-  const anim = { kind: preset.id, frames };
+  const frames = previewPhaseFrames(preset, showsText, options.text || PREVIEW_WORD);
+  const anim = options.params ? { kind: preset.id, frames, params: options.params } : { kind: preset.id, frames };
   let item: VisualItem;
   let loopFrames: number;
   let stillFrame: number;

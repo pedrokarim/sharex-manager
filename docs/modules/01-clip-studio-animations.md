@@ -307,6 +307,12 @@ C’est l’ajout qui change le plus les vidéos.
   décalage et l’ordre.
 - **Timeline** : la durée des phases d’entrée, de sortie et de mise en avant
   se voit et se règle au bord de l’élément.
+- **Galerie** (page « Animations », `pages/animations.tsx`, `lib/motion-gallery.ts`) :
+  tout le catalogue en vignettes vivantes, en sept onglets (Éléments, Texte,
+  Effets, Mises en avant, Transitions, Caméra, Effets de plan), avec
+  recherche, catégories, favoris partagés avec le sélecteur et « Tout lire »
+  (seules les vignettes visibles jouent, sur l’horloge commune) ; une carte
+  ouverte donne sa fiche : aperçu réglable, détails et chemin dans l’éditeur.
 - Pleine largeur, chargements localisés, et **passe d’intégrité visuelle**
   obligatoire (clair et sombre, cinq largeurs, noms longs) avant livraison.
 

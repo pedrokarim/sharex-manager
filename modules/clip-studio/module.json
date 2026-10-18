@@ -89,6 +89,7 @@
     { "path": "voices", "title": "Voix en ligne", "component": "pages/voices.tsx" },
     { "path": "export", "title": "Exporter", "component": "pages/export.tsx", "menu": false },
     { "path": "exports", "title": "Exports", "component": "pages/exports.tsx" },
+    { "path": "animations", "title": "Animations", "component": "pages/animations.tsx" },
     { "path": "publish", "title": "Publier", "component": "pages/publish.tsx", "menu": false }
   ],
   "navItems": [

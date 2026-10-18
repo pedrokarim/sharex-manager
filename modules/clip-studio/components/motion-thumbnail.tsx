@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { drawFrame } from "../engine/render";
-import type { MotionPreset } from "../engine/motion/types";
+import type { MotionParamValues, MotionPreset } from "../engine/motion/types";
 import type { PickerItemType, PickerPhase } from "../lib/motion-catalog";
 import { buildPreviewScene, previewFrameAt, type PreviewScene } from "../lib/motion-preview";
 import { subscribeTick } from "../lib/motion-ticker";
@@ -32,7 +32,7 @@ const rgbCache = new Map<string, string>();
  * ramenée en `rgb()` : les pistes de couleur du moteur ne lisent que
  * l'hexadécimal et `rgb()`. Un pixel peint suffit à la convertir.
  */
-function toRgb(color: string): string {
+export function toRgb(color: string): string {
   const fallback = "rgb(128, 128, 128)";
   if (!color) return fallback;
   const cached = rgbCache.get(color);
@@ -64,6 +64,10 @@ interface MotionThumbnailProps {
   playing: boolean;
   /** Taille du canevas en pixels réels ; l'affichage suit la largeur de son conteneur. */
   resolution?: [number, number];
+  /** Réglages du préréglage ; absents : ses défauts. */
+  params?: MotionParamValues;
+  /** Texte du témoin (un nombre pour un compteur) ; absent : le mot habituel. */
+  text?: string;
   className?: string;
 }
 
@@ -72,12 +76,13 @@ interface MotionThumbnailProps {
  * L'image figée n'est dessinée qu'une fois la vignette visible ; l'animation
  * ne tourne que pendant `playing`, sur l'horloge partagée.
  */
-export function MotionThumbnail({ preset, phase, itemType, playing, resolution = [192, 120], className }: MotionThumbnailProps) {
+export function MotionThumbnail({ preset, phase, itemType, playing, resolution = [192, 120], params, text, className }: MotionThumbnailProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<{ key: string; scene: PreviewScene } | null>(null);
   const [visible, setVisible] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
   const [width, height] = resolution;
+  const paramsKey = params ? JSON.stringify(params) : "";
 
   // Dessin à la demande : la vignette n'existe qu'une fois à l'écran.
   useEffect(() => {
@@ -105,9 +110,9 @@ export function MotionThumbnail({ preset, phase, itemType, playing, resolution =
 
     // La couleur du témoin est celle du texte de la vignette : elle suit le thème clair ou sombre.
     const color = toRgb(getComputedStyle(canvas).color);
-    const key = `${preset.id}|${phase}|${itemType}|${width}x${height}|${color}`;
+    const key = `${preset.id}|${phase}|${itemType}|${width}x${height}|${color}|${paramsKey}|${text ?? ""}`;
     if (sceneRef.current?.key !== key) {
-      sceneRef.current = { key, scene: buildPreviewScene(preset, phase, { width, height, color, itemType }) };
+      sceneRef.current = { key, scene: buildPreviewScene(preset, phase, { width, height, color, itemType, params, text }) };
     }
     const { scene } = sceneRef.current;
 
@@ -133,7 +138,9 @@ export function MotionThumbnail({ preset, phase, itemType, playing, resolution =
       startedAt ??= now;
       draw(previewFrameAt(scene, now - startedAt));
     });
-  }, [preset, phase, itemType, width, height, playing, reducedMotion, visible]);
+    // `params` est lu par sa clé : un objet recréé à chaque rendu ne relance pas le dessin.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset, phase, itemType, width, height, playing, reducedMotion, visible, paramsKey, text]);
 
   if (!preset) {
     return (

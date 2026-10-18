@@ -83,8 +83,8 @@ function drawLandscape(ctx: CanvasRenderingContext2D) {
   }
 }
 
-/** Image témoin d'une référence, dessinée une fois puis gardée. */
-function witness(ref: string): HTMLCanvasElement | null {
+/** Image témoin d'une référence, dessinée une fois puis gardée (aussi lue par l'aperçu de la galerie). */
+export function witness(ref: string): HTMLCanvasElement | null {
   const cached = witnessCache.get(ref);
   if (cached) return cached;
   if (typeof document === "undefined") return null;
