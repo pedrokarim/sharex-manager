@@ -95,7 +95,8 @@ function collectionReferences(collectionId?: string) {
       {
         b64: fs.readFileSync(full).toString("base64"),
         mimeType: "image/png",
-        role: "reference" as const,
+        // Une ancre fixe un personnage ou un objet d'une scène à l'autre.
+        role: "subject" as const,
       },
     ];
   });

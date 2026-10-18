@@ -69,6 +69,7 @@ import {
   touchesComposerPreference,
   type ComposerPreference,
 } from "../lib/composer-preference";
+import { normalizeReferenceRole } from "../lib/reference-roles";
 
 interface GeneratePageProps {
   moduleName: string;
@@ -154,7 +155,7 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
     if (!files) return null;
     return {
       files: files.split(",").map((name) => name.trim()).filter(Boolean).slice(0, MAX_REFERENCES),
-      role: searchParams.get("role") === "edit-target" ? "edit-target" : "reference",
+      role: normalizeReferenceRole(searchParams.get("role")),
     };
   });
 
@@ -232,22 +233,19 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
 
   const attach = useCallback(
     (images: PickedImage[], role: ComposerReference["role"] = "reference") => {
-      setState((prev) => {
-        // Une image en retouche fixe le rôle du lot : on aligne les nouvelles
-        // venues sur les images déjà présentes.
-        const inherited = prev.references[0]?.role ?? role;
-        return {
-          ...prev,
-          references: [
-            ...prev.references,
-            ...images.map((image) => ({
-              ...image,
-              id: crypto.randomUUID(),
-              role: inherited,
-            })),
-          ].slice(0, MAX_REFERENCES),
-        };
-      });
+      // Chaque image garde son rôle : celui d'une référence enregistrée, sinon
+      // le rôle demandé (inspiration par défaut). Il se change sur la vignette.
+      setState((prev) => ({
+        ...prev,
+        references: [
+          ...prev.references,
+          ...images.map((image) => ({
+            ...image,
+            id: crypto.randomUUID(),
+            role: image.role ?? role,
+          })),
+        ].slice(0, MAX_REFERENCES),
+      }));
       // L'image qui apparaît dans le plateau du dock confirme la jonction.
       dock.clear();
       promptRef.current?.focus();

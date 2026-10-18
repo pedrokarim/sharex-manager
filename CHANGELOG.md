@@ -7,6 +7,14 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- AI Image Gen, images de référence : chaque image jointe a un rôle,
+  choisi dans un menu sur sa vignette : Inspiration, Style, Sujet,
+  Composition, Couleurs ou Retouche, chacun décrit. Le rôle devient une
+  consigne pour le modèle. Une image peut être enregistrée dans « Mes
+  références », avec un nom et son rôle, puis rejointe en un clic depuis le
+  sélecteur d’images (recherche, retrait). Dans le fil, chaque image de
+  départ affiche le rôle qu’elle a joué. Les ancres d’une série partent
+  comme références de sujet.
 - Interface plus vivante, d’après libraries.dev et transitions.dev :
   pastille d’onglet en goutte liquide qui glisse d’un onglet à l’autre
   (`liquid-gooey`, toutes les barres d’onglets) ; étoile de favori qui
@@ -38,6 +46,14 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   fin ; réglage de la marque « Rythme du montage » (calme, normal, vif).
 - Clip Studio : la musique s’efface sous la voix off (environ 12 dB dessous
   pendant qu’elle parle) et remonte entre les répliques.
+- Réglages de direction artistique dans l’interface. Image de marque, section
+  Vidéo : le « Rythme du montage » se choisit sur trois cartes (calme, normal,
+  vif), chacune avec sa phrase et ses coupes dessinées, et s’applique aux clips
+  créés ensuite dans Clip Studio comme par l’assistant. Inspecteur de Clip
+  Studio : « Miroir » d’une image ou d’une pose de la mascotte, visible aussitôt
+  dans l’aperçu et à l’export ; « Creux sous la voix » d’une musique (activé ou
+  non, profondeur de 3 à 24 dB, pour toute la piste), entendu aussitôt, même
+  pendant la lecture.
 - Image de marque, mascotte : bibliothèque de poses étiquetées (dossier 07f,
   D2, partie marque). Chaque pose porte une émotion, un geste, un cadrage et le
   côté vers lequel elle regarde, modifiables sous sa vignette ; compteur par
@@ -843,6 +859,12 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- AI Image Gen : le rôle d’une image jointe était ignoré par OpenAI et
+  Gemini. Toute image partait vers l’API de retouche d’OpenAI, si bien
+  qu’une simple inspiration était retouchée ; Gemini recevait les images
+  sans savoir à quoi elles servaient. Le prompt dit désormais, image par
+  image, ce que le modèle doit en prendre, comme pour les moteurs en ligne
+  de commande.
 - Clip Studio : un export de plus de 100 Mo (clip de plus d’une minute et
   demie environ) était refusé par Cloudflare ; les fichiers de plus de 48 Mo
   partent désormais en morceaux, recollés par le serveur (500 Mo par fichier).

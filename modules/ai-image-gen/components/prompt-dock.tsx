@@ -2,9 +2,11 @@
 
 import { EngineLogo } from "./engine-logo";
 import { PromptEnhancer } from "./prompt-enhancer";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Bookmark,
+  BookmarkCheck,
   Check,
   ChevronDown,
   CloudUpload,
@@ -20,7 +22,15 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { FormStatus, type Feedback } from "@/components/feedback";
+import { FormStatus, errorMessage, useFeedback, type Feedback } from "@/components/feedback";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
@@ -61,13 +71,17 @@ import {
   type Collection,
   type ModelAvailability,
   type Pipeline,
+  callModule,
 } from "../lib/client";
 import type { PickedImage, PickerSource } from "./image-picker";
+import { REFERENCE_ROLES, REFERENCE_ROLE_INFO, type ReferenceRole } from "../lib/reference-roles";
 
 export interface ComposerReference extends PickedImage {
   /** Identifiant local, stable pour les animations du plateau. */
   id: string;
-  role: "reference" | "edit-target";
+  role: ReferenceRole;
+  /** Déjà enregistrée dans la bibliothèque de références. */
+  saved?: boolean;
 }
 
 export interface ComposerState {
@@ -432,11 +446,13 @@ function ReferenceTray({
   onAdd: () => void;
   onChange: (references: ComposerReference[]) => void;
 }) {
+  const [saving, setSaving] = useState<ComposerReference | null>(null);
+
   return (
-    <div className="relative flex items-end gap-2 overflow-x-auto border-b bg-muted/30 px-3 py-2.5 sm:gap-2.5 sm:px-4 sm:py-3">
+    <>
+    <div className="relative flex items-end gap-2 overflow-x-auto overflow-y-hidden border-b bg-muted/30 px-3 py-2.5 sm:gap-2.5 sm:px-4 sm:py-3">
       <AnimatePresence initial={false} mode="popLayout">
       {references.map((reference, index) => {
-        const editing = reference.role === "edit-target";
         return (
           <motion.figure
             key={reference.id}
@@ -445,7 +461,7 @@ function ReferenceTray({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ type: "spring", stiffness: 420, damping: 30 }}
-            className="group w-14 shrink-0 sm:w-[72px]"
+            className="group flex w-fit min-w-14 shrink-0 flex-col items-center sm:min-w-[72px]"
           >
             <div className="relative h-14 w-14 overflow-hidden rounded-xl border bg-background shadow-sm sm:h-[72px] sm:w-[72px]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -465,35 +481,17 @@ function ReferenceTray({
                 <X className="h-3 w-3" />
               </button>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onChange(
-                      references.map((entry, position) =>
-                        position === index
-                          ? { ...entry, role: editing ? "reference" : "edit-target" }
-                          : entry
-                      )
-                    )
-                  }
-                  className={cn(
-                    "mt-1.5 w-full rounded-md py-0.5 text-[10px] font-medium transition-colors",
-                    editing
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-background text-muted-foreground ring-1 ring-border hover:text-foreground"
-                  )}
-                >
-                  {editing ? "Retouche" : "Inspiration"}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-56">
-                {editing
-                  ? "L'image est retouchée : composition conservée, seul ce que décrit le prompt change. Cliquez pour s'en inspirer à la place."
-                  : "L'image sert d'inspiration (style, sujet). Cliquez pour la retoucher directement."}
-              </TooltipContent>
-            </Tooltip>
+            <RoleMenu
+              reference={reference}
+              onRole={(role) =>
+                onChange(
+                  references.map((entry, position) =>
+                    position === index ? { ...entry, role } : entry
+                  )
+                )
+              }
+              onSave={() => setSaving(reference)}
+            />
           </motion.figure>
         );
       })}
@@ -516,6 +514,168 @@ function ReferenceTray({
         </button>
       )}
     </div>
+    <SaveReferenceDialog
+      reference={saving}
+      onClose={() => setSaving(null)}
+      onSaved={(saved) =>
+        onChange(
+          references.map((entry) => (entry.id === saved.id ? { ...entry, saved: true } : entry))
+        )
+      }
+    />
+    </>
+  );
+}
+
+/**
+ * Rôle d'une image du plateau : six usages, chacun décrit, et l'entrée
+ * qui l'enregistre dans la bibliothèque pour la réutiliser plus tard.
+ */
+function RoleMenu({
+  reference,
+  onRole,
+  onSave,
+}: {
+  reference: ComposerReference;
+  onRole: (role: ReferenceRole) => void;
+  onSave: () => void;
+}) {
+  const info = REFERENCE_ROLE_INFO[reference.role];
+  const editing = reference.role === "edit-target";
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Rôle de ${reference.name} : ${info.label}`}
+          title={info.hint}
+          className={cn(
+            "mt-1.5 flex w-full items-center justify-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap transition-colors",
+            editing
+              ? "bg-primary text-primary-foreground"
+              : "bg-background text-muted-foreground ring-1 ring-border hover:text-foreground"
+          )}
+        >
+          <span>{info.label}</span>
+          {reference.saved ? <BookmarkCheck aria-hidden className="size-2.5 shrink-0" /> : null}
+          <ChevronDown aria-hidden className="size-2.5 shrink-0" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-2rem)]">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">
+          Ce que le modèle prend dans cette image
+        </DropdownMenuLabel>
+        {REFERENCE_ROLES.map((role) => (
+          <DropdownMenuItem key={role} onSelect={() => onRole(role)} className="items-start gap-2">
+            <Check
+              aria-hidden
+              className={cn("mt-0.5 size-4 shrink-0", role === reference.role ? "opacity-100" : "opacity-0")}
+            />
+            <span className="flex min-w-0 flex-col">
+              <span className="text-sm font-medium">{REFERENCE_ROLE_INFO[role].label}</span>
+              <span className="text-xs break-words text-muted-foreground">{REFERENCE_ROLE_INFO[role].hint}</span>
+            </span>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onSave} disabled={reference.saved} className="gap-2">
+          {reference.saved ? <BookmarkCheck aria-hidden className="size-4" /> : <Bookmark aria-hidden className="size-4" />}
+          {reference.saved ? "Enregistrée dans mes références" : "Enregistrer dans mes références…"}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Nom proposé : celui du fichier, sans extension ni préfixe technique. */
+function suggestedName(name: string) {
+  return name.replace(/\.[a-z0-9]+$/i, "").replace(/^(ref|gen)-\d+-/, "").slice(0, 80) || "Référence";
+}
+
+function SaveReferenceDialog({
+  reference,
+  onClose,
+  onSaved,
+}: {
+  reference: ComposerReference | null;
+  onClose: () => void;
+  onSaved: (reference: ComposerReference) => void;
+}) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const feedback = useFeedback();
+  const clearFeedback = feedback.clear;
+
+  useEffect(() => {
+    if (reference) {
+      setName(suggestedName(reference.name));
+      clearFeedback();
+    }
+  }, [reference, clearFeedback]);
+
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!reference) return;
+    setBusy(true);
+    feedback.clear();
+    try {
+      await callModule("saveReferenceToLibrary", { b64: reference.b64, name, role: reference.role });
+      onSaved(reference);
+      onClose();
+    } catch (error) {
+      feedback.error(errorMessage(error, "La référence n’a pas pu être enregistrée. Réessayez."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={reference !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
+      <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-md">
+        <form onSubmit={save} onChange={feedback.clear} className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>Enregistrer dans mes références</DialogTitle>
+            <DialogDescription>
+              Elle se retrouve ensuite dans « Mes références », avec son rôle :{" "}
+              {reference ? REFERENCE_ROLE_INFO[reference.role].label.toLowerCase() : ""}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex min-w-0 items-center gap-3">
+            {reference ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={reference.dataUrl}
+                alt=""
+                className="size-16 shrink-0 rounded-lg border object-cover"
+              />
+            ) : null}
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <label htmlFor="reference-name" className="text-sm font-medium">
+                Nom
+              </label>
+              <Input
+                id="reference-name"
+                value={name}
+                maxLength={80}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Personnage principal, palette d’automne…"
+              />
+            </div>
+          </div>
+          <div>
+            <FormStatus state={feedback.state} className="pb-3" />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Annuler
+              </Button>
+              <Button type="submit" loading={busy} disabled={!name.trim()}>
+                <Bookmark /> Enregistrer
+              </Button>
+            </DialogFooter>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

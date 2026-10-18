@@ -15,6 +15,7 @@ import type {
   GenerateResult,
 } from "./types";
 import { EngineError } from "./types";
+import { REFERENCE_ROLE_INFO, normalizeReferenceRole, referenceBrief } from "../reference-roles";
 
 /**
  * Les API renvoient leurs erreurs sous des formes différentes, et le message
@@ -143,7 +144,15 @@ async function openAIEdit(
 
   const form = new FormData();
   form.append("model", request.model);
-  form.append("prompt", request.prompt);
+  // L'API de retouche reçoit toutes les images de la même façon : c'est le
+  // prompt qui dit ce que chacune apporte, sinon une simple inspiration
+  // serait retouchée.
+  form.append(
+    "prompt",
+    `${referenceBrief(references.map((reference) => reference.role))}
+
+${request.prompt}`
+  );
   form.append("n", String(request.n));
   if (request.size) form.append("size", request.size);
   if (request.quality) form.append("quality", request.quality);
@@ -336,14 +345,26 @@ async function googleGeminiImage(
   request: GenerateRequest,
   apiKey: string
 ): Promise<GenerateResult> {
-  const parts: any[] = [{ text: request.prompt }];
-  if (request.negativePrompt?.trim()) {
-    parts.push({ text: `À éviter absolument : ${request.negativePrompt.trim()}` });
-  }
-  for (const reference of request.references ?? []) {
+  // Chaque image arrive précédée de son rôle, puis vient la demande.
+  const references = request.references ?? [];
+  const parts: any[] = [];
+  references.forEach((reference, index) => {
+    parts.push({
+      text: `Image ${index + 1} : ${REFERENCE_ROLE_INFO[normalizeReferenceRole(reference.role)].instruction}.`,
+    });
     parts.push({
       inline_data: { mime_type: reference.mimeType, data: reference.b64 },
     });
+  });
+  parts.push({
+    text: references.length
+      ? `${referenceBrief(references.map((reference) => reference.role))}
+
+${request.prompt}`
+      : request.prompt,
+  });
+  if (request.negativePrompt?.trim()) {
+    parts.push({ text: `À éviter absolument : ${request.negativePrompt.trim()}` });
   }
 
   const response = await fetch(

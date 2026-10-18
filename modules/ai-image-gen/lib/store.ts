@@ -11,6 +11,7 @@ import path from "path";
 import type { CustomEngineConfig, CliEngineSettings } from "./engines/registry";
 import { decodeImage } from "./image-type";
 import type { LogLine } from "./engines/types";
+import type { ReferenceRole } from "./reference-roles";
 
 export const MODULE_DIR = path.join(process.cwd(), "modules", "ai-image-gen");
 export const DATA_DIR = path.join(MODULE_DIR, "data");
@@ -204,7 +205,7 @@ export interface HistoryItem {
    * `data/images` : « Reprendre » les remet dans le compositeur. Les repères
    * d'une série n'y figurent pas, ils reviennent avec `collectionId`.
    */
-  sourceImages?: { file: string; role?: "reference" | "edit-target" }[];
+  sourceImages?: { file: string; role?: ReferenceRole }[];
 }
 
 /** Tous les fichiers d'une génération : rendus et images de départ archivées. */
@@ -337,7 +338,7 @@ export interface JobRequest {
 export interface JobReference {
   file: string;
   mimeType: string;
-  role?: "reference" | "edit-target";
+  role?: ReferenceRole;
   /**
    * Dossier où lire le fichier. Une étape de pipeline repart d'une image déjà
    * archivée, qu'il serait inutile de recopier dans `data/refs` pour la durée
@@ -350,7 +351,7 @@ export interface JobReference {
 export function storeReference(
   b64: string,
   mimeType: string,
-  role?: "reference" | "edit-target"
+  role?: ReferenceRole
 ): JobReference {
   ensureDataDirs();
   // Type et extension lus dans les octets, jamais dans le `mimeType` reçu.
@@ -364,7 +365,7 @@ export function storeReference(
 export function loadReference(reference: JobReference): {
   b64: string;
   mimeType: string;
-  role?: "reference" | "edit-target";
+  role?: ReferenceRole;
 } {
   const directory = reference.from === "images" ? IMAGES_DIR : REFS_DIR;
   const full = path.join(directory, path.basename(reference.file));

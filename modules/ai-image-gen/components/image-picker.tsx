@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import {
+  Bookmark,
   CalendarDays,
   Check,
   CircleAlert,
@@ -10,6 +11,7 @@ import {
   HardDrive,
   ImageOff,
   Link2,
+  Trash2,
   Search,
   Sparkles,
   Upload,
@@ -33,10 +35,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { REFERENCE_ROLE_INFO, type ReferenceRole } from "../lib/reference-roles";
 import {
   callModule,
   imageUrl,
   readFileAsBase64,
+  referenceUrl,
+  type LibraryReference,
   remoteImageToBase64,
   sameOriginImageToBase64,
   type HistoryItem,
@@ -48,9 +53,11 @@ export interface PickedImage {
   mimeType: string;
   dataUrl: string;
   name: string;
+  /** Rôle d'une référence enregistrée : il la suit dans le compositeur. */
+  role?: ReferenceRole;
 }
 
-export type PickerSource = "uploads" | "studio" | "device" | "link";
+export type PickerSource = "uploads" | "studio" | "references" | "device" | "link";
 
 interface ImagePickerProps {
   open: boolean;
@@ -69,6 +76,7 @@ const SOURCES: {
 }[] = [
   { id: "uploads", label: "Uploads", hint: "Vos captures ShareX", icon: CloudUpload },
   { id: "studio", label: "Studio", hint: "Rendus déjà générés", icon: Sparkles },
+  { id: "references", label: "Mes références", hint: "Images enregistrées", icon: Bookmark },
   { id: "device", label: "Ordinateur", hint: "Fichier local", icon: HardDrive },
   { id: "link", label: "Lien", hint: "Image d'un autre site", icon: Link2 },
 ];
@@ -82,6 +90,10 @@ interface Tile {
   name: string;
   caption: string;
   createdAt: number;
+  /** Rôle transmis à l'image une fois jointe (références enregistrées). */
+  role?: ReferenceRole;
+  /** Étiquette toujours visible sur la vignette. */
+  badge?: string;
 }
 
 /**
@@ -155,6 +167,7 @@ export function ImagePicker({
         selected.map(async (tile) => ({
           ...(await sameOriginImageToBase64(tile.source)),
           name: tile.name,
+          role: tile.role,
         }))
       );
       finish(images);
@@ -165,7 +178,7 @@ export function ImagePicker({
     }
   };
 
-  const browsing = source === "uploads" || source === "studio";
+  const browsing = source === "uploads" || source === "studio" || source === "references";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -175,47 +188,52 @@ export function ImagePicker({
       >
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           {/* ─── Sources ───────────────────────────── */}
-          <nav
-            aria-label="Provenance de l'image"
-            className="flex shrink-0 gap-1 overflow-x-auto border-b p-2 md:w-52 md:flex-col md:border-r md:border-b-0 md:p-3"
-          >
-            <div className="hidden px-2 pt-1 pb-3 md:block">
-              <DialogTitle className="text-base">Image de départ</DialogTitle>
-              <DialogDescription className="text-xs">
-                {maxSelection > 1
-                  ? `Jusqu'à ${maxSelection} images`
-                  : "Une image"}
-              </DialogDescription>
-            </div>
-            {SOURCES.map((entry) => {
-              const Icon = entry.icon;
-              const active = entry.id === source;
-              return (
-                <button
-                  key={entry.id}
-                  type="button"
-                  onClick={() => setSource(entry.id)}
-                  aria-current={active ? "true" : undefined}
-                  className={cn(
-                    "flex shrink-0 items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors",
-                    active
-                      ? "bg-primary/10 text-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <Icon
-                    className={cn("h-4 w-4 shrink-0", active && "text-primary")}
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">{entry.label}</span>
-                    <span className="hidden text-[11px] text-muted-foreground md:block">
-                      {entry.hint}
+          {/* Sur mobile, les sources défilent en ligne : l'enveloppe porte le
+              filet et laisse la place du bouton de fermeture ; la barre de
+              défilement, inutile au doigt, est masquée. */}
+          <div className="shrink-0 border-b pr-11 md:w-52 md:border-r md:border-b-0 md:pr-0">
+            <nav
+              aria-label="Provenance de l'image"
+              className="flex gap-1 overflow-x-auto overflow-y-hidden p-2 [scrollbar-width:none] md:flex-col md:overflow-visible md:p-3 [&::-webkit-scrollbar]:hidden"
+            >
+              <div className="hidden px-2 pt-1 pb-3 md:block">
+                <DialogTitle className="text-base">Image de départ</DialogTitle>
+                <DialogDescription className="text-xs">
+                  {maxSelection > 1
+                    ? `Jusqu'à ${maxSelection} images`
+                    : "Une image"}
+                </DialogDescription>
+              </div>
+              {SOURCES.map((entry) => {
+                const Icon = entry.icon;
+                const active = entry.id === source;
+                return (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={() => setSource(entry.id)}
+                    aria-current={active ? "true" : undefined}
+                    className={cn(
+                      "flex shrink-0 items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors",
+                      active
+                        ? "bg-primary/10 text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    <Icon
+                      className={cn("h-4 w-4 shrink-0", active && "text-primary")}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{entry.label}</span>
+                      <span className="hidden text-[11px] text-muted-foreground md:block">
+                        {entry.hint}
+                      </span>
                     </span>
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
 
           {/* ─── Contenu ───────────────────────────── */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -237,6 +255,13 @@ export function ImagePicker({
             )}
             {source === "studio" && (
               <StudioBrowser selected={selected} onToggle={toggle} />
+            )}
+            {source === "references" && (
+              <LibraryBrowser
+                selected={selected}
+                onToggle={toggle}
+                onRemoved={(key) => setSelected((current) => current.filter((tile) => tile.key !== key))}
+              />
             )}
             {source === "device" && (
               <DevicePane maxSelection={maxSelection} onPick={finish} />
@@ -636,6 +661,97 @@ function StudioBrowser({
   );
 }
 
+// ─── Bibliothèque de références ──────────────────────────────────
+
+function LibraryBrowser({
+  selected,
+  onToggle,
+  onRemoved,
+}: {
+  selected: Tile[];
+  onToggle: (tile: Tile) => void;
+  onRemoved: (key: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [entries, setEntries] = useState<LibraryReference[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    setLoadError(null);
+    callModule<LibraryReference[]>("listReferenceLibrary")
+      .then(setEntries)
+      .catch(() => {
+        setEntries([]);
+        setLoadError("Vos références n’ont pas pu être chargées. Réessayez.");
+      });
+  }, [attempt]);
+
+  const tiles = useMemo(() => {
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    return (entries ?? [])
+      .filter((entry) => words.every((word) => entry.name.toLowerCase().includes(word)))
+      .map<Tile>((entry) => ({
+        key: `library:${entry.id}`,
+        thumbnail: referenceUrl(entry.file),
+        source: referenceUrl(entry.file),
+        name: entry.name,
+        caption: `${entry.name} · ${REFERENCE_ROLE_INFO[entry.role].hint}`,
+        createdAt: entry.createdAt,
+        role: entry.role,
+        badge: REFERENCE_ROLE_INFO[entry.role].label,
+      }));
+  }, [entries, query]);
+
+  const remove = async (tile: Tile) => {
+    const id = tile.key.replace(/^library:/, "");
+    try {
+      await callModule("deleteReferenceFromLibrary", id);
+      setEntries((current) => (current ?? []).filter((entry) => entry.id !== id));
+      onRemoved(tile.key);
+      setLoadError(null);
+    } catch (error) {
+      setLoadError(errorMessage(error, "Cette référence n’a pas pu être retirée. Réessayez."));
+    }
+  };
+
+  return (
+    <>
+      <div className="border-b px-4 py-3">
+        <div className="relative max-w-sm">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Rechercher une référence"
+            className="h-8 pl-8 text-sm"
+          />
+        </div>
+      </div>
+      <TileGrid
+        tiles={tiles}
+        selected={selected}
+        onToggle={onToggle}
+        loading={entries === null}
+        hasMore={false}
+        onLoadMore={() => undefined}
+        summary={entries === null ? null : `${tiles.length} référence(s)`}
+        emptyLabel={
+          entries && entries.length === 0
+            ? "Aucune référence enregistrée. Dans le compositeur, le menu du rôle d’une image propose « Enregistrer dans mes références »."
+            : "Aucune référence ne correspond à cette recherche."
+        }
+        error={loadError}
+        onRetry={() => {
+          setEntries(null);
+          setAttempt((count) => count + 1);
+        }}
+        onRemove={remove}
+      />
+    </>
+  );
+}
+
 // ─── Grille commune ──────────────────────────────────────────────
 
 function TileGrid({
@@ -649,6 +765,7 @@ function TileGrid({
   emptyLabel,
   error = null,
   onRetry,
+  onRemove,
 }: {
   tiles: Tile[];
   selected: Tile[];
@@ -661,6 +778,8 @@ function TileGrid({
   /** Échec du chargement : affiché dans la grille, avec de quoi réessayer. */
   error?: string | null;
   onRetry?: () => void;
+  /** Retrait d'une vignette (bibliothèque) : bouton à côté, jamais dedans. */
+  onRemove?: (tile: Tile) => void;
 }) {
   const sentinel = useRef<HTMLDivElement>(null);
 
@@ -724,8 +843,8 @@ function TileGrid({
               const position = selected.findIndex((entry) => entry.key === tile.key);
               const isSelected = position !== -1;
               return (
+                <div key={tile.key} className="group/tile relative shrink-0">
                 <button
-                  key={tile.key}
                   type="button"
                   onClick={() => onToggle(tile)}
                   aria-pressed={isSelected}
@@ -754,7 +873,13 @@ function TileGrid({
                       isSelected && "scale-95 rounded-md"
                     )}
                   />
-                  <span className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-gradient-to-t from-black/80 to-transparent px-2 pt-6 pb-1.5 text-left text-[10px] leading-3 text-white transition-transform group-hover:translate-y-0">
+                  <span
+                    className={cn(
+                      "pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-gradient-to-t from-black/80 to-transparent px-2 pt-6 pb-1.5 text-left text-[10px] leading-3 text-white transition-transform group-hover:translate-y-0",
+                      // Le bouton de retrait se pose en bas à droite : la légende s'arrête avant.
+                      onRemove && "pr-9"
+                    )}
+                  >
                     <span className="line-clamp-2">{tile.caption}</span>
                     <span className="mt-0.5 block opacity-70">
                       {new Date(tile.createdAt).toLocaleTimeString("fr-FR", {
@@ -773,7 +898,25 @@ function TileGrid({
                   >
                     {isSelected ? position + 1 : ""}
                   </span>
+                  {tile.badge ? (
+                    <span className="pointer-events-none absolute top-1.5 left-1.5 max-w-[calc(100%-2.5rem)] truncate rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      {tile.badge}
+                    </span>
+                  ) : null}
                 </button>
+                {onRemove ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon-xs"
+                    aria-label={`Retirer ${tile.name} de la bibliothèque`}
+                    onClick={() => onRemove(tile)}
+                    className="absolute right-1.5 bottom-1.5 opacity-0 shadow-sm transition-opacity group-hover/tile:opacity-100 focus-visible:opacity-100"
+                  >
+                    <Trash2 />
+                  </Button>
+                ) : null}
+                </div>
               );
             })}
           </div>

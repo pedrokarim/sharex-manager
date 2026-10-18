@@ -62,6 +62,15 @@ import {
 } from "./lib/store";
 
 import { assertSandboxSetting } from "./lib/engines/sandbox";
+import {
+  listLibrary,
+  removeLibraryEntry,
+  saveToLibrary,
+  updateLibraryEntry,
+  type LibraryReference,
+  type SaveReferenceInput,
+} from "./lib/reference-library";
+import type { ReferenceRole } from "./lib/reference-roles";
 import type { AiModuleReport, AiProviderId } from "@/lib/ai-usage/types";
 // ─── Catalogue et moteurs ────────────────────────────────────────
 
@@ -287,6 +296,29 @@ export async function importImageFromUrl(url: string) {
     throw new Error("Lien manquant");
   }
   return fetchRemoteImage(url);
+}
+
+// ─── Bibliothèque de références ───────────────────────────────────
+
+export async function listReferenceLibrary(): Promise<LibraryReference[]> {
+  return listLibrary();
+}
+
+/** Enregistre une image comme référence réutilisable, depuis le compositeur ou le studio. */
+export async function saveReferenceToLibrary(input: SaveReferenceInput): Promise<LibraryReference> {
+  if (!input || typeof input !== "object") throw new Error("Image manquante");
+  return saveToLibrary(input);
+}
+
+export async function updateReferenceInLibrary(
+  id: string,
+  changes: { name?: string; role?: ReferenceRole }
+): Promise<LibraryReference> {
+  return updateLibraryEntry(String(id), changes ?? {});
+}
+
+export async function deleteReferenceFromLibrary(id: string): Promise<{ success: boolean }> {
+  return removeLibraryEntry(String(id));
 }
 
 // ─── Historique ──────────────────────────────────────────────────

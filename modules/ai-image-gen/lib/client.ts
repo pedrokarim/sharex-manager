@@ -11,6 +11,7 @@
 
 import type { CleanResult } from "./provenance-types";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReferenceRole } from "./reference-roles";
 
 const MODULE_NAME = "ai-image-gen";
 
@@ -93,7 +94,7 @@ export interface HistoryItem {
   pipelineId?: string;
   seed?: number;
   /** Images de départ archivées, rendues par « Reprendre ». */
-  sourceImages?: { file: string; role?: "reference" | "edit-target" }[];
+  sourceImages?: { file: string; role?: ReferenceRole }[];
 }
 
 export type JobStatus = "queued" | "running" | "done" | "error" | "canceled";
@@ -207,6 +208,19 @@ export async function callModule<T = any>(
 
 export function imageUrl(file: string): string {
   return `/api/modules/${MODULE_NAME}/data/images/${file}`;
+}
+
+/** Référence enregistrée dans la bibliothèque du module. */
+export interface LibraryReference {
+  id: string;
+  file: string;
+  name: string;
+  role: ReferenceRole;
+  createdAt: number;
+}
+
+export function referenceUrl(file: string): string {
+  return `/api/modules/${MODULE_NAME}/data/references/${file}`;
 }
 
 // ─── Suivi des travaux ───────────────────────────────────────────

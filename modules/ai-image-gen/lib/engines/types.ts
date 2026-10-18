@@ -9,6 +9,8 @@
  * accepte un prompt et rend des images.
  */
 
+import type { ReferenceRole } from "../reference-roles";
+
 export type EngineKind = "api" | "cli";
 
 /** D'où vient la facture : une clé prépayée, ou l'abonnement d'un compte. */
@@ -60,7 +62,7 @@ export interface ReferenceImage {
   b64: string;
   mimeType: string;
   /** Rôle annoncé au modèle : simple inspiration ou image à retoucher. */
-  role?: "reference" | "edit-target";
+  role?: ReferenceRole;
 }
 
 export interface GenerateRequest {

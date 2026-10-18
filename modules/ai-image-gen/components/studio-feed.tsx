@@ -85,6 +85,7 @@ import {
   ContextMenuContent,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { REFERENCE_ROLE_INFO, normalizeReferenceRole } from "../lib/reference-roles";
 
 export type FeedView = "mosaic" | "list" | "chat";
 
@@ -499,22 +500,24 @@ function ListRender({
     <GenerationContextMenu item={item} actions={actions} context={context}>
     <div className="flex flex-col gap-3">
       {item.sourceImages && item.sourceImages.length > 0 && (
-        <div className="flex items-center gap-1.5">
-          {item.sourceImages.map((source) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={source.file}
-              src={imageUrl(source.file)}
-              alt="Image de départ"
-              title={source.role === "edit-target" ? "Image retouchée" : "Image d'inspiration"}
-              className="h-10 w-10 rounded-md object-cover ring-1 ring-border"
-            />
-          ))}
-          <span className="text-[11px] text-muted-foreground">
-            {item.sourceImages.some((source) => source.role === "edit-target")
-              ? "Retouche"
-              : "Inspiration"}
-          </span>
+        // Chaque image de départ dit ce que le modèle en a pris.
+        <div className="flex min-w-0 flex-wrap items-start gap-2">
+          {item.sourceImages.map((source) => {
+            const info = REFERENCE_ROLE_INFO[normalizeReferenceRole(source.role)];
+            return (
+              <figure key={source.file} className="flex w-12 flex-col items-center gap-1" title={info.hint}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl(source.file)}
+                  alt={`Image de départ : ${info.label.toLowerCase()}`}
+                  className="h-10 w-10 rounded-md object-cover ring-1 ring-border"
+                />
+                <figcaption className="w-full truncate text-center text-[10px] leading-3 text-muted-foreground">
+                  {info.label}
+                </figcaption>
+              </figure>
+            );
+          })}
         </div>
       )}
       <PromptBlock

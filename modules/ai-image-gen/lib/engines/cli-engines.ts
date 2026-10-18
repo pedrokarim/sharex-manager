@@ -24,6 +24,7 @@ import type { CliEngineSpec, CliPlanInput, CliRunState } from "./cli-runner";
 import type { EngineModelSpec, LogLine } from "./types";
 
 import { resolveSandbox } from "./sandbox";
+import { REFERENCE_ROLE_INFO, normalizeReferenceRole } from "../reference-roles";
 /**
  * Le prompt de l'utilisateur est une donnée, pas une consigne. On l'isole dans
  * un bloc balisé et on le dit explicitement à l'agent : sans cette précaution,
@@ -49,9 +50,7 @@ function briefing(input: CliPlanInput, options: {
     lines.push(
       "Images jointes :",
       ...referenceFiles.map((file, index) => {
-        const role = roles[index]?.role === "edit-target"
-          ? "image à retoucher, conserve tout ce que la demande ne fait pas varier"
-          : "référence de style, de composition ou de sujet";
+        const role = REFERENCE_ROLE_INFO[normalizeReferenceRole(roles[index]?.role)].instruction;
         return `  ${index + 1}. ${path.basename(file)} – ${role}.`;
       })
     );

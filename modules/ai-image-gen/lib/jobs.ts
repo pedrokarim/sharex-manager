@@ -33,6 +33,7 @@ import {
   type Pipeline,
   type PipelineStep,
 } from "./store";
+import { normalizeReferenceRole, type ReferenceRole } from "./reference-roles";
 
 /** Travaux conservés dans le journal, terminés compris. */
 const JOB_LIMIT = 60;
@@ -102,7 +103,7 @@ const MAX_REFERENCES = 8;
 
 export interface EnqueueInput extends Omit<JobRequest, "references"> {
   /** Images de départ envoyées par le client, en base64 nu. */
-  references?: { b64: string; mimeType: string; role?: "reference" | "edit-target" }[];
+  references?: { b64: string; mimeType: string; role?: ReferenceRole }[];
   /** Pipeline à dérouler au lieu d'une génération simple. */
   pipelineId?: string;
 }
@@ -135,7 +136,8 @@ export function enqueueJob(input: EnqueueInput): Job {
     throw new Error(`${MAX_REFERENCES} images de référence au plus.`);
   }
   const references = (input.references ?? []).map((reference) =>
-    storeReference(reference.b64, reference.mimeType, reference.role)
+    // Le rôle vient du navigateur : une valeur inconnue devient une inspiration.
+    storeReference(reference.b64, reference.mimeType, normalizeReferenceRole(reference.role))
   );
 
   const totalSteps = pipeline ? pipeline.steps.length : 1;
