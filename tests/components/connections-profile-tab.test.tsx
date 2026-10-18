@@ -119,7 +119,7 @@ beforeEach(() => {
 describe("onglet Chaîne / Profil", () => {
   it("sépare ce qui s'envoie de ce qui se change chez le service, et propose la marque", async () => {
     renderTab();
-    expect(screen.getByRole("heading", { name: "Modifiable depuis ShareX Manager" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Identité" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /À changer chez Tube/ })).toBeTruthy();
 
     // La description proposée est le modèle de la marque, rendu.
@@ -130,7 +130,7 @@ describe("onglet Chaîne / Profil", () => {
     expect(screen.getByRole("button", { name: /Tout envoyer \(2\)/ })).toBeTruthy();
 
     // Ce que l'API ne permet pas : le texte de la marque, et la bonne page du service.
-    const manual = screen.getByRole("heading", { name: "Nom de la chaîne" }).closest("div")!.parentElement!;
+    const manual = screen.getByRole("group", { name: "Nom de la chaîne" });
     expect(within(manual).getByText(/ne permet pas de le changer par son API/)).toBeTruthy();
     expect(within(manual).getByText("Ma Marque")).toBeTruthy();
     expect(within(manual).getByRole("link", { name: /Ouvrir/ }).getAttribute("href")).toBe("https://studio.tube.test/UC123/profil");
@@ -144,7 +144,7 @@ describe("onglet Chaîne / Profil", () => {
     });
     renderTab();
     await screen.findByDisplayValue("Les sorties de la semaine");
-    const row = screen.getByRole("heading", { name: "Description" }).closest("div")!.parentElement!.parentElement!;
+    const row = screen.getByRole("group", { name: "Description" });
     await user.click(within(row).getByRole("button", { name: /Envoyer/ }));
     expect(actions.updateProfileAction).toHaveBeenCalledWith("acc-tube00001", { description: "Les sorties de la semaine" });
     await waitFor(() => expect(screen.getAllByText("À envoyer")).toHaveLength(1));

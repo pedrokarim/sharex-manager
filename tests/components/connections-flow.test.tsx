@@ -385,14 +385,40 @@ describe("file des envois", () => {
       { ...base, id: "pub-done01", title: "Déjà en ligne", state: "processing", result: { externalId: "r1", url: "https://example.com/r1" } },
     ];
     render(<QueueTab jobs={jobs} connector={connector()} onChanged={() => {}} />);
-    const waiting = screen.getByText("En attente du service").closest("li")!;
+    // Une ligne du tableau par envoi ; l'état et l'échéance sont répétés sous le titre pour les petits écrans.
+    const waiting = screen.getByText("En attente du service").closest("tr")!;
     expect(within(waiting).getByText("Le service prépare la vidéo")).toBeInTheDocument();
-    expect(within(waiting).getByText(/pas encore publié · prochain passage/i)).toBeInTheDocument();
+    expect(within(waiting).getAllByText(/pas encore publié/i).length).toBeGreaterThan(0);
+    expect(within(waiting).getAllByText(/prochain passage/i).length).toBeGreaterThan(0);
     expect(within(waiting).getByRole("button", { name: /Annuler/ })).toBeInTheDocument();
     expect(within(waiting).queryByRole("link")).toBeNull();
-    const online = screen.getByText("Déjà en ligne").closest("li")!;
+    const online = screen.getByText("Déjà en ligne").closest("tr")!;
     expect(within(online).getByRole("link", { name: /Voir sur Tube/ })).toHaveAttribute("href", "https://example.com/r1");
     expect(within(online).queryByRole("button", { name: /Annuler/ })).toBeNull();
+  });
+
+  it("montre un état vide explicite, sans « Rien en cours »", () => {
+    render(<QueueTab jobs={[]} connector={connector()} onChanged={() => {}} />);
+    expect(screen.getByText("Aucun envoi pour ce compte")).toBeInTheDocument();
+    expect(screen.getByText(/Clip Studio/)).toBeInTheDocument();
+    expect(screen.queryByText(/Rien en cours/)).toBeNull();
+    expect(screen.getByRole("button", { name: /Actualiser/ })).toBeInTheDocument();
+  });
+
+  it("filtre par état avec des compteurs, et ne propose que les filtres utiles", () => {
+    const jobs: PublishJobSummary[] = [
+      { ...base, id: "pub-done02", title: "Publiée hier", state: "done", result: { externalId: "r2", url: "https://example.com/r2" } },
+      { ...base, id: "pub-fail02", title: "Refusée", state: "failed", error: "Fichier trop lourd." },
+    ];
+    render(<QueueTab jobs={jobs} connector={connector()} onChanged={() => {}} />);
+    expect(screen.getByRole("radio", { name: /Tous\s*2/ })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /À venir/ })).toBeNull();
+    // Ce qui coince passe avant l'historique.
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("Refusée");
+    fireEvent.click(screen.getByRole("radio", { name: /Terminés\s*1/ }));
+    expect(screen.queryByText("Refusée")).toBeNull();
+    expect(screen.getByText("Publiée hier")).toBeInTheDocument();
   });
 
   it("dit qu'une reprise après l'attente ne republie pas", () => {

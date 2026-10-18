@@ -9,12 +9,13 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronsUpDown, Copy, CopyX, Download, ExternalLink, KeyRound, Plus, RotateCcw, Send, Undo2, X } from "lucide-react";
+import { AlignLeft, Check, ChevronsUpDown, CircleAlert, Copy, CopyX, Download, ExternalLink, ImageIcon, KeyRound, Link2, Plus, RotateCcw, Send, Type, Undo2, X, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CharacterCount } from "@/components/ui/character-count";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -551,93 +552,138 @@ function AccessNote({ access, serviceLabel }: { access: FieldAccess; serviceLabe
   );
 }
 
+/** État d'une ligne, posé à côté de son libellé. */
+function FieldState({ currentState, changed, error }: { currentState: EditableRowProps["currentState"]; changed: boolean; error: string | null }) {
+  if (currentState === "loading") return <Skeleton className="h-5 w-16 rounded-full" aria-hidden />;
+  if (currentState !== "ready") return null;
+  if (error) {
+    return (
+      <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
+        <CircleAlert aria-hidden />
+        À corriger
+      </Badge>
+    );
+  }
+  if (changed) {
+    return (
+      <Badge variant="outline" className="gap-1.5 border-amber-500/50 text-amber-800 dark:text-amber-300">
+        <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-amber-500" />
+        À envoyer
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="gap-1">
+      <Check aria-hidden />
+      À jour
+    </Badge>
+  );
+}
+
+/** Légende d'une colonne de valeur (« Actuellement chez… », « Proposé… »). */
+const CAPTION = "text-xs text-muted-foreground";
+
+/**
+ * Ligne de formulaire d'un élément modifiable. À gauche (ou au-dessus quand
+ * la place manque) : le libellé, son état, l'aide et l'accès. À droite : la
+ * valeur actuelle chez le service et la proposition, côte à côte dès que la
+ * ligne est assez large ; dessous, ce qui change et les gestes de la ligne.
+ * Se pose dans un `PanelRows` marqué `@container`.
+ */
 export function EditableFieldRow(props: EditableRowProps) {
   const { field, serviceLabel, current, currentState, proposed, brandValue, changed, error, access, sending, choices } = props;
   const fromBrand = brandValue !== undefined && !isEmptyValue(brandValue);
   const differsFromBrand = fromBrand && JSON.stringify(brandValue) !== JSON.stringify(proposed);
-  const canSend = access.state === "ok" && changed && !error && currentState === "ready" && !sending;
-  const status =
-    currentState === "loading" ? null : currentState !== "ready" ? null : changed ? (
-      <Badge variant="outline" className="border-amber-500/50 text-amber-800 dark:text-amber-300">
-        À envoyer
-      </Badge>
-    ) : (
-      <Badge variant="secondary" className="gap-1">
-        <Check aria-hidden />
-        À jour
-      </Badge>
-    );
+  const read = currentState === "ready";
+  const canSend = access.state === "ok" && changed && !error && read && !sending;
+  const choiceList = choices?.status === "ready" ? choices.data : undefined;
+  const titleId = `profile-${field.key}-title`;
+  const showSend = access.state === "ok" && changed && read;
+  const showFooter = differsFromBrand || (changed && read);
 
   return (
-    <div className="grid min-w-0 gap-3 border-t pt-4 first:border-t-0 first:pt-0">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h4 className="min-w-0 text-sm font-medium break-words">{field.label}</h4>
-          {status}
+    <div role="group" aria-labelledby={titleId} className="grid min-w-0 gap-x-8 gap-y-4 px-4 py-5 @5xl:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
+      <div className="flex min-w-0 flex-col items-start gap-1.5">
+        <div className="flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <h4 id={titleId} className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
+            {field.label}
+          </h4>
+          <FieldState currentState={currentState} changed={changed} error={error} />
           <ActionStatus state={props.sendStatus ?? null} />
         </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          {differsFromBrand ? (
-            <Button type="button" size="sm" variant="ghost" className="gap-1.5" disabled={sending} onClick={props.onUseBrand}>
-              <RotateCcw />
-              Reprendre la marque
-            </Button>
-          ) : null}
-          {changed && currentState === "ready" ? (
-            <Button type="button" size="sm" variant="ghost" className="gap-1.5" disabled={sending} onClick={props.onKeepCurrent}>
-              <Undo2 />
-              Garder l’actuel
-            </Button>
-          ) : null}
-          {access.state === "ok" ? (
-            <Button type="button" size="sm" className="gap-1.5" loading={sending} disabled={!canSend} onClick={props.onSend}>
-              <Send />
-              Envoyer
-            </Button>
-          ) : (
-            <AccessNote access={access} serviceLabel={serviceLabel} />
-          )}
-        </div>
-      </div>
-      {field.help ? <p className="-mt-1.5 text-xs text-pretty text-muted-foreground">{field.help}</p> : null}
-
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="grid min-w-0 content-start gap-1.5">
-          <span className="text-xs text-muted-foreground">Actuellement chez {serviceLabel}</span>
-          {currentState === "loading" ? (
-            <div className="grid gap-1.5" aria-hidden>
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-            </div>
-          ) : currentState === "error" || currentState === "none" ? (
-            <p className="text-sm text-muted-foreground italic">Non lue</p>
-          ) : (
-            <CurrentValue field={field} value={current ?? emptyValue(field)} choices={choices?.status === "ready" ? choices.data : undefined} />
-          )}
-        </div>
-        <div className="grid min-w-0 content-start gap-1.5">
-          <label htmlFor={`profile-${field.key}`} className="text-xs text-muted-foreground">
-            {fromBrand && !differsFromBrand ? "Proposé par la marque" : "Proposé"}
-          </label>
-          <FieldEditor field={field} value={proposed} onChange={props.onChange} disabled={sending || access.state === "reconnect"} choices={choices} onLoadChoices={props.onLoadChoices} />
-          {error ? (
-            <p role="alert" className="text-xs text-destructive">
-              {error}
-            </p>
-          ) : null}
-        </div>
+        {field.help ? <p className="max-w-prose text-xs text-pretty text-muted-foreground">{field.help}</p> : null}
+        {access.state !== "ok" ? <AccessNote access={access} serviceLabel={serviceLabel} /> : null}
       </div>
 
-      <AnimatePresence initial={false}>
-        {changed && currentState === "ready" ? (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="grid min-w-0 gap-1.5 overflow-hidden">
-            <span className="text-xs text-muted-foreground">Ce qui change</span>
-            <div className="min-w-0 rounded-md bg-muted/50 px-3 py-2">
-              <ValueDiff field={field} before={current ?? emptyValue(field)} after={proposed} choices={choices?.status === "ready" ? choices.data : undefined} />
+      <div className="@container grid min-w-0 content-start gap-3">
+        <div className="grid min-w-0 gap-x-4 gap-y-3 @xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="grid min-w-0 content-start gap-1.5">
+            <span className={CAPTION}>Actuellement chez {serviceLabel}</span>
+            <div className="min-h-9 min-w-0 rounded-md border bg-muted/40 px-3 py-2">
+              {currentState === "loading" ? (
+                <div className="grid gap-1.5 py-0.5" aria-hidden>
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              ) : currentState === "error" || currentState === "none" ? (
+                <p className="text-sm text-muted-foreground italic">Non lue</p>
+              ) : (
+                <CurrentValue field={field} value={current ?? emptyValue(field)} choices={choiceList} />
+              )}
             </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+          </div>
+          <div className="grid min-w-0 content-start gap-1.5">
+            <label htmlFor={`profile-${field.key}`} className={CAPTION}>
+              {fromBrand && !differsFromBrand ? "Proposé par la marque" : "Proposé"}
+              <span className="sr-only"> : {field.label}</span>
+            </label>
+            <FieldEditor field={field} value={proposed} onChange={props.onChange} disabled={sending || access.state === "reconnect"} choices={choices} onLoadChoices={props.onLoadChoices} />
+            {error ? (
+              <p role="alert" className="flex min-w-0 items-start gap-1.5 text-xs text-destructive">
+                <CircleAlert aria-hidden className="mt-px size-3.5 shrink-0" />
+                <span className="min-w-0 break-words">{error}</span>
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {showFooter ? (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="min-w-0 overflow-hidden">
+              <div className="grid min-w-0 gap-3">
+                {changed && read ? (
+                  <div className="grid min-w-0 gap-1.5">
+                    <span className={CAPTION}>Ce qui change</span>
+                    <div className="min-w-0 rounded-md bg-muted/50 px-3 py-2">
+                      <ValueDiff field={field} before={current ?? emptyValue(field)} after={proposed} choices={choiceList} />
+                    </div>
+                  </div>
+                ) : null}
+                <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+                  {differsFromBrand ? (
+                    <Button type="button" size="sm" variant="ghost" className="gap-1.5" disabled={sending} onClick={props.onUseBrand}>
+                      <RotateCcw />
+                      Reprendre la marque
+                    </Button>
+                  ) : null}
+                  {changed && read ? (
+                    <Button type="button" size="sm" variant="ghost" className="gap-1.5" disabled={sending} onClick={props.onKeepCurrent}>
+                      <Undo2 />
+                      Garder l’actuel
+                    </Button>
+                  ) : null}
+                  {showSend ? (
+                    <Button type="button" size="sm" className="gap-1.5" loading={sending} disabled={!canSend} onClick={props.onSend}>
+                      <Send />
+                      Envoyer
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
@@ -664,6 +710,20 @@ export function CopyButton({ text, label = "Copier" }: { text: string; label?: s
   );
 }
 
+/** Icône d'un élément à changer à la main, selon sa nature. */
+function manualIcon(field: ProfileField): LucideIcon {
+  if (field.kind === "image") return ImageIcon;
+  if (field.kind === "url") return Link2;
+  if (field.kind === "textarea") return AlignLeft;
+  return Type;
+}
+
+/**
+ * Élément que l'API ne permet pas de changer, en ligne de liste : ce qu'il
+ * est et pourquoi, la valeur actuelle face à celle de la marque, et les
+ * gestes (télécharger l'image, copier le texte, ouvrir la bonne page du
+ * service). Se pose dans un `PanelRows` marqué `@container`.
+ */
 export function ManualFieldRow({
   field,
   serviceLabel,
@@ -695,11 +755,66 @@ export function ManualFieldRow({
   const reason = field.manual?.reason ?? `${serviceLabel} ne permet pas de le changer par son API.`;
   const hasCurrent = currentState === "ready" && current !== undefined && !isEmptyValue(current);
   const isImage = field.kind === "image";
+  const Icon = manualIcon(field);
+  const titleId = `profile-${field.key}-manual-title`;
+  const hasActions = (isImage && onDownload) || (!isImage && brandText) || link;
+
   return (
-    <div className="grid min-w-0 gap-2 border-t pt-4 first:border-t-0 first:pt-0">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <h4 className="min-w-0 text-sm font-medium break-words">{field.label}</h4>
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+    <Item role="group" aria-labelledby={titleId} size="sm" className="min-w-0 items-start gap-x-4 gap-y-3 rounded-none px-4 py-4">
+      <ItemMedia variant="icon" className="text-muted-foreground">
+        <Icon aria-hidden />
+      </ItemMedia>
+      <ItemContent className="min-w-0 basis-0 gap-3">
+        <div className="grid min-w-0 gap-0.5">
+          <ItemTitle className="w-auto max-w-full min-w-0">
+            <h4 id={titleId} className="min-w-0 [overflow-wrap:anywhere]">
+              {field.label}
+            </h4>
+          </ItemTitle>
+          <ItemDescription className="line-clamp-none text-xs text-pretty">{reason}</ItemDescription>
+        </div>
+        <div className="@container min-w-0">
+          <dl className="grid min-w-0 gap-x-4 gap-y-3 @md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="grid min-w-0 content-start gap-1.5">
+              <dt className={CAPTION}>Actuellement chez {serviceLabel}</dt>
+              <dd className="min-w-0">
+                {currentState === "loading" ? (
+                  <Skeleton className={isImage ? "size-16 rounded-full" : "h-4 w-2/3"} aria-hidden />
+                ) : hasCurrent ? (
+                  <CurrentValue field={field} value={current} />
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">{currentState === "ready" ? "Non rendu par l’API" : "Non lu"}</p>
+                )}
+              </dd>
+            </div>
+            <div className="grid min-w-0 content-start gap-1.5">
+              <dt className={CAPTION}>Depuis la marque</dt>
+              <dd className="grid min-w-0 justify-items-start gap-1.5">
+                {isImage ? (
+                  brandImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- format exporté par la marque
+                    <img
+                      src={brandImage}
+                      alt=""
+                      className={cn("max-w-full bg-muted object-cover", field.imageFormat === "avatar" ? "size-16 rounded-full" : "aspect-[3/1] w-full max-w-sm rounded-md")}
+                    />
+                  ) : (
+                    <p className="text-sm text-pretty text-muted-foreground">{onDownload ? "Rendue depuis la marque au téléchargement." : "Aucune marque choisie."}</p>
+                  )
+                ) : brandText ? (
+                  <p className="max-h-40 w-full min-w-0 overflow-y-auto text-sm break-words whitespace-pre-wrap">{brandText}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">{field.brand ? "Vide dans la marque" : "Rien à proposer"}</p>
+                )}
+                {!isImage && brandText && field.maxLength ? <CharacterCount value={brandText} max={field.maxLength} /> : null}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </ItemContent>
+      {hasActions || downloadStatus ? (
+        <ItemActions className="min-w-0 basis-full flex-wrap gap-1.5 pl-12 @3xl:w-56 @3xl:shrink-0 @3xl:basis-auto @3xl:justify-end @3xl:pl-0">
+          {/* Largeur fixe en grand : les colonnes de valeurs restent alignées d'une ligne à l'autre. */}
           {isImage && onDownload ? (
             <Button type="button" size="sm" variant="outline" className="gap-1.5" loading={downloading} onClick={onDownload}>
               <Download />
@@ -721,45 +836,8 @@ export function ManualFieldRow({
             </Tooltip>
           ) : null}
           <ActionStatus state={downloadStatus} />
-        </div>
-      </div>
-      <p className="text-xs text-pretty text-muted-foreground">{reason}</p>
-      <div className="grid min-w-0 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="grid min-w-0 content-start gap-1.5">
-          <span className="text-xs text-muted-foreground">Actuellement chez {serviceLabel}</span>
-          {currentState === "loading" ? (
-            <Skeleton className={isImage ? "size-16 rounded-full" : "h-4 w-2/3"} aria-hidden />
-          ) : hasCurrent ? (
-            <CurrentValue field={field} value={current} />
-          ) : (
-            <p className="text-sm text-muted-foreground italic">{currentState === "ready" ? "Non rendu par l’API" : "Non lu"}</p>
-          )}
-        </div>
-        <div className="grid min-w-0 content-start gap-1.5">
-          <span className="text-xs text-muted-foreground">Depuis la marque</span>
-          {isImage ? (
-            brandImage ? (
-              // eslint-disable-next-line @next/next/no-img-element -- format exporté par la marque
-              <img
-                src={brandImage}
-                alt=""
-                className={cn("max-w-full bg-muted object-cover", field.imageFormat === "avatar" ? "size-16 rounded-full" : "aspect-[3/1] w-full max-w-sm rounded-md")}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">{onDownload ? "Rendue depuis la marque au téléchargement." : "Aucune marque choisie."}</p>
-            )
-          ) : brandText ? (
-            <p className="max-h-40 min-w-0 overflow-y-auto text-sm break-words whitespace-pre-wrap">{brandText}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground italic">{field.brand ? "Vide dans la marque" : "Rien à proposer"}</p>
-          )}
-          {!isImage && brandText && field.maxLength ? (
-            <div>
-              <CharacterCount value={brandText} max={field.maxLength} />
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </div>
+        </ItemActions>
+      ) : null}
+    </Item>
   );
 }

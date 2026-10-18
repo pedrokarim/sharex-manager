@@ -2,13 +2,15 @@
 
 /**
  * Page d'accueil du compte (sections) et playlists, quand le connecteur les
- * gère (`connector.profileSections`, `connector.playlists`). Chaque écriture
- * part aussitôt chez le service, puis la liste est relue.
+ * gère (`connector.profileSections`, `connector.playlists`), chacune dans son
+ * panneau : liste ordonnée, ajout dans l'en-tête ou le pied, état vide et
+ * erreur de lecture dans le panneau. Chaque écriture part aussitôt chez le
+ * service, puis la liste est relue.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown, ArrowUp, Check, ExternalLink, Globe, LayoutList, Link2, ListPlus, ListVideo, Lock, PencilLine, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, CircleAlert, ExternalLink, Globe, LayoutList, Link2, ListPlus, ListVideo, Lock, PencilLine, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { ActionStatus, FormStatus, useFeedback } from "@/components/feedback";
 import {
   AlertDialog,
@@ -20,12 +22,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { CharacterCount } from "@/components/ui/character-count";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { resolveManualUrl } from "@/lib/connections/profile";
 import type { AccountSummary, ConnectionCapability, PlaylistInput, PlaylistSummary, PostPrivacy, PostSummary, ProfileSection } from "@/lib/connections/types";
+import { Panel, PanelBody, PanelFooter, PanelHeader, PanelRows } from "@/components/connections/panel";
 import type { ConnectorView } from "@/components/connections/types";
 import {
   addPlaylistVideoAction,
@@ -53,6 +57,27 @@ const PRIVACY: Record<PostPrivacy, { label: string; icon: typeof Lock }> = {
   unlisted: { label: "Non répertoriée", icon: Link2 },
   public: { label: "Publique", icon: Globe },
 };
+
+/** Ancres des panneaux, reprises par le sommaire de l'onglet. */
+export const SECTIONS_PANEL_ID = "channel-sections";
+export const PLAYLISTS_PANEL_ID = "channel-playlists";
+
+/** Échec d'une lecture chez le service, dans le panneau concerné, avec de quoi réessayer. */
+function ReadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Alert variant="destructive">
+      <CircleAlert />
+      <AlertTitle>Lecture impossible</AlertTitle>
+      <AlertDescription>
+        <p className="break-words">{message}</p>
+        <Button size="sm" variant="outline" className="mt-1 gap-1.5" onClick={onRetry}>
+          <RefreshCw />
+          Réessayer
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 function AccessButton({ access, serviceLabel }: { access: FieldAccess; serviceLabel: string }) {
   if (access.state === "ok") return null;
@@ -166,54 +191,72 @@ function HomeSections({
   };
 
   return (
-    <section className="grid min-w-0 gap-4">
-      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-            <LayoutList className="size-4 shrink-0 text-muted-foreground" />
+    <Panel id={SECTIONS_PANEL_ID} aria-labelledby={`${SECTIONS_PANEL_ID}-title`} className="@container scroll-mt-4">
+      <PanelHeader
+        icon={LayoutList}
+        titleId={`${SECTIONS_PANEL_ID}-title`}
+        title={
+          <>
             Page d’accueil
             {sections.status === "ready" ? (
-              <span className="text-xs font-normal text-muted-foreground tabular-nums">
+              <span className="ml-2 text-xs font-normal text-muted-foreground tabular-nums">
                 {list.length}/{support.maxSections}
               </span>
             ) : null}
-          </h3>
-          <p className="text-xs text-pretty text-muted-foreground">Les sections affichées sous la bande-annonce, dans l’ordre.</p>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <AccessButton access={access} serviceLabel={connector.label} />
-          {manualUrl ? (
-            <Button asChild size="sm" variant="ghost" className="gap-1.5">
-              <a href={manualUrl} target="_blank" rel="noreferrer noopener">
-                <ExternalLink />
-                Ouvrir {connector.label}
-              </a>
+          </>
+        }
+        description="Les sections affichées sous la bande-annonce, dans l’ordre."
+        actions={
+          <>
+            <AccessButton access={access} serviceLabel={connector.label} />
+            {manualUrl ? (
+              <Button asChild size="sm" variant="ghost" className="gap-1.5">
+                <a href={manualUrl} target="_blank" rel="noreferrer noopener">
+                  <ExternalLink />
+                  Ouvrir {connector.label}
+                </a>
+              </Button>
+            ) : null}
+            <Button size="sm" variant="ghost" className="gap-1.5" loading={sections.status === "loading"} onClick={() => void load()}>
+              <RefreshCw />
+              Relire
             </Button>
-          ) : null}
-          <Button size="sm" variant="ghost" className="gap-1.5" loading={sections.status === "loading"} onClick={() => void load()}>
-            <RefreshCw />
-            Relire
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {sections.status === "loading" ? (
-        <div className="grid gap-2" aria-hidden>
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-        </div>
+        <PanelRows aria-hidden>
+          {[0, 1, 2].map((index) => (
+            <div key={index} className="flex min-w-0 items-center gap-3 px-4 py-3">
+              <Skeleton className="size-7 shrink-0 rounded-md" />
+              <div className="grid min-w-0 flex-1 gap-1.5">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          ))}
+        </PanelRows>
       ) : sections.status === "error" ? (
-        <p role="alert" className="text-sm text-destructive">
-          {sections.error}
-        </p>
+        <PanelBody>
+          <ReadError message={sections.error} onRetry={() => void load()} />
+        </PanelBody>
       ) : list.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucune section : la page d’accueil ne montre que la bande-annonce.</p>
+        <Empty className="gap-4 p-6 md:p-8">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <LayoutList />
+            </EmptyMedia>
+            <EmptyTitle className="text-base">Aucune section</EmptyTitle>
+            <EmptyDescription>La page d’accueil ne montre que la bande-annonce.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <ol className="grid min-w-0 divide-y rounded-lg border">
+        <ol className="min-w-0 divide-y">
           <AnimatePresence initial={false}>
             {list.map((section, index) => {
               const detail = describe(section);
+              const label = support.labels[section.type] ?? section.type;
               return (
                 <motion.li
                   key={section.id}
@@ -221,12 +264,15 @@ function HomeSections({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="flex min-w-0 items-center gap-3 overflow-hidden px-3 py-2"
+                  className="flex min-w-0 items-center gap-3 overflow-hidden px-4 py-2.5"
                 >
-                  <span className="w-5 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{index + 1}</span>
-                  <span className="grid min-w-0 flex-1">
-                    <span className="truncate text-sm" title={support.labels[section.type] ?? section.type}>
-                      {support.labels[section.type] ?? section.type}
+                  <span aria-hidden className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground tabular-nums">
+                    {index + 1}
+                  </span>
+                  <span className="grid min-w-0 flex-1 gap-0.5">
+                    <span className="truncate text-sm font-medium" title={label}>
+                      <span className="sr-only">{index + 1}. </span>
+                      {label}
                     </span>
                     {detail ? (
                       <span className="truncate text-xs text-muted-foreground" title={detail}>
@@ -237,11 +283,11 @@ function HomeSections({
                   </span>
                   {canEdit ? (
                     <span className="flex shrink-0 items-center gap-0.5">
-                      {busy === section.id ? <Spinner className="size-4 text-muted-foreground" /> : null}
+                      {busy === section.id ? <Spinner className="mr-1 size-4 text-muted-foreground" /> : null}
                       <Button
                         size="icon-sm"
                         variant="ghost"
-                        aria-label="Monter"
+                        aria-label={`Monter « ${label} »`}
                         disabled={busy !== null || index === 0}
                         onClick={() => void apply(section.id, () => moveSectionAction(account.id, section.id, list[index - 1].position))}
                       >
@@ -250,13 +296,13 @@ function HomeSections({
                       <Button
                         size="icon-sm"
                         variant="ghost"
-                        aria-label="Descendre"
+                        aria-label={`Descendre « ${label} »`}
                         disabled={busy !== null || index === list.length - 1}
                         onClick={() => void apply(section.id, () => moveSectionAction(account.id, section.id, list[index + 1].position))}
                       >
                         <ArrowDown />
                       </Button>
-                      <Button size="icon-sm" variant="ghost" aria-label="Retirer" className="text-destructive hover:text-destructive" disabled={busy !== null} onClick={() => setRemoving(section)}>
+                      <Button size="icon-sm" variant="ghost" aria-label={`Retirer « ${label} »`} className="text-destructive hover:text-destructive" disabled={busy !== null} onClick={() => setRemoving(section)}>
                         <Trash2 />
                       </Button>
                     </span>
@@ -269,67 +315,67 @@ function HomeSections({
       )}
 
       {canEdit && sections.status === "ready" ? (
-        full ? (
-          <p className="text-xs text-muted-foreground">
-            {support.maxSections} sections au plus chez {connector.label} : retirez-en une pour en ajouter une autre.
-          </p>
-        ) : (
-          <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-center">
-            <Select value={addType} onValueChange={setAddType}>
-              <SelectTrigger className="w-full min-w-0" aria-label="Type de section">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {support.types.map((entry) => (
-                  <SelectItem key={entry.value} value={entry.value}>
-                    {entry.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {type?.needsPlaylist ? (
-              <Select value={addPlaylist || undefined} onValueChange={setAddPlaylist} disabled={playlistList.length === 0}>
-                <SelectTrigger className="w-full min-w-0" aria-label="Playlist">
-                  <SelectValue placeholder={playlists?.status === "loading" ? "Lecture des playlists…" : playlistList.length === 0 ? "Aucune playlist" : "Choisir une playlist"} />
+        <PanelFooter className="py-3">
+          {full ? (
+            <span className="text-pretty">
+              {support.maxSections} sections au plus chez {connector.label} : retirez-en une pour en ajouter une autre.
+            </span>
+          ) : (
+            <div className="grid w-full min-w-0 gap-2 text-foreground @xl:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] @xl:items-center">
+              <Select value={addType} onValueChange={setAddType}>
+                <SelectTrigger size="sm" className="w-full min-w-0 bg-background" aria-label="Type de section à ajouter">
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {playlistList.map((playlist) => (
-                    <SelectItem key={playlist.id} value={playlist.id} disabled={playlist.privacy === "private"}>
-                      <span className="truncate">
-                        {playlist.title}
-                        {playlist.privacy === "private" ? " (privée)" : ""}
-                      </span>
+                <SelectContent>
+                  {support.types.map((entry) => (
+                    <SelectItem key={entry.value} value={entry.value}>
+                      {entry.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            ) : (
-              <span className="hidden sm:block" />
-            )}
-            <Button
-              size="sm"
-              className="gap-1.5"
-              loading={busy === "add"}
-              disabled={busy !== null || !type || (type.needsPlaylist && !addPlaylist)}
-              onClick={() =>
-                void apply("add", () => addSectionAction(account.id, { type: addType, ...(type?.needsPlaylist ? { playlistId: addPlaylist } : {}) }))
-              }
-            >
-              <Plus />
-              Ajouter
-            </Button>
-          </div>
-        )
+              {type?.needsPlaylist ? (
+                <Select value={addPlaylist || undefined} onValueChange={setAddPlaylist} disabled={playlistList.length === 0}>
+                  <SelectTrigger size="sm" className="w-full min-w-0 bg-background" aria-label="Playlist">
+                    <SelectValue placeholder={playlists?.status === "loading" ? "Lecture des playlists…" : playlistList.length === 0 ? "Aucune playlist" : "Choisir une playlist"} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {playlistList.map((playlist) => (
+                      <SelectItem key={playlist.id} value={playlist.id} disabled={playlist.privacy === "private"}>
+                        <span className="truncate">
+                          {playlist.title}
+                          {playlist.privacy === "private" ? " (privée)" : ""}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <span className="hidden @xl:block" />
+              )}
+              <Button
+                size="sm"
+                className="gap-1.5"
+                loading={busy === "add"}
+                disabled={busy !== null || !type || (type.needsPlaylist && !addPlaylist)}
+                onClick={() => void apply("add", () => addSectionAction(account.id, { type: addType, ...(type?.needsPlaylist ? { playlistId: addPlaylist } : {}) }))}
+              >
+                <Plus />
+                Ajouter la section
+              </Button>
+            </div>
+          )}
+          {/* Rendu seulement s'il y a un message : vide, il ajouterait un écart. */}
+          {applyStatusOf("add") ? <ActionStatus state={applyStatusOf("add")} className="basis-full" /> : null}
+        </PanelFooter>
       ) : null}
-      {/* Rendu seulement s'il y a un message : vide, il ajouterait un écart. */}
-      {applyStatusOf("add") ? <ActionStatus state={applyStatusOf("add")} /> : null}
 
       <AlertDialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Retirer cette section ?</AlertDialogTitle>
+            <AlertDialogTitle>Retirer cette section ?</AlertDialogTitle>
             <AlertDialogDescription>
-              « {removing ? (support.labels[removing.type] ?? removing.type) : ""} » disparaît de la page d’accueil chez {connector.label}. Les vidéos et les playlists restent en ligne.
+              « {removing ? (support.labels[removing.type] ?? removing.type) : ""} » disparaît de la page d’accueil chez {connector.label}. Les vidéos et les playlists restent en ligne.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -347,7 +393,7 @@ function HomeSections({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </Panel>
   );
 }
 
@@ -380,44 +426,70 @@ function Playlists({
   };
 
   return (
-    <section className="grid min-w-0 gap-4">
-      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-            <ListVideo className="size-4 shrink-0 text-muted-foreground" />
+    <Panel id={PLAYLISTS_PANEL_ID} aria-labelledby={`${PLAYLISTS_PANEL_ID}-title`} className="scroll-mt-4">
+      <PanelHeader
+        icon={ListVideo}
+        titleId={`${PLAYLISTS_PANEL_ID}-title`}
+        title={
+          <>
             Playlists
-            {playlists?.status === "ready" ? <span className="text-xs font-normal text-muted-foreground tabular-nums">{list.length}</span> : null}
-          </h3>
-          <p className="text-xs text-pretty text-muted-foreground">Créer, renommer, décrire, régler la visibilité et ajouter des vidéos.</p>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <AccessButton access={access} serviceLabel={connector.label} />
-          <Button size="sm" variant="ghost" className="gap-1.5" loading={playlists?.status === "loading"} onClick={onReload}>
-            <RefreshCw />
-            Relire
-          </Button>
-          {canEdit ? (
-            <Button size="sm" className="gap-1.5" onClick={() => setEditing("new")}>
-              <Plus />
-              Nouvelle playlist
+            {playlists?.status === "ready" ? <span className="ml-2 text-xs font-normal text-muted-foreground tabular-nums">{list.length}</span> : null}
+          </>
+        }
+        description="Créer, renommer, décrire, régler la visibilité et ajouter des vidéos."
+        actions={
+          <>
+            <AccessButton access={access} serviceLabel={connector.label} />
+            <Button size="sm" variant="ghost" className="gap-1.5" loading={playlists?.status === "loading"} onClick={onReload}>
+              <RefreshCw />
+              Relire
             </Button>
-          ) : null}
-        </div>
-      </div>
+            {canEdit ? (
+              <Button size="sm" className="gap-1.5" onClick={() => setEditing("new")}>
+                <Plus />
+                Nouvelle playlist
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
       {!playlists || playlists.status === "loading" ? (
-        <div className="grid gap-2" aria-hidden>
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-        </div>
+        <PanelRows aria-hidden>
+          {[0, 1].map((index) => (
+            <div key={index} className="flex min-w-0 items-center gap-3 px-4 py-3">
+              <Skeleton className="aspect-video w-20 shrink-0 rounded-sm" />
+              <div className="grid min-w-0 flex-1 gap-1.5">
+                <Skeleton className="h-4 w-2/5" />
+                <Skeleton className="h-3 w-1/4" />
+              </div>
+            </div>
+          ))}
+        </PanelRows>
       ) : playlists.status === "error" ? (
-        <p role="alert" className="text-sm text-destructive">
-          {playlists.error}
-        </p>
+        <PanelBody>
+          <ReadError message={playlists.error} onRetry={onReload} />
+        </PanelBody>
       ) : list.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucune playlist sur ce compte.</p>
+        <Empty className="gap-4 p-6 md:p-8">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ListVideo />
+            </EmptyMedia>
+            <EmptyTitle className="text-base">Aucune playlist</EmptyTitle>
+            <EmptyDescription>Ce compte n’a encore aucune playlist.</EmptyDescription>
+          </EmptyHeader>
+          {canEdit ? (
+            <EmptyContent>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing("new")}>
+                <Plus />
+                Créer une playlist
+              </Button>
+            </EmptyContent>
+          ) : null}
+        </Empty>
       ) : (
-        <ul className="grid min-w-0 divide-y rounded-lg border">
+        <ul className="min-w-0 divide-y">
           <AnimatePresence initial={false}>
             {list.map((playlist) => {
               const privacy = PRIVACY[playlist.privacy];
@@ -428,42 +500,40 @@ function Playlists({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 overflow-hidden px-3 py-2 sm:flex-nowrap"
+                  className="flex min-w-0 items-center gap-3 overflow-hidden px-4 py-3"
                 >
-                  <span className="flex min-w-0 flex-1 basis-56 items-center gap-3">
-                    {playlist.thumbnailUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- miniature servie par le service
-                      <img src={playlist.thumbnailUrl} alt="" referrerPolicy="no-referrer" className="aspect-video w-20 shrink-0 rounded-sm bg-muted object-cover" />
-                    ) : (
-                      <span className="flex aspect-video w-20 shrink-0 items-center justify-center rounded-sm bg-muted">
-                        <ListVideo className="size-4 text-muted-foreground" />
+                  {playlist.thumbnailUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- miniature servie par le service
+                    <img src={playlist.thumbnailUrl} alt="" referrerPolicy="no-referrer" className="aspect-video w-16 max-w-full shrink-0 rounded-sm bg-muted object-cover sm:w-20" />
+                  ) : (
+                    <span className="flex aspect-video w-16 shrink-0 items-center justify-center rounded-sm bg-muted sm:w-20">
+                      <ListVideo className="size-4 text-muted-foreground" />
+                    </span>
+                  )}
+                  <span className="grid min-w-0 flex-1 gap-0.5">
+                    <span className="truncate text-sm font-medium" title={playlist.title}>
+                      {playlist.title || "Sans titre"}
+                    </span>
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <privacy.icon className="size-3" aria-hidden />
+                        {privacy.label}
                       </span>
-                    )}
-                    <span className="grid min-w-0 flex-1">
-                      <span className="truncate text-sm font-medium" title={playlist.title}>
-                        {playlist.title || "Sans titre"}
-                      </span>
-                      <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <privacy.icon className="size-3" aria-hidden />
-                          {privacy.label}
+                      {playlist.itemCount !== undefined ? (
+                        <span className="tabular-nums">
+                          {playlist.itemCount}&nbsp;vidéo{playlist.itemCount > 1 ? "s" : ""}
                         </span>
-                        {playlist.itemCount !== undefined ? (
-                          <span className="tabular-nums">
-                            {playlist.itemCount} vidéo{playlist.itemCount > 1 ? "s" : ""}
-                          </span>
-                        ) : null}
-                      </span>
+                      ) : null}
                     </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-0.5">
                     {canEdit && support.addVideo && canListVideos ? <AddVideoButton accountId={account.id} playlist={playlist} onAdded={onReload} /> : null}
                     {canEdit ? (
-                      <Button size="icon-sm" variant="ghost" aria-label={`Modifier « ${playlist.title} »`} onClick={() => setEditing(playlist)}>
+                      <Button size="icon-sm" variant="ghost" aria-label={`Modifier « ${playlist.title} »`} onClick={() => setEditing(playlist)}>
                         <PencilLine />
                       </Button>
                     ) : null}
-                    <Button asChild size="icon-sm" variant="ghost" aria-label={`Voir « ${playlist.title} » sur ${connector.label}`}>
+                    <Button asChild size="icon-sm" variant="ghost" aria-label={`Voir « ${playlist.title} » sur ${connector.label}`}>
                       <a href={playlist.url} target="_blank" rel="noreferrer noopener">
                         <ExternalLink />
                       </a>
@@ -486,7 +556,7 @@ function Playlists({
           saved(playlist, created);
         }}
       />
-    </section>
+    </Panel>
   );
 }
 
