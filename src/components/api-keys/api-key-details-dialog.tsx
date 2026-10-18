@@ -1,6 +1,6 @@
 "use client";
 
-import { ApiKey } from "@/types/api-key";
+import type { ApiKeyView } from "@/types/api-key";
 import {
   Dialog,
   DialogContent,
@@ -13,29 +13,51 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Check, Copy, QrCode, X } from "lucide-react";
+import { Check, Copy, KeyRound, QrCode, TriangleAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import QRCode from "qrcode";
 
 interface ApiKeyDetailsDialogProps {
-  apiKey: ApiKey | null;
+  apiKey: ApiKeyView | null;
+  /**
+   * Clé complète, connue seulement juste après la création : le serveur n'en
+   * garde que l'empreinte. Sans elle, ni configuration ShareX ni QR code.
+   */
+  secret?: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+/** Explication commune aux onglets qui ont besoin de la clé complète. */
+function SecretUnavailable({ what }: { what: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
+      <KeyRound className="mt-0.5 h-4 w-4 shrink-0" />
+      <p className="min-w-0">
+        {what} demande la clé complète, qui n’est affichée qu’une fois, à la création : le serveur n’en garde
+        qu’une empreinte. Si vous ne l’avez plus, supprimez cette clé et créez-en une nouvelle.
+      </p>
+    </div>
+  );
+}
+
 export function ApiKeyDetailsDialog({
   apiKey,
+  secret = null,
   open,
   onOpenChange,
 }: ApiKeyDetailsDialogProps) {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
   // La copie se lit sur le bouton « Copier » lui-même.
   const { hasCopied, copyFailed, copyToClipboard } = useCopyToClipboard();
+  // Copie de la clé elle-même, confirmée sur son propre bouton.
+  const keyCopy = useCopyToClipboard();
 
   useEffect(() => {
-    if (apiKey && open) {
-      const qrData = generateQRCodeData();
+    setQrCodeDataUrl("");
+    if (apiKey && open && secret) {
+      const qrData = generateQRCodeData(secret);
       QRCode.toDataURL(qrData, {
         width: 256,
         margin: 2,
@@ -47,11 +69,11 @@ export function ApiKeyDetailsDialog({
         .then(setQrCodeDataUrl)
         .catch(console.error);
     }
-  }, [apiKey, open]);
+  }, [apiKey, open, secret]);
 
   if (!apiKey) return null;
 
-  const generateSxcuConfig = () => {
+  const generateSxcuConfig = (key: string) => {
     const destinations = [];
     if (apiKey.permissions.uploadImages) destinations.push("ImageUploader");
     if (apiKey.permissions.uploadText) destinations.push("TextUploader");
@@ -66,7 +88,7 @@ export function ApiKeyDetailsDialog({
         process.env.NEXT_PUBLIC_API_URL || window.location.origin
       }/api/upload`,
       Headers: {
-        "x-api-key": apiKey.key,
+        "x-api-key": key,
       },
       Body: "MultipartFormData",
       FileFormName: "file",
@@ -77,13 +99,13 @@ export function ApiKeyDetailsDialog({
     };
   };
 
-  const generateQRCodeData = () => {
+  const generateQRCodeData = (key: string) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
     return JSON.stringify({
       type: "sharex-mobile-config",
       version: "1.0.0",
       serverUrl: baseUrl,
-      apiKey: apiKey.key,
+      apiKey: key,
       permissions: apiKey.permissions,
     });
   };
@@ -134,9 +156,49 @@ export function ApiKeyDetailsDialog({
                 <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
                   Clé
                 </div>
-                <code className="mt-2 block rounded-xl border border-border/60 bg-background px-3 py-3 break-all text-xs">
-                  {apiKey.key}
-                </code>
+                {secret ? (
+                  <div className="mt-2 space-y-3">
+                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                      <code className="block min-w-0 flex-1 break-all rounded-xl border border-border/60 bg-background px-3 py-3 text-xs">
+                        {secret}
+                      </code>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full shrink-0 sm:w-auto"
+                        onClick={() => keyCopy.copyToClipboard(secret)}
+                      >
+                        {keyCopy.hasCopied ? (
+                          <Check className="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        ) : keyCopy.copyFailed ? (
+                          <X className="mr-2 h-4 w-4 text-destructive" />
+                        ) : (
+                          <Copy className="mr-2 h-4 w-4" />
+                        )}
+                        <span aria-live="polite">
+                          {keyCopy.hasCopied ? "Clé copiée" : keyCopy.copyFailed ? "Copie impossible" : "Copier la clé"}
+                        </span>
+                      </Button>
+                    </div>
+                    <p role="status" className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
+                      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span className="min-w-0">
+                        Copiez-la maintenant : elle ne sera plus affichée. Le serveur n’en garde qu’une empreinte.
+                      </span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    <code className="block break-all rounded-xl border border-border/60 bg-background px-3 py-3 text-xs">
+                      {apiKey.prefix}••••••••
+                    </code>
+                    <p className="text-sm text-muted-foreground">
+                      Seul le début de la clé reste visible. Si vous ne l’avez plus, supprimez-la et créez-en une
+                      nouvelle.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -166,6 +228,9 @@ export function ApiKeyDetailsDialog({
                     )}
                     {apiKey.permissions.uploadFiles && (
                       <Badge variant="secondary">Fichiers</Badge>
+                    )}
+                    {apiKey.permissions.extractColors && (
+                      <Badge variant="secondary">Couleurs</Badge>
                     )}
                   </div>
                 </div>
@@ -218,7 +283,9 @@ export function ApiKeyDetailsDialog({
               </div>
             </div>
 
-            {apiKey.permissions.uploadImages ||
+            {!secret ? (
+              <SecretUnavailable what="La configuration ShareX" />
+            ) : apiKey.permissions.uploadImages ||
             apiKey.permissions.uploadText ||
             apiKey.permissions.uploadFiles ? (
               <div className="space-y-2">
@@ -232,7 +299,7 @@ export function ApiKeyDetailsDialog({
                     className="w-full sm:w-auto"
                     onClick={() =>
                       copyToClipboard(
-                        JSON.stringify(generateSxcuConfig(), null, 2),
+                        JSON.stringify(generateSxcuConfig(secret), null, 2),
                       )
                     }
                   >
@@ -247,7 +314,7 @@ export function ApiKeyDetailsDialog({
                   </Button>
                 </div>
                 <pre className="max-h-[40svh] overflow-auto rounded-xl border border-border/60 bg-muted/20 p-4 text-xs sm:text-sm">
-                  <code>{JSON.stringify(generateSxcuConfig(), null, 2)}</code>
+                  <code>{JSON.stringify(generateSxcuConfig(secret), null, 2)}</code>
                 </pre>
               </div>
             ) : (
@@ -281,6 +348,9 @@ export function ApiKeyDetailsDialog({
               </div>
             </div>
 
+            {!secret ? (
+              <SecretUnavailable what="Le QR code de configuration" />
+            ) : (
             <div className="space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-lg font-semibold">
@@ -321,6 +391,7 @@ export function ApiKeyDetailsDialog({
                 )}
               </div>
             </div>
+            )}
           </TabsContent>
         </Tabs>
       </DialogContent>

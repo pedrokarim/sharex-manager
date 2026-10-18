@@ -11,7 +11,6 @@ import {
 import { join } from "node:path";
 import chalk from "chalk";
 import prompts from "prompts";
-import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
 
 import {
@@ -22,6 +21,7 @@ import {
   type SetupOptions,
 } from "../setup-config";
 import { resolveAuthProvider } from "@/lib/auth-config";
+import { hashPassword } from "@/lib/security/password-policy";
 
 export const description = "Configuration initiale de ShareX Manager";
 export const usage = `bun run setup [options]
@@ -141,7 +141,14 @@ async function createFile(
       }
     }
 
-    writeFileSync(path, JSON.stringify(content, null, 2));
+    // Données de l'instance (clés API, historique, jetons) : lisibles du seul
+    // compte du serveur. `mode` ne s'applique qu'à la création.
+    writeFileSync(path, JSON.stringify(content, null, 2), { mode: 0o600 });
+    try {
+      chmodSync(path, 0o600);
+    } catch {
+      // Systèmes de fichiers sans droits POSIX : sans effet.
+    }
     console.log(
       chalk.green(
         `✅ Fichier ${fileExists ? "écrasé" : "créé"} avec succès : ${path}`
@@ -419,7 +426,7 @@ async function createInitialBuiltinAdmin(options: SetupOptions) {
     return;
   }
 
-  const password = await bcrypt.hash(options.builtinAdmin.password, 10);
+  const password = await hashPassword(options.builtinAdmin.password);
   const usersPath = join(DATA_DIR, "users.json");
   writeFileSync(
     usersPath,

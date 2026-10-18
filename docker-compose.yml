@@ -24,7 +24,9 @@ services:
       - AUTH_URL=${AUTH_URL:-http://localhost:3000}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3000}
       - NEXT_PUBLIC_IMAGE_DOMAIN=${NEXT_PUBLIC_IMAGE_DOMAIN:-img.ascencia.re}
-      - NEXT_PUBLIC_APP_DOMAIN=${NEXT_PUBLIC_APP_DOMAIN:-ascencia.re}
+      # Même valeur par défaut qu'au build (`args`) : le proxy lit ce domaine à
+      # l'exécution pour CORS, next.config.mjs l'a figé au build.
+      - NEXT_PUBLIC_APP_DOMAIN=${NEXT_PUBLIC_APP_DOMAIN:-sxm.ascencia.re}
       # URL publique utilisée par les metadata et les images Open Graph. Comme
       # tout NEXT_PUBLIC_*, elle est figée dans le bundle au moment du build,
       # d'où sa présence aussi dans `args`.

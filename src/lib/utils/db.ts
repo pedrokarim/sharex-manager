@@ -1,7 +1,7 @@
 import type { Log, CreateLogOptions } from "@/lib/types/logs";
 import { Database } from "bun:sqlite";
 import { join } from "path";
-import { existsSync, mkdirSync } from "fs";
+import { chmodSync, existsSync, mkdirSync } from "fs";
 
 interface Statement {
   run: (params?: Record<string, any>) => { lastInsertRowid?: number };
@@ -13,9 +13,14 @@ class LogDatabase {
 
   private static initDbPath() {
     if (!LogDatabase.dbPath) {
+      // `LOGS_DB_PATH` déplace la base, pour les tests.
+      if (process.env.LOGS_DB_PATH) {
+        LogDatabase.dbPath = process.env.LOGS_DB_PATH;
+        return LogDatabase.dbPath;
+      }
       const dataDir = join(process.cwd(), "data");
       if (!existsSync(dataDir)) {
-        mkdirSync(dataDir, { recursive: true });
+        mkdirSync(dataDir, { recursive: true, mode: 0o700 });
       }
       LogDatabase.dbPath = join(dataDir, "logs.db");
     }
@@ -23,8 +28,18 @@ class LogDatabase {
   }
 
   private static getConnection(): Database {
-    const db = new Database(LogDatabase.initDbPath(), { create: true });
+    const path = LogDatabase.initDbPath();
+    const created = !existsSync(path);
+    const db = new Database(path, { create: true });
     db.run("PRAGMA journal_mode = WAL");
+    if (created) {
+      // Le journal contient des adresses IP et des noms de comptes.
+      try {
+        chmodSync(path, 0o600);
+      } catch {
+        // Systèmes de fichiers sans droits POSIX : sans effet.
+      }
+    }
     return db;
   }
 
@@ -187,6 +202,15 @@ class LogDatabase {
       ...row,
       metadata: row.metadata ? JSON.parse(row.metadata) : {},
     }));
+  }
+
+  /** Supprime les entrées antérieures à `before` (ISO) ; renvoie leur nombre. */
+  public static purgeOlderThan(before: string): number {
+    const db = LogDatabase.getConnection();
+    LogDatabase.initTable(db);
+
+    const result = db.prepare("DELETE FROM logs WHERE timestamp < ?").run(before);
+    return Number(result.changes ?? 0);
   }
 
   public static clearLogs(): void {

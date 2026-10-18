@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import { readFileSync } from "fs";
 import path from "path";
 
 const SECURE_FILES_PATH = path.join(process.cwd(), "data", "secure-files.json");
@@ -61,5 +62,19 @@ export async function removeFileFromSecure(filename: string): Promise<void> {
   if (index !== -1) {
     files.splice(index, 1);
     await fs.writeFile(SECURE_FILES_PATH, JSON.stringify({ files }, null, 2));
+  }
+}
+
+/**
+ * Liste des fichiers sécurisés, lue de façon synchrone et sans rien créer :
+ * pour les rendus serveur synchrones (metadata, catalogue). Fichier absent ou
+ * illisible : aucun fichier sécurisé.
+ */
+export function getSecureFilesSync(): string[] {
+  try {
+    const { files } = JSON.parse(readFileSync(SECURE_FILES_PATH, "utf-8")) as SecureFilesData;
+    return Array.isArray(files) ? files : [];
+  } catch {
+    return [];
   }
 }

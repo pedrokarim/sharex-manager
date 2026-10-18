@@ -1,5 +1,6 @@
 import { isInCatalog } from "@/lib/album-visibility";
 import { albumsDb } from "@/lib/utils/albums-db";
+import { securedFileNames, withoutSecuredFiles } from "@/lib/public-album-files";
 
 const IMAGE_PATTERN = /\.(jpe?g|png|gif|webp)$/i;
 
@@ -26,13 +27,14 @@ export function getPublicAlbumSummary(slug: string): PublicAlbumSummary | null {
     const album = albumsDb.getAlbumByPublicSlug(slug);
     if (!album || !album.isPublic) return null;
 
-    const images = albumsDb
-      .getAlbumFiles(album.id)
-      .filter((fileName) => IMAGE_PATTERN.test(fileName));
+    const secured = securedFileNames();
+    const images = withoutSecuredFiles(albumsDb.getAlbumFiles(album.id), (fileName) => fileName, secured).filter(
+      (fileName) => IMAGE_PATTERN.test(fileName)
+    );
 
     // La vignette choisie par l'auteur passe en premier : c'est la couverture
     // qu'il a explicitement retenue pour l'album.
-    const ordered = album.thumbnailFile
+    const ordered = album.thumbnailFile && !secured.has(album.thumbnailFile)
       ? [album.thumbnailFile, ...images.filter((n) => n !== album.thumbnailFile)]
       : images;
 

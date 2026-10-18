@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { requireAccess } from "@/lib/api-guard";
+import { isAdmin, requireAccess, withAuth } from "@/lib/api-guard";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ moduleName: string }> }
-) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
+/** Nom de réglage qui ressemble à un secret : jamais montré à un compte non admin. */
+const SECRET_LIKE = /(key|secret|token|password|credential)/i;
 
+/**
+ * Les réglages d'un module restent lisibles par tout compte connecté : les
+ * fenêtres d'action sur un fichier (filigrane…) partent des valeurs
+ * enregistrées. Ils ne portent pas de secret (les clés des services vivent
+ * dans les magasins de secrets des modules) ; par prudence, un nom de réglage
+ * qui ressemble à un secret n'est rendu qu'à un admin.
+ */
+export const GET = withAuth(async (
+  request: NextRequest,
+  { params }: { params: Promise<{ moduleName: string }> },
+  session
+) => {
   try {
     const { moduleName } = await params;
 
@@ -26,8 +30,11 @@ export async function GET(
       );
     }
 
+    const settings: Record<string, unknown> = loadedModule.config.settings || {};
     return NextResponse.json({
-      settings: loadedModule.config.settings || {},
+      settings: isAdmin(session)
+        ? settings
+        : Object.fromEntries(Object.entries(settings).filter(([name]) => !SECRET_LIKE.test(name))),
     });
   } catch (error) {
     console.error("Error fetching module settings:", error);
@@ -36,7 +43,7 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});
 
 export async function PUT(
   request: NextRequest,

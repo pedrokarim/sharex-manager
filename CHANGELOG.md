@@ -7,6 +7,24 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Réglages de sécurité de l’instance (`data/security.json`), modifiables par
+  l’API d’administration : longueur minimale des mots de passe et refus des
+  plus courants, durée des sessions, blocage après des échecs de connexion,
+  durée de vie des clés API, niveau de limitation de débit, conservation du
+  journal et journalisation des affichages d’images (toutes, une sur vingt ou
+  aucune), choix des alertes.
+- Sessions actives : liste (appareil, adresse IP, dernière activité) et
+  révocation, par l’administrateur pour tous les comptes et par chacun pour
+  lui-même.
+- Alertes de sécurité : échecs de connexion répétés, nouvelle clé API,
+  administrateur connecté depuis une nouvelle adresse, fichier passé de privé
+  à public.
+- Écran Sécurité de l’administration : points de contrôle réels de l’instance
+  et alertes à voir, sessions ouvertes révocables, clés API de tous les
+  comptes, journal des connexions, réglages des sessions, des clés, des mots
+  de passe, des limites de débit, des journaux et des alertes ; « Mes
+  sessions » dans Mon compte.
+
 - Clip Studio, l’assistant illustre en vidéo : avec une clé Pexels, le
   script choisit pour chaque segment une image ou un plan filmé de Pexels,
   posé muet sous la voix, pris en son milieu, bouclé s’il est trop court et
@@ -1057,6 +1075,28 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Security
 
+- Contrôles d’accès renforcés sur les fichiers envoyés, l’historique, les
+  statistiques, les pages d’administration, les albums partagés et les routes
+  de l’interface. Les liens de suppression ShareX fonctionnent de nouveau :
+  ils ouvrent une page de confirmation.
+- Les clés d’API des modules (AI Image Gen, Clip Studio, Scan Studio,
+  Reverse Search) sont chiffrées sur le disque, comme les jetons des comptes
+  connectés ; les fichiers existants le sont à leur prochaine écriture. La
+  clé de chiffrement peut tourner (`CONNECTIONS_ENCRYPTION_KEYS`).
+- Journal des connexions, des échecs de connexion et des déconnexions, y
+  compris par Ascencia ID ; blocage temporaire après des échecs répétés en
+  mode intégré, gardé en base. Le journal est purgé selon la durée de
+  conservation réglée.
+- Une seule politique de mot de passe (12 caractères par défaut) pour
+  l’administration, la CLI et le script de réinitialisation, et un seul coût
+  bcrypt ; changer le mot de passe d’un compte ferme ses sessions.
+- Origines CORS lues dans l’environnement, sans domaine écrit en dur ;
+  fichiers de données du cœur en droits 600.
+- Clés API générées par le serveur et gardées sous forme d’empreinte, remises
+  une seule fois à la création (les clés déjà distribuées restent valides) ;
+  durée de vie bornée par les réglages, révocation avec le compte, limites de
+  débit par clé, par adresse pour les images et l’API publique ; une seule
+  validation de la configuration des envois.
 - Clip Studio, vidéos récupérées par adresse et découpes : l’annulation, le
   délai ou le dépassement de taille arrêtent vraiment yt-dlp et le ffmpeg
   qu’il lance (groupe de processus) ; ffmpeg borne lui-même la taille écrite ;

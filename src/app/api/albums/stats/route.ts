@@ -1,26 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { withAuth } from "@/lib/api-guard";
 import { albumsDb } from "@/lib/utils/albums-db";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 
 // GET /api/albums/stats - Récupérer les statistiques des albums
-export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
+export const GET = withAuth(async (request: NextRequest, _context: unknown, session) => {
   try {
-    if (!session?.user) {
-      logDb.createLog({
-        level: "warning",
-        action: "album.stats" as LogAction,
-        message: "Tentative d'accès non autorisé aux statistiques des albums",
-        userId: undefined,
-        userEmail: undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const stats = albumsDb.getAlbumsStats(session.user.id);
 
     logDb.createLog({
@@ -50,4 +36,4 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
+});

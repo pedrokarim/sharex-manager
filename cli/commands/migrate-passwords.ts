@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import chalk from "chalk";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/lib/security/password-policy";
 
 export const description = "Migration des mots de passe vers bcrypt";
 export const usage = "bun cli migrate-passwords";
@@ -27,7 +27,7 @@ export default async function migratePasswords(
     for (const user of users) {
       // Si le mot de passe n'est pas déjà un hash bcrypt
       if (!user.password.startsWith("$2")) {
-        const hashedPassword = await bcrypt.hash(user.password, 10);
+        const hashedPassword = await hashPassword(user.password);
         user.password = hashedPassword;
         migrated = true;
       }

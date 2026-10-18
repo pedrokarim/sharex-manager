@@ -21,6 +21,24 @@ export async function getAllHistory(): Promise<HistoryEntry[]> {
   return JSON.parse(content);
 }
 
+function withoutDeletionToken(entry: HistoryEntry): HistoryEntry {
+  if (!("deletionToken" in entry)) return entry;
+  const { deletionToken: _deletionToken, ...rest } = entry;
+  return rest;
+}
+
+/** Entrée telle qu'une réponse d'API peut la montrer. */
+export type ClientHistoryEntry = Omit<HistoryEntry, "deletionToken" | "ipAddress"> & { ipAddress?: string };
+
+/**
+ * Ce qu'un compte peut voir d'une entrée : jamais le jeton de suppression
+ * (même un admin), et l'adresse IP seulement pour un admin.
+ */
+export function toClientHistoryEntry(entry: HistoryEntry, admin: boolean): ClientHistoryEntry {
+  const { deletionToken: _deletionToken, ipAddress, ...rest } = entry;
+  return admin ? { ...rest, ipAddress } : rest;
+}
+
 // Ajoute un nouvel enregistrement
 export async function addHistoryEntry(
   entry: Omit<HistoryEntry, "id">
@@ -32,7 +50,10 @@ export async function addHistoryEntry(
   };
 
   history.push(newEntry);
-  await fs.writeFile(historyFile, JSON.stringify(history, null, 2));
+  // Les anciennes entrées gardaient le jeton de suppression en clair : il est
+  // retiré à la prochaine écriture (seule son empreinte vit désormais dans
+  // data/deletion-tokens.json).
+  await fs.writeFile(historyFile, JSON.stringify(history.map(withoutDeletionToken), null, 2));
   return newEntry;
 }
 
@@ -89,7 +110,6 @@ export async function recordUpload({
   uploadMethod,
   fileUrl,
   thumbnailUrl,
-  deletionToken,
   ipAddress,
   userId,
   userName,
@@ -101,7 +121,6 @@ export async function recordUpload({
   uploadMethod: "api" | "web" | "sharex";
   fileUrl: string;
   thumbnailUrl?: string;
-  deletionToken?: string;
   ipAddress: string;
   userId?: string;
   userName?: string;
@@ -115,7 +134,6 @@ export async function recordUpload({
     uploadMethod,
     fileUrl,
     thumbnailUrl,
-    deletionToken,
     ipAddress,
     userId,
     userName,

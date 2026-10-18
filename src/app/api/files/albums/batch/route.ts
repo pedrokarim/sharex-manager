@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { withAuth } from "@/lib/api-guard";
 import { AlbumsDatabase } from "@/lib/utils/albums-db";
 import { logDb } from "@/lib/utils/db";
 import { z } from "zod";
@@ -9,13 +8,8 @@ const BatchAlbumsSchema = z.object({
   fileNames: z.array(z.string().min(1)).min(1).max(100), // Max 100 fichiers par requête
 });
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, _context: unknown, session) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const body = await request.json();
     const { fileNames } = BatchAlbumsSchema.parse(body);
 
@@ -75,4 +69,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { withAuth } from "@/lib/api-guard";
 import { albumsDb } from "@/lib/utils/albums-db";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
@@ -20,24 +19,12 @@ const UpdateAlbumSchema = z.object({
 const IdSchema = z.coerce.number().int().positive();
 
 // GET /api/albums/[id] - Récupérer un album spécifique
-export async function GET(
+export const GET = withAuth(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
+  { params }: { params: Promise<{ id: string }> },
+  session
+) => {
   try {
-    if (!session?.user) {
-      logDb.createLog({
-        level: "warning",
-        action: "album.get" as LogAction,
-        message: "Tentative d'accès non autorisé à un album",
-        userId: undefined,
-        userEmail: undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const { id } = await params;
     const albumId = IdSchema.parse(id);
     const album = albumsDb.getAlbum(albumId);
@@ -126,27 +113,15 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});
 
 // PUT /api/albums/[id] - Modifier un album
-export async function PUT(
+export const PUT = withAuth(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
+  { params }: { params: Promise<{ id: string }> },
+  session
+) => {
   try {
-    if (!session?.user) {
-      logDb.createLog({
-        level: "warning",
-        action: "album.update" as LogAction,
-        message: "Tentative de modification d'album non autorisée",
-        userId: undefined,
-        userEmail: undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const { id } = await params;
     const albumId = IdSchema.parse(id);
     const body = await request.json();
@@ -239,27 +214,15 @@ export async function PUT(
 
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
+});
 
 // DELETE /api/albums/[id] - Supprimer un album
-export async function DELETE(
+export const DELETE = withAuth(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
+  { params }: { params: Promise<{ id: string }> },
+  session
+) => {
   try {
-    if (!session?.user) {
-      logDb.createLog({
-        level: "warning",
-        action: "album.delete" as LogAction,
-        message: "Tentative de suppression d'album non autorisée",
-        userId: undefined,
-        userEmail: undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const { id } = await params;
     const albumId = IdSchema.parse(id);
 
@@ -324,4 +287,4 @@ export async function DELETE(
 
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
+});

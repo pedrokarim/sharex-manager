@@ -1,18 +1,11 @@
 import type { NextRequest } from "next/server";
+import { withAuth } from "@/lib/api-guard";
 import { logDb } from "@/lib/utils/db";
 import { logger } from "@/lib/utils/logger";
 import type { Log } from "@/lib/types/logs";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 
-export async function GET(req: NextRequest) {
+export const GET = withAuth(async (req: NextRequest, _context: unknown, session) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-
-    if (!session?.user || session.user.role !== "admin") {
-      return Response.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const searchParams = req.nextUrl.searchParams;
     const limit = Number.parseInt(searchParams.get("limit") || "50", 10);
     const offset = Number.parseInt(searchParams.get("offset") || "0", 10);
@@ -49,16 +42,10 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+}, { role: "admin" });
 
-export async function DELETE(req: NextRequest) {
+export const DELETE = withAuth(async (req: NextRequest, _context: unknown, session) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-
-    if (!session?.user || session.user.role !== "admin") {
-      return Response.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     if (!session.user.id || !session.user.email) {
       return Response.json({ error: "Session invalide" }, { status: 401 });
     }
@@ -82,4 +69,4 @@ export async function DELETE(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+}, { role: "admin" });

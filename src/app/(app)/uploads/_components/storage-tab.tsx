@@ -51,24 +51,26 @@ export function StorageTab({ form }: StorageTabProps) {
                 </p>
               </div>
 
-              <FormField
-                control={form.control}
-                name="storage.path"
-                render={({ field }) => (
-                  <FormItem className="rounded-xl border border-border/60 bg-background p-4">
-                    <FormLabel className="text-sm">
-                      {t("uploads.config.storage.path")}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        className="text-sm"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+              {/* Le dossier des envois vient de `UPLOAD_PATH` : il se lit ici,
+                  il ne se règle pas (une valeur saisie serait ignorée). */}
+              <div className="min-w-0 space-y-2 rounded-xl border border-border/60 bg-background p-4">
+                <Label htmlFor="storage-path-readonly" className="text-sm">
+                  {t("uploads.config.storage.path")}
+                </Label>
+                <Input
+                  id="storage-path-readonly"
+                  value={form.watch("storage.path") || "Non communiqué"}
+                  readOnly
+                  aria-describedby="storage-path-help"
+                  title={form.watch("storage.path") || undefined}
+                  className="min-w-0 cursor-default bg-muted/30 font-mono text-sm text-muted-foreground"
+                />
+                <p id="storage-path-help" className="text-xs text-muted-foreground sm:text-sm">
+                  Fixé par la variable d’environnement <code className="break-all rounded bg-muted px-1">UPLOAD_PATH</code> du
+                  serveur (par défaut <code className="rounded bg-muted px-1">./uploads</code>). Pour le changer, modifiez
+                  cette variable puis redémarrez le serveur.
+                </p>
+              </div>
 
               <FormField
                 control={form.control}

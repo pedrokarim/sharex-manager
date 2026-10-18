@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 import { getAllHistory } from "@/lib/history";
+import { isAdmin, withAuth } from "@/lib/api-guard";
+import { historyOwnedBy } from "@/lib/file-ownership";
 import { getAbsoluteUploadPath } from "@/lib/config";
 
 interface FileStats {
@@ -46,13 +46,12 @@ interface FileStats {
   };
 }
 
-export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
-  if (!session) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
-
+/**
+ * Les chiffres du dossier d'envois portent sur la galerie, commune à tous les
+ * comptes. Ceux de l'historique (envois par mois, par méthode) ne comptent,
+ * pour un compte qui n'est pas admin, que ses propres envois.
+ */
+export const GET = withAuth(async (request: NextRequest, _context, session) => {
   try {
     const { searchParams } = new URL(request.url);
     const startDateParam = searchParams.get("startDate");
@@ -62,7 +61,8 @@ export async function GET(request: NextRequest) {
 
     const uploadsDir = getAbsoluteUploadPath();
     const files = await fs.readdir(uploadsDir);
-    const history = await getAllHistory();
+    const allHistory = await getAllHistory();
+    const history = isAdmin(session) ? allHistory : await historyOwnedBy(allHistory, session.user.id);
 
     const fileStats: FileStats = {
       totalFiles: 0,
@@ -227,4 +227,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

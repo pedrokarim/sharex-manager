@@ -9,6 +9,9 @@ import { existsSync } from "fs";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { isFileSecure } from "@/lib/secure-files";
+import { shouldLogImageView } from "@/lib/security/image-view-policy";
+import { getLogSettings } from "@/lib/security/settings";
+import { limitImageView } from "@/lib/security/rate-limits";
 
 const UPLOADS_DIR = getAbsoluteUploadPath();
 const FILE_NOT_FOUND_PATH = join(process.cwd(), "public", "file_not_found.png");
@@ -19,6 +22,11 @@ export async function GET(
   { params }: { params: Promise<{ filename?: string }> }
 ) {
   const clientInfo = getClientInfo(request);
+
+  // Affichages par adresse IP et par minute, selon le niveau de l'écran
+  // Sécurité (large : une galerie charge vite des dizaines de miniatures).
+  const limited = limitImageView(request);
+  if (limited) return limited;
 
   // Dans Next.js 16, params est une Promise
   const resolvedParams = await params;
@@ -71,23 +79,26 @@ export async function GET(
     }
   }
 
-  // Logger la tentative d'accès
-  logDb.createLog({
-    level: fileExists ? "info" : "warning",
-    action: "file.download",
-    message: fileExists
-      ? `Accès à l'image: ${filename}`
-      : `Tentative d'accès à une image inexistante: ${filename}`,
-    ip: clientInfo.ip,
-    userAgent: clientInfo.userAgent,
-    metadata: {
-      filename,
-      path: filePath,
-      exists: fileExists,
-      isSecure,
-      referer: request.headers.get("referer") || undefined,
-    },
-  });
+  // Logger l'accès, selon le réglage « Journaux » de l'écran Sécurité
+  // (tout, un sur vingt, ou rien).
+  if (shouldLogImageView(getLogSettings().imageViews, { exists: fileExists })) {
+    logDb.createLog({
+      level: fileExists ? "info" : "warning",
+      action: "file.download",
+      message: fileExists
+        ? `Accès à l'image: ${filename}`
+        : `Tentative d'accès à une image inexistante: ${filename}`,
+      ip: clientInfo.ip,
+      userAgent: clientInfo.userAgent,
+      metadata: {
+        filename,
+        path: filePath,
+        exists: fileExists,
+        isSecure,
+        referer: request.headers.get("referer") || undefined,
+      },
+    });
+  }
 
   // Une vidéo se lit par morceaux (Range) : le lecteur peut se déplacer
   // sans tout télécharger.

@@ -89,7 +89,6 @@ export async function POST(request: NextRequest) {
     uploadMethod: "web",
     fileUrl: result.fileUrl,
     thumbnailUrl: result.thumbnailUrl,
-    deletionToken: result.deletionToken,
     ipAddress: getTrustedClientIp(request.headers),
     userId: session.user.id,
   });

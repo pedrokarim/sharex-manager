@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { withAuth } from "@/lib/api-guard";
 import fs from "fs";
 import path from "path";
 import { processImage } from "@/lib/modules/image-processor";
@@ -8,20 +7,8 @@ import { getAbsoluteUploadPath } from "@/lib/config";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 
-export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
+export const POST = withAuth(async (request: NextRequest, _context: unknown, session) => {
   try {
-    if (!session) {
-      logDb.createLog({
-        level: "warning",
-        action: "file.update" as LogAction,
-        message: "Tentative de traitement d'image non autorisée",
-        userId: undefined,
-        userEmail: undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const { fileName } = await request.json();
 
     if (!fileName) {
@@ -108,4 +95,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

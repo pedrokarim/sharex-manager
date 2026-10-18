@@ -1,10 +1,9 @@
 import { readFile, writeFile } from "fs/promises";
+import { withAuth } from "@/lib/api-guard";
 import { resolve } from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { Domain } from "@/lib/types/upload-config";
 import { logDb } from "@/lib/utils/db";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 
 const CONFIG_PATH = resolve(process.cwd(), "config", "uploads.json");
 
@@ -43,20 +42,8 @@ async function writeConfig(config: any) {
   }
 }
 
-export async function GET() {
-  const session = await auth.api.getSession({ headers: await headers() });
+export const GET = withAuth(async (_request: Request, _context: unknown, session) => {
   try {
-    if (!session?.user) {
-      logDb.createLog({
-        level: "warning",
-        action: "admin.action",
-        message: "Tentative de lecture des domaines non autorisée",
-        userId: session?.user?.id || undefined,
-        userEmail: session?.user?.email || undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const config = await readConfig();
 
     logDb.createLog({
@@ -84,22 +71,10 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});
 
-export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
+export const POST = withAuth(async (request: NextRequest, _context: unknown, session) => {
   try {
-    if (!session?.user || session.user.role !== "admin") {
-      logDb.createLog({
-        level: "warning",
-        action: "admin.action",
-        message: "Tentative d'ajout de domaine non autorisée",
-        userId: session?.user?.id || undefined,
-        userEmail: session?.user?.email || undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const newDomain = await request.json();
     const config = await readConfig();
 
@@ -165,22 +140,10 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+}, { role: "admin" });
 
-export async function PUT(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
+export const PUT = withAuth(async (request: NextRequest, _context: unknown, session) => {
   try {
-    if (!session?.user || session.user.role !== "admin") {
-      logDb.createLog({
-        level: "warning",
-        action: "admin.action",
-        message: "Tentative de modification de domaine non autorisée",
-        userId: session?.user?.id || undefined,
-        userEmail: session?.user?.email || undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const updates = await request.json();
     const config = await readConfig();
 
@@ -297,22 +260,10 @@ export async function PUT(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+}, { role: "admin" });
 
-export async function DELETE(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
+export const DELETE = withAuth(async (request: NextRequest, _context: unknown, session) => {
   try {
-    if (!session?.user || session.user.role !== "admin") {
-      logDb.createLog({
-        level: "warning",
-        action: "admin.action",
-        message: "Tentative de suppression de domaine non autorisée",
-        userId: session?.user?.id || undefined,
-        userEmail: session?.user?.email || undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const domainId = searchParams.get("id");
 
@@ -418,4 +369,4 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+}, { role: "admin" });

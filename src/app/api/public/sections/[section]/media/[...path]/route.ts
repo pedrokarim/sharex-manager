@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findCatalogSection, readSectionMedia } from "@/lib/modules/catalog-sections";
 import { serveMediaFile } from "@/lib/modules/media-response";
-import { checkRateLimit } from "@/lib/rate-limit";
-import { getTrustedClientIp } from "@/lib/request-ip";
+import { checkIpRateLimit } from "@/lib/rate-limit";
+import { getRateLimits } from "@/lib/security/settings";
 
 /**
  * Images des sections que les modules apportent au catalogue public
@@ -33,7 +33,11 @@ function refuse(status: number, error: string, headers: Record<string, string> =
 export async function GET(request: NextRequest, { params }: { params: Promise<{ section: string; path: string[] }> }) {
   const { section, path } = await params;
 
-  const limit = checkRateLimit(`catalog-media:${getTrustedClientIp(request.headers)}`, { max: MAX_PER_MINUTE, windowMs: 60_000 });
+  const limit = checkIpRateLimit("catalog-media", request.headers, {
+    // Le niveau choisi dans l'écran Sécurité (affichages d'images) s'applique s'il est plus strict.
+    max: Math.min(MAX_PER_MINUTE, getRateLimits().imageViewsPerIpPerMinute),
+    windowMs: 60_000,
+  });
   if (!limit.allowed) {
     return refuse(429, "Trop de demandes, réessayez dans un instant", { "Retry-After": String(Math.ceil(limit.retryAfterMs / 1000)) });
   }

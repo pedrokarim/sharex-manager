@@ -8,6 +8,7 @@
 
 import fs from "fs";
 import path from "path";
+import { readSecretJson, writeSecretJson } from "@/lib/security/secret-file";
 import type { CustomEngineConfig, CliEngineSettings } from "./engines/registry";
 import { decodeImage } from "./image-type";
 import type { LogLine } from "./engines/types";
@@ -22,6 +23,8 @@ export const REFS_DIR = path.join(DATA_DIR, "refs");
 
 const HISTORY_FILE = path.join(DATA_DIR, "history.json");
 const SECRETS_FILE = path.join(DATA_DIR, "secrets.json");
+/** Lie le chiffré de `secrets.json` à ce module (voir `lib/security/secret-file.ts`). */
+const SECRETS_CONTEXT = "module:ai-image-gen:secrets";
 const COLLECTIONS_FILE = path.join(DATA_DIR, "collections.json");
 const PIPELINES_FILE = path.join(DATA_DIR, "pipelines.json");
 const JOBS_FILE = path.join(DATA_DIR, "jobs.json");
@@ -116,7 +119,7 @@ export const API_ENGINE_IDS = Object.keys(ENV_KEYS);
  * effacer silencieusement priverait l'utilisateur de sa clé.
  */
 export function readSecrets(): EngineSecrets {
-  const raw = readJson<Partial<EngineSecrets>>(SECRETS_FILE, {});
+  const raw = readSecretJson<Partial<EngineSecrets>>(SECRETS_FILE, SECRETS_CONTEXT, {});
   const apiKeys: Record<string, string> = { ...(raw.apiKeys ?? {}) };
 
   if (raw.openai_api_key && !apiKeys.openai) apiKeys.openai = raw.openai_api_key;
@@ -131,16 +134,14 @@ export function readSecrets(): EngineSecrets {
   };
 }
 
+/** Chiffré avec la clé des comptes connectés, en droits 600. */
 export function writeSecrets(secrets: EngineSecrets) {
-  writeJson(
-    SECRETS_FILE,
-    {
-      apiKeys: secrets.apiKeys,
-      cli: secrets.cli,
-      customEngines: secrets.customEngines,
-    },
-    0o600
-  );
+  ensureDataDirs();
+  writeSecretJson(SECRETS_FILE, SECRETS_CONTEXT, {
+    apiKeys: secrets.apiKeys,
+    cli: secrets.cli,
+    customEngines: secrets.customEngines,
+  });
 }
 
 /**

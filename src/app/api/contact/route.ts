@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkIpRateLimit } from "@/lib/rate-limit";
 import { sendMail } from "@/lib/email/send";
 import { isMailConfigured } from "@/lib/email/transporter";
 import ContactMessage from "@/lib/email/templates/contact-message";
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
   const ip = getTrustedClientIp(request.headers);
 
-  const { allowed, retryAfterMs } = checkRateLimit(`contact:${ip}`);
+  const { allowed, retryAfterMs } = checkIpRateLimit("contact", request.headers);
   if (!allowed) {
     return NextResponse.json(
       { error: "Trop de messages envoyés. Réessayez plus tard." },

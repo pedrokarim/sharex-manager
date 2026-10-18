@@ -5,6 +5,7 @@ import { join } from "path";
 import { getAbsoluteUploadPath } from "@/lib/config";
 import { isInCatalog } from "@/lib/album-visibility";
 import { albumsDb } from "@/lib/utils/albums-db";
+import { securedFileNames, withoutSecuredFiles } from "@/lib/public-album-files";
 import { HomePageClient, type HomeShowcase } from "./page.client";
 import { publicPageMetadata } from "@/lib/seo";
 
@@ -47,8 +48,10 @@ function readPublicShowcase(): HomeShowcase {
     const publicAlbums = albumsDb.getAlbums().filter(isInCatalog);
 
     const seen = new Map<string, string>();
+    // Les fichiers sécurisés rangés dans un album public n'en sortent pas.
+    const secured = securedFileNames();
     for (const album of publicAlbums) {
-      for (const entry of albumsDb.getAlbumFileEntries(album.id)) {
+      for (const entry of withoutSecuredFiles(albumsDb.getAlbumFileEntries(album.id), (item) => item.fileName, secured)) {
         if (IMAGE_PATTERN.test(entry.fileName) && !seen.has(entry.fileName)) {
           seen.set(entry.fileName, entry.addedAt);
         }

@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { withAuth } from "@/lib/api-guard";
 import { getAllHistory } from "@/lib/history";
 import { batchResolveGeoIP, isPrivateIP } from "@/lib/geo-cache";
 import type { GeoStatsResponse, TopIPEntry, GeoMarker } from "@/lib/types/geo";
 
-export async function GET() {
-  const session = await auth.api.getSession({ headers: await headers() });
-
-  if (!session) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
-
+/** Adresses IP des envois et leur localisation : réservé aux admins. */
+export const GET = withAuth(async () => {
   try {
     const history = await getAllHistory();
 
@@ -97,4 +91,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+}, { role: "admin" });

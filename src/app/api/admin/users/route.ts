@@ -1,10 +1,11 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import bcrypt from "bcryptjs";
 import { auth } from "@/lib/auth";
 import { requireAccess } from "@/lib/api-guard";
 import { logDb } from "@/lib/utils/db";
 import { listAppUsers, toPublicUser, type AppUser } from "@/lib/admin-users";
+import { checkPassword, hashPassword } from "@/lib/security/password-policy";
+import { revokeApiKeysOfUser } from "@/lib/api-key-store";
 
 /**
  * Comptes de l'application, gérés par un administrateur.
@@ -13,20 +14,33 @@ import { listAppUsers, toPublicUser, type AppUser } from "@/lib/admin-users";
  * `data/users.json` ne sert qu'au premier démarrage : il n'est importé que
  * tant que la base est vide. Y écrire, comme le faisait cette route,
  * donnait des comptes qui ne pouvaient jamais se connecter.
+ *
+ * Le mot de passe suit la politique de l'écran Sécurité (longueur minimale,
+ * refus des mots de passe courants : `lib/security/password-policy.ts`).
  */
 
 const userSchema = z.object({
   username: z.string().min(3),
-  password: z.string().min(6),
+  password: z.string(),
   role: z.enum(["admin", "user"]),
 });
 
 const updateUserSchema = z.object({
   id: z.string(),
   username: z.string().min(3),
-  password: z.string().min(6).optional(),
+  // Vide : le mot de passe ne change pas.
+  password: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : undefined)),
   role: z.enum(["admin", "user"]),
 });
+
+/** Refus de la politique des mots de passe, prêt à renvoyer ; `null` si le mot de passe convient. */
+function passwordRejection(password: string) {
+  const check = checkPassword(password);
+  return check.ok ? null : Response.json({ error: check.message }, { status: 400 });
+}
 
 /** Même adresse synthétique que l'import des comptes historiques (lib/auth-migrate.ts). */
 function syntheticEmail(username: string) {
@@ -70,6 +84,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const data = userSchema.parse(await req.json());
+    const rejected = passwordRejection(data.password);
+    if (rejected) return rejected;
     if (await findByUsername(data.username)) {
       return Response.json({ error: "Username already exists" }, { status: 400 });
     }
@@ -91,7 +107,7 @@ export async function POST(req: NextRequest) {
       userId: created.id,
       providerId: "credential",
       accountId: created.id,
-      password: await bcrypt.hash(data.password, 10),
+      password: await hashPassword(data.password),
       createdAt: now,
       updatedAt: now,
     });
@@ -117,6 +133,10 @@ export async function PUT(req: NextRequest) {
 
   try {
     const data = updateUserSchema.parse(await req.json());
+    if (data.password) {
+      const rejected = passwordRejection(data.password);
+      if (rejected) return rejected;
+    }
     const ctx = await auth.$context;
     const existing = (await ctx.internalAdapter.findUserById(data.id)) as AppUser | null;
     if (!existing) {
@@ -141,8 +161,9 @@ export async function PUT(req: NextRequest) {
       updatedAt: new Date(),
     })) as AppUser;
 
+    let revokedSessions = 0;
     if (data.password) {
-      const hash = await bcrypt.hash(data.password, 10);
+      const hash = await hashPassword(data.password);
       const accounts = await ctx.internalAdapter.findAccounts(data.id);
       if (accounts.some((account: { providerId: string }) => account.providerId === "credential")) {
         await ctx.internalAdapter.updatePassword(data.id, hash);
@@ -156,6 +177,17 @@ export async function PUT(req: NextRequest) {
           updatedAt: new Date(),
         });
       }
+      // Comme `scripts/auth-set-password.ts` : les sessions ouvertes avec
+      // l'ancien mot de passe sont fermées. Pour son propre compte, l'admin
+      // garde la session en cours.
+      const sessions = await ctx.internalAdapter.listSessions(data.id);
+      const toRevoke = sessions.filter(
+        (item: { id: string }) => !(session.user.id === data.id && item.id === session.session.id)
+      );
+      if (toRevoke.length > 0) {
+        await ctx.internalAdapter.deleteSessions(toRevoke.map((item: { token: string }) => item.token));
+      }
+      revokedSessions = toRevoke.length;
     }
 
     logDb.createLog({
@@ -164,7 +196,7 @@ export async function PUT(req: NextRequest) {
       message: `Modification de l'utilisateur : ${data.username}`,
       userId: session.user.id,
       userEmail: session.user.email,
-      metadata: { targetUserId: data.id, role: data.role, passwordChanged: Boolean(data.password) },
+      metadata: { targetUserId: data.id, role: data.role, passwordChanged: Boolean(data.password), revokedSessions },
     });
     return Response.json(toPublicUser(updated ?? { ...existing, ...data }));
   } catch (error) {
@@ -192,6 +224,13 @@ export async function DELETE(req: NextRequest) {
   }
   // Supprime aussi ses sessions et ses comptes rattachés.
   await ctx.internalAdapter.deleteUser(id);
+  // Ses clés API cessent de fonctionner avec lui.
+  let revokedApiKeys = 0;
+  try {
+    revokedApiKeys = (await revokeApiKeysOfUser(id)).length;
+  } catch (error) {
+    console.error("[admin/users] clés API non révoquées :", error instanceof Error ? error.message : error);
+  }
 
   logDb.createLog({
     level: "info",
@@ -199,7 +238,7 @@ export async function DELETE(req: NextRequest) {
     message: `Suppression de l'utilisateur : ${toPublicUser(existing).username}`,
     userId: session.user.id,
     userEmail: session.user.email,
-    metadata: { targetUserId: id },
+    metadata: { targetUserId: id, revokedApiKeys },
   });
   return Response.json({ success: true });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,63 +24,120 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { CalendarIcon, RefreshCw } from "lucide-react";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
-import { cn } from "@/lib/utils";
-import { nanoid } from "nanoid";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { readApiError } from "@/lib/utils/chunk";
+import type { ApiKeyPolicy, CreatedApiKey } from "@/types/api-key";
 
-const formSchema = z.object({
-  name: z.string().min(1, "Le nom est requis"),
-  key: z.string().optional(),
-  expiresAt: z.date().optional(),
-  permissions: z.object({
-    uploadImages: z.boolean(),
-    uploadText: z.boolean(),
-    uploadFiles: z.boolean(),
-  }),
-});
+const NEVER = "never";
+
+/** Durées proposées, en jours, avant filtrage par la durée maximale de l'écran Sécurité. */
+const EXPIRY_CHOICES = [7, 30, 90, 180, 365, 730];
+
+const formSchema = z
+  .object({
+    name: z.string().trim().min(1, "Le nom est requis").max(100),
+    expiry: z.string(),
+    permissions: z.object({
+      uploadImages: z.boolean(),
+      uploadText: z.boolean(),
+      uploadFiles: z.boolean(),
+      extractColors: z.boolean(),
+    }),
+  })
+  .refine((value) => Object.values(value.permissions).some(Boolean), {
+    message: "Choisissez au moins une permission.",
+    path: ["permissions"],
+  });
 
 type FormValues = z.infer<typeof formSchema>;
+
+const PERMISSION_FIELDS: { name: keyof FormValues["permissions"]; label: string; description: string }[] = [
+  { name: "uploadImages", label: "Upload d'images", description: "Permet l'upload de fichiers images (PNG, JPG, etc.)" },
+  { name: "uploadText", label: "Upload de texte", description: "Permet l'upload de fichiers texte (TXT, PDF, etc.)" },
+  { name: "uploadFiles", label: "Upload de fichiers", description: "Permet l'upload de tout autre type de fichier" },
+  {
+    name: "extractColors",
+    label: "Extraction de couleurs",
+    description: "Permet d’extraire la palette d’une image (/api/colors)",
+  },
+];
 
 interface CreateApiKeyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  /** Reçoit la clé créée, avec la clé complète : c'est la seule fois qu'elle est remise. */
+  onCreated: (created: CreatedApiKey) => void;
 }
 
-function generateApiKey() {
-  // Génère une clé de 32 caractères avec nanoid
-  return `sk_${nanoid(32)}`;
+function durationLabel(days: number): string {
+  if (days % 365 === 0) return days === 365 ? "1 an" : `${days / 365} ans`;
+  if (days % 30 === 0 && days >= 30) return `${days / 30} mois`;
+  return days === 1 ? "1 jour" : `${days} jours`;
 }
 
-export function CreateApiKeyDialog({
-  open,
-  onOpenChange,
-  onSuccess,
-}: CreateApiKeyDialogProps) {
+/** Durées permises par les réglages : jamais au-delà du maximum, « sans expiration » seulement sans maximum. */
+function expiryOptions(policy: ApiKeyPolicy | null) {
+  const max = policy?.maxExpiryDays ?? null;
+  const days = new Set(EXPIRY_CHOICES.filter((value) => max === null || value <= max));
+  if (max !== null) days.add(max);
+  if (policy?.defaultExpiryDays) days.add(policy.defaultExpiryDays);
+  const options = [...days].sort((a, b) => a - b).map((value) => ({ value: String(value), label: durationLabel(value) }));
+  if (max === null) options.push({ value: NEVER, label: "Sans expiration" });
+  return options;
+}
+
+function defaultExpiry(policy: ApiKeyPolicy | null): string {
+  if (!policy) return "90";
+  if (policy.defaultExpiryDays !== null) return String(policy.defaultExpiryDays);
+  return policy.maxExpiryDays === null ? NEVER : String(policy.maxExpiryDays);
+}
+
+export function CreateApiKeyDialog({ open, onOpenChange, onCreated }: CreateApiKeyDialogProps) {
+  const [policy, setPolicy] = useState<ApiKeyPolicy | null>(null);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      name: "",
+      expiry: defaultExpiry(null),
       permissions: {
         uploadImages: true,
         uploadText: false,
         uploadFiles: false,
+        extractColors: false,
       },
     },
   });
 
-  // L'échec se lit dans la fenêtre, au-dessus du bouton ; la réussite se voit
-  // à la nouvelle clé dans la liste.
+  // Les durées permises viennent de l'écran Sécurité ; le serveur les
+  // applique de toute façon.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    fetch("/api/api-keys/policy")
+      .then((response) => (response.ok ? (response.json() as Promise<ApiKeyPolicy>) : null))
+      .then((value) => {
+        if (cancelled || !value) return;
+        setPolicy(value);
+        form.setValue("expiry", defaultExpiry(value));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open, form]);
+
+  const options = useMemo(() => expiryOptions(policy), [policy]);
+
+  // L'échec se lit dans la fenêtre, au-dessus du bouton ; la réussite ouvre
+  // la clé créée, à copier tout de suite.
   const feedback = useFeedback();
 
   const onSubmit = async (data: FormValues) => {
@@ -89,23 +146,28 @@ export function CreateApiKeyDialog({
       const response = await fetch("/api/api-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          name: data.name,
+          permissions: data.permissions,
+          expiresInDays: data.expiry === NEVER ? null : Number(data.expiry),
+        }),
       });
 
       if (!response.ok) {
-        throw new Error(
-          await readApiError(response, "La clé n’a pas pu être créée. Réessayez."),
-        );
+        throw new Error(await readApiError(response, "La clé n’a pas pu être créée. Réessayez."));
       }
 
-      onSuccess();
+      const created = (await response.json()) as CreatedApiKey;
+      onCreated(created);
       onOpenChange(false);
-      form.reset();
+      form.reset({ ...form.getValues(), name: "" });
     } catch (error) {
       console.error("Erreur lors de la création de la clé:", error);
       feedback.error(errorMessage(error, "La clé n’a pas pu être créée. Réessayez."));
     }
   };
+
+  const permissionsError = form.formState.errors.permissions?.root?.message ?? form.formState.errors.permissions?.message;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -113,7 +175,7 @@ export function CreateApiKeyDialog({
         <DialogHeader className="border-b border-border/60 px-5 py-5 sm:px-6">
           <DialogTitle>Créer une nouvelle clé API</DialogTitle>
           <DialogDescription>
-            Créez une clé API pour permettre l'upload via ShareX
+            Le serveur génère la clé. Elle ne s’affiche qu’une fois, juste après la création.
           </DialogDescription>
         </DialogHeader>
 
@@ -135,8 +197,7 @@ export function CreateApiKeyDialog({
                       <Input placeholder="ShareX Upload Key" {...field} />
                     </FormControl>
                     <FormDescription>
-                      Utilisez un nom explicite pour repérer rapidement
-                      l’intégration concernée.
+                      Utilisez un nom explicite pour repérer rapidement l’intégration concernée.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -145,77 +206,29 @@ export function CreateApiKeyDialog({
 
               <FormField
                 control={form.control}
-                name="key"
+                name="expiry"
                 render={({ field }) => (
-                  <FormItem className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                    <FormLabel>Clé (optionnelle)</FormLabel>
-                    <div className="flex flex-col gap-2 sm:flex-row">
+                  <FormItem className="min-w-0 rounded-xl border border-border/60 bg-muted/20 p-4">
+                    <FormLabel>Durée de validité</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
-                        <Input
-                          placeholder="Laissez vide pour générer automatiquement"
-                          {...field}
-                        />
+                        <SelectTrigger className="w-full min-w-0">
+                          <SelectValue placeholder="Choisir une durée" />
+                        </SelectTrigger>
                       </FormControl>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full shrink-0 gap-2 sm:w-10 sm:px-0"
-                        onClick={() => {
-                          const newKey = generateApiKey();
-                          form.setValue("key", newKey);
-                        }}
-                        title="Générer une nouvelle clé"
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                        <span className="sm:hidden">Générer une clé</span>
-                      </Button>
-                    </div>
+                      <SelectContent>
+                        {options.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormDescription>
-                      Vous pouvez saisir votre propre clé ou en générer une
-                      automatiquement
+                      {policy?.maxExpiryDays
+                        ? `Les réglages de sécurité limitent la durée à ${durationLabel(policy.maxExpiryDays)}.`
+                        : "La clé cesse de fonctionner à la fin de cette durée."}
                     </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="expiresAt"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col rounded-xl border border-border/60 bg-muted/20 p-4">
-                    <FormLabel>Date d'expiration</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground",
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP", { locale: fr })
-                            ) : (
-                              <span>Pas de date d'expiration</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) =>
-                            date < new Date() || date < new Date("1900-01-01")
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -223,79 +236,36 @@ export function CreateApiKeyDialog({
 
               <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
                 <Label>Permissions</Label>
-                <FormField
-                  control={form.control}
-                  name="permissions.uploadImages"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border border-border/60 bg-background px-4 py-3">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Upload d'images</FormLabel>
-                        <FormDescription>
-                          Permet l'upload de fichiers images (PNG, JPG, etc.)
-                        </FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="permissions.uploadText"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border border-border/60 bg-background px-4 py-3">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Upload de texte</FormLabel>
-                        <FormDescription>
-                          Permet l'upload de fichiers texte (TXT, MD, etc.)
-                        </FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="permissions.uploadFiles"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border border-border/60 bg-background px-4 py-3">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Upload de fichiers</FormLabel>
-                        <FormDescription>
-                          Permet l'upload de tout type de fichier
-                        </FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                {PERMISSION_FIELDS.map((permission) => (
+                  <FormField
+                    key={permission.name}
+                    control={form.control}
+                    name={`permissions.${permission.name}`}
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border border-border/60 bg-background px-4 py-3">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
+                        </FormControl>
+                        <div className="min-w-0 space-y-1 leading-none">
+                          <FormLabel>{permission.label}</FormLabel>
+                          <FormDescription>{permission.description}</FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                ))}
+                {permissionsError ? (
+                  <p role="alert" className="text-sm font-medium text-destructive">
+                    {permissionsError}
+                  </p>
+                ) : null}
               </div>
             </div>
 
             <FormStatus state={feedback.state} className="px-5 pb-4 sm:px-6" />
 
             <DialogFooter className="border-t border-border/60 px-5 py-4 sm:px-6">
-              <Button
-                type="submit"
-                className="w-full sm:w-auto"
-                loading={form.formState.isSubmitting}
-              >
+              <Button type="submit" className="w-full sm:w-auto" loading={form.formState.isSubmitting}>
                 Créer la clé
               </Button>
             </DialogFooter>

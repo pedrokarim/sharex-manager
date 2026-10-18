@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import { resolveAuthProvider, type AuthProvider } from "@/lib/auth-config";
+import { checkPassword } from "@/lib/security/password-policy";
 
 export interface SetupOptions {
   authProvider: AuthProvider;
@@ -60,8 +61,10 @@ export function parseSetupOptions(
       if (adminUsername.length < 3) {
         throw new Error("--admin-username doit contenir au moins 3 caractères");
       }
-      if (adminPassword.length < 12) {
-        throw new Error("--admin-password doit contenir au moins 12 caractères");
+      // Même politique que l'écran Sécurité (12 caractères par défaut).
+      const check = checkPassword(adminPassword);
+      if (!check.ok) {
+        throw new Error(`--admin-password refusé : ${check.message}`);
       }
     }
 

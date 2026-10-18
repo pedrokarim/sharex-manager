@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { getTrustedClientIp } from "@/lib/request-ip";
 import { auth } from "@/lib/auth";
-import { storeDeletionToken } from "@/lib/deletion-tokens";
+import { buildDeletionUrl, storeDeletionToken } from "@/lib/deletion-tokens";
 import { recordUpload } from "@/lib/history";
 import { getServerConfig } from "@/lib/server/config";
 import { handleFileUpload } from "@/lib/upload";
@@ -15,7 +15,6 @@ export async function POST(request: NextRequest) {
   // faire référence depuis le try le faisait échouer à son tour.
   const session = await auth.api.getSession({ headers: await headers() });
   try {
-
     if (!session) {
       logDb.createLog({
         level: "warning",
@@ -58,6 +57,19 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
+
+    // Le nombre de fichiers d'un envoi est borné côté serveur aussi (la
+    // fenêtre d'envoi le vérifie déjà) : l'interface envoie un fichier par
+    // requête, un appel direct n'en glisse pas des centaines dans une seule.
+    const parts = formData as unknown as { getAll(name: string): unknown[] };
+    const fileCount = parts.getAll("file").length + parts.getAll("files").length;
+    const maxFiles = limits.maxFilesPerUpload;
+    if (typeof maxFiles === "number" && fileCount > maxFiles) {
+      return NextResponse.json(
+        { error: `Trop de fichiers dans un même envoi (${maxFiles} au plus).` },
+        { status: 400 }
+      );
+    }
 
     if (!file) {
       logDb.createLog({
@@ -222,16 +234,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: uploadResult.error }, { status: 400 });
     }
 
+    const storedName = uploadResult.fileUrl!.split("/").pop()!;
+
+    // Même lien de suppression que pour ShareX ; seule l'empreinte du jeton est gardée.
+    const deletionUrl = uploadResult.deletionToken
+      ? buildDeletionUrl(request.nextUrl.origin, storedName, uploadResult.deletionToken)
+      : null;
+    if (uploadResult.deletionToken) {
+      await storeDeletionToken(storedName, uploadResult.deletionToken);
+    }
+
     // Enregistrer dans l'historique
     await recordUpload({
-      filename: uploadResult.fileUrl!.split("/").pop()!,
+      filename: storedName,
       originalFilename: file.name,
       fileSize: file.size,
       mimeType: file.type,
       uploadMethod: "web",
       fileUrl: uploadResult.fileUrl!,
       thumbnailUrl: uploadResult.thumbnailUrl,
-      deletionToken: uploadResult.deletionToken,
       ipAddress: getTrustedClientIp(request.headers),
       userId: session?.user?.id,
     });
@@ -255,7 +276,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       url: uploadResult.fileUrl,
       thumbnailUrl: uploadResult.thumbnailUrl,
-      deletionToken: uploadResult.deletionToken,
+      deletionUrl,
     });
   } catch (error) {
     logDb.createLog({

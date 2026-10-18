@@ -1,6 +1,7 @@
 import { isInCatalog } from "@/lib/album-visibility";
 import { albumsDb } from "@/lib/utils/albums-db";
 import type { Album } from "@/types/albums";
+import { securedFileNames, withoutSecuredFiles } from "@/lib/public-album-files";
 
 /** Les couvertures et la mosaïque ne montrent que des images fixes. */
 const STILL_IMAGE = /\.(jpg|jpeg|png|gif|webp)$/i;
@@ -43,6 +44,10 @@ interface CatalogOverviewOptions {
 export function readCatalogOverview({ limit = 20, includeImages = false, randomImages = 0 }: CatalogOverviewOptions = {}): CatalogOverview {
   // Un album public par son seul lien n'apparaît nulle part ici.
   const publicAlbums = albumsDb.getAlbums().filter(isInCatalog);
+  // Les fichiers sécurisés rangés dans ces albums n'en sortent pas.
+  const secured = securedFileNames();
+  const visibleEntries = (albumId: number) =>
+    withoutSecuredFiles(albumsDb.getAlbumFileEntries(albumId), (entry) => entry.fileName, secured);
 
   let heroImages: CatalogImageRef[] = [];
   let imagesTotal = 0;
@@ -52,7 +57,7 @@ export function readCatalogOverview({ limit = 20, includeImages = false, randomI
     // Une image rangée dans plusieurs albums ne compte qu'une fois.
     const unique = new Map<string, CatalogImageRef>();
     for (const album of publicAlbums) {
-      for (const entry of albumsDb.getAlbumFileEntries(album.id)) {
+      for (const entry of visibleEntries(album.id)) {
         if (!STILL_IMAGE.test(entry.fileName) || unique.has(entry.fileName)) continue;
         unique.set(entry.fileName, {
           name: entry.fileName,
@@ -76,17 +81,24 @@ export function readCatalogOverview({ limit = 20, includeImages = false, randomI
     heroImages = all.sort(() => Math.random() - 0.5).slice(0, randomImages);
   }
 
-  const albums = publicAlbums.slice(0, limit).map((album) =>
-    includeImages
+  const albums = publicAlbums.slice(0, limit).map((album) => {
+    const visible = visibleEntries(album.id);
+    // Le compte affiché ne trahit pas les fichiers sécurisés de l'album.
+    const counted = {
+      ...album,
+      fileCount: visible.length,
+      thumbnailFile: album.thumbnailFile && !secured.has(album.thumbnailFile) ? album.thumbnailFile : undefined,
+    };
+    return includeImages
       ? {
-          ...album,
-          coverImages: albumsDb
-            .getAlbumFiles(album.id)
+          ...counted,
+          coverImages: visible
+            .map((entry) => entry.fileName)
             .filter((fileName) => STILL_IMAGE.test(fileName))
             .slice(0, 4),
         }
-      : album,
-  );
+      : counted;
+  });
 
   return { albums, heroImages, imagesTotal, lastAddedAt, total: publicAlbums.length };
 }

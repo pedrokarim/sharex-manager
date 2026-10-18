@@ -1,5 +1,4 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { withAuth } from "@/lib/api-guard";
 import { resolveThemePayload } from "@/lib/theme/resolve-theme";
 import { themeDb } from "@/lib/theme/theme-db";
 import { globalThemeModeSchema } from "@/types/theme-runtime";
@@ -11,28 +10,16 @@ const updateGlobalThemeSchema = z.object({
   styles: themeStylesSchema,
 });
 
-export async function GET() {
-  const session = await auth.api.getSession({ headers: await headers() });
-
-  if (!session?.user || session.user.role !== "admin") {
-    return Response.json({ error: "Non autorisé" }, { status: 401 });
-  }
-
+export const GET = withAuth(async (_request: Request, _context: unknown, session) => {
   const globalTheme = themeDb.getGlobalThemeConfig();
 
   return Response.json({
     globalTheme,
     payload: resolveThemePayload(globalTheme),
   });
-}
+}, { role: "admin" });
 
-export async function PUT(request: Request) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
-  if (!session?.user || session.user.role !== "admin") {
-    return Response.json({ error: "Non autorisé" }, { status: 401 });
-  }
-
+export const PUT = withAuth(async (request: Request, _context: unknown, session) => {
   const body = await request.json();
   const parsed = updateGlobalThemeSchema.safeParse(body);
 
@@ -55,4 +42,4 @@ export async function PUT(request: Request) {
     globalTheme,
     payload: resolveThemePayload(globalTheme),
   });
-}
+}, { role: "admin" });

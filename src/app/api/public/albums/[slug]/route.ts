@@ -4,12 +4,16 @@ import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
 import { isVideoFile } from "@/lib/media-kind";
 import { videoMeta } from "@/lib/media/video";
+import { securedFileNames, withoutSecuredFiles } from "@/lib/public-album-files";
+import { limitPublicApi } from "@/lib/security/rate-limits";
 
 // GET /api/public/albums/[slug] - Récupérer un album public par son slug
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
+  const limited = limitPublicApi(request);
+  if (limited) return limited;
   try {
     const { slug } = await params;
 
@@ -31,8 +35,10 @@ export async function GET(
       return NextResponse.json({ error: "Album introuvable" }, { status: 404 });
     }
 
-    // Récupérer les fichiers de l'album avec leurs dates d'ajout
-    const files = albumsDb.getAlbumFileEntries(album.id);
+    // Récupérer les fichiers de l'album avec leurs dates d'ajout, sans les
+    // fichiers sécurisés : l'album est public, eux ne le sont pas.
+    const secured = securedFileNames();
+    const files = withoutSecuredFiles(albumsDb.getAlbumFileEntries(album.id), (entry) => entry.fileName, secured);
 
     logDb.createLog({
       level: "info",
@@ -50,6 +56,8 @@ export async function GET(
 
     return NextResponse.json({
       ...album,
+      fileCount: files.length,
+      thumbnailFile: album.thumbnailFile && !secured.has(album.thumbnailFile) ? album.thumbnailFile : undefined,
       // La durée d'une vidéo s'affiche sur sa vignette.
       files: files.map((entry) =>
         isVideoFile(entry.fileName) ? { ...entry, durationMs: videoMeta(entry.fileName)?.durationMs } : entry

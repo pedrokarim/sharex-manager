@@ -2,7 +2,7 @@
  * Réglages des moteurs de traduction : ordre d'appel, plafonds, adresse et clés.
  *
  *   data/translation/settings.json   ordre, plafonds mensuels, adresse de LibreTranslate
- *   data/translation/secrets.json    clés d'API, lisible par le seul compte du serveur
+ *   data/translation/secrets.json    clés d'API, chiffrées, lisibles par le seul compte du serveur
  *
  * Une variable d'environnement prime sur le fichier, comme pour les autres
  * modules : `DEEPL_API_KEY`, `LIBRETRANSLATE_URL`, `LIBRETRANSLATE_API_KEY`.
@@ -12,6 +12,7 @@
 
 import path from "path";
 import { createHash } from "crypto";
+import { readSecretJson, writeSecretJson } from "@/lib/security/secret-file";
 import { dataRoot, readJson, writeJson } from "../../store";
 import type { EngineSettingsPatch, TranslationEngineId } from "../../types";
 import { ENGINE_IDS, isEngineId } from "./engines";
@@ -21,6 +22,9 @@ import { normalizeContactEmail } from "./mymemory";
 export const translationDir = () => path.join(dataRoot(), "translation");
 const settingsFile = () => path.join(translationDir(), "settings.json");
 const secretsFile = () => path.join(translationDir(), "secrets.json");
+/** Lie le chiffré de `secrets.json` à ce module (voir `lib/security/secret-file.ts`). */
+const SECRETS_CONTEXT = "module:scan-studio:translation-secrets";
+const readSecrets = () => readSecretJson<StoredSecrets | null>(secretsFile(), SECRETS_CONTEXT, null) ?? {};
 
 /**
  * DeepL d'abord, plus juste vers le français ; LibreTranslate en secours (§ 7.5) ;
@@ -101,7 +105,7 @@ const fromEnv = (name: CredentialName) => process.env[ENV[name]]?.trim() || unde
 const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : undefined);
 
 export function readCredentials(): EngineCredentials {
-  const secrets = readJson<StoredSecrets>(secretsFile()) ?? {};
+  const secrets = readSecrets();
   const settings = readJson<StoredSettings>(settingsFile()) ?? {};
   const url = fromEnv("libreTranslateUrl") ?? text(settings.libreTranslateUrl);
   return {
@@ -232,7 +236,7 @@ export function applySettingsPatch(patch: unknown) {
   }
 
   if (deeplKey !== undefined || libreKey !== undefined) {
-    const stored = readJson<StoredSecrets>(secretsFile()) ?? {};
+    const stored = readSecrets();
     const next: Record<string, string> = {};
     const keys: [keyof StoredSecrets, string | undefined][] = [
       ["deeplKey", deeplKey],
@@ -242,6 +246,6 @@ export function applySettingsPatch(patch: unknown) {
       const value = given !== undefined ? given : text(stored[name]);
       if (value) next[name] = value;
     }
-    writeJson(secretsFile(), next, { mode: 0o600 });
+    writeSecretJson(secretsFile(), SECRETS_CONTEXT, next);
   }
 }

@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdmin, withAuth } from "@/lib/api-guard";
+import { historyOwnedBy } from "@/lib/file-ownership";
 import { deleteHistoryEntry, getAllHistory } from "@/lib/history";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 
-export async function DELETE(
+export const DELETE = withAuth(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
-  if (!session?.user) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
-
+  { params }: { params: Promise<{ id: string }> },
+  session
+) => {
   try {
     const { id } = await params;
 
@@ -26,7 +21,9 @@ export async function DELETE(
       );
     }
 
-    if (entry.userId && entry.userId !== session.user.id && session.user.role !== "admin") {
+    // Une entrée sans propriétaire connu (clé supprimée, envoi ancien) n'est
+    // retirée que par un admin.
+    if (!isAdmin(session) && (await historyOwnedBy([entry], session.user.id)).length === 0) {
       return NextResponse.json({ error: "Accès interdit" }, { status: 403 });
     }
 
@@ -46,4 +43,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+});

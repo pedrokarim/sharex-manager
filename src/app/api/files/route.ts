@@ -12,6 +12,12 @@ import type { NextRequest } from "next/server";
 import { logger } from "@/lib/utils/logger";
 import { basename } from "path";
 import { forgetVideo } from "@/lib/media/video";
+import { withAuth } from "@/lib/api-guard";
+import { canManageFile } from "@/lib/file-ownership";
+import { deleteDeletionToken } from "@/lib/deletion-tokens";
+import { logDb } from "@/lib/utils/db";
+import { raiseAlert } from "@/lib/security/alerts";
+import type { Session } from "@/lib/auth";
 
 const UPLOADS_DIR = getAbsoluteUploadPath();
 const PAGE_SIZE = 12; // Nombre d'images par page
@@ -76,14 +82,8 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (req: NextRequest, _context, session) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-
-    if (!session?.user) {
-      return Response.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     // Vérifier que l'utilisateur a un ID et un email
     if (!session.user.id || !session.user.email) {
       return Response.json({ error: "Session invalide" }, { status: 401 });
@@ -123,16 +123,31 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+});
+
+/** Un nom seul, jamais un chemin : « ../ » sortirait des uploads. */
+function isPlainName(filename: string | null): filename is string {
+  return Boolean(filename) && filename === basename(filename!) && !filename!.includes("\\") && !filename!.startsWith(".");
 }
 
-export async function DELETE(req: NextRequest) {
+/** Refus journalisé : le fichier appartient à un autre compte, ou à personne de connu. */
+function forbidden(session: Session, fileName: string, attempt: string): Response {
+  logDb.createLog({
+    level: "warning",
+    action: "file.unauthorized",
+    message: `${attempt} refusée : le fichier appartient à un autre compte`,
+    userId: session.user.id,
+    userEmail: session.user.email ?? undefined,
+    metadata: { fileName },
+  });
+  return Response.json(
+    { error: "Seul le propriétaire du fichier ou un admin peut le modifier" },
+    { status: 403 }
+  );
+}
+
+export const DELETE = withAuth(async (req: NextRequest, _context, session) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-
-    if (!session?.user) {
-      return Response.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     if (!session.user.id) {
       return Response.json({ error: "Session invalide" }, { status: 401 });
     }
@@ -140,12 +155,15 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const filename = searchParams.get("id");
 
-    // Un nom seul, jamais un chemin : « ../ » sortirait des uploads.
-    if (!filename || filename !== basename(filename) || filename.includes("\\") || filename.startsWith(".")) {
+    if (!isPlainName(filename)) {
       return Response.json(
         { error: "Nom du fichier manquant" },
         { status: 400 }
       );
+    }
+
+    if (!(await canManageFile(session, filename))) {
+      return forbidden(session, filename, "Suppression");
     }
 
     const filePath = join(UPLOADS_DIR, filename);
@@ -157,6 +175,7 @@ export async function DELETE(req: NextRequest) {
 
       // Retirer le fichier de la liste des fichiers sécurisés s'il y est
       await removeFileFromSecure(filename);
+      await deleteDeletionToken(filename);
 
       await logger.logFileAction("file.delete", "Suppression d'un fichier", {
         userId: session.user.id,
@@ -178,26 +197,37 @@ export async function DELETE(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
-export async function PUT(request: Request) {
+export const PUT = withAuth(async (request: Request, _context, session) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) {
-      return new Response("Non autorisé", { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const filename = searchParams.get("filename");
 
-    if (!filename) {
+    if (!isPlainName(filename)) {
       return new Response("Nom de fichier manquant", { status: 400 });
+    }
+
+    if (!(await canManageFile(session, filename))) {
+      return forbidden(session, filename, "Modification de la visibilité");
     }
 
     const formData = await request.formData();
     const isSecure = formData.get("isSecure") === "true";
 
     await setFileSecure(filename, isSecure);
+
+    // Passer un fichier de privé à public le rend lisible par tous : la
+    // bascule est journalisée dans les deux sens.
+    logDb.createLog({
+      level: "info",
+      action: "file.update",
+      message: isSecure ? "Fichier rendu privé" : "Fichier rendu public",
+      userId: session.user.id,
+      userEmail: session.user.email ?? undefined,
+      metadata: { fileName: filename, isSecure },
+    });
+    if (!isSecure) void raiseAlert("fileMadePublic", { userId: session.user.id, userEmail: session.user.email ?? undefined, fileName: filename });
 
     return NextResponse.json({
       success: true,
@@ -207,4 +237,4 @@ export async function PUT(request: Request) {
     console.error("Erreur lors de la modification de la sécurité:", error);
     return new Response("Erreur serveur", { status: 500 });
   }
-}
+});

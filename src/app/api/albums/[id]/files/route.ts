@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { withAuth } from "@/lib/api-guard";
 import { albumsDb } from "@/lib/utils/albums-db";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
@@ -21,24 +20,12 @@ const FileNamesSchema = z.object({
 });
 
 // GET /api/albums/[id]/files - Récupérer les fichiers d'un album
-export async function GET(
+export const GET = withAuth(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
+  { params }: { params: Promise<{ id: string }> },
+  session
+) => {
   try {
-    if (!session?.user) {
-      logDb.createLog({
-        level: "warning",
-        action: "album.files.list" as LogAction,
-        message: "Tentative d'accès non autorisé aux fichiers d'un album",
-        userId: undefined,
-        userEmail: undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const { id } = await params;
     const albumId = IdSchema.parse(id);
     const album = albumsDb.getAlbum(albumId);
@@ -152,27 +139,15 @@ export async function GET(
 
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
+});
 
 // POST /api/albums/[id]/files - Ajouter des fichiers à un album
-export async function POST(
+export const POST = withAuth(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
+  { params }: { params: Promise<{ id: string }> },
+  session
+) => {
   try {
-    if (!session?.user) {
-      logDb.createLog({
-        level: "warning",
-        action: "album.files.add" as LogAction,
-        message: "Tentative d'ajout de fichiers non autorisée",
-        userId: undefined,
-        userEmail: undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const { id } = await params;
     const albumId = IdSchema.parse(id);
     const body = await request.json();
@@ -290,27 +265,15 @@ export async function POST(
 
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
+});
 
 // DELETE /api/albums/[id]/files - Retirer des fichiers d'un album
-export async function DELETE(
+export const DELETE = withAuth(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
+  { params }: { params: Promise<{ id: string }> },
+  session
+) => {
   try {
-    if (!session?.user) {
-      logDb.createLog({
-        level: "warning",
-        action: "album.files.remove" as LogAction,
-        message: "Tentative de suppression de fichiers non autorisée",
-        userId: undefined,
-        userEmail: undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const { id } = await params;
     const albumId = IdSchema.parse(id);
     const body = await request.json();
@@ -388,4 +351,4 @@ export async function DELETE(
 
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
+});

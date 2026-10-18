@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { inspectImage } from "@/lib/provenance/inspect";
 import { provenanceVerdict } from "@/lib/provenance/types";
-import { checkRateLimit } from "@/lib/rate-limit";
-import { getTrustedClientIp } from "@/lib/request-ip";
+import { checkIpRateLimit } from "@/lib/rate-limit";
 
 /** Taille maximale d'une image analysée. */
 const MAX_BYTES = 30 * 1024 * 1024;
@@ -25,7 +24,7 @@ export async function POST(request: NextRequest) {
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > MAX_BYTES + 4096) return json({ error: "Image trop lourde (30 Mo maximum)." }, 413);
 
-  const { allowed, retryAfterMs } = checkRateLimit(`tools-provenance:${getTrustedClientIp(request.headers)}`, RATE);
+  const { allowed, retryAfterMs } = checkIpRateLimit("tools-provenance", request.headers, RATE);
   if (!allowed) {
     return json({ error: "Trop d'analyses d'affilée. Réessayez dans quelques minutes." }, 429, {
       "Retry-After": String(Math.ceil(retryAfterMs / 1000)),

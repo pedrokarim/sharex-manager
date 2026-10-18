@@ -6,6 +6,7 @@
 
 import fs from "fs";
 import path from "path";
+import { readSecretJson, writeSecretJson } from "@/lib/security/secret-file";
 import type { KeyName, SearchRecord } from "./types";
 
 export const MODULE_NAME = "reverse-search";
@@ -13,6 +14,8 @@ const DATA_DIR = path.join(process.cwd(), "modules", MODULE_NAME, "data");
 export const QUERIES_DIR = path.join(DATA_DIR, "queries");
 const HISTORY_FILE = path.join(DATA_DIR, "history.json");
 const SECRETS_FILE = path.join(DATA_DIR, "secrets.json");
+/** Lie le chiffré de `secrets.json` à ce module (voir `lib/security/secret-file.ts`). */
+const SECRETS_CONTEXT = "module:reverse-search:secrets";
 
 /** Au-delà, les recherches les plus anciennes sont oubliées, images comprises. */
 const MAX_HISTORY = 500;
@@ -141,7 +144,7 @@ const fromEnv = (name: KeyName) => process.env[KEY_ENV[name]]?.trim() || undefin
 
 /** Une variable d'environnement prime sur le fichier, comme pour les autres modules. */
 export function readKeys(): Partial<Record<KeyName, string>> {
-  const stored = readJson<Partial<Record<KeyName, string>>>(SECRETS_FILE, {});
+  const stored = readSecretJson<Partial<Record<KeyName, string>>>(SECRETS_FILE, SECRETS_CONTEXT, {});
   const keys: Partial<Record<KeyName, string>> = {};
   for (const name of KEY_NAMES) {
     const value = fromEnv(name) ?? (typeof stored[name] === "string" ? stored[name]!.trim() : undefined);
@@ -157,11 +160,12 @@ export function keyStatus(): Record<KeyName, { configured: boolean; fromEnv: boo
   ) as Record<KeyName, { configured: boolean; fromEnv: boolean }>;
 }
 
-/** Enregistre une clé, ou l'efface si elle est vide. */
+/** Enregistre une clé, ou l'efface si elle est vide. Le fichier est chiffré, en droits 600. */
 export function writeKey(name: KeyName, value: string) {
-  const stored = readJson<Partial<Record<KeyName, string>>>(SECRETS_FILE, {});
+  const stored = readSecretJson<Partial<Record<KeyName, string>>>(SECRETS_FILE, SECRETS_CONTEXT, {});
   const clean = value.trim();
   if (clean) stored[name] = clean;
   else delete stored[name];
-  writeJson(SECRETS_FILE, stored, 0o600);
+  ensureDirs();
+  writeSecretJson(SECRETS_FILE, SECRETS_CONTEXT, stored);
 }

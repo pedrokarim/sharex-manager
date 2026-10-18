@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -23,20 +23,48 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
+import { DEFAULT_PASSWORD_MIN_LENGTH } from "@/lib/security/settings-schema";
 
-const userFormSchema = z.object({
-  username: z
-    .string()
-    .min(3, "Le nom d'utilisateur doit faire au moins 3 caractères"),
-  password: z
-    .string()
-    .min(6, "Le mot de passe doit faire au moins 6 caractères"),
-  role: z.enum(["admin", "user"], {
-    required_error: "Veuillez sélectionner un rôle",
-  }),
-});
+/**
+ * Longueur minimale lue dans les réglages de sécurité : le serveur applique
+ * de toute façon la politique complète (mots de passe courants compris).
+ * Pour une modification, un mot de passe vide garde l'actuel.
+ */
+function userFormSchema(minPasswordLength: number, editing: boolean) {
+  const tooShort = `Le mot de passe doit faire au moins ${minPasswordLength} caractères`;
+  return z.object({
+    username: z
+      .string()
+      .min(3, "Le nom d'utilisateur doit faire au moins 3 caractères"),
+    password: editing
+      ? z.string().refine((value) => value === "" || value.length >= minPasswordLength, tooShort)
+      : z.string().min(minPasswordLength, tooShort),
+    role: z.enum(["admin", "user"], {
+      error: "Veuillez sélectionner un rôle",
+    }),
+  });
+}
 
-type UserFormValues = z.infer<typeof userFormSchema>;
+type UserFormValues = z.infer<ReturnType<typeof userFormSchema>>;
+
+/** Longueur minimale en vigueur, ou la valeur par défaut tant qu'elle n'est pas connue. */
+function useMinPasswordLength() {
+  const [minLength, setMinLength] = useState(DEFAULT_PASSWORD_MIN_LENGTH);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/admin/security/settings", { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { settings?: { passwords?: { minLength?: number } } } | null) => {
+        const value = data?.settings?.passwords?.minLength;
+        if (typeof value === "number") setMinLength(value);
+      })
+      .catch(() => {
+        // Réglages indisponibles : la valeur par défaut reste, le serveur tranche.
+      });
+    return () => controller.abort();
+  }, []);
+  return minLength;
+}
 
 interface UserFormProps {
   user?: {
@@ -52,9 +80,11 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
   // L'échec se lit dans la fenêtre, au-dessus du bouton ; la réussite se voit
   // à la liste mise à jour, la fenêtre se refermant.
   const feedback = useFeedback();
+  const minPasswordLength = useMinPasswordLength();
+  const schema = useMemo(() => userFormSchema(minPasswordLength, Boolean(user)), [minPasswordLength, user]);
 
   const form = useForm<UserFormValues>({
-    resolver: zodResolver(userFormSchema),
+    resolver: zodResolver(schema),
     defaultValues: user
       ? {
           username: user.username,
@@ -142,7 +172,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
                 <FormDescription>
                   {user
                     ? "Laissez vide pour conserver le mot de passe actuel."
-                    : "Le mot de passe doit contenir au moins 6 caractères."}
+                    : `Au moins ${minPasswordLength} caractères ; les mots de passe trop courants sont refusés.`}
                 </FormDescription>
                 <FormMessage />
               </FormItem>

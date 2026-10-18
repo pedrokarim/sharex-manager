@@ -11,6 +11,7 @@ export interface HistoryEntry {
   uploadMethod: "api" | "web" | "sharex";
   fileUrl: string;
   thumbnailUrl?: string;
+  /** Ancien champ : le jeton en clair. Plus écrit, jamais renvoyé par l'API. */
   deletionToken?: string;
 }
 

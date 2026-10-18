@@ -97,6 +97,11 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
   const headerFeedback = useFeedback();
   /** Résultat de la copie des URL de la sélection, lu au-dessus de sa barre. */
   const copyFeedback = useFeedback();
+  /** Changement du lien public, dit sur la ligne du lien. */
+  const linkFeedback = useFeedback();
+  /** Premier clic sur « Nouveau lien » : le second confirme. */
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [isRegeneratingLink, setIsRegeneratingLink] = useState(false);
 
   /**
    * L'origine n'est connue que côté navigateur. La lire pendant le rendu
@@ -572,6 +577,40 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
       setTimeout(() => setCopyUrlFailed(false), 4000);
     }
   };
+
+  // Nouveau lien public : l'ancien cesse de fonctionner, d'où la
+  // confirmation par un second clic, annoncée sur la ligne du lien.
+  const handleRegenerateLink = async () => {
+    if (!confirmRegenerate) {
+      setConfirmRegenerate(true);
+      linkFeedback.info(t("albums.regenerate_link_hint"));
+      return;
+    }
+    setConfirmRegenerate(false);
+    setIsRegeneratingLink(true);
+    linkFeedback.clear();
+    try {
+      const response = await fetch(`/api/albums/${albumId}/slug`, { method: "POST" });
+      if (!response.ok) throw new Error();
+      setAlbum(await response.json());
+      setCopiedUrl(false);
+      linkFeedback.success(t("albums.link_regenerated"));
+    } catch {
+      linkFeedback.error(t("albums.errors.regenerate_link"));
+    } finally {
+      setIsRegeneratingLink(false);
+    }
+  };
+
+  // Sans second clic, la demande de confirmation retombe d'elle-même.
+  useEffect(() => {
+    if (!confirmRegenerate) return;
+    const timer = window.setTimeout(() => {
+      setConfirmRegenerate(false);
+      linkFeedback.clear();
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [confirmRegenerate, linkFeedback]);
 
   // Copie lancée d'un menu contextuel, de la visionneuse ou d'un raccourci,
   // dont les boutons appartiennent à leurs composants : le toast reste.
@@ -1068,6 +1107,21 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
               )}
             </span>
           </Button>
+          <ActionStatus state={linkFeedback.state} className="hidden max-w-56 shrink sm:inline-flex" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void handleRegenerateLink()}
+            disabled={isRegeneratingLink}
+            className={cn("h-7 shrink-0 gap-1.5 px-2 text-xs", confirmRegenerate && "text-destructive")}
+            title={t("albums.regenerate_link_hint")}
+            aria-label={confirmRegenerate ? t("albums.regenerate_link_confirm") : t("albums.regenerate_link")}
+          >
+            <RotateCw className={cn("h-3.5 w-3.5", isRegeneratingLink && "animate-spin")} />
+            <span className={confirmRegenerate ? undefined : "hidden sm:inline"}>
+              {confirmRegenerate ? t("albums.regenerate_link_confirm") : t("albums.regenerate_link")}
+            </span>
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -1080,6 +1134,10 @@ export function AlbumViewClient({ albumId }: AlbumViewClientProps) {
             <ExternalLink className="h-3.5 w-3.5" />
           </Button>
         </div>
+      )}
+      {album.isPublic && album.publicSlug && linkFeedback.state && (
+        // Sur un écran étroit, la ligne du lien n'a pas la place du message.
+        <ActionStatus state={linkFeedback.state} className="-mt-4 mb-6 sm:hidden" />
       )}
 
       {/* Contenu de l'album */}

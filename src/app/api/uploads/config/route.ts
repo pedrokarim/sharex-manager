@@ -1,69 +1,11 @@
 import type { NextRequest } from "next/server";
-import { readFile, writeFile } from "fs/promises";
-import { join } from "path";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { isAdmin } from "@/lib/api-guard";
-import { defaultConfig } from "@/lib/defaultConfig";
-import type { UploadConfig } from "@/lib/types/upload-config";
+import { isAdmin, withAuth } from "@/lib/api-guard";
 import { logDb } from "@/lib/utils/db";
+import { presentUploadConfig, readUploadConfig, saveUploadConfig } from "@/lib/server/upload-config-store";
 
-const CONFIG_FILE_PATH = join(process.cwd(), "config", "uploads.json");
-
-async function getConfig(): Promise<UploadConfig> {
+export const GET = withAuth(async (_request: Request, _context: unknown, session) => {
   try {
-    const configData = await readFile(CONFIG_FILE_PATH, "utf-8");
-    return JSON.parse(configData);
-  } catch (error) {
-    logDb.createLog({
-      level: "warning",
-      action: "system.error",
-      message:
-        "Configuration non trouvée, utilisation de la configuration par défaut",
-      metadata: {
-        error: error instanceof Error ? error.message : "Unknown error",
-        configPath: CONFIG_FILE_PATH,
-      },
-    });
-    // Si le fichier n'existe pas ou est invalide, retourner la configuration par défaut
-    return defaultConfig;
-  }
-}
-
-async function saveConfig(config: UploadConfig): Promise<void> {
-  try {
-    await writeFile(CONFIG_FILE_PATH, JSON.stringify(config, null, 2), "utf-8");
-  } catch (error) {
-    logDb.createLog({
-      level: "error",
-      action: "system.error",
-      message: "Erreur lors de la sauvegarde de la configuration",
-      metadata: {
-        error: error instanceof Error ? error.message : "Unknown error",
-        configPath: CONFIG_FILE_PATH,
-      },
-    });
-    throw error;
-  }
-}
-
-export async function GET() {
-  const session = await auth.api.getSession({ headers: await headers() });
-
-  if (!session?.user) {
-    logDb.createLog({
-      level: "warning",
-      action: "admin.action",
-      message:
-        "Tentative de lecture de la configuration des uploads non autorisée",
-      userId: session?.user?.id || undefined,
-      userEmail: session?.user?.email || undefined,
-    });
-    return new Response("Non autorisé", { status: 401 });
-  }
-
-  try {
-    const config = await getConfig();
+    const config = await readUploadConfig();
 
     logDb.createLog({
       level: "info",
@@ -73,7 +15,7 @@ export async function GET() {
       userEmail: session.user.email || undefined,
     });
 
-    return Response.json(config);
+    return Response.json(presentUploadConfig(config, { admin: isAdmin(session) }));
   } catch (error) {
     logDb.createLog({
       level: "error",
@@ -87,51 +29,31 @@ export async function GET() {
     });
     return new Response("Erreur serveur", { status: 500 });
   }
-}
+});
 
-export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
-  // Mêmes droits que PUT /api/settings/config, utilisé par l'interface.
-  if (!session?.user || !isAdmin(session)) {
-    logDb.createLog({
-      level: "warning",
-      action: "admin.action",
-      message:
-        "Tentative de modification de la configuration des uploads non autorisée",
-      userId: session?.user?.id || undefined,
-      userEmail: session?.user?.email || undefined,
-    });
-    return new Response("Non autorisé", { status: 401 });
+export const POST = withAuth(async (request: NextRequest, _context: unknown, session) => {
+  // Mêmes droits et même validation que PUT /api/settings/config, utilisé
+  // par l'interface : les deux passent par `saveUploadConfig`.
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Configuration invalide" }, { status: 400 });
   }
 
   try {
-    const newConfig: UploadConfig = await request.json();
-    const oldConfig = await getConfig();
-
-    // Validation basique
-    if (
-      typeof newConfig !== "object" ||
-      !newConfig.allowedTypes ||
-      typeof newConfig.limits.maxFileSize !== "number" ||
-      typeof newConfig.filenamePattern !== "string" ||
-      !newConfig.thumbnails ||
-      !newConfig.storage
-    ) {
+    const result = await saveUploadConfig(body);
+    if (!result.ok) {
       logDb.createLog({
         level: "warning",
         action: "admin.action",
         message: "Tentative de sauvegarde d'une configuration invalide",
         userId: session.user.id || undefined,
         userEmail: session.user.email || undefined,
-        metadata: {
-          invalidConfig: newConfig,
-        },
+        metadata: { fieldErrors: result.fieldErrors, formErrors: result.formErrors },
       });
-      return new Response("Configuration invalide", { status: 400 });
+      return Response.json({ error: result.error }, { status: 400 });
     }
-
-    await saveConfig(newConfig);
 
     logDb.createLog({
       level: "info",
@@ -141,13 +63,13 @@ export async function POST(request: NextRequest) {
       userEmail: session.user.email || undefined,
       metadata: {
         changes: {
-          before: oldConfig,
-          after: newConfig,
+          before: result.before,
+          after: result.config,
         },
       },
     });
 
-    return new Response("Configuration sauvegardée", { status: 200 });
+    return Response.json(presentUploadConfig(result.config, { admin: true }));
   } catch (error) {
     logDb.createLog({
       level: "error",
@@ -161,4 +83,4 @@ export async function POST(request: NextRequest) {
     });
     return new Response("Erreur serveur", { status: 500 });
   }
-}
+}, { role: "admin" });

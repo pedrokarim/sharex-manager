@@ -8,7 +8,7 @@
  * les autres sont payées à l'usage chez chaque fournisseur.
  *
  * Les clés sont réservées aux admins. Elles viennent d'une variable
- * d'environnement ou de `data/secrets.json` (droits 600), et ne sont jamais
+ * d'environnement ou de `data/secrets.json` (droits 600, chiffré), et ne sont jamais
  * renvoyées au navigateur : seule leur fin sert à les reconnaître.
  */
 
@@ -16,6 +16,7 @@ import fs from "fs";
 import path from "path";
 import type { TimedWord } from "../engine/types";
 import { DATA_DIR, ensureDirs } from "./store";
+import { readSecretJson, writeSecretJson } from "@/lib/security/secret-file";
 import { escapeXmlText, fetchEdgeVoices, prosodyRate, stripControls, synthesizeEdge } from "./edge-tts";
 import { countCharacters, recordAiUsage, usageError, type AiLimit, type AiModuleReport, type AiProviderId } from "@/lib/ai-usage";
 import { readElevenLabsLimits } from "@/lib/ai-usage/remote";
@@ -46,6 +47,8 @@ export const AZURE_FREE_CHARACTERS = 500_000;
 const AZURE_REQUESTS_PER_MINUTE = 20;
 
 const SECRETS_FILE = path.join(DATA_DIR, "secrets.json");
+/** Lie le chiffré de `secrets.json` à ce module (voir `lib/security/secret-file.ts`). */
+const SECRETS_CONTEXT = "module:clip-studio:secrets";
 const USAGE_FILE = path.join(DATA_DIR, "tts-usage.json");
 const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_AUDIO_BYTES = 30 * 1024 * 1024;
@@ -65,7 +68,11 @@ interface Secrets {
 
 function readSecrets(): Secrets {
   try {
-    const raw = JSON.parse(fs.readFileSync(SECRETS_FILE, "utf-8"));
+    const raw = readSecretJson<{ apiKeys?: Secrets["apiKeys"]; azureRegion?: unknown; edgeDisabled?: unknown } | null>(
+      SECRETS_FILE,
+      SECRETS_CONTEXT,
+      null
+    );
     return {
       apiKeys: raw?.apiKeys && typeof raw.apiKeys === "object" ? raw.apiKeys : {},
       ...(typeof raw?.azureRegion === "string" ? { azureRegion: raw.azureRegion } : {}),
@@ -76,12 +83,10 @@ function readSecrets(): Secrets {
   }
 }
 
+/** Chiffré avec la clé des comptes connectés, en droits 600. */
 function writeSecrets(secrets: Secrets) {
   ensureDirs();
-  const temporary = `${SECRETS_FILE}.${process.pid}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify(secrets, null, 2), { mode: 0o600 });
-  fs.renameSync(temporary, SECRETS_FILE);
-  fs.chmodSync(SECRETS_FILE, 0o600);
+  writeSecretJson(SECRETS_FILE, SECRETS_CONTEXT, secrets);
 }
 
 function apiKey(provider: CloudProvider): string {

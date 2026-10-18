@@ -979,24 +979,6 @@
         "description": "Configurez les paramètres de sécurité avancés."
       }
     },
-    "security": {
-      "title": "Sécurité",
-      "description": "Configuration des paramètres de sécurité avancés",
-      "coming_soon": {
-        "title": "Fonctionnalité à venir",
-        "subtitle": "Cette section est en cours de développement",
-        "description": "La configuration avancée de la sécurité sera bientôt disponible. Cette section permettra de :",
-        "check_back": "Revenez bientôt pour découvrir ces nouvelles fonctionnalités !"
-      },
-      "features": {
-        "password_policies": "Configurer les politiques de mots de passe",
-        "two_factor": "Gérer l'authentification à deux facteurs (2FA)",
-        "ip_restrictions": "Définir les restrictions d'accès IP",
-        "sessions": "Configurer les sessions et leur durée de vie",
-        "login_attempts": "Gérer les tentatives de connexion et le blocage automatique",
-        "security_alerts": "Mettre en place des alertes de sécurité"
-      }
-    },
     "system": {
       "title": "Configuration système",
       "description": "Gérez les paramètres système et la configuration des uploads",
@@ -1406,6 +1388,10 @@
     "make_private": "Rendre privé",
     "copy_public_url": "Copier l'URL publique",
     "open_new_tab": "Ouvrir dans un nouvel onglet",
+    "regenerate_link": "Nouveau lien",
+    "regenerate_link_confirm": "Confirmer",
+    "regenerate_link_hint": "L’ancien lien cessera de fonctionner.",
+    "link_regenerated": "Nouveau lien créé",
     "public_album": "Album public",
     "public_album_description": "Cet album est accessible publiquement via l'URL ci-dessous",
     "public_url": "URL publique",
@@ -1419,6 +1405,7 @@
       "remove_file": "Erreur lors du retrait du fichier de l'album",
       "delete": "Erreur lors de la suppression de l'album",
       "toggle_visibility": "Erreur lors de la mise à jour de la visibilité",
+      "regenerate_link": "Impossible de changer le lien",
       "copy_url": "Erreur lors de la copie de l'URL"
     }
   },

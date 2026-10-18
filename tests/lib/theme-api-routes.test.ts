@@ -54,11 +54,11 @@ describe("theme API routes", () => {
     });
 
     const { GET } = await import("@/app/api/admin/theme/route");
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/admin/theme"), {});
     const body = await response.json();
 
-    expect(response.status).toBe(401);
-    expect(body.error).toBe("Non autorisé");
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Réservé aux administrateurs");
   });
 
   it("should let an admin publish the global theme", async () => {
@@ -89,7 +89,8 @@ describe("theme API routes", () => {
             },
           },
         }),
-      })
+      }),
+      {}
     );
     const body = await response.json();
 

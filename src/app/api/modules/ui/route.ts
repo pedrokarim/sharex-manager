@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/api-guard";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, _context: unknown, session) => {
   try {
-    // Vérifier l'authentification
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     // Récupérer le nom du module depuis les paramètres de requête
     const moduleName = request.nextUrl.searchParams.get("moduleName");
 
@@ -54,4 +47,4 @@ export async function POST(request: NextRequest) {
     );
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
+});

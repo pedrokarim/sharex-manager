@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/api-guard";
 import { announceNewUpload } from "@/lib/gallery-events";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 import fs from "fs";
 import path from "path";
 import { getAbsoluteUploadPath } from "@/lib/config";
@@ -33,20 +32,8 @@ function isGalleryFileName(value: unknown): value is string {
   );
 }
 
-export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
+export const POST = withAuth(async (request: NextRequest, _context: unknown, session) => {
   try {
-    if (!session) {
-      logDb.createLog({
-        level: "warning",
-        action: "file.update" as LogAction,
-        message: "Tentative de traitement d'image non autorisée",
-        userId: undefined,
-        userEmail: undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const {
       fileName,
       moduleName,
@@ -228,4 +215,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { withAuth } from "@/lib/api-guard";
 import { albumsDb } from "@/lib/utils/albums-db";
 import { logDb } from "@/lib/utils/db";
 import { LogAction } from "@/lib/types/logs";
@@ -21,21 +20,8 @@ const BatchActionSchema = z.object({
 });
 
 // POST /api/files/batch - Opérations en lot sur les fichiers
-export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
-
+export const POST = withAuth(async (request: NextRequest, _context: unknown, session) => {
   try {
-    if (!session?.user) {
-      logDb.createLog({
-        level: "warning",
-        action: "files.batch" as LogAction,
-        message: "Tentative d'opération en lot non autorisée",
-        userId: undefined,
-        userEmail: undefined,
-      });
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
     const body = await request.json();
     const { action } = BatchActionSchema.parse(body);
 
@@ -208,4 +194,4 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
+});

@@ -3,8 +3,8 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import prompts from "prompts";
 import chalk from "chalk";
-import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
+import { checkPassword, hashPassword } from "@/lib/security/password-policy";
 
 export const description = "Gestion des utilisateurs ShareX Manager";
 export const usage = "bun cli users [add|list|delete]";
@@ -31,8 +31,11 @@ async function addUser() {
       type: "password",
       name: "password",
       message: "Mot de passe",
-      validate: (value) =>
-        value.length >= 6 || "Le mot de passe doit faire au moins 6 caractères",
+      // Politique de l'écran Sécurité : longueur minimale, mots de passe courants refusés.
+      validate: (value: string) => {
+        const check = checkPassword(value);
+        return check.ok || check.message;
+      },
     },
     {
       type: "select",
@@ -58,7 +61,7 @@ async function addUser() {
       return;
     }
 
-    const hashedPassword = await bcrypt.hash(response.password, 10);
+    const hashedPassword = await hashPassword(response.password);
 
     const newUser: User = {
       id: `usr_${nanoid()}`,

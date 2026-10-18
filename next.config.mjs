@@ -1,3 +1,11 @@
+import { imageHost, primaryAppOrigin } from './src/lib/security/cors-origins.mjs';
+
+// Domaines lus dans l'environnement au moment du build (variables
+// NEXT_PUBLIC_* passées en `args` dans docker-compose.yml) : un seul endroit,
+// `src/lib/security/cors-origins.mjs`, partagé avec le proxy.
+const appOrigin = primaryAppOrigin(process.env);
+const imageDomainHost = imageHost(process.env);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // Les SDK Ascencia ID sont publiés en TypeScript source. Toute la chaîne
@@ -62,11 +70,13 @@ const nextConfig = {
         ],
     },
     async rewrites() {
+        // Sans domaine d'images distinct, les images se servent par /img-handler.
+        if (!imageDomainHost) return [];
         return [
             {
                 // Redirection pour le domaine images vers le handler
                 source: '/:path*',
-                has: [{ type: "host", value: "img.ascencia.re" }],
+                has: [{ type: "host", value: imageDomainHost }],
                 destination: '/img-handler/:path*',
             },
         ];
@@ -126,13 +136,13 @@ const nextConfig = {
                 source: '/:path*',
                 headers: [
                     // Pas d'Access-Control-Allow-Credentials : l'application ne
-                    // s'appelle qu'elle-même. Avec, une page d'img.* ou de
-                    // ascencia.re (origines admises par le proxy) pouvait lire
-                    // les réponses d'une session connectée.
-                    {
-                        key: 'Access-Control-Allow-Origin',
-                        value: 'https://sxm.ascencia.re',
-                    },
+                    // s'appelle qu'elle-même. Avec, une page du domaine d'images
+                    // ou d'une origine supplémentaire (admises par le proxy)
+                    // pourrait lire les réponses d'une session connectée.
+                    // Le proxy remplace cette valeur selon l'origine de la requête.
+                    ...(appOrigin
+                        ? [{ key: 'Access-Control-Allow-Origin', value: appOrigin }]
+                        : []),
                     {
                         key: 'Access-Control-Allow-Headers',
                         value: 'Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range',

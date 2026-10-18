@@ -1,104 +1,122 @@
 "use client";
 
-import { Shield } from "lucide-react";
-import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { useTranslation } from "@/lib/i18n";
+/**
+ * Écran « Sécurité » : l'en-tête (et « Revérifier », qui relit les points de
+ * contrôle), puis cinq onglets gardés dans l'adresse (`?tab=`) : État,
+ * Sessions, Clés API, Connexion, Règles. Chaque onglet ne lit que ses
+ * propres données, au moment où il s'ouvre, avec son attente dessinée à sa
+ * place.
+ */
+
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useQueryState } from "nuqs";
+import { MotionConfig } from "framer-motion";
+import { RefreshCw, Shield } from "lucide-react";
 import { ActionStatus, useFeedback } from "@/components/feedback";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { SecurityTabId } from "@/lib/security/checks";
+import { ApiKeysTab } from "./_components/api-keys-tab";
+import { useAlerts, useChecks } from "./_components/data";
+import { OverviewTab, reviewCount } from "./_components/overview-tab";
+import { ResourceProvider } from "./_components/resource";
+import { RulesTab } from "./_components/rules-tab";
+import { SessionsTab } from "./_components/sessions-tab";
+import { SignInTab } from "./_components/sign-in-tab";
 
-export default function SecurityPageClient() {
-  const { t } = useTranslation();
-  const [isLoading, setIsLoading] = useState(false);
-  // Le résultat de l'analyse s'affiche à côté de son bouton.
-  const scanFeedback = useFeedback({ successDuration: 6000 });
+export const SECURITY_TABS: { id: SecurityTabId; label: string }[] = [
+  { id: "overview", label: "État" },
+  { id: "sessions", label: "Sessions" },
+  { id: "keys", label: "Clés API" },
+  { id: "sign-in", label: "Connexion" },
+  { id: "rules", label: "Règles" },
+];
 
-  const handleSecurityScan = async () => {
-    setIsLoading(true);
-    scanFeedback.clear();
-    try {
-      // Simulation d'une analyse de sécurité
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      scanFeedback.success(t("admin.security.scan.success"));
-    } catch (error) {
-      scanFeedback.error(t("admin.security.scan.error"));
-    } finally {
-      setIsLoading(false);
-    }
+/** Onglet demandé par l'adresse, ou État pour une valeur absente ou inconnue. */
+export function resolveTab(value: string | null | undefined): SecurityTabId {
+  return SECURITY_TABS.some((tab) => tab.id === value) ? (value as SecurityTabId) : "overview";
+}
+
+export default function SecurityPageClient({ ascenciaIssuer = null }: { ascenciaIssuer?: string | null }) {
+  return (
+    <ResourceProvider>
+      <SecurityScreen ascenciaIssuer={ascenciaIssuer} />
+    </ResourceProvider>
+  );
+}
+
+function SecurityScreen({ ascenciaIssuer }: { ascenciaIssuer: string | null }) {
+  // Onglet gardé dans l'adresse (?tab=) : un lien, un rechargement ou le bouton Retour rouvrent le même.
+  const [tabParam, setTabParam] = useQueryState("tab", { history: "push" });
+  const tab = resolveTab(tabParam);
+  const setTab = (next: string) => void setTabParam(next === "overview" ? null : next);
+
+  const checks = useChecks({ auto: false });
+  const alerts = useAlerts({ auto: false });
+  const [checking, setChecking] = useState(false);
+  const feedback = useFeedback({ successDuration: 4000 });
+  const review = checks.state.status === "ready" ? reviewCount(checks.state.data.checks) : 0;
+
+  const recheck = async () => {
+    setChecking(true);
+    feedback.clear();
+    const [result] = await Promise.all([checks.reload(), alerts.reload()]);
+    setChecking(false);
+    if (!result.ok) return void feedback.error(result.error);
+    const count = reviewCount(result.data.checks);
+    feedback.success(count ? `${count} point${count > 1 ? "s" : ""} à revoir` : "Tout est en ordre");
   };
 
   return (
-    <div className="w-full space-y-6">
-      <AdminPageHeader icon={Shield} title={t("admin.security.title")} description={t("admin.security.description")} />
-
-      <Card className="gap-0 rounded-2xl border-border/70 py-0 shadow-sm">
-        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
-            {t("admin.security.scan.title")}
-          </CardTitle>
-          <CardDescription className="text-sm">
-            {t("admin.security.scan.subtitle")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-5 sm:p-6">
-          <div className="space-y-4">
-            <p className="text-sm sm:text-base">
-              {t("admin.security.scan.description")}
-            </p>
-            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-              <Button
-                onClick={handleSecurityScan}
-                loading={isLoading}
-                className="text-sm"
-              >
-                <Shield />
-                {isLoading
-                  ? t("admin.security.scan.running")
-                  : t("admin.security.scan.button")}
+    <MotionConfig reducedMotion="user">
+      <div className="w-full min-w-0 space-y-6">
+        <AdminPageHeader
+          icon={Shield}
+          title="Sécurité"
+          description="L’état de l’instance, les sessions ouvertes, les clés API, les connexions et les règles qui les encadrent."
+          actions={
+            <>
+              <ActionStatus state={feedback.state} />
+              <Button variant="outline" size="sm" className="gap-2" loading={checking} onClick={() => void recheck()}>
+                <RefreshCw aria-hidden className="size-4" />
+                Revérifier
               </Button>
-              <ActionStatus state={scanFeedback.state} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </>
+          }
+        />
 
-      <Card className="gap-0 rounded-2xl border-border/70 py-0 shadow-sm">
-        <CardHeader className="border-b border-border/60 p-5 sm:p-6">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
-            {t("admin.security.coming_soon.title")}
-          </CardTitle>
-          <CardDescription className="text-sm">
-            {t("admin.security.coming_soon.subtitle")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-5 sm:p-6">
-          <div className="space-y-4">
-            <p className="text-sm sm:text-base">
-              {t("admin.security.coming_soon.description")}
-            </p>
-            <ul className="list-disc pl-4 sm:pl-6 space-y-1 sm:space-y-2 text-sm sm:text-base">
-              <li>{t("admin.security.features.password_policies")}</li>
-              <li>{t("admin.security.features.two_factor")}</li>
-              <li>{t("admin.security.features.ip_restrictions")}</li>
-              <li>{t("admin.security.features.sessions")}</li>
-              <li>{t("admin.security.features.login_attempts")}</li>
-              <li>{t("admin.security.features.security_alerts")}</li>
-            </ul>
-            <p className="text-muted-foreground mt-4 text-sm sm:text-base">
-              {t("admin.security.coming_soon.check_back")}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        <Tabs value={tab} onValueChange={setTab} className="min-w-0">
+          {/* Onglets sur plusieurs lignes sur téléphone plutôt qu'une barre qui défile pour quelques pixels ; hauteur fixe des onglets, sinon ils s'étirent. */}
+          <TabsList className="h-auto max-w-full flex-wrap justify-start group-data-[orientation=horizontal]/tabs:h-auto *:data-[slot=tabs-trigger]:h-7.5">
+            {SECURITY_TABS.map((entry) => (
+              <TabsTrigger key={entry.id} value={entry.id} className="gap-1.5">
+                {entry.label}
+                {entry.id === "overview" && review ? (
+                  <span className="rounded-full bg-amber-500/15 px-1.5 text-[11px] tabular-nums text-amber-800 dark:text-amber-300" title={`${review} point${review > 1 ? "s" : ""} à revoir`}>
+                    {review}
+                  </span>
+                ) : null}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TabsContent value="overview" className="min-w-0 pt-4">
+            <OverviewTab onOpenTab={setTab} />
+          </TabsContent>
+          <TabsContent value="sessions" className="min-w-0 pt-4">
+            <SessionsTab />
+          </TabsContent>
+          <TabsContent value="keys" className="min-w-0 pt-4">
+            <ApiKeysTab />
+          </TabsContent>
+          <TabsContent value="sign-in" className="min-w-0 pt-4">
+            <SignInTab ascenciaIssuer={ascenciaIssuer} />
+          </TabsContent>
+          <TabsContent value="rules" className="min-w-0 pt-4">
+            <RulesTab />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </MotionConfig>
   );
 }

@@ -42,6 +42,11 @@ export async function register() {
     import("@/lib/connections/publish-queue")
       .then(({ startPublishQueue }) => startPublishQueue())
       .catch((error) => console.error("[connections] échec de la reprise de la file :", error));
+    // Droits des fichiers de data/, puis ménage quotidien du journal selon la
+    // durée de conservation de l'écran Sécurité.
+    import("@/lib/security/maintenance")
+      .then(({ startSecurityMaintenance }) => startSecurityMaintenance())
+      .catch((error) => console.error("[security] échec du démarrage de la tâche de fond :", error));
     // Prolongation des jetons même sans publication, ménage des liens publics.
     import("@/lib/connections/maintenance")
       .then(({ startConnectionMaintenance }) => startConnectionMaintenance())

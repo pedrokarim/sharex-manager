@@ -1,162 +1,53 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
-import { isEdgeRuntime } from "@/lib/utils";
-import type { LogAction } from "@/lib/types/logs";
-import { getTrustedClientIp } from "@/lib/request-ip";
-
-const imageDomain = process.env.NEXT_PUBLIC_IMAGE_DOMAIN;
+import { CORS_BASE_HEADERS, resolveCorsOrigin } from "@/lib/security/cors";
 
 /**
- * Routes publiques. `"/"` testé avec `startsWith` laisse tout passer : c'est
- * délibéré, ne le referme pas.
+ * Le proxy ne fait qu'ajouter les en-têtes CORS : il laisse passer toutes les
+ * requêtes, sans contrôle de session.
  *
  * Ce proxy voit l'intégralité du trafic, et pas seulement les pages de
- * l'application : le domaine d'images, dont c'est la raison d'être même du
+ * l'application : le domaine d'images, dont c'est la raison d'être même du
  * produit, et tous les fichiers de `public/`. Restreindre ici emporte les deux
  * avec, et le site public se retrouve sans la moindre image. C'est exactement
  * ce qui est arrivé le 22/08/2026 (commit b8bbc66, révoqué).
  *
- * La confidentialité des images est gérée là où elle a du sens, fichier par
- * fichier, dans `app/img-handler/[filename]/route.ts` (`isFileSecure`). Les
- * pages privées sont gardées par le layout du groupe `(app)`, et les deux
- * pages hors de ce groupe (`/dashboard`, `/upgrade`) portent chacune leur
- * propre vérification de session.
+ * Chaque route se garde donc elle-même : les routes d'API par
+ * `lib/api-guard.ts`, la confidentialité des images fichier par fichier dans
+ * `app/img-handler/[filename]/route.ts` (`isFileSecure`), les pages privées
+ * par le layout du groupe `(app)`, et les deux pages hors de ce groupe
+ * (`/dashboard`, `/upgrade`) par leur propre vérification de session.
+ *
+ * L'ancien contrôle de session de ce fichier ne s'exécutait jamais (la liste
+ * des routes publiques contenait `"/"`, testé avec `startsWith`) : il a été
+ * retiré le 18/10/2026, sans changer le comportement.
  */
-const publicRoutes = ["/img-handler", "/", "/login"];
-
-// Configuration CORS – restreint aux domaines autorisés
-const ALLOWED_ORIGINS = [
-  "https://sxm.ascencia.re",
-  "https://ascencia.re",
-  "https://img.ascencia.re",
-];
-
-function getCorsOrigin(req: NextRequest): string {
-  const origin = req.headers.get("origin") || "";
-  if (ALLOWED_ORIGINS.includes(origin)) return origin;
-  // En dev, autoriser localhost
-  if (process.env.NODE_ENV === "development" && origin.startsWith("http://localhost")) return origin;
-  return ALLOWED_ORIGINS[0];
-}
-
-const baseCorsHeaders = {
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-} as const;
-
-const setCorsHeaders = (response: NextResponse, req: NextRequest) => {
-  response.headers.set("Access-Control-Allow-Origin", getCorsOrigin(req));
-  for (const [key, value] of Object.entries(baseCorsHeaders)) {
-    response.headers.set(key, value);
-  }
-  return response;
-};
 
 // Configuration du matcher.
-// Pas de clé `runtime` ici : contrairement à middleware.ts, proxy.ts s'exécute
+// Pas de clé `runtime` ici : contrairement à middleware.ts, proxy.ts s'exécute
 // toujours sur Node.js et Next refuse une config de segment dans ce fichier.
 //
-// Les routes d'envoi de fichiers sont exclues : Next copie en mémoire le corps
+// Les routes d'envoi de fichiers sont exclues : Next copie en mémoire le corps
 // de toute requête qui traverse le proxy et le tronque à 10 Mo
 // (`proxyClientMaxBodySize`), si bien qu'un export de Clip Studio ou une
-// capture ShareX un peu lourde arrivait coupé (« Envoi illisible »). Ces
+// capture ShareX un peu lourde arrivait coupé (« Envoi illisible »). Ces
 // routes vérifient elles-mêmes la session ou le jeton, et sont de même
-// origine : le proxy ne leur apportait rien.
+// origine : le proxy ne leur apportait rien.
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|api/upload$|api/modules/[^/]+/upload$).*)",
   ],
 };
 
-// Fonction de journalisation sécurisée pour le proxy
-const safeLog = async (options: {
-  level: "info" | "warning" | "error";
-  action: LogAction;
-  message: string;
-  userId?: string;
-  userEmail?: string;
-  metadata?: any;
-  ip?: string;
-  userAgent?: string;
-}) => {
-  console.log(
-    `[Edge Runtime Log] ${options.level.toUpperCase()} - ${options.action}: ${
-      options.message
-    }`,
-    {
-      ...options,
-      timestamp: new Date().toISOString(),
-    }
-  );
-};
-
-// Configuration du proxy
-export async function proxy(req: NextRequest) {
-  const path = req.nextUrl.pathname;
-  const url = req.nextUrl.clone();
-
-  // get real domain
-  const realDomain = req.headers.get("host") || url.host || url.hostname;
-
-  // Vérifier si la route est publique
-  if (publicRoutes.some((route) => path.startsWith(route))) {
-    return setCorsHeaders(NextResponse.next(), req);
+export function proxy(req: NextRequest) {
+  const response = NextResponse.next();
+  // Origines admises : `lib/security/cors-origins.mjs` (variables d'environnement).
+  const origin = resolveCorsOrigin(req.headers.get("origin"));
+  // Pas de `Vary: Origin` : les images publiques passent par le cache de
+  // Cloudflare, et le comportement doit rester celui d'avant.
+  if (origin) response.headers.set("Access-Control-Allow-Origin", origin);
+  for (const [key, value] of Object.entries(CORS_BASE_HEADERS)) {
+    response.headers.set(key, value);
   }
-
-  // Gestion des routes API
-  const apiPublicRoutes = {
-    // /api/contact sert le formulaire de la page vitrine : il doit rester
-    // joignable sans session (il a sa propre limitation de débit).
-    exact: ["/api/upload", "/api/logs", "/api/contact"],
-    startsWith: ["/api/auth"],
-  };
-
-  if (path.startsWith("/api")) {
-    // Vérification des routes publiques
-    if (
-      apiPublicRoutes.exact.includes(path) ||
-      apiPublicRoutes.startsWith.some((route) => path.startsWith(route))
-    ) {
-      return setCorsHeaders(NextResponse.next(), req);
-    }
-
-    // Vérification de l'authentification avec Next Auth 5
-    const session = await auth.api.getSession({ headers: req.headers });
-    if (!session) {
-      await safeLog({
-        level: "warning",
-        action: "auth.unauthorized" as LogAction,
-        message: "Tentative d'accès non autorisé à l'API",
-        ip: getTrustedClientIp(req.headers),
-        userAgent: req.headers.get("user-agent") || "unknown",
-        metadata: { path },
-      });
-      return new NextResponse(JSON.stringify({ error: "Non autorisé" }), {
-        status: 401,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": getCorsOrigin(req),
-          ...baseCorsHeaders,
-        },
-      });
-    }
-    return setCorsHeaders(NextResponse.next(), req);
-  }
-
-  // Vérification de l'authentification avec Next Auth 5
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session) {
-    await safeLog({
-      level: "warning",
-      action: "auth.unauthorized" as LogAction,
-      message: "Tentative d'accès non autorisé",
-      ip: getTrustedClientIp(req.headers),
-      userAgent: req.headers.get("user-agent") || "unknown",
-      metadata: { path },
-    });
-    return NextResponse.redirect(new URL("/login", req.nextUrl));
-  }
-
-  return setCorsHeaders(NextResponse.next(), req);
+  return response;
 }

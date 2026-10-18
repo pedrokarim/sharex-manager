@@ -54,7 +54,8 @@ export function AdminPageClient() {
       href: "/admin/security",
       icon: Shield,
       accent: "indigo",
-      tag: t("admin.soon"),
+      title: "Sécurité",
+      description: "Points de contrôle de l’instance, sessions ouvertes, clés API, journal des connexions, limites de débit et alertes.",
     },
   ];
 

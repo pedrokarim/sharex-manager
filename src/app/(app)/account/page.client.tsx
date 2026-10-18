@@ -32,6 +32,8 @@ import { languageAtom } from "@/lib/atoms/preferences";
 import { signOut } from "@/lib/auth-client";
 import { useTranslation } from "@/lib/i18n";
 
+import { AccountSessionsPanel } from "./sessions-panel";
+
 interface AccountSummary {
   name: string;
   email: string;
@@ -249,6 +251,8 @@ export function AccountPageClient({ account }: { account: AccountSummary }) {
         </Card>
       </div>
 
+      <AccountSessionsPanel ascencia={isAscencia} />
+
       <section className="space-y-4 pt-2">
         <div className="space-y-1">
           <h2 className="flex items-center gap-2 text-lg font-semibold sm:text-xl">
@@ -309,7 +313,7 @@ function DetailRow({
     <div className="flex min-w-0 items-center gap-3 py-4 first:pt-5 last:pb-5 sm:first:pt-6 sm:last:pb-6">
       <Icon className="size-4 shrink-0 text-muted-foreground" />
       <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="ml-auto min-w-0 max-w-[52%] truncate text-right text-sm font-medium">
+      <span className="ml-auto min-w-0 max-w-[52%] truncate text-right text-sm font-medium" title={value}>
         {value}
       </span>
     </div>

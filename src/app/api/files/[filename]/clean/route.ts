@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { galleryProvenance, visitorAccess } from "@/lib/provenance/gallery";
-import { checkRateLimit } from "@/lib/rate-limit";
-import { getTrustedClientIp } from "@/lib/request-ip";
+import { checkIpRateLimit } from "@/lib/rate-limit";
 
 /** Un visiteur sans compte ne peut pas en demander à la chaîne : chaque version coûte deux décodages. */
 const VISITOR_RATE = { max: 30, windowMs: 10 * 60 * 1000 };
@@ -17,7 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!(await canRead(filename))) return NextResponse.json({ error: "Fichier introuvable" }, { status: 404 });
 
   if (!signedIn) {
-    const { allowed, retryAfterMs } = checkRateLimit(`clean:${getTrustedClientIp(request.headers)}`, VISITOR_RATE);
+    const { allowed, retryAfterMs } = checkIpRateLimit("clean", request.headers, VISITOR_RATE);
     if (!allowed) {
       return NextResponse.json(
         { error: "Trop de téléchargements d'affilée. Réessayez dans quelques minutes." },

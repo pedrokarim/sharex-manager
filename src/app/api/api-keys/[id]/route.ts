@@ -1,39 +1,19 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { isAdmin } from "@/lib/api-guard";
-import { readFile, writeFile } from "fs/promises";
-import { join } from "path";
+import { isAdmin, withAuth } from "@/lib/api-guard";
 import { NextRequest } from "next/server";
-import { ApiKey } from "@/types/api-key";
 import { logDb } from "@/lib/utils/db";
-
-const API_KEYS_FILE = join(process.cwd(), "data/api-keys.json");
+import { deleteApiKey } from "@/lib/api-key-store";
 
 // DELETE /api/api-keys/[id]
-export async function DELETE(
+export const DELETE = withAuth(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  { params }: { params: Promise<{ id: string }> },
+  session
+) => {
   try {
-    if (!session?.user) {
-      logDb.createLog({
-        level: "warning",
-        action: "admin.action",
-        message: "Tentative de suppression de clé API non autorisée",
-        userId: session?.user?.id || undefined,
-        userEmail: session?.user?.email || undefined,
-      });
-      return new Response("Non autorisé", { status: 401 });
-    }
-
     const { id } = await params;
-    const content = await readFile(API_KEYS_FILE, "utf-8");
-    const keys: ApiKey[] = JSON.parse(content);
-
-    const keyToDelete = keys.find((key) => key.id === id);
     // Seul un admin supprime la clé d'un autre compte.
-    if (!keyToDelete || (!isAdmin(session) && keyToDelete.createdBy !== session.user.id)) {
+    const keyToDelete = await deleteApiKey(id, (key) => isAdmin(session) || key.createdBy === session.user.id);
+    if (!keyToDelete) {
       logDb.createLog({
         level: "warning",
         action: "api.request",
@@ -44,9 +24,6 @@ export async function DELETE(
       });
       return new Response("Clé non trouvée", { status: 404 });
     }
-
-    const newKeys = keys.filter((key) => key.id !== id);
-    await writeFile(API_KEYS_FILE, JSON.stringify(newKeys, null, 2));
 
     logDb.createLog({
       level: "info",
@@ -75,4 +52,4 @@ export async function DELETE(
     });
     return new Response("Erreur serveur", { status: 500 });
   }
-}
+});

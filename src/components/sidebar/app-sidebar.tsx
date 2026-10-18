@@ -119,11 +119,16 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
             url: "/uploads/history",
             icon: History,
           },
-          {
-            title: t("sidebar.main.configuration"),
-            url: "/uploads/config",
-            icon: Settings,
-          },
+          // Réservée aux admins (la page renvoie les autres vers l'accueil).
+          ...(isAdmin
+            ? [
+                {
+                  title: t("sidebar.main.configuration"),
+                  url: "/uploads/config",
+                  icon: Settings,
+                },
+              ]
+            : []),
           {
             title: t("sidebar.main.stats"),
             url: "/uploads/stats",
@@ -164,30 +169,25 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
             icon: Sliders,
           },
           {
-            title: t("sidebar.settings.general"),
-            url: "/settings/general",
-            icon: Settings,
-          },
-          {
             title: t("account.api_keys"),
             url: "/settings/api-keys",
             icon: Key,
-          },
-          {
-            title: t("sidebar.admin.security"),
-            url: "/settings/security",
-            icon: Shield,
           },
           {
             title: t("sidebar.settings.integrations"),
             url: "/settings/integrations",
             icon: Share2,
           },
-          {
-            title: "Modules",
-            url: "/modules",
-            icon: FileImage,
-          },
+          // La gestion des modules est réservée aux admins, comme sa page.
+          ...(isAdmin
+            ? [
+                {
+                  title: "Modules",
+                  url: "/modules",
+                  icon: FileImage,
+                },
+              ]
+            : []),
         ],
       },
     ],

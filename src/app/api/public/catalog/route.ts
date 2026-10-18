@@ -5,9 +5,13 @@ import { isImageFile, isVideoFile } from "@/lib/media-kind";
 import { videoMeta } from "@/lib/media/video";
 import { readCatalogOverview } from "@/lib/public-catalog";
 import { summarizeMonths } from "@/lib/timeline";
+import { securedFileNames, withoutSecuredFiles } from "@/lib/public-album-files";
+import { limitPublicApi } from "@/lib/security/rate-limits";
 
 // GET /api/public/catalog - Récupérer tous les albums publics
 export async function GET(request: NextRequest) {
+  const limited = limitPublicApi(request);
+  if (limited) return limited;
   try {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "20");
@@ -29,8 +33,10 @@ export async function GET(request: NextRequest) {
     if (images) {
       const allImages: Array<{ name: string; addedAt: string; albumSlug: string; albumName: string; durationMs?: number }> = [];
 
+      // Les fichiers sécurisés rangés dans un album public n'en sortent pas.
+      const secured = securedFileNames();
       for (const album of publicAlbums) {
-        const fileEntries = albumsDb.getAlbumFileEntries(album.id);
+        const fileEntries = withoutSecuredFiles(albumsDb.getAlbumFileEntries(album.id), (entry) => entry.fileName, secured);
         const imgs = fileEntries
           .filter((entry) => isImageFile(entry.fileName) || isVideoFile(entry.fileName))
           .map((entry) => ({

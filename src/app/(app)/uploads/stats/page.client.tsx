@@ -21,7 +21,8 @@ import { StatsAnalyticsTab } from "./_components/stats-analytics-tab";
 import { StatsGrowthTab } from "./_components/stats-growth-tab";
 import { StatsNetworkTab } from "./_components/stats-network-tab";
 
-export function StatsPageClient() {
+/** `showNetwork` : l'onglet Réseau montre les adresses IP des envois, réservé aux admins. */
+export function StatsPageClient({ showNetwork = false }: { showNetwork?: boolean }) {
   const { t } = useTranslation();
   const locale = useDateLocale();
   const [tab, setTab] = useQueryState("tab", { defaultValue: "overview" });
@@ -288,7 +289,7 @@ export function StatsPageClient() {
 
       {/* Tabs */}
       <Tabs value={tab} onValueChange={setTab} className="flex-1 gap-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className={cn("grid w-full", showNetwork ? "grid-cols-4" : "grid-cols-3")}>
           <TabsTrigger value="overview" className="gap-1.5">
             <LayoutDashboard className="h-3.5 w-3.5 hidden sm:block" />
             <span className="text-xs sm:text-sm">{t("uploads.stats.tabs.overview")}</span>
@@ -301,10 +302,12 @@ export function StatsPageClient() {
             <TrendingUp className="h-3.5 w-3.5 hidden sm:block" />
             <span className="text-xs sm:text-sm">{t("uploads.stats.tabs.growth")}</span>
           </TabsTrigger>
-          <TabsTrigger value="network" className="gap-1.5">
-            <Network className="h-3.5 w-3.5 hidden sm:block" />
-            <span className="text-xs sm:text-sm">{t("uploads.stats.tabs.network")}</span>
-          </TabsTrigger>
+          {showNetwork ? (
+            <TabsTrigger value="network" className="gap-1.5">
+              <Network className="h-3.5 w-3.5 hidden sm:block" />
+              <span className="text-xs sm:text-sm">{t("uploads.stats.tabs.network")}</span>
+            </TabsTrigger>
+          ) : null}
         </TabsList>
 
         <TabsContent value="overview">
@@ -319,9 +322,11 @@ export function StatsPageClient() {
           <StatsGrowthTab stats={stats} />
         </TabsContent>
 
-        <TabsContent value="network" className="flex flex-col">
-          <StatsNetworkTab />
-        </TabsContent>
+        {showNetwork ? (
+          <TabsContent value="network" className="flex flex-col">
+            <StatsNetworkTab />
+          </TabsContent>
+        ) : null}
       </Tabs>
     </main>
   );

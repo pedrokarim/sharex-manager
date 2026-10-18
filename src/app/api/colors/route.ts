@@ -6,6 +6,7 @@ import { logDb } from "@/lib/utils/db";
 import {
   validateApiKeyForColorExtraction,
   extractApiKeyFromFormData,
+  extractApiKeyFromRequest,
 } from "@/lib/api-key-validator";
 
 interface ColorResult {
@@ -125,7 +126,10 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const image = formData.get("image") as File;
-    const apiKey = extractApiKeyFromFormData(formData);
+    // En-tête `x-api-key` d'abord, comme partout ; le champ `apiKey` du
+    // formulaire reste accepté, déprécié, pour les anciens appelants.
+    const apiKey = extractApiKeyFromRequest(request) ??
+      extractApiKeyFromFormData(formData as unknown as { get(name: string): unknown });
 
     console.log("🔑 Clé API extraite:", apiKey ? "Présente" : "Absente");
 
@@ -163,11 +167,12 @@ export async function POST(request: NextRequest) {
       userId = session.user.id;
       console.log("✅ Accès autorisé via session utilisateur");
     } else if (apiKey) {
-      // Pas de session mais clé API fournie, la valider
+      // Pas de session mais clé API fournie : elle doit porter la permission
+      // « extraction de couleurs ».
       validatedKey = await validateApiKeyForColorExtraction(apiKey);
       if (!validatedKey) {
         return new Response(
-          JSON.stringify({ error: "Clé API invalide ou expirée" }),
+          JSON.stringify({ error: "Clé API invalide, expirée ou sans permission d’extraction de couleurs" }),
           {
             status: 401,
             headers: { "Content-Type": "application/json" },

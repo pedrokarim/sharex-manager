@@ -1,18 +1,13 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { withAuth } from "@/lib/api-guard";
 import { NextResponse } from "next/server";
 import { toggleFileStarred } from "@/lib/starred-files";
 
-export async function PUT(
+export const PUT = withAuth(async (
   request: Request,
-  { params }: { params: Promise<{ filename: string }> }
-) {
+  { params }: { params: Promise<{ filename: string }> },
+  session
+) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) {
-      return new Response("Non autorisé", { status: 401 });
-    }
-
     const { filename } = await params;
     const formData = await request.formData();
     const isStarred = formData.get("isStarred") === "true";
@@ -27,4 +22,4 @@ export async function PUT(
     console.error("Erreur lors de la modification des favoris:", error);
     return new Response("Erreur serveur", { status: 500 });
   }
-}
+});

@@ -1,8 +1,5 @@
-import { writeFile, readFile } from "fs/promises";
-import path from "path";
 import type { NextRequest } from "next/server";
-import type { ApiKey } from "@/types/api-key";
-import { storeDeletionToken } from "@/lib/deletion-tokens";
+import { buildDeletionUrl, storeDeletionToken } from "@/lib/deletion-tokens";
 import { recordUpload } from "@/lib/history";
 import { getServerConfig } from "@/lib/server/config";
 import { handleFileUpload } from "@/lib/upload";
@@ -17,135 +14,13 @@ import { join } from "path";
 import { getSecureFiles } from "@/lib/secure-files";
 import { getStarredFiles } from "@/lib/starred-files";
 import { isVideoFile, maxVideoMb } from "@/lib/media-kind";
-
-const API_KEYS_FILE = path.join(process.cwd(), "data/api-keys.json");
-
-/** La clé existe et n'a pas expiré (les permissions par type se vérifient ensuite). */
-async function isKnownActiveKey(apiKey: string): Promise<boolean> {
-  try {
-    const keys: ApiKey[] = JSON.parse(await readFile(API_KEYS_FILE, "utf-8"));
-    const key = keys.find((entry) => entry.key === apiKey);
-    return Boolean(key && !(key.expiresAt && new Date(key.expiresAt) < new Date()));
-  } catch {
-    return false;
-  }
-}
-
-async function validateApiKey(
-  apiKey: string,
-  fileType: string
-): Promise<ApiKey | null> {
-  try {
-    const content = await readFile(API_KEYS_FILE, "utf-8");
-    const keys: ApiKey[] = JSON.parse(content);
-
-    const key = keys.find((k) => k.key === apiKey);
-    if (!key) {
-      logDb.createLog({
-        level: "warning",
-        action: "api.request",
-        message: "Tentative d'utilisation d'une clé API inexistante",
-        metadata: {
-          apiKey: apiKey.substring(0, 8) + "...", // On ne log que le début de la clé pour la sécurité
-        },
-      });
-      return null;
-    }
-
-    // Vérifier si la clé a expiré
-    if (key.expiresAt && new Date(key.expiresAt) < new Date()) {
-      logDb.createLog({
-        level: "warning",
-        action: "api.request",
-        message: "Tentative d'utilisation d'une clé API expirée",
-        userId: key.id,
-        metadata: {
-          keyName: key.name,
-          expiresAt: key.expiresAt,
-        },
-      });
-      return null;
-    }
-
-    // Vérifier les permissions selon le type de fichier
-    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileType);
-    const isDocument = /\.(pdf|doc|docx|txt)$/i.test(fileType);
-    const isArchive = /\.(zip|rar)$/i.test(fileType);
-
-    if (isImage && !key.permissions.uploadImages) {
-      logDb.createLog({
-        level: "warning",
-        action: "api.request",
-        message: "Tentative d'upload d'image sans permission",
-        userId: key.id,
-        metadata: {
-          keyName: key.name,
-          fileType,
-        },
-      });
-      return null;
-    }
-    if (isDocument && !key.permissions.uploadText) {
-      logDb.createLog({
-        level: "warning",
-        action: "api.request",
-        message: "Tentative d'upload de document sans permission",
-        userId: key.id,
-        metadata: {
-          keyName: key.name,
-          fileType,
-        },
-      });
-      return null;
-    }
-    // Une archive est un fichier comme un autre : elle demande la permission « fichiers ».
-    if (!isImage && !isDocument && !key.permissions.uploadFiles) {
-      logDb.createLog({
-        level: "warning",
-        action: "api.request",
-        message: "Tentative d'upload de fichier sans permission",
-        userId: key.id,
-        metadata: {
-          keyName: key.name,
-          fileType,
-        },
-      });
-      return null;
-    }
-
-    // Mettre à jour la date de dernière utilisation
-    key.lastUsed = new Date().toISOString();
-    await writeFile(API_KEYS_FILE, JSON.stringify(keys, null, 2));
-
-    logDb.createLog({
-      level: "info",
-      action: "api.request",
-      message: "Validation de clé API réussie",
-      userId: key.id,
-      metadata: {
-        keyName: key.name,
-        fileType,
-      },
-    });
-
-    return key;
-  } catch (error) {
-    logDb.createLog({
-      level: "error",
-      action: "system.error",
-      message: "Erreur lors de la validation de la clé API",
-      metadata: {
-        error: error instanceof Error ? error.message : "Unknown error",
-        apiKey: apiKey.substring(0, 8) + "...",
-      },
-    });
-    return null;
-  }
-}
+import { extractApiKeyFromRequest, findActiveApiKey, validateApiKeyForUpload } from "@/lib/api-key-validator";
+import { limitApiKeyUploads } from "@/lib/security/rate-limits";
 
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = request.headers.get("x-api-key");
+    // Envoi ShareX : la clé vient de l'en-tête `x-api-key`, jamais d'un cookie.
+    const apiKey = extractApiKeyFromRequest(request);
     if (!apiKey) {
       logDb.createLog({
         level: "warning",
@@ -164,12 +39,16 @@ export async function POST(request: NextRequest) {
     // Avant de lire le corps : une clé inconnue ou expirée, ou un envoi sans
     // taille annoncée, ne doit pas pouvoir faire charger en mémoire des
     // dizaines de mégaoctets.
-    if (!(await isKnownActiveKey(apiKey))) {
+    const activeKey = await findActiveApiKey(apiKey);
+    if (!activeKey) {
       return new Response(
         JSON.stringify({ error: "Clé API invalide ou permissions insuffisantes" }),
         { status: 403, headers: { "Content-Type": "application/json" } }
       );
     }
+    // Envois par clé et par heure (écran Sécurité), comptés avant de lire le corps.
+    const limited = limitApiKeyUploads(activeKey.id);
+    if (limited) return limited;
     const declared = Number(request.headers.get("content-length"));
     const serverConfig = await getServerConfig();
     const limits = serverConfig.limits;
@@ -203,7 +82,7 @@ export async function POST(request: NextRequest) {
         message: "Tentative d'upload sans fichier",
         metadata: {
           ip: getTrustedClientIp(request.headers),
-          apiKey: apiKey.substring(0, 8) + "...",
+          keyId: activeKey.id,
         },
       });
       return new Response(JSON.stringify({ error: "Aucun fichier fourni" }), {
@@ -212,7 +91,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const validKey = await validateApiKey(apiKey, file.name);
+    const validKey = await validateApiKeyForUpload(apiKey, file.name);
     if (!validKey) {
       return new Response(
         JSON.stringify({
@@ -389,16 +268,26 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const storedName = uploadResult.fileUrl!.split("/").pop()!;
+
+    // Le jeton n'est remis qu'ici, dans le lien de suppression : le serveur
+    // n'en garde que l'empreinte.
+    const deletionUrl = uploadResult.deletionToken
+      ? buildDeletionUrl(request.nextUrl.origin, storedName, uploadResult.deletionToken)
+      : null;
+    if (uploadResult.deletionToken) {
+      await storeDeletionToken(storedName, uploadResult.deletionToken);
+    }
+
     // Enregistrer dans l'historique
     await recordUpload({
-      filename: uploadResult.fileUrl!.split("/").pop()!,
+      filename: storedName,
       originalFilename: file.name,
       fileSize: file.size,
       mimeType: file.type,
       uploadMethod: "api",
       fileUrl: uploadResult.fileUrl!,
       thumbnailUrl: uploadResult.thumbnailUrl,
-      deletionToken: uploadResult.deletionToken,
       ipAddress: getTrustedClientIp(request.headers),
       userId: validKey.id,
       userName: validKey.name,
@@ -496,9 +385,7 @@ export async function POST(request: NextRequest) {
       JSON.stringify({
         url: uploadResult.fileUrl,
         thumbnail_url: uploadResult.thumbnailUrl || null,
-        deletion_url: uploadResult.deletionToken
-          ? `${uploadResult.fileUrl}?token=${uploadResult.deletionToken}`
-          : null,
+        deletion_url: deletionUrl,
         key: {
           name: validKey.name,
           lastUsed: validKey.lastUsed,

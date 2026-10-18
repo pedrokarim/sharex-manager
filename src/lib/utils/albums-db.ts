@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { join } from "path";
 import { existsSync, mkdirSync } from "fs";
+import { newPublicAlbumSlug } from "../album-slug";
 
 export interface Album {
   id: number;
@@ -448,44 +449,40 @@ export class AlbumsDatabase {
     updateQuery.run(fileCount, new Date().toISOString(), albumId);
   }
 
+  /**
+   * Nouvelle adresse publique, unique : préfixe tiré du nom et suffixe
+   * aléatoire (voir `album-slug.ts`). Les albums déjà publics gardent la leur,
+   * qui a pu être partagée ; seule `regeneratePublicSlug` la remplace.
+   */
   public static generateUniqueSlug(
     baseName: string,
     excludeId?: number
   ): string {
     const db = AlbumsDatabase.getConnection();
+    const checkQuery = db.prepare(`
+      SELECT id FROM albums WHERE public_slug = ? AND (? IS NULL OR id != ?)
+    `);
 
-    // Générer un slug à partir du nom
-    const baseSlug = baseName
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // Supprimer les accents
-      .replace(/[^a-z0-9]+/g, "-") // Remplacer les caractères spéciaux par des tirets
-      .replace(/^-+|-+$/g, "") // Supprimer les tirets en début/fin
-      .substring(0, 50); // Limiter la longueur
-
-    let slug = baseSlug || "album";
-    let counter = 0;
-    let isUnique = false;
-
-    while (!isUnique) {
-      const checkQuery = db.prepare(`
-        SELECT id FROM albums WHERE public_slug = ? AND (? IS NULL OR id != ?)
-      `);
-      const existing = checkQuery.get(
-        slug,
-        excludeId || null,
-        excludeId || null
-      );
-
-      if (!existing) {
-        isUnique = true;
-      } else {
-        counter++;
-        slug = `${baseSlug}-${counter}`;
+    // Une collision sur 60 bits n'arrive pas en pratique ; la boucle reste
+    // pour ne jamais donner l'adresse d'un autre album.
+    for (;;) {
+      const slug = newPublicAlbumSlug(baseName);
+      if (!checkQuery.get(slug, excludeId ?? null, excludeId ?? null)) {
+        return slug;
       }
     }
+  }
 
-    return slug;
+  /**
+   * Remplace l'adresse publique d'un album public : l'ancien lien cesse de
+   * fonctionner. Sans effet (null) sur un album privé ou introuvable.
+   */
+  public static regeneratePublicSlug(id: number): Album | null {
+    const album = AlbumsDatabase.getAlbum(id);
+    if (!album || !album.isPublic) return null;
+    return AlbumsDatabase.updateAlbum(id, {
+      publicSlug: AlbumsDatabase.generateUniqueSlug(album.name, id),
+    });
   }
 
   private static mapAlbumFromDb(row: any): Album {

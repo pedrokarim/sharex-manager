@@ -4,10 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/lib/auth-client";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
-import { ApiKey } from "@/types/api-key";
+import type { ApiKeyView, CreatedApiKey } from "@/types/api-key";
 import { ActionStatus, useFeedback } from "@/components/feedback";
-import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { useDateLocale } from "@/lib/i18n/date-locales";
 import { CreateApiKeyDialog } from "@/components/api-keys/create-api-key-dialog";
@@ -33,31 +31,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Copy,
-  CopyCheck,
-  CopyX,
-  Eye,
-  EyeOff,
-  Info,
-  KeyRound,
-  Plus,
-  RotateCw,
-  Trash2,
-} from "lucide-react";
+import { Info, KeyRound, Plus, RotateCw, Trash2 } from "lucide-react";
 
 
 
 export default function ApiKeysPage() {
   const { t } = useTranslation();
   const { data: session, isPending: isSessionPending } = useSession();
-  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [keys, setKeys] = useState<ApiKeyView[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showKey, setShowKey] = useState<string | null>(null);
   const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
   const [selectedKeyForDetails, setSelectedKeyForDetails] =
-    useState<ApiKey | null>(null);
+    useState<ApiKeyView | null>(null);
+  // Clé complète remise à la création : gardée en mémoire le temps de la
+  // copier, jamais relue du serveur (il n'en garde que l'empreinte).
+  const [createdSecret, setCreatedSecret] = useState<{ id: string; key: string } | null>(null);
   const locale = useDateLocale();
   // Un échec de chargement remplace la liste (avec de quoi réessayer) au lieu
   // de laisser croire qu'il n'y a aucune clé.
@@ -66,9 +55,6 @@ export default function ApiKeysPage() {
   // sur la clé concernée.
   const deleteFeedback = useFeedback();
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  // La copie se confirme sur le bouton de la clé copiée.
-  const { copyToClipboard, hasCopied, copyFailed } = useCopyToClipboard();
-  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSessionPending && !session) {
@@ -125,14 +111,15 @@ export default function ApiKeysPage() {
     }
   };
 
-  const copyKey = (key: ApiKey) => {
-    setCopiedKeyId(key.id);
-    copyToClipboard(key.key);
+  const handleCreated = (created: CreatedApiKey) => {
+    const { key, ...view } = created;
+    setCreatedSecret({ id: created.id, key });
+    setSelectedKeyForDetails(view);
+    fetchKeys();
   };
 
-  /** État de copie propre à une clé : seule celle copiée change d'icône. */
-  const copyStateOf = (id: string) =>
-    copiedKeyId === id ? (hasCopied ? "copied" : copyFailed ? "failed" : null) : null;
+  /** Masque d'affichage : le début de la clé, le reste n'est plus connu. */
+  const maskedKey = (key: ApiKeyView) => `${key.prefix || "sk_"}••••••••`;
 
   const deleteStatusOf = (id: string) => (deleteTargetId === id ? deleteFeedback.state : null);
 
@@ -255,10 +242,8 @@ export default function ApiKeysPage() {
                   <div className="grid gap-2 rounded-xl border border-border/60 bg-background px-3 py-3 text-xs">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-muted-foreground">Clé</span>
-                      <code className="max-w-[60%] truncate rounded-full border border-border/60 bg-muted/30 px-2 py-1">
-                        {showKey === key.id
-                          ? key.key
-                          : `${key.key.slice(0, 6)}••••${key.key.slice(-4)}`}
+                      <code className="min-w-0 max-w-[60%] truncate rounded-full border border-border/60 bg-muted/30 px-2 py-1" title={maskedKey(key)}>
+                        {maskedKey(key)}
                       </code>
                     </div>
                     <div className="flex items-center justify-between gap-3">
@@ -303,50 +288,21 @@ export default function ApiKeysPage() {
                         {t("settings.api_keys.permissions.files")}
                       </Badge>
                     )}
+                    {key.permissions.extractColors && (
+                      <Badge variant="secondary" className="text-xs">
+                        Couleurs
+                      </Badge>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <Button
                       variant="outline"
-                      className="text-sm"
+                      className="col-span-2 text-sm"
                       onClick={() => setSelectedKeyForDetails(key)}
                     >
                       <Info className="mr-2 h-4 w-4" />
                       Détails
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="text-sm"
-                      onClick={() =>
-                        setShowKey(showKey === key.id ? null : key.id)
-                      }
-                    >
-                      {showKey === key.id ? (
-                        <EyeOff className="mr-2 h-4 w-4" />
-                      ) : (
-                        <Eye className="mr-2 h-4 w-4" />
-                      )}
-                      {showKey === key.id ? "Masquer" : "Afficher"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className={cn("col-span-2 text-sm", copyStateOf(key.id) === "failed" && "text-destructive")}
-                      onClick={() => copyKey(key)}
-                    >
-                      {copyStateOf(key.id) === "copied" ? (
-                        <CopyCheck className="mr-2 h-4 w-4" />
-                      ) : copyStateOf(key.id) === "failed" ? (
-                        <CopyX className="mr-2 h-4 w-4" />
-                      ) : (
-                        <Copy className="mr-2 h-4 w-4" />
-                      )}
-                      <span aria-live="polite">
-                        {copyStateOf(key.id) === "copied"
-                          ? "Clé copiée"
-                          : copyStateOf(key.id) === "failed"
-                            ? "Copie impossible"
-                            : "Copier la clé"}
-                      </span>
                     </Button>
                     <Button
                       variant="outline"
@@ -427,53 +383,9 @@ export default function ApiKeysPage() {
                         </Button>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <code className="rounded-full border border-border/60 bg-muted/30 px-3 py-1 text-xs">
-                            {showKey === key.id ? key.key : "••••••••"}
-                          </code>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() =>
-                              setShowKey(showKey === key.id ? null : key.id)
-                            }
-                          >
-                            {showKey === key.id ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn("h-8 w-8", copyStateOf(key.id) === "failed" && "text-destructive")}
-                            onClick={() => copyKey(key)}
-                            title={
-                              copyStateOf(key.id) === "copied"
-                                ? "Clé copiée"
-                                : copyStateOf(key.id) === "failed"
-                                  ? "Copie impossible"
-                                  : "Copier la clé"
-                            }
-                          >
-                            {copyStateOf(key.id) === "copied" ? (
-                              <CopyCheck className="h-4 w-4" />
-                            ) : copyStateOf(key.id) === "failed" ? (
-                              <CopyX className="h-4 w-4" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                            <span className="sr-only" aria-live="polite">
-                              {copyStateOf(key.id) === "copied"
-                                ? "Clé copiée"
-                                : copyStateOf(key.id) === "failed"
-                                  ? "Copie impossible"
-                                  : "Copier la clé"}
-                            </span>
-                          </Button>
-                        </div>
+                        <code className="rounded-full border border-border/60 bg-muted/30 px-3 py-1 text-xs">
+                          {maskedKey(key)}
+                        </code>
                       </TableCell>
                       <TableCell className="hidden text-xs sm:table-cell sm:text-sm">
                         {format(new Date(key.createdAt), "dd/MM/yyyy", {
@@ -502,6 +414,11 @@ export default function ApiKeysPage() {
                           {key.permissions.uploadFiles && (
                             <Badge variant="secondary" className="text-xs">
                               {t("settings.api_keys.permissions.files")}
+                            </Badge>
+                          )}
+                          {key.permissions.extractColors && (
+                            <Badge variant="secondary" className="text-xs">
+                              Couleurs
                             </Badge>
                           )}
                         </div>
@@ -548,10 +465,7 @@ export default function ApiKeysPage() {
       <CreateApiKeyDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
-        onSuccess={() => {
-          setShowCreateDialog(false);
-          fetchKeys();
-        }}
+        onCreated={handleCreated}
       />
 
       <AlertDialog
@@ -578,8 +492,18 @@ export default function ApiKeysPage() {
 
       <ApiKeyDetailsDialog
         apiKey={selectedKeyForDetails}
+        secret={
+          selectedKeyForDetails && createdSecret?.id === selectedKeyForDetails.id
+            ? createdSecret.key
+            : null
+        }
         open={!!selectedKeyForDetails}
-        onOpenChange={(open) => !open && setSelectedKeyForDetails(null)}
+        onOpenChange={(open) => {
+          if (open) return;
+          setSelectedKeyForDetails(null);
+          // Fenêtre refermée : la clé complète est oubliée.
+          setCreatedSecret(null);
+        }}
       />
     </div>
   );

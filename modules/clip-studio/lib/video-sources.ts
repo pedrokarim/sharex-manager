@@ -12,15 +12,21 @@
  * des données (ni `.txt` ni `.json`) et ne repartent jamais vers le
  * navigateur : seul l'état (« configuré », date, fin de la clé) en sort. La
  * clé Pexels peut aussi venir de la variable `PEXELS_API_KEY`.
+ *
+ * `video-sources.json` est chiffré (`lib/security/secret-file.ts`) ; le
+ * fichier de cookies reste en clair, en 600 : yt-dlp doit pouvoir le lire.
  */
 
 import fs from "fs";
 import path from "path";
 import { randomBytes } from "crypto";
 import { DATA_DIR, ensureDirs } from "./store";
+import { readSecretJson, writeSecretJson } from "@/lib/security/secret-file";
 
 const COOKIES_FILE = path.join(DATA_DIR, "youtube-cookies.txt");
 const SETTINGS_FILE = path.join(DATA_DIR, "video-sources.json");
+/** Lie le chiffré de `video-sources.json` à ce module. */
+const SETTINGS_CONTEXT = "module:clip-studio:video-sources";
 const PEXELS_ENV = "PEXELS_API_KEY";
 /** Un export de cookies de navigateur tient en quelques dizaines de kilo-octets. */
 const MAX_COOKIES_BYTES = 512 * 1024;
@@ -35,11 +41,15 @@ interface Settings {
 
 function readSettings(): Settings {
   try {
-    const raw = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
+    const raw = readSecretJson<{ pexelsKey?: unknown; cookiesSavedAt?: number; cookiesRejectedAt?: number } | null>(
+      SETTINGS_FILE,
+      SETTINGS_CONTEXT,
+      null
+    );
     return {
       ...(typeof raw?.pexelsKey === "string" && raw.pexelsKey ? { pexelsKey: raw.pexelsKey } : {}),
-      ...(Number.isFinite(raw?.cookiesSavedAt) ? { cookiesSavedAt: raw.cookiesSavedAt } : {}),
-      ...(Number.isFinite(raw?.cookiesRejectedAt) ? { cookiesRejectedAt: raw.cookiesRejectedAt } : {}),
+      ...(Number.isFinite(raw?.cookiesSavedAt) ? { cookiesSavedAt: raw?.cookiesSavedAt } : {}),
+      ...(Number.isFinite(raw?.cookiesRejectedAt) ? { cookiesRejectedAt: raw?.cookiesRejectedAt } : {}),
     };
   } catch {
     return {};
@@ -56,7 +66,8 @@ function writePrivate(file: string, content: string) {
 }
 
 function writeSettings(settings: Settings) {
-  writePrivate(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+  ensureDirs();
+  writeSecretJson(SETTINGS_FILE, SETTINGS_CONTEXT, settings);
 }
 
 // ─── Cookies YouTube ─────────────────────────────────────────────

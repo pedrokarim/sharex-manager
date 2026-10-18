@@ -964,24 +964,6 @@
         "description": "Configure advanced security settings."
       }
     },
-    "security": {
-      "title": "Security",
-      "description": "Configure advanced security settings",
-      "coming_soon": {
-        "title": "Feature Coming Soon",
-        "subtitle": "This section is under development",
-        "description": "Advanced security configuration will be available soon. This section will allow you to:",
-        "check_back": "Check back soon to discover these new features!"
-      },
-      "features": {
-        "password_policies": "Configure password policies",
-        "two_factor": "Manage two-factor authentication (2FA)",
-        "ip_restrictions": "Define IP access restrictions",
-        "sessions": "Configure sessions and their lifetime",
-        "login_attempts": "Manage login attempts and automatic blocking",
-        "security_alerts": "Set up security alerts"
-      }
-    },
     "system": {
       "title": "System Configuration",
       "description": "Manage system settings and upload configuration",
@@ -1391,6 +1373,10 @@
     "make_private": "Make private",
     "copy_public_url": "Copy public URL",
     "open_new_tab": "Open in new tab",
+    "regenerate_link": "New link",
+    "regenerate_link_confirm": "Confirm",
+    "regenerate_link_hint": "The old link will stop working.",
+    "link_regenerated": "New link created",
     "public_album": "Public album",
     "public_album_description": "This album is publicly accessible via the URL below",
     "public_url": "Public URL",
@@ -1404,6 +1390,7 @@
       "remove_file": "Error removing file from album",
       "delete": "Error deleting album",
       "toggle_visibility": "Error updating visibility",
+      "regenerate_link": "Could not change the link",
       "copy_url": "Error copying URL"
     }
   },

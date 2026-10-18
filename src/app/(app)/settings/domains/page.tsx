@@ -1,3 +1,7 @@
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { isAdmin } from "@/lib/api-guard";
 import { readFile } from "fs/promises";
 import { resolve } from "path";
 import { Metadata } from "next";
@@ -36,6 +40,9 @@ async function getDomainsConfig() {
 }
 
 export default async function Page() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session || !isAdmin(session)) redirect("/");
+
   const { domains, config } = await getDomainsConfig();
 
   return <DomainsPage initialDomains={domains} initialConfig={config} />;

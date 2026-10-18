@@ -5,10 +5,13 @@
  *
  * Sans mot de passe, un mot de passe fort est généré et affiché.
  * Le hash passe par ctx.password.hash, donc par la config bcrypt de lib/auth.ts.
+ * Le mot de passe fourni suit la politique de l'écran Sécurité
+ * (`lib/security/password-policy.ts`).
  */
 import { randomBytes } from "crypto";
 
 import { auth } from "@/lib/auth";
+import { checkPassword } from "@/lib/security/password-policy";
 
 const [, , rawUsername, providedPassword] = process.argv;
 
@@ -41,9 +44,9 @@ if (!user) {
   process.exit(1);
 }
 
-const minLength = auth.options.emailAndPassword?.minPasswordLength ?? 8;
-if (password.length < minLength) {
-  console.error(`Mot de passe trop court (minimum ${minLength} caractères).`);
+const check = checkPassword(password);
+if (!check.ok) {
+  console.error(check.message);
   process.exit(1);
 }
 

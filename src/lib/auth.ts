@@ -1,7 +1,6 @@
 import { Database } from "bun:sqlite";
 import { join } from "path";
-import { mkdirSync } from "fs";
-import bcrypt from "bcryptjs";
+import { chmodSync, existsSync, mkdirSync } from "fs";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import {
@@ -17,27 +16,52 @@ import {
   resolveAuthConfig,
   type AscenciaAuthConfig,
 } from "@/lib/auth-config";
+import { createSecurityHooks } from "@/lib/security/auth-hooks";
+import {
+  getPasswordPolicy,
+  hashPassword,
+  PASSWORD_MAX_LENGTH,
+  verifyPassword,
+} from "@/lib/security/password-policy";
+import { appOrigins } from "@/lib/security/cors";
+import { sessionDurations } from "@/lib/security/settings";
 
 const dataDir = join(process.cwd(), "data");
-mkdirSync(dataDir, { recursive: true });
+mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 
-const database = new Database(join(dataDir, "auth.db"));
+const databasePath = join(dataDir, "auth.db");
+const databaseCreated = !existsSync(databasePath);
+const database = new Database(databasePath);
+if (databaseCreated) {
+  // Sessions, comptes et condensats de mots de passe : lisibles du seul serveur.
+  try {
+    chmodSync(databasePath, 0o600);
+  } catch {
+    // Systèmes de fichiers sans droits POSIX : sans effet.
+  }
+}
 const authConfig = resolveAuthConfig();
+
+/**
+ * Durée des sessions et longueur minimale des mots de passe, réglables dans
+ * l'écran Sécurité (`data/security.json`). better-auth les lit une fois, à la
+ * création de l'instance : une modification s'applique au prochain
+ * redémarrage du serveur. La politique complète (longueur et mots de passe
+ * courants) est en plus appliquée à chaque création ou changement par
+ * `lib/security/password-policy.ts`.
+ */
+const { expiresIn, updateAge } = sessionDurations();
+const passwordPolicy = getPasswordPolicy();
+const securityHooks = createSecurityHooks(authConfig.provider);
 
 /**
  * better-auth rejette toute requête dont l'`Origin` ne correspond pas au
  * `baseURL` (l'équivalent d'Auth.js était `trustHost: true`, qui désactivait
  * la vérification). AUTH_URL pointe sur le domaine de production : sans cette
- * liste, se connecter depuis http://localhost:<PORT> renvoie 403.
+ * liste, se connecter depuis http://localhost:<PORT> renvoie 403. La liste
+ * vient de `lib/security/cors.ts`, qui sert aussi le proxy et `next.config.mjs`.
  */
-export const trustedOrigins = [
-  process.env.AUTH_URL,
-  process.env.NEXT_PUBLIC_API_URL,
-  process.env.NEXT_PUBLIC_APP_DOMAIN &&
-    `https://${process.env.NEXT_PUBLIC_APP_DOMAIN}`,
-  process.env.NODE_ENV === "development" &&
-    `http://localhost:${process.env.PORT ?? 3000}`,
-].filter((origin): origin is string => Boolean(origin));
+export const trustedOrigins = appOrigins();
 
 export const auth = betterAuth({
   appName: "ShareX Manager",
@@ -45,6 +69,14 @@ export const auth = betterAuth({
   secret: process.env.AUTH_SECRET,
   baseURL: process.env.AUTH_URL,
   trustedOrigins,
+  session: {
+    expiresIn,
+    updateAge,
+  },
+  hooks: {
+    before: securityHooks.before,
+    after: securityHooks.after,
+  },
   advanced: {
     ipAddress: {
       // Le port applicatif est limité au loopback et Nginx écrase cet en-tête
@@ -59,11 +91,13 @@ export const auth = betterAuth({
     // sont créés par un admin. Laisser l'inscription ouverte donnait un compte
     // à n'importe quel visiteur, puisque le proxy laisse passer /api/auth.
     disableSignUp: true,
+    minPasswordLength: passwordPolicy.minLength,
+    maxPasswordLength: PASSWORD_MAX_LENGTH,
     // Les comptes historiques (data/users.json) portent un hash bcrypt : on garde
     // bcrypt des deux côtés pour que les mots de passe existants restent valides.
     password: {
-      hash: (password) => bcrypt.hash(password, 10),
-      verify: ({ hash, password }) => bcrypt.compare(password, hash),
+      hash: (password) => hashPassword(password),
+      verify: ({ hash, password }) => verifyPassword(password, hash),
     },
   },
   account: {

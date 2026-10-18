@@ -1,204 +1,136 @@
-import { readFile, writeFile } from "fs/promises";
-import path from "path";
-import type { ApiKey } from "@/types/api-key";
+/**
+ * Validation des clés API : la seule, utilisée par `/api/upload` comme par
+ * `/api/colors`.
+ *
+ * La clé présentée est comparée par empreinte SHA-256, à temps constant
+ * (`lib/api-key-store.ts`). Une clé inconnue, expirée ou sans la permission
+ * demandée est refusée de la même façon : l'appelant ne dit pas laquelle des
+ * trois.
+ */
+
+import type { ApiKey, ApiKeyPermission } from "@/types/api-key";
 import { logDb } from "@/lib/utils/db";
+import { displayPrefix, findApiKeyBySecret, isApiKeyExpired, loadApiKeys, touchApiKey } from "@/lib/api-key-store";
 
-const API_KEYS_FILE = path.join(process.cwd(), "data/api-keys.json");
+export const API_KEY_HEADER = "x-api-key";
 
-/**
- * Lit toutes les clés API depuis le fichier de stockage
- */
-async function getApiKeys(): Promise<ApiKey[]> {
+function log(entry: Parameters<typeof logDb.createLog>[0]) {
   try {
-    const content = await readFile(API_KEYS_FILE, "utf-8");
-    return JSON.parse(content);
-  } catch (error) {
-    console.error("Erreur lors de la lecture des clés API:", error);
-    return [];
+    logDb.createLog(entry);
+  } catch {
+    // Journal indisponible : la validation n'en dépend pas.
   }
 }
 
-/**
- * Sauvegarde les clés API dans le fichier de stockage
- */
-async function saveApiKeys(keys: ApiKey[]): Promise<void> {
-  try {
-    await writeFile(API_KEYS_FILE, JSON.stringify(keys, null, 2));
-  } catch (error) {
-    console.error("Erreur lors de la sauvegarde des clés API:", error);
-    throw error;
-  }
+/** Permissions exigées pour envoyer ce fichier, d'après son extension. */
+export function permissionsForFile(filename: string): ApiKeyPermission[] {
+  if (/\.(jpg|jpeg|png|gif|webp)$/i.test(filename)) return ["uploadImages"];
+  if (/\.(pdf|doc|docx|txt)$/i.test(filename)) return ["uploadText"];
+  // Archive, vidéo ou autre : un fichier comme un autre.
+  return ["uploadFiles"];
 }
 
 /**
- * Valide une clé API et retourne les informations de la clé si elle est valide
- * @param apiKey La clé API à valider
- * @param requiredPermissions Permissions requises (optionnel)
- * @returns Les informations de la clé si valide, null sinon
+ * Clé existante et non expirée, sans contrôle de permission ni écriture :
+ * le contrôle rapide fait avant de lire le corps d'un envoi.
+ */
+export async function findActiveApiKey(secret: string | null | undefined): Promise<ApiKey | null> {
+  if (!secret) return null;
+  const key = findApiKeyBySecret(await loadApiKeys(), secret);
+  return key && !isApiKeyExpired(key) ? key : null;
+}
+
+/**
+ * Valide une clé et ses permissions. Renvoie la clé (avec `lastUsed` à jour)
+ * si elle convient, `null` sinon.
  */
 export async function validateApiKey(
-  apiKey: string,
-  requiredPermissions?: {
-    uploadImages?: boolean;
-    uploadText?: boolean;
-    uploadFiles?: boolean;
-    extractColors?: boolean;
-  }
+  secret: string | null | undefined,
+  required: ApiKeyPermission[] = [],
+  context: Record<string, unknown> = {}
 ): Promise<ApiKey | null> {
+  if (!secret) return null;
   try {
-    const keys = await getApiKeys();
-    const key = keys.find((k) => k.key === apiKey);
-
+    const key = findApiKeyBySecret(await loadApiKeys(), secret);
     if (!key) {
-      logDb.createLog({
+      log({
         level: "warning",
         action: "api.request",
         message: "Tentative d'utilisation d'une clé API inexistante",
-        metadata: {
-          apiKey: apiKey.substring(0, 8) + "...",
-        },
+        metadata: { apiKey: `${displayPrefix(secret)}…`, ...context },
       });
       return null;
     }
 
-    // Vérifier si la clé a expiré
-    if (key.expiresAt && new Date(key.expiresAt) < new Date()) {
-      logDb.createLog({
+    if (isApiKeyExpired(key)) {
+      log({
         level: "warning",
         action: "api.request",
         message: "Tentative d'utilisation d'une clé API expirée",
         userId: key.id,
-        metadata: {
-          keyName: key.name,
-          expiresAt: key.expiresAt,
-        },
+        metadata: { keyName: key.name, expiresAt: key.expiresAt, ...context },
       });
       return null;
     }
 
-    // Vérifier les permissions si spécifiées
-    if (requiredPermissions) {
-      const hasRequiredPermissions = Object.entries(requiredPermissions).every(
-        ([permission, required]) => {
-          if (!required) return true;
-          return (
-            key.permissions[permission as keyof typeof key.permissions] === true
-          );
-        }
-      );
-
-      if (!hasRequiredPermissions) {
-        logDb.createLog({
-          level: "warning",
-          action: "api.request",
-          message:
-            "Tentative d'utilisation d'une clé API avec permissions insuffisantes",
-          userId: key.id,
-          metadata: {
-            keyName: key.name,
-            requiredPermissions,
-            actualPermissions: key.permissions,
-          },
-        });
-        return null;
-      }
+    const missing = required.filter((permission) => key.permissions?.[permission] !== true);
+    if (missing.length > 0) {
+      log({
+        level: "warning",
+        action: "api.request",
+        message: "Tentative d'utilisation d'une clé API avec permissions insuffisantes",
+        userId: key.id,
+        metadata: { keyName: key.name, missingPermissions: missing, ...context },
+      });
+      return null;
     }
 
-    // Mettre à jour la date de dernière utilisation
-    key.lastUsed = new Date().toISOString();
-    await saveApiKeys(keys);
+    let lastUsed = key.lastUsed;
+    try {
+      lastUsed = await touchApiKey(key.id);
+    } catch (error) {
+      console.error("[api-keys] dernière utilisation non enregistrée :", (error as Error).message);
+    }
 
-    logDb.createLog({
+    log({
       level: "info",
       action: "api.request",
       message: "Validation de clé API réussie",
       userId: key.id,
-      metadata: {
-        keyName: key.name,
-        requiredPermissions,
-      },
+      metadata: { keyName: key.name, requiredPermissions: required, ...context },
     });
-
-    return key;
+    return { ...key, lastUsed };
   } catch (error) {
-    logDb.createLog({
+    log({
       level: "error",
       action: "system.error",
       message: "Erreur lors de la validation de la clé API",
-      metadata: {
-        error: error instanceof Error ? error.message : "Unknown error",
-        apiKey: apiKey.substring(0, 8) + "...",
-      },
+      metadata: { error: error instanceof Error ? error.message : "Unknown error" },
     });
     return null;
   }
 }
 
-/**
- * Valide une clé API pour l'upload de fichiers
- * @param apiKey La clé API à valider
- * @param fileType Le type de fichier à uploader
- * @returns Les informations de la clé si valide, null sinon
- */
-export async function validateApiKeyForUpload(
-  apiKey: string,
-  fileType: string
-): Promise<ApiKey | null> {
-  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileType);
-  const isDocument = /\.(pdf|doc|docx|txt)$/i.test(fileType);
-  const isArchive = /\.(zip|rar)$/i.test(fileType);
-
-  let requiredPermissions: any = {};
-
-  if (isImage) {
-    requiredPermissions.uploadImages = true;
-  } else if (isDocument) {
-    requiredPermissions.uploadText = true;
-  } else if (isArchive) {
-    requiredPermissions.uploadFiles = true;
-  } else {
-    requiredPermissions.uploadFiles = true;
-  }
-
-  return validateApiKey(apiKey, requiredPermissions);
+/** Valide une clé pour l'envoi de ce fichier (permission selon l'extension). */
+export function validateApiKeyForUpload(secret: string | null | undefined, filename: string): Promise<ApiKey | null> {
+  return validateApiKey(secret, permissionsForFile(filename), { fileType: filename });
 }
 
-/**
- * Valide une clé API pour l'extraction de couleurs
- * @param apiKey La clé API à valider
- * @returns Les informations de la clé si valide, null sinon
- */
-export async function validateApiKeyForColorExtraction(
-  apiKey: string
-): Promise<ApiKey | null> {
-  // Pour l'instant, on accepte toutes les clés valides pour l'extraction de couleurs
-  // On peut ajouter une permission spécifique plus tard si nécessaire
-  return validateApiKey(apiKey);
+/** Valide une clé pour l'extraction de couleurs : permission `extractColors` exigée. */
+export function validateApiKeyForColorExtraction(secret: string | null | undefined): Promise<ApiKey | null> {
+  return validateApiKey(secret, ["extractColors"]);
 }
 
-/**
- * Extrait la clé API depuis les headers ou le FormData
- * @param request La requête NextRequest
- * @returns La clé API ou null si non trouvée
- */
+/** Clé lue dans l'en-tête `x-api-key`, partout le moyen attendu. */
 export function extractApiKeyFromRequest(request: Request): string | null {
-  // Essayer d'abord dans les headers
-  const headerKey = request.headers.get("x-api-key");
-  if (headerKey) {
-    return headerKey;
-  }
-
-  // Si c'est une requête FormData, on ne peut pas l'extraire ici
-  // Il faudra le faire dans la route qui traite le FormData
-  return null;
+  return request.headers.get(API_KEY_HEADER)?.trim() || null;
 }
 
 /**
- * Extrait la clé API depuis FormData
- * @param formData Le FormData de la requête
- * @returns La clé API ou null si non trouvée
+ * Clé lue dans le champ `apiKey` d'un formulaire. Déprécié : seul
+ * `/api/colors` l'accepte encore, après l'en-tête.
  */
-export function extractApiKeyFromFormData(formData: FormData): string | null {
-  const apiKey = formData.get("apiKey");
-  return apiKey ? apiKey.toString() : null;
+export function extractApiKeyFromFormData(formData: { get(name: string): unknown }): string | null {
+  const value = formData.get("apiKey");
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }

@@ -13,6 +13,8 @@ interface SliderWithStopsProps
   stops?: number[];
   /** Libellé d'un palier : « 40 % », « Grasse »… */
   formatStop?: (value: number) => string;
+  /** Valeur lue par un lecteur d'écran (« 7 jours ») quand le curseur porte un indice de palier. */
+  valueText?: string;
 }
 
 /** Diamètre du curseur : Radix le garde dans la piste, son centre va de 8 px à la largeur moins 8 px. */
@@ -45,6 +47,7 @@ const SliderWithStops = React.forwardRef<
       stopInterval = step,
       stops: customStops,
       formatStop = (value) => String(value),
+      valueText,
       ...props
     },
     ref
@@ -99,7 +102,7 @@ const SliderWithStops = React.forwardRef<
           <SliderPrimitive.Track className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-muted">
             <SliderPrimitive.Range className="absolute h-full bg-primary" />
           </SliderPrimitive.Track>
-          <SliderPrimitive.Thumb aria-label={props["aria-label"]} className="block size-4 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50" />
+          <SliderPrimitive.Thumb aria-label={props["aria-label"]} aria-valuetext={valueText} className="block size-4 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50" />
         </SliderPrimitive.Root>
       </div>
     );

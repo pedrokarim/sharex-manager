@@ -14,14 +14,13 @@
 
 import type { NextRequest } from "next/server";
 import { servePublicMedia } from "@/lib/connections/public-media";
-import { checkRateLimit } from "@/lib/rate-limit";
-import { getTrustedClientIp } from "@/lib/request-ip";
+import { checkIpRateLimit } from "@/lib/rate-limit";
 
 /** Un service lit par morceaux : large, mais un balayage de jetons au hasard est vite freiné. */
 const MAX_PER_MINUTE = 600;
 
 function limited(request: NextRequest): Response | null {
-  const limit = checkRateLimit(`connections-media:${getTrustedClientIp(request.headers)}`, { max: MAX_PER_MINUTE, windowMs: 60_000 });
+  const limit = checkIpRateLimit("connections-media", request.headers, { max: MAX_PER_MINUTE, windowMs: 60_000 });
   if (limit.allowed) return null;
   return new Response(JSON.stringify({ error: "Trop de demandes, réessayez dans un instant" }), {
     status: 429,
