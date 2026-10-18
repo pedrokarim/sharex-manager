@@ -222,7 +222,7 @@ async function run(job: PoseJob, model: string, signal: AbortSignal) {
       const prompt = posePrompt(kit, candidate.tags);
       update(candidate.id, { state: "running", prompt });
       try {
-        const image = await generateImage({ prompt, size: candidate.tags.framing === "full" ? "1024x1536" : "1024x1024", references: sheetPaths(kit), model }, signal, (imageJobId) =>
+        const image = await generateImage({ prompt, size: candidate.tags.framing === "full" ? "1024x1536" : "1024x1024", references: sheetPaths(kit).map((file) => ({ file, role: "subject" as const })), model }, signal, (imageJobId) =>
           update(candidate.id, { imageJobId })
         );
         const cut = await cutOutImage(fs.readFileSync(image.path));

@@ -31,8 +31,19 @@ export async function chooseModel(): Promise<string> {
 
 const MIME: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif" };
 
-function reference(file: string) {
-  return { b64: fs.readFileSync(file).toString("base64"), mimeType: MIME[path.extname(file).toLowerCase()] ?? "image/png", role: "reference" as const };
+/**
+ * Image jointe à une génération : un chemin (inspiration libre) ou un chemin
+ * et son rôle pour le moteur. La fiche de modèle de la mascotte est un
+ * `subject` : le moteur garde le personnage, pas seulement l'ambiance.
+ */
+export type ImageReference = string | { file: string; role: "reference" | "style" | "subject" | "composition" | "palette" };
+
+const referenceFile = (entry: ImageReference) => (typeof entry === "string" ? entry : entry.file);
+
+function reference(entry: ImageReference) {
+  const file = referenceFile(entry);
+  const role = typeof entry === "string" ? "reference" : entry.role;
+  return { b64: fs.readFileSync(file).toString("base64"), mimeType: MIME[path.extname(file).toLowerCase()] ?? "image/png", role };
 }
 
 export interface GeneratedImage {
@@ -44,7 +55,7 @@ export interface GeneratedImage {
 
 /** Met une image en file, attend sa fin, et rend le fichier produit. */
 export async function generateImage(
-  input: { prompt: string; size: string; collectionId?: string; references?: string[]; model?: string },
+  input: { prompt: string; size: string; collectionId?: string; references?: ImageReference[]; model?: string },
   signal?: AbortSignal,
   onJob?: (jobId: string) => void
 ): Promise<GeneratedImage> {
@@ -56,7 +67,7 @@ export async function generateImage(
     quality: "medium",
     n: 1,
     collectionId: input.collectionId,
-    references: (input.references ?? []).slice(0, 6).filter((file) => fs.existsSync(file)).map(reference),
+    references: (input.references ?? []).slice(0, 6).filter((entry) => fs.existsSync(referenceFile(entry))).map(reference),
     origin: { module: "brand-kit", feature: "Image de marque" },
   });
   onJob?.(job.id);

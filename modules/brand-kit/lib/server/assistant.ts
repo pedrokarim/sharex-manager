@@ -346,7 +346,7 @@ async function generateCheckedPose(prompt: string, sheetPath: string, collection
   let last: Awaited<ReturnType<typeof generateImage>> | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      last = await generateImage({ prompt, size: "1024x1536", collectionId, references: [sheetPath, ...references].slice(0, 6) }, signal);
+      last = await generateImage({ prompt, size: "1024x1536", collectionId, references: [{ file: sheetPath, role: "subject" as const }, ...references].slice(0, 6) }, signal);
     } catch (error) {
       if (signal.aborted) throw error;
       continue;
@@ -380,7 +380,7 @@ export async function regenerateAsset(kitId: unknown, assetId: unknown, note?: u
     image = result.image;
     check = result.check;
   } else {
-    image = await generateImage({ prompt, size, collectionId: kit.ai.collectionId, references: sheetPath && asset.kind !== "logo" ? [sheetPath, ...references] : references });
+    image = await generateImage({ prompt, size, collectionId: kit.ai.collectionId, references: sheetPath && asset.kind !== "logo" ? [{ file: sheetPath, role: "subject" as const }, ...references] : references });
   }
   // Même identifiant, nouveau fichier : les réglages qui le désignent restent valables.
   const { asset: fresh } = await addImageToKit(kit.id, fs.readFileSync(image.path), asset.kind, asset.label);
