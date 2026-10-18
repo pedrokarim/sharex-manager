@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AlignCenter, AlignLeft, AlignRight, Check, Mic, Palette, X } from "lucide-react";
-import { toast } from "sonner";
+import { AlignCenter, AlignLeft, AlignRight, AudioLines, Check, FlipHorizontal2, Mic, Palette, X } from "lucide-react";
+import { FormStatus, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Toggle } from "@/components/ui/toggle";
 import {
   Select,
   SelectContent,
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { TEXT_PRESETS, videoSpeedPatch } from "../engine/edit";
+import { DEFAULT_DUCK, DUCK_DB_MAX, DUCK_DB_MIN, canDuck, decibelsToDuck, duckToDecibels, voiceWindows } from "../engine/mix";
 import { isVoiceItem } from "../engine/revoice";
 import { MAX_SPEED, MIN_SPEED, speedOf } from "../engine/timeline";
 import type {
@@ -48,10 +50,16 @@ interface InspectorProps {
   brandFonts?: BrandFontChoice[];
   /** Relit tous les extraits de la piste de cette voix avec une autre voix. */
   onChangeTrackVoice?: (trackId: string) => void;
+  /**
+   * Règle le creux sous la voix de toute la piste du son (`undefined` le
+   * retire). Absent : seul le son sélectionné change.
+   */
+  onSetTrackDuck?: (trackId: string, duck: number | undefined, key: string) => void;
 }
 
-export function Inspector({ project, item, onPatch, onClose, onCaption, brandFonts = [], onChangeTrackVoice }: InspectorProps) {
+export function Inspector({ project, item, onPatch, onClose, onCaption, brandFonts = [], onChangeTrackVoice, onSetTrackDuck }: InspectorProps) {
   const fps = project.fps;
+  const track = project.tracks.find((entry) => entry.items.some((other) => other.id === item.id));
   const title =
     item.type === "text" ? "Texte" : item.type === "image" ? "Image" : item.type === "video" ? "Vidéo" : item.type === "shape" ? "Forme" : "Son";
 
@@ -69,6 +77,15 @@ export function Inspector({ project, item, onPatch, onClose, onCaption, brandFon
         {item.type === "video" && <VideoFields item={item} project={project} onPatch={onPatch} />}
         {item.type === "shape" && <ShapeFields item={item} onPatch={onPatch} />}
         {item.type === "audio" && <AudioFields item={item} fps={fps} onPatch={onPatch} />}
+        {track && canDuck(item, track.name) && (
+          <DuckField
+            duck={item.duck}
+            trackName={track.name}
+            shared={track.items.filter((other) => canDuck(other, track.name)).length > 1}
+            hasVoice={voiceWindows(project).length > 0}
+            onChange={(duck, key) => (onSetTrackDuck ? onSetTrackDuck(track.id, duck, key) : onPatch({ duck } as Partial<ClipItem>, key))}
+          />
+        )}
         {item.type === "audio" &&
         item.source.words?.length &&
         !project.tracks.some((track) => track.items.some((other) => other.type === "text" && other.karaoke?.voiceId === item.id)) ? (
@@ -438,6 +455,81 @@ function ImageFields({ item, onPatch }: { item: ImageItem; onPatch: InspectorPro
       <Choice label="Cadrage" value={item.fit} options={{ cover: "Remplir", contain: "Contenir" }} onChange={(fit) => onPatch({ fit } as Partial<ClipItem>, "fit")} />
       <CameraField item={item} onPatch={onPatch} />
       <Slider label="Coins arrondis" min={0} max={200} step={1} value={item.radius} onChange={(radius) => onPatch({ radius } as Partial<ClipItem>, "radius")} />
+      <MirrorField flipped={Boolean(item.flipX)} onChange={(flipX) => onPatch({ flipX: flipX || undefined } as Partial<ClipItem>, "flip")} />
+    </Section>
+  );
+}
+
+/**
+ * Miroir d'une image (une pose de la mascotte tournée vers le contenu…) :
+ * l'image se retourne dans son cadre, à l'aperçu comme à l'export
+ * (`drawFrame`, le même dessin pour les deux).
+ */
+export function MirrorField({ flipped, onChange }: { flipped: boolean; onChange: (flipped: boolean) => void }) {
+  return (
+    <Row label="Miroir">
+      <Toggle
+        variant="outline"
+        size="sm"
+        pressed={flipped}
+        onPressedChange={onChange}
+        title="Retourne l’image de gauche à droite, dans son cadre"
+        className="h-7 gap-1.5 px-2 text-[11px] data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
+      >
+        <FlipHorizontal2 className="size-3.5" />
+        Retourner
+      </Toggle>
+    </Row>
+  );
+}
+
+/**
+ * Creux sous la voix d'une musique (`engine/mix.ts`) : le son baisse pendant
+ * qu'une voix off parle, puis remonte entre les répliques. La profondeur se
+ * règle en dB sous le volume du son.
+ */
+export function DuckField({
+  duck,
+  trackName,
+  shared,
+  hasVoice,
+  onChange,
+}: {
+  duck: number | undefined;
+  trackName: string;
+  /** La piste porte d'autres sons, réglés en même temps. */
+  shared: boolean;
+  hasVoice: boolean;
+  onChange: (duck: number | undefined, key: string) => void;
+}) {
+  const on = duck !== undefined;
+  const depth = on ? duckToDecibels(duck) : duckToDecibels(DEFAULT_DUCK);
+  return (
+    <Section title="Creux sous la voix">
+      <Row label="Baisser ce son quand la voix parle">
+        <Switch checked={on} onCheckedChange={(next) => onChange(next ? DEFAULT_DUCK : undefined, "duck")} aria-label="Creux sous la voix" />
+      </Row>
+      {on && (
+        <>
+          <Slider label="Profondeur" unit="dB" min={DUCK_DB_MIN} max={DUCK_DB_MAX} step={1} value={depth} onChange={(value) => onChange(decibelsToDuck(value), "duck-depth")} />
+          <p className="flex gap-1.5 text-[11px] leading-4 text-muted-foreground">
+            <AudioLines aria-hidden className="mt-px size-3.5 shrink-0" />
+            <span className="min-w-0">
+              Le son descend de {Math.round(depth).toLocaleString("fr-FR")}&nbsp;dB pendant que la voix parle, puis remonte entre les répliques.
+            </span>
+          </p>
+          {!hasVoice && (
+            <p className="text-[11px] leading-4 text-muted-foreground">
+              Aucune voix off dans ce projet pour l’instant&nbsp;: le creux s’entendra dès qu’il y en aura une.
+            </p>
+          )}
+        </>
+      )}
+      {shared && (
+        <p className="text-[11px] leading-4 break-words text-muted-foreground">
+          Réglé pour tous les sons de la piste «&nbsp;{trackName}&nbsp;».
+        </p>
+      )}
     </Section>
   );
 }
@@ -551,15 +643,18 @@ export function ProjectInspector({
   onApplyBrand: (kitId: string | null) => Promise<void>;
 }) {
   const [pending, setPending] = useState<string | null>(null);
+  // L'échec s'affiche sous la liste des marques, là où le geste a eu lieu.
+  const feedback = useFeedback();
   const current = project.brandKitId;
   const known = kits.some((kit) => kit.id === current);
 
   const apply = async (kitId: string | null) => {
     setPending(kitId ?? "none");
+    feedback.clear();
     try {
       await onApplyBrand(kitId);
     } catch (error: any) {
-      toast.error(error?.message ?? "Image de marque impossible à appliquer");
+      feedback.error(error?.message ?? "Image de marque impossible à appliquer");
     } finally {
       setPending(null);
     }
@@ -643,6 +738,7 @@ export function ProjectInspector({
                   </Button>
                 </div>
               )}
+              <FormStatus state={feedback.state} />
             </>
           )}
         </Section>

@@ -44,6 +44,8 @@ function mergeServerKit(local: BrandKit, server: BrandKit): BrandKit {
     assets,
     logoAssetId: server.logoAssetId,
     markAssetId: server.markAssetId,
+    // Style mesuré (D4) : écrit seulement par le serveur, il ne se perd pas dans une fusion.
+    measuredStyle: server.measuredStyle,
     watermark: server.watermark && local.watermark ? { ...local.watermark, assetId: server.watermark.assetId } : server.watermark,
     mascot: server.mascot
       ? {

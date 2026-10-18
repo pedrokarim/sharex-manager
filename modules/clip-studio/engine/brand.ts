@@ -15,6 +15,7 @@ import { backdropOf, legibleKaraoke, legibleStyle, opaqueHex, type Backdrop } fr
 import { getPreset } from "./motion/registry";
 import { needsMirror, rankPoses, readEmotion, readGesture, type PoseFraming, type PoseTags } from "./poses";
 import { wordGroups } from "./render";
+import type { MeasuredStyle } from "./measured-style";
 import { segmentsOf, type EditPace } from "./rhythm";
 import { projectDuration } from "./timeline";
 import type { ClipItem, ClipProject, ImageItem, MediaSource, SegmentCue, ShapeItem, ShapePattern, TextItem, TextRole, TextStyle, ThemeHint, Track } from "./types";
@@ -96,6 +97,11 @@ export interface BrandTheme {
    * la main) : un modèle est monté comme avant.
    */
   pace?: EditPace;
+  /**
+   * Style relevé sur une vidéo de référence (D4), suivi quand le rythme est
+   * « measured », dans les bornes des règles (`measured-style.ts`).
+   */
+  measuredStyle?: MeasuredStyle;
 }
 
 /** Pose de la bibliothèque d'une marque, telle que le moteur la reçoit. */

@@ -55,6 +55,13 @@ import {
   rejectPoseCandidate as rejectPose,
   startPoseGeneration as launchPoses,
 } from "./lib/server/poses";
+import {
+  applyStyleAnalysis as adoptStyle,
+  cancelStyleAnalysis as stopStyleAnalysis,
+  getStyleJob as readStyleJob,
+  listStyleJobs as readStyleJobs,
+  startStyleAnalysis as launchStyleAnalysis,
+} from "./lib/server/reference-video";
 import type { AiModuleReport } from "@/lib/ai-usage/types";
 
 // ─── Consommation des IA (écran `/admin/ai`) ─────────────────────
@@ -208,6 +215,31 @@ export async function acceptPoseCandidate(kitId: string, jobId: string, candidat
 
 export async function rejectPoseCandidate(kitId: string, jobId: string, candidateId: string) {
   return rejectPose(kitId, jobId, candidateId);
+}
+
+// ─── Style mesuré sur une vidéo de référence (07 sexies, D4) ─────
+
+/** Analyse d'une vidéo déposée par la route d'upload ; rend le travail, suivi par `getStyleJob`. */
+export async function startStyleAnalysis(kitId: string, input: { file: string; name?: string }) {
+  return launchStyleAnalysis(kitId, input ?? {});
+}
+
+export async function getStyleJob(jobId: string) {
+  return readStyleJob(jobId);
+}
+
+export async function listStyleJobs(kitId: string) {
+  return readStyleJobs(kitId);
+}
+
+export async function cancelStyleAnalysis(jobId: string) {
+  stopStyleAnalysis(jobId);
+  return { success: true };
+}
+
+/** La marque adopte le relevé ; ses clips suivent alors « D'après la vidéo de référence ». */
+export async function applyStyleAnalysis(kitId: string, jobId: string): Promise<BrandKit> {
+  return adoptStyle(kitId, jobId);
 }
 
 // ─── Comptes connectés (cœur) ────────────────────────────────────

@@ -71,6 +71,8 @@ export type { PoseEmotion, PoseFacing, PoseFraming, PoseGesture, PoseTags } from
 import type { PoseTags } from "@/modules/clip-studio/engine/poses";
 import type { EditPace } from "@/modules/clip-studio/engine/rhythm";
 export type { EditPace } from "@/modules/clip-studio/engine/rhythm";
+import type { MeasuredStyle } from "@/modules/clip-studio/engine/measured-style";
+export type { MeasuredStyle } from "@/modules/clip-studio/engine/measured-style";
 
 export interface BrandAsset {
   id: string;
@@ -220,10 +222,17 @@ export interface BrandKit {
   halftone?: boolean;
   /**
    * Rythme du montage des clips créés avec la marque (D3) : « calm » n'ajoute
-   * rien (montage d'avant), « normal » un changement toutes les 2,5 s au plus,
-   * « lively » toutes les 1,5 s. Absent : « normal ».
+   * rien (montage d'avant), « normal » un changement toutes les 2,2 s au plus,
+   * « lively » toutes les 1,4 s. Absent : « normal ».
    */
   pace?: EditPace;
+  /**
+   * Style relevé sur une vidéo de référence (D4) : durée des plans, zooms,
+   * place et taille des sous-titres, densité des bruitages, chaque valeur avec
+   * sa confiance. Suivi par les clips quand `pace` vaut « measured ». Écrit
+   * seulement par le serveur (`applyStyleAnalysis`) ; la vidéo n'est pas gardée.
+   */
+  measuredStyle?: MeasuredStyle;
   assets: BrandAsset[];
   logoAssetId?: string;
   markAssetId?: string;

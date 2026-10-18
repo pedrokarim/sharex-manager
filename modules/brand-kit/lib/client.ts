@@ -1,7 +1,7 @@
 "use client";
 
 import type { PublishField, TextCount } from "@/lib/connections/types";
-import type { BrandKit, BrandTheme, HashtagRule, KitSummary, PoseTags } from "./types";
+import type { BrandKit, BrandTheme, HashtagRule, KitSummary, MeasuredStyle, PoseTags } from "./types";
 import { MODULE_NAME, MODULE_PATH } from "./types";
 
 export { MODULE_NAME, MODULE_PATH };
@@ -50,6 +50,21 @@ export interface PoseJob {
 /** Adresse d'une pose générée, gardée de côté jusqu'à la décision. */
 export function pendingPoseUrl(kitId: string, file: string): string {
   return `/api/modules/${MODULE_NAME}/data/kits/${kitId}/pending/${file}`;
+}
+
+/** Analyse d'une vidéo de référence (`lib/server/reference-video.ts`, D4). */
+export interface StyleJob {
+  id: string;
+  kitId: string;
+  status: "running" | "done" | "error" | "canceled";
+  phase: "video" | "audio" | "compute";
+  progress: number;
+  referenceName: string;
+  style?: MeasuredStyle;
+  applied?: boolean;
+  error?: string;
+  createdAt: number;
+  finishedAt?: number;
 }
 
 export interface PublishAccount {
@@ -136,6 +151,11 @@ export const api = {
   cancelPoseJob: (jobId: string) => call<{ success: boolean }>("cancelPoseJob", jobId),
   acceptPoseCandidate: (kitId: string, jobId: string, candidateId: string, tags?: PoseTags) => call<BrandKit>("acceptPoseCandidate", kitId, jobId, candidateId, tags),
   rejectPoseCandidate: (kitId: string, jobId: string, candidateId: string) => call<{ success: boolean }>("rejectPoseCandidate", kitId, jobId, candidateId),
+  startStyleAnalysis: (kitId: string, input: { file: string; name: string }) => call<StyleJob>("startStyleAnalysis", kitId, input),
+  getStyleJob: (jobId: string) => call<StyleJob | null>("getStyleJob", jobId),
+  listStyleJobs: (kitId: string) => call<StyleJob[]>("listStyleJobs", kitId),
+  cancelStyleAnalysis: (jobId: string) => call<{ success: boolean }>("cancelStyleAnalysis", jobId),
+  applyStyleAnalysis: (kitId: string, jobId: string) => call<BrandKit>("applyStyleAnalysis", kitId, jobId),
   listPublishAccounts: () => call<PublishAccount[]>("listPublishAccounts"),
   listPublishServices: () => call<PublishService[]>("listPublishServices"),
 };

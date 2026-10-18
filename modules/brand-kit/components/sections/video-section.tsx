@@ -3,8 +3,11 @@
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { PositionPicker } from "@/components/ui/position-picker";
 import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
+import { EDIT_PACES, EDIT_PACE_LABELS, PACE_SHOT_SECONDS, readPace } from "@/modules/clip-studio/engine/rhythm";
 import { watermarkAsset } from "../../lib/theme";
-import { KIT_LIMITS, kitAssetUrl, type BrandKit, type BrandWatermark, type WatermarkAnchor } from "../../lib/types";
+import { KIT_LIMITS, kitAssetUrl, type BrandKit, type BrandWatermark, type EditPace, type WatermarkAnchor } from "../../lib/types";
 import { AssetChooser } from "../asset-chooser";
 import { CountedInput, Field, FieldGroup, SectionHeading, SteppedSliderField, formatPercent, formatSeconds } from "../fields";
 import type { SectionProps } from "./types";
@@ -41,6 +44,59 @@ function WatermarkOverlay({ kit, mark }: { kit: BrandKit; mark: BrandWatermark }
   );
 }
 
+const frenchSeconds = (seconds: number) => `${seconds.toLocaleString("fr-FR")} s`;
+
+/** Ce que chaque rythme change au montage, en une phrase. */
+export const PACE_DESCRIPTIONS: Record<EditPace, string> = {
+  calm: "Le montage d’avant, plans longs.",
+  normal: `Un changement toutes les ${frenchSeconds(PACE_SHOT_SECONDS.normal)} au plus.`,
+  lively: `Un changement toutes les ${frenchSeconds(PACE_SHOT_SECONDS.lively)}.`,
+  measured: "Le montage relevé sur un short que vous aimez (section « Style de référence »).",
+};
+
+/** Plans d'environ 9 secondes de montage, pour dessiner chaque rythme. */
+const PACE_SHOTS: Record<EditPace, number> = { calm: 1, normal: Math.round(9 / PACE_SHOT_SECONDS.normal), lively: Math.round(9 / PACE_SHOT_SECONDS.lively), measured: 6 };
+
+/**
+ * Rythme du montage (D3) : quatre cartes, chacune avec sa phrase et une
+ * bande qui montre ses coupes sur quelques secondes de clip. La dernière (D4)
+ * suit le style mesuré sur une vidéo de référence, et attend qu’il y en ait un.
+ */
+export function PaceField({ value, onChange, measuredReady = false }: { value: EditPace; onChange: (pace: EditPace) => void; measuredReady?: boolean }) {
+  return (
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      spacing={2}
+      value={value}
+      onValueChange={(next) => {
+        const pace = readPace(next);
+        if (pace) onChange(pace);
+      }}
+      aria-label="Rythme du montage"
+      className="grid w-full grid-cols-1 gap-2 @md/form:grid-cols-2 @3xl/form:grid-cols-4"
+    >
+      {EDIT_PACES.map((pace) => (
+        <ToggleGroupItem
+          key={pace}
+          value={pace}
+          // D4 : sans style mesuré appliqué à la marque, ce rythme ne se choisit pas.
+          disabled={pace === "measured" && !measuredReady && value !== "measured"}
+          className="h-auto w-full min-w-0 shrink flex-col items-stretch gap-2 px-3 py-2.5 text-left whitespace-normal data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
+        >
+          <span className="text-sm font-medium">{EDIT_PACE_LABELS[pace]}</span>
+          <span className="flex h-2 w-full gap-0.5" aria-hidden>
+            {Array.from({ length: PACE_SHOTS[pace] }, (_, index) => (
+              <span key={index} className={cn("min-w-0 flex-1 rounded-sm", value === pace ? "bg-primary/70" : "bg-muted-foreground/35")} />
+            ))}
+          </span>
+          <span className="text-xs font-normal break-words text-muted-foreground">{PACE_DESCRIPTIONS[pace]}</span>
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  );
+}
+
 export function VideoSection({ kit, update }: SectionProps) {
   const logos = kit.assets.filter((asset) => asset.kind === "logo" || asset.kind === "logo-mark");
   const poses = kit.assets.filter((asset) => asset.kind === "mascot-pose");
@@ -56,7 +112,7 @@ export function VideoSection({ kit, update }: SectionProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeading title="Vidéo" text="Ce que la marque ajoute à chaque clip de Clip Studio : un filigrane et un carton de fin." />
+      <SectionHeading title="Vidéo" text="Ce que la marque ajoute à chaque clip de Clip Studio : un filigrane, un carton de fin et le rythme du montage." />
 
       <FieldGroup title="Filigrane">
         <label className="flex items-center gap-2.5 text-sm">
@@ -112,6 +168,13 @@ export function VideoSection({ kit, update }: SectionProps) {
             </div>
           </div>
         )}
+      </FieldGroup>
+
+      <FieldGroup
+        title="Rythme du montage"
+        text="Pour les clips créés ensuite avec cette marque, dans Clip Studio ou par l’assistant. Un clip déjà monté ne change pas."
+      >
+        <PaceField value={readPace(kit.pace) ?? "normal"} onChange={(pace) => update((draft) => ({ ...draft, pace }))} measuredReady={Boolean(kit.measuredStyle)} />
       </FieldGroup>
 
       <FieldGroup title="Carton de fin" text="L’aperçu des formats le joue à sa durée réelle.">

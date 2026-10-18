@@ -14,7 +14,7 @@
   "hasUI": false,
   "supportedFileTypes": [],
   "settings": {},
-  "uploads": { "maxMb": 20, "kinds": ["image"] },
+  "uploads": { "maxMb": 200, "kinds": ["image", "video"] },
   "functions": {
     "listKits": "user",
     "getKit": "user",
@@ -46,6 +46,11 @@
     "cancelPoseJob": "user",
     "acceptPoseCandidate": "user",
     "rejectPoseCandidate": "user",
+    "startStyleAnalysis": "user",
+    "getStyleJob": "user",
+    "listStyleJobs": "user",
+    "cancelStyleAnalysis": "user",
+    "applyStyleAnalysis": "user",
     "listPublishAccounts": "user",
     "listPublishServices": "user",
     "getWatermarkImage": "public"

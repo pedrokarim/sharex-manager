@@ -7,13 +7,83 @@
  * `duck` garde exactement son enveloppe d'avant.
  */
 
-import { hasAudio, type AudioItem, type ClipProject, type VideoItem } from "./types";
+import { hasAudio, type AudioItem, type ClipItem, type ClipProject, type VideoItem } from "./types";
 
 /** Descente avant la voix et remontée après elle, en secondes. */
 export const DUCK_ATTACK = 0.12;
 export const DUCK_RELEASE = 0.3;
 /** Deux répliques séparées de moins que ça : la musique reste basse entre les deux. */
 const DUCK_MERGE = 0.6;
+
+/** Creux posé par défaut : la musique à ×0,43 sous la voix, environ 7 dB plus bas (mesuré en D3). */
+export const DEFAULT_DUCK = 0.43;
+/** Profondeur réglable du creux dans l'inspecteur, en dB sous le volume de la musique. */
+export const DUCK_DB_MIN = 3;
+export const DUCK_DB_MAX = 24;
+
+/** Profondeur d'un creux, en dB (positif) : ×0,43 donne environ 7,3 dB. */
+export function duckToDecibels(duck: number): number {
+  const gain = Math.max(10 ** (-DUCK_DB_MAX / 20), Math.min(1, Number.isFinite(duck) ? duck : DEFAULT_DUCK));
+  return -20 * Math.log10(gain);
+}
+
+/** Gain d'un creux depuis sa profondeur en dB, bornée au réglage de l'inspecteur. */
+export function decibelsToDuck(decibels: number): number {
+  const depth = Math.max(DUCK_DB_MIN, Math.min(DUCK_DB_MAX, Number.isFinite(decibels) ? decibels : duckToDecibels(DEFAULT_DUCK)));
+  return 10 ** (-depth / 20);
+}
+
+/** Un son peut-il s'effacer sous la voix ? Tout son, sauf une voix off elle-même. */
+export function canDuck(item: ClipItem, trackName: string): item is AudioItem {
+  return item.type === "audio" && !item.source.words?.length && !item.source.speech && !/^Voix\b/.test(trackName);
+}
+
+/**
+ * Règle le creux sous la voix de tous les sons d'une piste (les voix
+ * exceptées) : une musique coupée en plusieurs extraits s'efface partout de
+ * la même façon. `undefined` le retire : le volume ne bouge plus.
+ */
+export function setTrackDuck(project: ClipProject, trackId: string, duck: number | undefined): ClipProject {
+  const track = project.tracks.find((entry) => entry.id === trackId);
+  if (!track || track.kind !== "audio") return project;
+  const value = duck === undefined ? undefined : Math.max(0, Math.min(1, duck));
+  return {
+    ...project,
+    updatedAt: Date.now(),
+    tracks: project.tracks.map((entry) =>
+      entry.id !== trackId
+        ? entry
+        : {
+            ...entry,
+            items: entry.items.map((item) => {
+              if (!canDuck(item, entry.name)) return item;
+              const { duck: _previous, ...rest } = item;
+              return value === undefined ? rest : { ...rest, duck: value };
+            }),
+          }
+    ),
+  };
+}
+
+/**
+ * Empreinte de ce qui s'entend (sons, volumes, fondus, creux, pistes
+ * muettes) : quand elle change pendant la lecture, l'aperçu reprogramme ses
+ * sons, et un réglage de l'inspecteur s'entend aussitôt.
+ */
+export function audioSignature(project: ClipProject): string {
+  return JSON.stringify(
+    project.tracks
+      .filter((track) => track.items.some(hasAudio))
+      .map((track) => [
+        track.id,
+        Boolean(track.muted),
+        Boolean(track.hidden),
+        track.items
+          .filter(hasAudio)
+          .map((item) => [item.id, item.source.url, item.start, item.duration, item.trimStart, item.volume, item.type === "audio" ? [item.fadeIn, item.fadeOut, item.duck ?? null] : item.speed ?? 1]),
+      ])
+  );
+}
 
 /** Est-ce une voix off ? Un son de synthèse (mots horodatés), ou un son posé sur une piste « Voix ». */
 function isVoice(item: AudioItem | VideoItem, trackName: string): boolean {

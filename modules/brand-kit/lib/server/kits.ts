@@ -224,6 +224,11 @@ export async function registerKitAsset(kitId: unknown, input: { file?: unknown; 
   if (!isFileName(input?.file)) throw new Error("Nom de fichier invalide");
   const dropped = path.join(uploadsDir(), input.file);
   if (!fs.existsSync(dropped)) throw new Error("Fichier déposé introuvable");
+  // Le dépôt accepte aussi les vidéos de référence (D4), plus lourdes : une image est bornée avant d'être lue.
+  if (fs.statSync(dropped).size > MAX_IMAGE_BYTES) {
+    fs.rmSync(dropped, { force: true });
+    throw new Error("Image trop lourde (20 Mo au plus).");
+  }
   try {
     const buffer = fs.readFileSync(dropped);
     return await addImageToKit(kitId, buffer, input.kind, typeof input.label === "string" ? input.label : input.file);

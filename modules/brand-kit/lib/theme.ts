@@ -42,6 +42,8 @@ export function toBrandTheme(kit: BrandKit): BrandTheme {
     ...(kit.halftone ? { halftone: true } : {}),
     // Rythme du montage des clips créés avec la marque (D3) : « normal » tant qu'il n'est pas réglé.
     pace: readPace(kit.pace) ?? "normal",
+    // Style relevé sur une vidéo de référence (D4) : suivi seulement au rythme « measured ».
+    ...(kit.measuredStyle ? { measuredStyle: structuredClone(kit.measuredStyle) } : {}),
     fonts: kit.fonts.map((font) => ({ family: font.family, kitId: kit.id, fontId: font.id })),
     watermark:
       kit.watermark && mark

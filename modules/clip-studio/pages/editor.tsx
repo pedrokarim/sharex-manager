@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
@@ -55,6 +55,7 @@ import {
   updateItem,
   updateTrack,
 } from "../engine/edit";
+import { audioSignature, setTrackDuck } from "../engine/mix";
 import { MediaLibrary, PreviewPlayer } from "../engine/preview";
 import { msToFrames, projectDuration } from "../engine/timeline";
 import {
@@ -197,6 +198,15 @@ function Editor({ initial }: { initial: ClipProject }) {
     player.prefetchAudio();
     if (!player.playing) player.render();
   }, [project]);
+
+  // Un réglage du son (volume, creux sous la voix…) s'entend aussitôt, même pendant la lecture.
+  const soundKey = useMemo(() => audioSignature(project), [project]);
+  const heardKey = useRef(soundKey);
+  useEffect(() => {
+    if (heardKey.current === soundKey) return;
+    heardKey.current = soundKey;
+    playerRef.current?.refreshAudio();
+  }, [soundKey]);
 
   const seek = useCallback((next: number) => playerRef.current?.seek(next), []);
   const togglePlay = useCallback(() => playerRef.current?.toggle(), []);
@@ -523,6 +533,7 @@ function Editor({ initial }: { initial: ClipProject }) {
                       commit((current) => updateItem(current, selected.id, patch), `inspect-${selected.id}-${key}`)
                     }
                     onChangeTrackVoice={setVoiceTrackId}
+                    onSetTrackDuck={(trackId, duck, key) => commit((current) => setTrackDuck(current, trackId, duck), `track-${trackId}-${key}`)}
                   />
                 ) : (
                   <ProjectInspector project={project} kits={brandKits ?? []} onApplyBrand={applyBrand} />

@@ -167,7 +167,7 @@ function sendUpload<T>(url: string, body: Blob | FormData, onProgress?: (loaded:
 }
 
 /** Envoi en morceaux successifs, recollés par le serveur ; la progression couvre tout le fichier. */
-async function uploadInChunks(file: Blob, name: string, onProgress?: (ratio: number) => void): Promise<UploadResult> {
+async function uploadInChunks(file: Blob, name: string, onProgress?: (ratio: number) => void, moduleName = MODULE_NAME): Promise<UploadResult> {
   const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
   const chunks = Math.ceil(file.size / CHUNK_BYTES);
   let result: UploadResult | null = null;
@@ -177,22 +177,26 @@ async function uploadInChunks(file: Blob, name: string, onProgress?: (ratio: num
     // Le nom d'origine part une seule fois, en en-tête : il ne finit ni dans l'adresse ni dans les journaux.
     const query = new URLSearchParams({ upload: id, chunk: String(index), of: String(chunks), size: String(file.size) });
     const extraHeaders = index === 0 ? { "X-File-Name": encodeURIComponent(name) } : undefined;
-    const response = await sendUpload<UploadResult>(`/api/modules/${MODULE_NAME}/upload?${query}`, part, (loaded) => onProgress?.((start + loaded) / file.size), extraHeaders);
+    const response = await sendUpload<UploadResult>(`/api/modules/${moduleName}/upload?${query}`, part, (loaded) => onProgress?.((start + loaded) / file.size), extraHeaders);
     if (index === chunks - 1) result = response;
   }
   return result!;
 }
 
-/** Dépose un fichier dans les données du module, avec suivi de progression. */
+/**
+ * Dépose un fichier dans les données du module (ou d'un autre module qui
+ * accepte les envois, `moduleName`), avec suivi de progression.
+ */
 export function uploadFile(
   file: Blob,
   name: string,
-  onProgress?: (ratio: number) => void
+  onProgress?: (ratio: number) => void,
+  moduleName = MODULE_NAME
 ): Promise<UploadResult> {
-  if (file.size > CHUNK_BYTES) return uploadInChunks(file, name, onProgress);
+  if (file.size > CHUNK_BYTES) return uploadInChunks(file, name, onProgress, moduleName);
   const form = new FormData();
   form.append("file", file, name);
-  return sendUpload<UploadResult>(`/api/modules/${MODULE_NAME}/upload`, form, (loaded) => onProgress?.(loaded / Math.max(1, file.size)));
+  return sendUpload<UploadResult>(`/api/modules/${moduleName}/upload`, form, (loaded) => onProgress?.(loaded / Math.max(1, file.size)));
 }
 
 /** Envoie un fichier local et l'enregistre comme média du module. */

@@ -40,6 +40,7 @@ import {
 } from "../engine/templates";
 import type { BrandTheme } from "../engine/brand";
 import { POSE_EMOTIONS, POSE_GESTURES, readEmotion, readGesture, type PoseEmotion, type PoseGesture } from "../engine/poses";
+import { DEFAULT_DUCK } from "../engine/mix";
 import type { EditPace } from "../engine/rhythm";
 import type { AspectPreset, ClipProject, MediaSource } from "../engine/types";
 import { addItem, createMusicItems } from "../engine/edit";
@@ -308,7 +309,7 @@ export function startAssistant(request: AssistantRequest): AssistantJob {
  * −16,5 LUFS à 0,9) : 0,28 × 0,43 ≈ 0,12 met la musique environ 12 dB sous la
  * voix pendant qu'elle parle.
  */
-export const MUSIC_UNDER_VOICE = { volume: 0.28, duck: 0.43 };
+export const MUSIC_UNDER_VOICE = { volume: 0.28, duck: DEFAULT_DUCK };
 
 /** Rythme d'un clip de l'assistant : celui de la marque, sinon le rythme normal. */
 export function assistantPace(brand: Pick<AssistantBrand, "theme"> | null): EditPace {

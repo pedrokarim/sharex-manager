@@ -6,7 +6,9 @@
  * canevas : un même modèle fonctionne en 9:16, 16:9, 1:1 ou 4:5.
  */
 
-import { accentOf, applyBrandTheme, paintFill, shade, themedTextStyle, type BrandTheme } from "./brand";
+import { accentOf, applyBrandTheme, paintFill, shade, SHORT_SAFE_ZONE, themedTextStyle, type BrandTheme } from "./brand";
+import { captionCenterBounds, captionLineCount, measuredPlan, type MeasuredPlan } from "./measured-style";
+import { ASPECTS } from "./types";
 import {
   appendSequence,
   createCaptionItem,
@@ -18,6 +20,7 @@ import {
 } from "./edit";
 import type { PoseEmotion, PoseGesture } from "./poses";
 import { addBeats, cutShots, fillStills, type EditPace } from "./rhythm";
+import { wordGroups } from "./render";
 import type {
   AspectPreset,
   AudioItem,
@@ -179,6 +182,8 @@ export interface TemplateLayout {
   onWord?: boolean;
   /** Une place est gardée à la mascotte de la marque (ouverture, conclusion, choix du quiz). */
   mascot?: boolean;
+  /** Sous-titres d'un style mesuré (D4) : centre, taille de police et mots à l'écran, déjà bornés. */
+  caption?: MeasuredPlan["caption"];
 }
 
 class Builder {
@@ -397,13 +402,25 @@ function spokenCaption(b: Builder, voice: AudioItem | undefined, y: number): Tex
   if (!b.layout.captions || !voice || !words?.length) return null;
   const caption = createCaptionItem(words, voice.start, b.fps, b.vertical);
   caption.duration = voice.duration;
-  caption.karaoke = { ...caption.karaoke!, voiceId: voice.id };
+  caption.karaoke = { ...caption.karaoke!, voiceId: voice.id, ...(b.layout.caption ? { groupSize: b.layout.caption.groupSize } : {}) };
   caption.transform = { ...caption.transform, y };
+  if (b.layout.caption) {
+    // Style mesuré : la taille de la référence ; la lisibilité (contour, contraste) vient ensuite de la marque.
+    const { size, groupSize } = b.layout.caption;
+    caption.style = { ...caption.style, size };
+    // Un groupe qui passe sur deux lignes remonte d'autant : le bloc reste dans la zone visible du short.
+    const groups = wordGroups(words, groupSize).map((group) => group.map((index) => words[index].text).join(" "));
+    const bounds = captionCenterBounds(size, SHORT_SAFE_ZONE, captionLineCount(groups, size, b.project));
+    caption.transform.y = Math.min(bounds.max, Math.max(bounds.min, y));
+  }
   return b.add("Sous-titres", caption);
 }
 
-/** Hauteur des sous-titres mot à mot : en bas du tiers central d'un short, au bas d'un cadre large. */
-const captionY = (b: Builder) => (b.vertical ? 0.67 : 0.8);
+/**
+ * Hauteur des sous-titres mot à mot : en bas du tiers central d'un short, au
+ * bas d'un cadre large ; celle de la référence avec un style mesuré (D4).
+ */
+const captionY = (b: Builder) => b.layout.caption?.y ?? (b.vertical ? 0.67 : 0.8);
 
 const STOP_WORDS = new Set(["les", "des", "une", "aux", "the", "and", "logo", "app", "icon", "key", "art", "official", "officiel", "officielle", "game", "jeu"]);
 
@@ -1035,7 +1052,8 @@ export interface BuildOptions {
   /**
    * Rythme du montage (D3). Absent : celui de la marque ; sans marque ni
    * rythme, le modèle est monté comme avant, au pixel près. « calm » garde le
-   * montage d'avant, avec la place réservée à la mascotte.
+   * montage d'avant, avec la place réservée à la mascotte. « measured » suit
+   * le style mesuré de la marque (D4), « normal » sans lui.
    */
   pace?: EditPace;
 }
@@ -1063,8 +1081,12 @@ export function buildFromTemplate(
   const pace = options.pace ?? theme?.pace;
   // L'Avant / Après garde ses deux images immobiles et alignées : ni découpe ni secousse.
   const lively = pace !== undefined && pace !== "calm" && template !== "before-after";
+  // Style mesuré sur une vidéo de référence (D4), borné par les règles ; sans lui, le rythme normal.
+  const plan = lively && pace === "measured" ? measuredPlan(theme?.measuredStyle, ASPECTS[aspect], SHORT_SAFE_ZONE) : null;
   const layout: TemplateLayout =
-    pace === undefined ? {} : { captions: lively, onWord: lively, mascot: Boolean(theme?.mascot?.library?.length) };
+    pace === undefined
+      ? {}
+      : { captions: lively, onWord: lively, mascot: Boolean(theme?.mascot?.library?.length), ...(plan?.caption ? { caption: plan.caption } : {}) };
   let project =
     template === "free"
       ? buildFree(name, aspect, data as FreeData, layout)
@@ -1075,8 +1097,8 @@ export function buildFromTemplate(
           : template === "before-after"
             ? buildBeforeAfter(name, aspect, data as BeforeAfterData)
             : buildSlideshow(name, aspect, data as SlideshowData, layout);
-  if (lively) project = cutShots(project, pace);
+  if (lively) project = cutShots(project, pace, plan);
   if (theme) project = applyBrandTheme(project, theme);
-  if (lively) project = fillStills(addBeats(project, pace), pace);
+  if (lively) project = fillStills(addBeats(project, pace, plan), pace, plan);
   return project;
 }

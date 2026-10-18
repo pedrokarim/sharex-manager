@@ -14,6 +14,7 @@ import {
   Image as ImageIcon,
   Palette,
   RefreshCw,
+  Ruler,
   Send,
   Smile,
   Sparkles,
@@ -41,13 +42,14 @@ import { MascotSection } from "../components/sections/mascot-section";
 import { PublishingSection } from "../components/sections/publishing-section";
 import { TypographySection } from "../components/sections/typography-section";
 import { VideoSection } from "../components/sections/video-section";
+import { ReferenceStyleSection } from "../components/sections/reference-style-section";
 import { api, downloadBase64, errorMessage } from "../lib/client";
 import type { FormatId } from "../lib/formats";
 import { MODULE_PATH } from "../lib/types";
 import { useElementWidth, useFillHeight, useStoredLayout } from "../lib/use-editor-layout";
 import { useKitEditor, type SaveState } from "../lib/use-kit-editor";
 
-type SectionId = "identity" | "colors" | "typography" | "logos" | "mascot" | "video" | "ai" | "publishing";
+type SectionId = "identity" | "colors" | "typography" | "logos" | "mascot" | "video" | "ai" | "publishing" | "style";
 
 /**
  * Sections de l'éditeur, et le format où chacune se voit le mieux : en
@@ -64,6 +66,8 @@ const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; format?: Forma
   { id: "video", label: "Vidéo", icon: Clapperboard, format: "endcard-vertical" },
   { id: "ai", label: "Assistant IA", icon: Sparkles },
   { id: "publishing", label: "Publication", icon: Send },
+  // Style mesuré sur une vidéo de référence (07 sexies, D4).
+  { id: "style", label: "Style de référence", icon: Ruler, format: "endcard-vertical" },
 ];
 
 /** En dessous, les trois panneaux ne tiennent plus côte à côte. */
@@ -108,7 +112,7 @@ export default function EditorPage() {
     if (target) setFormat(target);
   }, []);
 
-  // Touches 1 à 8 : une section, hors d'un champ de saisie.
+  // Touches 1 à 9 : une section, hors d'un champ de saisie.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey || event.repeat || isEditable(event.target)) return;
@@ -228,6 +232,7 @@ export default function EditorPage() {
             {section === "video" && <VideoSection {...sectionProps} />}
             {section === "ai" && <AiSection {...sectionProps} />}
             {section === "publishing" && <PublishingSection {...sectionProps} />}
+            {section === "style" && <ReferenceStyleSection {...sectionProps} />}
           </motion.div>
         </AnimatePresence>
       ) : (

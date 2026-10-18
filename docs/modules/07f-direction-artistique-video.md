@@ -297,7 +297,144 @@ supprime.
   Contraste des textes mesuré sur les pixels, textes posés : 5,54:1 au plus
   bas. Bruitages : 2 au libre et au diaporama (accroche, fin), 3 au quiz et
   au classement (plus la révélation), 0 en rythme calme.
-- **Reste à faire** (interface, hors de ce lot) : le choix « Rythme du
-  montage » dans l’éditeur de la marque, et dans l’inspecteur de Clip Studio
-  le miroir d’une image et le creux sous la voix d’une musique (`flipX`,
-  `duck` se règlent aujourd’hui par le projet).
+- **Réglages dans l’interface : faits** (octobre 2026).
+  - Éditeur de la marque, section Vidéo : « Rythme du montage », trois cartes
+    (Calme : le montage d’avant, plans longs ; Normal : un changement toutes
+    les 2,2 s au plus ; Vif : toutes les 1,4 s), plus une quatrième,
+    « D’après la vidéo de référence », active une fois le style D4
+    appliqué ; chacune avec une bande qui
+    dessine ses coupes. Le choix écrit `pace`, gardé par `sanitizeKit` (une
+    valeur inconnue garde celle enregistrée), lu par `toBrandTheme`, puis par
+    `buildFromTemplate` quand Clip Studio (fenêtre de création) ou l’assistant
+    (`assistantPace`) crée le clip. Un clip déjà monté ne change pas.
+    L’aperçu des formats de la marque ne le montre pas : ce sont des images
+    fixes.
+  - Inspecteur de Clip Studio, image sélectionnée : « Miroir » (`flipX`),
+    dessiné par `drawFrame`, le même rendu pour l’aperçu et l’export.
+  - Inspecteur de Clip Studio, son qui n’est pas une voix : « Creux sous la
+    voix » (`duck`), activé à ×0,43 comme la musique de l’assistant, profondeur
+    réglable de 3 à 24 dB (`duckToDecibels`, `decibelsToDuck`). Il se pose sur
+    tous les sons de la piste (`setTrackDuck`) : une musique coupée en
+    plusieurs extraits s’efface partout pareil. Un réglage du son s’entend
+    aussitôt : l’aperçu reprogramme ses sons pendant la lecture quand
+    `audioSignature` change.
+
+### D4 – Style mesuré : fait (octobre 2026)
+
+Une marque peut adopter le montage d’un short qu’elle aime : elle dépose la
+vidéo, le serveur la mesure avec ffmpeg et des calculs classiques (aucun
+modèle appris), puis « Appliquer à la marque » range le relevé dans la fiche.
+Les clips créés ensuite au rythme « D’après la vidéo de référence » (`pace`
+`measured`, quatrième carte de « Rythme du montage ») le suivent, dans les
+bornes des règles ci-dessus.
+
+- **Analyse** (`brand-kit/lib/reference-analysis.ts`, pur ; décodage dans
+  `lib/server/reference-video.ts`) : images grises de 432 px de large, dix par
+  seconde, et son mono à 16 kHz, lus au fil de l’eau sur la sortie de ffmpeg
+  (arguments en tableau, sans shell, délai maximal, annulation).
+  - **Coupes** : 1 − corrélation entre deux vignettes successives (la bande
+    des sous-titres ignorée) ; une coupe est un écart isolé, quatre fois
+    l’écart habituel autour de lui. Un passage au noir de moins d’une
+    demi-seconde ne compte pas comme un plan. Relevé : médiane, quartiles,
+    plus long, histogramme par 0,5 s. Fiable sur des coupes franches ; un
+    fondu enchaîné long peut passer inaperçu.
+  - **Mouvements** : la dernière image de chaque plan recalée sur la
+    première (zoom de ×0,77 à ×1,3, décalage jusqu’à 12 %, recherche
+    grossière puis fine), ramenée à toute la durée du plan. Un plan dont le
+    mouvement n’explique pas les changements (sujet qui bouge, vidéo filmée)
+    est écarté, et la fiabilité baisse d’autant.
+  - **Sous-titres** : lignes très chargées en contours forts, regroupées en
+    bandes ; parmi les hauteurs qui reviennent, celle dont le texte change le
+    plus (un titre fixe ou une interface ne sont pas des sous-titres). Relevé :
+    centre, bande habituelle, hauteur d’une ligne, mots à l’écran (le compte
+    le plus fréquent, seulement s’il revient sur un quart des images : un fond
+    très chargé le fausse). Le détecteur ONNX de Scan Studio n’est pas repris :
+    il tourne dans le navigateur, n’est installé que sur demande d’un
+    administrateur et a été entraîné sur des pages de bande dessinée.
+  - **Bruitages** : séparation harmonique / percussive du spectrogramme par
+    filtres médians ; une attaque compte si sa partie percussive monte de
+    12 dB et dépasse les consonnes de la voix (neuvième décile + 6 dB,
+    99ᵉ centile + 1 dB), ou si un son tenu surgit au-dessus de la voix (cloche,
+    note). Au-delà de 30 attaques par minute, ce sont surtout des notes de
+    musique : la mesure est montrée « trop incertaine » et n’est pas appliquée.
+  - **Non mesuré** : le niveau de la musique sous la voix (il faudrait un
+    modèle pour séparer musique et voix). Chaque mesure manquante est dite
+    avec sa raison, et le moteur garde alors la valeur de D3.
+- **Réception** : route d’upload des modules (envoi en morceaux au-delà de
+  48 Mo), type réel lu sur les premiers octets (MP4, MOV, WebM), 200 Mo et
+  3 minutes au plus, 3 s au moins ; une analyse par marque, deux sur le
+  serveur. La vidéo attend dans `kits/<id>/reference/` puis est effacée à la
+  fin de l’analyse, réussie ou non : la marque ne garde que le relevé, le nom
+  du fichier, sa durée, ses dimensions et la date (`measuredStyle`). Le
+  relevé n’entre dans la fiche que par le serveur (`applyStyleAnalysis`) :
+  l’éditeur peut le retirer, jamais le réécrire. Fonctions déclarées « user »
+  dans `module.json`.
+- **Application** (`clip-studio/engine/measured-style.ts`, `rhythm.ts`,
+  `templates.ts`), seulement les mesures de fiabilité ≥ 50 % :
+  - plans de la durée médiane (0,8 à 2,2 s), jamais plus longs que le
+    troisième quartile ni que 2,4 s : le critère de D3 (2,5 s sans changement)
+    tient toujours ;
+  - la part de plans animés de la référence, les autres fixes ; chaque coupe
+    change réellement le cadrage (un zoom arrière qui finit au repos n’est
+    jamais suivi d’un plan fixe au repos : celui-ci est serré à ×1,15). Les
+    préréglages du moteur ont une ampleur fixe (×1,15, ou ×1,3 pour une
+    référence qui zoome plus) ; un panoramique va dans le sens où l’image n’a
+    que la marge du zoom (une photo paysage dans un short glisse
+    verticalement, au lieu d’être balayée d’un bord à l’autre en une seconde) ;
+  - sous-titres d’un short : taille de la référence (hauteur mesurée divisée
+    par 0,86, étalonné sur des sous-titres rendus par le moteur), bornée de
+    3,5 à 8,5 % de la hauteur ; mots à l’écran de 1 à 4 ; centre de la
+    référence, mais le bloc entier reste dans la zone visible du short : un
+    sous-titre dont un groupe de mots passe sur deux lignes remonte d’autant.
+    Contour, couleurs et contraste restent ceux de D1 (`legibleKaraoke`) ;
+  - bruitages : la densité de la référence, 24 par minute au plus, à 1 s l’un
+    de l’autre au moins, toujours sur des temps forts : l’accroche, la
+    révélation et la fin d’abord, puis le début des segments et les visuels
+    qui arrivent sur le mot, puis les coupes, répartis sur le clip.
+  - Sans style mesuré, « D’après la vidéo de référence » monte exactement
+    comme « Normal ».
+- **Interface** (éditeur de la marque, section « Style de référence »,
+  touche 9) : dépôt par glisser ou « Choisir une vidéo » (le sélecteur commun
+  ne choisit que des images), avancement de l’envoi puis de l’analyse par
+  étape, « Annuler ». Le relevé est un panneau à en-tête (nom, durée,
+  dimensions, date), une ligne par mesure : histogramme des plans,
+  répartition zooms / panoramiques / plans fixes, silhouette d’écran 9:16 avec
+  la zone visible, la bande des sous-titres et le trait où le moteur les
+  posera, bruitages par minute, fiabilité de chaque valeur, raisons de ce qui
+  manque, puis « Ce que les clips reprendront » une fois les bornes
+  appliquées. Mise en page mesurée dans Chrome à 390 et 1440 px (thèmes
+  clair et sombre) : ni débordement ni chevauchement ; les états « envoi » et
+  « analyse en cours » n’ont été vus que dans le code, pas rendus.
+- **Vérifié sur une vraie vidéo.** Référence fabriquée avec ffmpeg : 16 plans
+  de durées connues (médiane 1,3 s, quartiles 1,1 et 1,53 s, plus long 2 s),
+  8 zooms de ×1,12, 4 panoramiques, 4 plans fixes ; sous-titres drawtext
+  (Arial gras, capitales, contour noir) de deux mots centrés à 72 % ; une
+  voix factice et 8 bruitages à des instants connus (22,4 par minute).
+  L’analyse rend exactement ces valeurs (zoom ×1,12, centre à 71,9 %, ligne
+  de 5,73 %, 2 mots, les 8 bruitages à moins de 20 ms). Une marque inventée
+  (« Atelier Brume », sans mascotte) l’applique ; un clip libre de cinq
+  segments est rendu par `drawFrame` (30 images par seconde, son mixé
+  d’après les pistes), encodé, puis mesuré par la même analyse :
+
+  | Mesure | Référence | Clip test | Clip au rythme normal |
+  | --- | --- | --- | --- |
+  | Plans, médiane (quartiles) | 1,3 s (1,1 à 1,53) | 1,4 s (1,3 à 1,4) | 1,9 s (1,65 à 2) |
+  | Plus long plan | 2 s | 3,5 s (la conclusion, sur un aplat) | 5,3 s |
+  | Plans animés / zooms | 75 % / 50 % | 60 % / 35 % | 75 % / 63 % |
+  | Zoom typique | ×1,12 | ×1,19 (préréglage ×1,15) | ×1,18 |
+  | Ligne de sous-titres | 5,73 % | 5,73 % | 4,43 % |
+  | Mots à l’écran | 2 | 2 | 1 |
+  | Centre des sous-titres | 71,9 % (69 à 74,7) | 67,6 % | 69,5 % |
+  | Bruitages par minute | 22,4 | 23,8 (14 posés) | 6,3 |
+
+  Le rythme des coupes, la taille des sous-titres, les mots à l’écran et la
+  densité des bruitages tombent dans les valeurs de la référence. Écarts
+  connus : le centre des sous-titres remonte de 4 % parce que des groupes de
+  mots de cette narration passent sur deux lignes et que le bloc doit rester
+  dans la zone visible (une variante aux mots courts, sans retour à la
+  ligne, les pose à 70,4 %, dans la bande de la référence) ; le plus long
+  « plan » mesuré est la conclusion sur un aplat, animée par un zoom bref et
+  non par une coupe ; la part de plans animés mesurée compte aussi ces
+  aplats fixes. Sur un export réel d’avant D3 (voix et musique, sans
+  bruitage), les textes sont trouvés à leur place, mais la musique donne
+  62 « attaques » par minute : mesure marquée trop incertaine, non appliquée.

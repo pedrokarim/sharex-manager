@@ -7,6 +7,15 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Image de marque, « Style de référence » : une marque adopte le montage
+  d’un short qu’elle aime. La vidéo déposée est mesurée par ffmpeg, sans IA
+  (durée des plans, part de plans animés et zooms, place et taille des
+  sous-titres, mots à l’écran, bruitages par minute, chacun avec sa
+  fiabilité ; ce qui n’a pas pu être mesuré est dit), puis effacée. Le
+  relevé s’affiche en panneau (histogramme, silhouette d’écran) et
+  s’applique à la marque : les clips suivent alors le rythme « D’après la
+  vidéo de référence », dans les bornes de lisibilité et de rythme de la
+  direction artistique.
 - AI Image Gen, images de référence : chaque image jointe a un rôle,
   choisi dans un menu sur sa vignette : Inspiration, Style, Sujet,
   Composition, Couleurs ou Retouche, chacun décrit. Le rôle devient une

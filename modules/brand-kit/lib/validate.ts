@@ -9,6 +9,7 @@
 
 import { isCatalogFamily } from "@/modules/clip-studio/lib/font-catalog";
 import { TEXT_ROLES } from "@/modules/clip-studio/engine/brand";
+import { readMeasuredStyle } from "@/modules/clip-studio/engine/measured-style";
 import { readPace } from "@/modules/clip-studio/engine/rhythm";
 import { HASHTAG_RULES } from "@/modules/clip-studio/lib/post-types";
 import { cleanVoiceSettings } from "@/modules/clip-studio/lib/voice-settings";
@@ -322,6 +323,9 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
     ...(typeof kit.halftone === "boolean" ? { halftone: kit.halftone } : stored.halftone !== undefined ? { halftone: stored.halftone } : {}),
     // Rythme du montage (D3) : liste fermée ; une valeur inconnue garde celle de la fiche enregistrée.
     ...(readPace(kit.pace) ? { pace: readPace(kit.pace) } : stored.pace ? { pace: stored.pace } : {}),
+    // Style mesuré (D4) : écrit seulement par le serveur. L'éditeur peut le retirer (champ absent),
+    // jamais le remplacer : c'est la version enregistrée qui reste.
+    ...(kit.measuredStyle && readMeasuredStyle(stored.measuredStyle) ? { measuredStyle: readMeasuredStyle(stored.measuredStyle) } : {}),
     ai: {
       styleNotes: text(ai.styleNotes, KIT_LIMITS.styleNotes),
       collectionId: typeof ai.collectionId === "string" && /^col-[A-Za-z0-9-]{1,60}$/.test(ai.collectionId) ? ai.collectionId : undefined,
