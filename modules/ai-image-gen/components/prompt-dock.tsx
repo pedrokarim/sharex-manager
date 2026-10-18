@@ -15,6 +15,7 @@ import {
   ImagePlus,
   KeyRound,
   Layers,
+  MessageSquareText,
   Link2,
   Palette,
   SlidersHorizontal,
@@ -74,7 +75,7 @@ import {
   callModule,
 } from "../lib/client";
 import type { PickedImage, PickerSource } from "./image-picker";
-import { REFERENCE_ROLES, REFERENCE_ROLE_INFO, type ReferenceRole } from "../lib/reference-roles";
+import { REFERENCE_ROLES, REFERENCE_ROLE_INFO, rolesFromPrompt, type ReferenceRole } from "../lib/reference-roles";
 
 export interface ComposerReference extends PickedImage {
   /** Identifiant local, stable pour les animations du plateau. */
@@ -202,6 +203,12 @@ export function PromptDock({
       : null;
   const canSubmit =
     Boolean(state.prompt.trim()) && !submitting && !(model && !model.available);
+  // Rôles que le message donne aux images « Auto », lus pendant la frappe :
+  // la vignette montre ce que le serveur comprendra.
+  const detected = useMemo(
+    () => rolesFromPrompt(state.prompt, state.references.length),
+    [state.prompt, state.references.length]
+  );
 
   return (
     <div className="overflow-hidden rounded-2xl border bg-card/95 shadow-2xl shadow-black/10 backdrop-blur-xl supports-[backdrop-filter]:bg-card/85">
@@ -218,6 +225,7 @@ export function PromptDock({
         >
         <ReferenceTray
           references={state.references}
+          detected={detected}
           importing={importing}
           canAdd={freeSlots > 0}
           onAdd={() => onOpenPicker("uploads")}
@@ -238,9 +246,11 @@ export function PromptDock({
           autoFocus
           rows={1}
           placeholder={
-            state.references.some((reference) => reference.role === "edit-target")
-              ? "Décrivez ce qui doit changer dans l'image…"
-              : "Décrivez l'image à créer : un phare isolé au crépuscule, mer d'huile, lumière rasante…"
+            state.references.length > 1
+              ? "Désignez les images par leur numéro : « prends le style de l’image 1 pour retoucher l’image 2 »…"
+              : state.references.some((reference, index) => (reference.role === "auto" ? detected[index] : reference.role) === "edit-target")
+                ? "Décrivez ce qui doit changer dans l'image…"
+                : "Décrivez l'image à créer : un phare isolé au crépuscule, mer d'huile, lumière rasante…"
           }
           value={state.prompt}
           onChange={(event) => {
@@ -435,12 +445,15 @@ function ImageSourceMenu({
 
 function ReferenceTray({
   references,
+  detected,
   importing,
   canAdd,
   onAdd,
   onChange,
 }: {
   references: ComposerReference[];
+  /** Rôle que le message donne à chaque image, s'il en donne un. */
+  detected: (ReferenceRole | undefined)[];
   importing: boolean;
   canAdd: boolean;
   onAdd: () => void;
@@ -467,9 +480,16 @@ function ReferenceTray({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={reference.dataUrl}
-                alt={reference.name}
+                alt={`Image ${index + 1} : ${reference.name}`}
                 className="h-full w-full object-cover"
               />
+              {/* Numéro par lequel le message désigne l'image. */}
+              <span
+                aria-hidden
+                className="absolute top-1 left-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-black/70 px-1 text-[11px] font-semibold text-white tabular-nums"
+              >
+                {index + 1}
+              </span>
               <button
                 type="button"
                 aria-label={`Retirer ${reference.name}`}
@@ -483,6 +503,8 @@ function ReferenceTray({
             </div>
             <RoleMenu
               reference={reference}
+              number={index + 1}
+              detected={detected[index]}
               onRole={(role) =>
                 onChange(
                   references.map((entry, position) =>
@@ -533,22 +555,32 @@ function ReferenceTray({
  */
 function RoleMenu({
   reference,
+  number,
+  detected,
   onRole,
   onSave,
 }: {
   reference: ComposerReference;
+  number: number;
+  detected?: ReferenceRole;
   onRole: (role: ReferenceRole) => void;
   onSave: () => void;
 }) {
-  const info = REFERENCE_ROLE_INFO[reference.role];
-  const editing = reference.role === "edit-target";
+  // Une image « Auto » affiche le rôle que le message lui donne, marqué comme tel.
+  const fromMessage = reference.role === "auto" && detected ? detected : null;
+  const shown = fromMessage ?? reference.role;
+  const info = REFERENCE_ROLE_INFO[shown];
+  const editing = shown === "edit-target";
+  const hint = fromMessage
+    ? `D’après votre message : ${info.label.toLowerCase()}. ${info.hint}`
+    : info.hint;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={`Rôle de ${reference.name} : ${info.label}`}
-          title={info.hint}
+          aria-label={`Rôle de l’image ${number} : ${info.label}${fromMessage ? " (d’après votre message)" : ""}`}
+          title={hint}
           className={cn(
             "mt-1.5 flex w-full items-center justify-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap transition-colors",
             editing
@@ -556,14 +588,18 @@ function RoleMenu({
               : "bg-background text-muted-foreground ring-1 ring-border hover:text-foreground"
           )}
         >
+          {fromMessage ? <MessageSquareText aria-hidden className="size-2.5 shrink-0" /> : null}
           <span>{info.label}</span>
           {reference.saved ? <BookmarkCheck aria-hidden className="size-2.5 shrink-0" /> : null}
           <ChevronDown aria-hidden className="size-2.5 shrink-0" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-2rem)]">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">
-          Ce que le modèle prend dans cette image
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+          <span className="block font-medium text-foreground">Image {number} : ce que le modèle en fait</span>
+          <span className="block break-words">
+            Ou dites-le dans le message : « retouche l’image {number} », « le style de l’image {number} »…
+          </span>
         </DropdownMenuLabel>
         {REFERENCE_ROLES.map((role) => (
           <DropdownMenuItem key={role} onSelect={() => onRole(role)} className="items-start gap-2">

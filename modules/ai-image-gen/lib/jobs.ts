@@ -33,7 +33,7 @@ import {
   type Pipeline,
   type PipelineStep,
 } from "./store";
-import { normalizeReferenceRole, type ReferenceRole } from "./reference-roles";
+import { normalizeReferenceRole, resolveReferenceRoles, type ReferenceRole } from "./reference-roles";
 
 /** Travaux conservés dans le journal, terminés compris. */
 const JOB_LIMIT = 60;
@@ -135,9 +135,15 @@ export function enqueueJob(input: EnqueueInput): Job {
   if ((input.references?.length ?? 0) > MAX_REFERENCES) {
     throw new Error(`${MAX_REFERENCES} images de référence au plus.`);
   }
-  const references = (input.references ?? []).map((reference) =>
-    // Le rôle vient du navigateur : une valeur inconnue devient une inspiration.
-    storeReference(reference.b64, reference.mimeType, normalizeReferenceRole(reference.role))
+  // Le rôle vient du navigateur : une valeur inconnue devient une inspiration,
+  // et une image « Auto » prend celui que le message lui donne (« modifie
+  // l'image 2 »). Le rôle résolu est celui que garde l'historique.
+  const roles = resolveReferenceRoles(
+    (input.references ?? []).map((reference) => normalizeReferenceRole(reference.role)),
+    typeof input.prompt === "string" ? input.prompt : ""
+  );
+  const references = (input.references ?? []).map((reference, index) =>
+    storeReference(reference.b64, reference.mimeType, roles[index])
   );
 
   const totalSteps = pipeline ? pipeline.steps.length : 1;

@@ -16,14 +16,20 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   s’applique à la marque : les clips suivent alors le rythme « D’après la
   vidéo de référence », dans les bornes de lisibilité et de rythme de la
   direction artistique.
-- AI Image Gen, images de référence : chaque image jointe a un rôle,
-  choisi dans un menu sur sa vignette : Inspiration, Style, Sujet,
-  Composition, Couleurs ou Retouche, chacun décrit. Le rôle devient une
-  consigne pour le modèle. Une image peut être enregistrée dans « Mes
-  références », avec un nom et son rôle, puis rejointe en un clic depuis le
-  sélecteur d’images (recherche, retrait). Dans le fil, chaque image de
-  départ affiche le rôle qu’elle a joué. Les ancres d’une série partent
-  comme références de sujet.
+- AI Image Gen, images de référence : chaque image jointe porte un numéro
+  et un rôle. Par défaut, « Auto » : le message dit ce qu’on en fait, en la
+  désignant par son numéro (« sers-toi de l’image 1 comme référence pour
+  modifier l’image 2 », « le style de l’image 1 », « cette image »),
+  et la vignette affiche aussitôt le rôle compris, marqué « d’après votre
+  message ». Le rôle se choisit aussi dans un menu : Inspiration, Style,
+  Sujet, Composition, Couleurs ou Retouche, chacun décrit. Le rôle devient
+  une consigne numérotée pour le modèle ; sans image désignée à modifier,
+  il crée une image nouvelle. Une image peut être enregistrée dans « Mes
+  références », avec un nom et son rôle, puis rejointe en un clic depuis
+  le sélecteur d’images (recherche, retrait). Dans le fil et la
+  conversation, chaque image envoyée affiche son numéro et le rôle qu’elle
+  a joué. « Retoucher » une image du fil garde les références déjà
+  jointes. Les ancres d’une série partent comme références de sujet.
 - Interface plus vivante, d’après libraries.dev et transitions.dev :
   pastille d’onglet en goutte liquide qui glisse d’un onglet à l’autre
   (`liquid-gooey`, toutes les barres d’onglets) ; étoile de favori qui

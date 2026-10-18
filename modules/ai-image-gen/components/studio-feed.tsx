@@ -502,16 +502,25 @@ function ListRender({
       {item.sourceImages && item.sourceImages.length > 0 && (
         // Chaque image de départ dit ce que le modèle en a pris.
         <div className="flex min-w-0 flex-wrap items-start gap-2">
-          {item.sourceImages.map((source) => {
+          {item.sourceImages.map((source, index) => {
             const info = REFERENCE_ROLE_INFO[normalizeReferenceRole(source.role)];
+            // Le numéro est celui par lequel le message désignait l'image.
             return (
-              <figure key={source.file} className="flex w-12 flex-col items-center gap-1" title={info.hint}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imageUrl(source.file)}
-                  alt={`Image de départ : ${info.label.toLowerCase()}`}
-                  className="h-10 w-10 rounded-md object-cover ring-1 ring-border"
-                />
+              <figure key={source.file} className="flex w-12 flex-col items-center gap-1" title={`Image ${index + 1} : ${info.hint}`}>
+                <span className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imageUrl(source.file)}
+                    alt={`Image ${index + 1} : ${info.label.toLowerCase()}`}
+                    className="h-10 w-10 rounded-md object-cover ring-1 ring-border"
+                  />
+                  <span
+                    aria-hidden
+                    className="absolute -top-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-0.5 text-[10px] font-semibold text-background tabular-nums"
+                  >
+                    {index + 1}
+                  </span>
+                </span>
                 <figcaption className="w-full truncate text-center text-[10px] leading-3 text-muted-foreground">
                   {info.label}
                 </figcaption>
@@ -653,7 +662,7 @@ function UserBubble({
   toolbar,
 }: {
   prompt: string;
-  sources?: string[];
+  sources?: { file: string; role?: string }[];
   withImage?: boolean;
   meta: string;
   toolbar?: React.ReactNode;
@@ -662,20 +671,34 @@ function UserBubble({
     <div className="group/bubble flex flex-col items-end gap-1 pl-12">
       <div className="max-w-xl rounded-2xl rounded-br-md bg-primary/10 px-4 py-2.5">
         {sources && sources.length > 0 && (
-          <div className="mb-2 flex justify-end gap-1.5">
-            {sources.map((file) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={file}
-                src={imageUrl(file)}
-                alt="Image de départ"
-                className="h-14 w-14 rounded-lg object-cover ring-1 ring-border"
-              />
-            ))}
+          // Chaque image envoyée garde son numéro (celui que le message emploie) et ce que le modèle en a fait.
+          <div className="mb-2 flex flex-wrap justify-end gap-2">
+            {sources.map((source, index) => {
+              const info = REFERENCE_ROLE_INFO[normalizeReferenceRole(source.role)];
+              return (
+                <figure key={source.file} className="flex w-14 flex-col items-center gap-1" title={`Image ${index + 1} : ${info.hint}`}>
+                  <span className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imageUrl(source.file)}
+                      alt={`Image ${index + 1} : ${info.label.toLowerCase()}`}
+                      className="h-14 w-14 rounded-lg object-cover ring-1 ring-border"
+                    />
+                    <span
+                      aria-hidden
+                      className="absolute top-1 left-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-black/70 px-1 text-[11px] font-semibold text-white tabular-nums"
+                    >
+                      {index + 1}
+                    </span>
+                  </span>
+                  <figcaption className="w-full truncate text-center text-[10px] leading-3 text-foreground/70">{info.label}</figcaption>
+                </figure>
+              );
+            })}
           </div>
         )}
         <p className="text-sm leading-6 whitespace-pre-wrap">{prompt}</p>
-        <p className="mt-1 flex flex-wrap items-center justify-end gap-x-1.5 text-[11px] text-muted-foreground">
+        <p className="mt-1 flex flex-wrap items-center justify-end gap-x-1.5 text-[11px] text-foreground/70">
           {withImage && !sources?.length && (
             <span className="inline-flex items-center gap-1">
               <ImageIcon className="h-3 w-3" />
@@ -731,7 +754,7 @@ function ChatRenderExchange({
         <div>
           <UserBubble
             prompt={item.prompt}
-            sources={item.sourceImages?.map((source) => source.file)}
+            sources={item.sourceImages}
             withImage={item.usedReference}
             meta={meta}
             toolbar={

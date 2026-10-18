@@ -155,7 +155,7 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
     if (!files) return null;
     return {
       files: files.split(",").map((name) => name.trim()).filter(Boolean).slice(0, MAX_REFERENCES),
-      role: normalizeReferenceRole(searchParams.get("role")),
+      role: searchParams.get("role") ? normalizeReferenceRole(searchParams.get("role")) : "auto",
     };
   });
 
@@ -232,9 +232,10 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
   // ─── Images de départ ───────────────────────────────────────
 
   const attach = useCallback(
-    (images: PickedImage[], role: ComposerReference["role"] = "reference") => {
+    (images: PickedImage[], role: ComposerReference["role"] = "auto") => {
       // Chaque image garde son rôle : celui d'une référence enregistrée, sinon
-      // le rôle demandé (inspiration par défaut). Il se change sur la vignette.
+      // le rôle demandé, « Auto » par défaut (le message dit ce qu'on en fait,
+      // par son numéro). Il se change aussi sur la vignette.
       setState((prev) => ({
         ...prev,
         references: [
@@ -297,10 +298,12 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
       .then((images) => {
         setState((prev) => ({
           ...prev,
-          // Une retouche repart de cette image seule ; une inspiration
-          // s'ajoute à ce qui est déjà joint.
+          // Une retouche remplace l'image à retoucher d'avant et garde les
+          // références déjà jointes ; une inspiration s'y ajoute.
           references: [
-            ...(request.role === "edit-target" ? [] : prev.references),
+            ...(request.role === "edit-target"
+              ? prev.references.filter((reference) => reference.role !== "edit-target")
+              : prev.references),
             ...images.map((image) => ({
               ...image,
               id: crypto.randomUUID(),
@@ -393,17 +396,21 @@ export default function GeneratePage({ settings }: GeneratePageProps) {
       }
       try {
         const reference = await fileToReference(file);
+        // Les références déjà jointes restent : « retouche cette image avec le
+        // style de l'image 1 » doit rester possible. Seule l'ancienne image à
+        // retoucher cède la place.
         setState((prev) => ({
           ...prev,
           references: [
+            ...prev.references.filter((entry) => entry.role !== "edit-target"),
             {
               ...reference,
               dataUrl: `data:${reference.mimeType};base64,${reference.b64}`,
               name: file,
               id: crypto.randomUUID(),
-              role: "edit-target",
+              role: "edit-target" as const,
             },
-          ],
+          ].slice(-MAX_REFERENCES),
           prompt: "",
         }));
         // L'image dans le plateau et le prompt vide (« Décrivez ce qui doit
