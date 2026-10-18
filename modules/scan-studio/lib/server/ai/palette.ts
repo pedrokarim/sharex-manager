@@ -20,6 +20,7 @@
  */
 
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
+import { recordAiUsage, usageError } from "@/lib/ai-usage";
 import { askCodex, findCodex } from "../../../../ai-image-gen/lib/codex-text";
 import { findModel, generateWithEngine, getCatalog } from "../../../../ai-image-gen/lib/engines/registry";
 import { EngineError } from "../../../../ai-image-gen/lib/engines/types";
@@ -94,11 +95,48 @@ function assertInService() {
   if (off) throw new AiCallError("unavailable", off);
 }
 
-async function askLanguageModel(ref: AiModelRef, prompt: string, image: AiImage | undefined, signal: AbortSignal): Promise<string> {
+/** Usage noté dans le registre de consommation des IA. */
+const READING_FEATURE = "Relecture de zone";
+const TRANSLATION_FEATURE = "Traduction de bulle";
+const PAGE_FEATURE = "Traduction de page";
+
+/** Un appel à OpenAI ou Gemini, noté avec ses jetons quand la réponse les donne. */
+async function metered(provider: "openai" | "google", ref: AiModelRef, feature: string, call: (onTokens: (tokens: number) => void) => Promise<string>): Promise<string> {
+  let tokens = 0;
+  const note = (ok: boolean, error?: unknown) =>
+    recordAiUsage({
+      provider,
+      module: "scan-studio",
+      feature,
+      model: ref.model,
+      unit: "calls",
+      amount: 1,
+      ok,
+      ...(ok ? {} : { error: usageError(error) }),
+      ...(tokens ? { extra: { tokens } } : {}),
+    });
+  try {
+    const answer = await call((used) => (tokens += used));
+    note(true);
+    return answer;
+  } catch (error) {
+    note(false, error);
+    throw error;
+  }
+}
+
+async function askLanguageModel(ref: AiModelRef, prompt: string, image: AiImage | undefined, signal: AbortSignal, feature: string): Promise<string> {
   assertInService();
-  if (ref.provider === "openai") return askOpenAi({ apiKey: requireKey(ref, "OpenAI"), model: ref.model, prompt, image, signal });
-  if (ref.provider === "google") return askGoogle({ apiKey: requireKey(ref, "Google"), model: ref.model, prompt, image, signal });
-  if (ref.provider === "codex" && !image) return askCodex(prompt, { signal, timeoutMs: 120_000 });
+  if (ref.provider === "openai") {
+    const apiKey = requireKey(ref, "OpenAI");
+    return metered("openai", ref, feature, (onTokens) => askOpenAi({ apiKey, model: ref.model, prompt, image, signal, onTokens }));
+  }
+  if (ref.provider === "google") {
+    const apiKey = requireKey(ref, "Google");
+    return metered("google", ref, feature, (onTokens) => askGoogle({ apiKey, model: ref.model, prompt, image, signal, onTokens }));
+  }
+  // Codex note lui-même son appel, jetons compris.
+  if (ref.provider === "codex" && !image) return askCodex(prompt, { signal, timeoutMs: 120_000, origin: { module: "scan-studio", feature } });
   throw new AiCallError("invalid-request", "Ce modèle ne sait pas faire cela.");
 }
 
@@ -131,9 +169,9 @@ export function createPalette(): AiPalette {
       };
     },
 
-    readImage: (ref, prompt, image, signal) => askLanguageModel(ref, prompt, image, signal),
+    readImage: (ref, prompt, image, signal) => askLanguageModel(ref, prompt, image, signal, READING_FEATURE),
 
-    completeText: (ref, prompt, signal) => askLanguageModel(ref, prompt, undefined, signal),
+    completeText: (ref, prompt, signal) => askLanguageModel(ref, prompt, undefined, signal, TRANSLATION_FEATURE),
 
     async editImage(ref, prompt, image, size, signal): Promise<AiImage> {
       assertInService();
@@ -146,7 +184,7 @@ export function createPalette(): AiPalette {
         const result = await generateWithEngine(
           { prompt, model: model.id, size: closestSize(model.sizes, size), n: 1, references: [{ ...image, role: "edit-target" }] },
           config,
-          { signal },
+          { signal, origin: { module: "scan-studio", feature: PAGE_FEATURE } },
         );
         const rendered = result.images[0];
         if (!rendered?.b64) throw new AiCallError("refused", "Le moteur n’a rendu aucune image.");

@@ -62,6 +62,7 @@ import {
 } from "./lib/store";
 
 import { assertSandboxSetting } from "./lib/engines/sandbox";
+import type { AiModuleReport, AiProviderId } from "@/lib/ai-usage/types";
 // ─── Catalogue et moteurs ────────────────────────────────────────
 
 export interface CatalogPayload {
@@ -128,6 +129,42 @@ export async function getEngineDetails(): Promise<CatalogPayload> {
   const config = buildEngineConfig();
   const { models, cli } = await getCatalog(config);
   return { models, cli, apiEngines: describeApiEngines() };
+}
+
+// ─── Consommation des IA (écran `/admin/ai`) ─────────────────────
+
+/** Fournisseur du registre de consommation, pour chaque moteur intégré. */
+const AI_USAGE_ENGINES: Record<string, AiProviderId> = {
+  openai: "openai",
+  stability: "stability",
+  google: "google",
+  codex: "codex",
+  "gemini-cli": "gemini-cli",
+  claude: "claude-cli",
+};
+
+/**
+ * Réservé aux administrateurs (absent de `functions`), déclaré dans
+ * `aiUsage.limits`. L’état des clés et des CLI, sans aucune clé ni compte : le
+ * module ne tient aucun compteur de consommation à lui.
+ */
+export async function getAiLimits(): Promise<AiModuleReport> {
+  const settingsHref = "/m/ai-image-gen/settings";
+  const report: AiModuleReport = {};
+  const keys = resolveApiKeys();
+  for (const id of API_ENGINE_IDS) {
+    const provider = AI_USAGE_ENGINES[id];
+    if (!provider) continue;
+    report[provider] = { access: apiKeyComesFromEnv(id) ? "env" : keys[id] ? "key" : "none", settingsHref };
+  }
+  const cli = await probeCliEngines(buildEngineConfig());
+  for (const status of cli) {
+    const provider = AI_USAGE_ENGINES[status.id];
+    if (!provider || status.custom) continue;
+    const connected = Boolean(status.binaryPath) && status.authenticated !== false;
+    report[provider] = { access: connected ? "cli" : "none", settingsHref };
+  }
+  return report;
 }
 
 /** Relance la détection des CLI, sans passer par le catalogue complet. */

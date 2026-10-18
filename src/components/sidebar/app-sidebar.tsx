@@ -34,6 +34,7 @@ import {
   Server,
   Package,
   Link2,
+  BrainCircuit,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -227,6 +228,11 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
         title: "Comptes connectés",
         url: "/admin/connections",
         icon: Link2,
+      },
+      {
+        title: "Intelligence artificielle",
+        url: "/admin/ai",
+        icon: BrainCircuit,
       },
       {
         title: t("sidebar.admin.security"),

@@ -65,6 +65,7 @@
     "removeConcept": "user",
     "resolveExportFile": "public"
   },
+  "aiUsage": { "limits": "getAiLimits", "remote": "readAiRemoteLimits" },
   "pages": [
     { "path": "", "title": "Projets", "component": "pages/projects.tsx" },
     { "path": "edit", "title": "Éditeur", "component": "pages/editor.tsx" },

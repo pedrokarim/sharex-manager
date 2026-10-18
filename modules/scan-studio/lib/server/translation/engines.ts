@@ -10,6 +10,7 @@
  */
 
 import type { SourceLanguage, TranslationEngineId } from "../../types";
+import { countCharacters, recordAiUsage, usageError } from "@/lib/ai-usage";
 
 export const ENGINE_IDS: TranslationEngineId[] = ["deepl", "libretranslate", "mymemory"];
 
@@ -73,6 +74,34 @@ export interface RemoteUsage {
   used: number;
   /** Plafond du compte ; 0 quand le service n'en annonce pas. */
   limit: number;
+}
+
+// ─── Registre de consommation ────────────────────────────────────
+
+/**
+ * Note dans le registre de consommation des IA une requête de traduction
+ * réellement partie, réussie ou non. Les caractères ne sont comptés que pour
+ * une traduction rendue : un refus n'en consomme pas chez le service.
+ */
+export async function meteredTranslation(id: TranslationEngineId, texts: string[], send: () => Promise<string[]>): Promise<string[]> {
+  const note = (ok: boolean, amount: number, error?: unknown) =>
+    recordAiUsage({
+      provider: id,
+      module: "scan-studio",
+      feature: "Traduction de bulle",
+      unit: "characters",
+      amount,
+      ok,
+      ...(ok ? {} : { error: usageError(error) }),
+    });
+  try {
+    const translated = await send();
+    note(true, countCharacters(texts));
+    return translated;
+  } catch (error) {
+    note(false, 0, error);
+    throw error;
+  }
 }
 
 // ─── Requête HTTP commune ────────────────────────────────────────

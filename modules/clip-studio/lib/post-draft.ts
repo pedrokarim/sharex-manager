@@ -300,7 +300,7 @@ function fitToLimits(post: ExportPost, services: CheckedService[]): ExportPost {
 
 export async function draftExportPost(
   input: { entry: ClipExport; project: ClipProject | null; brand: ExportBrand | null; connectors: ConnectorInfo[]; request: DraftRequest },
-  ask: AskCodex = defaultAsk
+  ask: AskCodex = (prompt, options) => defaultAsk(prompt, { ...options, origin: { module: "clip-studio", feature: "Textes de publication" } })
 ): Promise<DraftResult> {
   const { entry, project, brand } = input;
   const request = input.request && typeof input.request === "object" ? input.request : ({ connectors: [] } as DraftRequest);

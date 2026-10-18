@@ -535,7 +535,7 @@ export function voiceSample(input: { voice: string; speed?: number; tone?: strin
   const task = (async () => {
     fs.mkdirSync(SAMPLES_DIR, { recursive: true });
     if (cloud) {
-      const { audio, extension } = await synthesizeCloud(voiceId, text, speed);
+      const { audio, extension } = await synthesizeCloud(voiceId, text, speed, "Écoute d'une voix");
       const file = sampleFileName(voiceId, speed, tone, text, extension);
       fs.writeFileSync(path.join(SAMPLES_DIR, file), audio);
       return { url: sampleUrl(file), cached: false };

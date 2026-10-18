@@ -236,6 +236,11 @@ Déplacer les clés des fournisseurs d’IA hors d’AI Image Gen :
 - migration : AI Image Gen lit le coffre, et à défaut son ancien
   `secrets.json`, qu’il recopie une fois dans le coffre.
 
+Le registre de consommation des IA existe (`src/lib/ai-usage`) : chaque
+appel à un fournisseur y est noté par `recordAiUsage`, chaque module y
+rapporte accès et limites par la déclaration `aiUsage` de son `module.json`,
+et la page « Fournisseurs IA » devient l’écran `/admin/ai`.
+
 ### 2.8 Pages publiques de module
 
 Tutoriels a besoin de pages consultables sans session, comme les albums

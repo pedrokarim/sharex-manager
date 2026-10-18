@@ -165,6 +165,7 @@ export async function runGeneration(
   const result = await generateWithEngine(engineRequest, config, {
     onProgress: options.onProgress,
     signal: options.signal,
+    origin: request.origin,
   });
 
   if (result.images.length === 0) {

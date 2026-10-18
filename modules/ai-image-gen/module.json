@@ -54,6 +54,7 @@
     "savePipeline": "user",
     "deletePipeline": "user"
   },
+  "aiUsage": { "limits": "getAiLimits" },
   "pages": [
     { "path": "", "title": "Studio", "component": "pages/generate.tsx" },
     { "path": "library", "title": "Bibliothèque", "component": "pages/library.tsx" },

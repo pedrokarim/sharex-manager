@@ -334,6 +334,7 @@ async function run(job: AssistantJob, signal: AbortSignal) {
     step("script", "running", web ? "Codex rédige le contenu et vérifie sur le web…" : "Codex rédige le contenu…");
     const answer = await askCodex(scriptPrompt(job.request, brand, { web }), {
       signal,
+      origin: { module: "clip-studio", feature: "Script" },
       ...(web ? { search: true, timeoutMs: SCRIPT_WEB_TIMEOUT_MS } : {}),
     });
     let script = sanitize(job.request, extractJson<RawScript>(answer), brand?.language);
@@ -1929,6 +1930,7 @@ async function generateImages(
         n: 1,
         // Les ancres de la collection (mascotte, références) accompagnent chaque image.
         ...(brand?.collectionId ? { collectionId: brand.collectionId } : {}),
+        origin: { module: "clip-studio", feature: "Illustration de vidéo" },
       })) as ImageGenJob;
       queued.push(enqueued.id);
       controller?.imageJobs.push(enqueued.id);

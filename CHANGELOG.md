@@ -18,6 +18,16 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   génération, analyse et traduction d’un chapitre, `border-beam`) ;
   pastille « Pro » en métal liquide dans le menu du compte (`metal-fx`).
   Tout respecte le mouvement réduit.
+- Administration › Intelligence artificielle (`/admin/ai`) : ce que l’application
+  consomme chez chaque IA et service à quota. Limites en jauges, les plus
+  tendues d’abord (offre gratuite Azure, plafonds de Scan Studio, soldes lus
+  chez ElevenLabs, DeepL, trace.moe et SerpApi) ; tableau des fournisseurs
+  (accès, consommation du mois, échecs, dernier appel, modules) ; tiroir de
+  détail avec les trente derniers jours, la répartition par module et les
+  derniers appels. Un registre commun (`data/ai-usage/`) note chaque appel
+  réel : Codex (appels et jetons), OpenAI, Google, Stability, voix, traduction,
+  recherche inversée, Openverse. Les modules y déclarent leurs limites par
+  `aiUsage` dans `module.json`.
 - Clip Studio : la mascotte d’une marque prend à chaque segment la pose de son
   émotion (écrite par le script de l’assistant), jamais deux fois la même
   d’affilée, tournée vers le contenu (miroir au besoin), en grand et sans jamais
@@ -690,6 +700,12 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Compte connecté : les onglets « Envois en cours », « Quotas » et « Chaîne »
+  sont refaits en écrans de logiciel. Envois en tableau filtrable et paginé,
+  quotas en panneaux de jauges avec échéance et état, chaîne en écran de
+  réglages (source et changements à envoyer dans une colonne collante,
+  panneaux Identité, Images, À changer chez le service, Page d’accueil,
+  Playlists).
 - Clip Studio, images de marque : lisibilité garantie des textes (dossier
   07f, D1). Aucun texte n’est plus posé nu sur une image : le moteur regarde
   ce qu’il y a dessous et pose une étiquette aux couleurs de la palette, garde

@@ -103,7 +103,7 @@ export async function enhancePrompt(input: Partial<EnhanceRequest> | undefined):
   }
   running++;
   try {
-    const answer = await askCodex(buildEnhancePrompt(request), { timeoutMs: TIMEOUT_MS });
+    const answer = await askCodex(buildEnhancePrompt(request), { timeoutMs: TIMEOUT_MS, origin: { module: "ai-image-gen", feature: "Amélioration de prompt" } });
     const prompt = cleanEnhanced(answer);
     if (!prompt) throw new Error("L'assistant n'a rien renvoyé. Réessayez.");
     return { prompt };

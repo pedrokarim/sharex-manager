@@ -17,6 +17,8 @@ import path from "path";
 import type { TimedWord } from "../engine/types";
 import { DATA_DIR, ensureDirs } from "./store";
 import { escapeXmlText, fetchEdgeVoices, prosodyRate, stripControls, synthesizeEdge } from "./edge-tts";
+import { countCharacters, recordAiUsage, usageError, type AiLimit, type AiModuleReport, type AiProviderId } from "@/lib/ai-usage";
+import { readElevenLabsLimits } from "@/lib/ai-usage/remote";
 
 export type CloudProvider = "edge" | "azure" | "openai" | "google" | "elevenlabs";
 /** Fournisseurs qui demandent une clé (tous sauf Edge). */
@@ -277,6 +279,62 @@ export function recordUsage(provider: CloudProvider, characters: number, now = n
   const temporary = `${USAGE_FILE}.${process.pid}.tmp`;
   fs.writeFileSync(temporary, JSON.stringify(usage, null, 2));
   fs.renameSync(temporary, USAGE_FILE);
+}
+
+// ─── Consommation des IA (écran `/admin/ai`) ─────────────────────
+
+/** Premier instant du mois suivant, en temps universel : le compteur d’Azure repart alors. */
+function nextUsageMonth(now: Date): number {
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
+}
+
+function keyAccess(provider: KeyProvider): "env" | "key" | "none" {
+  if (process.env[PROVIDER_INFO[provider].env]) return "env";
+  return readSecrets().apiKeys[provider] ? "key" : "none";
+}
+
+/**
+ * Ce que Clip Studio sait des voix en ligne, sans aucune clé : l’accès à
+ * chaque fournisseur et le compteur mensuel d’Azure, tenu ici.
+ */
+export function voiceUsageReport(now = new Date()): AiModuleReport {
+  const settingsHref = "/m/clip-studio/voices";
+  const azureAccess = keyAccess("azure");
+  return {
+    "edge-tts": { access: edgeEnabled() ? "open" : "none", settingsHref },
+    "azure-speech": {
+      // Une clé sans région ne sert à rien.
+      access: azureAccess !== "none" && azureRegion() ? azureAccess : "none",
+      settingsHref,
+      limits: [
+        {
+          id: "azure-free-characters",
+          label: "Caractères gratuits du mois (offre F0)",
+          unit: "characters",
+          period: "month",
+          used: usageThisMonth("azure", now),
+          limit: AZURE_FREE_CHARACTERS,
+          resetsAt: nextUsageMonth(now),
+          source: "local",
+          note: "Compté par Clip Studio ; au-delà, une voix Azure est refusée.",
+        },
+      ],
+    },
+    "google-tts": { access: keyAccess("google"), settingsHref },
+    elevenlabs: { access: keyAccess("elevenlabs"), remoteReadable: Boolean(apiKey("elevenlabs")), settingsHref },
+  };
+}
+
+/** Accès d’OpenAI pour les voix : une clé propre à Clip Studio, ou la variable d’environnement. */
+export function openAiVoiceAccess(): "env" | "key" | "none" {
+  return keyAccess("openai");
+}
+
+/** Solde ElevenLabs lu chez le service, sans rien dépenser. */
+export async function readElevenLabsBalance(): Promise<AiLimit[]> {
+  const key = apiKey("elevenlabs");
+  if (!key) throw new Error("Aucune clé ElevenLabs n’est configurée dans « Voix en ligne ».");
+  return readElevenLabsLimits(key);
 }
 
 /**
@@ -542,16 +600,68 @@ export interface CloudSynthesis {
   words?: TimedWord[];
 }
 
+/** Fournisseur du registre de consommation des IA, pour chaque source de voix en ligne. */
+const USAGE_PROVIDERS: Record<CloudProvider, AiProviderId> = {
+  edge: "edge-tts",
+  azure: "azure-speech",
+  openai: "openai",
+  google: "google-tts",
+  elevenlabs: "elevenlabs",
+};
+
+/** Modèle noté dans le registre : le modèle de synthèse quand il est fixe, sinon la voix. */
+function usageModel(provider: CloudProvider, voice: string): string {
+  if (provider === "openai") return "gpt-4o-mini-tts";
+  if (provider === "elevenlabs") return "eleven_multilingual_v2";
+  return voice;
+}
+
 /**
  * Lit un texte chez le fournisseur. Renvoie le son tel qu'il arrive (MP3 ou
- * WAV) ; la conversion en WAV mono se fait ensuite avec ffmpeg.
+ * WAV) ; la conversion en WAV mono se fait ensuite avec ffmpeg. `feature` :
+ * l'usage noté dans le registre de consommation des IA.
  */
-export async function synthesizeCloud(id: string, text: string, speed: number): Promise<CloudSynthesis> {
+export async function synthesizeCloud(id: string, text: string, speed: number, feature = "Voix off"): Promise<CloudSynthesis> {
   const parsed = parseCloudVoice(id);
   if (!parsed) throw new Error("Voix inconnue.");
+  // Caractères facturés : ceux du SSML pour Azure, ceux du texte ailleurs.
+  let characters = countCharacters(text);
+  let sent = false;
+  try {
+    const synthesis = await synthesizeWith(parsed, text, speed, (billed) => {
+      sent = true;
+      if (billed !== undefined) characters = billed;
+    });
+    recordAiUsage({ provider: USAGE_PROVIDERS[parsed.provider], module: "clip-studio", feature, model: usageModel(parsed.provider, parsed.voice), unit: "characters", amount: characters, ok: true });
+    return synthesis;
+  } catch (error) {
+    // Refusé avant tout envoi (clé absente, quota local atteint) : aucun appel n'est parti.
+    if (sent) {
+      recordAiUsage({
+        provider: USAGE_PROVIDERS[parsed.provider],
+        module: "clip-studio",
+        feature,
+        model: usageModel(parsed.provider, parsed.voice),
+        unit: "characters",
+        amount: 0,
+        ok: false,
+        error: usageError(error),
+      });
+    }
+    throw error;
+  }
+}
 
+/** `onSend` est appelé juste avant la requête au fournisseur, avec les caractères facturés s'ils diffèrent du texte. */
+async function synthesizeWith(
+  parsed: { provider: CloudProvider; voice: string },
+  text: string,
+  speed: number,
+  onSend: (billed?: number) => void
+): Promise<CloudSynthesis> {
   if (parsed.provider === "edge") {
     if (!edgeEnabled()) throw new Error("Les voix d'Edge sont désactivées dans « Voix en ligne ».");
+    onSend();
     const result = await synthesizeEdge(parsed.voice, text, speed);
     return { audio: result.audio, extension: "mp3", words: result.words };
   }
@@ -574,6 +684,7 @@ export async function synthesizeCloud(id: string, text: string, speed: number): 
       );
     }
     await azureSlot();
+    onSend(characters);
     const response = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
       method: "POST",
       signal,
@@ -592,6 +703,7 @@ export async function synthesizeCloud(id: string, text: string, speed: number): 
 
   if (parsed.provider === "openai") {
     if (!OPENAI_VOICES.some((entry) => entry.voice === parsed.voice)) throw new Error("Voix OpenAI inconnue.");
+    onSend();
     const response = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       signal,
@@ -609,6 +721,7 @@ export async function synthesizeCloud(id: string, text: string, speed: number): 
   }
 
   if (parsed.provider === "google") {
+    onSend();
     const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${encodeURIComponent(key)}`, {
       method: "POST",
       signal,
@@ -627,6 +740,7 @@ export async function synthesizeCloud(id: string, text: string, speed: number): 
     return { audio, extension: "mp3" };
   }
 
+  onSend();
   const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${parsed.voice}?output_format=mp3_44100_128`, {
     method: "POST",
     signal,

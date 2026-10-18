@@ -16,7 +16,9 @@ import {
   startSearch as startNewSearch,
   type SearchInput,
 } from "./lib/search";
-import { clearRecords, isKeyName, isSearchId, keyStatus, readHistory, removeRecord, thumbUrl, writeKey } from "./lib/store";
+import { clearRecords, isKeyName, isSearchId, keyStatus, readHistory, readKeys, removeRecord, thumbUrl, writeKey } from "./lib/store";
+import { readSerpApiLimits, readTraceMoeLimits } from "@/lib/ai-usage/remote";
+import type { AiLimit, AiModuleReport } from "@/lib/ai-usage/types";
 import { ENGINES, bestMatchOf, type Catalogue, type EngineId, type HistoryEntry } from "./lib/types";
 
 // ─── Moteurs ─────────────────────────────────────────────────────
@@ -39,6 +41,32 @@ export async function saveKey(name: string, value: string) {
   if (keyStatus()[name].fromEnv) throw new Error("Cette clé vient d’une variable d’environnement : elle se change là-bas.");
   writeKey(name, value);
   return keyStatus();
+}
+
+// ─── Consommation des IA (écran `/admin/ai`) ─────────────────────
+
+/** Réservé aux administrateurs (absent de `functions`), déclaré dans `aiUsage.limits`. Aucune clé n’en sort. */
+export async function getAiLimits(): Promise<AiModuleReport> {
+  const keys = keyStatus();
+  const settingsHref = "/m/reverse-search/settings";
+  const access = (name: "saucenao" | "serpapi" | "tracemoe") => (keys[name].fromEnv ? "env" : keys[name].configured ? "key" : "none") as "env" | "key" | "none";
+  return {
+    serpapi: { access: access("serpapi"), remoteReadable: keys.serpapi.configured, settingsHref },
+    saucenao: { access: access("saucenao"), settingsHref },
+    // trace.moe répond sans clé : une clé n’ajoute que du quota.
+    tracemoe: { access: keys.tracemoe.configured ? access("tracemoe") : "open", remoteReadable: true, settingsHref },
+  };
+}
+
+/** Réservé aux administrateurs, déclaré dans `aiUsage.remote` : solde de SerpApi et de trace.moe, sans rien dépenser. */
+export async function readAiRemoteLimits(provider: string): Promise<AiLimit[] | null> {
+  if (provider === "tracemoe") return readTraceMoeLimits(readKeys().tracemoe);
+  if (provider === "serpapi") {
+    const key = readKeys().serpapi;
+    if (!key) throw new Error("Aucune clé SerpApi n’est enregistrée dans la recherche inversée.");
+    return readSerpApiLimits(key);
+  }
+  return null;
 }
 
 // ─── Recherche ───────────────────────────────────────────────────

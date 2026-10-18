@@ -214,7 +214,7 @@ async function run(job: KitAssistantJob, request: KitAssistantRequest, reference
   try {
     // 1. Fiche
     step("sheet", "running", "Codex rédige la fiche…");
-    const raw = extractJson<RawSheet>(await askCodex(sheetPrompt(request, references.length), { signal }));
+    const raw = extractJson<RawSheet>(await askCodex(sheetPrompt(request, references.length), { signal, origin: { module: "brand-kit", feature: "Assistant de marque" } }));
     let kit = applySheet(createDefaultKit(request.name || cut(raw.name, 80) || "Nouvelle marque"), raw);
     writeKit(kit);
     job.kitId = kit.id;
@@ -329,7 +329,7 @@ export async function checkCharacter(imagePath: string, sheetPath: string, signa
         "sameCharacter : même personnage (visage, coiffure, couleurs, tenue). fiveFingers : chaque main visible a cinq doigts. sameShoes : mêmes chaussures que sur la feuille (vrai si on ne les voit pas). noThirdPartyLogo : aucun logo ni personnage d'une marque existante.",
         "N'utilise aucun outil et n'écris aucun fichier.",
       ].join("\n"),
-      { signal, images: [sheet, image], timeoutMs: 3 * 60 * 1000 }
+      { signal, images: [sheet, image], timeoutMs: 3 * 60 * 1000, origin: { module: "brand-kit", feature: "Contrôle d'image de marque" } }
     );
     const result = extractJson<CheckAnswer>(answer);
     return Boolean(result.sameCharacter && result.fiveFingers && result.sameShoes !== false && result.noThirdPartyLogo !== false);

@@ -31,7 +31,19 @@ import {
   writeProject,
 } from "./lib/store";
 import { prefetchTts, prepareVoice as downloadVoice, respeak, synthesize, voiceSample, voiceStatuses, type SpeakInput } from "./lib/tts";
-import { isCloudProvider, isKeyProvider, providerStatuses, saveAzureRegion, saveProviderKey, setEdgeEnabled, type ProviderStatus } from "./lib/cloud-tts";
+import {
+  isCloudProvider,
+  isKeyProvider,
+  openAiVoiceAccess,
+  providerStatuses,
+  readElevenLabsBalance,
+  saveAzureRegion,
+  saveProviderKey,
+  setEdgeEnabled,
+  voiceUsageReport,
+  type ProviderStatus,
+} from "./lib/cloud-tts";
+import type { AiLimit, AiModuleReport } from "@/lib/ai-usage/types";
 import {
   addMusic,
   downloadTrack,
@@ -879,7 +891,7 @@ function videoHistory(): HistoryEntry[] {
 }
 
 const ideaDeps: IdeaDeps = {
-  ask: (prompt, options) => askCodex(prompt, options),
+  ask: (prompt, options) => askCodex(prompt, { ...options, origin: { module: "clip-studio", feature: "Idées de vidéos" } }),
   loadBrand: loadIdeaBrand,
   history: videoHistory,
   // Comptes connectés qui savent lire une chaîne publique (YouTube aujourd'hui).
@@ -944,6 +956,27 @@ export async function startNicheStudy(input: { kitId?: string | null; accountId:
 
 export async function removeConcept(input: { kitId?: string | null; conceptId: string }): Promise<ConceptBank> {
   return dropConcept(input?.kitId, input?.conceptId);
+}
+
+// ─── Consommation des IA (écran `/admin/ai`) ─────────────────────
+
+/**
+ * Réservé aux administrateurs (absent de `functions`), déclaré dans
+ * `aiUsage.limits`. Voix en ligne, Openverse et Codex, sans aucune clé.
+ */
+export async function getAiLimits(): Promise<AiModuleReport> {
+  return {
+    ...voiceUsageReport(),
+    // La clé OpenAI des voix est celle de Clip Studio ; les textes passent par Codex (AI Image Gen).
+    openai: { access: openAiVoiceAccess(), settingsHref: "/m/clip-studio/voices" },
+    codex: {},
+    openverse: { access: "open" },
+  };
+}
+
+/** Réservé aux administrateurs, déclaré dans `aiUsage.remote` : le solde ElevenLabs. */
+export async function readAiRemoteLimits(provider: string): Promise<AiLimit[] | null> {
+  return provider === "elevenlabs" ? readElevenLabsBalance() : null;
 }
 
 // ─── Voix de synthèse ────────────────────────────────────────────

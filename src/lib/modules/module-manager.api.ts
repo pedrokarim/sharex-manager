@@ -56,6 +56,13 @@ const ModuleCatalogSectionSchema = z.object({
   media: z.string(),
 });
 
+/** Fonctions qui renseignent le registre de consommation des IA (`/admin/ai`). */
+const FunctionNameSchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,63}$/, "Nom de fonction invalide");
+const ModuleAiUsageSchema = z.object({
+  limits: FunctionNameSchema.optional(),
+  remote: FunctionNameSchema.optional(),
+});
+
 /**
  * Accès aux fonctions serveur d'un module via `call-function`. `public` : une
  * fonction du catalogue public, appelée par le serveur sans session.
@@ -90,6 +97,7 @@ const ModuleConfigSchema = z.object({
   fileActions: z.array(ModuleFileActionSchema).optional(),
   gallerySources: z.array(ModuleGallerySourceSchema).optional(),
   catalogSections: z.array(ModuleCatalogSectionSchema).optional(),
+  aiUsage: ModuleAiUsageSchema.optional(),
   functions: FunctionAccessSchema.optional(),
   uploads: z
     .object({

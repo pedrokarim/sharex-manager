@@ -37,6 +37,7 @@ import type {
   GenerateResult,
 } from "./types";
 import { EngineError } from "./types";
+import { recordAiUsage, usageError, type AiProviderId, type AiUsageOrigin } from "@/lib/ai-usage";
 
 export type { CustomEngineConfig } from "./cli-engines";
 export type { CliProbe } from "./cli-detect";
@@ -414,10 +415,28 @@ export async function getCatalog(
 
 // ─── Exécution ───────────────────────────────────────────────────
 
+/**
+ * Fournisseur du registre de consommation pour chaque moteur intégré. Un CLI
+ * personnalisé n'y figure pas : on ne sait pas à quel service il parle.
+ */
+const USAGE_PROVIDERS: Record<string, AiProviderId> = {
+  openai: "openai",
+  stability: "stability",
+  google: "google",
+  codex: "codex",
+  "gemini-cli": "gemini-cli",
+  claude: "claude-cli",
+};
+
+export interface GenerateHooks extends Pick<EngineContext, "onProgress" | "signal"> {
+  /** Module et usage à l'origine de la génération. Absent : AI Image Gen, « Image générée ». */
+  origin?: AiUsageOrigin;
+}
+
 export async function generateWithEngine(
   request: GenerateRequest,
   config: EngineConfig,
-  hooks: Pick<EngineContext, "onProgress" | "signal"> = {}
+  hooks: GenerateHooks = {}
 ): Promise<GenerateResult> {
   const model = findModel(request.model, config);
   if (!model) {
@@ -435,11 +454,34 @@ export async function generateWithEngine(
     );
   }
 
-  return engine.generate(request, {
-    apiKey: config.apiKeys[engine.id],
-    onProgress: hooks.onProgress,
-    signal: hooks.signal,
-  });
+  const provider = USAGE_PROVIDERS[engine.id];
+  const note = (ok: boolean, images: number, error?: unknown) => {
+    if (!provider) return;
+    recordAiUsage({
+      provider,
+      module: hooks.origin?.module ?? "ai-image-gen",
+      feature: hooks.origin?.feature ?? "Image générée",
+      model: model.id,
+      unit: "images",
+      amount: images,
+      ok,
+      ...(ok ? {} : { error: usageError(error) }),
+    });
+  };
+
+  try {
+    const result = await engine.generate(request, {
+      apiKey: config.apiKeys[engine.id],
+      onProgress: hooks.onProgress,
+      signal: hooks.signal,
+    });
+    const images = result.images.length;
+    note(images > 0, images, images > 0 ? undefined : new Error("Aucune image rendue."));
+    return result;
+  } catch (error) {
+    note(false, 0, error);
+    throw error;
+  }
 }
 
 // ─── Diagnostic des clés API ─────────────────────────────────────

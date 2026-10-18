@@ -9,8 +9,10 @@ import { cn } from "@/lib/utils";
  * simple-icons (CC0) pour Openverse ; icône publiée par jamendo.com pour
  * Jamendo ; icônes publiées par leurs propres sites pour trace.moe, SauceNAO,
  * IQDB, Yandex, TinEye, ascii2d, Bing et SerpApi ; logo à quatre carrés
- * publié par Microsoft pour Microsoft ; simple-icons 16.28.0
- * (CC0) pour les tracés de YouTube, Facebook, Instagram, Threads, X et TikTok, avec
+ * publié par Microsoft pour Microsoft ; icône publiée par mymemory.translated.net
+ * pour MyMemory ; simple-icons 16.28.0 (CC0) pour les tracés de DeepL (source
+ * deepl.com/press.html) et de LibreTranslate (source libretranslate.com),
+ * monochromes, et pour ceux de YouTube, Facebook, Instagram, Threads, X et TikTok, avec
  * les couleurs de leurs chartes (rouge YouTube #FF0000, bleu Facebook
  * #0866FF, dégradé d'Instagram ; Threads, X et TikTok sont monochromes). Les marques
  * restent la propriété de leurs titulaires : elles ne servent ici qu'à
@@ -41,6 +43,9 @@ export type Brand =
   | "bing"
   | "serpapi"
   | "microsoft"
+  | "deepl"
+  | "libretranslate"
+  | "mymemory"
   | "youtube"
   | "facebook"
   | "instagram"
@@ -53,6 +58,8 @@ const INLINE: Partial<Record<Brand, string>> = {
   elevenlabs: "M5 0h5v24H5V0zM14 0h5v24h-5V0z",
   threads: "M18.263 11.097c-.03-3.486-1.92-5.586-5.111-5.586-2.13 0-3.922.963-4.863 2.499l2.062 1.438c.535-.843 1.272-1.543 2.628-1.543 1.528 0 2.318.85 2.544 2.431a15 15 0 0 0-2.236-.173c-4.125 0-6.068 1.867-6.068 4.336s1.943 3.99 4.804 3.99c3.139 0 5.013-2.115 5.781-4.735.798.361 1.348 1.204 1.348 2.47 0 3.387-3.907 5.232-7.22 5.232-4.885 0-8.077-3.207-8.077-8.424 0-6.392 4.223-10.487 9.9-10.487 3.808 0 5.69 1.671 6.97 3.914l2.108-1.475C21.44 2.078 18.331 0 13.663 0 6.227 0 1.168 5.277 1.168 12.934c0 7 4.953 11.066 10.856 11.066 4.878 0 9.809-2.846 9.809-7.716 0-2.545-1.46-4.231-3.569-5.187m-6.33 4.855c-1.077 0-2.026-.512-2.026-1.453 0-1.483 1.822-1.934 3.606-1.934.678 0 1.34.045 1.927.173-.422 1.927-1.671 3.215-3.508 3.214Z",
   tiktok: "M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z",
+  deepl: "M20.907 4.93953 12.68543.18573a1.3577 1.3577 0 0 0-1.3709 0L3.09298 4.9565a1.3766 1.3766 0 0 0-.68639 1.18233v9.52646a1.3766 1.3766 0 0 0 .68639 1.19363l8.22157 4.75946.06223.03583 4.04856 2.3458-.01131-2.06106.0075-1.1446.0038.01885v-.38467c0-.23006.1188-.43371.29605-.56005l.264-.15086.12633-.06977h-.0075l4.80283-2.7795a1.3803 1.3803 0 0 0 .68639-1.19551V6.13505a1.3803 1.3803 0 0 0-.68642-1.19552m-9.85269 9.68863a1.4275 1.4275 0 0 1-.39976 1.3841 1.4086 1.4086 0 0 1-1.97054 0 1.4199 1.4199 0 0 1 0-2.06294 1.4086 1.4086 0 0 1 2.0422.07543l3.32822-1.91585.6864.38656zm5.77019-2.41367a1.4086 1.4086 0 0 1-1.97054 0 1.4256 1.4256 0 0 1-.3696-1.47837l-.0132.0075-3.7525-2.1723-.05657.05656a1.4086 1.4086 0 0 1-1.97053 0 1.4199 1.4199 0 0 1 0-2.06293 1.4086 1.4086 0 0 1 1.97242 0c.3941.37713.52422.91832.39033 1.40672l3.7808 2.20059.01886-.01886a1.4086 1.4086 0 0 1 1.97242 0 1.42746 1.42746 0 0 1 0 2.06105z",
+  libretranslate: "M13.7835 0q-1.7162 4.666-8.892 7.991l1.3623 1.523q5.3951-2.6385 7.8192-5.996 2.4777 3.1857 8.1948 6.1247L23.544 8.066q-6.103-2.9283-8.4198-6.2425.118-.1824.4827-1.255ZM9.5467 7.991q-.3218 3.5075-1.4481 5.8028-1.1155 2.2953-3.6683 4.5692l1.4265 1.2763q2.8426-2.6064 4.1941-5.556 1.1799 1.0297 2.4133 2.6494l1.4588-1.3086q-1.1477-1.4587-3.2286-3.25.547-2.0271.7614-3.9793zm7.1007 0q-.1716 4.151-1.4158 6.3927-1.2444 2.2417-3.7328 3.8934l1.4051 1.298q3.5718-2.6065 4.7088-5.8242 1.7268 3.4644 4.8696 5.867l1.4051-1.3408q-1.7806-1.3192-3.0141-2.7887-1.2227-1.4801-1.8662-3.0461-.6328-1.5767-.6328-2.1452l.075-.751q.0859-.8366.0859-1.3942zM.1126 8.8018V24h9.4443v-1.7095H2.0515V8.8018Z",
   x: "M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z",
 };
 
@@ -86,6 +93,12 @@ const FILES: Partial<Record<Brand, string>> = {
   bing: "/logos/bing.png",
   serpapi: "/logos/serpapi.png",
   microsoft: "/logos/microsoft.svg",
+  mymemory: "/logos/mymemory.png",
+};
+
+/** Logos en fichier qui demandent un fond : l'icône grise de MyMemory se perdrait sur un thème sombre. */
+const FILE_CLASSES: Partial<Record<Brand, string>> = {
+  mymemory: "rounded-[3px] bg-white p-px",
 };
 
 const NAMES: Record<Brand, string> = {
@@ -108,6 +121,9 @@ const NAMES: Record<Brand, string> = {
   bing: "Bing",
   serpapi: "SerpApi",
   microsoft: "Microsoft",
+  deepl: "DeepL",
+  libretranslate: "LibreTranslate",
+  mymemory: "MyMemory",
   youtube: "YouTube",
   facebook: "Facebook",
   instagram: "Instagram",
@@ -174,7 +190,7 @@ export function BrandLogo({ brand, className, labelled = false }: { brand: Brand
       alt={label}
       aria-hidden={labelled ? undefined : true}
       draggable={false}
-      className={cn("size-4 shrink-0 object-contain", className)}
+      className={cn("size-4 shrink-0 object-contain", FILE_CLASSES[brand], className)}
     />
   );
 }

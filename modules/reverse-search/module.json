@@ -25,6 +25,7 @@
     "deleteSearch": "user",
     "clearHistory": "user"
   },
+  "aiUsage": { "limits": "getAiLimits", "remote": "readAiRemoteLimits" },
   "pages": [
     { "path": "", "title": "Recherche", "component": "pages/search.tsx" },
     { "path": "history", "title": "Historique", "component": "pages/history.tsx" },

@@ -50,6 +50,7 @@
     "listPublishServices": "user",
     "getWatermarkImage": "public"
   },
+  "aiUsage": { "limits": "getAiLimits" },
   "pages": [
     { "path": "", "title": "Images de marque", "component": "pages/kits.tsx" },
     { "path": "edit", "title": "Éditeur", "component": "pages/editor.tsx" }

@@ -12,7 +12,7 @@
  */
 
 import type { SourceLanguage } from "../../types";
-import { EngineError, getJson, type TranslationEngine } from "./engines";
+import { EngineError, getJson, meteredTranslation, type TranslationEngine } from "./engines";
 
 export const MYMEMORY_ENDPOINT = "https://api.mymemory.translated.net/get";
 /** Taille d'une phrase acceptée par le service, en octets UTF-8. */
@@ -133,28 +133,30 @@ export function createMyMemoryEngine(contactEmail?: string): TranslationEngine {
       url.searchParams.set("langpair", `${from}|${myMemoryTargetLanguage(target)}`);
       if (contactEmail) url.searchParams.set("de", contactEmail);
 
-      const response = await getJson(url.toString(), {}, signal);
-      const body = response.body as {
-        responseStatus?: unknown;
-        responseDetails?: unknown;
-        quotaFinished?: unknown;
-        responseData?: { translatedText?: unknown; match?: unknown } | null;
-        matches?: unknown;
-      } | null;
-      const details = typeof body?.responseDetails === "string" ? body.responseDetails : "";
-      const translated = typeof body?.responseData?.translatedText === "string" ? body.responseData.translatedText : "";
-      // Le service répond souvent 200 et range le vrai statut dans le corps.
-      const inner = typeof body?.responseStatus === "number" ? body.responseStatus : Number(body?.responseStatus);
-      const status = response.status !== 200 ? response.status : Number.isFinite(inner) && inner > 0 ? inner : 200;
+      return meteredTranslation("mymemory", texts, async () => {
+        const response = await getJson(url.toString(), {}, signal);
+        const body = response.body as {
+          responseStatus?: unknown;
+          responseDetails?: unknown;
+          quotaFinished?: unknown;
+          responseData?: { translatedText?: unknown; match?: unknown } | null;
+          matches?: unknown;
+        } | null;
+        const details = typeof body?.responseDetails === "string" ? body.responseDetails : "";
+        const translated = typeof body?.responseData?.translatedText === "string" ? body.responseData.translatedText : "";
+        // Le service répond souvent 200 et range le vrai statut dans le corps.
+        const inner = typeof body?.responseStatus === "number" ? body.responseStatus : Number(body?.responseStatus);
+        const status = response.status !== 200 ? response.status : Number.isFinite(inner) && inner > 0 ? inner : 200;
 
-      if (body?.quotaFinished === true || QUOTA.test(translated) || QUOTA.test(details)) throw failure(429, "QUOTA");
-      if (status !== 200) throw failure(status, `${details} ${translated}`, response.retryAfterMs);
-      if (!body || translated.trim() === "" || WARNING.test(translated.trim())) throw new EngineError("unavailable", "Réponse inattendue du service.");
-      const bestMatch = typeof body.responseData?.match === "number" ? body.responseData.match : undefined;
-      const chosen = pickMyMemoryTranslation(text, translated, bestMatch, body.matches);
-      // Rien de sûr : mieux vaut une zone sans traduction qu'une phrase d'un autre texte posée dans la bulle.
-      if (chosen === null) throw new EngineError("invalid-request", "MyMemory n’a pas de traduction sûre pour cette phrase.");
-      return [chosen];
+        if (body?.quotaFinished === true || QUOTA.test(translated) || QUOTA.test(details)) throw failure(429, "QUOTA");
+        if (status !== 200) throw failure(status, `${details} ${translated}`, response.retryAfterMs);
+        if (!body || translated.trim() === "" || WARNING.test(translated.trim())) throw new EngineError("unavailable", "Réponse inattendue du service.");
+        const bestMatch = typeof body.responseData?.match === "number" ? body.responseData.match : undefined;
+        const chosen = pickMyMemoryTranslation(text, translated, bestMatch, body.matches);
+        // Rien de sûr : mieux vaut une zone sans traduction qu'une phrase d'un autre texte posée dans la bulle.
+        if (chosen === null) throw new EngineError("invalid-request", "MyMemory n’a pas de traduction sûre pour cette phrase.");
+        return [chosen];
+      });
     },
   };
 }

@@ -9,7 +9,7 @@
  */
 
 import type { SourceLanguage } from "../../types";
-import { EngineError, expectTranslations, getJson, postJson, type TranslationEngine } from "./engines";
+import { EngineError, expectTranslations, getJson, meteredTranslation, postJson, type TranslationEngine } from "./engines";
 
 const FREE_HOST = "https://api-free.deepl.com";
 const PRO_HOST = "https://api.deepl.com";
@@ -77,12 +77,14 @@ export function createDeeplEngine(key: string): TranslationEngine {
         target_lang: deeplTargetLanguage(target),
         ...(sourceLanguage ? { source_lang: sourceLanguage } : {}),
       };
-      const response = await postJson(endpoint, payload, { Authorization: `DeepL-Auth-Key ${key.trim()}` }, signal);
-      if (response.status !== 200) throw failure(response.status, response.retryAfterMs);
+      return meteredTranslation("deepl", texts, async () => {
+        const response = await postJson(endpoint, payload, { Authorization: `DeepL-Auth-Key ${key.trim()}` }, signal);
+        if (response.status !== 200) throw failure(response.status, response.retryAfterMs);
 
-      const translations = (response.body as { translations?: unknown } | null)?.translations;
-      const list = Array.isArray(translations) ? translations.map((entry) => (entry as { text?: unknown } | null)?.text) : null;
-      return expectTranslations(list, texts.length);
+        const translations = (response.body as { translations?: unknown } | null)?.translations;
+        const list = Array.isArray(translations) ? translations.map((entry) => (entry as { text?: unknown } | null)?.text) : null;
+        return expectTranslations(list, texts.length);
+      });
     },
     // `GET /v2/usage` : caractères consommés et plafond de la période en cours.
     async usage(signal) {

@@ -25,6 +25,8 @@ import * as sources from "./lib/server/sources";
 import * as translation from "./lib/server/translation";
 import * as detector from "./lib/server/detector";
 import { ensureDirs } from "./lib/store";
+import { readDeeplBalance, scanStudioAiReport } from "./lib/server/ai-usage";
+import type { AiLimit, AiModuleReport } from "@/lib/ai-usage/types";
 import type { LinkImportReport } from "./lib/library-helpers";
 import type {
   AiCatalogue,
@@ -265,6 +267,18 @@ export async function removeDetector(variant: DetectorVariantId): Promise<Detect
 /** Réservé aux administrateurs (absent de `module.json`) : la consommation du compte, lue chez le service. */
 export async function readEngineUsage(engineId: TranslationEngineId): Promise<{ ok: boolean; message: string; used?: number; limit?: number }> {
   return translation.readEngineUsage(engineId);
+}
+
+// ─── Consommation des IA (écran `/admin/ai`) ─────────────────────
+
+/** Réservé aux administrateurs (absent de `functions`), déclaré dans `aiUsage.limits`. */
+export async function getAiLimits(): Promise<AiModuleReport> {
+  return scanStudioAiReport();
+}
+
+/** Réservé aux administrateurs, déclaré dans `aiUsage.remote` : le solde DeepL, d’une requête de lecture. */
+export async function readAiRemoteLimits(provider: string): Promise<AiLimit[] | null> {
+  return provider === "deepl" ? readDeeplBalance(() => translation.readEngineUsage("deepl")) : null;
 }
 
 // ─── Sources : import d'un chapitre par son lien ─────────────────

@@ -9,7 +9,7 @@
  */
 
 import type { SourceLanguage } from "../../types";
-import { EngineError, expectTranslations, postJson, type TranslationEngine } from "./engines";
+import { EngineError, expectTranslations, meteredTranslation, postJson, type TranslationEngine } from "./engines";
 
 /** Le service accepte nos codes tels quels : « en », « ja », « ko », « zh-Hans », « zh-Hant », « auto ». */
 export function libreSourceLanguage(source: SourceLanguage): string {
@@ -70,16 +70,18 @@ export function createLibreTranslateEngine(baseUrl: string, apiKey?: string): Tr
         format: "text",
         ...(apiKey ? { api_key: apiKey } : {}),
       };
-      const response = await postJson(endpoint, payload, {}, signal);
-      if (response.status !== 200) throw failure(response.status, response.retryAfterMs);
+      return meteredTranslation("libretranslate", texts, async () => {
+        const response = await postJson(endpoint, payload, {}, signal);
+        if (response.status !== 200) throw failure(response.status, response.retryAfterMs);
 
-      const translated = (response.body as { translatedText?: unknown } | null)?.translatedText;
-      if (texts.length === 1 && typeof translated === "string") return [translated];
-      if (texts.length > 1 && typeof translated === "string") {
-        // Une version trop ancienne pour les lots : on ne la contourne pas par une requête par phrase.
-        throw new EngineError("invalid-request", "Cette version de LibreTranslate ne traduit pas plusieurs textes par requête.");
-      }
-      return expectTranslations(translated, texts.length);
+        const translated = (response.body as { translatedText?: unknown } | null)?.translatedText;
+        if (texts.length === 1 && typeof translated === "string") return [translated];
+        if (texts.length > 1 && typeof translated === "string") {
+          // Une version trop ancienne pour les lots : on ne la contourne pas par une requête par phrase.
+          throw new EngineError("invalid-request", "Cette version de LibreTranslate ne traduit pas plusieurs textes par requête.");
+        }
+        return expectTranslations(translated, texts.length);
+      });
     },
   };
 }

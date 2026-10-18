@@ -55,6 +55,18 @@ import {
   rejectPoseCandidate as rejectPose,
   startPoseGeneration as launchPoses,
 } from "./lib/server/poses";
+import type { AiModuleReport } from "@/lib/ai-usage/types";
+
+// ─── Consommation des IA (écran `/admin/ai`) ─────────────────────
+
+/**
+ * Réservé aux administrateurs (absent de `functions`), déclaré dans
+ * `aiUsage.limits`. L’assistant écrit avec Codex ; les images passent par la
+ * file d’AI Image Gen, qui en note le moteur.
+ */
+export async function getAiLimits(): Promise<AiModuleReport> {
+  return { codex: {} };
+}
 
 // ─── Fiches ──────────────────────────────────────────────────────
 

@@ -99,11 +99,20 @@ async function failureOf(response: Response, label: string): Promise<AiCallError
 
 const OPENAI_CHAT = "https://api.openai.com/v1/chat/completions";
 
+/** Ce qu'un adaptateur reçoit. `onTokens` : jetons consommés, quand la réponse les donne. */
+export interface AiProviderRequest {
+  apiKey: string;
+  model: string;
+  prompt: string;
+  image?: AiImage;
+  signal: AbortSignal;
+  onTokens?: (tokens: number) => void;
+}
+
+const tokenCount = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.round(value) : 0);
+
 /** Une question à un modèle d'OpenAI, avec ou sans image. Une requête, jamais retentée. */
-export async function askOpenAi(
-  request: { apiKey: string; model: string; prompt: string; image?: AiImage; signal: AbortSignal },
-  fetchImpl: Fetch = fetch,
-): Promise<string> {
+export async function askOpenAi(request: AiProviderRequest, fetchImpl: Fetch = fetch): Promise<string> {
   const content: unknown[] = [{ type: "text", text: request.prompt }];
   if (request.image) {
     content.push({ type: "image_url", image_url: { url: `data:${request.image.mimeType};base64,${request.image.b64}` } });
@@ -116,7 +125,9 @@ export async function askOpenAi(
   });
   if (!response.ok) throw await failureOf(response, "OpenAI");
 
-  const payload = (await response.json()) as { choices?: { message?: { content?: unknown; refusal?: unknown } }[] } | null;
+  const payload = (await response.json()) as { choices?: { message?: { content?: unknown; refusal?: unknown } }[]; usage?: { total_tokens?: unknown } } | null;
+  const tokens = tokenCount(payload?.usage?.total_tokens);
+  if (tokens) request.onTokens?.(tokens);
   const message = payload?.choices?.[0]?.message;
   if (typeof message?.refusal === "string" && message.refusal) {
     throw new AiCallError("refused", `Le modèle a refusé : ${message.refusal.slice(0, 200)}`);
@@ -130,10 +141,7 @@ export async function askOpenAi(
 const GOOGLE_MODELS = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /** Une question à un modèle Gemini, avec ou sans image. Une requête, jamais retentée. */
-export async function askGoogle(
-  request: { apiKey: string; model: string; prompt: string; image?: AiImage; signal: AbortSignal },
-  fetchImpl: Fetch = fetch,
-): Promise<string> {
+export async function askGoogle(request: AiProviderRequest, fetchImpl: Fetch = fetch): Promise<string> {
   const parts: unknown[] = [{ text: request.prompt }];
   if (request.image) parts.push({ inline_data: { mime_type: request.image.mimeType, data: request.image.b64 } });
 
@@ -148,7 +156,10 @@ export async function askGoogle(
   const payload = (await response.json()) as {
     candidates?: { content?: { parts?: { text?: unknown }[] }; finishReason?: unknown }[];
     promptFeedback?: { blockReason?: unknown };
+    usageMetadata?: { totalTokenCount?: unknown };
   } | null;
+  const tokens = tokenCount(payload?.usageMetadata?.totalTokenCount);
+  if (tokens) request.onTokens?.(tokens);
   const candidate = payload?.candidates?.[0];
   const text = (candidate?.content?.parts ?? [])
     .map((part) => (typeof part?.text === "string" ? part.text : ""))

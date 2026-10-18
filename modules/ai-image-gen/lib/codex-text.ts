@@ -6,6 +6,10 @@
  * Clip Studio. La détection de l'exécutable et le réglage d'isolation sont
  * ceux du moteur d'images Codex, pour se comporter exactement comme lui. La réponse finale est lue dans le fichier que Codex
  * écrit via `--output-last-message`, plus fiable que d'analyser son flux.
+ *
+ * Le flux part en JSON (`--json`), un événement par ligne : la fin du tour
+ * (`turn.completed`) porte les jetons consommés, notés dans le registre de
+ * consommation des IA avec l'origine que l'appelant donne.
  */
 
 import fs from "fs";
@@ -17,6 +21,7 @@ import { readSecrets } from "./store";
 
 import { childEnv } from "@/lib/child-env";
 import { resolveSandbox } from "./engines/sandbox";
+import { recordAiUsage, usageError, type AiUsageOrigin } from "@/lib/ai-usage";
 
 export interface CodexOptions {
   timeoutMs?: number;
@@ -30,6 +35,40 @@ export interface CodexOptions {
    * données à contrôler par l'appelant.
    */
   search?: boolean;
+  /**
+   * Module et usage à l'origine de la demande, pour le registre de
+   * consommation. Absent : AI Image Gen, « Texte ».
+   */
+  origin?: AiUsageOrigin;
+}
+
+/** Jetons d'une ligne du flux JSON de `codex exec --json`, quand c'est la fin d'un tour. */
+export function codexTurnTokens(line: string): number | null {
+  if (!line.startsWith("{") || !line.includes("turn.completed")) return null;
+  try {
+    const event = JSON.parse(line) as { type?: unknown; usage?: Record<string, unknown> };
+    if (event.type !== "turn.completed" || !event.usage) return null;
+    const input = Number(event.usage.input_tokens) || 0;
+    const output = Number(event.usage.output_tokens) || 0;
+    return input + output > 0 ? input + output : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Texte lisible d'une ligne du flux JSON, pour `onLog` : message ou commande d'un élément terminé. */
+function codexLogLine(line: string): string | null {
+  if (!line.startsWith("{")) return line;
+  try {
+    const event = JSON.parse(line) as { type?: unknown; item?: { text?: unknown; command?: unknown } };
+    const item = event.item;
+    if (event.type !== "item.completed" || !item) return null;
+    if (typeof item.text === "string") return item.text;
+    if (typeof item.command === "string") return item.command;
+    return null;
+  } catch {
+    return line;
+  }
 }
 
 function codexSettings(): { binaryPath?: string; sandbox?: string } {
@@ -47,10 +86,24 @@ export function findCodex(): string | null {
 
 export async function askCodex(prompt: string, options: CodexOptions = {}): Promise<string> {
   const { timeoutMs = 4 * 60 * 1000, signal, onLog, images = [], search = false } = options;
+  const origin = options.origin ?? { module: "ai-image-gen", feature: "Texte" };
   const binary = findCodex();
   if (!binary) {
     throw new Error("Codex CLI est introuvable sur ce serveur : l'assistant d'écriture en a besoin.");
   }
+  let tokens = 0;
+  const note = (ok: boolean, error?: unknown) =>
+    recordAiUsage({
+      provider: "codex",
+      module: origin.module,
+      feature: origin.feature,
+      model: "codex",
+      unit: "calls",
+      amount: 1,
+      ok,
+      ...(ok ? {} : { error: usageError(error) }),
+      ...(tokens > 0 ? { extra: { tokens } } : {}),
+    });
 
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "sxm-codex-"));
   const output = path.join(workspace, "answer.txt");
@@ -61,6 +114,8 @@ export async function askCodex(prompt: string, options: CodexOptions = {}): Prom
     // Option globale de Codex : elle se place avant la sous-commande, `exec` la refuserait.
     ...(search ? ["--search"] : []),
     "exec",
+    // Un événement JSON par ligne : la fin du tour donne les jetons consommés.
+    "--json",
     "--skip-git-repo-check",
     "--ignore-user-config",
     "--cd",
@@ -92,8 +147,24 @@ export async function askCodex(prompt: string, options: CodexOptions = {}): Prom
       signal?.addEventListener("abort", abort, { once: true });
 
       child.stdout.setEncoding("utf-8");
+      // Une ligne peut arriver en deux morceaux : on attend sa fin avant de la lire.
+      let partial = "";
+      const readLine = (raw: string) => {
+        const line = raw.trim();
+        if (!line) return;
+        const used = codexTurnTokens(line);
+        if (used !== null) tokens += used;
+        const text = codexLogLine(line);
+        if (text?.trim()) onLog?.(text.trim().slice(0, 300));
+      };
       child.stdout.on("data", (chunk: string) => {
-        for (const line of chunk.split("\n")) if (line.trim()) onLog?.(line.trim().slice(0, 300));
+        const lines = (partial + chunk).split("\n");
+        partial = lines.pop() ?? "";
+        for (const line of lines) readLine(line);
+      });
+      child.stdout.on("end", () => {
+        readLine(partial);
+        partial = "";
       });
       child.stderr.setEncoding("utf-8");
       child.stderr.on("data", (chunk: string) => {
@@ -116,7 +187,12 @@ export async function askCodex(prompt: string, options: CodexOptions = {}): Prom
     });
 
     if (!fs.existsSync(output)) throw new Error("Codex n'a renvoyé aucune réponse.");
-    return fs.readFileSync(output, "utf-8");
+    const answer = fs.readFileSync(output, "utf-8");
+    note(true);
+    return answer;
+  } catch (error) {
+    note(false, error);
+    throw error;
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
   }

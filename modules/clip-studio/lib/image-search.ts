@@ -28,6 +28,9 @@ import { randomBytes } from "crypto";
 import { buildContactSheet } from "@/lib/image-search/contact-sheet";
 import { checkImage, downloadImage, type DownloadedImage } from "@/lib/image-search/download";
 import { getOpenverseImage, searchOpenverseImages, type FetchLike, type OpenverseCandidate } from "@/lib/image-search/openverse";
+
+/** Origine des recherches Openverse dans le registre de consommation des IA. */
+const OPENVERSE_ORIGIN = { module: "clip-studio", feature: "Recherche d'images" };
 import { httpUrl, imageCredit } from "@/lib/image-search/types";
 import type { RemoteImage } from "@/lib/remote-image";
 import type { ClipAsset } from "../engine/types";
@@ -274,7 +277,7 @@ export async function searchWeb(
   const answer = await webLimiter(async () => {
     signal?.throwIfAborted();
     const prompt = kind === "icon" ? iconSearchPrompt(clean) : webSearchPrompt(clean);
-    return (deps.askCodex ?? askCodex)(prompt, { search: true, signal, timeoutMs: WEB_TIMEOUT_MS });
+    return (deps.askCodex ?? askCodex)(prompt, { search: true, signal, timeoutMs: WEB_TIMEOUT_MS, origin: { module: "clip-studio", feature: "Recherche d'images" } });
   });
   const proposals = parseWebAnswer(answer);
   const checked = await Promise.all(
@@ -300,7 +303,7 @@ export async function searchWeb(
 
 /** Les premières candidates d'Openverse pour un sujet, téléchargées et contrôlées. */
 export async function searchOpenverseCandidates(query: string, signal?: AbortSignal, deps: ImageSearchDeps = {}): Promise<CheckedCandidate[]> {
-  const results = await searchOpenverseImages(query, { minShortSide: FOUND_LIMITS.minShortSide, signal, fetch: deps.fetch });
+  const results = await searchOpenverseImages(query, { minShortSide: FOUND_LIMITS.minShortSide, signal, fetch: deps.fetch, origin: OPENVERSE_ORIGIN });
   const checked = await Promise.all(
     results.slice(0, FOUND_LIMITS.candidatesPerSegment).map(async (candidate) => {
       try {
@@ -379,7 +382,7 @@ export async function pickBest(
     signal?.throwIfAborted();
     const text = segmentText.slice(0, 600);
     const prompt = icon ? pickIconPrompt(list.length, options.query ?? "", text) : pickPrompt(list.length, text, options.query);
-    const answer = await (options.askCodex ?? askCodex)(prompt, { images: [file], signal, timeoutMs: PICK_TIMEOUT_MS });
+    const answer = await (options.askCodex ?? askCodex)(prompt, { images: [file], signal, timeoutMs: PICK_TIMEOUT_MS, origin: { module: "clip-studio", feature: "Choix d'image" } });
     const choice = Math.round(Number(extractJson<{ choice?: unknown }>(answer).choice));
     return Number.isInteger(choice) && choice >= 0 && choice <= list.length ? choice : fallback;
   } catch (error) {
@@ -454,7 +457,7 @@ export async function importFoundImageById(id: string, deps: ImageSearchDeps = {
   if (openverse) {
     const already = (readAssets() as FoundAsset[]).find((asset) => asset.foundId === value && fs.existsSync(path.join(ASSETS_DIR, asset.file)));
     if (already) return toImported(already);
-    const candidate = await getOpenverseImage(openverse[1], { fetch: deps.fetch });
+    const candidate = await getOpenverseImage(openverse[1], { fetch: deps.fetch, origin: { module: "clip-studio", feature: "Import d'image" } });
     const image = await downloadImage(candidate.imageUrl, { fetchImage: deps.fetchImage, minShortSide: FOUND_LIMITS.minShortSide });
     return importFoundImage({ found: publicFound(candidate), image });
   }
@@ -493,7 +496,7 @@ export async function searchFoundImages(
     return (await searchWeb(query, undefined, deps)).map((candidate) => candidate.found);
   }
   if (input?.provider !== "openverse") throw new Error("Source de recherche inconnue.");
-  const results = await searchOpenverseImages(query, { page: input.page, minShortSide: FOUND_LIMITS.minShortSide, fetch: deps.fetch });
+  const results = await searchOpenverseImages(query, { page: input.page, minShortSide: FOUND_LIMITS.minShortSide, fetch: deps.fetch, origin: OPENVERSE_ORIGIN });
   return results.map(publicFound);
 }
 

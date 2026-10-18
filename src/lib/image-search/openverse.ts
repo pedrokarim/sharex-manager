@@ -9,6 +9,7 @@
  */
 
 import { SITE_LINKS } from "@/config/links";
+import { recordAiUsage, usageError, type AiUsageOrigin } from "@/lib/ai-usage";
 import { httpUrl, type ImageCandidate } from "./types";
 
 export const OPENVERSE_IMAGES = "https://api.openverse.org/v1/images/";
@@ -60,6 +61,8 @@ export interface OpenverseOptions {
   minShortSide?: number;
   signal?: AbortSignal;
   fetch?: FetchLike;
+  /** Module et usage notés dans le registre de consommation des IA. Absent : le cœur, « Recherche d'images ». */
+  origin?: AiUsageOrigin;
 }
 
 export function isOpenverseId(value: unknown): value is string {
@@ -107,7 +110,31 @@ export function toCandidate(item: OpenverseImage, minShortSide = 0): OpenverseCa
   };
 }
 
-async function openverse<T>(url: string, options: Pick<OpenverseOptions, "signal" | "fetch">): Promise<T> {
+async function openverse<T>(url: string, options: Pick<OpenverseOptions, "signal" | "fetch" | "origin">): Promise<T> {
+  try {
+    const body = await requestOpenverse<T>(url, options);
+    noteCall(options.origin, true);
+    return body;
+  } catch (error) {
+    // Une recherche annulée par l'appelant n'a rien demandé au service.
+    if (!options.signal?.aborted) noteCall(options.origin, false, error);
+    throw error;
+  }
+}
+
+function noteCall(origin: AiUsageOrigin | undefined, ok: boolean, error?: unknown) {
+  recordAiUsage({
+    provider: "openverse",
+    module: origin?.module ?? "core",
+    feature: origin?.feature ?? "Recherche d'images",
+    unit: "calls",
+    amount: 1,
+    ok,
+    ...(ok ? {} : { error: usageError(error) }),
+  });
+}
+
+async function requestOpenverse<T>(url: string, options: Pick<OpenverseOptions, "signal" | "fetch">): Promise<T> {
   const doFetch = options.fetch ?? fetch;
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
@@ -169,7 +196,7 @@ export async function searchOpenverseImages(query: string, options: OpenverseOpt
  * Relit une image chez Openverse, licence comprise. Seul l'identifiant vient
  * du navigateur : adresse, auteur et licence sont ceux d'Openverse.
  */
-export async function getOpenverseImage(id: string, options: Pick<OpenverseOptions, "signal" | "fetch"> = {}): Promise<OpenverseCandidate> {
+export async function getOpenverseImage(id: string, options: Pick<OpenverseOptions, "signal" | "fetch" | "origin"> = {}): Promise<OpenverseCandidate> {
   if (!isOpenverseId(id)) throw new Error("Identifiant Openverse invalide.");
   const item = await openverse<OpenverseImage>(`${OPENVERSE_IMAGES}${id}/`, options);
   if (!isAllowed(item?.license)) {

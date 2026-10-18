@@ -57,6 +57,7 @@ export async function generateImage(
     n: 1,
     collectionId: input.collectionId,
     references: (input.references ?? []).slice(0, 6).filter((file) => fs.existsSync(file)).map(reference),
+    origin: { module: "brand-kit", feature: "Image de marque" },
   });
   onJob?.(job.id);
   const deadline = Date.now() + IMAGE_TIMEOUT_MS;

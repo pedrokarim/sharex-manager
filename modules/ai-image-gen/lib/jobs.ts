@@ -107,6 +107,15 @@ export interface EnqueueInput extends Omit<JobRequest, "references"> {
   pipelineId?: string;
 }
 
+/** Origine annoncée par l'appelant : un nom de module et un libellé courts, rien d'autre. */
+function cleanOrigin(value: unknown): JobRequest["origin"] {
+  const origin = value as { module?: unknown; feature?: unknown } | null;
+  if (!origin || typeof origin !== "object") return undefined;
+  const moduleName = typeof origin.module === "string" && /^[a-z0-9][a-z0-9_-]{0,39}$/.test(origin.module) ? origin.module : null;
+  const feature = typeof origin.feature === "string" ? origin.feature.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 80) : "";
+  return moduleName && feature ? { module: moduleName, feature } : undefined;
+}
+
 export function enqueueJob(input: EnqueueInput): Job {
   ensureDataDirs();
   const config = buildEngineConfig();
@@ -130,10 +139,11 @@ export function enqueueJob(input: EnqueueInput): Job {
   );
 
   const totalSteps = pipeline ? pipeline.steps.length : 1;
+  const origin = cleanOrigin(input.origin);
   const job: Job = {
     id: `job-${Date.now()}-${randomSlug(6)}`,
     status: "queued",
-    request: { ...input, references },
+    request: { ...input, references, origin },
     modelLabel: model.label,
     engineId: model.engineId,
     engineKind: model.kind,
@@ -385,6 +395,7 @@ async function executeStep(
     parentId: previous?.historyId ?? job.request.parentId,
     pipelineId: job.request.pipelineId,
     references,
+    origin: job.request.origin,
   };
 
   const outcome = await runGeneration(request, {

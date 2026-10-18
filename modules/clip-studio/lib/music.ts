@@ -18,6 +18,7 @@ import fs from "fs";
 import path from "path";
 import { ensureResource, resourcePath, resourceState, type ResourceSpec, type ResourceState } from "./resources";
 import { DATA_DIR, ensureDirs } from "./store";
+import { recordAiUsage, usageError } from "@/lib/ai-usage";
 
 const MODULE_DIR = path.join(process.cwd(), "modules", "clip-studio");
 const LIBRARY_FILE = path.join(MODULE_DIR, "music", "library.json");
@@ -175,11 +176,20 @@ function toTrack(item: OpenverseAudio, mood: Mood, id: string): MusicTrack {
   };
 }
 
-async function openverse<T>(url: string): Promise<T> {
-  const response = await fetch(url, { headers: { "user-agent": USER_AGENT, accept: "application/json" } });
-  if (response.status === 429) throw new Error("Openverse limite le nombre de recherches : réessayez dans une minute.");
-  if (!response.ok) throw new Error(`Openverse ne répond pas (HTTP ${response.status}).`);
-  return (await response.json()) as T;
+async function openverse<T>(url: string, feature: string): Promise<T> {
+  const note = (ok: boolean, error?: unknown) =>
+    recordAiUsage({ provider: "openverse", module: "clip-studio", feature, unit: "calls", amount: 1, ok, ...(ok ? {} : { error: usageError(error) }) });
+  try {
+    const response = await fetch(url, { headers: { "user-agent": USER_AGENT, accept: "application/json" } });
+    if (response.status === 429) throw new Error("Openverse limite le nombre de recherches : réessayez dans une minute.");
+    if (!response.ok) throw new Error(`Openverse ne répond pas (HTTP ${response.status}).`);
+    const body = (await response.json()) as T;
+    note(true);
+    return body;
+  } catch (error) {
+    note(false, error);
+    throw error;
+  }
 }
 
 /** Morceaux de Jamendo sous CC0 ou CC BY, par mots-clés. */
@@ -197,7 +207,7 @@ export async function searchMusic(input: { query: string; page?: number }): Prom
   // Les requêtes anonymes sont limitées à 20 résultats par page.
   const fetchPage = async (q: string) => {
     const params = new URLSearchParams({ q, source: "jamendo", license: "cc0,by", page_size: "20", page: String(page) });
-    return (await openverse<{ results: OpenverseAudio[] }>(`${OPENVERSE}?${params}`)).results;
+    return (await openverse<{ results: OpenverseAudio[] }>(`${OPENVERSE}?${params}`, "Recherche de musique")).results;
   };
   let items = await fetchPage(query);
   // Openverse exige tous les mots : « epic orchestral » ne trouve rien. On
@@ -244,7 +254,7 @@ export async function addMusic(input: { id: string; mood?: string }): Promise<Mu
   const existing = readLibrary().find((track) => track.id === id);
   if (existing) return listMusic().find((track) => track.id === id)!;
 
-  const item = await openverse<OpenverseAudio>(`${OPENVERSE}${id}/`);
+  const item = await openverse<OpenverseAudio>(`${OPENVERSE}${id}/`, "Ajout de musique");
   if (item.license !== "cc0" && item.license !== "by") {
     throw new Error("Seuls les morceaux sous CC0 ou CC BY peuvent entrer dans la banque.");
   }

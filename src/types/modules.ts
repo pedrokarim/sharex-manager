@@ -162,6 +162,25 @@ export interface CatalogSectionMedia {
   indexable?: boolean;
 }
 
+/**
+ * Ce qu’un module apporte au registre de consommation des IA. Les appels, eux,
+ * sont notés par `recordAiUsage` (`@/lib/ai-usage`) là où ils partent.
+ */
+export interface ModuleAiUsage {
+  /**
+   * Fonction serveur : `() => AiModuleReport`. Les fournisseurs que le module
+   * utilise, l’état de leur accès et les limites qu’il tient (compteurs,
+   * plafonds réglés), sans aucune clé.
+   */
+  limits?: string;
+  /**
+   * Fonction serveur : `(provider: AiProviderId) => AiLimit[] | null`. Lit le
+   * solde chez le service avec la clé du module, sans rien dépenser ; `null`
+   * pour un fournisseur qu’il ne tient pas.
+   */
+  remote?: string;
+}
+
 export interface ModuleConfig {
   name: string;
   version: string;
@@ -193,6 +212,11 @@ export interface ModuleConfig {
   fileActions?: ModuleFileAction[];
   gallerySources?: ModuleGallerySource[];
   catalogSections?: ModuleCatalogSection[];
+  /**
+   * Consommation des IA (écran `/admin/ai`). Le cœur ne lit pas les fichiers
+   * du module : il appelle ces fonctions serveur, réservées aux admins.
+   */
+  aiUsage?: ModuleAiUsage;
   /**
    * Fonctions appelables par `/api/modules/call-function`, avec le rôle
    * minimal. Une fonction absente de la liste est réservée aux admins.

@@ -13,6 +13,7 @@
  */
 
 import type { EngineId, EngineResult, KeyName, Match, MatchLink } from "../types";
+import { recordAiUsage, type AiProviderId } from "@/lib/ai-usage";
 
 const TIMEOUT_MS = 30_000;
 const MAX_MATCHES = 12;
@@ -345,6 +346,35 @@ const INLINE: Partial<Record<EngineId, Engine>> = {
 
 export const hasInlineEngine = (id: EngineId) => id in INLINE;
 
+/**
+ * Moteurs notés dans le registre de consommation des IA : le service appelé,
+ * la clé sans laquelle rien ne part, et le moteur de SerpApi. IQDB, sans
+ * compte ni quota, n'y figure pas.
+ */
+const USAGE: Partial<Record<EngineId, { provider: AiProviderId; key?: KeyName; model?: string }>> = {
+  tracemoe: { provider: "tracemoe" },
+  saucenao: { provider: "saucenao", key: "saucenao" },
+  google: { provider: "serpapi", key: "serpapi", model: "google_lens" },
+  yandex: { provider: "serpapi", key: "serpapi", model: "yandex_images" },
+};
+
+function noteCall(id: EngineId, context: EngineContext, result: EngineResult) {
+  const usage = USAGE[id];
+  // Sans clé, le moteur a refusé avant d'envoyer quoi que ce soit.
+  if (!usage || (usage.key && !context.keys[usage.key])) return;
+  const ok = result.status === "ok" || result.status === "empty";
+  recordAiUsage({
+    provider: usage.provider,
+    module: "reverse-search",
+    feature: "Recherche inversée",
+    ...(usage.model ? { model: usage.model } : {}),
+    unit: "calls",
+    amount: 1,
+    ok,
+    ...(ok ? {} : { error: result.message }),
+  });
+}
+
 /** Interroge un moteur. Ne lève jamais : un échec est un résultat comme un autre. */
 export async function runEngine(id: EngineId, context: EngineContext): Promise<EngineResult> {
   const started = Date.now();
@@ -356,12 +386,16 @@ export async function runEngine(id: EngineId, context: EngineContext): Promise<E
   });
   const engine = INLINE[id];
   if (!engine) return done({ status: "error", matches: [], message: "Ce moteur ne s’ouvre que dans un onglet." });
-  try {
-    const { matches, message } = await engine(context);
-    return done({ status: matches.length > 0 ? "ok" : "empty", matches, message });
-  } catch (error) {
-    if (error instanceof EngineError) return done({ status: error.status, matches: [], message: error.message });
-    console.error(`[reverse-search] ${id} :`, error);
-    return done({ status: "error", matches: [], message: "Réponse du moteur illisible." });
-  }
+  const result = await (async () => {
+    try {
+      const { matches, message } = await engine(context);
+      return done({ status: matches.length > 0 ? "ok" : "empty", matches, message });
+    } catch (error) {
+      if (error instanceof EngineError) return done({ status: error.status, matches: [], message: error.message });
+      console.error(`[reverse-search] ${id} :`, error);
+      return done({ status: "error", matches: [], message: "Réponse du moteur illisible." });
+    }
+  })();
+  noteCall(id, context, result);
+  return result;
 }

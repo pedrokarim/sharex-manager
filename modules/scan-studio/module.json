@@ -69,6 +69,7 @@
     "listAiPageVersions": "user",
     "deleteAiPageVersion": "user"
   },
+  "aiUsage": { "limits": "getAiLimits", "remote": "readAiRemoteLimits" },
   "pages": [
     {
       "path": "",

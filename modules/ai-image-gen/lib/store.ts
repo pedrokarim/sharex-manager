@@ -327,6 +327,11 @@ export interface JobRequest {
    * de plusieurs mégaoctets par génération.
    */
   references?: JobReference[];
+  /**
+   * Module et usage à l'origine de la demande (Brand Kit, Clip Studio…), pour
+   * le registre de consommation des IA. Absent : le studio lui-même.
+   */
+  origin?: { module: string; feature: string };
 }
 
 export interface JobReference {
