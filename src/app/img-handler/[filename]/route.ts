@@ -103,5 +103,8 @@ export async function GET(
     clientInfo,
     fallbackPath: FILE_NOT_FOUND_PATH,
     enableLogging: false, // On désactive le logging interne car on le gère nous-mêmes
+    // Un fichier sécurisé n'est jamais gardé par un cache partagé : servi à
+    // un compte connecté, Cloudflare le rendrait sinon à n'importe qui.
+    cacheControl: isSecure ? "private, no-store" : PUBLIC_IMAGE_CACHE,
   });
 }
