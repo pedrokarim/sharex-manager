@@ -5,6 +5,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
 } from "react";
@@ -52,14 +53,24 @@ export function ThemeProvider({
   initialTheme: ResolvedThemePayload;
 }) {
   const [resolvedTheme, setResolvedTheme] = useState(initialTheme);
-  const [localPreference, setLocalPreference] = useState(() =>
-    readThemePreference(),
-  );
-  const [prefersDark, setPrefersDark] = useState(() =>
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches,
-  );
+  // Le premier rendu reprend exactement celui du serveur, qui ignore le
+  // choix gardé dans ce navigateur : sinon l'icône du thème diffère et
+  // l'hydratation échoue (erreur React #418). Le choix est lu juste après,
+  // avant l'affichage ; la classe de <html>, posée par le script d'amorce,
+  // est déjà la bonne, donc rien ne clignote.
+  const [localPreference, setLocalPreference] =
+    useState<ThemePreference | null>(null);
+  const [prefersDark, setPrefersDark] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useLayoutEffect(() => {
+    setLocalPreference(readThemePreference());
+    setPrefersDark(
+      typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches,
+    );
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
     setResolvedTheme(initialTheme);
@@ -84,6 +95,9 @@ export function ThemeProvider({
   );
 
   useEffect(() => {
+    // Avant la lecture du choix local, appliquer le thème par défaut
+    // écraserait celui du script d'amorce.
+    if (!hydrated) return;
     const root = document.documentElement;
     applyRuntimeThemeToElement(
       root,
@@ -94,6 +108,7 @@ export function ThemeProvider({
     root.dataset.themePreference = runtimeState.themePreference;
     root.dataset.themeMode = runtimeState.activeMode;
   }, [
+    hydrated,
     resolvedTheme.styles,
     runtimeState.activeMode,
     runtimeState.themePreference,
