@@ -28,8 +28,8 @@ const percent = (value: number) => `${Math.round(value * 100)} %`;
 const date = (value: number) => new Date(value).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 
 const PHASES: Record<StyleJob["phase"], string> = {
-  video: "Lecture des images : coupes, mouvements, sous-titres",
-  audio: "Écoute du son : bruitages",
+  video: "Lecture des images",
+  audio: "Écoute des bruitages",
   compute: "Calcul du relevé",
 };
 
@@ -359,9 +359,9 @@ export function StylePanel({ style }: { style: MeasuredStyle }) {
 
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border">
-      <div className="flex min-w-0 items-center gap-2.5 border-b bg-muted/40 px-3 py-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 border-b bg-muted/40 px-3 py-2">
         <FileVideo aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium" title={reference.name}>
+        <span className="min-w-0 flex-1 basis-32 truncate text-sm font-medium" title={reference.name}>
           {reference.name}
         </span>
         <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground tabular-nums">

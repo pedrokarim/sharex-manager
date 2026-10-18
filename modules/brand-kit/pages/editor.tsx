@@ -67,7 +67,7 @@ const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; format?: Forma
   { id: "ai", label: "Assistant IA", icon: Sparkles },
   { id: "publishing", label: "Publication", icon: Send },
   // Style mesuré sur une vidéo de référence (07 sexies, D4).
-  { id: "style", label: "Style de référence", icon: Ruler, format: "endcard-vertical" },
+  { id: "style", label: "Référence", icon: Ruler, format: "endcard-vertical" },
 ];
 
 /** En dessous, les trois panneaux ne tiennent plus côte à côte. */

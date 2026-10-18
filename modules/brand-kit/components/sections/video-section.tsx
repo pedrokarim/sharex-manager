@@ -51,7 +51,7 @@ export const PACE_DESCRIPTIONS: Record<EditPace, string> = {
   calm: "Le montage d’avant, plans longs.",
   normal: `Un changement toutes les ${frenchSeconds(PACE_SHOT_SECONDS.normal)} au plus.`,
   lively: `Un changement toutes les ${frenchSeconds(PACE_SHOT_SECONDS.lively)}.`,
-  measured: "Le montage relevé sur un short que vous aimez (section « Style de référence »).",
+  measured: "Le montage relevé sur un short que vous aimez (section « Référence »).",
 };
 
 /** Plans d'environ 9 secondes de montage, pour dessiner chaque rythme. */
@@ -82,7 +82,7 @@ export function PaceField({ value, onChange, measuredReady = false }: { value: E
           value={pace}
           // D4 : sans style mesuré appliqué à la marque, ce rythme ne se choisit pas.
           disabled={pace === "measured" && !measuredReady && value !== "measured"}
-          className="h-auto w-full min-w-0 shrink flex-col items-stretch gap-2 px-3 py-2.5 text-left whitespace-normal data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
+          className="group h-auto w-full min-w-0 shrink flex-col items-stretch gap-2 px-3 py-2.5 text-left whitespace-normal data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
         >
           <span className="text-sm font-medium">{EDIT_PACE_LABELS[pace]}</span>
           <span className="flex h-2 w-full gap-0.5" aria-hidden>
@@ -90,7 +90,7 @@ export function PaceField({ value, onChange, measuredReady = false }: { value: E
               <span key={index} className={cn("min-w-0 flex-1 rounded-sm", value === pace ? "bg-primary/70" : "bg-muted-foreground/35")} />
             ))}
           </span>
-          <span className="text-xs font-normal break-words text-muted-foreground">{PACE_DESCRIPTIONS[pace]}</span>
+          <span className="text-xs font-normal break-words text-muted-foreground group-data-[state=on]:text-foreground/75">{PACE_DESCRIPTIONS[pace]}</span>
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
