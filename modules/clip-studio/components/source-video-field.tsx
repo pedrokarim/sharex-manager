@@ -16,12 +16,21 @@ import { RemoteImportPanel } from "./remote-import-panel";
 type Tab = "mine" | "url";
 
 /**
- * « Vidéo source » de l'assistant (dossier 01 vidéo, V4.3) : une vidéo des
+ * « Vidéo source » de l'assistant (dossier 01 vidéo, V4.3) : une vidéo des
  * médias du module, ou récupérée par son adresse. Le script s'appuie sur sa
- * transcription et en cite des extraits ; sans vidéo choisie, l'assistant
+ * transcription et en cite des extraits ; sans vidéo choisie, l'assistant
  * travaille comme avant.
  */
-export function SourceVideoField({ value, onChange }: { value: MediaSource | null; onChange: (source: MediaSource | null) => void }) {
+export function SourceVideoField({
+  value,
+  onChange,
+  embedded = false,
+}: {
+  value: MediaSource | null;
+  onChange: (source: MediaSource | null) => void;
+  /** Posé dans un panneau qui porte déjà le titre : ni cadre ni intitulé, la vidéo est demandée. */
+  embedded?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("mine");
   const [videos, setVideos] = useState<ClipAsset[] | null>(null);
@@ -48,14 +57,18 @@ export function SourceVideoField({ value, onChange }: { value: MediaSource | nul
   };
 
   return (
-    <div className="min-w-0 space-y-2 rounded-lg border p-3">
+    <div className={cn("min-w-0 space-y-2", !embedded && "rounded-lg border p-3")}>
       <div className="flex min-w-0 items-start justify-between gap-3">
-        <span className="min-w-0 text-sm">
-          Vidéo source
-          <span className="block text-xs text-muted-foreground">
-            Facultatif. Montez par-dessus une vidéo&nbsp;: le script s’appuie sur ce qui s’y dit, et en cite ou en montre des extraits.
+        {embedded ? (
+          <span className="min-w-0 text-sm text-muted-foreground">{value ? null : "Aucune vidéo choisie : une vidéo de vos médias, ou récupérée par son adresse."}</span>
+        ) : (
+          <span className="min-w-0 text-sm">
+            Vidéo source
+            <span className="block text-xs text-muted-foreground">
+              Facultatif. Montez par-dessus une vidéo&nbsp;: le script s’appuie sur ce qui s’y dit, et en cite ou en montre des extraits.
+            </span>
           </span>
-        </span>
+        )}
         {!value && (
           <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
             <Film className="h-4 w-4" />

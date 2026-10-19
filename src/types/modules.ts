@@ -213,7 +213,7 @@ export interface ModuleConfig {
   gallerySources?: ModuleGallerySource[];
   catalogSections?: ModuleCatalogSection[];
   /**
-   * Consommation des IA (écran `/admin/ai`). Le cœur ne lit pas les fichiers
+   * Consommation des IA (écran `/admin/services`). Le cœur ne lit pas les fichiers
    * du module : il appelle ces fonctions serveur, réservées aux admins.
    */
   aiUsage?: ModuleAiUsage;

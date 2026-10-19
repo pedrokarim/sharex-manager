@@ -407,7 +407,7 @@ l’écart avant le suivant est signalé.
 ### Voix de l’assistant, voix de la marque et calage (étape 13)
 
 **Débit et intonation dans « Créer ».** À côté du choix de la voix, la
-fenêtre « Créer » de l’assistant propose le débit (Posée, Normale, Rapide :
+page « Nouveau clip » propose le débit (Posée, Normale, Rapide :
 les paliers de l’éditeur, `VOICE_SPEEDS` dans `lib/voice-settings.ts`) et,
 pour une voix locale, l’intonation. « Écouter » joue la voix à ce débit et à
 cette intonation. Débit et intonation sont gardés dans ce navigateur
@@ -418,7 +418,7 @@ les transmet (`voiceSpeed`, `voiceTone`), bornés par `cleanRequest` : débit d
 
 **Voix de la marque.** Une image de marque peut fixer sa voix (dossier 07,
 section « Assistant IA ») : source et voix, débit, intonation. Quand la
-fenêtre « Créer » choisit une marque qui a une voix, ces réglages sont
+page « Nouveau clip » choisit une marque qui a une voix, ces réglages sont
 préremplis et une ligne l’indique (« Voix de la marque « Nom » »). Changer
 la voix, le débit ou l’intonation ne vaut que pour ce clip (« Voix changée
 pour ce clip », avec « Reprendre la voix de la marque »). Côté serveur,
@@ -428,10 +428,10 @@ voix. Une voix indisponible – clé Azure absente, source coupée – est
 remplacée par la voix locale par défaut (Siwis) avant le premier mot ; une
 voix en ligne qui ne répond pas dès la première ligne (Edge en panne) aussi.
 Le suivi le dit (« Voix de la marque indisponible (…) : voix locale Siwis à
-la place ») et le clip se fait. La fenêtre « Créer » prévient de même quand
+la place ») et le clip se fait. La page « Nouveau clip » prévient de même quand
 la voix de la marque n’est pas proposée sur ce serveur.
 
-**Calage sur la durée visée.** La fenêtre « Créer » règle une durée parlée
+**Calage sur la durée visée.** La page « Nouveau clip » règle une durée parlée
 visée, bornée par format : 60 s au plus pour un short 9:16, 90 s en 1:1 et
 4:5, 180 s en 16:9. Par défaut : 45 s (libre, top), 60 s (quiz), 40 s
 (diaporama), dans la limite du format. Le script la reçoit dans sa consigne.
@@ -460,6 +460,23 @@ les sous-titres karaoké viennent de la voix finale. Le travail garde ce suivi
 dans `narration` (voix retenue et son origine, repli, durée mesurée,
 accélération, secondes gagnées, tentatives). Le script raccourci n’est pas
 revérifié : la consigne interdit d’ajouter ou de changer un fait.
+
+**Séquences « Auto ».** Le nombre de segments (séquences, questions,
+éléments, diapositives) n’est plus imposé : par défaut, la demande n’en porte
+pas (`AssistantRequest.count` absent, ou « auto ») et le script découpe
+lui-même selon le sujet et la durée visée. La consigne (`autoCountLines`)
+donne les bornes (3 à 10, 3 à 8 pour un quiz, `AUTO_SEGMENTS` dans
+`lib/segment-count.ts`), la place d’un segment dans la voix (environ
+22 mots pour une séquence libre, 40 pour une question lue avec ses choix et
+sa réponse, 15 pour un élément de classement, 12 pour une légende ; 14 pour
+le titre et la conclusion, à 160 mots par minute) et le nombre qui remplit
+la durée (`suggestedSegments` : 5 séquences pour 45 s) ; elle demande d’en
+prendre moins quand le sujet a peu d’éléments solides, de ne jamais délayer
+ni tasser, et de tenir un nombre annoncé dans la demande (« 5 jeux »). La
+lecture du script accepte le nombre rendu jusqu’au plafond du modèle ; le
+bilan de l’écriture le dit (« 6 séquences choisies par le script »).
+« Choisir » sur la page garde l’ancien réglage : un nombre de 2 à 10, tenu
+tel quel. Les travaux et les projets existants ne changent pas.
 
 ### Idées de vidéos (étape 14)
 
@@ -518,6 +535,26 @@ en a (`mixTargets`). Le bilan affiché après la recherche dit ce qui a été
 obtenu et ce qui manque (`checkMix`) : banque vide, web coupé, part
 d’actualité qui laisse moins de trois idées prouvées.
 
+**Un sujet en phrase entière.** Le champ « Chercher des idées » prend des
+mots-clés (« jeux mobiles ») ou une phrase entière (« les secrets de
+fabrication des sabres japonais et pourquoi ils coupent si bien »), 300
+caractères au plus. La consigne (`topicLines` dans `lib/ideas.ts`) passe le
+texte comme une donnée entre balises `<sujet>` ; pour une phrase, Codex en
+dégage d’abord le sujet précis et l’angle, puis cherche autour sans glisser
+vers un thème voisin, et rend ce qu’il a compris (`subject`), affiché avec
+le bilan de la série (« Sujet compris : … »). Les mots-clés gardent leur
+rôle : ils délimitent le domaine.
+
+**Au format de la création.** Chaque idée porte les options de la page
+« Nouveau clip », montrées en puces sur sa carte : forme (libre, quiz,
+classement, diaporama), durée visée, découpage (`count` de 3 à 10 quand
+l’idée annonce un nombre, « 5 jeux », sinon absent : « Découpage auto »),
+format, et la vidéo source à choisir quand l’idée se monte par-dessus une
+vidéo (`sourceVideoHint`). Le mode « Depuis une idée » de la page de
+création fait la même recherche en plus court (trois idées, sans actualité)
+et liste les idées nouvelles et gardées de la marque ; « Utiliser »
+préremplit l’assistant.
+
 **Filtre avant d’écrire**, affiché sur chaque idée : la première phrase
 nomme l’objet ou la douleur avec un détail concret (un chiffre, un nom connu,
 « gratuit ») ; quelque chose à montrer dès la première seconde ; une seule
@@ -526,10 +563,12 @@ case est recalculée par le serveur ; les autres sont l’avis de Codex.
 
 **Une carte par idée.** Onglets Nouvelles, Gardées, Faites, Écartées.
 
-- « Créer cette vidéo » ouvre la page des projets avec des paramètres
-  d’adresse (`createHref`, `readCreatePrefill` dans `lib/idea-prefill.ts`) ;
-  la fenêtre « Créer » s’ouvre en mode Assistant, préremplie : demande
-  (accroche puis prompt), modèle, nombre, durée, format, marque. La demande
+- « Créer depuis cette idée » ouvre la page « Nouveau clip » préremplie
+  (`createHref`, `readCreatePrefill` dans `lib/idea-prefill.ts`) : mode
+  Assistant, ou « Monter sur une vidéo » quand l’idée en demande une
+  (`sourceVideoHint`, rappelé au-dessus du choix de la vidéo) ; demande
+  (accroche puis prompt), forme, découpage (« Auto » ou le nombre annoncé),
+  durée, format, marque. Tout reste modifiable avant de lancer. La demande
   envoie `ideaId` ; l’idée devient « faite » quand l’assistant a rendu son
   projet (« Ouvrir le projet »), et revient parmi les nouvelles si la
   création échoue ou est annulée.
@@ -620,8 +659,10 @@ possible pour qui veut aller plus loin.
 
 1. Dans la galerie (ou dans le fil d’AI Image Gen), sélection de plusieurs
    images, clic droit, « Modules », « Créer un clip avec la sélection ».
-2. Une fenêtre demande deux choses seulement : le **format** (16:9, 9:16,
-   1:1, 4:5, avec aperçu de la forme) et la **recette** :
+2. La page « Nouveau clip » s’ouvre sur « Sélection de la galerie »
+   (`/m/clip-studio/new?mode=gallery&files=…`) et demande deux choses : le
+   **format** (16:9, 9:16, 1:1, 4:5, avec aperçu de la forme) et la
+   **recette** :
    - **Diaporama** : 3 s par image, mouvement de caméra lent alterné, fondus
      enchaînés de 0,6 s ;
    - **Avant / Après** : images par paires, balayage de l’une à l’autre ;
@@ -638,13 +679,78 @@ galerie ou se télécharge.
 
 ## 3. Interface
 
-### 3.1 Page « Projets »
+### 3.1 Accueil, projets et exports
 
-Grille de cartes : image de couverture, nom, format, durée, date. Survol :
-lecture muette de l’aperçu du dernier export. Menu contextuel : Ouvrir,
-Dupliquer, Changer de format (crée une copie adaptée), Exporter, Supprimer.
-Bouton « Nouveau clip » : même fenêtre que la création express, avec
-sélection des médias par le `MediaPicker` du kit.
+**Accueil** (`/m/clip-studio`) : un tableau de bord, en panneaux à en-tête.
+« Reprendre » montre les six derniers projets modifiés (vignette, format,
+durée, marque, dernière modification) avec « Tous les projets » ;
+« Derniers exports » deux rangées de clips rendus (affiche, titre, format,
+durée, date) et, pour les administrateurs, les logos des comptes où chacun est
+publié, programmé ou en échec ; « Activité » un graphique des exports et des
+publications des trente derniers jours, puis les publications par service ;
+« Meilleures publications » les clips les plus vus. Les statistiques ne sont
+jamais demandées en cachette : l’accueil lit celles que le cœur garde en
+mémoire (`peekPosts`), « Lire les statistiques » les demande aux services. En
+tête : « Nouveau clip », « Importer une vidéo » (liens vers la page de création
+`/m/clip-studio/new`, la seconde avec `?mode=clipping`) et « Idées ».
+
+**Nouveau clip** (`/m/clip-studio/new`, `pages/create.tsx`) : la création
+a sa page, en pleine largeur ; elle remplace l’ancienne fenêtre, devenue trop
+chargée. À gauche, le point de départ en grandes cartes : « Assistant IA »,
+« Depuis une idée », « Monter sur une vidéo » (l’assistant avec une vidéo
+source), « Modèle » (galerie des modèles, chacun montré par une image de son
+exemple dessinée par `drawFrame` au format et à la marque choisis), « Vide »,
+« Sous-titrer un clip », « Découper une vidéo », et « Sélection de la
+galerie » quand des fichiers arrivent de la galerie. Puis ce que le mode
+demande : le sujet et la forme, l’idée, la vidéo, le modèle. À droite,
+« Réglages » : format, marque, durée visée, découpage (« Auto » par défaut,
+ou « Choisir » et un nombre de 2 à 10), voix off (choix dans un tiroir),
+musique, illustrations ; au pied de la colonne, toujours visibles, le résumé
+de ce qui sera créé et « Créer ». Sur un téléphone, les colonnes s’empilent
+et les réglages se replient sous leur en-tête. Le mode vit dans l’adresse
+(`?mode=assistant|idea|overlay|template|blank|subtitle|clipping|gallery`,
+`lib/create-mode.ts`), comme l’idée préremplie et la sélection de la galerie
+(`?files=`) ; l’ancienne adresse `?action=create` de l’accueil et de la page
+des projets y renvoie avec ses paramètres (`legacyCreateHref`). Une création
+de l’assistant se suit sur place (`?job=`) : étapes, « Annuler la
+création », « Continuer en arrière-plan », puis « Ouvrir le projet ».
+« Modèle », « Vide » et « Sélection » créent le projet et ouvrent l’éditeur ;
+« Sous-titrer » et « Découper » posent leurs boutons dans la colonne des
+réglages.
+
+**Projets** (`/m/clip-studio/projects`) : grille ou liste (choix gardé dans le
+navigateur), recherche, filtres (format, marque, origine, étiquette, exporté
+ou non, période), tri, pagination par 24, côté serveur (`searchProjects`). La
+requête vit dans l’adresse (`?q=&sort=&dir=&aspect=&brand=&origin=&tag=&exported=&period=&view=&page=`),
+lue et écrite par `lib/library.ts`. Pour chaque projet : ouvrir, renommer sur
+place (double clic ou menu), étiquettes, dupliquer, copie dans un autre format
+(`duplicateProject(id, aspect)`, même geste que l’éditeur, l’original reste
+intact), changer ou retirer la marque (comme l’inspecteur), exporter, voir ses
+exports, télécharger le projet en JSON, supprimer. « Importer un projet »
+relit un JSON avec la validation de l’enregistrement et compte les médias
+absents de ce serveur. La sélection agit sur plusieurs projets : étiqueter
+(ajouter, retirer), dupliquer, supprimer.
+
+Étiquettes plutôt que dossiers : un projet sert souvent deux classements à la
+fois (un client et une saison), une étiquette ne coûte qu’un champ `tags` et
+un filtre, alors que des dossiers demanderaient un arbre, des déplacements et
+un écran de plus. L’origine (`origin` : assistant, modèle, vide, galerie,
+sous-titré, découpé, importé) est notée à la création ; un projet plus ancien
+issu de l’assistant est reconnu à sa demande (`brief`).
+
+Vignettes : à la première visite, le navigateur dessine une image du clip
+avec `drawFrame` (la fonction de l’aperçu et de l’export), un rendu à la fois
+et seulement pour les cartes visibles, puis l’envoie (`setProjectThumbnail`) ;
+le serveur la réencode (JPEG, 640 px au plus) dans `data/thumbs/`. Elle est
+refaite quand le projet a changé depuis.
+
+**Exports** (`/m/clip-studio/exports`) : tableau ou grille paginés par 24,
+recherche, format, projet, marque, période, tri ; pour les administrateurs,
+service et état de publication (`searchExportsWithPublications`), et sur
+chaque ligne jusqu’à quatre logos de comptes puis « +2 ». La fiche
+(`?id=`) ajoute un panneau « Publications » : une ligne par compte (logo,
+nom, état, lien, date, vues, j’aime, commentaires), « Reprendre » un envoi
+raté, « Publier ailleurs » ; le suivi détaillé reste dans l’onglet « Envois ».
 
 ### 3.2 Éditeur
 
@@ -897,6 +1003,13 @@ dès qu’il est prêt, sans que l’utilisateur ait à le savoir.
 | `createProject({ refs, aspect, recipe })` | Crée un projet monté selon une recette |
 | `saveProject(project)` | Enregistrement automatique, contrôle de version optimiste |
 | `duplicateProject(id, aspect?)` | Copie, avec adaptation du cadrage si le format change |
+| `searchProjects(query)` | Page de projets filtrée et triée, avec les valeurs des filtres |
+| `updateProjectDetails({ id, name?, tags? })`, `tagProjects`, `duplicateProjects`, `deleteProjects` | Renommer, étiqueter ; actions sur une sélection |
+| `importProject(project)` | Importe un projet JSON (nouvel identifiant, médias absents comptés) |
+| `setProjectThumbnail(id, renderedAt, image)` | Vignette rendue par le navigateur, réencodée |
+| `getStudioOverview()` | Accueil : projets à reprendre, derniers exports, activité |
+| `searchExports(query)` ; `searchExportsWithPublications(query)` (admins) | Page d’exports ; avec publications, filtres par service et par état |
+| `getPublicationsOverview({ exportIds, readStats })`, `getExportPublications(id, { refresh })` (admins) | Publications par export, par service, meilleures publications, statistiques |
 | `importAudio(ref)` | Copie une musique uploadée dans `audio/` et calcule sa forme d’onde |
 | `ensureProxy(ref)` | Met en file la création du proxy d’une vidéo |
 | `enqueueExport(projectId, quality)` | Export aperçu ou final |

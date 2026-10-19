@@ -17,6 +17,14 @@
   "uploads": { "maxMb": 500, "kinds": ["image", "video", "audio"] },
   "functions": {
     "listProjects": "user",
+    "searchProjects": "user",
+    "updateProjectDetails": "user",
+    "tagProjects": "user",
+    "deleteProjects": "user",
+    "duplicateProjects": "user",
+    "importProject": "user",
+    "setProjectThumbnail": "user",
+    "getStudioOverview": "user",
     "getProject": "user",
     "saveProject": "user",
     "deleteProject": "user",
@@ -25,6 +33,7 @@
     "registerAsset": "user",
     "deleteAsset": "user",
     "listExports": "user",
+    "searchExports": "user",
     "registerExport": "user",
     "deleteExport": "user",
     "getExport": "user",
@@ -83,7 +92,9 @@
   },
   "aiUsage": { "limits": "getAiLimits", "remote": "readAiRemoteLimits" },
   "pages": [
-    { "path": "", "title": "Projets", "component": "pages/projects.tsx" },
+    { "path": "", "title": "Accueil", "component": "pages/hub.tsx" },
+    { "path": "projects", "title": "Projets", "component": "pages/projects.tsx" },
+    { "path": "new", "title": "Nouveau clip", "component": "pages/create.tsx", "menu": false },
     { "path": "edit", "title": "Éditeur", "component": "pages/editor.tsx" },
     { "path": "ideas", "title": "Idées", "component": "pages/ideas.tsx" },
     { "path": "voices", "title": "Voix en ligne", "component": "pages/voices.tsx" },
@@ -114,8 +125,8 @@
       "icon": "Clapperboard",
       "fileTypes": ["png", "jpg", "jpeg", "webp", "mp4", "webm", "mov"],
       "maxFiles": 60,
-      "page": "",
-      "params": { "action": "create" }
+      "page": "new",
+      "params": { "mode": "gallery" }
     }
   ]
 }

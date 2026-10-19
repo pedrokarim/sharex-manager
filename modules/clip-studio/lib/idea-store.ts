@@ -115,9 +115,11 @@ export function cleanIdea(raw: unknown): Idea | null {
         }
       : {}),
     template,
-    count: Math.min(IDEA_LIMITS.perSearch.max, Math.max(2, Math.round(finite(entry.count, 5)))),
+    // Absent ou « auto » : le script choisira le nombre d'éléments.
+    ...(entry.count === undefined || entry.count === null || entry.count === "auto" ? {} : { count: Math.min(IDEA_LIMITS.perSearch.max, Math.max(2, Math.round(finite(entry.count, 5)))) }),
     targetSeconds: cleanTargetSeconds(entry.targetSeconds, template, aspect),
     aspect,
+    ...(text(entry.sourceVideoHint, IDEA_LIMITS.sourceVideoHint) ? { sourceVideoHint: text(entry.sourceVideoHint, IDEA_LIMITS.sourceVideoHint) } : {}),
     ...(typeof entry.language === "string" && /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(entry.language) ? { language: entry.language } : {}),
     prompt,
     checks: {

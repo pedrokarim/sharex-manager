@@ -140,7 +140,7 @@ export async function getEngineDetails(): Promise<CatalogPayload> {
   return { models, cli, apiEngines: describeApiEngines() };
 }
 
-// ─── Consommation des IA (écran `/admin/ai`) ─────────────────────
+// ─── Consommation des IA (écran `/admin/services`) ─────────────────────
 
 /** Fournisseur du registre de consommation, pour chaque moteur intégré. */
 const AI_USAGE_ENGINES: Record<string, AiProviderId> = {

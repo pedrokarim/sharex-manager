@@ -72,7 +72,7 @@ YouTube.
 
 Écarts de la réalisation (18/10/2026) :
 
-- Les cookies YouTube et la clé Pexels ne sont pas dans `data/secrets.json`
+- Les cookies YouTube et les clés Pexels et Pixabay ne sont pas dans `data/secrets.json`
   (qui efface à l’écriture les champs qu’il ne connaît pas) mais dans
   `data/youtube-cookies.txt` et `data/video-sources.json`, droits 600, réglés
   dans « Voix en ligne », section « Sources vidéo ». yt-dlp reçoit une copie
@@ -187,9 +187,11 @@ Dans la fenêtre de création, à côté de « Assistant IA », « Modèle » et
    de la source servent d’illustrations, leur son s’efface sous la voix ou se
    garde quand l’extrait est cité.
 4. **L’assistant illustre en vidéo** : le script dit, pour chaque segment, s’il
-   vaut mieux une image ou une vidéo ; les vidéos viennent de **Pexels** (clé
-   gratuite, réglages de Clip Studio), posées muettes sous la voix et coupées
-   en plans comme les images.
+   vaut mieux une image ou une vidéo ; les vidéos viennent de **Pixabay**
+   (clé gratuite et immédiate), de **Pexels** (clé gratuite, mais Pexels a
+   suspendu la délivrance de nouvelles clés) ou de **Wikimedia Commons**
+   (sans clé, licences libres seulement), réglés dans Clip Studio, posées
+   muettes sous la voix et coupées en plans comme les images.
 
 Réalisé pour 1 et 2 (18/10/2026) : `lib/clip-jobs.ts` (travaux),
 `lib/clip-moments.ts` (passages, pur), `engine/video-templates.ts`
@@ -320,6 +322,71 @@ source « Vidéos » de l’onglet « Trouver ». Précisions et écarts :
   Aucune clé Pexels sur le poste de développement : pas d’appel réel à
   Pexels ; Whisper réel non vérifié (clé sans crédit) ; l’interface n’a pas
   été vue dans le navigateur.
+
+Réalisé pour 4, suite (19/10/2026) : Pexels a **suspendu la délivrance de
+nouvelles clés** ; deux banques s’ajoutent. `lib/video-pixabay.ts`,
+`lib/video-wikimedia.ts`, `lib/video-providers.ts` (liste des banques,
+ordre, repli) ; `lib/video-search.ts` garde Pexels et la mécanique commune
+(téléchargement contrôlé, mise au format, import). Précisions et écarts :
+
+- **Pixabay** (clé des « Sources vidéo », ou `PIXABAY_API_KEY`, chiffrée
+  dans `data/video-sources.json` comme celle de Pexels) : `GET
+  https://pixabay.com/api/videos/` avec `q`, `page`, `per_page`,
+  `safesearch=true` et `video_type=film`. Pas de filtre d’orientation chez
+  Pixabay : les vidéos dans l’orientation du projet passent devant. Parmi
+  `large`, `medium`, `small` et `tiny` (MP4 en H.264), la hauteur la plus
+  proche de celle du projet sans dépasser 1920 px. Conditions de Pixabay
+  respectées : chaque réponse gardée **24 heures** sur le serveur (une même
+  recherche ne repart pas), fichiers toujours téléchargés par le serveur
+  (jamais liés en direct dans un projet ; seules les vignettes et l’aperçu
+  au survol des résultats viennent du CDN, ce que Pixabay permet), source
+  citée (« Vidéo : auteur sur Pixabay », « Licence Pixabay »). Limite de
+  100 requêtes par 60 secondes : en-têtes `X-RateLimit-*` relus, appels de
+  la minute comptés, dix gardés pour l’onglet « Trouver ». Hôtes admis au
+  téléchargement : `cdn.pixabay.com` (celui de la documentation actuelle),
+  `pixabay.com`, et Vimeo (`player.vimeo.com`, `*.vimeocdn.com`), qui
+  servait d’anciennes réponses. Aucune clé sur le poste de développement :
+  **aucun appel réel à Pixabay**, hôtes et forme des réponses pris dans la
+  documentation officielle.
+- **Wikimedia Commons** (sans clé, toujours disponible) : API MediaWiki,
+  `generator=search` dans l’espace des fichiers (`gsrnamespace=6`,
+  `filetype:video`), `prop=videoinfo` avec `url|size|mime|mediatype|
+  extmetadata|derivatives`. `User-Agent` qui nomme l’application et donne
+  le dépôt et l’adresse de contact (`src/config/links.ts`), comme le
+  demande la politique de Wikimedia ; 30 requêtes par minute au plus,
+  réponses gardées une heure. Seules les licences **CC0, domaine public,
+  CC BY et CC BY-SA** sont gardées (jamais NC, ND, GFDL seule ni un fichier
+  marqué non libre) ; auteur (texte brut tiré du HTML de Commons) et
+  licence vont dans la mention : « Vidéo : auteur sur Wikimedia Commons
+  (CC BY-SA 4.0) ». Plans de 2 à 120 s ; version téléchargée : petit côté
+  de 1080 px au plus, 200 Mo au plus (taille estimée d’après le débit pour
+  une version réencodée), une version WebM réencodée par Commons préférée à
+  l’original à hauteur égale. Hôte admis : `upload.wikimedia.org`. Le
+  fichier (WebM ou Ogg) est lu comme un lien direct (`-protocol_whitelist
+  file`, conteneurs admis, Ogg en plus) et toujours réencodé en H.264 et AAC
+  par le ffmpeg épinglé : l’export du navigateur l’exige.
+- **Onglet « Trouver »** : la source « Vidéos » est toujours là (Wikimedia
+  Commons l’est toujours) ; quand plusieurs banques sont utilisables, un
+  sélecteur à logos officiels choisit la banque. Chaque carte cite sa
+  licence et ouvre la page de la vidéo sur sa banque.
+- **Assistant** : la case « Illustrer aussi en vidéo » est toujours
+  proposée (logos des banques utilisables) ; un segment « video » se
+  cherche dans **Pixabay** (avec une clé), puis **Pexels** (avec une clé),
+  puis **Wikimedia Commons** ; une banque qui échoue ou ne trouve rien
+  laisse passer la suivante, et rien du tout ramène à l’image, comme avant.
+  Le suivi dit où chaque vidéo a été trouvée (« 2 vidéos Pixabay, 1 vidéo
+  Wikimedia Commons »).
+- **Registre des services** : Pixabay (API à clé) et Wikimedia Commons
+  (service gratuit) y figurent avec leurs logos et leurs limites ; chaque
+  appel est noté avec sa durée (`durationMs`) et, en cas d’échec, sa
+  famille (`errorKind` : limite de débit, clé refusée, délai…).
+- Vérifications : tests Vitest (Pixabay et Wikimedia simulés : choix du
+  fichier, licences, cache de 24 heures, limite de débit, ordre des
+  banques, clé chiffrée). Vérifié pour de vrai sur Wikimedia Commons :
+  recherche « ocean waves » (24 résultats libres), téléchargement et
+  réencodage d’un WebM VP9 (2,8 s, 3,6 s de travail) et d’un original Ogg
+  Theora 1080p (6,4 s, 8,5 s de travail) en H.264 lisible. L’interface n’a
+  pas été vue dans le navigateur.
 
 ## Hors champ, pour l’instant
 

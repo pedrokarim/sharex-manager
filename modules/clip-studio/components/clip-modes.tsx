@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Créations à partir d'une vidéo (dossier 01, V4), dans la fenêtre « Nouveau
+ * Créations à partir d'une vidéo (dossier 01, V4), sur la page « Nouveau
  * clip » : « Sous-titrer un clip » et « Découper une vidéo ».
  *
  * Le panneau porte tout le parcours de son mode : choix de la source
@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Captions,
@@ -34,7 +35,6 @@ import { Orb } from "@/components/loading";
 import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
@@ -129,11 +129,22 @@ function sourceTitle(source: PickedSource | null): string {
   return (source.asset.origin?.title ?? source.asset.originalName).replace(/\.[a-z0-9]{2,4}$/i, "");
 }
 
-function SourcePicker({ kind, value, onChange }: { kind: ClipModeKind; value: PickedSource | null; onChange: (source: PickedSource | null) => void }) {
+function SourcePicker({
+  kind,
+  value,
+  onChange,
+  embedded = false,
+}: {
+  kind: ClipModeKind;
+  value: PickedSource | null;
+  onChange: (source: PickedSource | null) => void;
+  /** Dans un panneau de la page : ni cadre ni filet, le contenu suit l'en-tête. */
+  embedded?: boolean;
+}) {
   const [tab, setTab] = useState<SourceTab>(value?.type === "asset" ? (value.uploaded ? "file" : "media") : "url");
   return (
-    <section className="min-w-0 rounded-lg border" aria-label="Vidéo source">
-      <header className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
+    <section className={cn("min-w-0", !embedded && "rounded-lg border")} aria-label="Vidéo source">
+      <header className={cn("flex min-w-0 flex-wrap items-center justify-between gap-2", embedded ? "pb-2" : "border-b px-3 py-2")}>
         <span className="text-sm font-medium">Vidéo source</span>
         <div className="flex max-w-full flex-wrap gap-0.5 rounded-md bg-muted p-0.5" role="tablist" aria-label="Origine de la vidéo">
           {SOURCE_TABS.map((entry) => {
@@ -158,7 +169,7 @@ function SourcePicker({ kind, value, onChange }: { kind: ClipModeKind; value: Pi
           })}
         </div>
       </header>
-      <div className="min-w-0 p-3">
+      <div className={cn("min-w-0", !embedded && "p-3")}>
         {tab === "url" && <UrlSource kind={kind} value={value?.type === "url" ? value : null} onChange={onChange} />}
         {tab === "media" && <MediaList kind={kind} value={value?.type === "asset" && !value.uploaded ? value.asset : null} onChange={(asset) => onChange(asset ? { type: "asset", asset, uploaded: false } : null)} />}
         {tab === "file" && <FileSource value={value?.type === "asset" && value.uploaded ? value.asset : null} onChange={(asset) => onChange(asset ? { type: "asset", asset, uploaded: true } : null)} />}
@@ -788,6 +799,17 @@ function CreatedClips({ job, onOpen }: { job: ClipJob; onOpen: (projectId: strin
 
 // ─── Panneau d'un mode ───────────────────────────────────────────
 
+/**
+ * Boutons du panneau : posés dans `target` (la colonne des réglages de la
+ * page) quand il est donné, sinon au pied du panneau. `null` : la cible n'est
+ * pas encore montée, rien n'est posé.
+ */
+function PanelActions({ target, children }: { target?: HTMLElement | null; children: ReactNode }) {
+  const actions = <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{children}</div>;
+  if (target === undefined) return <div className="border-t pt-4">{actions}</div>;
+  return target ? createPortal(actions, target) : null;
+}
+
 export function ClipModePanel({
   kind,
   aspect,
@@ -796,16 +818,19 @@ export function ClipModePanel({
   onCreated,
   onClose,
   onActiveChange,
+  actionsTarget,
 }: {
   kind: ClipModeKind;
   aspect: AspectPreset;
   brandKitId: string | null;
-  /** Choix du format, posé avant les boutons. */
-  aspectPicker: ReactNode;
+  /** Choix du format, posé avant les boutons ; absent quand la page le porte dans ses réglages. */
+  aspectPicker?: ReactNode;
   onCreated: (projectId: string) => void;
   onClose: () => void;
   /** Un travail est suivi : la fenêtre masque le choix du mode et de la marque. */
   onActiveChange: (active: boolean) => void;
+  /** Où poser les boutons (colonne des réglages) ; absent : au pied du panneau. */
+  actionsTarget?: HTMLElement | null;
 }) {
   const [source, setSource] = useState<PickedSource | null>(null);
   const [framing, setFraming] = useState<ClipFraming>("crop");
@@ -965,7 +990,7 @@ export function ClipModePanel({
           )}
           <FormStatus state={reviewFeedback.state} />
         </div>
-        <DialogFooter>
+        <PanelActions target={actionsTarget}>
           {review ? (
             <>
               <Button variant="ghost" loading={canceling} onClick={() => void cancel()}>
@@ -989,7 +1014,7 @@ export function ClipModePanel({
               </Button>
             </>
           )}
-        </DialogFooter>
+        </PanelActions>
       </>
     );
   }
@@ -997,10 +1022,10 @@ export function ClipModePanel({
   return (
     <>
       <div className="flex min-w-0 flex-col gap-5">
-        <p className="text-xs break-words text-muted-foreground">{detail}</p>
-        <SourcePicker kind={kind} value={source} onChange={setSource} />
+        {actionsTarget === undefined ? <p className="text-xs break-words text-muted-foreground">{detail}</p> : null}
+        <SourcePicker kind={kind} value={source} onChange={setSource} embedded={actionsTarget !== undefined} />
         {kind === "subtitle" && (
-          <div className="min-w-0 space-y-2 rounded-lg border p-3">
+          <div className={cn("min-w-0 space-y-2", actionsTarget === undefined && "rounded-lg border p-3")}>
             <label className="flex items-start justify-between gap-3">
               <span className="min-w-0 text-sm">
                 Titre d’accroche
@@ -1031,7 +1056,7 @@ export function ClipModePanel({
         <FormStatus state={startFeedback.state} />
         {typeof request === "string" && source && <p className="text-xs break-words text-destructive">{request}</p>}
       </div>
-      <DialogFooter>
+      <PanelActions target={actionsTarget}>
         <Button variant="ghost" onClick={onClose} disabled={starting}>
           Annuler
         </Button>
@@ -1039,7 +1064,7 @@ export function ClipModePanel({
           {kind === "subtitle" ? <Captions className="h-4 w-4" /> : <Scissors className="h-4 w-4" />}
           {kind === "subtitle" ? "Sous-titrer" : "Trouver les moments forts"}
         </Button>
-      </DialogFooter>
+      </PanelActions>
     </>
   );
 }

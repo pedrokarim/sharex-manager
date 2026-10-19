@@ -108,7 +108,7 @@ export default function EditorPage() {
       <div className="flex flex-col items-center gap-3 py-24 text-center">
         <p className="text-sm text-muted-foreground">Ce projet est introuvable.</p>
         <Button asChild variant="outline" size="sm">
-          <Link href="/m/clip-studio">Retour aux projets</Link>
+          <Link href="/m/clip-studio/projects">Retour aux projets</Link>
         </Button>
       </div>
     );
@@ -395,7 +395,7 @@ function Editor({ initial }: { initial: ClipProject }) {
         <Tooltip>
           <TooltipTrigger asChild>
             <Button asChild variant="ghost" size="icon" className="h-8 w-8">
-              <Link href="/m/clip-studio" aria-label="Retour aux projets">
+              <Link href="/m/clip-studio/projects" aria-label="Retour aux projets">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>

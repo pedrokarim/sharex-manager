@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   EDGE_BROKEN_MESSAGE,
+  EdgeUnavailableError,
   parseBinaryMessage,
   parseTextMessage,
   parseWordBoundaries,
@@ -141,10 +142,13 @@ describe("lecture à voix haute d’Edge", () => {
     ]);
   });
 
-  it("échoue avec un message clair, sans boucle, quand Microsoft refuse la connexion", async () => {
-    let attempts = 0;
-    const factory = (): SocketLike => {
-      attempts++;
+  /** Faux service qui refuse les `refusals` premières connexions, puis répond. */
+  function flakyService(refusals: number) {
+    const service = fakeService([["Salut", 0, 300]], [[1, 2, 3]]);
+    let calls = 0;
+    const factory = (url: string, headers: Record<string, string>): SocketLike => {
+      calls++;
+      if (calls > refusals) return service.factory(url, headers);
       const socket: SocketLike = {
         binaryType: "blob",
         onopen: null,
@@ -157,13 +161,30 @@ describe("lecture à voix haute d’Edge", () => {
       queueMicrotask(() => socket.onerror?.({}));
       return socket;
     };
-    // L'heure du serveur égale la nôtre : pas de nouvel essai.
+    return { factory, calls: () => calls };
+  }
+
+  it("réessaie une connexion refusée et réussit si le refus était passager", async () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 200, headers: { date: new Date().toUTCString() } }));
     vi.stubGlobal("fetch", fetchMock);
+    // Les deux hôtes refusent au premier essai, puis le nouvel hôte répond.
+    const service = flakyService(2);
+    const result = await synthesizeEdge("fr-FR-DeniseNeural", "Salut", 1, { socketFactory: service.factory, delays: [0, 0, 0] });
+    expect(result.audio.length).toBeGreaterThan(0);
+    expect(result.attempts).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 
-    await expect(synthesizeEdge("fr-FR-DeniseNeural", "Salut", 1, { socketFactory: factory })).rejects.toThrow(EDGE_BROKEN_MESSAGE);
-    // Un essai par hôte (nouveau, puis ancien), une seule vérification d'horloge.
-    expect(attempts).toBe(2);
+  it("échoue avec un message honnête après tous les essais, sans parler d’un changement d’accès", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200, headers: { date: new Date().toUTCString() } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const service = flakyService(1_000);
+    const failure = synthesizeEdge("fr-FR-DeniseNeural", "Salut", 1, { socketFactory: service.factory, delays: [0, 0, 0] });
+    await expect(failure).rejects.toBeInstanceOf(EdgeUnavailableError);
+    await expect(failure).rejects.toThrow(/après 4 essais/);
+    await expect(failure).rejects.not.toThrow(EDGE_BROKEN_MESSAGE);
+    // Quatre essais, chacun sur les deux hôtes ; une seule vérification d'horloge.
+    expect(service.calls()).toBe(8);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

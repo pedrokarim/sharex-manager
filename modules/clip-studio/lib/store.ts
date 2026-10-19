@@ -17,6 +17,9 @@ export const DATA_DIR = path.join(MODULE_DIR, "data");
 export const PROJECTS_DIR = path.join(DATA_DIR, "projects");
 export const ASSETS_DIR = path.join(DATA_DIR, "assets");
 export const EXPORTS_DIR = path.join(DATA_DIR, "exports");
+/** Vignettes des projets : une image du clip rendue par le navigateur, servie par la route des données. */
+export const THUMBS_DIR = path.join(DATA_DIR, "thumbs");
+const THUMBS_FILE = path.join(DATA_DIR, "thumbs.json");
 const ASSETS_FILE = path.join(DATA_DIR, "assets.json");
 const EXPORTS_FILE = path.join(DATA_DIR, "exports.json");
 
@@ -24,7 +27,7 @@ const EXPORTS_FILE = path.join(DATA_DIR, "exports.json");
 const MAX_PROJECT_BYTES = 2 * 1024 * 1024;
 
 export function ensureDirs() {
-  for (const dir of [DATA_DIR, PROJECTS_DIR, ASSETS_DIR, EXPORTS_DIR]) {
+  for (const dir of [DATA_DIR, PROJECTS_DIR, ASSETS_DIR, EXPORTS_DIR, THUMBS_DIR]) {
     fs.mkdirSync(dir, { recursive: true });
   }
   // Bruitages synthétisés (D3) : écrits au premier passage, vérifiés une fois par processus.
@@ -90,6 +93,33 @@ export function listProjectFiles(): ClipProject[] {
 
 export function removeProject(id: string) {
   fs.rmSync(projectFile(id), { force: true });
+  removeThumb(id);
+}
+
+// ─── Vignettes ───────────────────────────────────────────────────
+
+/** Vignette d'un projet : son fichier et l'`updatedAt` du projet rendu. */
+export interface ProjectThumb {
+  file: string;
+  at: number;
+}
+
+export function readThumbs(): Record<string, ProjectThumb> {
+  return readJson<Record<string, ProjectThumb>>(THUMBS_FILE, {});
+}
+
+export function writeThumbs(thumbs: Record<string, ProjectThumb>) {
+  writeJsonAtomic(THUMBS_FILE, thumbs);
+}
+
+/** Retire la vignette d'un projet (fichier et entrée). */
+export function removeThumb(id: string) {
+  const thumbs = readThumbs();
+  const entry = thumbs[id];
+  if (!entry) return;
+  if (/^[a-z0-9][a-z0-9._-]{0,120}$/i.test(entry.file)) fs.rmSync(path.join(THUMBS_DIR, entry.file), { force: true });
+  delete thumbs[id];
+  writeThumbs(thumbs);
 }
 
 // ─── Médias importés ─────────────────────────────────────────────

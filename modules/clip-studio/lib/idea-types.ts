@@ -73,9 +73,15 @@ export interface Idea {
   /** « Pourquoi maintenant », avec sa source pour une actualité. */
   why?: { text: string; source?: IdeaSource };
   template: IdeaTemplate;
-  count: number;
+  /** Nombre d'éléments (3 à 10) quand le sujet l'impose ; absent : le script le choisit selon la durée. */
+  count?: number;
   targetSeconds: number;
   aspect: AspectPreset;
+  /**
+   * L'idée se monte par-dessus une vidéo existante (réaction, analyse d'une
+   * bande-annonce, commentaire d'un extrait) : la vidéo à choisir, en une phrase.
+   */
+  sourceVideoHint?: string;
   language?: string;
   /** Prompt initial pour l'assistant, sans l'accroche (ajoutée à la création). */
   prompt: string;
@@ -99,7 +105,11 @@ export interface IdeaSettings {
   newsShare: number;
   templates: IdeaTemplate[];
   aspect: AspectPreset;
-  /** Thème ou mot-clé facultatif. */
+  /**
+   * Sujet facultatif : des mots-clés (« jeux mobiles ») ou une phrase entière
+   * (« les secrets de fabrication des sabres japonais et pourquoi ils coupent
+   * si bien »), dont Codex dégage le sujet et l'angle.
+   */
   topic: string;
   /** Recherche web permise (actualité, vérification des faits). */
   web: boolean;
@@ -134,7 +144,10 @@ export const IDEA_LIMITS = {
   url: 500,
   /** Prompt initial avec l'accroche : la limite de la demande de l'assistant. */
   brief: 600,
-  topic: 120,
+  topic: 300,
+  /** Sujet compris par Codex, rendu avec la série. */
+  subject: 160,
+  sourceVideoHint: 160,
   altHooks: 3,
 } as const;
 

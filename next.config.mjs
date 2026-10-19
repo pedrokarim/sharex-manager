@@ -69,6 +69,23 @@ const nextConfig = {
             },
         ],
     },
+    async redirects() {
+        return [
+            {
+                // L'écran « Intelligence artificielle » est devenu « Services
+                // externes » : il couvre aussi DeepL, les voix, SerpApi… Les
+                // anciens liens et favoris y mènent, paramètres compris.
+                source: '/admin/ai',
+                destination: '/admin/services',
+                permanent: true,
+            },
+            {
+                source: '/admin/ai/:path*',
+                destination: '/admin/services/:path*',
+                permanent: true,
+            },
+        ];
+    },
     async rewrites() {
         // Sans domaine d'images distinct, les images se servent par /img-handler.
         if (!imageDomainHost) return [];

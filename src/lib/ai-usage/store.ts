@@ -19,7 +19,7 @@ import fs from "fs";
 import path from "path";
 import { randomBytes } from "crypto";
 import { AI_UNITS, isAiProviderId, isAiUnit } from "./catalog";
-import type { AiProviderId, AiUnit, AiUsageEvent, AiUsageInput } from "./types";
+import { AI_ERROR_KINDS, type AiProviderId, type AiUnit, type AiUsageEvent, type AiUsageInput } from "./types";
 
 /** Jours gardés : treize mois et un peu de marge. */
 export const RETENTION_DAYS = 400;
@@ -103,6 +103,20 @@ function cleanText(value: unknown, max: number): string | undefined {
   return clean ? clean.slice(0, max) : undefined;
 }
 
+/** Texte sur plusieurs lignes (détail d'un échec) : les retours à la ligne restent, les autres caractères de contrôle partent. */
+function cleanMultiline(value: unknown, max: number): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const clean = value
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, " ")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trimEnd())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return clean ? clean.slice(0, max) : undefined;
+}
+
 const cleanAmount = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.round(value * 1000) / 1000 : 0);
 
 /** Événement propre, ou `null` s'il n'est pas exploitable. */
@@ -123,7 +137,12 @@ export function normalizeEvent(input: AiUsageInput, now = Date.now()): AiUsageEv
   if (!event.ok) {
     const error = cleanText(input.error, 400);
     if (error) event.error = redactSecrets(error).slice(0, 200);
+    if (typeof input.errorKind === "string" && (AI_ERROR_KINDS as readonly string[]).includes(input.errorKind)) event.errorKind = input.errorKind;
+    const detail = cleanMultiline(input.detail, 2000);
+    if (detail) event.detail = redactSecrets(detail).slice(0, 1200);
   }
+  if (typeof input.durationMs === "number" && Number.isFinite(input.durationMs) && input.durationMs >= 0) event.durationMs = Math.round(input.durationMs);
+  if (typeof input.attempts === "number" && Number.isInteger(input.attempts) && input.attempts > 0) event.attempts = Math.min(input.attempts, 20);
   if (input.extra && typeof input.extra === "object") {
     const extra: Partial<Record<AiUnit, number>> = {};
     for (const unit of AI_UNITS) {

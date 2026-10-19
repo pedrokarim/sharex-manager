@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ExternalLink, Eye, EyeOff, FileUp, Lock, TriangleAlert } from "lucide-react";
-import { BrandLogo } from "@/components/brand-logo";
+import { BrandLogo, type Brand } from "@/components/brand-logo";
 import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,13 +10,14 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { getVideoSources, savePexelsKey, saveYoutubeCookies, type VideoSourcesStatus } from "../lib/client";
+import { getVideoSources, savePexelsKey, savePixabayKey, saveYoutubeCookies, type VideoSourcesStatus } from "../lib/client";
+import type { ApiKeyStatus } from "../lib/video-sources";
 
 const dateFormat = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" });
 
 /**
- * « Sources vidéo » : cookies YouTube d'un compte dédié et clé Pexels. Les
- * fonctions appelées sont réservées aux admins ; rien de secret ne revient
+ * « Sources vidéo » : cookies YouTube d'un compte dédié, clés Pixabay et Pexels, et Wikimedia Commons (sans clé). Les
+ * fonctions appelées sont réservées aux admins ; rien de secret ne revient
  * du serveur, seulement l'état.
  */
 export function VideoSourcesSettings() {
@@ -51,11 +52,30 @@ export function VideoSourcesSettings() {
         <div className="space-y-3">
           <Skeleton className="h-48 rounded-xl" />
           <Skeleton className="h-28 rounded-xl" />
+          <Skeleton className="h-28 rounded-xl" />
         </div>
       ) : (
         <>
           <YoutubeCookiesCard status={status} onChange={setStatus} />
-          <PexelsCard status={status} onChange={setStatus} />
+          <ApiKeyCard
+            id="pixabay-key"
+            name="Pixabay"
+            brand="pixabay"
+            description="Vidéos libres de droits pour illustrer un clip, cherchées en premier. La clé est gratuite et immédiate : créez un compte Pixabay, elle s’affiche dans la documentation de l’API."
+            status={status.pixabay}
+            save={savePixabayKey}
+            onChange={setStatus}
+          />
+          <ApiKeyCard
+            id="pexels-key"
+            name="Pexels"
+            brand="pexels"
+            description="Vidéos libres de droits, cherchées après Pixabay. Pexels a suspendu la délivrance de nouvelles clés : une clé déjà obtenue reste utilisable."
+            status={status.pexels}
+            save={savePexelsKey}
+            onChange={setStatus}
+          />
+          <WikimediaCard />
         </>
       )}
     </section>
@@ -163,18 +183,28 @@ function YoutubeCookiesCard({ status, onChange }: { status: VideoSourcesStatus; 
   );
 }
 
-function PexelsCard({ status, onChange }: { status: VideoSourcesStatus; onChange: (status: VideoSourcesStatus) => void }) {
+/** Une banque de vidéos à clé : nom et logo officiel, lien pour obtenir la clé, champ masqué. */
+interface KeyCardProps {
+  id: string;
+  name: string;
+  brand: Brand;
+  description: string;
+  status: ApiKeyStatus;
+  save: (key: string) => Promise<VideoSourcesStatus>;
+  onChange: (status: VideoSourcesStatus) => void;
+}
+
+function ApiKeyCard({ id, name, brand, description, status, save: saveKey, onChange }: KeyCardProps) {
   const [draft, setDraft] = useState("");
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
   const feedback = useFeedback();
-  const pexels = status.pexels;
 
   const save = async () => {
     setBusy(true);
     feedback.clear();
     try {
-      onChange(await savePexelsKey(draft));
+      onChange(await saveKey(draft));
       setDraft("");
       feedback.success(draft ? "Clé enregistrée." : "Clé supprimée.");
     } catch (error) {
@@ -187,25 +217,25 @@ function PexelsCard({ status, onChange }: { status: VideoSourcesStatus; onChange
   return (
     <section className="rounded-xl border p-4">
       <Field>
-        <div className="flex flex-wrap items-center gap-2">
-          <FieldLabel htmlFor="pexels-key" className="flex flex-wrap items-center gap-2">
-            <BrandLogo brand="pexels" className="size-5" />
-            Pexels
-            {pexels.configured && (
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <FieldLabel htmlFor={id} className="flex min-w-0 flex-wrap items-center gap-2">
+            <BrandLogo brand={brand} className="size-5" />
+            {name}
+            {status.configured && (
               <Badge variant="secondary" className="h-5 gap-1 px-1.5 text-[10px] font-normal">
-                {pexels.fromEnv ? (
+                {status.fromEnv ? (
                   <>
                     <Lock className="h-2.5 w-2.5" />
-                    {pexels.envVariable}
+                    {status.envVariable}
                   </>
                 ) : (
-                  pexels.hint
+                  status.hint
                 )}
               </Badge>
             )}
           </FieldLabel>
           <a
-            href={pexels.site}
+            href={status.site}
             target="_blank"
             rel="noreferrer"
             className="ml-auto inline-flex items-center gap-1 text-xs font-normal text-muted-foreground hover:text-foreground"
@@ -214,20 +244,20 @@ function PexelsCard({ status, onChange }: { status: VideoSourcesStatus; onChange
             <ExternalLink className="h-3 w-3" />
           </a>
         </div>
-        <FieldDescription>Vidéos libres de droits pour illustrer un clip. La clé est gratuite, sur demande auprès de Pexels.</FieldDescription>
-        {pexels.fromEnv ? (
+        <FieldDescription>{description}</FieldDescription>
+        {status.fromEnv ? (
           <FieldDescription>
-            Définie par l’environnement du serveur ({pexels.envVariable}). Retirez la variable pour gérer la clé depuis cette page.
+            Définie par l’environnement du serveur ({status.envVariable}). Retirez la variable pour gérer la clé depuis cette page.
           </FieldDescription>
         ) : (
           <div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <InputGroup className="flex-1">
+              <InputGroup className="min-w-0 flex-1">
                 <InputGroupInput
-                  id="pexels-key"
+                  id={id}
                   type={revealed ? "text" : "password"}
                   autoComplete="off"
-                  placeholder={pexels.configured ? "Nouvelle clé, pour remplacer l’actuelle" : "Coller la clé…"}
+                  placeholder={status.configured ? "Nouvelle clé, pour remplacer l’actuelle" : "Coller la clé…"}
                   value={draft}
                   onChange={(event) => {
                     setDraft(event.target.value);
@@ -241,14 +271,33 @@ function PexelsCard({ status, onChange }: { status: VideoSourcesStatus; onChange
                   </InputGroupButton>
                 </InputGroupAddon>
               </InputGroup>
-              <Button variant="outline" loading={busy} disabled={!draft && !pexels.configured} onClick={save}>
-                {draft ? "Enregistrer" : pexels.configured ? "Supprimer la clé" : "Enregistrer"}
+              <Button variant="outline" loading={busy} disabled={!draft && !status.configured} onClick={save}>
+                {draft ? "Enregistrer" : status.configured ? "Supprimer la clé" : "Enregistrer"}
               </Button>
             </div>
             <FormStatus state={feedback.state} className="pt-2" />
           </div>
         )}
       </Field>
+    </section>
+  );
+}
+
+/** Wikimedia Commons : rien à régler, la banque est ouverte. */
+function WikimediaCard() {
+  return (
+    <section className="rounded-xl border p-4">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-medium">
+        <BrandLogo brand="wikimediacommons" className="size-5" />
+        Wikimedia Commons
+        <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
+          Sans clé
+        </Badge>
+      </div>
+      <p className="mt-1.5 text-sm break-words text-muted-foreground">
+        Toujours disponible, en dernier recours de l’assistant : seules les vidéos sous licence libre (CC0, domaine public, CC BY, CC BY-SA) sont proposées,
+        réencodées pour le montage, avec leur auteur et leur licence dans la mention.
+      </p>
     </section>
   );
 }

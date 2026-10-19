@@ -22,7 +22,7 @@ import { BenchCell, BenchGrid, PreviewFrame } from "./bench-parts";
 // Les écrans d'attente des routes, tels que Next les affiche.
 import AppLoading from "../loading";
 import AdminLoading from "../admin/loading";
-import AdminAiLoading from "../admin/ai/loading";
+import AdminServicesLoading from "../admin/services/loading";
 import AdminLogsLoading from "../admin/logs/loading";
 import AdminSecurityLoading from "../admin/security/loading";
 import AdminSystemLoading from "../admin/system/loading";
@@ -41,7 +41,7 @@ import UploadsStatsLoading from "../uploads/stats/loading";
 const ROUTE_LOADINGS: { route: string; file: string; shows: string; Component: ComponentType }[] = [
   { route: "/… (toute page sans attente propre)", file: "(app)/loading.tsx", shows: "LoadingState fill", Component: AppLoading },
   { route: "/admin", file: "admin/loading.tsx", shows: "CardsPageSkeleton", Component: AdminLoading },
-  { route: "/admin/ai", file: "admin/ai/loading.tsx", shows: "écran sur mesure", Component: AdminAiLoading },
+  { route: "/admin/services", file: "admin/services/loading.tsx", shows: "écran sur mesure", Component: AdminServicesLoading },
   { route: "/admin/logs", file: "admin/logs/loading.tsx", shows: "TablePageSkeleton", Component: AdminLogsLoading },
   { route: "/admin/security", file: "admin/security/loading.tsx", shows: "écran sur mesure", Component: AdminSecurityLoading },
   { route: "/admin/system", file: "admin/system/loading.tsx", shows: "FormPageSkeleton", Component: AdminSystemLoading },

@@ -17,8 +17,8 @@ import path from "path";
 import type { TimedWord } from "../engine/types";
 import { DATA_DIR, ensureDirs } from "./store";
 import { readSecretJson, writeSecretJson } from "@/lib/security/secret-file";
-import { escapeXmlText, fetchEdgeVoices, prosodyRate, stripControls, synthesizeEdge } from "./edge-tts";
-import { countCharacters, recordAiUsage, usageError, type AiLimit, type AiModuleReport, type AiProviderId } from "@/lib/ai-usage";
+import { EdgeAccessError, EdgeUnavailableError, escapeXmlText, fetchEdgeVoices, prosodyRate, stripControls, synthesizeEdge } from "./edge-tts";
+import { countCharacters, recordAiUsage, usageError, type AiErrorKind, type AiLimit, type AiModuleReport, type AiProviderId } from "@/lib/ai-usage";
 import { readElevenLabsLimits } from "@/lib/ai-usage/remote";
 
 export type CloudProvider = "edge" | "azure" | "openai" | "google" | "elevenlabs";
@@ -611,6 +611,23 @@ export interface CloudSynthesis {
   extension: "mp3" | "wav";
   /** Instants des mots quand le fournisseur les donne (Edge) ; sinon l'alignement les calcule. */
   words?: TimedWord[];
+  /** Essais faits (Edge réessaie une connexion refusée). */
+  attempts?: number;
+}
+
+/** Famille d'un échec de synthèse, pour l'expliquer dans l'écran des services. */
+export function ttsErrorKind(error: unknown): AiErrorKind {
+  if (error instanceof EdgeUnavailableError) return "network";
+  if (error instanceof EdgeAccessError) return "provider";
+  const text = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+  if (/abort|timeout|délai/i.test(text)) return "timeout";
+  if (/\b429\b|too many/i.test(text)) return "rate-limit";
+  if (/credit|quota|insufficient/i.test(text)) return "quota";
+  if (/\b40[13]\b|unauthori|invalid.*key|clé/i.test(text)) return "auth";
+  if (/fetch failed|econn|enotfound|network|socket|connexion/i.test(text)) return "network";
+  if (/\b4\d\d\b/.test(text)) return "input";
+  if (/\b5\d\d\b/.test(text)) return "provider";
+  return "unknown";
 }
 
 /** Fournisseur du registre de consommation des IA, pour chaque source de voix en ligne. */
@@ -640,12 +657,23 @@ export async function synthesizeCloud(id: string, text: string, speed: number, f
   // Caractères facturés : ceux du SSML pour Azure, ceux du texte ailleurs.
   let characters = countCharacters(text);
   let sent = false;
+  const started = Date.now();
   try {
     const synthesis = await synthesizeWith(parsed, text, speed, (billed) => {
       sent = true;
       if (billed !== undefined) characters = billed;
     });
-    recordAiUsage({ provider: USAGE_PROVIDERS[parsed.provider], module: "clip-studio", feature, model: usageModel(parsed.provider, parsed.voice), unit: "characters", amount: characters, ok: true });
+    recordAiUsage({
+      provider: USAGE_PROVIDERS[parsed.provider],
+      module: "clip-studio",
+      feature,
+      model: usageModel(parsed.provider, parsed.voice),
+      unit: "characters",
+      amount: characters,
+      ok: true,
+      durationMs: Date.now() - started,
+      ...(synthesis.attempts ? { attempts: synthesis.attempts } : {}),
+    });
     return synthesis;
   } catch (error) {
     // Refusé avant tout envoi (clé absente, quota local atteint) : aucun appel n'est parti.
@@ -659,6 +687,9 @@ export async function synthesizeCloud(id: string, text: string, speed: number, f
         amount: 0,
         ok: false,
         error: usageError(error),
+        errorKind: ttsErrorKind(error),
+        durationMs: Date.now() - started,
+        ...(error instanceof EdgeUnavailableError ? { attempts: error.attempts, detail: `Dernier problème : ${error.detail}.` } : {}),
       });
     }
     throw error;
@@ -676,7 +707,7 @@ async function synthesizeWith(
     if (!edgeEnabled()) throw new Error("Les voix d'Edge sont désactivées dans « Voix en ligne ».");
     onSend();
     const result = await synthesizeEdge(parsed.voice, text, speed);
-    return { audio: result.audio, extension: "mp3", words: result.words };
+    return { audio: result.audio, extension: "mp3", words: result.words, attempts: result.attempts };
   }
 
   const key = apiKey(parsed.provider);

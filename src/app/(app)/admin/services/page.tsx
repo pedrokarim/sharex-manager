@@ -4,13 +4,13 @@ import { auth } from "@/lib/auth";
 import { isAdmin } from "@/lib/api-guard";
 import { getAiUsageOverview } from "@/lib/ai-usage";
 import { privatePageMetadata } from "@/lib/seo";
-import { AiUsagePageClient } from "./page.client";
+import { ServicesPageClient } from "./page.client";
 
-export const metadata = privatePageMetadata({ title: "Intelligence artificielle" });
+export const metadata = privatePageMetadata({ title: "Services externes" });
 
 /** Réservé à l'administration ; l'aperçu est lu côté serveur pour un premier rendu complet. */
-export default async function AiUsagePage() {
+export default async function ServicesPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || !isAdmin(session)) redirect("/");
-  return <AiUsagePageClient initial={await getAiUsageOverview()} />;
+  return <ServicesPageClient initial={await getAiUsageOverview()} />;
 }

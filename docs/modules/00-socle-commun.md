@@ -239,7 +239,14 @@ Déplacer les clés des fournisseurs d’IA hors d’AI Image Gen :
 Le registre de consommation des IA existe (`src/lib/ai-usage`) : chaque
 appel à un fournisseur y est noté par `recordAiUsage`, chaque module y
 rapporte accès et limites par la déclaration `aiUsage` de son `module.json`,
-et la page « Fournisseurs IA » devient l’écran `/admin/ai`.
+et la page « Fournisseurs IA » est devenue l’écran « Services externes »
+(`/admin/services`, l’ancienne adresse `/admin/ai` y redirige) : il couvre
+aussi les services qui ne sont pas des IA (DeepL, voix d’Edge, SerpApi,
+Openverse, trace.moe, Pexels…). Un appel en échec y porte sa famille
+(`errorKind` : trop de demandes, réseau, accès refusé, crédit épuisé, délai
+dépassé, erreur du service, demande refusée), son détail, sa durée et ses
+essais ; un clic sur l’appel dit ce qui s’est passé et quoi faire. Pour les
+appels notés sans famille, elle est déduite du message.
 
 ### 2.8 Pages publiques de module
 

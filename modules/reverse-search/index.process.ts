@@ -43,7 +43,7 @@ export async function saveKey(name: string, value: string) {
   return keyStatus();
 }
 
-// ─── Consommation des IA (écran `/admin/ai`) ─────────────────────
+// ─── Consommation des IA (écran `/admin/services`) ─────────────────────
 
 /** Réservé aux administrateurs (absent de `functions`), déclaré dans `aiUsage.limits`. Aucune clé n’en sort. */
 export async function getAiLimits(): Promise<AiModuleReport> {

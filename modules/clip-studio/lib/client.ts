@@ -7,6 +7,8 @@ import type { PublishJobSummary } from "@/lib/connections/types";
 import type { ExportDetails, ExportPost, PublishTarget } from "./post-types";
 import type { DraftRequest, DraftResult } from "./post-draft";
 import type { VoiceSettings } from "./voice-settings";
+import type { ExportQuery, ProjectPage, ProjectQuery, ProjectSummary } from "./library";
+import type { ExportPage, ExportPublicationDetails, PublicationsOverview, StudioOverview } from "./library-service";
 
 export const MODULE_NAME = "clip-studio";
 
@@ -15,19 +17,7 @@ export function formatMegabytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Mo`;
 }
 
-export interface ProjectSummary {
-  id: string;
-  name: string;
-  aspect: ClipProject["aspect"];
-  width: number;
-  height: number;
-  durationFrames: number;
-  fps: number;
-  itemCount: number;
-  cover?: string;
-  createdAt: number;
-  updatedAt: number;
-}
+export type { ProjectSummary } from "./library";
 
 export async function callModule<T = unknown>(
   functionName: string,
@@ -404,6 +394,66 @@ export function publishExport(input: { exportId: string; targets: PublishTarget[
   return callModule("publishExport", input);
 }
 
+// ─── Bibliothèque : accueil, projets, exports ────────────────────
+
+export type { ExportPage, ExportPublicationDetails, PublicationAccount, PublicationsOverview, StudioOverview, TopPublication } from "./library-service";
+
+export function getStudioOverview(): Promise<StudioOverview> {
+  return callModule<StudioOverview>("getStudioOverview");
+}
+
+export function searchProjects(query: ProjectQuery): Promise<ProjectPage> {
+  return callModule<ProjectPage>("searchProjects", query);
+}
+
+export function updateProjectDetails(input: { id: string; name?: string; tags?: string[] }): Promise<ProjectSummary> {
+  return callModule<ProjectSummary>("updateProjectDetails", input);
+}
+
+export function tagProjects(input: { ids: string[]; add?: string[]; remove?: string[] }): Promise<{ updated: number }> {
+  return callModule("tagProjects", input);
+}
+
+export function deleteProjects(ids: string[]): Promise<{ deleted: number }> {
+  return callModule("deleteProjects", ids);
+}
+
+export function duplicateProjects(ids: string[]): Promise<{ created: ProjectSummary[] }> {
+  return callModule("duplicateProjects", ids);
+}
+
+/** Copie d'un projet ; avec `aspect`, au format voulu. */
+export function duplicateProject(id: string, aspect?: ClipProject["aspect"]): Promise<ProjectSummary> {
+  return callModule<ProjectSummary>("duplicateProject", id, aspect);
+}
+
+export function importProject(project: unknown): Promise<{ project: ProjectSummary; missingMedia: number }> {
+  return callModule("importProject", project);
+}
+
+/** Envoie la vignette rendue d'un projet (JPEG) ; `renderedAt` est l'`updatedAt` du projet dessiné. */
+export async function setProjectThumbnail(id: string, renderedAt: number, image: Blob): Promise<{ thumbnail: string }> {
+  const bytes = new Uint8Array(await image.arrayBuffer());
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  return callModule("setProjectThumbnail", id, renderedAt, { type: "buffer", data: btoa(binary) });
+}
+
+/** Une page d'exports ; `withPublications` (administrateurs) ajoute les publications et les filtres par service et par état. */
+export function searchExports(query: ExportQuery, withPublications = false): Promise<ExportPage> {
+  return callModule<ExportPage>(withPublications ? "searchExportsWithPublications" : "searchExports", query);
+}
+
+/** Publications pour l'accueil (administrateurs). */
+export function getPublicationsOverview(input: { exportIds?: string[]; readStats?: boolean } = {}): Promise<PublicationsOverview> {
+  return callModule<PublicationsOverview>("getPublicationsOverview", input);
+}
+
+/** Publications d'un export, une ligne par compte, avec statistiques (administrateurs). */
+export function getExportPublications(id: string, refresh = false): Promise<ExportPublicationDetails> {
+  return callModule<ExportPublicationDetails>("getExportPublications", id, { refresh });
+}
+
 // ─── Images de marque (module brand-kit, facultatif) ─────────────
 
 /** Ce que montre le sélecteur d'une marque. */
@@ -524,20 +574,29 @@ export function savePexelsKey(key: string): Promise<import("./video-sources").Vi
   return callModule("savePexelsKey", { key });
 }
 
-// ─── Vidéos trouvées (Pexels) ────────────────────────────────────
+export function savePixabayKey(key: string): Promise<import("./video-sources").VideoSourcesStatus> {
+  return callModule("savePixabayKey", { key });
+}
 
-export type { FoundVideo, ImportedVideo } from "./video-search";
+// ─── Vidéos trouvées (Pixabay, Pexels, Wikimedia Commons) ────────
 
-/** La recherche de vidéos est-elle possible ? Une clé Pexels est enregistrée (son contenu ne sort jamais). */
-export function getVideoSearchStatus(): Promise<{ pexels: boolean }> {
+export type { FoundVideo, ImportedVideo, VideoProviderId } from "./video-search";
+
+/** Banques de vidéos utilisables, dans l'ordre ; Wikimedia Commons l'est toujours (aucune clé ne sort). */
+export function getVideoSearchStatus(): Promise<{ pexels: boolean; providers: import("./video-search").VideoProviderId[] }> {
   return callModule("getVideoSearchStatus");
 }
 
-export function searchVideos(input: { query: string; orientation?: "portrait" | "landscape" | "square"; page?: number }): Promise<import("./video-search").FoundVideo[]> {
+export function searchVideos(input: {
+  query: string;
+  orientation?: "portrait" | "landscape" | "square";
+  page?: number;
+  provider?: import("./video-search").VideoProviderId;
+}): Promise<import("./video-search").FoundVideo[]> {
   return callModule("searchVideos", input);
 }
 
-/** Importe une vidéo de Pexels dans Mes médias, au fichier qui va au format du projet. */
+/** Importe une vidéo d'une banque dans Mes médias, au fichier qui va au format du projet. */
 export function importFoundVideo(input: { id: string; aspect?: import("../engine/types").AspectPreset }): Promise<import("./video-search").ImportedVideo> {
   return callModule("importFoundVideo", input);
 }

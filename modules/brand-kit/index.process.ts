@@ -64,7 +64,7 @@ import {
 } from "./lib/server/reference-video";
 import type { AiModuleReport } from "@/lib/ai-usage/types";
 
-// ─── Consommation des IA (écran `/admin/ai`) ─────────────────────
+// ─── Consommation des IA (écran `/admin/services`) ─────────────────────
 
 /**
  * Réservé aux administrateurs (absent de `functions`), déclaré dans

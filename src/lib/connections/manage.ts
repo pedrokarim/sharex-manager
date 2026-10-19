@@ -72,6 +72,15 @@ export async function listPosts(accountId: string, options: { refresh?: boolean 
   return entry;
 }
 
+/**
+ * Publications déjà lues pour ce compte, gardées en mémoire par le cœur,
+ * sans appel au service ; `null` si rien n'a encore été lu depuis le
+ * démarrage. Sert aux tableaux de bord qui ne doivent pas consommer de quota.
+ */
+export function peekPosts(accountId: string): { posts: PostSummary[]; fetchedAt: number } | null {
+  return postsCache.get(accountId) ?? null;
+}
+
 export async function updatePost(accountId: string, postId: string, patch: PostPatch): Promise<PostSummary> {
   if (typeof postId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(postId)) throw new Error("Publication invalide.");
   const updated = await withAccount(accountId, "posts.manage", (connector, context) => {

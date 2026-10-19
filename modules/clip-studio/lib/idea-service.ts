@@ -284,7 +284,8 @@ export async function searchIdeas(settings: IdeaSettings, deps: IdeaDeps, onStep
   writeIdeas([...ideas, ...readIdeas()]);
   const mix = checkMix(ideas, targets, { concepts: bank.concepts.length, recentHits: ownHits.length, web: settings.web, count: settings.count });
   const summary = `${ideas.length} idée(s)\u00a0: ${mix.counts.proven} sur des concepts prouvés, ${mix.counts.news} actualité(s), ${mix.counts.remake} reprise(s), ${mix.counts.fresh} nouvelle(s).`;
-  return { ideas, notes: [summary, ...mix.notes, ...parsed.notes] };
+  const understood = parsed.subject ? [`Sujet compris\u00a0: ${parsed.subject}`] : [];
+  return { ideas, notes: [summary, ...understood, ...mix.notes, ...parsed.notes] };
 }
 
 export function startIdeaSearch(raw: unknown, deps: IdeaDeps): IdeaTask {

@@ -418,7 +418,7 @@ describe("préremplissage de « Créer »", () => {
 
   it("fait l'aller-retour par l'adresse", () => {
     const href = createHref(prefillFromIdea(stored));
-    expect(href.startsWith("/m/clip-studio?")).toBe(true);
+    expect(href.startsWith("/m/clip-studio/new?mode=assistant&")).toBe(true);
     const prefill = readCreatePrefill(new URL(href, "https://sxm.test").searchParams);
     expect(prefill).toEqual({
       brief: "Accroche : « " + "4 jeux sortent avant Noël" + " ». Classement de quatre jeux à la sortie confirmée.",

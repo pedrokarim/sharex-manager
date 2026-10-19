@@ -1,38 +1,45 @@
 /**
- * « Créer cette vidéo » : l'écran Idées ouvre la page des projets avec des
- * paramètres d'adresse, qu'elle lit pour ouvrir la fenêtre « Créer » en mode
- * Assistant, préremplie. Les valeurs reçues sont relues et bornées : une
- * adresse se modifie à la main.
+ * « Créer depuis cette idée » : l'écran Idées (et le mode « Depuis une idée »
+ * de la page de création) ouvre la page « Nouveau clip » avec des paramètres
+ * d'adresse, qu'elle lit pour se préremplir en mode Assistant (ou « Monter
+ * par-dessus une vidéo » quand l'idée en demande une). Les valeurs reçues sont
+ * relues et bornées : une adresse se modifie à la main.
  *
- * Pur : aucun disque, aucun réseau.
+ * Pur : aucun disque, aucun réseau.
  */
 
 import type { AspectPreset } from "../engine/types";
 import { cleanTargetSeconds } from "./voice-settings";
 import { IDEA_ASPECTS, IDEA_LIMITS, IDEA_TEMPLATES, NO_KIT, type Idea, type IdeaTemplate } from "./idea-types";
 
+/** Adresse de la page de création. */
+export const CREATE_PATH = "/m/clip-studio/new";
+
 export interface CreatePrefill {
   brief: string;
   template: IdeaTemplate;
-  count: number;
+  /** Nombre de segments ; absent : « Auto », le script découpe lui-même. */
+  count?: number;
   targetSeconds: number;
   aspect: AspectPreset;
-  /** Marque ; `null` : aucune ; absente : la marque par défaut. */
+  /** Marque ; `null` : aucune ; absente : la marque par défaut. */
   brandKitId?: string | null;
   ideaId?: string;
+  /** L'idée se monte par-dessus une vidéo : laquelle choisir (mode « Monter par-dessus une vidéo »). */
+  sourceVideoHint?: string;
 }
 
 const KIT_ID = /^kit-[a-z0-9]{6,32}$/;
 const IDEA_ID = /^idea-[a-z0-9]{6,40}$/;
 
-/** Début de la demande : l'accroche à dire en premier. */
+/** Début de la demande : l'accroche à dire en premier. */
 export function hookLead(hook: string): string {
   const text = hook.trim();
-  return text ? `Accroche\u00a0: «\u00a0${text}\u00a0». ` : "";
+  return text ? `Accroche : « ${text} ». ` : "";
 }
 
 /**
- * Demande donnée à l'assistant : l'accroche choisie, puis le prompt initial,
+ * Demande donnée à l'assistant : l'accroche choisie, puis le prompt initial,
  * le tout dans la limite de 600 caractères de l'assistant.
  */
 export function ideaBrief(idea: Pick<Idea, "hook" | "prompt">): string {
@@ -48,53 +55,75 @@ export function ideaBrief(idea: Pick<Idea, "hook" | "prompt">): string {
   return `${lead}${prompt}`.slice(0, IDEA_LIMITS.brief);
 }
 
+/** Les options de l'idée, telles que la page de création les attend. */
 export function prefillFromIdea(idea: Idea): CreatePrefill {
   return {
     brief: ideaBrief(idea),
     template: idea.template,
-    count: idea.count,
+    ...(idea.count !== undefined ? { count: idea.count } : {}),
     targetSeconds: idea.targetSeconds,
     aspect: idea.aspect,
     brandKitId: idea.kitId ?? null,
     ideaId: idea.id,
+    ...(idea.sourceVideoHint ? { sourceVideoHint: idea.sourceVideoHint } : {}),
   };
 }
 
-/** Adresse de la page des projets qui ouvre « Créer » préremplie. */
+/** Mode de la page de création qui reçoit une idée. */
+export function prefillMode(prefill: Pick<CreatePrefill, "sourceVideoHint">): "assistant" | "overlay" {
+  return prefill.sourceVideoHint ? "overlay" : "assistant";
+}
+
+/** Adresse de la page de création, préremplie. */
 export function createHref(prefill: CreatePrefill): string {
   const params = new URLSearchParams({
-    action: "create",
-    mode: "assistant",
+    mode: prefillMode(prefill),
     brief: prefill.brief.slice(0, IDEA_LIMITS.brief),
     template: prefill.template,
-    count: String(prefill.count),
+    count: prefill.count === undefined ? "auto" : String(prefill.count),
     seconds: String(prefill.targetSeconds),
     aspect: prefill.aspect,
   });
   if (prefill.brandKitId !== undefined) params.set("kit", prefill.brandKitId ?? NO_KIT);
   if (prefill.ideaId) params.set("idea", prefill.ideaId);
-  return `/m/clip-studio?${params.toString()}`;
+  if (prefill.sourceVideoHint) params.set("hint", prefill.sourceVideoHint.slice(0, IDEA_LIMITS.sourceVideoHint));
+  return `${CREATE_PATH}?${params.toString()}`;
 }
 
-/** Préremplissage lu dans l'adresse ; `null` si elle ne demande pas l'assistant. */
+/** Nombre de segments lu dans l'adresse : 2 à 10, ou `undefined` (« auto », absent, illisible). */
+export function readCount(value: string | null): number | undefined {
+  if (value === null || value === "" || value === "auto") return undefined;
+  const parsed = Math.round(Number(value));
+  return Number.isFinite(parsed) && parsed > 0 ? Math.min(10, Math.max(2, parsed)) : undefined;
+}
+
+/**
+ * Préremplissage lu dans l'adresse ; `null` sans demande (`brief`) ni idée.
+ * L'ancienne adresse (`?action=create&mode=assistant` sur l'accueil) se lit
+ * de la même façon.
+ */
 export function readCreatePrefill(params: Pick<URLSearchParams, "get">): CreatePrefill | null {
-  if (params.get("action") !== "create" || params.get("mode") !== "assistant") return null;
-  // Blancs ordinaires seulement : les espaces insécables de la typographie restent.
-  const brief = String(params.get("brief") ?? "").replace(/[^\S\u00a0\u202f]+/g, " ").trim().slice(0, IDEA_LIMITS.brief);
+  const mode = params.get("mode");
+  if (mode !== null && mode !== "assistant" && mode !== "overlay") return null;
+  if (params.get("brief") === null && params.get("idea") === null) return null;
+  // Blancs ordinaires seulement : les espaces insécables de la typographie restent.
+  const brief = String(params.get("brief") ?? "").replace(/[^\S  ]+/g, " ").trim().slice(0, IDEA_LIMITS.brief);
   const template = IDEA_TEMPLATES.includes(params.get("template") as IdeaTemplate) ? (params.get("template") as IdeaTemplate) : "free";
-  const count = Math.min(10, Math.max(2, Math.round(Number(params.get("count")) || 5)));
+  const count = readCount(params.get("count"));
   const aspect = IDEA_ASPECTS.includes(params.get("aspect") as AspectPreset) ? (params.get("aspect") as AspectPreset) : "9:16";
   // Bornée au format, comme le fait l'assistant (60 s au plus pour un short 9:16).
   const seconds = cleanTargetSeconds(params.get("seconds") ?? undefined, template, aspect);
   const kit = params.get("kit");
   const idea = params.get("idea");
+  const hint = String(params.get("hint") ?? "").replace(/[^\S  ]+/g, " ").trim().slice(0, IDEA_LIMITS.sourceVideoHint);
   return {
     brief,
     template,
-    count,
+    ...(count !== undefined ? { count } : {}),
     targetSeconds: seconds,
     aspect,
     ...(kit === NO_KIT ? { brandKitId: null } : kit && KIT_ID.test(kit) ? { brandKitId: kit } : {}),
     ...(idea && IDEA_ID.test(idea) ? { ideaId: idea } : {}),
+    ...(hint ? { sourceVideoHint: hint } : {}),
   };
 }

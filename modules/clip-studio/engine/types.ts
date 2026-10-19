@@ -9,6 +9,7 @@
 
 import type { MotionParamValues } from "./motion/types";
 import type { ExportCover, ExportPost } from "../lib/post-types";
+import type { ProjectOrigin } from "../lib/library";
 
 export type AspectPreset = "9:16" | "16:9" | "1:1" | "4:5";
 
@@ -30,6 +31,10 @@ export interface ClipProject {
   background: string;
   /** Image de marque appliquée (module `brand-kit`) ; absente pour un projet libre. */
   brandKitId?: string;
+  /** Étiquettes libres, pour ranger et filtrer la liste des projets (douze au plus). */
+  tags?: string[];
+  /** Comment le projet a été créé ; absente pour un projet d’avant son relevé. */
+  origin?: ProjectOrigin;
   /** Demande et script quand le clip vient de l'assistant, pour rédiger ses textes de publication. */
   brief?: {
     prompt: string;

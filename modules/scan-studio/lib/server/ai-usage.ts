@@ -1,6 +1,6 @@
 /**
  * Ce que Scan Studio rapporte au registre de consommation des IA du cœur
- * (écran `/admin/ai`) : l’accès aux moteurs de traduction, leurs compteurs
+ * (écran `/admin/services`) : l’accès aux moteurs de traduction, leurs compteurs
  * et plafonds, et le plafond mensuel des appels d’IA. Aucune clé n’en sort.
  *
  * Les compteurs restent ceux du module, en temps universel : ils décident

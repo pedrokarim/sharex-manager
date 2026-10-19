@@ -1,17 +1,18 @@
 /**
- * Réglages des sources vidéo (réservés aux administrateurs) : les cookies
- * YouTube d'un compte dédié, et la clé de l'API Pexels.
+ * Réglages des sources vidéo (réservés aux administrateurs) : les cookies
+ * YouTube d'un compte dédié, et les clés des API Pexels et Pixabay.
  *
  * Rangés à part de `secrets.json` (voix en ligne), qui ne garde que les
- * champs qu'il connaît et effacerait les autres à sa prochaine écriture :
+ * champs qu'il connaît et effacerait les autres à sa prochaine écriture :
  *
- * - `data/youtube-cookies.txt` : le fichier de cookies, au format Netscape ;
- * - `data/video-sources.json` : la clé Pexels et la date des cookies.
+ * - `data/youtube-cookies.txt` : le fichier de cookies, au format Netscape ;
+ * - `data/video-sources.json` : les clés Pexels et Pixabay et la date des cookies.
  *
  * Les deux fichiers sont en droits 600, ne sont jamais servis par la route
  * des données (ni `.txt` ni `.json`) et ne repartent jamais vers le
- * navigateur : seul l'état (« configuré », date, fin de la clé) en sort. La
- * clé Pexels peut aussi venir de la variable `PEXELS_API_KEY`.
+ * navigateur : seul l'état (« configuré », date, fin de la clé) en sort. La
+ * clé Pexels peut aussi venir de la variable `PEXELS_API_KEY`, celle de
+ * Pixabay de `PIXABAY_API_KEY`.
  *
  * `video-sources.json` est chiffré (`lib/security/secret-file.ts`) ; le
  * fichier de cookies reste en clair, en 600 : yt-dlp doit pouvoir le lire.
@@ -28,11 +29,13 @@ const SETTINGS_FILE = path.join(DATA_DIR, "video-sources.json");
 /** Lie le chiffré de `video-sources.json` à ce module. */
 const SETTINGS_CONTEXT = "module:clip-studio:video-sources";
 const PEXELS_ENV = "PEXELS_API_KEY";
+const PIXABAY_ENV = "PIXABAY_API_KEY";
 /** Un export de cookies de navigateur tient en quelques dizaines de kilo-octets. */
 const MAX_COOKIES_BYTES = 512 * 1024;
 
 interface Settings {
   pexelsKey?: string;
+  pixabayKey?: string;
   /** Date d'enregistrement des cookies YouTube. */
   cookiesSavedAt?: number;
   /** Dernier refus de YouTube malgré les cookies : ils sont à renouveler. */
@@ -41,13 +44,14 @@ interface Settings {
 
 function readSettings(): Settings {
   try {
-    const raw = readSecretJson<{ pexelsKey?: unknown; cookiesSavedAt?: number; cookiesRejectedAt?: number } | null>(
+    const raw = readSecretJson<{ pexelsKey?: unknown; pixabayKey?: unknown; cookiesSavedAt?: number; cookiesRejectedAt?: number } | null>(
       SETTINGS_FILE,
       SETTINGS_CONTEXT,
       null
     );
     return {
       ...(typeof raw?.pexelsKey === "string" && raw.pexelsKey ? { pexelsKey: raw.pexelsKey } : {}),
+      ...(typeof raw?.pixabayKey === "string" && raw.pixabayKey ? { pixabayKey: raw.pixabayKey } : {}),
       ...(Number.isFinite(raw?.cookiesSavedAt) ? { cookiesSavedAt: raw?.cookiesSavedAt } : {}),
       ...(Number.isFinite(raw?.cookiesRejectedAt) ? { cookiesRejectedAt: raw?.cookiesRejectedAt } : {}),
     };
@@ -163,11 +167,41 @@ export function savePexelsKey(input: unknown) {
   writeSettings(key ? { ...settings, pexelsKey: key } : settings);
 }
 
+// ─── Clé Pixabay ─────────────────────────────────────────────────
+
+export function pixabayApiKey(): string {
+  return process.env[PIXABAY_ENV] || readSettings().pixabayKey || "";
+}
+
+/** Enregistre la clé Pixabay ; une chaîne vide l'efface. */
+export function savePixabayKey(input: unknown) {
+  if (typeof input !== "string") throw new Error("Clé invalide.");
+  const key = input.trim();
+  // Une clé Pixabay ressemble à « 12345678-0123456789abcdef0123456 ».
+  if (key && !/^[\x21-\x7e]{8,200}$/.test(key)) throw new Error("Cette clé ne ressemble pas à une clé Pixabay : copiez-la depuis pixabay.com/api/docs.");
+  const { pixabayKey: _previous, ...settings } = readSettings();
+  writeSettings(key ? { ...settings, pixabayKey: key } : settings);
+}
+
 // ─── État pour l'écran des réglages ──────────────────────────────
 
 export interface VideoSourcesStatus {
   youtubeCookies: { configured: boolean; savedAt?: number; rejectedAt?: number };
-  pexels: { configured: boolean; fromEnv: boolean; hint: string; envVariable: string; site: string };
+  pexels: ApiKeyStatus;
+  pixabay: ApiKeyStatus;
+}
+
+/** État d'une clé d'API : jamais la clé elle-même, seulement ses quatre derniers caractères. */
+export interface ApiKeyStatus {
+  configured: boolean;
+  fromEnv: boolean;
+  hint: string;
+  envVariable: string;
+  site: string;
+}
+
+function keyStatus(key: string, envVariable: string, site: string): ApiKeyStatus {
+  return { configured: Boolean(key), fromEnv: Boolean(process.env[envVariable]), hint: key ? `••••••••${key.slice(-4)}` : "", envVariable, site };
 }
 
 export function videoSourcesStatus(): VideoSourcesStatus {
@@ -180,12 +214,7 @@ export function videoSourcesStatus(): VideoSourcesStatus {
       ...(configured && settings.cookiesSavedAt ? { savedAt: settings.cookiesSavedAt } : {}),
       ...(configured && settings.cookiesRejectedAt ? { rejectedAt: settings.cookiesRejectedAt } : {}),
     },
-    pexels: {
-      configured: Boolean(key),
-      fromEnv: Boolean(process.env[PEXELS_ENV]),
-      hint: key ? `••••••••${key.slice(-4)}` : "",
-      envVariable: PEXELS_ENV,
-      site: "https://www.pexels.com/api/",
-    },
+    pexels: keyStatus(key, PEXELS_ENV, "https://www.pexels.com/api/"),
+    pixabay: keyStatus(pixabayApiKey(), PIXABAY_ENV, "https://pixabay.com/api/docs/"),
   };
 }

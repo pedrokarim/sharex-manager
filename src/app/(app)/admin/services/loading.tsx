@@ -6,9 +6,9 @@ import { PageHeaderSkeleton } from "@/components/skeletons/page-skeletons";
  * limites en jauges, les onglets et le tableau des fournisseurs. Rien ne
  * prend toute la page : chaque bloc garde sa place.
  */
-export default function AiUsageLoading() {
+export default function ServicesLoading() {
   return (
-    <div className="flex w-full min-w-0 flex-col gap-6" role="status" aria-label="Chargement de l’écran Intelligence artificielle">
+    <div className="flex w-full min-w-0 flex-col gap-6" role="status" aria-label="Chargement de l’écran Services externes">
       <PageHeaderSkeleton actions />
 
       <div className="min-w-0 overflow-hidden rounded-xl border" aria-hidden>

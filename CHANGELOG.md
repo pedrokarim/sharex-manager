@@ -7,6 +7,41 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Clip Studio, page « Nouveau clip » (`/m/clip-studio/new`) : la création
+  quitte sa fenêtre pour un espace en pleine largeur, avec le point de départ
+  en grandes cartes (Assistant IA, Depuis une idée, Monter sur une vidéo,
+  Modèle avec aperçus dessinés, Vide, Sous-titrer, Découper, sélection de la
+  galerie), une colonne « Réglages » (format, marque, durée, découpage, voix,
+  musique, illustrations) avec le résumé et « Créer » toujours visibles, et
+  le suivi de la création sur place jusqu’à « Ouvrir le projet ». Le mode et
+  l’idée préremplie vivent dans l’adresse.
+- Clip Studio, séquences « Auto » : par défaut, le script choisit lui-même
+  le nombre de séquences, de questions, d’éléments ou de diapositives selon
+  le sujet et la durée visée ; « Choisir » garde un nombre fixe.
+- Clip Studio, idées depuis une phrase : la recherche d’idées prend une
+  phrase entière autant que des mots-clés, Codex en dégage le sujet et
+  l’angle (« Sujet compris ») ; chaque idée arrive au format de la création
+  (forme, durée, découpage, format, vidéo source) et « Créer depuis cette
+  idée » préremplit la page « Nouveau clip ».
+- Clip Studio, accueil en tableau de bord : « Reprendre » (les six derniers
+  projets en vignettes rendues de leur propre image), « Derniers exports »
+  (deux rangées, avec les logos des comptes où chacun est publié, programmé ou
+  en échec), « Activité » (exports et publications des trente derniers jours,
+  publications par service) et « Meilleures publications » d’après les
+  statistiques des services, lues à la demande ; « Nouveau clip » et
+  « Importer une vidéo » mènent à la page de création (`/m/clip-studio/new`).
+- Clip Studio, page « Projets » : grille ou liste (choix retenu), recherche,
+  filtres (format, marque, origine, étiquette, exporté ou non, période), tri,
+  pagination par 24, le tout dans l’adresse ; renommer sur place, étiquettes,
+  copie dans un autre format, changement de marque, exporter, voir ses
+  exports, télécharger ou importer un projet en JSON ; sélection multiple pour
+  étiqueter, dupliquer ou supprimer d’un coup.
+- Clip Studio, vignettes des projets : une image du clip dessinée par le
+  moteur de rendu à la première visite, gardée par le serveur et refaite quand
+  le projet change.
+- Clip Studio, fiche d’un export : panneau « Publications », une ligne par
+  compte (logo, état, lien, date, vues, j’aime, commentaires), « Reprendre »
+  pour un envoi raté et « Publier ailleurs ».
 - Banc des chargements (`/loading-bench`, réservé à l’administration) : tous les visuels
   d’attente de l’application en direct (orbes, Spinner, boutons en attente,
   textes scintillants, retours d’action, squelettes et écran d’attente de
@@ -49,6 +84,20 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 - Clip Studio, onglet « Trouver » des médias : source « Vidéos »
   (Pexels, au format du clip, aperçu au survol), quand une clé est
   enregistrée.
+- Clip Studio, vidéos libres de Pixabay et de Wikimedia Commons, en plus
+  de Pexels (qui a suspendu la délivrance de nouvelles clés) : clé Pixabay
+  gratuite dans « Voix en ligne », section « Sources vidéo » (ou
+  `PIXABAY_API_KEY`), avec son logo et un lien pour l’obtenir ; Wikimedia
+  Commons sans clé, toujours disponible, limité aux licences libres (CC0,
+  domaine public, CC BY, CC BY-SA), auteur et licence dans la mention, WebM
+  et Ogg réencodés en H.264 et AAC. L’onglet « Trouver » montre la source
+  « Vidéos » dans tous les cas, avec un sélecteur de banque à logos quand
+  plusieurs sont utilisables ; l’assistant cherche dans Pixabay, puis
+  Pexels, puis Wikimedia Commons, avant de se replier sur une image.
+  Recherches Pixabay gardées 24 heures comme l’exigent ses conditions,
+  limite de 100 requêtes par minute respectée ; les deux banques
+  apparaissent au registre des services, chaque appel noté avec sa durée et
+  la famille de l’échec.
 
 - Clip Studio, « Sous-titrer un clip » : nouveau mode de la fenêtre de
   création. Une adresse (clip ou VOD Twitch, YouTube, lien direct), une
@@ -120,7 +169,8 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   génération, analyse et traduction d’un chapitre, `border-beam`) ;
   pastille « Pro » en métal liquide dans le menu du compte (`metal-fx`).
   Tout respecte le mouvement réduit.
-- Administration › Intelligence artificielle (`/admin/ai`) : ce que l’application
+- Administration › Services externes (`/admin/services`, d’abord nommé
+  « Intelligence artificielle » à `/admin/ai`) : ce que l’application
   consomme chez chaque IA et service à quota. Limites en jauges, les plus
   tendues d’abord (offre gratuite Azure, plafonds de Scan Studio, soldes lus
   chez ElevenLabs, DeepL, trace.moe et SerpApi) ; tableau des fournisseurs
@@ -810,6 +860,32 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Clip Studio, écran « Idées » : la recherche passe dans un panneau en
+  pleine largeur (sujet à gauche, réglages de la série à droite), les options
+  de création de chaque idée s’affichent en puces ; les anciennes adresses de
+  création (`?action=create`) mènent à la page « Nouveau clip ».
+- Clip Studio, page « Exports » : tableau ou grille paginés par 24, recherche,
+  filtres par format, projet, marque, période et, pour les administrateurs,
+  par service et par état de publication (publié, programmé, en cours, échec,
+  non publié), tri par date, nom, durée ou poids, adresse partagée ; chaque
+  ligne montre jusqu’à quatre logos de comptes, puis « +2 ».
+- Clip Studio : l’onglet des envois de la fiche d’un export s’appelle
+  « Envois » ; les retours aux projets mènent à la nouvelle page « Projets ».
+- Administration › Services externes : l’écran « Intelligence artificielle »
+  prend ce nom, car il couvre aussi DeepL, les voix d’Edge, SerpApi, Openverse,
+  trace.moe, Pexels… ; il passe à `/admin/services` et l’ancienne adresse y
+  redirige (paramètres compris). Le journal des derniers appels ne s’écrase
+  plus : chaque colonne tient sur une ligne (moment, service, usage, modèle,
+  quantité, nouvelle durée, issue avec la famille de l’échec : « Trop de
+  demandes », « Réseau », « Crédit épuisé »…) et les colonnes secondaires
+  s’effacent sur un écran étroit. Un appel se clique (ou se choisit au
+  clavier) et ouvre son détail : ce qui s’est passé et quoi faire, propre au
+  service, le message et la réponse complète du service, la date, la durée,
+  les essais et la quantité. Dans le tiroir d’un service, le détail s’ouvre
+  à la place du corps avec « Retour », le dernier appel de l’en-tête
+  s’ouvre aussi et une fonctionnalité de la répartition filtre le journal.
+  Les appels notés avant cette version retrouvent leur famille d’après leur
+  message.
 - Compte connecté : les onglets « Envois en cours », « Quotas » et « Chaîne »
   sont refaits en écrans de logiciel. Envois en tableau filtrable et paginé,
   quotas en panneaux de jauges avec échéance et état, chaîne en écran de

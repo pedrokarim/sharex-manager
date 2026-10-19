@@ -105,6 +105,44 @@ const rawIdea = (title: string, extra: Record<string, unknown> = {}) => ({
 });
 
 describe("recherche d'idées", () => {
+  it("une phrase entière : Codex reçoit la phrase, rend le sujet compris et des idées au format de la création", async () => {
+    const sentence = "les secrets de fabrication des sabres japonais et pourquoi ils coupent si bien";
+    const asked: string[] = [];
+    const fake = deps({
+      ask: async (prompt) => {
+        asked.push(prompt);
+        return JSON.stringify({
+          subject: "La fabrication des katanas et la science de leur tranchant",
+          ideas: [
+            rawIdea("Pourquoi un katana coupe si bien", { template: "free", count: "auto", targetSeconds: 45, hook: "Un katana plie sans casser" }),
+            rawIdea("5 étapes pour forger un katana", { template: "top", count: 5, sourceVideo: "Une vidéo de forgeron japonais au travail, plan large sur la forge" }),
+          ],
+        });
+      },
+    });
+    const { ideas, notes } = await service.searchIdeas(service.cleanSettings({ kitId: KIT, count: 3, topic: sentence, web: false }), fake);
+    expect(asked[0]).toContain(sentence);
+    expect(asked[0]).toContain("<sujet>");
+    expect(asked[0]).toContain('"subject"');
+    expect(asked[0]).toContain('"count": number | "auto"');
+    expect(notes).toContain("Sujet compris : La fabrication des katanas et la science de leur tranchant");
+    expect(ideas).toHaveLength(2);
+    // « auto » : pas de nombre, le script découpera selon la durée.
+    expect(ideas[0].count).toBeUndefined();
+    expect(ideas[0].template).toBe("free");
+    expect(ideas[0].targetSeconds).toBe(45);
+    expect(ideas[1].count).toBe(5);
+    expect(ideas[1].sourceVideoHint).toContain("forgeron");
+    // Relue du disque, l'idée garde son découpage automatique et sa vidéo source.
+    const stored = store.readIdeas();
+    expect(stored.find((idea) => idea.title === "Pourquoi un katana coupe si bien")?.count).toBeUndefined();
+    expect(stored.find((idea) => idea.title === "5 étapes pour forger un katana")?.sourceVideoHint).toContain("forgeron");
+  });
+
+  it("garde une phrase de 300 caractères au plus comme sujet", () => {
+    expect(service.cleanSettings({ topic: "a".repeat(500) }).topic).toHaveLength(300);
+  });
+
   it("range les idées trouvées, bornées, avec le bilan du mélange", async () => {
     const fake = deps({
       ask: async () => JSON.stringify({ ideas: [rawIdea("Trois jeux gratuits à tester ce soir"), rawIdea("5 jeux les plus attendus en 2027")] }),

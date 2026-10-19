@@ -26,7 +26,9 @@ const MODULE_PAGES: Record<string, Record<string, PageLoader>> = {
     edit: () => import("@/modules/brand-kit/pages/editor"),
   },
   "clip-studio": {
-    "": () => import("@/modules/clip-studio/pages/projects"),
+    "": () => import("@/modules/clip-studio/pages/hub"),
+    projects: () => import("@/modules/clip-studio/pages/projects"),
+    new: () => import("@/modules/clip-studio/pages/create"),
     edit: () => import("@/modules/clip-studio/pages/editor"),
     ideas: () => import("@/modules/clip-studio/pages/ideas"),
     voices: () => import("@/modules/clip-studio/pages/voices"),

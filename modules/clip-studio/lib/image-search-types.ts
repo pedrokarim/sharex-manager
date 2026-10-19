@@ -53,8 +53,8 @@ export interface ImportedImage {
   kind?: "icon";
 }
 
-/** Source retenue pour un segment, affichée dans le suivi de l'assistant ; « pexels » : une vidéo. */
-export type SegmentImageSource = "openverse" | "web" | "pexels" | "generated" | "none";
+/** Source retenue pour un segment, affichée dans le suivi de l'assistant ; « pexels », « pixabay », « wikimedia » : une vidéo. */
+export type SegmentImageSource = "openverse" | "web" | "pexels" | "pixabay" | "wikimedia" | "generated" | "none";
 
 export const FOUND_LIMITS = {
   /** Petit côté minimal d'une image retenue, en pixels. */

@@ -20,6 +20,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatDateTime, formatRelative } from "@/components/connections/shared";
 import { ACCESS_LABELS, KIND_LABELS, amountIn, formatAmount, moduleName, needsWatch, primaryUnit } from "./format";
 import { AccessPill, MiniGauge } from "./limit-gauge";
+import { ERROR_KIND_LABELS, errorKindOf } from "./explain";
 
 export type ProviderFilter = "all" | "used" | "watch" | "unconfigured";
 
@@ -128,6 +129,7 @@ function ProviderRow({ provider, onOpen }: { provider: AiProviderOverview; onOpe
   const amount = amountIn(provider.month, unit);
   const tightest = provider.limits[0];
   const modules = provider.usedBy.map(moduleName);
+  const lastKind = provider.lastCall ? errorKindOf(provider.lastCall) : null;
   const consumption = (
     <div className="grid min-w-0 gap-1">
       <span className="min-w-0 truncate text-sm tabular-nums" title={formatAmount(amount, unit)}>
@@ -175,7 +177,7 @@ function ProviderRow({ provider, onOpen }: { provider: AiProviderOverview; onOpe
               <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground lg:hidden">
                 {/* Les appels sont déjà la consommation affichée au-dessus quand c'est l'unité du fournisseur. */}
                 {unit !== "calls" ? <span className="tabular-nums">{formatAmount(provider.month.calls, "calls")}</span> : null}
-                {provider.month.failures ? <span className="text-destructive tabular-nums">{provider.month.failures.toLocaleString("fr-FR")} en échec</span> : null}
+                {provider.month.failures ? <span className="text-red-700 tabular-nums dark:text-red-400">{provider.month.failures.toLocaleString("fr-FR")} en échec</span> : null}
                 {provider.lastCall ? (
                   <span title={formatDateTime(provider.lastCall.at)} suppressHydrationWarning>
                     {formatRelative(provider.lastCall.at)}
@@ -197,12 +199,12 @@ function ProviderRow({ provider, onOpen }: { provider: AiProviderOverview; onOpe
       <TableCell className="hidden align-top sm:table-cell">{consumption}</TableCell>
       <TableCell className="hidden text-right align-top lg:table-cell">
         <span className="block text-sm tabular-nums">{provider.month.calls.toLocaleString("fr-FR")}</span>
-        {provider.month.failures ? <span className="block text-xs text-destructive tabular-nums">{provider.month.failures.toLocaleString("fr-FR")} en échec</span> : null}
+        {provider.month.failures ? <span className="block text-xs text-red-700 tabular-nums dark:text-red-400">{provider.month.failures.toLocaleString("fr-FR")} en échec</span> : null}
       </TableCell>
       <TableCell className="hidden align-top lg:table-cell">
         {provider.lastCall ? (
-          <span className="flex min-w-0 items-center gap-1.5 text-xs" title={`${formatDateTime(provider.lastCall.at)}${provider.lastCall.ok ? "" : ` : ${provider.lastCall.error ?? "échec"}`}`} suppressHydrationWarning>
-            {provider.lastCall.ok ? null : <CircleX className="size-3.5 shrink-0 text-destructive" aria-label="En échec" />}
+          <span className="flex min-w-0 items-center gap-1.5 text-xs" title={`${formatDateTime(provider.lastCall.at)}${lastKind ? `, échec : ${ERROR_KIND_LABELS[lastKind].toLocaleLowerCase("fr")}` : ""}`} suppressHydrationWarning>
+            {provider.lastCall.ok ? null : <CircleX className="size-3.5 shrink-0 text-red-700 dark:text-red-400" aria-label="En échec" />}
             <span className="min-w-0 truncate" suppressHydrationWarning>
               {formatRelative(provider.lastCall.at)}
             </span>

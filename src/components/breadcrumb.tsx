@@ -65,7 +65,7 @@ export function BreadcrumbNav({ modules = [] }: { modules?: BreadcrumbModule[] }
       account: t("account.my_account"),
       // Libellé en dur, comme l'entrée de la barre latérale.
       connections: "Comptes connectés",
-      ai: "Intelligence artificielle",
+      services: "Services externes",
     };
 
     // Fiche d'un compte : son identifiant interne ne dit rien à personne.

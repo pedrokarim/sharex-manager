@@ -12,16 +12,16 @@ const actions = vi.hoisted(() => ({
   aiUsageOverviewAction: vi.fn(),
   readRemoteLimitsAction: vi.fn(),
 }));
-vi.mock("@/app/(app)/admin/ai/actions", () => actions);
+vi.mock("@/app/(app)/admin/services/actions", () => actions);
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
-  usePathname: () => "/admin/ai",
+  usePathname: () => "/admin/services",
   useSearchParams: () => new URLSearchParams(),
 }));
 
-import { AiUsagePageClient } from "@/app/(app)/admin/ai/page.client";
-import { sortedLimits } from "@/app/(app)/admin/ai/_components/limits-panel";
-import { formatRemaining, mergeLimits } from "@/app/(app)/admin/ai/_components/format";
+import { ServicesPageClient } from "@/app/(app)/admin/services/page.client";
+import { sortedLimits } from "@/app/(app)/admin/services/_components/limits-panel";
+import { formatRemaining, mergeLimits } from "@/app/(app)/admin/services/_components/format";
 
 MotionGlobalConfig.skipAnimations = true;
 // Radix mesure ses éléments ; jsdom ne connaît ni ResizeObserver ni scrollIntoView.
@@ -117,8 +117,22 @@ function overview(): AiUsageOverview {
       provider({ id: "libretranslate", label: "LibreTranslate", brand: "libretranslate", kind: "self-hosted", access: "none", usedBy: ["scan-studio"] }),
     ],
     recent: [
-      { provider: "deepl", module: "scan-studio", feature: "Traduction de page", unit: "characters", amount: 1_200, ok: true, at: NOW - 60_000 },
+      { provider: "deepl", module: "scan-studio", feature: "Traduction de page", unit: "characters", amount: 1_200, ok: true, at: NOW - 60_000, durationMs: 850 },
       { provider: "elevenlabs", module: "clip-studio", feature: "Voix off", model: "eleven_multilingual_v2", unit: "characters", amount: 800, ok: false, error: "Quota épuisé chez le service.", at: NOW - 120_000 },
+      {
+        provider: "deepl",
+        module: "scan-studio",
+        feature: "Traduction de bulle",
+        unit: "characters",
+        amount: 0,
+        ok: false,
+        error: "429 Too Many Requests",
+        errorKind: "rate-limit",
+        detail: "Réponse de DeepL : too many requests, retry later.",
+        attempts: 3,
+        durationMs: 4_200,
+        at: NOW - 180_000,
+      },
     ],
   };
 }
@@ -138,14 +152,14 @@ function providerNames() {
     .filter((name) => ["DeepL", "OpenAI", "ElevenLabs", "trace.moe", "LibreTranslate"].includes(name ?? ""));
 }
 
-describe("écran Intelligence artificielle", () => {
+describe("écran Services externes", () => {
   beforeEach(() => {
     actions.aiUsageOverviewAction.mockResolvedValue({ ok: true, data: overview() });
     actions.readRemoteLimitsAction.mockResolvedValue({ ok: false, error: "non simulé" });
   });
 
   it("trie les limites : la limite refusée d’abord, puis la plus entamée", () => {
-    render(<AiUsagePageClient initial={overview()} />);
+    render(<ServicesPageClient initial={overview()} />);
     // Les limites tendues se montrent toutes ; la plus large attend « Afficher ».
     expect(limitLabels()).toEqual(["Caractères de voix", "Recherches du mois", "Caractères traduits"]);
     const panel = screen.getByRole("region", { name: "Limites" });
@@ -174,7 +188,7 @@ describe("écran Intelligence artificielle", () => {
 
   it("filtre les fournisseurs avec des compteurs", async () => {
     const user = userEvent.setup();
-    render(<AiUsagePageClient initial={overview()} />);
+    render(<ServicesPageClient initial={overview()} />);
     const filters = screen.getByRole("radiogroup", { name: "Filtrer les fournisseurs" });
     expect(within(filters).getByRole("radio", { name: /Tous\s*5/ })).toBeTruthy();
     expect(within(filters).getByRole("radio", { name: /Utilisés ce mois\s*4/ })).toBeTruthy();
@@ -202,7 +216,7 @@ describe("écran Intelligence artificielle", () => {
       ok: true,
       data: [limit({ id: "deepl-month", label: "Caractères traduits", unit: "characters", used: 450_000, limit: 500_000, source: "remote" })],
     });
-    render(<AiUsagePageClient initial={overview()} />);
+    render(<ServicesPageClient initial={overview()} />);
 
     await user.click(within(screen.getByRole("region", { name: "Fournisseurs" })).getByRole("button", { name: "DeepL" }));
     const sheet = await screen.findByRole("dialog");
@@ -227,20 +241,78 @@ describe("écran Intelligence artificielle", () => {
     expect(actions.readRemoteLimitsAction).toHaveBeenCalledTimes(2);
   });
 
-  it("montre les derniers appels et leurs erreurs en entier", async () => {
+  it("ouvre le détail d’un appel en échec et explique ce qui s’est passé", async () => {
     const user = userEvent.setup();
-    render(<AiUsagePageClient initial={overview()} />);
+    render(<ServicesPageClient initial={overview()} />);
     await user.click(screen.getByRole("tab", { name: /Derniers appels/ }));
     const table = await screen.findByRole("table", { name: "Derniers appels" });
-    expect(within(table).getByText("Quota épuisé chez le service.")).toBeTruthy();
+    // Le message n'est plus dans la ligne : seule la famille de l'échec s'y lit.
+    expect(within(table).queryByText("Quota épuisé chez le service.")).toBeNull();
+    expect(within(table).getByText("Crédit épuisé")).toBeTruthy();
+    expect(within(table).getByText("Trop de demandes")).toBeTruthy();
+
     await user.click(screen.getByRole("radio", { name: /Échecs/ }));
     await waitFor(() => expect(within(table).queryByText("Traduction de page")).toBeNull());
     expect(within(table).getByText("Voix off")).toBeTruthy();
+
+    // Un clic sur la ligne (pas seulement sur le bouton) ouvre le détail.
+    await user.click(within(table).getByText("Trop de demandes"));
+    const sheet = await screen.findByRole("dialog");
+    expect(within(sheet).getByRole("heading", { name: "Traduction de bulle" })).toBeTruthy();
+    expect(within(sheet).getByText(/a refusé des demandes trop rapprochées/)).toBeTruthy();
+    expect(within(sheet).getByText("429 Too Many Requests")).toBeTruthy();
+    expect(within(sheet).getByText("Réponse de DeepL : too many requests, retry later.")).toBeTruthy();
+    expect(within(sheet).getByText(norm("3 essais"))).toBeTruthy();
+    expect(within(sheet).getByText(norm("4,2 s"))).toBeTruthy();
+  });
+
+  it("ouvre un appel au clavier, et un crédit épuisé mène aux réglages", async () => {
+    const user = userEvent.setup();
+    const data = overview();
+    data.providers = data.providers.map((entry) => (entry.id === "elevenlabs" ? { ...entry, settingsHref: "/m/clip-studio/settings" } : entry));
+    render(<ServicesPageClient initial={data} />);
+    await user.click(screen.getByRole("tab", { name: /Derniers appels/ }));
+    const row = await screen.findByRole("button", { name: /Détail de l’appel.*Voix off/ });
+    row.focus();
+    await user.keyboard("{Enter}");
+    const sheet = await screen.findByRole("dialog");
+    expect(within(sheet).getByText("Quota épuisé chez le service.")).toBeTruthy();
+    expect(within(sheet).getByText(/Crédit épuisé chez ElevenLabs/)).toBeTruthy();
+    expect(within(sheet).getByRole("link", { name: /Régler ElevenLabs/ }).getAttribute("href")).toBe("/m/clip-studio/settings");
+  });
+
+  it("dans le tiroir d’un service, un appel s’ouvre à la place du corps et « Retour » y ramène", async () => {
+    const user = userEvent.setup();
+    const data = overview();
+    data.providers[0].byFeature.push({ module: "scan-studio", feature: "Traduction de bulle", calls: 3, failures: 1, amount: {}, lastAt: NOW - 180_000 });
+    data.providers[0].lastCall = { at: NOW - 30_000, ok: false, module: "scan-studio", feature: "Traduction de bulle", error: "fetch failed" };
+    render(<ServicesPageClient initial={data} />);
+    await user.click(within(screen.getByRole("region", { name: "Fournisseurs" })).getByRole("button", { name: "DeepL" }));
+    const sheet = await screen.findByRole("dialog");
+
+    // Une fonctionnalité de la répartition filtre le journal du tiroir.
+    const calls = within(sheet).getByRole("table", { name: "Derniers appels à DeepL" });
+    expect(within(calls).getByText("Traduction de page")).toBeTruthy();
+    await user.click(within(sheet).getByRole("button", { name: /Traduction de bulle, Scan Studio.*voir ses derniers appels/ }));
+    await waitFor(() => expect(within(calls).queryByText("Traduction de page")).toBeNull());
+    expect(within(calls).getByText("Traduction de bulle")).toBeTruthy();
+
+    // Un appel du journal, puis « Retour ».
+    await user.click(within(calls).getByText("Traduction de bulle"));
+    expect(await within(sheet).findByText(/a refusé des demandes trop rapprochées/)).toBeTruthy();
+    expect(within(sheet).queryByText("Trente derniers jours")).toBeNull();
+    await user.click(within(sheet).getByRole("button", { name: "Retour" }));
+    expect(await within(sheet).findByText("Trente derniers jours")).toBeTruthy();
+
+    // Le dernier appel de l'en-tête s'ouvre aussi, avec la famille déduite de son message.
+    await user.click(within(sheet).getByRole("button", { name: /en échec \(réseau\)/ }));
+    expect(await within(sheet).findByText(/n’a pas répondu ou a refusé la connexion/)).toBeTruthy();
+    expect(within(sheet).getByText("fetch failed")).toBeTruthy();
   });
 
   it("actualise l’aperçu et le dit à côté du bouton", async () => {
     const user = userEvent.setup();
-    render(<AiUsagePageClient initial={overview()} />);
+    render(<ServicesPageClient initial={overview()} />);
     await user.click(screen.getByRole("button", { name: "Actualiser" }));
     expect(await screen.findByText("À jour")).toBeTruthy();
     expect(actions.aiUsageOverviewAction).toHaveBeenCalledTimes(1);
@@ -249,7 +321,7 @@ describe("écran Intelligence artificielle", () => {
   it("dit proprement qu’aucune limite n’est connue", () => {
     const empty = overview();
     empty.providers = empty.providers.map((entry) => ({ ...entry, limits: [] }));
-    render(<AiUsagePageClient initial={empty} />);
+    render(<ServicesPageClient initial={empty} />);
     expect(screen.getByText("Aucune limite connue")).toBeTruthy();
   });
 });

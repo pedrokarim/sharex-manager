@@ -23,7 +23,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { BrandLogo } from "@/components/brand-logo";
+import { BrandLogo, type Brand } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { ActionStatus, FormStatus, errorMessage, useFeedback, type FeedbackState } from "@/components/feedback";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,7 @@ import {
   type BrowsableMedia,
   type FoundVideo,
   type ImportedVideo,
+  type VideoProviderId,
 } from "../lib/client";
 import type { AspectPreset, ClipAsset, MediaSource } from "../engine/types";
 import type { FoundImage, ImportedImage } from "../lib/image-search-types";
@@ -455,19 +456,41 @@ function StudioMedia({ onAdd }: { onAdd: (source: MediaSource) => void }) {
 
 // ─── Trouver : des images qui existent ───────────────────────────
 
-/** Où chercher : la banque libre (Openverse), le web par Codex, l'icône officielle d'un sujet, ou une vidéo de Pexels. */
+/** Où chercher : la banque libre (Openverse), le web par Codex, l'icône officielle d'un sujet, ou une vidéo d'une banque libre. */
 type FindSource = "openverse" | "web" | "icon" | "video";
 
 const FIND_SOURCES: { id: FindSource; label: string; hint: string; icon: typeof Library }[] = [
   { id: "openverse", label: "Libre", hint: "Banque libre Openverse : CC0, CC BY et domaine public, licence vérifiée.", icon: Library },
   { id: "web", label: "Web", hint: "Le web par Codex, de 20 à 60 secondes : visuels officiels, droits à vérifier avant de publier.", icon: Globe },
   { id: "icon", label: "Icône", hint: "Icône ou logo officiel d'un jeu, d'une appli, d'une marque…, par Codex : droits à vérifier.", icon: BadgeCheck },
-  { id: "video", label: "Vidéos", hint: "Vidéos libres de Pexels (licence Pexels), au format du clip ; la mention de l’auteur suit le clip.", icon: Clapperboard },
+  { id: "video", label: "Vidéos", hint: "Vidéos libres, au format du clip ; la mention de l’auteur suit le clip.", icon: Clapperboard },
 ];
+
+/** Banques de vidéos : nom, logo officiel et ce qu'il faut savoir de leurs droits. */
+const VIDEO_PROVIDER_UI: Record<VideoProviderId, { label: string; short: string; brand: Brand; hint: string }> = {
+  pixabay: {
+    label: "Pixabay",
+    short: "Pixabay",
+    brand: "pixabay",
+    hint: "Vidéos libres de Pixabay (licence Pixabay), au format du clip ; la mention de l’auteur suit le clip.",
+  },
+  pexels: {
+    label: "Pexels",
+    short: "Pexels",
+    brand: "pexels",
+    hint: "Vidéos libres de Pexels (licence Pexels), au format du clip ; la mention de l’auteur suit le clip.",
+  },
+  wikimedia: {
+    label: "Wikimedia Commons",
+    short: "Commons",
+    brand: "wikimediacommons",
+    hint: "Vidéos libres de Wikimedia Commons (CC0, domaine public, CC BY, CC BY-SA), réencodées pour le montage ; l’auteur et la licence suivent le clip.",
+  },
+};
 
 /** Openverse ne sert pas plus de dix pages à un visiteur anonyme. */
 const OPENVERSE_MAX_PAGE = 10;
-/** Pages de vidéos au plus : la limite horaire de Pexels reste surtout pour l'assistant. */
+/** Pages de vidéos au plus : les limites des banques restent surtout pour l'assistant. */
 const VIDEO_MAX_PAGE = 10;
 
 /** Orientation des vidéos cherchées, selon le format du clip. */
@@ -476,9 +499,17 @@ function videoOrientation(aspect: AspectPreset): "portrait" | "landscape" | "squ
 }
 
 /** Dernière recherche, gardée entre deux ouvertures de l'onglet. */
-let findSnapshot: { query: string; source: FindSource; page: number; results: FoundImage[]; videos: FoundVideo[]; hasMore: boolean } | null = null;
-/** Recherche de vidéos possible (clé Pexels enregistrée), lue une fois par ouverture de l'éditeur. */
-let videoSearchSnapshot: boolean | null = null;
+let findSnapshot: {
+  query: string;
+  source: FindSource;
+  page: number;
+  results: FoundImage[];
+  videos: FoundVideo[];
+  hasMore: boolean;
+  videoProvider?: VideoProviderId;
+} | null = null;
+/** Banques de vidéos utilisables, lues une fois par ouverture de l'éditeur ; Wikimedia Commons l'est toujours. */
+let videoSearchSnapshot: VideoProviderId[] | null = null;
 
 /** Média du projet tiré d'une image importée : la mention et l'état des droits la suivent jusqu'à la publication. */
 function importedToSource(image: ImportedImage): MediaSource {
@@ -499,7 +530,8 @@ function FindMedia({ onAdd, aspect }: { onAdd: (source: MediaSource) => void; as
   const [source, setSource] = useState<FindSource>(findSnapshot?.source ?? "openverse");
   const [results, setResults] = useState<FoundImage[]>(findSnapshot?.results ?? []);
   const [videos, setVideos] = useState<FoundVideo[]>(findSnapshot?.videos ?? []);
-  const [videoSearch, setVideoSearch] = useState<boolean>(videoSearchSnapshot ?? false);
+  const [videoProviders, setVideoProviders] = useState<VideoProviderId[]>(videoSearchSnapshot ?? ["wikimedia"]);
+  const [videoProvider, setVideoProvider] = useState<VideoProviderId>(findSnapshot?.videoProvider ?? (videoSearchSnapshot ?? ["wikimedia"])[0]);
   /** Import en cours ou fait, par vidéo : la vidéo importée sert aux clics suivants. */
   const [videoImports, setVideoImports] = useState<Record<string, "pending" | ImportedVideo>>({});
   const [videoErrors, setVideoErrors] = useState<Record<string, FeedbackState>>({});
@@ -526,7 +558,7 @@ function FindMedia({ onAdd, aspect }: { onAdd: (source: MediaSource) => void; as
     setError(null);
     try {
       if (source === "video") {
-        const found = await searchVideos({ query: text, orientation: videoOrientation(aspect), page: target });
+        const found = await searchVideos({ query: text, orientation: videoOrientation(aspect), page: target, provider: videoProvider });
         if (id !== searchId.current) return;
         const next = target > 1 ? [...videos, ...found.filter((entry) => !videos.some((known) => known.id === entry.id))] : found;
         const more = found.length > 0 && target < VIDEO_MAX_PAGE;
@@ -534,7 +566,7 @@ function FindMedia({ onAdd, aspect }: { onAdd: (source: MediaSource) => void; as
         setPage(target);
         setHasMore(more);
         setSearched(true);
-        findSnapshot = { query: text, source, page: target, results: [], videos: next, hasMore: more };
+        findSnapshot = { query: text, source, page: target, results: [], videos: next, hasMore: more, videoProvider };
         return;
       }
       const found = await callModule<FoundImage[]>("searchImages", {
@@ -610,19 +642,23 @@ function FindMedia({ onAdd, aspect }: { onAdd: (source: MediaSource) => void; as
     }
   };
 
-  // La source « Vidéos » n'apparaît qu'avec une clé Pexels ; une clé retirée ramène à la banque libre.
+  // Banques utilisables : Wikimedia Commons toujours, Pixabay et Pexels avec leur clé ; une clé retirée ramène à la première banque restante.
   useEffect(() => {
+    const settle = (providers: VideoProviderId[]) => {
+      const usable: VideoProviderId[] = providers.length ? providers : ["wikimedia"];
+      setVideoProviders(usable);
+      setVideoProvider((current) => (usable.includes(current) ? current : usable[0]));
+    };
     if (videoSearchSnapshot !== null) {
-      if (!videoSearchSnapshot && source === "video") setSource("openverse");
+      settle(videoSearchSnapshot);
       return;
     }
     let alive = true;
     getVideoSearchStatus()
       .then((status) => {
-        videoSearchSnapshot = status.pexels;
+        videoSearchSnapshot = Array.isArray(status.providers) ? status.providers : status.pexels ? ["pexels", "wikimedia"] : ["wikimedia"];
         if (!alive) return;
-        setVideoSearch(status.pexels);
-        if (!status.pexels && source === "video") setSource("openverse");
+        settle(videoSearchSnapshot);
       })
       .catch(() => undefined);
     return () => {
@@ -631,8 +667,9 @@ function FindMedia({ onAdd, aspect }: { onAdd: (source: MediaSource) => void; as
     // eslint-disable-next-line react-hooks/exhaustive-deps -- lu une fois à l'ouverture de l'onglet
   }, []);
 
-  const sources = FIND_SOURCES.filter((entry) => entry.id !== "video" || videoSearch);
+  const sources = FIND_SOURCES.filter((entry) => entry.id !== "video" || videoProviders.length > 0);
   const current = FIND_SOURCES.find((entry) => entry.id === source)!;
+  const provider = VIDEO_PROVIDER_UI[videoProvider];
   const icons = source === "icon";
   const isVideo = source === "video";
   const slow = source === "web" || source === "icon";
@@ -693,15 +730,43 @@ function FindMedia({ onAdd, aspect }: { onAdd: (source: MediaSource) => void; as
         })}
       </ToggleGroup>
 
+      {isVideo && videoProviders.length > 1 && (
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={videoProvider}
+          onValueChange={(value) => {
+            if (!value || value === videoProvider) return;
+            setVideoProvider(value as VideoProviderId);
+            setVideos([]);
+            setHasMore(false);
+            setSearched(false);
+            setError(null);
+            searchId.current++;
+            setLoading(null);
+          }}
+          className="w-full"
+          aria-label="Banque de vidéos"
+        >
+          {videoProviders.map((id) => (
+            <ToggleGroupItem key={id} value={id} className="h-7 min-w-0 flex-1 gap-1 px-1.5 text-xs" aria-label={VIDEO_PROVIDER_UI[id].label}>
+              <BrandLogo brand={VIDEO_PROVIDER_UI[id].brand} className="size-3.5" />
+              <span className="truncate">{VIDEO_PROVIDER_UI[id].short}</span>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      )}
+
       <p className={cn("flex min-w-0 items-start gap-1.5 text-[11px] leading-snug", slow ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
         {slow ? (
           <ShieldAlert className="mt-px h-3.5 w-3.5 shrink-0" />
         ) : isVideo ? (
-          <BrandLogo brand="pexels" className="mt-px size-3.5" />
+          <BrandLogo brand={provider.brand} className="mt-px size-3.5" />
         ) : (
           <BadgeCheck className="mt-px h-3.5 w-3.5 shrink-0" />
         )}
-        <span className="min-w-0 break-words">{current.hint}</span>
+        <span className="min-w-0 break-words">{isVideo ? provider.hint : current.hint}</span>
       </p>
 
       {error && <p className="rounded-md bg-destructive/10 px-2.5 py-2 text-[11px] break-words text-destructive">{error}</p>}
@@ -783,7 +848,7 @@ function FindMedia({ onAdd, aspect }: { onAdd: (source: MediaSource) => void; as
   );
 }
 
-/** Vidéo de Pexels : vignette, aperçu au survol, durée, licence et auteur. */
+/** Vidéo d'une banque libre : vignette, aperçu au survol, durée, licence et auteur. */
 function FoundVideoCard({
   video,
   index,
@@ -823,7 +888,7 @@ function FoundVideoCard({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={video.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full max-w-full object-cover" />
-          {/* Aperçu au survol : le plus petit fichier de Pexels, muet, chargé seulement à ce moment. */}
+          {/* Aperçu au survol : le plus petit fichier de la banque, muet, chargé seulement à ce moment. */}
           {hover && video.preview && !pending && (
             <video src={video.preview} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full max-w-full object-cover" />
           )}
@@ -875,7 +940,9 @@ function FoundVideoCard({
       <div className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
         <span className="inline-flex min-w-0 items-center gap-0.5 rounded bg-emerald-500/15 px-1 py-px font-medium text-emerald-700 dark:text-emerald-300">
           <BadgeCheck className="h-2.5 w-2.5 shrink-0" />
-          <span className="truncate">{video.license}</span>
+          <span className="truncate" title={video.license}>
+            {video.license}
+          </span>
         </span>
         {video.sourcePage && (
           <Tooltip>
@@ -884,7 +951,7 @@ function FoundVideoCard({
                 href={video.sourcePage}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Ouvrir la page de la vidéo sur Pexels"
+                aria-label={`Ouvrir la page de la vidéo sur ${VIDEO_PROVIDER_UI[video.provider]?.label ?? "sa banque"}`}
                 className="ml-auto inline-flex shrink-0 items-center rounded p-0.5 hover:bg-muted hover:text-foreground"
               >
                 <ExternalLink className="h-3 w-3" />

@@ -269,7 +269,7 @@ export async function readEngineUsage(engineId: TranslationEngineId): Promise<{ 
   return translation.readEngineUsage(engineId);
 }
 
-// ─── Consommation des IA (écran `/admin/ai`) ─────────────────────
+// ─── Consommation des IA (écran `/admin/services`) ─────────────────────
 
 /** Réservé aux administrateurs (absent de `functions`), déclaré dans `aiUsage.limits`. */
 export async function getAiLimits(): Promise<AiModuleReport> {

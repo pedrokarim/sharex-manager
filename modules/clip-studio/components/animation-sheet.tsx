@@ -316,7 +316,7 @@ function SheetBody({ entry, favorite, onToggleFavorite, onPrevious, onNext, posi
           {favorite ? "Dans les favoris" : "Ajouter aux favoris"}
         </Button>
         <Button asChild variant="ghost" size="sm" className="gap-1.5">
-          <Link href="/m/clip-studio">
+          <Link href="/m/clip-studio/projects">
             <FolderOpen className="size-3.5" />
             Mes projets
           </Link>

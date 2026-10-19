@@ -153,7 +153,7 @@ export function LimitRow({
           getValueLabel={() => formatUsedOf(limit.used, limit.limit, limit.unit)}
           className={cn("h-2 bg-muted", BAR_TONE[state])}
         />
-        <span className={cn("min-w-0 text-xs text-muted-foreground tabular-nums", remaining === 0 && "font-medium text-destructive")}>
+        <span className={cn("min-w-0 text-xs text-muted-foreground tabular-nums", remaining === 0 && "font-medium text-red-700 dark:text-red-400")}>
           {remaining === 0 ? "Plus rien de disponible" : formatRemaining(remaining, limit.unit)}
         </span>
       </div>
@@ -175,7 +175,7 @@ export function LimitRow({
       </div>
 
       {state === "blocked" && limit.blockedUntil ? (
-        <p role="alert" className={cn("flex min-w-0 items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive", !stacked && "md:col-span-3")} suppressHydrationWarning>
+        <p role="alert" className={cn("flex min-w-0 items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-red-700 dark:text-red-400", !stacked && "md:col-span-3")} suppressHydrationWarning>
           <Ban className="mt-px size-3.5 shrink-0" aria-hidden />
           <span className="min-w-0 text-pretty [overflow-wrap:anywhere]" suppressHydrationWarning>
             {provider ? `${provider.label} refuse` : "Le service refuse"} les appels, quota épuisé, jusqu’au {formatDateTime(limit.blockedUntil)} ({formatRelative(limit.blockedUntil)}).

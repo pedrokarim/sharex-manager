@@ -520,7 +520,7 @@ async function runSubtitle(job: ClipJob, signal: AbortSignal) {
       theme,
       hook: job.request.hook,
     });
-    writeProject(project);
+    writeProject({ ...project, origin: "subtitle" });
     job.projectId = project.id;
     job.status = "done";
     job.finishedAt = Date.now();
@@ -650,7 +650,7 @@ async function runCuts(job: ClipJob, moments: ClipMoment[], signal: AbortSignal)
         theme,
         hook: moment.title,
       });
-      writeProject(project);
+      writeProject({ ...project, origin: "clipping" });
       job.clips.push({ projectId: project.id, name: moment.title, durationMs: asset.durationMs ?? moment.endMs - moment.startMs, momentId: moment.id });
       save(job);
     }

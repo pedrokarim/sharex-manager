@@ -1,15 +1,15 @@
 /**
- * Assistant IA : « fais-moi un short sur les animaux », en forme libre ou
+ * Assistant IA : « fais-moi un short sur les animaux », en forme libre ou
  * selon un modèle (quiz, classement, diaporama).
  *
- * Étapes suivies par l'interface :
- * 1. script : Codex CLI écrit le contenu, en JSON, selon le modèle choisi,
- *    avec la date du jour ; quand la demande porte sur des faits réels et que
- *    le web est permis, il vérifie en écrivant (`lib/fact-check.ts`) ;
- * 1 bis. vérification des faits : une seconde passe de Codex relit le script
+ * Étapes suivies par l'interface :
+ * 1. script : Codex CLI écrit le contenu, en JSON, selon le modèle choisi,
+ *    avec la date du jour ; quand la demande porte sur des faits réels et que
+ *    le web est permis, il vérifie en écrivant (`lib/fact-check.ts`) ;
+ * 1 bis. vérification des faits : une seconde passe de Codex relit le script
  *    comme une donnée, corrige, remplace ou retire ce qui est faux et range
  *    ses sources dans le projet. Si elle échoue, le clip continue et le suivi
- *    le dit ;
+ *    le dit ;
  * 2. illustrations : une image par segment. Selon le mode, le segment qui
  *    parle d'un sujet réel la cherche d'abord (Openverse, puis le web par
  *    Codex si la demande l'autorise, `lib/image-search.ts`) ; ce qui ne se
@@ -17,14 +17,16 @@
  *    apparaissent aussi dans son fil). Avec le web, un sujet nommé (jeu,
  *    film, appli, marque…) reçoit aussi son icône ou son logo officiel,
  *    reconnu par Codex, posé à côté de son nom ;
- * 3. narration : chaque segment est lu par une voix de synthèse (Piper) ;
- * 4. montage : le modèle transforme le tout en projet, prêt à retoucher, en
+ * 3. narration : chaque segment est lu par une voix de synthèse (Piper) ;
+ * 4. montage : le modèle transforme le tout en projet, prêt à retoucher, en
  *    allongeant chaque segment pour laisser le temps à la voix.
  *
- * En vidéo (dossier 01 vidéo, V4) : avec une clé Pexels, le script dit pour
- * chaque segment s'il vaut mieux une image ou une vidéo ; une vidéo trouvée
- * est posée muette et coupée en plans (`lib/video-search.ts`). Avec une vidéo
- * source (« Monter par-dessus une vidéo »), elle est d'abord transcrite ; le
+ * En vidéo (dossier 01 vidéo, V4) : le script dit pour
+ * chaque segment s'il vaut mieux une image ou une vidéo ; une vidéo trouvée
+ * est posée muette et coupée en plans. Les vidéos viennent de Pixabay ou de
+ * Pexels (avec leur clé), sinon de Wikimedia Commons, toujours disponible
+ * (`lib/video-providers.ts`). Avec une vidéo
+ * source (« Monter par-dessus une vidéo »), elle est d'abord transcrite ; le
  * script s'appuie sur la transcription et place des extraits, cités (avec
  * leur son, la voix off attend) ou muets sous la voix off.
  *
@@ -69,6 +71,7 @@ import {
 import { findSegmentIcon, findSegmentImage, type FoundForSegment } from "./image-search";
 import { FOUND_LIMITS, IMAGE_SOURCE_MODES, type ImageSourceMode, type SegmentImageSource } from "./image-search-types";
 import { MOODS, pickTrack } from "./music";
+import { AUTO_SEGMENTS, SEGMENT_WORDS, FRAME_WORDS, cleanCount, segmentCap, suggestedSegments } from "./segment-count";
 import { SPEAKING_RATE_WPM, cleanScriptText, frenchTypography, pickBestHook, scriptRuleLines, spokenSeconds, type ScriptHook } from "./script-rules";
 import { DEFAULT_VOICE, VOICES, isKnownVoice, synthesize, type SpeakInput, type SpeechResult } from "./tts";
 import { parseCloudVoice, providerLabel } from "./cloud-tts";
@@ -83,8 +86,8 @@ import {
   type VoiceSettings,
 } from "./voice-settings";
 import { ASSETS_DIR, DATA_DIR, ensureDirs, readAssets, writeAssets, writeProject } from "./store";
-import { findSegmentVideo, importedVideoToSource } from "./video-search";
-import { pexelsApiKey } from "./video-sources";
+import { importedVideoToSource, type VideoProviderId } from "./video-search";
+import { VIDEO_PROVIDERS, VIDEO_PROVIDER_LABELS, findStockSegmentVideo } from "./video-providers";
 import { cancelTranscriptionJob, getTranscriptionJob, resolveMedia, startTranscriptionJob } from "./transcription-jobs";
 
 /** L'assistant écrit et illustre lui-même : l'Avant / Après, fait d'images fournies, n'en fait pas partie. */
@@ -96,7 +99,12 @@ export interface AssistantRequest {
   brief: string;
   template: AssistantTemplate;
   aspect: AspectPreset;
-  count: number;
+  /**
+   * Nombre de segments (questions, éléments, séquences, diapositives), de 2
+   * à 10. Absent (ou « auto ») : le script le choisit selon le sujet et la
+   * durée visée, dans `AUTO_SEGMENTS`.
+   */
+  count?: number;
   /**
    * Ancien réglage, gardé pour les appels d'avant l'étape 9 : sans
    * `imageSource`, `true` vaut « generate » et `false` vaut « none ».
@@ -127,8 +135,8 @@ export interface AssistantRequest {
   /** Image de marque dont le clip prend le ton, le style et l'habillage. */
   brandKitId?: string;
   /**
-   * Le script peut demander une vidéo plutôt qu'une image (Pexels) : seulement
-   * quand on cherche les illustrations, et que la clé Pexels est enregistrée.
+   * Le script peut demander une vidéo plutôt qu'une image (Pixabay, Pexels ou
+   * Wikimedia Commons) : seulement quand on cherche les illustrations.
    */
   videos?: boolean;
   /** « Monter par-dessus une vidéo » : une vidéo des médias du module, transcrite puis citée par extraits. */
@@ -264,6 +272,35 @@ function imagesStepLabel(mode: ImageSourceMode): string {
   return "Création des illustrations";
 }
 
+/**
+ * Consigne du nombre de segments quand le script le choisit : bornes, place
+ * d'un segment dans la voix, et le nombre qui remplit la durée visée.
+ */
+export function autoCountLines(request: Pick<AssistantRequest, "template" | "aspect" | "targetSeconds">): string[] {
+  const seconds = cleanTargetSeconds(request.targetSeconds, request.template, request.aspect);
+  const words = Math.floor((seconds * SPEAKING_RATE_WPM) / 60);
+  const unit = SEGMENT_UNITS[request.template];
+  const bounds = AUTO_SEGMENTS[request.template];
+  const perSegment = SEGMENT_WORDS[request.template];
+  const suggested = suggestedSegments(request.template, seconds);
+  return [
+    `Nombre de ${unit.many} : choisis-le toi-même, de ${bounds.min} à ${bounds.max}, d'après le sujet et la durée visée. C'est toi qui découpes : le sujet décide, pas un chiffre imposé.`,
+    `Repère : ${unit.feminine ? "une" : "un"} ${unit.one} se lit en ${perSegment} mots environ (${Math.round((perSegment * 60) / SPEAKING_RATE_WPM)} s), le titre et la conclusion en ${FRAME_WORDS} mots ; ${seconds} s de voix font ${words} mots, soit ${suggested} ${suggested > 1 ? unit.many : unit.one} environ.`,
+    `Prends-en moins quand le sujet n'a que peu d'éléments solides ou qu'un élément demande plus de place, davantage quand ils sont courts ; ne délaye jamais un élément pour remplir et ne tasse jamais le texte pour en ajouter un. Quand la demande annonce un nombre (« 5 jeux », « trois astuces »), tiens-le.`,
+  ];
+}
+
+/** Bilan de l'écriture : quand le script a choisi son découpage, il le dit. */
+export function scriptDoneDetail(request: Pick<AssistantRequest, "template" | "count">, script: Pick<CleanScript, "title" | "spokenSeconds" | "segmentTexts">): string {
+  const voice = `environ ${script.spokenSeconds} s de voix`;
+  const title = `« ${script.title} »`;
+  if (request.count !== undefined) return `${title}, ${voice}`;
+  const count = script.segmentTexts.length;
+  const unit = SEGMENT_UNITS[request.template as AssistantTemplate];
+  const chosen = `choisi${unit.feminine ? "e" : ""}${count > 1 ? "s" : ""}`;
+  return `${title}, ${count} ${count > 1 ? unit.many : unit.one} ${chosen} par le script, ${voice}`;
+}
+
 /** Demande nettoyée et bornée, telle qu'elle est rangée avec le travail. */
 export function cleanRequest(request: AssistantRequest): AssistantRequest {
   const imageSource = resolveImageSource(request);
@@ -273,7 +310,7 @@ export function cleanRequest(request: AssistantRequest): AssistantRequest {
     brief: String(request.brief ?? "").trim().slice(0, 600),
     template,
     aspect,
-    count: Math.min(10, Math.max(2, Math.round(Number(request.count) || 5))),
+    ...(cleanCount(request.count) !== undefined ? { count: cleanCount(request.count) } : {}),
     images: imageSource !== "none",
     imageSource,
     // Le web n'est jamais fouillé sans un geste explicite. Il sert au script et à sa
@@ -314,8 +351,7 @@ export function startAssistant(request: AssistantRequest): AssistantJob {
   const clean = cleanRequest(request);
   if (clean.brief.length < 3) throw new Error("Décrivez le short à créer.");
   const imageSource = resolveImageSource(clean);
-  // Sans clé Pexels, le script ne propose aucune vidéo : rien ne serait trouvé.
-  if (clean.videos && !pexelsApiKey()) delete clean.videos;
+  // Wikimedia Commons, sans clé, est toujours là : la vidéo reste proposée même sans clé Pixabay ni Pexels.
 
   const job: AssistantJob = {
     id: `asst-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
@@ -397,7 +433,7 @@ async function run(job: AssistantJob, signal: AbortSignal) {
     job.title = script.title;
     job.hook = script.hook;
     job.spokenSeconds = script.spokenSeconds;
-    step("script", "done", `« ${script.title} », environ ${script.spokenSeconds} s de voix`);
+    step("script", "done", scriptDoneDetail(job.request, script));
 
     // 1 bis. Vérification des faits : le script corrigé repart dans la suite normale.
     let facts: FactCheckOutcome | null = null;
@@ -429,15 +465,16 @@ async function run(job: AssistantJob, signal: AbortSignal) {
             // Une vidéo d'abord quand le script la demande ; introuvable, une image du même sujet.
             if (plan.video) {
               try {
-                const found = await findSegmentVideo({ query: plan.query ?? "", aspect: job.request.aspect, minSeconds: spokenSeconds(plan.text) + 1, signal: findSignal });
+                // Pixabay, puis Pexels (avec leur clé), puis Wikimedia Commons.
+                const found = await findStockSegmentVideo({ query: plan.query ?? "", aspect: job.request.aspect, minSeconds: spokenSeconds(plan.text) + 1, signal: findSignal });
                 if (found) {
                   const video = importedVideoToSource(found.video);
                   if (found.alternates.length) alternates.set(video.ref, found.alternates.map(importedVideoToSource));
-                  return { provider: "pexels", source: video };
+                  return { provider: found.provider, source: video };
                 }
               } catch (error) {
                 if (findSignal.aborted) throw error;
-                videoError ??= cut((error as Error)?.message, 200) || "Pexels ne répond pas";
+                videoError ??= cut((error as Error)?.message, 200) || "les banques de vidéos ne répondent pas";
               }
             }
             const found = await findSegmentImage({ query: plan.query ?? "", text: plan.text, webSearch, webFirst: plan.webFirst, signal: findSignal });
@@ -450,7 +487,7 @@ async function run(job: AssistantJob, signal: AbortSignal) {
           return found ? foundToSource(found) : null;
         }),
       ]);
-      const summary = imagesSummary(job) + (videoError ? `. Vidéos Pexels indisponibles : ${videoError}` : "");
+      const summary = imagesSummary(job) + (videoError ? `. Vidéos indisponibles : ${videoError}` : "");
       step("images", job.images.done > 0 || (job.icons?.found ?? 0) > 0 || job.images.total === 0 ? "done" : "error", summary);
     }
 
@@ -491,7 +528,7 @@ async function run(job: AssistantJob, signal: AbortSignal) {
       }
     }
     // La demande, le script et ses sources suivent le projet : l'assistant de publication les relit pour rédiger les textes.
-    project = { ...project, brief: projectBrief(job.request, script, facts) };
+    project = { ...project, brief: projectBrief(job.request, script, facts), origin: "assistant" };
     writeProject(project);
     job.projectId = project.id;
     job.status = "done";
@@ -522,7 +559,7 @@ interface RawImage {
   official?: unknown;
   /** Icône ou logo officiel du sujet nommé, en plus de l'illustration. */
   icon?: unknown;
-  /** « video » : un plan filmé (Pexels) plutôt qu'une image ; proposé seulement avec une clé Pexels. */
+  /** « video » : un plan filmé (Pixabay, Pexels ou Wikimedia Commons) plutôt qu'une image. */
   kind?: unknown;
 }
 
@@ -572,7 +609,7 @@ function imageField(request: AssistantRequest): string {
     : `"image": {${kind}"mode": "find" | "generate", "query": string, "prompt": string}`;
 }
 
-/** Le script peut demander une vidéo : demande qui le permet (`videos`, posé seulement avec une clé Pexels) et recherche d'illustrations. */
+/** Le script peut demander une vidéo : demande qui le permet (`videos`) et recherche d'illustrations. */
 const offersVideos = (request: AssistantRequest) => request.videos === true && finds(resolveImageSource(request));
 
 /** Consigne des illustrations. En recherche, le script dit segment par segment s'il faut trouver ou générer. */
@@ -601,7 +638,7 @@ function imageGuide(request: AssistantRequest, quiz = false): string[] {
     ...(quiz ? ["L'image ne doit pas révéler la réponse : query et prompt montrent le sujet de la question, jamais la bonne réponse."] : []),
     ...(offersVideos(request)
       ? [
-          `- kind : "video" quand un plan filmé sert mieux le segment qu'une image fixe : une action, un geste, la nature, une ville, une foule, un processus, un mouvement (l'eau qui coule, un plat qu'on prépare, un sport). Les vidéos viennent d'une banque de vidéos libres (Pexels), posées sans leur son : query est alors une requête de 2 à 5 mots-clés en anglais qui décrit ce qu'on voit à l'image (par exemple "waves crashing on beach", "chef chopping vegetables"), jamais un nom propre précis. "image" pour un sujet précis qu'une banque de vidéos n'a pas : une personne nommée, un produit, une œuvre, une carte, un logo, un jeu, un film. ${
+          `- kind : "video" quand un plan filmé sert mieux le segment qu'une image fixe : une action, un geste, la nature, une ville, une foule, un processus, un mouvement (l'eau qui coule, un plat qu'on prépare, un sport). Les vidéos viennent de banques de vidéos libres (Pixabay, Pexels, Wikimedia Commons), posées sans leur son : query est alors une requête de 2 à 5 mots-clés en anglais qui décrit ce qu'on voit à l'image (par exemple "waves crashing on beach", "chef chopping vegetables"), jamais un nom propre précis. "image" pour un sujet précis qu'une banque de vidéos n'a pas : une personne nommée, un produit, une œuvre, une carte, un logo, un jeu, un film. ${
             source === "find" ? "" : "Une vidéo introuvable est remplacée par une image du même sujet, cherchée puis générée : prompt reste obligatoire. "
           }Alterne : pas que des vidéos, pas que des images.`,
         ]
@@ -676,11 +713,13 @@ export function scriptPrompt(
     ...(request.targetSeconds ? [durationLine(request.targetSeconds)] : []),
     ...(brand ? brandLines(brand, finds(resolveImageSource(request))) : []),
     ...(options.source ? sourceLines(options.source, request.template === "quiz") : []),
+    ...(request.count === undefined ? autoCountLines(request) : []),
   ];
+  const fixed = request.count;
   if (request.template === "quiz") {
     return [
       ...common,
-      `Format : un quiz de ${request.count} questions.`,
+      fixed !== undefined ? `Format : un quiz de ${fixed} questions.` : "Format : un quiz, du nombre de questions que tu as choisi.",
       `Schéma : {"title": string, "subtitle": string, "questions": [${segment}], "outro": string}`,
       "Contraintes : title accrocheur de 40 caractères au plus ; question de 80 caractères au plus ; 3 choix de 26 caractères au plus ; answer est l'index (0, 1 ou 2) de la bonne réponse, à varier d'une question à l'autre ; explanation de 70 caractères au plus, qui apprend quelque chose ; outro de 40 caractères au plus.",
       "Les questions doivent être exactes, vérifiables et de difficulté croissante.",
@@ -690,7 +729,7 @@ export function scriptPrompt(
   if (request.template === "free") {
     return [
       ...common,
-      `Format libre en ${request.count} séquences : choisis toi-même la forme qui sert le mieux la demande (histoire, explication, conseils, recette, anecdote, comparaison, tutoriel…), sans en faire un quiz ni un classement sauf si la demande le réclame.`,
+      `Format libre en ${fixed !== undefined ? `${fixed} séquences` : "autant de séquences que tu en as choisi"} : choisis toi-même la forme qui sert le mieux la demande (histoire, explication, conseils, recette, anecdote, comparaison, tutoriel…), sans en faire un quiz ni un classement sauf si la demande le réclame.`,
       `Schéma : {"title": string, "subtitle": string, "scenes": [${segment}], "outro": string}`,
       "Contraintes : title de 45 caractères au plus ; subtitle facultatif de 70 caractères au plus ; heading facultatif de 32 caractères au plus ; text de 110 caractères au plus, écrit pour être lu à voix haute ; chaque séquence porte au moins un heading ou un text ; outro facultatif de 40 caractères au plus.",
       "Les séquences s'enchaînent : la première accroche, la dernière conclut.",
@@ -700,15 +739,17 @@ export function scriptPrompt(
   if (request.template === "top") {
     return [
       ...common,
-      `Format : un classement de ${request.count} éléments, présenté du numéro ${request.count} au numéro 1.`,
+      fixed !== undefined
+        ? `Format : un classement de ${fixed} éléments, présenté du numéro ${fixed} au numéro 1.`
+        : "Format : un classement du nombre d'éléments que tu as choisi, présenté du dernier au numéro 1.",
       `Schéma : {"title": string, "entries": [${segment}], "outro": string}`,
-      `Contraintes : entries dans l'ordre d'apparition, le premier est le numéro ${request.count} et le dernier le numéro 1 ; title de 45 caractères au plus ; chaque title d'entrée de 30 caractères au plus ; detail de 50 caractères au plus, précis et vérifiable ; outro de 40 caractères au plus.`,
+      `Contraintes : entries dans l'ordre d'apparition, le premier est le numéro ${fixed !== undefined ? fixed : "le plus grand"} et le dernier le numéro 1 ; title de 45 caractères au plus ; chaque title d'entrée de 30 caractères au plus ; detail de 50 caractères au plus, précis et vérifiable ; outro de 40 caractères au plus.`,
       ...imageGuide(request),
     ].join("\n");
   }
   return [
     ...common,
-    `Format : un diaporama narratif de ${request.count} diapositives.`,
+    fixed !== undefined ? `Format : un diaporama narratif de ${fixed} diapositives.` : "Format : un diaporama narratif, du nombre de diapositives que tu as choisi.",
     `Schéma : {"title": string, "slides": [${segment}], "outro": string}`,
     "Contraintes : title de 40 caractères au plus ; caption de 70 caractères au plus ; outro de 40 caractères au plus.",
     ...imageGuide(request),
@@ -793,7 +834,7 @@ export interface ScriptImage {
   official?: boolean;
   /** Requête de l'icône ou du logo officiel du sujet nommé, en plus de l'illustration. */
   iconQuery?: string;
-  /** « video » : chercher d'abord un plan filmé (Pexels) avec `query`. */
+  /** « video » : chercher d'abord un plan filmé (banques de vidéos libres) avec `query`. */
   kind?: "video";
 }
 
@@ -917,7 +958,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
         };
       })
       .filter((question) => question.question && question.choices.length >= 2)
-      .slice(0, request.count);
+      .slice(0, segmentCap(request));
     if (questions.length === 0) throw new Error("Le script reçu ne contient aucune question exploitable.");
     return {
       title,
@@ -938,7 +979,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
         ...directionFields(scene),
       }))
       .filter((scene) => scene.heading || scene.text)
-      .slice(0, request.count);
+      .slice(0, segmentCap(request));
     if (scenes.length === 0) throw new Error("Le script reçu ne contient aucune séquence exploitable.");
     return {
       title,
@@ -959,7 +1000,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
         ...directionFields(entry),
       }))
       .filter((entry) => entry.title)
-      .slice(0, request.count);
+      .slice(0, segmentCap(request));
     if (entries.length === 0) throw new Error("Le script reçu ne contient aucun élément exploitable.");
     return {
       title,
@@ -972,7 +1013,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
   }
   const slides = (raw.slides ?? [])
     .map((slide) => ({ caption: line(slide.caption, 110) || undefined, ...imageFields(slide), ...directionFields(slide) }))
-    .slice(0, request.count);
+    .slice(0, segmentCap(request));
   if (slides.length === 0) throw new Error("Le script reçu ne contient aucune diapositive.");
   return {
     title,
@@ -1240,7 +1281,7 @@ export interface SegmentPlan {
   webFirst?: boolean;
   /** Icône ou logo officiel à chercher en plus de l'illustration, seulement quand le web est permis. */
   iconQuery?: string;
-  /** Chercher d'abord une vidéo (Pexels) avec `query`, puis une image. */
+  /** Chercher d'abord une vidéo (banques de vidéos libres) avec `query`, puis une image. */
   video?: boolean;
   /** Un extrait muet de la vidéo source couvre tout le segment : aucune illustration à chercher. */
   covered?: boolean;
@@ -1286,7 +1327,7 @@ export function segmentPlans(
 /** Accès extérieurs de l'étape des illustrations, remplaçables par les tests. */
 export interface IllustrationDeps {
   /** Échelle des sources d'un segment (Openverse, puis le web si permis) ; `null` si rien ne convient. */
-  find: (plan: SegmentPlan, signal: AbortSignal) => Promise<{ source: MediaSource; provider: "openverse" | "web" | "pexels" } | null>;
+  find: (plan: SegmentPlan, signal: AbortSignal) => Promise<{ source: MediaSource; provider: "openverse" | "web" | VideoProviderId } | null>;
   /** Génère une image par entrée ; `onResult` est appelé une fois par entrée, avec ou sans image. */
   generate: (
     entries: { prompt: string; mascot: boolean }[],
@@ -1442,12 +1483,16 @@ function foundWhere(job: ImagesTracking): string {
   const sources = job.imageSources ?? [];
   const web = sources.filter((source) => source === "web").length;
   const openverse = sources.filter((source) => source === "openverse").length;
-  const pexels = sources.filter((source) => source === "pexels").length;
-  const parts = [web ? `${web} sur le web` : "", openverse ? `${openverse} sur Openverse` : "", pexels ? `${plural(pexels, "vidéo")} Pexels` : ""].filter(Boolean);
+  const videos = VIDEO_PROVIDERS.map((provider) => ({ provider, count: sources.filter((source) => source === provider).length })).filter((entry) => entry.count > 0);
+  const parts = [
+    web ? `${web} sur le web` : "",
+    openverse ? `${openverse} sur Openverse` : "",
+    ...videos.map((entry) => `${plural(entry.count, "vidéo")} ${VIDEO_PROVIDER_LABELS[entry.provider]}`),
+  ].filter(Boolean);
   if (parts.length > 1) return ` (${parts.join(", ")})`;
   if (web) return " sur le web";
   if (openverse) return " sur Openverse";
-  if (pexels) return " en vidéo, sur Pexels";
+  if (videos.length === 1) return ` en vidéo, sur ${VIDEO_PROVIDER_LABELS[videos[0].provider]}`;
   return "";
 }
 

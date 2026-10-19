@@ -3,35 +3,53 @@
 /**
  * Exports de Clip Studio (dossier 01 ter, § 2 et § 3.2).
  *
- * - `/m/clip-studio/exports` : tous les exports, filtrés par projet, par
- *   état de publication et par marque ; chaque carte ouvre la fiche.
+ * - `/m/clip-studio/exports` : tous les exports, en tableau ou en grille,
+ *   paginés par 24 : recherche, format, projet, marque, période et, pour
+ *   les administrateurs, service et état de publication ; tout vit dans
+ *   l'adresse. Chaque ligne ouvre la fiche.
  * - `/m/clip-studio/exports?id=<id>` : la fiche d'un export. Lecteur et
  *   caractéristiques, projet d'origine, couverture, textes de publication
  *   (texte commun et variantes par service), crédits figés au rendu,
- *   publications retrouvées dans la file par la source, et les actions.
+ *   publications (une ligne par compte, avec lien et statistiques), envois
+ *   retrouvés dans la file par la source, et les actions.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
   ArrowRight,
+  CalendarClock,
   Check,
+  CircleAlert,
+  CircleCheck,
+  CircleDashed,
+  CircleSlash,
   Clapperboard,
   Copy,
   CopyX,
   Download,
+  ExternalLink,
+  Eye,
   FileVideo,
   History,
+  ImageUp,
+  LayoutGrid,
+  List,
+  MessageSquare,
   MoreHorizontal,
   RefreshCw,
+  RotateCcw,
+  Search,
   Send,
   Sparkles,
+  ThumbsUp,
   Trash2,
   Undo2,
   Wand2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -45,22 +63,28 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { ActionStatus, FormStatus, errorMessage, useFeedback } from "@/components/feedback";
+import { ActionStatus, FormStatus, errorMessage, useFeedback, type FeedbackState } from "@/components/feedback";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { formatBytes } from "@/components/connections/shared";
+import { Panel, PanelBody, PanelFooter, PanelHeader, PanelRows } from "@/components/connections/panel";
+import { ServiceLogo, formatBytes } from "@/components/connections/shared";
 import { formatSchedule } from "@/components/connections/date-time-picker";
+import { retryJobAction } from "@/app/(app)/admin/connections/actions";
 import { useSession } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 import type { PublishJobSummary } from "@/lib/connections/types";
 import type { ClipExport } from "../engine/types";
 import {
@@ -69,18 +93,45 @@ import {
   draftPostTexts,
   exportUrl,
   getExport,
+  getExportPublications,
   listExportPublications,
+  searchExports,
+  sendExportToGallery,
   updateExportPost,
   useBrandKits,
+  type ExportPage,
+  type ExportPublicationDetails,
+  type PublicationAccount,
 } from "../lib/client";
 import { creditsText, emptyPost, mergeDraft, samePost, setPostField } from "../lib/export-screens";
 import type { ExportDetails, ExportPost, PostTextField } from "../lib/post-types";
-import { ExportCard, exportHref, publicationSummary, publishHref } from "../components/export-card";
+import {
+  ASPECT_LABELS,
+  ASPECT_PRESETS,
+  EXPORT_SORTS,
+  EXPORT_SORT_LABELS,
+  EXPORT_STATUSES,
+  EXPORT_STATUS_LABELS,
+  PERIODS,
+  PERIOD_LABELS,
+  exportQueryString,
+  exportTitle,
+  hasExportFilters,
+  parseExportQuery,
+  updateExportQuery,
+  type ChannelState,
+  type ExportPublications,
+  type ExportQuery,
+  type LibraryView,
+  type PublicationRow,
+} from "../lib/library";
+import { exportHref, publishHref } from "../components/export-card";
 import { ExportCover } from "../components/export-cover";
 import { SendToGalleryButton } from "../components/gallery-button";
 import { PostTextsEditor } from "../components/post-texts-editor";
 import { JobTimeline, MOVING, formatDuration, jobsPending, serviceTargets, type PublishTargets } from "../components/publish-shared";
 import { ScreenHeader } from "../components/screen-header";
+import { AspectChip, ChannelLogos, ExportPoster, FiltersBar, Pager, SortButton, formatClock, formatCount, formatRelative, formatShortDate, type ConnectorBadge } from "../components/library-ui";
 
 export default function ExportsPage() {
   const params = useSearchParams();
@@ -110,191 +161,658 @@ function usePublishTargets(): PublishTargets | null | undefined {
 
 // ─── Liste ───────────────────────────────────────────────────────
 
-type PublishedFilter = "all" | "published" | "unpublished";
+const BASE = "/m/clip-studio/exports";
+const VIEW_KEY = "clip-studio.exports.view";
+const ALL = "__all";
 
-/** Publications de chaque export, lues quatre à la fois. */
-async function loadPublications(exports: ClipExport[]): Promise<Record<string, PublishJobSummary[]>> {
-  const out: Record<string, PublishJobSummary[]> = {};
-  const queue = [...exports];
-  await Promise.all(
-    Array.from({ length: Math.min(4, queue.length) }, async () => {
-      for (let entry = queue.shift(); entry; entry = queue.shift()) {
-        out[entry.id] = await listExportPublications(entry.id).catch(() => []);
-      }
-    })
-  );
-  return out;
+/** Pages déjà vues, par adresse : le retour à la liste est instantané. */
+const pages = new Map<string, ExportPage>();
+
+function readStoredView(): LibraryView | null {
+  try {
+    const value = window.localStorage.getItem(VIEW_KEY);
+    return value === "list" || value === "grid" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeView(view: LibraryView) {
+  try {
+    window.localStorage.setItem(VIEW_KEY, view);
+  } catch {
+    // Stockage refusé : la vue reste dans l'adresse.
+  }
+}
+
+/** De quoi afficher les publications : services et comptes. */
+interface PublicationContext {
+  connectors: ConnectorBadge[];
+  accounts: PublicationAccount[];
 }
 
 function ExportsList() {
-  const isAdmin = useIsAdmin();
+  const { data: session, isPending: sessionPending } = useSession();
+  const isAdmin = session?.user?.role === "admin";
   const kits = useBrandKits();
   const targets = usePublishTargets();
-  const [exports, setExports] = useState<ClipExport[] | null>(null);
-  const [publications, setPublications] = useState<Record<string, PublishJobSummary[]> | null>(null);
-  const [project, setProject] = useState("all");
-  const [brand, setBrand] = useState("all");
-  const [published, setPublished] = useState<PublishedFilter>("all");
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const query = useMemo(() => parseExportQuery(new URLSearchParams(params.toString())), [params]);
+  const urlView: LibraryView | null = params.get("view") === "grid" ? "grid" : params.get("view") === "list" ? "list" : null;
+  const [storedView, setStoredView] = useState<LibraryView | null>(null);
+  useEffect(() => setStoredView(readStoredView()), []);
+  const view: LibraryView = urlView ?? storedView ?? "list";
+  const key = `${isAdmin ? "a" : "u"}${exportQueryString(query)}`;
 
-  const refresh = useCallback(async () => {
-    const next = await callModule<ClipExport[]>("listExports").catch(() => [] as ClipExport[]);
-    setExports(next);
-    return next;
-  }, []);
+  const [data, setData] = useState<ExportPage | null>(() => pages.get(key) ?? null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const navigate = useCallback(
+    (next: ExportQuery, nextView: LibraryView = view) => router.replace(`${pathname}${exportQueryString(next, nextView)}`, { scroll: false }),
+    [router, pathname, view]
+  );
+  const patch = useCallback((change: Partial<ExportQuery>) => navigate(updateExportQuery(query, change)), [navigate, query]);
 
-  useEffect(() => {
-    if (!isAdmin || !exports) return;
-    let alive = true;
-    void loadPublications(exports).then((next) => alive && setPublications(next));
-    return () => {
-      alive = false;
-    };
-  }, [isAdmin, exports]);
-
-  const projects = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const entry of exports ?? []) if (!map.has(entry.projectId)) map.set(entry.projectId, entry.projectName);
-    return [...map].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "fr"));
-  }, [exports]);
-  const brands = useMemo(() => (kits ?? []).filter((kit) => (exports ?? []).some((entry) => entry.brandKitId === kit.id)), [kits, exports]);
-
-  const shown = (exports ?? []).filter((entry) => {
-    if (project !== "all" && entry.projectId !== project) return false;
-    if (brand !== "all" && (brand === "none" ? Boolean(entry.brandKitId) : entry.brandKitId !== brand)) return false;
-    if (published !== "all" && publications) {
-      const done = publicationSummary(publications[entry.id]).published.length > 0;
-      if (published === "published" ? !done : done) return false;
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const next = await searchExports(query, isAdmin);
+      pages.set(key, next);
+      setData(next);
+      setLoadError(null);
+      if (next.page !== query.page) navigate({ ...query, page: next.page });
+    } catch (error) {
+      setLoadError(errorMessage(error, "Les exports n’ont pas pu être chargés."));
+    } finally {
+      setLoading(false);
     }
-    return true;
-  });
-  const filtered = project !== "all" || brand !== "all" || published !== "all";
+  }, [query, key, isAdmin, navigate]);
+
+  useEffect(() => {
+    // Le rôle décide des publications : on attend la session plutôt que de lire deux fois.
+    if (sessionPending) return;
+    const cached = pages.get(key);
+    if (cached) setData(cached);
+    void load();
+    // Une lecture par adresse (et par rôle).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, sessionPending]);
+
+  const [search, setSearch] = useState(query.q);
+  useEffect(() => setSearch(query.q), [query.q]);
+  useEffect(() => {
+    if (search.trim() === query.q) return;
+    const timer = setTimeout(() => patch({ q: search.trim() }), 300);
+    return () => clearTimeout(timer);
+  }, [search, query.q, patch]);
+
+  const setView = (next: LibraryView) => {
+    storeView(next);
+    setStoredView(next);
+    navigate(query, next);
+  };
+
+  const rowFeedback = useFeedback();
+  const [rowTarget, setRowTarget] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<ClipExport | null>(null);
+  const afterChange = () => {
+    pages.clear();
+    void load();
+  };
+  const sendToGallery = async (entry: ClipExport) => {
+    setRowTarget(entry.id);
+    rowFeedback.clear();
+    try {
+      await sendExportToGallery(entry.id);
+      rowFeedback.success("Ajouté à la galerie.");
+      afterChange();
+    } catch (error) {
+      rowFeedback.error(errorMessage(error, "L’envoi dans la galerie a échoué."));
+    }
+  };
+
+  const items = data?.items ?? [];
+  const facets = data?.facets;
+  const filtered = hasExportFilters(query);
+  const clearFilters = () => {
+    setSearch("");
+    navigate({ ...query, q: "", aspect: "", brand: "", project: "", channel: "", status: "", period: "", page: 1 });
+  };
+  const connectorList: ConnectorBadge[] = useMemo(() => {
+    const known = new Map<string, ConnectorBadge>();
+    for (const connector of targets?.connectors ?? []) known.set(connector.id, { id: connector.id, label: connector.label, logo: connector.logo });
+    for (const id of facets?.channels ?? []) if (!known.has(id)) known.set(id, { id, label: id, logo: id });
+    return [...known.values()];
+  }, [targets, facets]);
+  const context: PublicationContext = {
+    connectors: connectorList,
+    accounts: (targets?.accounts ?? []).map((account) => ({ id: account.id, connector: account.connector, connectorLabel: account.connectorLabel, logo: account.logo, displayName: account.displayName })),
+  };
+  const kitName = (id: string) => kits?.find((kit) => kit.id === id)?.name ?? "Marque introuvable";
+  const hrefFor = (page: number) => `${BASE}${exportQueryString({ ...query, page }, view)}`;
+  const toggleSort = (sort: ExportQuery["sort"]) => patch(query.sort === sort ? { sort, dir: query.dir === "asc" ? "desc" : "asc" } : { sort });
 
   return (
-    <div className="flex min-h-full shrink-0 flex-col gap-6">
+    <div className="flex min-h-full shrink-0 flex-col gap-5">
       <ScreenHeader
-        back={{ href: "/m/clip-studio", label: "Projets" }}
+        back={{ href: "/m/clip-studio", label: "Accueil de Clip Studio" }}
         icon={FileVideo}
         title="Exports"
-        description="Chaque clip rendu, avec sa couverture, ses textes de publication et l’endroit où il a été publié."
+        description={
+          data
+            ? `${data.libraryTotal.toLocaleString("fr-FR")} clip${data.libraryTotal > 1 ? "s" : ""} rendu${data.libraryTotal > 1 ? "s" : ""}, avec leur couverture, leurs textes et ${isAdmin ? "les comptes où ils sont publiés" : "leurs crédits"}.`
+            : "Chaque clip rendu, avec sa couverture, ses textes de publication et l’endroit où il a été publié."
+        }
       />
 
-      {/* Aucun export : les filtres n'ont rien à filtrer. */}
-      {exports?.length === 0 ? null : (
-        <div className="flex min-w-0 flex-wrap items-end gap-3">
-          <div className="grid min-w-0 flex-1 basis-56 gap-1.5 sm:flex-none">
-            <Label htmlFor="exports-project">Projet</Label>
-            <Select value={project} onValueChange={setProject}>
-              <SelectTrigger id="exports-project" className="w-full min-w-0 sm:w-64">
+      <div className="grid min-w-0 gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <InputGroup className="w-full min-w-0 sm:w-72">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Titre ou projet" aria-label="Chercher un export" />
+            {search ? (
+              <InputGroupAddon align="inline-end">
+                <Button variant="ghost" size="icon" className="size-6" aria-label="Effacer la recherche" onClick={() => setSearch("")}>
+                  <X className="size-3.5" />
+                </Button>
+              </InputGroupAddon>
+            ) : null}
+          </InputGroup>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+            {loading && data ? <Spinner className="size-4 text-muted-foreground" aria-label="Mise à jour" /> : null}
+            <Select value={query.sort} onValueChange={(value) => patch({ sort: value as ExportQuery["sort"] })}>
+              <SelectTrigger size="sm" className="w-auto min-w-0" aria-label="Trier par">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="max-w-[min(32rem,calc(100vw-2rem))]">
-                <SelectItem value="all">Tous les projets</SelectItem>
-                {projects.map((item) => (
-                  <SelectItem key={item.id} value={item.id} className="*:[span]:last:min-w-0">
-                    <span className="truncate" title={item.name}>
-                      {item.name}
-                    </span>
+              <SelectContent>
+                {EXPORT_SORTS.map((sort) => (
+                  <SelectItem key={sort} value={sort}>
+                    {EXPORT_SORT_LABELS[sort]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <Button variant="outline" size="sm" className="w-28" onClick={() => patch({ sort: query.sort, dir: query.dir === "asc" ? "desc" : "asc" })} aria-label="Inverser l’ordre">
+              {query.sort === "name" ? (query.dir === "asc" ? "A → Z" : "Z → A") : query.sort === "date" ? (query.dir === "desc" ? "Plus récents" : "Plus anciens") : query.dir === "desc" ? "Décroissant" : "Croissant"}
+            </Button>
+            <ToggleGroup type="single" variant="outline" size="sm" value={view} onValueChange={(value) => value && setView(value as LibraryView)} aria-label="Affichage">
+              <ToggleGroupItem value="list" aria-label="Liste" className="px-2.5">
+                <List className="size-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="grid" aria-label="Grille" className="px-2.5">
+                <LayoutGrid className="size-4" />
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
-          {brands.length > 0 ? (
-            <div className="grid min-w-0 flex-1 basis-48 gap-1.5 sm:flex-none">
-              <Label htmlFor="exports-brand">Marque</Label>
-              <Select value={brand} onValueChange={setBrand}>
-                <SelectTrigger id="exports-brand" className="w-full min-w-0 sm:w-56">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="max-w-[min(32rem,calc(100vw-2rem))]">
-                  <SelectItem value="all">Toutes les marques</SelectItem>
-                  <SelectItem value="none">Sans marque</SelectItem>
-                  {brands.map((kit) => (
-                    <SelectItem key={kit.id} value={kit.id} className="*:[span]:last:min-w-0">
-                      <span className="truncate" title={kit.name}>
-                        {kit.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
+        </div>
+        <FiltersBar activeCount={[query.status, query.channel, query.aspect, query.project, query.brand, query.period].filter(Boolean).length} onClear={filtered ? clearFilters : undefined}>
           {isAdmin ? (
-            <div className="grid min-w-0 gap-1.5">
-              <Label id="exports-published">Publication</Label>
-              <ToggleGroup type="single" variant="outline" aria-labelledby="exports-published" value={published} onValueChange={(value) => value && setPublished(value as PublishedFilter)} className="flex flex-wrap">
-                <ToggleGroupItem value="all" className="px-3">
-                  Tous
-                </ToggleGroupItem>
-                <ToggleGroupItem value="published" className="px-3" disabled={!publications}>
-                  Publiés
-                </ToggleGroupItem>
-                <ToggleGroupItem value="unpublished" className="px-3" disabled={!publications}>
-                  Non publiés
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
+            <>
+              <FilterSelect
+                label="État"
+                value={query.status}
+                onChange={(value) => patch({ status: value as ExportQuery["status"] })}
+                options={EXPORT_STATUSES.map((status) => ({ value: status, label: EXPORT_STATUS_LABELS[status] }))}
+                allLabel="Tous les états"
+              />
+              {(facets?.channels.length ?? 0) > 0 || query.channel ? (
+                <FilterSelect
+                  label="Publié sur"
+                  value={query.channel}
+                  onChange={(value) => patch({ channel: value })}
+                  options={(facets?.channels ?? []).map((id) => {
+                    const connector = connectorList.find((entry) => entry.id === id);
+                    return { value: id, label: connector?.label ?? id, logo: connector?.logo };
+                  })}
+                  allLabel="Tous les services"
+                />
+              ) : null}
+            </>
           ) : null}
-          {isAdmin && !publications && exports && exports.length > 0 ? (
-            <span className="flex items-center gap-1.5 pb-2 text-xs text-muted-foreground">
-              <Spinner className="size-3.5" aria-hidden />
-              Lecture des publications…
-            </span>
+          <FilterSelect
+            label="Format"
+            value={query.aspect}
+            onChange={(value) => patch({ aspect: value as ExportQuery["aspect"] })}
+            options={ASPECT_PRESETS.map((aspect) => ({ value: aspect, label: ASPECT_LABELS[aspect] }))}
+            allLabel="Tous les formats"
+          />
+          {(facets?.projects.length ?? 0) > 1 || query.project ? (
+            <FilterSelect
+              label="Projet"
+              value={query.project}
+              onChange={(value) => patch({ project: value })}
+              options={(facets?.projects ?? []).map((project) => ({ value: project.id, label: project.name, count: project.count }))}
+              allLabel="Tous les projets"
+            />
           ) : null}
-        </div>
-      )}
+          {(facets?.brands.length ?? 0) > 0 || query.brand ? (
+            <FilterSelect
+              label="Marque"
+              value={query.brand}
+              onChange={(value) => patch({ brand: value })}
+              options={[
+                ...(facets && facets.withoutBrand > 0 ? [{ value: "none", label: "Sans marque", count: facets.withoutBrand }] : []),
+                ...(facets?.brands ?? []).map((entry) => ({ value: entry.id, label: kitName(entry.id), count: entry.count })),
+              ]}
+              allLabel="Toutes les marques"
+            />
+          ) : null}
+          <FilterSelect
+            label="Période"
+            value={query.period}
+            onChange={(value) => patch({ period: value as ExportQuery["period"] })}
+            options={PERIODS.map((period) => ({ value: period, label: `Rendus ces ${PERIOD_LABELS[period]}` }))}
+            allLabel="Toutes les dates"
+          />
+        </FiltersBar>
+      </div>
 
-      {exports === null ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-          {Array.from({ length: 6 }, (_, index) => (
-            <Skeleton key={index} className="aspect-video rounded-lg" />
-          ))}
-        </div>
-      ) : shown.length === 0 ? (
+      {data === null ? (
+        loadError ? (
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <FileVideo />
+              </EmptyMedia>
+              <EmptyTitle>Exports indisponibles</EmptyTitle>
+              <EmptyDescription>{loadError}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button variant="outline" onClick={() => void load()}>
+                Réessayer
+              </Button>
+            </EmptyContent>
+          </Empty>
+        ) : (
+          <div className="min-w-0 overflow-hidden rounded-xl border" aria-busy>
+            {Array.from({ length: 8 }, (_, index) => (
+              <div key={index} className="flex items-center gap-4 border-b px-4 py-3 last:border-b-0">
+                <Skeleton className="aspect-video w-24 rounded-md" />
+                <div className="grid flex-1 gap-2">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+                <Skeleton className="hidden h-4 w-20 sm:block" />
+              </div>
+            ))}
+          </div>
+        )
+      ) : items.length === 0 ? (
         <Empty className="border border-dashed">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <FileVideo />
             </EmptyMedia>
-            <EmptyTitle>{filtered ? "Aucun export ne correspond" : "Aucun export"}</EmptyTitle>
-            <EmptyDescription>{filtered ? "Changez les filtres pour en voir d’autres." : "Ouvrez un projet puis « Exporter » : le clip rendu arrive ici."}</EmptyDescription>
+            <EmptyTitle>{data.libraryTotal === 0 ? "Aucun export" : "Aucun export ne correspond"}</EmptyTitle>
+            <EmptyDescription>{data.libraryTotal === 0 ? "Ouvrez un projet puis « Exporter » : le clip rendu arrive ici." : "Changez la recherche ou les filtres pour en voir d’autres."}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            {filtered ? (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setProject("all");
-                  setBrand("all");
-                  setPublished("all");
-                }}
-              >
-                Retirer les filtres
+            {data.libraryTotal === 0 ? (
+              <Button asChild variant="outline">
+                <Link href="/m/clip-studio/projects">Voir les projets</Link>
               </Button>
             ) : (
-              <Button asChild variant="outline">
-                <Link href="/m/clip-studio">Voir les projets</Link>
+              <Button variant="outline" onClick={clearFilters}>
+                Retirer les filtres
               </Button>
             )}
           </EmptyContent>
         </Empty>
-      ) : (
-        <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-4 sm:grid-cols-[repeat(3,minmax(0,1fr))] lg:grid-cols-[repeat(4,minmax(0,1fr))] xl:grid-cols-[repeat(6,minmax(0,1fr))]">
-          <AnimatePresence initial={false}>
-            {shown.map((entry) => (
+      ) : view === "grid" ? (
+        <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-x-4 gap-y-5 sm:grid-cols-[repeat(3,minmax(0,1fr))] lg:grid-cols-[repeat(4,minmax(0,1fr))] 2xl:grid-cols-[repeat(6,minmax(0,1fr))]">
+          <AnimatePresence initial={false} mode="popLayout">
+            {items.map((entry) => (
               <motion.div key={entry.id} layout initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="min-w-0">
-                <ExportCard entry={entry} jobs={publications?.[entry.id]} connectors={targets?.connectors} canPublish={isAdmin} onChanged={() => void refresh()} />
+                <ExportGridCard
+                  entry={entry}
+                  publications={data.publications?.[entry.id]}
+                  context={context}
+                  isAdmin={isAdmin}
+                  status={rowTarget === entry.id ? rowFeedback.state : null}
+                  onGallery={() => void sendToGallery(entry)}
+                  onRemove={() => setRemoving(entry)}
+                />
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
+      ) : (
+        <div className="min-w-0 overflow-hidden rounded-xl border">
+          <Table className="table-fixed">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-24 pl-4 sm:w-32">
+                  <span className="sr-only">Affiche</span>
+                </TableHead>
+                <TableHead>
+                  <SortButton label="Titre" active={query.sort === "name"} desc={query.dir === "desc"} onClick={() => toggleSort("name")} />
+                </TableHead>
+                {isAdmin ? <TableHead className="hidden w-36 md:table-cell">Publications</TableHead> : null}
+                <TableHead className="hidden w-20 lg:table-cell">Format</TableHead>
+                <TableHead className="hidden w-20 text-right sm:table-cell">
+                  <SortButton label="Durée" align="right" active={query.sort === "duration"} desc={query.dir === "desc"} onClick={() => toggleSort("duration")} />
+                </TableHead>
+                <TableHead className="hidden w-24 text-right xl:table-cell">
+                  <SortButton label="Poids" align="right" active={query.sort === "size"} desc={query.dir === "desc"} onClick={() => toggleSort("size")} />
+                </TableHead>
+                <TableHead className="hidden w-32 lg:table-cell">
+                  <SortButton label="Rendu" active={query.sort === "date"} desc={query.dir === "desc"} onClick={() => toggleSort("date")} />
+                </TableHead>
+                <TableHead className="w-12 pr-3">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <AnimatePresence initial={false}>
+                {items.map((entry) => (
+                  <ExportRow
+                    key={entry.id}
+                    entry={entry}
+                    publications={data.publications?.[entry.id]}
+                    context={context}
+                    isAdmin={isAdmin}
+                    status={rowTarget === entry.id ? rowFeedback.state : null}
+                    onGallery={() => void sendToGallery(entry)}
+                    onRemove={() => setRemoving(entry)}
+                  />
+                ))}
+              </AnimatePresence>
+            </TableBody>
+          </Table>
+        </div>
       )}
+
+      {data ? <Pager page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.pageSize} hrefFor={hrefFor} noun="exports" /> : null}
+
+      <DeleteExportDialog
+        entry={removing}
+        onClose={() => setRemoving(null)}
+        onDone={() => {
+          setRemoving(null);
+          afterChange();
+        }}
+      />
     </div>
+  );
+}
+
+/** Un filtre : liste déroulante compacte, avec le nombre d'éléments de chaque valeur et le logo d'un service. */
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  allLabel,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string; count?: number; logo?: string }[];
+  allLabel: string;
+}) {
+  return (
+    <Select value={value || ALL} onValueChange={(next) => onChange(next === ALL ? "" : next)}>
+      <SelectTrigger size="sm" className={cn("w-auto max-w-full min-w-0", value && "border-primary/60")} aria-label={label}>
+        <span className="shrink-0 text-muted-foreground">{label}&nbsp;:</span>
+        <span className="flex max-h-full min-w-0 items-center overflow-hidden">
+          <SelectValue />
+        </span>
+      </SelectTrigger>
+      <SelectContent className="max-w-[min(24rem,calc(100vw-2rem))]">
+        <SelectItem value={ALL}>{allLabel}</SelectItem>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value} className="*:[span]:last:min-w-0">
+            {option.logo ? <ServiceLogo logo={option.logo} /> : null}
+            <span className="truncate" title={option.label}>
+              {option.label}
+            </span>
+            {option.count !== undefined ? <span className="ml-auto pl-2 text-xs text-foreground/60 tabular-nums">{option.count}</span> : null}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** Les mêmes entrées pour le menu « … » et le clic droit d'un export. */
+function ExportMenuItems({ entry, isAdmin, kind, onGallery, onRemove }: { entry: ClipExport; isAdmin: boolean; kind: "dropdown" | "context"; onGallery: () => void; onRemove: () => void }) {
+  const Item = kind === "dropdown" ? DropdownMenuItem : ContextMenuItem;
+  const Separator = kind === "dropdown" ? DropdownMenuSeparator : ContextMenuSeparator;
+  return (
+    <>
+      <Item asChild>
+        <Link href={exportHref(entry.id)}>
+          <FileVideo className="mr-2 size-4" />
+          Ouvrir la fiche
+        </Link>
+      </Item>
+      {isAdmin ? (
+        <Item asChild>
+          <Link href={publishHref(entry.id)}>
+            <Send className="mr-2 size-4" />
+            Publier
+          </Link>
+        </Item>
+      ) : null}
+      <Item asChild>
+        <a href={exportUrl(entry.file)} download={`${entry.projectName}.mp4`}>
+          <Download className="mr-2 size-4" />
+          Télécharger
+        </a>
+      </Item>
+      {entry.galleryFile ? (
+        <Item asChild>
+          <Link href="/gallery">
+            <ImageUp className="mr-2 size-4" />
+            Voir dans la galerie
+          </Link>
+        </Item>
+      ) : (
+        <Item onSelect={onGallery}>
+          <ImageUp className="mr-2 size-4" />
+          Envoyer dans la galerie
+        </Item>
+      )}
+      <Item asChild>
+        <Link href={`/m/clip-studio/edit?id=${encodeURIComponent(entry.projectId)}`}>
+          <Clapperboard className="mr-2 size-4" />
+          Ouvrir le projet
+        </Link>
+      </Item>
+      <Separator />
+      <Item variant="destructive" onSelect={onRemove}>
+        <Trash2 className="mr-2 size-4" />
+        Supprimer l’export
+      </Item>
+    </>
+  );
+}
+
+interface ExportItemProps {
+  entry: ClipExport;
+  publications?: ExportPublications;
+  context: PublicationContext;
+  isAdmin: boolean;
+  status: FeedbackState | null;
+  onGallery: () => void;
+  onRemove: () => void;
+}
+
+function PublicationCell({ publications, context }: { publications?: ExportPublications; context: PublicationContext }) {
+  if (!publications) return <Skeleton className="h-4 w-16" />;
+  if (publications.rows.length === 0) return <span className="text-xs text-muted-foreground">{EXPORT_STATUS_LABELS.none}</span>;
+  const failedCount = publications.rows.filter((row) => row.state === "failed").length;
+  return (
+    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+      <ChannelLogos rows={publications.rows} connectors={context.connectors} accounts={context.accounts} />
+      {failedCount > 0 ? <span className="text-[11px] text-destructive">{failedCount > 1 ? `${failedCount} échecs` : "1 échec"}</span> : null}
+    </span>
+  );
+}
+
+function ExportRow({ entry, publications, context, isAdmin, status, onGallery, onRemove }: ExportItemProps) {
+  const title = exportTitle(entry);
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <motion.tr layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="border-b transition-colors hover:bg-muted/50">
+          <TableCell className="pl-4">
+            <Link href={exportHref(entry.id)} className="relative block aspect-video w-full overflow-hidden rounded-md bg-black" tabIndex={-1} aria-hidden>
+              <ExportPoster entry={entry} />
+            </Link>
+          </TableCell>
+          <TableCell className="min-w-0">
+            <div className="grid min-w-0 gap-0.5">
+              <Link href={exportHref(entry.id)} className="truncate font-medium hover:underline" title={title}>
+                {title}
+              </Link>
+              <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                <Clapperboard className="size-3 shrink-0" aria-hidden />
+                <Link href={`/m/clip-studio/edit?id=${encodeURIComponent(entry.projectId)}`} className="min-w-0 truncate hover:text-foreground hover:underline" title={entry.projectName}>
+                  {entry.projectName}
+                </Link>
+              </span>
+              <span className="text-xs text-muted-foreground tabular-nums lg:hidden">
+                {formatClock(entry.durationMs / 1000)} · {formatShortDate(entry.createdAt)}
+              </span>
+              {isAdmin ? (
+                <span className="md:hidden">
+                  <PublicationCell publications={publications} context={context} />
+                </span>
+              ) : null}
+              <ActionStatus state={status} className="max-w-full empty:hidden" />
+            </div>
+          </TableCell>
+          {isAdmin ? (
+            <TableCell className="hidden md:table-cell">
+              <PublicationCell publications={publications} context={context} />
+            </TableCell>
+          ) : null}
+          <TableCell className="hidden lg:table-cell">
+            <AspectChip width={entry.width} height={entry.height} className="bg-muted" />
+          </TableCell>
+          <TableCell className="hidden text-right text-xs tabular-nums sm:table-cell">{formatClock(entry.durationMs / 1000)}</TableCell>
+          <TableCell className="hidden text-right text-xs tabular-nums xl:table-cell">{formatBytes(entry.sizeBytes)}</TableCell>
+          <TableCell className="hidden text-xs text-muted-foreground lg:table-cell" title={new Date(entry.createdAt).toLocaleString("fr-FR")}>
+            {formatShortDate(entry.createdAt)}
+          </TableCell>
+          <TableCell className="pr-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions sur ${title}`}>
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <ExportMenuItems entry={entry} isAdmin={isAdmin} kind="dropdown" onGallery={onGallery} onRemove={onRemove} />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        </motion.tr>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ExportMenuItems entry={entry} isAdmin={isAdmin} kind="context" onGallery={onGallery} onRemove={onRemove} />
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+function ExportGridCard({ entry, publications, context, isAdmin, status, onGallery, onRemove }: ExportItemProps) {
+  const title = exportTitle(entry);
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="group grid min-w-0 gap-1.5">
+          <Link href={exportHref(entry.id)} className="relative block aspect-video w-full overflow-hidden rounded-lg bg-black focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" aria-label={`Ouvrir la fiche de ${title}`}>
+            <ExportPoster entry={entry} />
+            <AspectChip width={entry.width} height={entry.height} className="absolute top-1.5 left-1.5" />
+            <span className="absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white tabular-nums">{formatClock(entry.durationMs / 1000)}</span>
+          </Link>
+          <div className="flex min-w-0 items-start gap-1 px-0.5">
+            <div className="grid min-w-0 flex-1 gap-0.5">
+              <Link href={exportHref(entry.id)} className="truncate text-sm font-medium hover:underline" title={title}>
+                {title}
+              </Link>
+              <span className="truncate text-[11px] text-muted-foreground tabular-nums">
+                {formatShortDate(entry.createdAt)} · {formatBytes(entry.sizeBytes)}
+              </span>
+              {isAdmin ? (
+                <span className="min-h-5">
+                  <PublicationCell publications={publications} context={context} />
+                </span>
+              ) : null}
+              <ActionStatus state={status} className="max-w-full empty:hidden" />
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-7 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 md:data-[state=open]:opacity-100" aria-label={`Actions sur ${title}`}>
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <ExportMenuItems entry={entry} isAdmin={isAdmin} kind="dropdown" onGallery={onGallery} onRemove={onRemove} />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ExportMenuItems entry={entry} isAdmin={isAdmin} kind="context" onGallery={onGallery} onRemove={onRemove} />
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+/** Confirmation de suppression d'un export depuis la liste ; un échec reste dans la fenêtre. */
+function DeleteExportDialog({ entry, onClose, onDone }: { entry: ClipExport | null; onClose: () => void; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const feedback = useFeedback();
+  useEffect(() => {
+    if (entry) feedback.clear();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry]);
+  const remove = async () => {
+    if (!entry) return;
+    setBusy(true);
+    feedback.clear();
+    try {
+      await callModule("deleteExport", entry.id);
+      onDone();
+    } catch (error) {
+      feedback.error(errorMessage(error, "L’export n’a pas pu être supprimé. Réessayez."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <AlertDialog open={entry !== null} onOpenChange={(open) => !open && !busy && onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="[overflow-wrap:anywhere]">{entry ? `Supprimer « ${exportTitle(entry)} » ?` : "Supprimer cet export ?"}</AlertDialogTitle>
+          <AlertDialogDescription>La vidéo, sa couverture, ses sous-titres et ses textes disparaissent. Les publications déjà faites restent en ligne chez chaque service.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <FormStatus state={feedback.state} />
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Garder</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(event) => {
+              event.preventDefault();
+              void remove();
+            }}
+            disabled={busy}
+            className="bg-destructive text-white hover:bg-destructive/90"
+          >
+            {busy ? "Suppression…" : "Supprimer"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -604,6 +1122,8 @@ function ExportDetail({ id }: { id: string }) {
           <ExportCover entry={entry} video={() => videoRef.current} onChanged={(next) => setDetails((current) => (current ? { ...current, export: next } : current))} />
         </aside>
 
+        <div className="grid min-w-0 content-start gap-6">
+          {isAdmin ? <PublicationsPanel entryId={entry.id} jobsKey={(jobs ?? []).map((job) => `${job.id}:${job.state}`).join(",")} onChanged={() => void loadJobs()} /> : null}
         <Tabs value={detailTab} onValueChange={(next) => void setDetailTab(next === "texts" ? null : (next as (typeof DETAIL_TABS)[number]))} className="min-w-0 gap-4">
           {/* Onglets sur plusieurs lignes : hauteur fixe, sinon la hauteur en pourcentage des onglets s'étire et ils passent sur les champs. */}
           <TabsList className="h-auto w-full min-w-0 flex-wrap justify-start group-data-[orientation=horizontal]/tabs:h-auto *:data-[slot=tabs-trigger]:h-7.5">
@@ -611,7 +1131,7 @@ function ExportDetail({ id }: { id: string }) {
               Textes
             </TabsTrigger>
             <TabsTrigger value="publications" className="flex-none px-3">
-              Publications{jobs && jobs.length > 0 ? ` (${jobs.length})` : ""}
+              Envois{jobs && jobs.length > 0 ? ` (${jobs.length})` : ""}
             </TabsTrigger>
             <TabsTrigger value="credits" className="flex-none px-3">
               Crédits{credits.length > 0 ? ` (${credits.length})` : ""}
@@ -783,6 +1303,7 @@ function ExportDetail({ id }: { id: string }) {
             )}
           </TabsContent>
         </Tabs>
+        </div>
       </div>
 
       <AlertDialog
@@ -868,5 +1389,210 @@ function DetailSkeleton() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Publications d'un export ────────────────────────────────────
+
+const ROW_STATE: Record<ChannelState, { icon: typeof CircleCheck; className: string }> = {
+  published: { icon: CircleCheck, className: "text-emerald-700 dark:text-emerald-400" },
+  scheduled: { icon: CalendarClock, className: "text-primary" },
+  pending: { icon: CircleDashed, className: "text-amber-700 dark:text-amber-400" },
+  failed: { icon: CircleAlert, className: "text-destructive" },
+  cancelled: { icon: CircleSlash, className: "text-muted-foreground" },
+};
+
+/** Ce que dit la ligne d'un compte : état et date. */
+function rowStateText(row: PublicationRow): string {
+  if (row.state === "published") return `Publié ${formatRelative(row.at)}`;
+  if (row.state === "scheduled") return `Programmé pour le ${formatSchedule(row.publishAt ?? row.at)}`;
+  if (row.state === "pending") return "Envoi en cours";
+  if (row.state === "failed") return `Échec ${formatRelative(row.at)}`;
+  return `Annulé ${formatRelative(row.at)}`;
+}
+
+/**
+ * Où en est l'export, compte par compte : logo et nom du compte, état, lien
+ * vers la publication, date, statistiques lues chez le service ; reprendre un
+ * envoi raté, publier sur un autre compte. Le détail de chaque envoi (suites,
+ * progression) reste dans l'onglet « Envois ».
+ */
+function PublicationsPanel({ entryId, jobsKey, onChanged }: { entryId: string; jobsKey: string; onChanged: () => void }) {
+  const [details, setDetails] = useState<ExportPublicationDetails | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const rowFeedback = useFeedback();
+  const [rowTarget, setRowTarget] = useState<string | null>(null);
+  const headerFeedback = useFeedback();
+
+  const load = useCallback(
+    async (refresh = false) => {
+      try {
+        const next = await getExportPublications(entryId, refresh);
+        setDetails(next);
+        setError(null);
+        return next;
+      } catch (reason) {
+        setError(errorMessage(reason, "Les publications n’ont pas pu être lues."));
+        return null;
+      }
+    },
+    [entryId]
+  );
+  // Relue quand la file change (un envoi avance, une reprise part).
+  useEffect(() => {
+    void load();
+  }, [load, jobsKey]);
+
+  const refreshStats = async () => {
+    setRefreshing(true);
+    headerFeedback.clear();
+    const next = await load(true);
+    setRefreshing(false);
+    if (next?.statsErrors.length) headerFeedback.error(next.statsErrors[0]);
+    else if (next) headerFeedback.success("Statistiques à jour.");
+  };
+
+  const retry = async (row: PublicationRow) => {
+    setBusy(row.jobId);
+    rowFeedback.clear();
+    const result = await retryJobAction(row.jobId);
+    setBusy(null);
+    if (!result.ok) {
+      setRowTarget(row.accountId);
+      rowFeedback.error(result.error || "La reprise n’a pas abouti. Réessayez dans un instant.");
+    }
+    onChanged();
+    void load();
+  };
+
+  const rows = details?.rows ?? [];
+  const accountOf = (id: string) => details?.accounts.find((account) => account.id === id);
+  const connectorOf = (id: string) => details?.connectors.find((connector) => connector.id === id);
+  const hasStats = rows.some((row) => row.state === "published" && row.externalId);
+
+  return (
+    <Panel aria-labelledby="export-publications">
+      <PanelHeader
+        icon={Send}
+        titleId="export-publications"
+        title="Publications"
+        description="Un compte par ligne : état, lien vers la publication et statistiques."
+        actions={
+          <>
+            <ActionStatus state={headerFeedback.state} className="max-w-full" />
+            {hasStats ? (
+              <Button variant="ghost" size="sm" className="gap-1.5" loading={refreshing} onClick={() => void refreshStats()}>
+                <RefreshCw className="size-3.5" />
+                Statistiques
+              </Button>
+            ) : null}
+            <Button asChild size="sm" variant={rows.length > 0 ? "outline" : "default"} className="gap-1.5">
+              <Link href={publishHref(entryId)}>
+                <Send className="size-3.5" />
+                {rows.length > 0 ? "Publier ailleurs" : "Publier"}
+              </Link>
+            </Button>
+          </>
+        }
+      />
+      {details === null && !error ? (
+        <PanelRows aria-busy>
+          {Array.from({ length: 2 }, (_, index) => (
+            <div key={index} className="flex items-center gap-3 px-4 py-3">
+              <Skeleton className="size-8 rounded-full" />
+              <div className="grid flex-1 gap-1.5">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-28" />
+              </div>
+            </div>
+          ))}
+        </PanelRows>
+      ) : error && !details ? (
+        <PanelBody>
+          <p className="text-sm text-destructive">{error}</p>
+        </PanelBody>
+      ) : rows.length === 0 ? (
+        <PanelBody>
+          <p className="text-sm text-pretty text-muted-foreground">Pas encore publié. Chaque compte où l’export partira aura sa ligne ici, avec son état, son lien et ses statistiques.</p>
+        </PanelBody>
+      ) : (
+        <PanelRows>
+          <AnimatePresence initial={false}>
+            {rows.map((row) => {
+              const account = accountOf(row.accountId);
+              const connector = connectorOf(row.connector);
+              const tone = ROW_STATE[row.state];
+              const Icon = tone.icon;
+              return (
+                <motion.div key={row.accountId} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid min-w-0 gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="relative mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                      {connector ? <ServiceLogo logo={connector.logo} className="size-4" /> : null}
+                    </span>
+                    <div className="grid min-w-0 gap-0.5">
+                      <span className="flex min-w-0 items-center gap-1.5 text-sm">
+                        <span className="min-w-0 truncate font-medium" title={account?.displayName ?? row.accountId}>
+                          {account?.displayName ?? "Compte retiré"}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{connector?.label ?? row.connector}</span>
+                      </span>
+                      <span className={cn("flex min-w-0 items-center gap-1.5 text-xs", tone.className)}>
+                        <Icon className="size-3.5 shrink-0" aria-hidden />
+                        <span className="min-w-0 [overflow-wrap:anywhere]">
+                          {rowStateText(row)}
+                          {row.attempts > 1 ? <span className="text-muted-foreground"> · {row.attempts} envois</span> : null}
+                        </span>
+                      </span>
+                      {row.error && row.state !== "published" ? <span className="text-xs text-pretty text-destructive [overflow-wrap:anywhere]">{row.error}</span> : null}
+                      {row.stats ? (
+                        <span className="flex min-w-0 flex-wrap items-center gap-x-3 text-xs text-muted-foreground tabular-nums">
+                          <span className="inline-flex items-center gap-1">
+                            <Eye className="size-3.5" aria-hidden />
+                            {formatCount(row.stats.views)} vue{(row.stats.views ?? 0) > 1 ? "s" : ""}
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <ThumbsUp className="size-3.5" aria-hidden />
+                            {formatCount(row.stats.likes)}
+                          </span>
+                          {row.stats.comments !== undefined ? (
+                            <span className="inline-flex items-center gap-1">
+                              <MessageSquare className="size-3.5" aria-hidden />
+                              {formatCount(row.stats.comments)}
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : null}
+                      <ActionStatus state={rowTarget === row.accountId ? rowFeedback.state : null} className="max-w-full empty:hidden" />
+                    </div>
+                  </div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 pl-11 sm:pl-0">
+                    {row.url ? (
+                      <Button asChild variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs">
+                        <a href={row.url} target="_blank" rel="noreferrer noopener">
+                          Voir
+                          <ExternalLink className="size-3" />
+                        </a>
+                      </Button>
+                    ) : null}
+                    {row.retryable ? (
+                      <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" loading={busy === row.jobId} onClick={() => void retry(row)}>
+                        <RotateCcw className="size-3.5" />
+                        Reprendre
+                      </Button>
+                    ) : null}
+                    <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground">
+                      <Link href={`/admin/connections/${encodeURIComponent(row.accountId)}`}>Fiche du compte</Link>
+                    </Button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </PanelRows>
+      )}
+      {details?.statsFetchedAt ? <PanelFooter>Statistiques lues {formatRelative(details.statsFetchedAt)}, gardées dix minutes avant d’être relues chez le service.</PanelFooter> : null}
+    </Panel>
   );
 }

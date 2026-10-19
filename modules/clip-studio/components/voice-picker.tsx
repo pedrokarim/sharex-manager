@@ -489,7 +489,7 @@ export function VoicePicker({
                             {sampleError}
                           </span>
                         ) : (
-                          <span className="block truncate text-[11px] text-muted-foreground">
+                          <span className="block truncate text-[11px] text-foreground/65">
                             {state.status === "downloading"
                               ? `Téléchargement ${progress(state)} %`
                               : state.status === "error"
@@ -582,7 +582,7 @@ export function SpeedControl({ value, onChange }: { value: number; onChange: (sp
           className={
             value === entry.value
               ? "flex-1 rounded-md bg-background px-2 py-1 text-xs font-medium shadow-sm"
-              : "flex-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+              : "flex-1 rounded-md px-2 py-1 text-xs text-foreground/70 hover:text-foreground"
           }
         >
           {entry.label}
@@ -605,7 +605,7 @@ export function ToneControl({ value, onChange }: { value: string; onChange: (ton
           className={
             value === entry.value
               ? "flex-1 rounded-md bg-background px-2 py-1 text-xs font-medium shadow-sm"
-              : "flex-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+              : "flex-1 rounded-md px-2 py-1 text-xs text-foreground/70 hover:text-foreground"
           }
         >
           {entry.label}

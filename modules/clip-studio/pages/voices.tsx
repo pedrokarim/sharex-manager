@@ -64,7 +64,7 @@ export default function VoicesPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <header className="flex flex-wrap items-center gap-3">
-        <Button asChild variant="ghost" size="icon" aria-label="Retour aux projets">
+        <Button asChild variant="ghost" size="icon" aria-label="Retour à l’accueil de Clip Studio">
           <Link href="/m/clip-studio">
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -112,7 +112,7 @@ export default function VoicesPage() {
         </div>
       )}
 
-      {/* Cookies YouTube et clé Pexels : mêmes droits que les clés des voix. */}
+      {/* Cookies YouTube, clés Pixabay et Pexels : mêmes droits que les clés des voix. */}
       {!forbidden && providers !== null && <VideoSourcesSettings />}
     </div>
   );

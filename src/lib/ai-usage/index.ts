@@ -3,7 +3,7 @@
  *
  * - `recordAiUsage` : chaque appel réel à un fournisseur, d’où qu’il parte ;
  * - `getAiUsageOverview` : l’aperçu de tous les fournisseurs du catalogue,
- *   même jamais appelés, pour l’écran `/admin/ai` ;
+ *   même jamais appelés, pour l’écran `/admin/services` ;
  * - `readRemoteLimits` : le solde lu chez le service, à la demande.
  *
  * Le cœur ne lit aucun fichier de module : ce qu’un module sait d’un
@@ -28,6 +28,7 @@ import type { ModuleConfig } from "@/types/modules";
 
 export { recordAiUsage, flushAiUsage, setAiUsageDataRoot, usageError, countCharacters } from "./store";
 export type * from "./types";
+export { AI_ERROR_KINDS } from "./types";
 
 /** Une fonction de module qui ne répond pas ne bloque pas l’écran. */
 const MODULE_TIMEOUT_MS = 10_000;
@@ -238,9 +239,11 @@ function buildProvider(entry: AiProviderEntry, usage: StoredUsage, reports: Modu
     byFeature: [...features.values()].sort((a, b) => b.calls - a.calls || b.lastAt - a.lastAt),
   };
   if (last) {
-    overview.lastCall = { at: last.at, ok: last.ok, module: last.module, feature: last.feature };
-    if (last.model) overview.lastCall.model = last.model;
-    if (last.error) overview.lastCall.error = last.error;
+    overview.lastCall = { at: last.at, ok: last.ok, module: last.module, feature: last.feature, unit: last.unit, amount: last.amount };
+    // Ce qu'il faut pour l'expliquer dans le détail de l'appel, quand le registre l'a noté.
+    for (const key of ["model", "error", "errorKind", "detail", "durationMs", "attempts", "extra"] as const) {
+      if (last[key] !== undefined) (overview.lastCall as Record<string, unknown>)[key] = last[key];
+    }
   }
   if (settingsHref) overview.settingsHref = settingsHref;
   return overview;

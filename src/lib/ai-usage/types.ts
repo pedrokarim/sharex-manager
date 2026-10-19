@@ -1,6 +1,6 @@
 /**
  * Consommation des IA et des services à quota, vue d'ensemble pour l'écran
- * d'administration « Intelligence artificielle » (`/admin/ai`).
+ * d'administration « Services externes » (`/admin/services`).
  *
  * Chaque appel à un fournisseur, d'où qu'il parte (module ou cœur), est noté
  * dans un registre commun par `recordAiUsage`. Les limites connues (offre
@@ -29,9 +29,20 @@ export type AiProviderId =
   | "saucenao"
   | "tracemoe"
   | "openverse"
-  | "pexels";
+  | "pexels"
+  | "pixabay"
+  | "wikimedia";
 
 /** Unité de ce qui est consommé ; un même fournisseur peut en compter plusieurs. */
+/**
+ * Famille d'un échec : trop de demandes à la fois (`rate-limit`), réseau ou
+ * service injoignable (`network`), clé ou connexion refusée (`auth`), crédit
+ * ou quota épuisé (`quota`), délai dépassé (`timeout`), erreur renvoyée par le
+ * service (`provider`), demande refusée par le service (`input`).
+ */
+export const AI_ERROR_KINDS = ["rate-limit", "network", "auth", "quota", "timeout", "provider", "input", "unknown"] as const;
+export type AiErrorKind = (typeof AI_ERROR_KINDS)[number];
+
 export type AiUnit = "calls" | "characters" | "images" | "tokens" | "seconds";
 
 /** Un appel noté dans le registre. */
@@ -48,6 +59,14 @@ export interface AiUsageEvent {
   ok: boolean;
   /** Message d'erreur abrégé, sans secret. */
   error?: string;
+  /** Famille de l'échec, pour l'expliquer et dire quoi faire. */
+  errorKind?: AiErrorKind;
+  /** Explication plus longue d'un échec (réponse du service, dernières lignes de l'outil), sans secret. */
+  detail?: string;
+  /** Durée de l'appel, essais compris, en millisecondes. */
+  durationMs?: number;
+  /** Nombre d'essais faits (1 sans nouvel essai). */
+  attempts?: number;
   at: number;
   /**
    * Autres quantités du même appel, dans d'autres unités : un appel de modèle
@@ -123,7 +142,9 @@ export interface AiProviderOverview {
   daily: AiDailyUsage[];
   /** Répartition sur trente jours, de la plus forte à la plus faible. */
   byFeature: AiFeatureUsage[];
-  lastCall?: Pick<AiUsageEvent, "at" | "ok" | "module" | "feature" | "model" | "error">;
+  /** Dernier appel, avec de quoi l'expliquer quand il a échoué (famille, détail, essais, durée). */
+  lastCall?: Pick<AiUsageEvent, "at" | "ok" | "module" | "feature"> &
+    Partial<Pick<AiUsageEvent, "model" | "error" | "errorKind" | "detail" | "durationMs" | "attempts" | "unit" | "amount" | "extra">>;
   /** Où se règle ce fournisseur (clé, plafond), s'il a une page. */
   settingsHref?: string;
 }

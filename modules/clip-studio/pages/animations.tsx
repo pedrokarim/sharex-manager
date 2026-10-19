@@ -157,7 +157,7 @@ export default function AnimationsPage() {
     <MotionConfig reducedMotion="user">
       <div className="flex min-h-full min-w-0 shrink-0 flex-col gap-6">
         <ScreenHeader
-          back={{ href: "/m/clip-studio", label: "Projets" }}
+          back={{ href: "/m/clip-studio", label: "Accueil de Clip Studio" }}
           icon={WandSparkles}
           title="Animations"
           description={`Les ${total.toLocaleString("fr-FR")} animations intégrées à Clip Studio, telles qu’elles se posent depuis l’éditeur : une carte ouverte dit où les trouver.`}

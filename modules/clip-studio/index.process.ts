@@ -89,8 +89,8 @@ import {
 } from "./lib/remote-import";
 import {
   clearYoutubeCookies,
-  pexelsApiKey,
   savePexelsKey as storePexelsKey,
+  savePixabayKey as storePixabayKey,
   saveYoutubeCookies as storeYoutubeCookies,
   videoSourcesStatus,
   type VideoSourcesStatus,
@@ -98,7 +98,10 @@ import {
 import { startWorkDirSweeper } from "./lib/job-safety";
 import { cleanFoundImages, importFoundImageById, searchFoundImages } from "./lib/image-search";
 import type { FoundImage, ImportedImage } from "./lib/image-search-types";
-import { importFoundVideoById, pexelsUsageReport, searchFoundVideos, type FoundVideo, type ImportedVideo } from "./lib/video-search";
+import { pexelsUsageReport, type FoundVideo, type ImportedVideo, type VideoProviderId } from "./lib/video-search";
+import { importStockVideoById, searchStockVideos, usableVideoProviders } from "./lib/video-providers";
+import { pixabayUsageReport } from "./lib/video-pixabay";
+import { wikimediaUsageReport } from "./lib/video-wikimedia";
 import {
   enqueuePublish,
   listAccounts,
@@ -131,6 +134,27 @@ import {
   type CoverInput,
 } from "./lib/exports";
 import { draftExportPost, type DraftRequest, type DraftResult } from "./lib/post-draft";
+import { MAX_TAGS, MAX_TAG_LENGTH, isProjectOrigin, type ProjectPage, type ProjectSummary } from "./lib/library";
+import {
+  allProjectSummaries,
+  deleteMany,
+  duplicateMany,
+  duplicateOne,
+  exportPublicationDetails,
+  importOne,
+  liveExports,
+  overview,
+  publicationsOverview,
+  searchExportPage,
+  searchProjectPage,
+  storeThumbnail,
+  tagMany,
+  updateDetails,
+  type ExportPage,
+  type ExportPublicationDetails,
+  type PublicationsOverview,
+  type StudioOverview,
+} from "./lib/library-service";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
 import { askCodex } from "./lib/codex";
 import { channelReadCost, quotaForAccount, readChannelVideos } from "@/lib/connections";
@@ -155,51 +179,7 @@ import {
   type IdeasBoard,
 } from "./lib/idea-service";
 
-export interface ProjectSummary {
-  id: string;
-  name: string;
-  aspect: ClipProject["aspect"];
-  width: number;
-  height: number;
-  durationFrames: number;
-  fps: number;
-  itemCount: number;
-  /** Première image du projet, pour la carte. */
-  cover?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-function summarize(project: ClipProject): ProjectSummary {
-  let end = 0;
-  let itemCount = 0;
-  let cover: string | undefined;
-  let brandCover: string | undefined;
-  for (const track of project.tracks) {
-    for (const item of track.items) {
-      end = Math.max(end, item.start + item.duration);
-      itemCount++;
-      if (item.type !== "image") continue;
-      // Filigrane et carton de fin de la marque : une miniature seulement à défaut d'image du clip.
-      if (item.origin === "brand" || track.origin === "brand") brandCover ??= item.source.url;
-      else cover ??= item.source.url;
-    }
-  }
-  cover ??= brandCover;
-  return {
-    id: project.id,
-    name: project.name,
-    aspect: project.aspect,
-    width: project.width,
-    height: project.height,
-    durationFrames: end,
-    fps: project.fps,
-    itemCount,
-    cover,
-    createdAt: project.createdAt,
-    updatedAt: project.updatedAt,
-  };
-}
+export type { ProjectSummary } from "./lib/library";
 
 const ITEM_TYPES = new Set(["image", "video", "audio", "text", "shape"]);
 /** Trente minutes à 60 images par seconde : au-delà, un projet est forcément abîmé. */
@@ -270,6 +250,10 @@ function validateProject(project: ClipProject) {
     }
   }
   if (count > 2000) throw new Error("Trop d'éléments dans le projet");
+  if (project.tags !== undefined && (!Array.isArray(project.tags) || project.tags.length > MAX_TAGS || project.tags.some((tag) => typeof tag !== "string" || tag.length > MAX_TAG_LENGTH))) {
+    throw new Error("Étiquettes invalides");
+  }
+  if (project.origin !== undefined && !isProjectOrigin(project.origin)) throw new Error("Origine du projet invalide");
 
   // Demande de l'assistant : relue par Codex pour rédiger les textes de publication.
   if (project.brief !== undefined) {
@@ -310,16 +294,49 @@ function validBriefSources(sources: unknown): boolean {
 // ─── Projets ─────────────────────────────────────────────────────
 
 export async function listProjects(): Promise<ProjectSummary[]> {
-  // Un projet illisible est ignoré plutôt que de rendre la liste vide pour tous.
-  return listProjectFiles()
-    .flatMap((project) => {
-      try {
-        return [summarize(project)];
-      } catch {
-        return [];
-      }
-    })
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  return allProjectSummaries();
+}
+
+/**
+ * Une page de projets : recherche, filtres (format, marque, origine,
+ * étiquette, exporté ou non, période), tri, et les valeurs que proposent les
+ * filtres, comptées sur toute la bibliothèque.
+ */
+export async function searchProjects(query: unknown = {}): Promise<ProjectPage> {
+  return searchProjectPage(query);
+}
+
+/** Renomme un projet ou change ses étiquettes. */
+export async function updateProjectDetails(input: { id: string; name?: string; tags?: string[] }): Promise<ProjectSummary> {
+  return updateDetails(input);
+}
+
+/** Ajoute ou retire des étiquettes à plusieurs projets d'un coup. */
+export async function tagProjects(input: { ids: string[]; add?: string[]; remove?: string[] }): Promise<{ updated: number }> {
+  return tagMany(input);
+}
+
+export async function deleteProjects(ids: string[]): Promise<{ deleted: number }> {
+  return deleteMany(ids);
+}
+
+export async function duplicateProjects(ids: string[]): Promise<{ created: ProjectSummary[] }> {
+  return duplicateMany(ids);
+}
+
+/** Importe un projet enregistré en JSON (« Télécharger le projet » d'une autre instance ou d'une sauvegarde). */
+export async function importProject(project: unknown): Promise<{ project: ProjectSummary; missingMedia: number }> {
+  return importOne(project, validateProject);
+}
+
+/** Vignette d'un projet, rendue par le navigateur (`drawFrame`) puis réencodée ici. */
+export async function setProjectThumbnail(id: string, renderedAt: number, image: unknown): Promise<{ thumbnail: string }> {
+  return storeThumbnail(id, renderedAt, image);
+}
+
+/** L'accueil du module : projets à reprendre, derniers exports, activité. */
+export async function getStudioOverview(): Promise<StudioOverview> {
+  return overview();
 }
 
 export async function getProject(id: string): Promise<ClipProject | null> {
@@ -339,19 +356,9 @@ export async function deleteProject(id: string): Promise<{ success: boolean }> {
   return { success: true };
 }
 
-export async function duplicateProject(id: string): Promise<ProjectSummary> {
-  const project = readProject(id);
-  if (!project) throw new Error("Projet introuvable");
-  const now = Date.now();
-  const copy: ClipProject = {
-    ...structuredClone(project),
-    id: `clip-${now.toString(36)}${Math.random().toString(36).slice(2, 8)}`,
-    name: `${project.name} (copie)`,
-    createdAt: now,
-    updatedAt: now,
-  };
-  writeProject(copy);
-  return summarize(copy);
+/** Copie d'un projet ; avec `aspect`, la copie passe à ce format (l'original reste intact). */
+export async function duplicateProject(id: string, aspect?: string): Promise<ProjectSummary> {
+  return duplicateOne(id, aspect);
 }
 
 // ─── Médias importés ─────────────────────────────────────────────
@@ -400,9 +407,37 @@ export async function deleteAsset(file: string): Promise<{ success: boolean }> {
 // ─── Exports ─────────────────────────────────────────────────────
 
 export async function listExports(): Promise<ClipExport[]> {
-  return readExports()
-    .filter((entry) => fs.existsSync(path.join(EXPORTS_DIR, entry.file)))
-    .sort((a, b) => b.createdAt - a.createdAt);
+  return liveExports();
+}
+
+/** Une page d'exports : recherche, format, marque, projet, période et tri. */
+export async function searchExports(query: unknown = {}): Promise<ExportPage> {
+  return searchExportPage(query, false);
+}
+
+/**
+ * Comme `searchExports`, avec les publications de chaque export et les
+ * filtres par service et par état. Absente de `functions` dans module.json :
+ * réservée aux administrateurs, comme toute la publication.
+ */
+export async function searchExportsWithPublications(query: unknown = {}): Promise<ExportPage> {
+  return searchExportPage(query, true);
+}
+
+/**
+ * Publications de Clip Studio pour l'accueil : états des exports demandés,
+ * totaux par service, dates des publications, meilleures publications d'après
+ * les statistiques déjà lues (`readStats` : les demander aux services).
+ * Réservée aux administrateurs.
+ */
+export async function getPublicationsOverview(input: { exportIds?: string[]; readStats?: boolean } = {}): Promise<PublicationsOverview> {
+  return publicationsOverview(input);
+}
+
+/** Publications d'un export, une ligne par compte, avec leurs statistiques (administrateurs). */
+export async function getExportPublications(id: string, options: { refresh?: boolean } = {}): Promise<ExportPublicationDetails> {
+  const entry = findExport(id);
+  return exportPublicationDetails(entry.id, options?.refresh === true);
 }
 
 /**
@@ -1063,6 +1098,9 @@ export async function getAiLimits(): Promise<AiModuleReport> {
     openverse: { access: "open" },
     // Vidéos de l'assistant et de l'onglet « Trouver » : solde relevé dans les réponses, appels de l'heure comptés ici.
     pexels: pexelsUsageReport(),
+    // Pixabay (clé gratuite) et Wikimedia Commons (sans clé) : mêmes usages que Pexels.
+    pixabay: pixabayUsageReport(),
+    wikimedia: wikimediaUsageReport(),
   };
 }
 
@@ -1184,24 +1222,30 @@ export async function importFoundImage(input: { id: string }): Promise<ImportedI
 
 // ─── Vidéos trouvées (onglet « Trouver », source « Vidéos ») ─────
 
-/** La recherche de vidéos est-elle possible (clé Pexels enregistrée) ? Rien d'autre n'en sort. */
-export async function getVideoSearchStatus(): Promise<{ pexels: boolean }> {
-  return { pexels: Boolean(pexelsApiKey()) };
+/**
+ * Banques de vidéos utilisables, dans l'ordre (Pixabay et Pexels avec leur
+ * clé, Wikimedia Commons toujours) ; `pexels` reste pour les écrans qui ne
+ * lisent que lui. Aucune clé n'en sort.
+ */
+export async function getVideoSearchStatus(): Promise<{ pexels: boolean; providers: VideoProviderId[] }> {
+  const providers = usableVideoProviders();
+  return { pexels: providers.includes("pexels"), providers };
 }
 
-/** Cherche des vidéos libres sur Pexels, par page, dans l'orientation du projet. */
-export async function searchVideos(input: { query: string; orientation?: string; page?: number }): Promise<FoundVideo[]> {
-  return searchFoundVideos({ query: String(input?.query ?? ""), orientation: input?.orientation, page: input?.page });
+/** Cherche des vidéos libres dans une banque (`provider`), par page, dans l'orientation du projet. */
+export async function searchVideos(input: { query: string; orientation?: string; page?: number; provider?: string }): Promise<FoundVideo[]> {
+  return searchStockVideos({ provider: input?.provider, query: String(input?.query ?? ""), orientation: input?.orientation, page: input?.page });
 }
 
 /**
- * Importe une vidéo de Pexels dans les médias du module (le fichier dont la
- * hauteur va au format du projet), avec sa mention. Seul l'identifiant vient
- * du navigateur, jamais une adresse.
+ * Importe une vidéo d'une banque dans les médias du module (le fichier dont
+ * la hauteur va au format du projet), avec sa mention. Seul l'identifiant
+ * (`pixabay:12`, `pexels:34`, `wikimedia:56`) vient du navigateur, jamais une
+ * adresse.
  */
 export async function importFoundVideo(input: { id: string; aspect?: string }): Promise<ImportedVideo> {
   const aspect = (["9:16", "16:9", "1:1", "4:5"] as const).find((entry) => entry === input?.aspect);
-  return importFoundVideoById(String(input?.id ?? ""), aspect ? { aspect } : {});
+  return importStockVideoById(String(input?.id ?? ""), aspect ? { aspect } : {});
 }
 
 // ─── Vidéos récupérées par adresse (onglet « Adresse ») ──────────
@@ -1239,8 +1283,8 @@ export async function cancelRemoteImport(id: string): Promise<{ success: boolean
 }
 
 /**
- * Réglages des sources vidéo : cookies YouTube et clé Pexels, jamais
- * renvoyés (seulement leur état). Absentes de `functions` dans module.json :
+ * Réglages des sources vidéo : cookies YouTube, clés Pexels et Pixabay, jamais
+ * renvoyés (seulement leur état). Absentes de `functions` dans module.json :
  * réservées aux admins, comme `getTtsProviders`.
  */
 export async function getVideoSources(): Promise<VideoSourcesStatus> {
@@ -1258,6 +1302,12 @@ export async function saveYoutubeCookies(input: { cookies?: string | null }): Pr
 /** Enregistre (ou efface, avec une chaîne vide) la clé de l'API Pexels. Réservée aux admins. */
 export async function savePexelsKey(input: { key: string }): Promise<VideoSourcesStatus> {
   storePexelsKey(input?.key ?? "");
+  return videoSourcesStatus();
+}
+
+/** Enregistre (ou efface, avec une chaîne vide) la clé de l'API Pixabay. Réservée aux admins (absente de `functions`). */
+export async function savePixabayKey(input: { key: string }): Promise<VideoSourcesStatus> {
+  storePixabayKey(input?.key ?? "");
   return videoSourcesStatus();
 }
 

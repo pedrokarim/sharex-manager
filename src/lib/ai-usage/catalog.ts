@@ -36,6 +36,10 @@ export const AI_PROVIDERS: AiProviderEntry[] = [
   { id: "openverse", label: "Openverse", brand: "openverse", kind: "free", remote: false },
   // Pexels publie son solde dans les en-têtes de chaque réponse : relevé au passage, sans appel de plus.
   { id: "pexels", label: "Pexels", brand: "pexels", kind: "api", remote: false },
+  // Pixabay : 100 requêtes par minute et par clé, solde relevé dans les en-têtes ; recherches gardées 24 heures.
+  { id: "pixabay", label: "Pixabay", brand: "pixabay", kind: "api", remote: false },
+  // Wikimedia Commons : sans clé ; Clip Studio s'impose son propre rythme.
+  { id: "wikimedia", label: "Wikimedia Commons", brand: "wikimediacommons", kind: "free", remote: false },
 ];
 
 const BY_ID = new Map(AI_PROVIDERS.map((entry) => [entry.id, entry]));

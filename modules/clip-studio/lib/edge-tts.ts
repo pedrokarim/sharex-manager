@@ -60,6 +60,39 @@ export class EdgeAccessError extends Error {
   }
 }
 
+/**
+ * Edge refuse ou coupe la connexion après plusieurs essais. C’est le plus
+ * souvent passager (vu le 19/10/2026 : deux refus au milieu de 63 lectures
+ * réussies) : le message ne parle pas d’un changement d’accès.
+ */
+export class EdgeUnavailableError extends Error {
+  constructor(
+    readonly attempts: number,
+    readonly detail: string
+  ) {
+    super(`Edge n’a pas répondu après ${attempts} essais (${detail}). C’est le plus souvent passager${" "}: relancez dans un instant, ou choisissez une autre voix si cela dure.`);
+    this.name = "EdgeUnavailableError";
+  }
+}
+
+/** Attentes avant les nouveaux essais d’une connexion refusée ou coupée. */
+export const EDGE_RETRY_DELAYS_MS = [1_500, 4_000, 10_000];
+/** Lectures simultanées au plus : au-delà, Microsoft refuse plus souvent les connexions. */
+export const EDGE_MAX_CONCURRENT = 3;
+
+const edgeQueue: { running: number; waiting: (() => void)[] } = { running: 0, waiting: [] };
+
+async function withEdgeSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (edgeQueue.running >= EDGE_MAX_CONCURRENT) await new Promise<void>((resolve) => edgeQueue.waiting.push(resolve));
+  edgeQueue.running++;
+  try {
+    return await task();
+  } finally {
+    edgeQueue.running--;
+    edgeQueue.waiting.shift()?.();
+  }
+}
+
 // ─── Jeton ───────────────────────────────────────────────────────
 
 /** Écart entre l’horloge du serveur de Microsoft et la nôtre, lu dans l’en-tête `Date`. */
@@ -483,6 +516,46 @@ async function synthesizeOnAnyEndpoint(
 export interface EdgeSynthesis {
   audio: Buffer;
   words: TimedWord[];
+  /** Essais faits pour le morceau le plus difficile (1 sans nouvel essai). */
+  attempts: number;
+}
+
+/**
+ * Un morceau, avec ses nouveaux essais. Un refus d’ouverture peut venir d’une
+ * horloge décalée (corrigée une fois d’après l’heure de Microsoft) ou d’un
+ * refus passager ; une connexion coupée en route se retente aussi. Au bout
+ * des essais : `EdgeUnavailableError`.
+ */
+async function synthesizeChunkWithRetries(
+  voice: string,
+  text: string,
+  speed: number,
+  offsetMs: number,
+  socketFactory: SocketFactory,
+  onAttempt: (count: number) => void,
+  delays: number[] = EDGE_RETRY_DELAYS_MS
+): Promise<{ audio: Buffer; boundaries: EdgeBoundary[] }> {
+  let clockChecked = false;
+  let lastProblem = "connexion refusée";
+  for (let attempt = 1; ; attempt++) {
+    onAttempt(attempt);
+    try {
+      return await synthesizeOnAnyEndpoint(voice, text, speed, offsetMs, socketFactory);
+    } catch (error) {
+      const passing = error instanceof HandshakeError || (error instanceof EdgeAccessError && /connexion (interrompue|fermée)/.test(error.message));
+      if (!passing) throw error;
+      lastProblem = error instanceof HandshakeError ? error.message : "connexion coupée";
+      if (error instanceof HandshakeError && !clockChecked) {
+        clockChecked = true;
+        await fetch(VOICES_URL, { method: "HEAD", signal: AbortSignal.timeout(8_000) })
+          .then((response) => adjustClock(response.headers.get("date")))
+          .catch(() => 0);
+      }
+      const delay = delays[attempt - 1];
+      if (delay === undefined) throw new EdgeUnavailableError(attempt, lastProblem);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
 }
 
 /**
@@ -494,34 +567,19 @@ export async function synthesizeEdge(
   voice: string,
   text: string,
   speed: number,
-  options: { socketFactory?: SocketFactory } = {}
+  options: { socketFactory?: SocketFactory; delays?: number[] } = {}
 ): Promise<EdgeSynthesis> {
   const socketFactory = options.socketFactory ?? defaultSocket;
   const parts: Buffer[] = [];
   const boundaries: EdgeBoundary[] = [];
   let bytes = 0;
+  let attempts = 1;
   for (const chunk of splitForEdge(text)) {
     const offsetMs = (bytes * 8 * 1000) / MP3_BITRATE;
-    let result: { audio: Buffer; boundaries: EdgeBoundary[] };
-    try {
-      result = await synthesizeOnAnyEndpoint(voice, chunk, speed, offsetMs, socketFactory);
-    } catch (error) {
-      if (!(error instanceof HandshakeError)) throw error;
-      // Un refus peut venir d’une horloge décalée : un seul nouvel essai,
-      // et seulement si l’heure de Microsoft a corrigé la nôtre.
-      const corrected = await fetch(VOICES_URL, { method: "HEAD", signal: AbortSignal.timeout(8_000) })
-        .then((response) => adjustClock(response.headers.get("date")))
-        .catch(() => 0);
-      if (corrected < 60_000) throw new EdgeAccessError(error.message);
-      try {
-        result = await synthesizeOnAnyEndpoint(voice, chunk, speed, offsetMs, socketFactory);
-      } catch (retryError) {
-        throw retryError instanceof HandshakeError ? new EdgeAccessError(retryError.message) : retryError;
-      }
-    }
+    const result = await withEdgeSlot(() => synthesizeChunkWithRetries(voice, chunk, speed, offsetMs, socketFactory, (count) => (attempts = Math.max(attempts, count)), options.delays));
     parts.push(result.audio);
     boundaries.push(...result.boundaries);
     bytes += result.audio.length;
   }
-  return { audio: Buffer.concat(parts), words: wordsFromBoundaries(text, boundaries) };
+  return { audio: Buffer.concat(parts), words: wordsFromBoundaries(text, boundaries), attempts };
 }

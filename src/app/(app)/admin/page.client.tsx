@@ -1,11 +1,11 @@
 "use client";
 
 import {
-  BrainCircuit,
   Database,
   Link2,
   Package,
   Palette,
+  PlugZap,
   Server,
   Shield,
   Users,
@@ -42,12 +42,12 @@ export function AdminPageClient() {
       description: "Chaînes YouTube et autres comptes où publier les clips, communs à tous les modules.",
     },
     {
-      key: "ai",
-      href: "/admin/ai",
-      icon: BrainCircuit,
+      key: "services",
+      href: "/admin/services",
+      icon: PlugZap,
       accent: "slate",
-      title: "Intelligence artificielle",
-      description: "Consommation et quotas de chaque IA et service à quota, les limites qui approchent, les derniers appels.",
+      title: "Services externes",
+      description: "Consommation, quotas et derniers appels des services utilisés par l’application.",
     },
     {
       key: "security",

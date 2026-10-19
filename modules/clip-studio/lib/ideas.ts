@@ -216,6 +216,20 @@ function conceptData(concepts: Concept[]) {
 
 const TEMPLATE_NAMES: Record<IdeaTemplate, string> = { free: "libre (séquences)", quiz: "quiz", top: "classement", slideshow: "diaporama" };
 
+/**
+ * Sujet donné par l'utilisateur : des mots-clés, ou une phrase entière dont
+ * Codex dégage le sujet précis et l'angle, puis autour duquel il cherche.
+ */
+export function topicLines(topic: string): string[] {
+  const text = topic.trim();
+  if (!text) return [];
+  return [
+    `Sujet donné par l'utilisateur (donnée), en mots-clés ou en phrase entière : <sujet>${asData(text)}</sujet>`,
+    "Si c'est une phrase, dégage d'abord le sujet précis qu'elle vise et l'angle voulu (la question posée, ce qui intrigue, le ton), puis cherche autour : chaque idée parle directement de ce sujet, sous des angles et des formes différents, sans glisser vers un thème voisin plus facile. Si ce sont des mots-clés, ils délimitent le domaine.",
+    `Rends ce que tu as compris dans "subject" : le sujet et l'angle, en une phrase de ${IDEA_LIMITS.subject} caractères au plus.`,
+  ];
+}
+
 /** Consigne de la recherche d'idées. */
 export function ideasPrompt(context: IdeaContext, targets: MixTargets): string {
   const { settings, brand } = context;
@@ -244,7 +258,7 @@ export function ideasPrompt(context: IdeaContext, targets: MixTargets): string {
           "Les sujets servent cette marque : son ton (tone, scriptTone), ses sujets (tags, hashtags), ses règles always et never.",
         ]
       : []),
-    ...(settings.topic ? [`Thème demandé par l'utilisateur (donnée) : <theme>${asData(settings.topic)}</theme>`] : []),
+    ...topicLines(settings.topic),
     context.concepts.length
       ? `Banque de concepts : des formes de sujets qui ont déjà sur-performé, mesurées (score = vues ÷ médiane de la chaîne ; 3 et plus = vrai signal). Une « recette » a trois succès sur au moins deux chaînes ; un « pari » n'en a qu'un. <concepts>${asData(conceptData(context.concepts))}</concepts>`
       : "La banque de concepts est vide : appuie-toi sur des formes de sujets dont tu sais qu'elles marchent dans ce domaine, sans inventer de chiffre.",
@@ -277,8 +291,10 @@ export function ideasPrompt(context: IdeaContext, targets: MixTargets): string {
     "Règles d'écriture des accroches et des scripts, à respecter dans hook, title et prompt :",
     ...scriptRuleLines({ french: !foreign }).filter((line) => !line.startsWith("Accroches : ajoute") && !line.startsWith("- ") && !line.startsWith("score sur 10") && !line.startsWith("L'accroche la mieux")),
     "Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour ni bloc de code :",
-    `{"ideas": [{"kind": "proven" | "news" | "remake" | "fresh", "title": string, "hook": string, "angle": string, "concept": {"name": string, "conceptId": string | null}, "remakeOf": string | null, "why": {"text": string, "source": {"url": string, "title": string, "date": "AAAA-MM-JJ"} | null} | null, "template": ${templates.map((template) => `"${template}"`).join(" | ")}, "count": number, "targetSeconds": number, "prompt": string, "checks": {"concreteOpening": boolean, "visualFirstSecond": boolean, "singlePromise": boolean, "shortEnough": boolean}}]}`,
-    `Limites : title ${IDEA_LIMITS.title} caractères ; angle ${IDEA_LIMITS.angle} ; concept.name ${IDEA_LIMITS.conceptName} ; why.text ${IDEA_LIMITS.why} (pourquoi maintenant) ; count de 3 à 10 éléments (questions, entrées, séquences) ; targetSeconds de 15 à 60.`,
+    `{${settings.topic.trim() ? `"subject": string, ` : ""}"ideas": [{"kind": "proven" | "news" | "remake" | "fresh", "title": string, "hook": string, "angle": string, "concept": {"name": string, "conceptId": string | null}, "remakeOf": string | null, "why": {"text": string, "source": {"url": string, "title": string, "date": "AAAA-MM-JJ"} | null} | null, "template": ${templates.map((template) => `"${template}"`).join(" | ")}, "count": number | "auto", "targetSeconds": number, "sourceVideo": string | null, "prompt": string, "checks": {"concreteOpening": boolean, "visualFirstSecond": boolean, "singlePromise": boolean, "shortEnough": boolean}}]}`,
+    `Limites : title ${IDEA_LIMITS.title} caractères ; angle ${IDEA_LIMITS.angle} ; concept.name ${IDEA_LIMITS.conceptName} ; why.text ${IDEA_LIMITS.why} (pourquoi maintenant) ; targetSeconds de 15 à 60.`,
+    `count : le nombre d'éléments (questions, entrées, séquences, diapositives), de 3 à 10, seulement quand l'idée l'annonce (« 5 jeux », « trois astuces ») ; sinon "auto", et le script découpera lui-même selon la durée.`,
+    `sourceVideo : quand l'idée gagne à être montée par-dessus une vidéo existante (réaction, analyse d'une bande-annonce, commentaire d'un extrait), la vidéo à choisir en une phrase de ${IDEA_LIMITS.sourceVideoHint} caractères au plus ; sinon null.`,
   ].join("\n");
 }
 
@@ -295,6 +311,7 @@ interface RawIdea {
   template?: unknown;
   count?: unknown;
   targetSeconds?: unknown;
+  sourceVideo?: unknown;
   prompt?: unknown;
   checks?: Record<string, unknown> | null;
 }
@@ -303,6 +320,15 @@ export interface ParsedIdeas {
   ideas: Omit<Idea, "id" | "status" | "batchId" | "createdAt" | "updatedAt">[];
   /** Ce qui a été écarté ou corrigé, en clair. */
   notes: string[];
+  /** Sujet et angle compris dans le sujet donné (une phrase), quand il y en a un. */
+  subject?: string;
+}
+
+/** Nombre d'éléments d'une idée : 3 à 10 quand il est donné, `undefined` pour « auto ». */
+export function ideaCount(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "" || value === "auto") return undefined;
+  const parsed = Math.round(Number(value));
+  return Number.isFinite(parsed) ? Math.min(IDEA_LIMITS.perSearch.max, Math.max(3, parsed)) : undefined;
 }
 
 /** Date AAAA-MM-JJ lue d'une source, ou `null`. */
@@ -347,7 +373,7 @@ const DUEL = /\b(contre|vs\.?|versus|duel|face à)\b/i;
  * - prompt initial coupé pour que l'accroche et lui tiennent en 600 caractères.
  */
 export function parseIdeas(answer: string, context: IdeaContext): ParsedIdeas {
-  const raw = extractJson<{ ideas?: unknown }>(answer);
+  const raw = extractJson<{ ideas?: unknown; subject?: unknown }>(answer);
   const list = Array.isArray(raw?.ideas) ? (raw.ideas as RawIdea[]) : [];
   const { settings, brand } = context;
   const french = !foreignLanguage(brand);
@@ -401,7 +427,8 @@ export function parseIdeas(answer: string, context: IdeaContext): ParsedIdeas {
     if (whyText || source) why = { text: whyText, ...(source ? { source } : {}) };
 
     const template: IdeaTemplate = allowed.includes(entry.template as IdeaTemplate) ? (entry.template as IdeaTemplate) : allowed[0];
-    const count = Math.min(IDEA_LIMITS.perSearch.max, Math.max(3, Math.round(Number(entry.count) || 5)));
+    const count = ideaCount(entry.count);
+    const sourceVideoHint = entry.sourceVideo ? text(entry.sourceVideo, IDEA_LIMITS.sourceVideoHint) : "";
     const targetSeconds = cleanTargetSeconds(entry.targetSeconds, template, settings.aspect);
     const angle = text(entry.angle, IDEA_LIMITS.angle);
     const conceptName = text(concept?.name ?? entry.concept?.name, IDEA_LIMITS.conceptName) || "Sujet libre";
@@ -435,9 +462,10 @@ export function parseIdeas(answer: string, context: IdeaContext): ParsedIdeas {
       },
       ...(why ? { why } : {}),
       template,
-      count,
+      ...(count !== undefined ? { count } : {}),
       targetSeconds,
       aspect: settings.aspect as AspectPreset,
+      ...(sourceVideoHint.length >= 8 ? { sourceVideoHint } : {}),
       ...(brand?.language ? { language: brand.language } : {}),
       prompt: fitted,
       checks: ideaChecks,
@@ -445,7 +473,8 @@ export function parseIdeas(answer: string, context: IdeaContext): ParsedIdeas {
     seen.push({ title });
     if (ideas.length >= settings.count) break;
   }
-  return { ideas, notes };
+  const subject = settings.topic.trim() ? text(raw?.subject, IDEA_LIMITS.subject) : "";
+  return { ideas, notes, ...(subject ? { subject } : {}) };
 }
 
 // ─── Autres accroches ────────────────────────────────────────────

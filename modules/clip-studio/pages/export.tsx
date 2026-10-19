@@ -125,7 +125,7 @@ export default function ExportPage() {
           </EmptyHeader>
           <EmptyContent>
             <Button asChild variant="outline">
-              <Link href="/m/clip-studio">Retour aux projets</Link>
+              <Link href="/m/clip-studio/projects">Retour aux projets</Link>
             </Button>
           </EmptyContent>
         </Empty>

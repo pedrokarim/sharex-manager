@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * Actions serveur de l’écran « Intelligence artificielle ». Chacune vérifie la
+ * Actions serveur de l’écran « Services externes ». Chacune vérifie la
  * session administrateur : une action est joignable par une requête directe,
  * pas seulement depuis la page. Les erreurs sont rendues comme valeur, avec
  * leur message en français : une erreur levée serait masquée en production.
@@ -33,7 +33,7 @@ async function run<T>(task: () => Promise<T> | T, fallback: string): Promise<Act
 
 /** Aperçu de tous les fournisseurs : accès, limites, consommation, derniers appels. */
 export async function aiUsageOverviewAction(): Promise<ActionResult<AiUsageOverview>> {
-  return run(() => getAiUsageOverview(), "Consommation des IA indisponible.");
+  return run(() => getAiUsageOverview(), "Consommation des services indisponible.");
 }
 
 /** Solde lu chez le service, d’une seule requête de lecture qui ne dépense rien. */

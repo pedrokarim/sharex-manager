@@ -1,5 +1,5 @@
 /**
- * Mots et calculs communs de l'écran « Intelligence artificielle » : unités en
+ * Mots et calculs communs de l'écran « Services externes » : unités en
  * toutes lettres, nombres en français, part d'une limite et son état, accès
  * d'un fournisseur, noms des modules. Rien ici ne dessine.
  */

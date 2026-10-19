@@ -1,19 +1,22 @@
 "use client";
 
 /**
- * Idées de vidéos (dossier 01, « Idées de vidéos »).
+ * Idées de vidéos (dossier 01, « Idées de vidéos »).
  *
- * - Réglages de la série (marque, nombre, part d'actualité, modèles,
- *   format, thème) et « Trouver des idées » : Codex propose des sujets avec
- *   titre, accroche, angle, concept, « pourquoi maintenant » et prompt
- *   initial prêt pour l'assistant.
- * - Chaque idée : « Créer cette vidéo » (fenêtre « Créer » préremplie sur la
- *   page des projets), « Garder », « Écarter », « Autres accroches ».
- * - Banque de concepts de la marque, nourrie par « Étudier la niche »
- *   (tiroir latéral : chaînes de référence, coût en quota, limites).
+ * - « Chercher des idées » : un sujet en mots-clés ou en phrase entière
+ *   (Codex en dégage le sujet et l'angle), et les réglages de la série à
+ *   côté (marque, nombre, part d'actualité, formes, format, web). Codex
+ *   propose des sujets avec titre, accroche, angle, concept, « pourquoi
+ *   maintenant » et les options de création (forme, durée, découpage,
+ *   format, vidéo source).
+ * - Chaque idée : « Créer depuis cette idée » (page « Nouveau clip »
+ *   préremplie, tout reste modifiable), « Garder », « Écarter »,
+ *   « Autres accroches ».
+ * - Banque de concepts de la marque, nourrie par « Étudier la niche »
+ *   (tiroir latéral : chaînes de référence, coût en quota, limites).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
@@ -25,6 +28,7 @@ import {
   Copy,
   CopyX,
   ExternalLink,
+  Film,
   Lightbulb,
   Newspaper,
   Plus,
@@ -32,6 +36,7 @@ import {
   RotateCcw,
   Shapes,
   Sparkles,
+  Settings2,
   Telescope,
   ThumbsDown,
   Trash2,
@@ -44,7 +49,7 @@ import { useSession } from "@/lib/auth-client";
 import { BrandLogo, isBrand } from "@/components/brand-logo";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ActionStatus, FormStatus, errorMessage, useFeedback } from "@/components/feedback";
+import { ActionStatus, FormStatus, errorMessage, useFeedback, type FeedbackState } from "@/components/feedback";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -55,12 +60,15 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ThinkingStatus, type OrbState } from "@/components/loading";
 import { ScreenHeader } from "../components/screen-header";
+import { Panel, PanelBody, PanelHeader } from "@/components/connections/panel";
+import { IDEA_TEMPLATE_LABELS, IdeaOptionChips } from "../components/idea-chips";
 import { BrandKitMark } from "../components/inspector";
 import { callModule, useBrandKits, type BrandKitChoice } from "../lib/client";
 import { createHref, ideaBrief, prefillFromIdea } from "../lib/idea-prefill";
@@ -68,6 +76,7 @@ import { conceptStatus, formatScore } from "../lib/idea-scoring";
 import {
   DEFAULT_IDEA_SETTINGS,
   IDEA_ASPECTS,
+  IDEA_LIMITS,
   IDEA_CHECK_LABELS,
   IDEA_TEMPLATES,
   NEWS_SHARES,
@@ -85,7 +94,7 @@ import type { IdeasBoard } from "../lib/idea-service";
 
 const SETTINGS_KEY = "clip-studio:idea-settings";
 
-const TEMPLATE_LABELS: Record<IdeaTemplate, string> = { free: "Libre", quiz: "Quiz", top: "Classement", slideshow: "Diaporama" };
+const TEMPLATE_LABELS = IDEA_TEMPLATE_LABELS;
 
 const KIND_INFO: Record<IdeaKind, { label: string; icon: typeof Plus; help: string }> = {
   proven: { label: "Concept prouvé", icon: TrendingUp, help: "Une forme de sujet qui a déjà sur-performé (banque de concepts)." },
@@ -122,12 +131,12 @@ function readSettings(): IdeaSettings {
         newsShare: NEWS_SHARES.includes(stored.newsShare) ? stored.newsShare : DEFAULT_IDEA_SETTINGS.newsShare,
         templates: Array.isArray(stored.templates) ? stored.templates.filter((template: IdeaTemplate) => IDEA_TEMPLATES.includes(template)) : DEFAULT_IDEA_SETTINGS.templates,
         aspect: IDEA_ASPECTS.includes(stored.aspect) ? stored.aspect : "9:16",
-        topic: typeof stored.topic === "string" ? stored.topic.slice(0, 120) : "",
+        topic: typeof stored.topic === "string" ? stored.topic.slice(0, IDEA_LIMITS.topic) : "",
         web: stored.web !== false,
       };
     }
   } catch {
-    // Stockage indisponible : réglages par défaut.
+    // Stockage indisponible : réglages par défaut.
   }
   return { ...DEFAULT_IDEA_SETTINGS };
 }
@@ -137,7 +146,7 @@ function writeSettings(settings: IdeaSettings) {
     const { kitId: _kit, ...rest } = settings;
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(rest));
   } catch {
-    // Rien à faire : les réglages valent pour cette visite.
+    // Rien à faire : les réglages valent pour cette visite.
   }
 }
 
@@ -207,20 +216,23 @@ export default function IdeasPage() {
     return next;
   }, [kitId, accountId]);
 
-  // Travaux de fond (idées, étude, propositions de chaînes, accroches) : leur
-  // fin se notifie par un toast, l'utilisateur a pu changer d'écran entre-temps.
+  // Travaux de fond (étude, propositions de chaînes, accroches) : leur fin se
+  // notifie par un toast, l'utilisateur a pu changer d'écran entre-temps. La
+  // recherche d'idées, elle, répond dans son panneau (bilan ou erreur).
   const { tasks, track, running } = useTasks((task) => {
-    if (task.status === "error") toast.error(task.error ?? "Le travail n’a pas abouti. Réessayez dans un instant.");
-    else if (task.kind === "ideas") {
-      setLastNotes(task.notes ?? []);
-      setTab("new");
-      toast.success(task.notes?.[0] ?? "Idées trouvées.");
-    } else if (task.kind === "study") toast.success(task.notes?.[0] ?? "Étude terminée.");
+    if (task.kind === "ideas") {
+      if (task.status === "error") searchFeedback.error(task.error ?? "La recherche n’a pas abouti. Réessayez dans un instant.");
+      else {
+        setLastNotes(task.notes ?? []);
+        setTab("new");
+      }
+    } else if (task.status === "error") toast.error(task.error ?? "Le travail n’a pas abouti. Réessayez dans un instant.");
+    else if (task.kind === "study") toast.success(task.notes?.[0] ?? "Étude terminée.");
     else if (task.kind === "channels") toast.success(task.notes?.[0] ?? "Chaînes proposées.");
     void refresh().catch(() => undefined);
   });
 
-  // Un état local plutôt que `useFeedback` : l'effet de chargement ne doit dépendre d'aucune fonction qui change.
+  // Un état local plutôt que `useFeedback` : l'effet de chargement ne doit dépendre d'aucune fonction qui change.
   const [loadError, setLoadError] = useState<string | null>(null);
   useEffect(() => {
     if (!kitReady) return;
@@ -240,6 +252,7 @@ export default function IdeasPage() {
     };
   }, [kitReady, kitId, accountId, track]);
 
+  const searchFeedback = useFeedback();
   const kit = kits?.find((entry) => entry.id === kitId);
   const searching = running.find((task) => task.kind === "ideas" && (task.kitId ?? null) === kitId);
   const ideas = board?.kitId === kitId ? board.ideas : null;
@@ -247,7 +260,6 @@ export default function IdeasPage() {
   const shown = ideas?.filter((idea) => idea.status === tab) ?? null;
 
   // Un lancement refusé s'écrit là où la recherche aurait affiché son avancement.
-  const searchFeedback = useFeedback();
   const findIdeas = async () => {
     searchFeedback.clear();
     try {
@@ -265,7 +277,7 @@ export default function IdeasPage() {
     <MotionConfig reducedMotion="user">
       <div className="flex min-w-0 flex-col gap-6">
         <ScreenHeader
-          back={{ href: "/m/clip-studio", label: "Projets" }}
+          back={{ href: "/m/clip-studio", label: "Accueil de Clip Studio" }}
           icon={Lightbulb}
           title="Idées"
           description="Des sujets de vidéos partis de ce qui a déjà marché, avec titre, accroche et prompt prêt pour l'assistant."
@@ -276,45 +288,45 @@ export default function IdeasPage() {
                 Étudier la niche
                 {board?.studyDue ? <span className="size-2 rounded-full bg-primary" aria-label="Étude conseillée" /> : null}
               </Button>
-              <Button className="gap-2" onClick={findIdeas} loading={Boolean(searching)} disabled={!kitReady || settings.templates.length === 0}>
-                <Sparkles className="size-4" />
-                Trouver des idées
+              <Button asChild variant="ghost" className="gap-2">
+                <Link href="/m/clip-studio/new">
+                  <Plus className="size-4" />
+                  Nouveau clip
+                </Link>
               </Button>
             </>
           }
         />
 
-        <SettingsBar settings={settings} kits={kits} kit={kit} onChange={update} />
+        <SearchPanel
+          settings={settings}
+          kits={kits}
+          kit={kit}
+          onChange={update}
+          onSearch={findIdeas}
+          searching={searching}
+          disabled={!kitReady || settings.templates.length === 0}
+          feedback={searchFeedback.state}
+          notes={lastNotes}
+          onCloseNotes={() => setLastNotes([])}
+        />
 
         <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
           <section className="flex min-w-0 flex-col gap-4">
             <FormStatus state={loadError ? { tone: "error", message: loadError, id: 0 } : null} />
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-              {/* Une seule ligne : sur un téléphone, les quatre onglets se partagent la largeur. */}
+              {/* Une seule ligne : sur un téléphone, les quatre onglets se partagent la largeur. */}
               <Tabs value={tab} onValueChange={(value) => setTab(value as IdeaStatus)} className="w-full min-w-0 sm:w-auto">
                 <TabsList className="w-full min-w-0 sm:w-fit">
                   {TABS.map((entry) => (
                     <TabsTrigger key={entry.id} value={entry.id} className="min-w-0 gap-1 px-1.5 sm:gap-1.5 sm:px-2">
                       {entry.label}
-                      <span className="text-xs text-muted-foreground tabular-nums">{counts[entry.id]}</span>
+                      <span className="text-xs text-foreground/70 tabular-nums">{counts[entry.id]}</span>
                     </TabsTrigger>
                   ))}
                 </TabsList>
               </Tabs>
             </div>
-
-            <FormStatus state={searchFeedback.state} />
-            <AnimatePresence initial={false}>
-              {searching ? (
-                <motion.div key="searching" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                  <TaskLine task={searching} />
-                </motion.div>
-              ) : lastNotes.length > 0 ? (
-                <motion.div key="notes" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                  <MixNotes notes={lastNotes} onClose={() => setLastNotes([])} />
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
 
             {shown === null ? (
               <div className="grid min-w-0 gap-4 md:grid-cols-[repeat(2,minmax(0,1fr))]">
@@ -394,130 +406,219 @@ export default function IdeasPage() {
   );
 }
 
-// ─── Réglages ────────────────────────────────────────────────────
+// ─── Recherche ───────────────────────────────────────────────────
 
-function SettingsBar({
+/** Une ligne de réglage de la série : intitulé à gauche, contrôle à droite (dessous sur un écran étroit). */
+function SettingRow({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 py-3">
+      {htmlFor ? (
+        <Label htmlFor={htmlFor} className="min-w-0">
+          {label}
+        </Label>
+      ) : (
+        <span className="min-w-0 text-sm font-medium">{label}</span>
+      )}
+      <div className="flex max-w-full min-w-0 justify-end">{children}</div>
+    </div>
+  );
+}
+
+/** Exemples de sujets : une phrase entière, ou quelques mots-clés. */
+const TOPIC_EXAMPLES = [
+  "Les secrets de fabrication des sabres japonais et pourquoi ils coupent si bien",
+  "Pourquoi le ciel est bleu le jour et rouge au coucher du soleil",
+  "jeux mobiles gratuits",
+  "cuisine rapide, recettes en 10 minutes",
+];
+
+function SearchPanel({
   settings,
   kits,
   kit,
   onChange,
+  onSearch,
+  searching,
+  disabled,
+  feedback,
+  notes,
+  onCloseNotes,
 }: {
   settings: IdeaSettings;
   kits: BrandKitChoice[] | null | undefined;
   kit: BrandKitChoice | undefined;
   onChange: (patch: Partial<IdeaSettings>) => void;
+  onSearch: () => void;
+  searching: IdeaTask | undefined;
+  disabled: boolean;
+  feedback: FeedbackState | null;
+  notes: string[];
+  onCloseNotes: () => void;
 }) {
   return (
-    <section aria-label="Réglages de la série" className="flex min-w-0 flex-wrap items-end gap-x-5 gap-y-4">
-      {kits?.length ? (
-        <div className="grid min-w-0 basis-56 gap-1.5 sm:flex-none">
-          <Label htmlFor="ideas-kit">Marque</Label>
-          <Select value={settings.kitId ?? "none"} onValueChange={(value) => onChange({ kitId: value === "none" ? null : value })}>
-            <SelectTrigger id="ideas-kit" className="w-full min-w-0 sm:w-56">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Sans marque</SelectItem>
-              {kits.map((entry) => (
-                <SelectItem key={entry.id} value={entry.id}>
-                  <span className="flex min-w-0 items-center gap-2">
-                    <BrandKitMark kit={entry} />
-                    <span className="truncate">{entry.name}</span>
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-
-      <div className="grid gap-1.5">
-        <Label htmlFor="ideas-count">Idées</Label>
-        <Select value={String(settings.count)} onValueChange={(value) => onChange({ count: Number(value) })}>
-          <SelectTrigger id="ideas-count" className="w-20">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Array.from({ length: 8 }, (_, index) => index + 3).map((value) => (
-              <SelectItem key={value} value={String(value)}>
-                {value}
-              </SelectItem>
+    <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      <Panel aria-labelledby="ideas-search">
+        <PanelHeader
+          icon={Sparkles}
+          titleId="ideas-search"
+          title="Chercher des idées"
+          description="Des mots-clés ou une phrase entière : Codex en dégage le sujet et l’angle, puis cherche autour. Laissé vide, il cherche des sujets pour la marque."
+        />
+        <PanelBody className="flex min-w-0 flex-col gap-3">
+          <Textarea
+            id="ideas-topic"
+            value={settings.topic}
+            maxLength={IDEA_LIMITS.topic}
+            rows={4}
+            placeholder="Par exemple : les secrets de fabrication des sabres japonais et pourquoi ils coupent si bien ; ou : jeux mobiles, cuisine rapide"
+            aria-label="Sujet, en mots-clés ou en phrase"
+            className="resize-none text-[15px]"
+            onChange={(event) => onChange({ topic: event.target.value.slice(0, IDEA_LIMITS.topic) })}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !disabled && !searching) onSearch();
+            }}
+          />
+          <div className="flex min-w-0 flex-wrap gap-1.5" aria-label="Exemples">
+            {TOPIC_EXAMPLES.map((example) => (
+              <button
+                key={example}
+                type="button"
+                onClick={() => onChange({ topic: example })}
+                className="max-w-full rounded-full border px-2.5 py-1 text-left text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              >
+                {example}
+              </button>
             ))}
-          </SelectContent>
-        </Select>
-      </div>
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {settings.topic.length}&nbsp;/&nbsp;{IDEA_LIMITS.topic}
+            </span>
+            <Button className="gap-2" onClick={onSearch} loading={Boolean(searching)} disabled={disabled}>
+              <Sparkles className="size-4" />
+              Trouver des idées
+            </Button>
+          </div>
+          <FormStatus state={feedback} />
+          <AnimatePresence initial={false}>
+            {searching ? (
+              <motion.div key="searching" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                <TaskLine task={searching} />
+              </motion.div>
+            ) : notes.length > 0 ? (
+              <motion.div key="notes" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                <MixNotes notes={notes} onClose={onCloseNotes} />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </PanelBody>
+      </Panel>
 
-      <div className="grid min-w-0 gap-1.5">
-        <span className="text-sm font-medium">Actualité</span>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          value={String(settings.newsShare)}
-          onValueChange={(value) => value && onChange({ newsShare: Number(value) })}
-          aria-label="Part d'actualité, le reste intemporel"
-        >
-          {NEWS_SHARES.map((share) => (
-            <ToggleGroupItem key={share} value={String(share)} className="px-2.5 text-xs">
-              {share === 0 ? "Aucune" : `${share} %`}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </div>
+      <Panel aria-labelledby="ideas-settings">
+        <PanelHeader icon={Settings2} titleId="ideas-settings" title="Réglages de la série" description="Chaque idée arrive avec ses options de création : forme, durée, découpage, format." />
+        <div className="min-w-0 divide-y">
+          {kits?.length ? (
+            <SettingRow label="Marque" htmlFor="ideas-kit">
+              <Select value={settings.kitId ?? "none"} onValueChange={(value) => onChange({ kitId: value === "none" ? null : value })}>
+                <SelectTrigger id="ideas-kit" className="w-52 max-w-full min-w-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sans marque</SelectItem>
+                  {kits.map((entry) => (
+                    <SelectItem key={entry.id} value={entry.id}>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <BrandKitMark kit={entry} />
+                        <span className="truncate">{entry.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingRow>
+          ) : null}
 
-      <div className="grid min-w-0 gap-1.5">
-        <span className="text-sm font-medium">Modèles permis</span>
-        <ToggleGroup
-          type="multiple"
-          variant="outline"
-          size="sm"
-          value={settings.templates}
-          onValueChange={(value) => onChange({ templates: value.filter((entry): entry is IdeaTemplate => IDEA_TEMPLATES.includes(entry as IdeaTemplate)) })}
-          aria-label="Modèles permis"
-          className="flex-wrap"
-        >
-          {IDEA_TEMPLATES.map((template) => (
-            <ToggleGroupItem key={template} value={template} className="px-2.5 text-xs">
-              {TEMPLATE_LABELS[template]}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </div>
+          <SettingRow label="Idées" htmlFor="ideas-count">
+            <Select value={String(settings.count)} onValueChange={(value) => onChange({ count: Number(value) })}>
+              <SelectTrigger id="ideas-count" className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 8 }, (_, index) => index + 3).map((value) => (
+                  <SelectItem key={value} value={String(value)}>
+                    {value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingRow>
 
-      <div className="grid min-w-0 gap-1.5">
-        <span className="text-sm font-medium">Format</span>
-        <ToggleGroup type="single" variant="outline" size="sm" value={settings.aspect} onValueChange={(value) => value && onChange({ aspect: value as IdeaSettings["aspect"] })} aria-label="Format">
-          {IDEA_ASPECTS.map((aspect) => (
-            <ToggleGroupItem key={aspect} value={aspect} className="px-2.5 text-xs tabular-nums">
-              {aspect}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </div>
+          <SettingRow label="Actualité">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={String(settings.newsShare)}
+              onValueChange={(value) => value && onChange({ newsShare: Number(value) })}
+              aria-label="Part d'actualité, le reste intemporel"
+            >
+              {NEWS_SHARES.map((share) => (
+                <ToggleGroupItem key={share} value={String(share)} className="px-2 text-xs">
+                  {share === 0 ? "Aucune" : `${share} %`}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </SettingRow>
 
-      <div className="grid min-w-0 flex-1 basis-56 gap-1.5">
-        <Label htmlFor="ideas-topic">Thème ou mot-clé</Label>
-        <Input id="ideas-topic" value={settings.topic} maxLength={120} placeholder={"Facultatif\u00a0: «\u00a0jeux mobiles\u00a0», «\u00a0cuisine rapide\u00a0»…"} onChange={(event) => onChange({ topic: event.target.value })} />
-      </div>
+          <SettingRow label="Formes permises">
+            <ToggleGroup
+              type="multiple"
+              variant="outline"
+              size="sm"
+              value={settings.templates}
+              onValueChange={(value) => onChange({ templates: value.filter((entry): entry is IdeaTemplate => IDEA_TEMPLATES.includes(entry as IdeaTemplate)) })}
+              aria-label="Formes permises"
+              className="flex-wrap justify-end"
+            >
+              {IDEA_TEMPLATES.map((template) => (
+                <ToggleGroupItem key={template} value={template} className="px-2 text-xs">
+                  {TEMPLATE_LABELS[template]}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </SettingRow>
 
-      <label className="flex min-w-0 items-center gap-2 pb-2 text-sm">
-        <Switch checked={settings.web} onCheckedChange={(web) => onChange({ web })} />
-        <span>Recherche web</span>
-      </label>
+          <SettingRow label="Format">
+            <ToggleGroup type="single" variant="outline" size="sm" value={settings.aspect} onValueChange={(value) => value && onChange({ aspect: value as IdeaSettings["aspect"] })} aria-label="Format">
+              {IDEA_ASPECTS.map((aspect) => (
+                <ToggleGroupItem key={aspect} value={aspect} className="px-2 text-xs tabular-nums">
+                  {aspect}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </SettingRow>
 
-      {kit ? (
-        <p className="basis-full text-xs text-muted-foreground">
-          Ton, sujets (mots-clés et mots-dièse) et règles de «&nbsp;{kit.name}&nbsp;» guident les idées
-          {settings.templates.length === 0 ? "\u00a0; choisissez au moins un modèle." : "."}
-        </p>
-      ) : settings.templates.length === 0 ? (
-        <p className="basis-full text-xs text-destructive">Choisissez au moins un modèle.</p>
-      ) : null}
-    </section>
+          <label className="flex min-w-0 items-start justify-between gap-3 px-4 py-3">
+            <span className="min-w-0 text-sm font-medium">
+              Recherche web
+              <span className="block text-xs font-normal text-muted-foreground">Actualité et faits datés vérifiés ; plus long.</span>
+            </span>
+            <Switch checked={settings.web} onCheckedChange={(web) => onChange({ web })} />
+          </label>
+
+          {kit || settings.templates.length === 0 ? (
+            <p className={cn("px-4 py-3 text-xs", settings.templates.length === 0 && !kit ? "text-destructive" : "text-muted-foreground")}>
+              {kit ? `Ton, sujets (mots-clés et mots-dièse) et règles de « ${kit.name} » guident les idées` : ""}
+              {settings.templates.length === 0 ? (kit ? " ; choisissez au moins une forme." : "Choisissez au moins une forme.") : kit ? "." : ""}
+            </p>
+          ) : null}
+        </div>
+      </Panel>
+    </div>
   );
 }
 
-/** L'orbe dit la nature du travail : écrire des idées, lire des chaînes, étudier la niche. */
+/** L'orbe dit la nature du travail : écrire des idées, lire des chaînes, étudier la niche. */
 const TASK_ORB: Record<IdeaTaskKind, OrbState> = {
   ideas: "composing",
   hooks: "composing",
@@ -534,7 +635,7 @@ function TaskLine({ task }: { task: IdeaTask }) {
   const seconds = Math.max(0, Math.round((now - task.startedAt) / 1000));
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-lg bg-muted/50 px-3 py-2.5 text-sm">
-      {/* La ligne d'état annonce l'étape ; le compteur de secondes reste muet. */}
+      {/* La ligne d'état annonce l'étape ; le compteur de secondes reste muet. */}
       <ThinkingStatus messages={task.step} state={TASK_ORB[task.kind]} className="flex-1" />
       <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{seconds}&nbsp;s</span>
     </div>
@@ -568,7 +669,7 @@ function IdeaCard({ idea, hooksTask, onChanged, onTask }: { idea: Idea; hooksTas
   const kind = KIND_INFO[idea.kind];
   const KindIcon = kind.icon;
   const brief = ideaBrief(idea);
-  // La carte qui change d'onglet ou d'accroche est le retour ; un échec s'écrit au bout de ses boutons.
+  // La carte qui change d'onglet ou d'accroche est le retour ; un échec s'écrit au bout de ses boutons.
   const feedback = useFeedback();
   const { hasCopied, copyFailed, copyToClipboard } = useCopyToClipboard();
 
@@ -617,15 +718,9 @@ function IdeaCard({ idea, hooksTask, onChanged, onTask }: { idea: Idea; hooksTas
           </TooltipTrigger>
           <TooltipContent className="max-w-64">{kind.help}</TooltipContent>
         </Tooltip>
-        <span aria-hidden>·</span>
-        <span>
-          {TEMPLATE_LABELS[idea.template]}, {idea.count} éléments
-        </span>
-        <span aria-hidden>·</span>
-        <span className="tabular-nums">{idea.targetSeconds}&nbsp;s</span>
-        <span aria-hidden>·</span>
-        <span className="tabular-nums">{idea.aspect}</span>
       </div>
+
+      <IdeaOptionChips idea={idea} />
 
       <h3 className="text-base leading-snug font-semibold text-pretty [overflow-wrap:anywhere]">{idea.title}</h3>
 
@@ -634,6 +729,13 @@ function IdeaCard({ idea, hooksTask, onChanged, onTask }: { idea: Idea; hooksTas
       </p>
 
       {idea.angle ? <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{idea.angle}</p> : null}
+
+      {idea.sourceVideoHint ? (
+        <p className="flex min-w-0 items-start gap-2 text-sm">
+          <Film className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-label="Vidéo source" />
+          <span className="min-w-0 [overflow-wrap:anywhere]">{idea.sourceVideoHint}</span>
+        </p>
+      ) : null}
 
       <dl className="grid min-w-0 gap-2 text-sm">
         <div className="flex min-w-0 items-start gap-2">
@@ -731,7 +833,7 @@ function IdeaCard({ idea, hooksTask, onChanged, onTask }: { idea: Idea; hooksTas
           <>
             <Button size="sm" className="gap-1.5" onClick={() => router.push(createHref(prefillFromIdea(idea)))} loading={Boolean(idea.jobId)}>
               <Wand2 className="size-4" />
-              {idea.jobId ? "Création en cours" : "Créer cette vidéo"}
+              {idea.jobId ? "Création en cours" : "Créer depuis cette idée"}
             </Button>
             {idea.status === "dismissed" ? (
               <Button size="sm" variant="outline" className="gap-1.5" disabled={busy !== null} onClick={() => setStatus("new")}>
@@ -782,7 +884,7 @@ function ConceptPanel({
   onStudy: () => void;
   onChanged: (bank: ConceptBank) => void;
 }) {
-  // Le concept qui s'en va suffit ; un échec s'écrit sur sa ligne.
+  // Le concept qui s'en va suffit ; un échec s'écrit sur sa ligne.
   const feedback = useFeedback();
   const [failedConcept, setFailedConcept] = useState<string | null>(null);
   const remove = async (conceptId: string) => {
@@ -924,7 +1026,7 @@ function NicheSheet({
   const kitId = board?.kitId ?? null;
   const bank = board?.bank;
   const study = tasks.find((task) => task.kind === "study" && task.status === "running");
-  // L'étude dépense le quota du compte YouTube connecté par un administrateur : réservée aux administrateurs.
+  // L'étude dépense le quota du compte YouTube connecté par un administrateur : réservée aux administrateurs.
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
   const adminOnly = isAdmin ? undefined : "Réservé aux administrateurs : l’étude dépense le quota YouTube du compte connecté.";
@@ -933,7 +1035,7 @@ function NicheSheet({
   const pending = bank?.channels.filter((channel) => channel.state === "pending") ?? [];
   const estimate = board?.estimate;
   const account = board?.accounts.find((entry) => entry.id === accountId);
-  // Les gestes sur les chaînes répondent sous le champ d'ajout ; le lancement de l'étude, au-dessus de son bouton.
+  // Les gestes sur les chaînes répondent sous le champ d'ajout ; le lancement de l'étude, au-dessus de son bouton.
   const channelsFeedback = useFeedback();
   const studyFeedback = useFeedback();
 
@@ -1103,7 +1205,7 @@ function NicheSheet({
                             <span className={cn("block text-xs [overflow-wrap:anywhere]", stat.error ? "text-destructive" : "text-muted-foreground")}>
                               {stat.error
                                 ? stat.error
-                                : `${stat.shorts} vidéos courtes · médiane ${stat.median === null ? "inconnue" : stat.median.toLocaleString("fr-FR")} vues${stat.top[0] ? ` · meilleur ${formatScore(stat.top[0].score)}` : ""}${stat.small ? " · médiane fragile" : ""}`}
+                                : `${stat.shorts} vidéos courtes · médiane ${stat.median === null ? "inconnue" : stat.median.toLocaleString("fr-FR")} vues${stat.top[0] ? ` · meilleur ${formatScore(stat.top[0].score)}` : ""}${stat.small ? " · médiane fragile" : ""}`}
                             </span>
                           ) : null}
                         </span>

@@ -56,7 +56,7 @@ const ModuleCatalogSectionSchema = z.object({
   media: z.string(),
 });
 
-/** Fonctions qui renseignent le registre de consommation des IA (`/admin/ai`). */
+/** Fonctions qui renseignent le registre de consommation des IA (`/admin/services`). */
 const FunctionNameSchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,63}$/, "Nom de fonction invalide");
 const ModuleAiUsageSchema = z.object({
   limits: FunctionNameSchema.optional(),
