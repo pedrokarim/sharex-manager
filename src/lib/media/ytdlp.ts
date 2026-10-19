@@ -260,6 +260,7 @@ export function parseFileLine(line: string): string | null {
 
 export type YtDlpErrorCode =
   | "missing"
+  | "ffmpeg-crash"
   | "bot-check"
   | "cookies-invalid"
   | "age"
@@ -293,6 +294,7 @@ export function classifyYtDlpError(stderr: string): YtDlpErrorCode {
   if (text.includes("not available in your country") || text.includes("geo restrict") || text.includes("geo-restrict")) return "geo";
   if (text.includes("is live") || text.includes("live event will begin") || text.includes("premieres in")) return "live";
   if (text.includes("file is larger than max-filesize")) return "too-large";
+  if (/ffmpeg exited with code (-11|139|-6|134)/.test(text) || text.includes("segmentation fault")) return "ffmpeg-crash";
   if (text.includes("unsupported url") || text.includes("is not a valid url")) return "unsupported";
   if (text.includes("video unavailable") || text.includes("video is unavailable") || text.includes("http error 404") || text.includes("does not exist") || text.includes("has been removed") || text.includes("clip not found")) return "unavailable";
   if (text.includes("timed out") || text.includes("unable to download webpage") || text.includes("connection") || text.includes("http error 5")) return "network";
@@ -328,6 +330,8 @@ export function ytDlpErrorMessage(code: YtDlpErrorCode, options: { hasCookies?: 
       return "La vidéo dépasse 500 Mo. Choisissez un passage plus court.";
     case "network":
       return `${options.site ?? "Le site"} ne répond pas pour l’instant. Réessayez dans un moment.`;
+    case "ffmpeg-crash":
+      return "ffmpeg a planté sur le serveur en lisant la vidéo : la vidéo a bien été trouvée, c’est l’outil de découpe qui a lâché. Prévenez un administrateur.";
     case "timeout":
       return "La récupération a pris trop de temps et a été arrêtée. Choisissez un passage plus court, ou réessayez.";
     case "canceled":
@@ -354,12 +358,25 @@ export interface RunResult {
   stderr: string;
 }
 
+/**
+ * ffmpeg pour yt-dlp, qui lui fait lire des adresses en ligne (un passage
+ * d'une vidéo). Celui du système d'abord : la version statique épinglée plante
+ * dès qu'elle résout un nom de domaine (erreur de segmentation). À défaut,
+ * l'épinglée, qui suffit tant qu'aucun passage n'est demandé.
+ */
+export async function networkFfmpeg(): Promise<string | null> {
+  for (const candidate of ["/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg"]) {
+    if (process.platform !== "win32" && fs.existsSync(candidate)) return candidate;
+  }
+  return ensureFfmpeg();
+}
+
 /** Options communes à tous les appels, avant celles de l'appel. */
 export async function commonArgs(cookiesFile?: string | null): Promise<string[]> {
   const args = ["--no-config", "--no-cache-dir", "--no-playlist", "--no-warnings", "--socket-timeout", "30", "--no-js-runtimes"];
   const bun = bunRuntimePath();
   if (bun) args.push("--js-runtimes", `bun:${bun}`);
-  const ffmpeg = await ensureFfmpeg();
+  const ffmpeg = await networkFfmpeg();
   if (ffmpeg) args.push("--ffmpeg-location", ffmpeg);
   if (cookiesFile) args.push("--cookies", cookiesFile);
   return args;

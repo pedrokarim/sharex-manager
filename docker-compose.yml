@@ -33,6 +33,9 @@ services:
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-https://sxm.ascencia.re}
       - TZ=Europe/Paris
     restart: unless-stopped
+    # Un outil qui plante (ffmpeg, yt-dlp) ne laisse pas de vidage mémoire sur le disque.
+    ulimits:
+      core: 0
     user: "${UID:-1000}:${GID:-1000}"
     volumes:
       # Montage des dossiers locaux

@@ -142,8 +142,14 @@ RUN mkdir -p /app/.next/static \
 #
 # Des polices, aussi : sharp dessine les textes (filigrane…) en SVG avec
 # celles du système, et sans aucune le texte disparaissait simplement.
+#
+# Et ffmpeg de Debian, lié dynamiquement : yt-dlp lui fait lire les vidéos en
+# ligne pour n'en garder qu'un passage. La version statique épinglée
+# (`src/lib/media/ffmpeg.ts`) plante dès qu'elle doit résoudre un nom de
+# domaine (erreur de segmentation, vu le 19/10/2026) ; elle reste utilisée pour
+# les fichiers locaux.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates fontconfig fonts-dejavu-core \
+    && apt-get install -y --no-install-recommends ca-certificates fontconfig fonts-dejavu-core ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Codex, plus son `rg` et son `bwrap`. Le PATH plutôt qu'un lien symbolique :
