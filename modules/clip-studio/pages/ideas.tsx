@@ -309,9 +309,8 @@ export default function IdeasPage() {
           feedback={searchFeedback.state}
           notes={lastNotes}
           onCloseNotes={() => setLastNotes([])}
-        />
-
-        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+          aside={<ConceptPanel bank={board?.bank ?? null} kitName={kit?.name} studyDue={board?.studyDue ?? false} onStudy={() => setNicheOpen(true)} onChanged={(bank) => setBoard((current) => (current ? { ...current, bank } : current))} />}
+        >
           <section className="flex min-w-0 flex-col gap-4">
             <FormStatus state={loadError ? { tone: "error", message: loadError, id: 0 } : null} />
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
@@ -385,9 +384,7 @@ export default function IdeasPage() {
               </div>
             )}
           </section>
-
-          <ConceptPanel bank={board?.bank ?? null} kitName={kit?.name} studyDue={board?.studyDue ?? false} onStudy={() => setNicheOpen(true)} onChanged={(bank) => setBoard((current) => (current ? { ...current, bank } : current))} />
-        </div>
+        </SearchPanel>
       </div>
 
       <NicheSheet
@@ -443,6 +440,8 @@ function SearchPanel({
   feedback,
   notes,
   onCloseNotes,
+  aside,
+  children,
 }: {
   settings: IdeaSettings;
   kits: BrandKitChoice[] | null | undefined;
@@ -454,9 +453,14 @@ function SearchPanel({
   feedback: FeedbackState | null;
   notes: string[];
   onCloseNotes: () => void;
+  /** Colonne de droite, sous les réglages (banque de concepts). */
+  aside?: ReactNode;
+  /** Sous la recherche, dans la même colonne : la liste des idées. Sans cela, elle attendrait la fin de la colonne de droite. */
+  children?: ReactNode;
 }) {
   return (
     <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      <div className="flex min-w-0 flex-col gap-6">
       <Panel aria-labelledby="ideas-search">
         <PanelHeader
           icon={Sparkles}
@@ -513,7 +517,10 @@ function SearchPanel({
           </AnimatePresence>
         </PanelBody>
       </Panel>
+      {children}
+      </div>
 
+      <div className="flex min-w-0 flex-col gap-6">
       <Panel aria-labelledby="ideas-settings">
         <PanelHeader icon={Settings2} titleId="ideas-settings" title="Réglages de la série" description="Chaque idée arrive avec ses options de création : forme, durée, découpage, format." />
         <div className="min-w-0 divide-y">
@@ -614,6 +621,8 @@ function SearchPanel({
           ) : null}
         </div>
       </Panel>
+      {aside}
+      </div>
     </div>
   );
 }

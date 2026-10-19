@@ -560,9 +560,8 @@ function FilterSelect({
     <Select value={value || ALL} onValueChange={(next) => onChange(next === ALL ? "" : next)}>
       <SelectTrigger size="sm" className={cn("w-auto max-w-full min-w-0", value && "border-primary/60")} aria-label={label}>
         <span className="shrink-0 text-muted-foreground">{label}&nbsp;:</span>
-        <span className="flex max-h-full min-w-0 items-center overflow-hidden">
-          <SelectValue />
-        </span>
+        {/* Le logo et le nom de l'option choisie restent sur une ligne, côte à côte. */}
+        <SelectValue className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap [&>span]:truncate" />
       </SelectTrigger>
       <SelectContent className="max-w-[min(24rem,calc(100vw-2rem))]">
         <SelectItem value={ALL}>{allLabel}</SelectItem>
