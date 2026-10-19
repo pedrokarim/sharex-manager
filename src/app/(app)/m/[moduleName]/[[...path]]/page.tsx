@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
+import { modulePageTitle } from "@/lib/modules/page-title";
 import { ModulePageLoader } from "./module-page-loader";
 
 interface ModulePageProps {
@@ -11,19 +12,20 @@ interface ModulePageProps {
 }
 
 /**
- * Le titre suit le module chargé : « AI Image Gen » plutôt que le nom générique
- * de l'application dans l'onglet. Le `noindex` vient du layout du groupe (app).
+ * Le titre nomme la page et son module : « Projets · Clip Studio » plutôt que
+ * l'identifiant technique dans l'onglet. Le `noindex` vient du layout du groupe (app).
  */
 export async function generateMetadata({
   params,
 }: ModulePageProps): Promise<Metadata> {
-  const { moduleName } = await params;
+  const { moduleName, path: pathSegments } = await params;
 
   try {
     await apiModuleManager.ensureInitialized();
     const loadedModule = apiModuleManager.getLoadedModule(moduleName);
-    const nom = loadedModule?.manifest?.name;
-    if (nom) return { title: nom };
+    if (loadedModule?.config) {
+      return { title: modulePageTitle(loadedModule.config, pathSegments?.join("/") || "") };
+    }
   } catch (error) {
     console.error(`Métadonnées du module "${moduleName}" indisponibles:`, error);
   }
