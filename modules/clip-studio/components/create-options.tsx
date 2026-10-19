@@ -8,17 +8,19 @@
 
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Check, Images, ListOrdered, PenLine, Plus, SquareSplitHorizontal, Trophy, X, Zap } from "lucide-react";
+import { Check, Film, Images, ListOrdered, PenLine, Plus, SquareSplitHorizontal, Trophy, Volume2, VolumeX, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Orb } from "@/components/loading";
 import { AssistantAvatar } from "@/components/motion/assistant-avatar";
-import type { Brand } from "@/components/brand-logo";
+import { BrandLogo, type Brand } from "@/components/brand-logo";
 import { isVideoFile } from "@/lib/media-kind";
 import { cn } from "@/lib/utils";
 import { SAMPLE_BEFORE_AFTER, SAMPLE_FREE, SAMPLE_QUIZ, SAMPLE_SLIDESHOW, SAMPLE_TOP, type TemplateId } from "../engine/templates";
 import { ASPECTS, type AspectPreset, type MediaSource } from "../engine/types";
 import { probeMedia, type BrandKitChoice, type VideoProviderId } from "../lib/client";
 import type { AssistantJob } from "../lib/assistant";
+import type { ClipOutcome } from "../lib/clip-sourcing";
+
 import { IMAGE_SOURCE_MODES, type ImageSourceMode } from "../lib/image-search-types";
 import { cleanSpeed, isToneId } from "../lib/voice-settings";
 import { BrandKitMark } from "./inspector";
@@ -279,6 +281,77 @@ export function AspectPicker({ value, onChange }: { value: AspectPreset; onChang
 
 // ─── Suivi de l'assistant ────────────────────────────────────────
 
+const CLIP_SITE_BRANDS: Record<"youtube" | "twitch", { label: string; brand: Brand }> = {
+  youtube: { label: "YouTube", brand: "youtube" },
+  twitch: { label: "Twitch", brand: "twitch" },
+};
+
+/** « 1:05 » */
+const clipClock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+
+/**
+ * Étape « Vidéos » (V5), segment par segment : l'extrait trouvé (aperçu, titre,
+ * site, passage, son gardé ou muet) ou le repli et sa raison.
+ */
+export function ClipResults({ clips }: { clips: ClipOutcome[] }) {
+  return (
+    <ul className="mt-2 flex min-w-0 flex-col divide-y" aria-label="Extraits de vidéos, segment par segment">
+      {clips.map((clip) => {
+        const site = clip.video ? CLIP_SITE_BRANDS[clip.video.site] : null;
+        return (
+          <li key={clip.segment} className="flex min-w-0 items-start gap-3 py-2 first:pt-1 last:pb-0">
+            {clip.status === "found" && clip.mediaUrl ? (
+              <video src={`${clip.mediaUrl}#t=${Math.max(0.5, Math.round(((clip.quoteSeconds ?? clip.seconds ?? 2) / 2) * 10) / 10)}`} muted preload="metadata" className="aspect-video w-20 max-w-full shrink-0 rounded bg-muted object-cover" aria-hidden />
+            ) : (
+              <span className="flex aspect-video w-20 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground" aria-hidden>
+                <Film className="size-4" />
+              </span>
+            )}
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-xs">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="shrink-0 text-muted-foreground tabular-nums">Segment {clip.segment + 1}</span>
+                {clip.status === "found" ? (
+                  <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-medium", clip.keepAudio ? "bg-primary/10 text-primary" : "bg-muted text-foreground/80")}>
+                    {clip.keepAudio ? <Volume2 className="size-3" /> : <VolumeX className="size-3" />}
+                    {clip.keepAudio ? "Son gardé" : "Muet"}
+                  </span>
+                ) : (
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-amber-500/10 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400">Remplacé</span>
+                )}
+              </span>
+              {clip.status === "found" && clip.video ? (
+                <>
+                  <a
+                    href={clip.video.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="flex min-w-0 items-center gap-1.5 text-sm text-foreground hover:underline"
+                    title={clip.video.author ? `${clip.video.title} – ${clip.video.author}` : clip.video.title}
+                  >
+                    {site ? <BrandLogo brand={site.brand} className="size-3.5 shrink-0" /> : null}
+                    <span className="min-w-0 truncate">{clip.video.title}</span>
+                  </a>
+                  <span className="min-w-0 text-muted-foreground [overflow-wrap:anywhere]">
+                    {[site?.label, clip.video.author, `${clipClock(clip.video.start)} – ${clipClock(clip.video.end)}`, clip.keepAudio && clip.quoteSeconds ? `${String(clip.quoteSeconds).replace(".", ",")} s de son` : ""]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </>
+              ) : (
+                <span className="min-w-0 text-foreground [overflow-wrap:anywhere]">
+                  «&nbsp;{clip.search}&nbsp;»{clip.fallback ? ` → ${clip.fallback}` : ""}
+                </span>
+              )}
+              {clip.moment ? <span className="min-w-0 text-muted-foreground [overflow-wrap:anywhere]">{clip.moment}</span> : null}
+              {clip.note ? <span className="min-w-0 text-muted-foreground italic [overflow-wrap:anywhere]">{clip.note}</span> : null}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function AssistantProgress({ job, onCancel }: { job: AssistantJob; onCancel?: () => void }) {
   return (
     <div className="space-y-4">
@@ -309,6 +382,7 @@ export function AssistantProgress({ job, onCancel }: { job: AssistantJob; onCanc
                 {step.label}
               </span>
               {step.detail && <span className="mt-0.5 block text-xs text-pretty text-muted-foreground [overflow-wrap:anywhere]">{step.detail}</span>}
+              {step.id === "videos" && job.clips?.length ? <ClipResults clips={job.clips} /> : null}
             </span>
           </motion.li>
         ))}

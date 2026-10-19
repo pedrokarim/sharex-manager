@@ -34,6 +34,7 @@ import { prefetchTts, prepareVoice as downloadVoice, respeak, synthesize, voiceS
 import {
   isCloudProvider,
   isKeyProvider,
+  openAiApiKey,
   openAiVoiceAccess,
   providerStatuses,
   readElevenLabsBalance,
@@ -78,6 +79,9 @@ import {
   startSubtitleClip as launchSubtitleClip,
   type ClipJob,
 } from "./lib/clip-jobs";
+import { cancelTakeEditJob, getTakeEditJob as readTakeEditJob, startTakeEdit as launchTakeEdit, type TakeEditJob } from "./lib/take-edit";
+import { isTranscriptionEngine, saveTranscriptionEngine, transcriptionEngine, type TranscriptionSettings } from "./lib/transcription-settings";
+import { ensureWhisperCpp, whisperCppStatus } from "@/lib/media/whisper-cpp";
 import {
   cancelRemoteImportJob,
   getRemoteImportJob as readRemoteImportJob,
@@ -100,6 +104,7 @@ import { cleanFoundImages, importFoundImageById, searchFoundImages } from "./lib
 import type { FoundImage, ImportedImage } from "./lib/image-search-types";
 import { pexelsUsageReport, type FoundVideo, type ImportedVideo, type VideoProviderId } from "./lib/video-search";
 import { importStockVideoById, searchStockVideos, usableVideoProviders } from "./lib/video-providers";
+import { clipSourcesStatus } from "./lib/clip-sourcing";
 import { pixabayUsageReport } from "./lib/video-pixabay";
 import { wikimediaUsageReport } from "./lib/video-wikimedia";
 import {
@@ -156,7 +161,7 @@ import {
   type StudioOverview,
 } from "./lib/library-service";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
-import { askCodex } from "./lib/codex";
+import { askCodex, findCodex } from "./lib/codex";
 import { channelReadCost, quotaForAccount, readChannelVideos } from "@/lib/connections";
 import { cleanScriptText } from "./lib/script-rules";
 import type { HistoryEntry, IdeaBrand } from "./lib/ideas";
@@ -954,6 +959,50 @@ export async function cancelClipJob(id: string): Promise<{ success: boolean }> {
   return { success: abandonClipJob(id) };
 }
 
+// ─── Monter une prise de parole (dossier 01, V6) ─────────────────
+
+/**
+ * « Monter ma prise » : une ou plusieurs prises face caméra → transcription
+ * mot pour mot, coupe des blancs et des reprises, plan des temps forts,
+ * planches, sous-titres, musique. Suivi par `getTakeEditJob`.
+ */
+export async function startTakeEdit(options: unknown): Promise<TakeEditJob> {
+  return launchTakeEdit(options);
+}
+
+export async function getTakeEditJob(id: string): Promise<TakeEditJob | null> {
+  return readTakeEditJob(id);
+}
+
+export async function cancelTakeEdit(id: string): Promise<{ success: boolean }> {
+  return { success: cancelTakeEditJob(id) };
+}
+
+// ─── Moteur de transcription ─────────────────────────────────────
+
+function transcriptionSettings(): TranscriptionSettings {
+  return { engine: transcriptionEngine(), openAiKey: Boolean(openAiApiKey()), local: whisperCppStatus() };
+}
+
+/** Réglage du moteur de transcription. Absente de `functions` : réservée aux admins. */
+export async function getTranscriptionSettings(): Promise<TranscriptionSettings> {
+  return transcriptionSettings();
+}
+
+/**
+ * Change le moteur de transcription (`auto`, `openai`, `local`) ; avec
+ * `install`, télécharge tout de suite le moteur local (sinon au premier
+ * usage). Réservée aux admins.
+ */
+export async function saveTranscriptionSettings(input: { engine?: unknown; install?: unknown }): Promise<TranscriptionSettings> {
+  if (input?.engine !== undefined) {
+    if (!isTranscriptionEngine(input.engine)) throw new Error("Moteur de transcription inconnu.");
+    saveTranscriptionEngine(input.engine);
+  }
+  if (input?.install === true) void ensureWhisperCpp();
+  return transcriptionSettings();
+}
+
 // ─── Idées de vidéos ─────────────────────────────────────────────
 
 const LANGUAGE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
@@ -1101,6 +1150,8 @@ export async function getAiLimits(): Promise<AiModuleReport> {
     // Pixabay (clé gratuite) et Wikimedia Commons (sans clé) : mêmes usages que Pexels.
     pixabay: pixabayUsageReport(),
     wikimedia: wikimediaUsageReport(),
+    // Transcription sur le serveur (whisper.cpp) : gratuite, ouverte dès que la plateforme a un exécutable.
+    "whisper-local": { access: whisperCppStatus().supported ? "open" : "none", settingsHref: "/m/clip-studio/voices" },
   };
 }
 
@@ -1227,9 +1278,19 @@ export async function importFoundImage(input: { id: string }): Promise<ImportedI
  * clé, Wikimedia Commons toujours) ; `pexels` reste pour les écrans qui ne
  * lisent que lui. Aucune clé n'en sort.
  */
-export async function getVideoSearchStatus(): Promise<{ pexels: boolean; providers: VideoProviderId[] }> {
+export async function getVideoSearchStatus(): Promise<{ pexels: boolean; providers: VideoProviderId[]; clips: ClipSourcesStatus }> {
   const providers = usableVideoProviders();
-  return { pexels: providers.includes("pexels"), providers };
+  // Extraits de vraies vidéos (V5) : YouTube (avec ou sans cookies), Twitch par la recherche web de Codex.
+  const clips = clipSourcesStatus();
+  return { pexels: providers.includes("pexels"), providers, clips: { ...clips, twitch: clips.twitch && findCodex() !== null } };
+}
+
+/** Sources des extraits de vraies vidéos, pour l'écran de création : aucun secret. */
+export interface ClipSourcesStatus {
+  /** « ok » : cookies enregistrés ; « no-cookies » : sans cookies (YouTube peut refuser un serveur) ; « refused » : refusé récemment. */
+  youtube: "ok" | "no-cookies" | "refused";
+  /** Clips Twitch trouvés par la recherche web de Codex. */
+  twitch: boolean;
 }
 
 /** Cherche des vidéos libres dans une banque (`provider`), par page, dans l'orientation du projet. */

@@ -40,6 +40,8 @@ export const AI_PROVIDERS: AiProviderEntry[] = [
   { id: "pixabay", label: "Pixabay", brand: "pixabay", kind: "api", remote: false },
   // Wikimedia Commons : sans clé ; Clip Studio s'impose son propre rythme.
   { id: "wikimedia", label: "Wikimedia Commons", brand: "wikimediacommons", kind: "free", remote: false },
+  // whisper.cpp sur le serveur : transcription gratuite, sans clé ni compte, comptée en secondes de son.
+  { id: "whisper-local", label: "Whisper local (whisper.cpp)", brand: "ggml", kind: "self-hosted", remote: false },
 ];
 
 const BY_ID = new Map(AI_PROVIDERS.map((entry) => [entry.id, entry]));

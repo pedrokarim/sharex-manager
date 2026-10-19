@@ -7,10 +7,60 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
-- Clip Studio, page « Nouveau clip » (`/m/clip-studio/new`) : la création
+- Clip Studio, « Monter ma prise » (dossier 01 vidéo, V6) : une ou plusieurs
+  prises de vous face caméra (adresse, Mes médias ou fichier) deviennent un
+  short monté. Transcription mot pour mot, puis coupe des blancs et des
+  respirations d’après l’énergie du son (seuil doux, normal ou serré, marges
+  de 80 à 180 ms autour de la parole) et des faux départs et reprises
+  (la dernière tentative complète reste) ; vitesse ×1 à ×1,3 (×1,1 par
+  défaut), la prise réencodée accélérée sans changer la hauteur de la voix.
+  Codex lit ce qui est dit et pose les temps forts : planche en haut et
+  caméra cadrée sur le visage en bas, ou caméra plein cadre pour une phrase
+  directe de 5 s ou plus ; un chiffre devient un compteur, un outil nommé
+  son logo officiel (sinon son nom en grand, jamais un sosie), une liste des
+  puces qui arrivent sur leur mot, un résultat une grande phrase avec un mot
+  en valeur, un avant / après deux cartes. Un changement toutes les 4 s au
+  plus (zoom alterné à chaque coupe), sous-titres mot à mot sur la couture
+  avec les mots clés à la couleur de la marque et tus pendant qu’une planche
+  écrit ce qui est dit, musique choisie d’après l’émotion de l’accroche et
+  effacée sous la voix, bruitages sur les vrais temps forts seulement. Tout
+  reste modifiable dans l’éditeur ; le bilan (blancs et reprises coupés,
+  temps forts) reste sur la page.
+- Clip Studio, transcription gratuite sur le serveur : whisper.cpp (b5454,
+  v1.9.5) et le modèle multilingue « small » quantifié (190 Mo),
+  téléchargés une seule fois dans `data/tools/` et vérifiés par leur
+  empreinte SHA-256, mots horodatés par alignement DTW. Réglage
+  « Transcription de la parole » dans « Voix en ligne » :
+  Automatique (OpenAI, puis le moteur local si OpenAI échoue : crédit
+  épuisé, clé refusée, réseau), OpenAI ou Local. Chaque essai est noté au
+  registre des services, où « Whisper local (whisper.cpp) » apparaît
+  comme service auto-hébergé gratuit.
+- Clip Studio, l’assistant monte de la vidéo (dossier 01 vidéo, V5) : pour
+  chaque sujet nommé (jeu, film, personne, événement, moment de stream), le
+  script demande un extrait de sa vraie vidéo ; l’assistant le cherche sur
+  YouTube (yt-dlp), sinon sur le web par Codex (YouTube ou clips Twitch,
+  adresses contrôlées), choisit la vidéo sans IA (chaîne officielle d’abord),
+  repère le bon passage (citation retrouvée mot à mot dans la transcription,
+  ou scène la plus vivante d’après les coupes et le mouvement) et ne récupère
+  que ce passage, à l’image près, en 1080p au plus. Un extrait illustre muet
+  sous la voix, coupé en plans ; quand l’entendre compte (réplique,
+  réaction), son son est gardé, sous-titré, la musique s’efface dessous et la
+  voix off parle après lui, dans la limite de 35 % de la durée. Ce qui ne se
+  trouve pas se replie sur une vidéo libre, une image trouvée puis générée,
+  et l’étape « Vidéos » du suivi le dit segment par segment.
+- Clip Studio, page « Nouveau clip » : un seul assistant, avec un panneau
+  « Vidéos » (chercher des extraits sur le web, garder leur son quand il
+  compte, plans filmés libres, sources utilisables et lien vers les cookies
+  YouTube pour un administrateur) et « Vidéos à utiliser » (jusqu’à trois de
+  vos vidéos, utilisées d’abord). La carte « Monter sur une vidéo »
+  disparaît : ses anciens liens ouvrent l’assistant, choix des vidéos ouvert,
+  et une idée qui suggère une vidéo ne bloque plus « Créer ».
+
+- Clip Studio, page « Nouveau clip » (`/m/clip-studio/new`) : la création
   quitte sa fenêtre pour un espace en pleine largeur, avec le point de départ
-  en grandes cartes (Assistant IA, Depuis une idée, Monter sur une vidéo,
+  en grandes cartes (Assistant IA, Depuis une idée,
   Modèle avec aperçus dessinés, Vide, Sous-titrer, Découper, sélection de la
+
   galerie), une colonne « Réglages » (format, marque, durée, découpage, voix,
   musique, illustrations) avec le résumé et « Créer » toujours visibles, et
   le suivi de la création sur place jusqu’à « Ouvrir le projet ». Le mode et
@@ -860,6 +910,11 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Docker : l’image d’exécution installe `libstdc++6` et `libgomp1`, dont
+  dépend whisper.cpp (transcription locale de Clip Studio).
+- Clip Studio, sous-titres mot à mot : des mots peuvent être mis en valeur
+  dans leur propre couleur (`karaoke.emphasis`), dessinée à l’aperçu comme à
+  l’export.
 - Clip Studio, écran « Idées » : la recherche passe dans un panneau en
   pleine largeur (sujet à gauche, réglages de la série à droite), les options
   de création de chaque idée s’affichent en puces ; les anciennes adresses de

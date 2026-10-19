@@ -19,6 +19,7 @@ import type { ProviderStatus } from "../lib/cloud-tts";
 import type { VoiceStatus } from "../lib/tts";
 import { callModule } from "../lib/client";
 import { VideoSourcesSettings } from "../components/video-sources-settings";
+import { TranscriptionSettings } from "../components/transcription-settings";
 
 const PROVIDER_BRANDS: Record<ProviderStatus["id"], Brand> = {
   edge: "microsoft",
@@ -114,6 +115,9 @@ export default function VoicesPage() {
 
       {/* Cookies YouTube, clés Pixabay et Pexels : mêmes droits que les clés des voix. */}
       {!forbidden && providers !== null && <VideoSourcesSettings />}
+
+      {/* Moteur de transcription (OpenAI ou local) : mêmes droits que les clés des voix. */}
+      {!forbidden && providers !== null && <TranscriptionSettings />}
     </div>
   );
 }

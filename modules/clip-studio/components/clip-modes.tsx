@@ -91,7 +91,7 @@ function lengthLabel(ms: number): string {
 
 // ─── Source ──────────────────────────────────────────────────────
 
-type PickedSource =
+export type PickedSource =
   | { type: "url"; probe: RemoteProbe; range: [number, number] | null; freeStart: string; freeEnd: string }
   | { type: "asset"; asset: ClipAsset; uploaded: boolean };
 
@@ -104,7 +104,7 @@ const SOURCE_TABS: { id: SourceTab; label: string; icon: typeof Link2 }[] = [
 ];
 
 /** Source à envoyer au serveur, ou le message qui dit ce qui manque. */
-function sourceRequest(source: PickedSource | null, kind: ClipModeKind): ClipOptions["source"] | string {
+export function sourceRequest(source: PickedSource | null, kind: ClipModeKind): ClipOptions["source"] | string {
   if (!source) return "Choisissez une vidéo.";
   if (source.type === "asset") return { assetFile: source.asset.file, ...(source.uploaded ? { uploaded: true } : {}) };
   const max = MAX_SECONDS[kind];
@@ -123,13 +123,13 @@ function sourceRequest(source: PickedSource | null, kind: ClipModeKind): ClipOpt
 }
 
 /** Titre de la source : celui de la vidéo lue, ou le nom du fichier sans extension. */
-function sourceTitle(source: PickedSource | null): string {
+export function sourceTitle(source: PickedSource | null): string {
   if (!source) return "";
   if (source.type === "url") return source.probe.title;
   return (source.asset.origin?.title ?? source.asset.originalName).replace(/\.[a-z0-9]{2,4}$/i, "");
 }
 
-function SourcePicker({
+export function SourcePicker({
   kind,
   value,
   onChange,
@@ -527,7 +527,7 @@ function FramingPicker({ value, onChange }: { value: ClipFraming; onChange: (val
 
 // ─── Étapes du travail ───────────────────────────────────────────
 
-function JobSteps({ job }: { job: ClipJob }) {
+export function JobSteps({ job }: { job: { steps: { id: string; label: string; state: string; detail?: string }[] } }) {
   return (
     <ol className="space-y-2" aria-label="Étapes">
       {job.steps.map((step) => (
@@ -804,7 +804,7 @@ function CreatedClips({ job, onOpen }: { job: ClipJob; onOpen: (projectId: strin
  * page) quand il est donné, sinon au pied du panneau. `null` : la cible n'est
  * pas encore montée, rien n'est posé.
  */
-function PanelActions({ target, children }: { target?: HTMLElement | null; children: ReactNode }) {
+export function PanelActions({ target, children }: { target?: HTMLElement | null; children: ReactNode }) {
   const actions = <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{children}</div>;
   if (target === undefined) return <div className="border-t pt-4">{actions}</div>;
   return target ? createPortal(actions, target) : null;

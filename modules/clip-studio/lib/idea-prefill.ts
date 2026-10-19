@@ -1,8 +1,9 @@
 /**
  * « Créer depuis cette idée » : l'écran Idées (et le mode « Depuis une idée »
  * de la page de création) ouvre la page « Nouveau clip » avec des paramètres
- * d'adresse, qu'elle lit pour se préremplir en mode Assistant (ou « Monter
- * par-dessus une vidéo » quand l'idée en demande une). Les valeurs reçues sont
+ * d'adresse, qu'elle lit pour se préremplir en mode Assistant (avec une
+ * suggestion de vidéo à fournir quand l'idée en demande une, jamais
+ * bloquante). Les valeurs reçues sont
  * relues et bornées : une adresse se modifie à la main.
  *
  * Pur : aucun disque, aucun réseau.
@@ -25,7 +26,7 @@ export interface CreatePrefill {
   /** Marque ; `null` : aucune ; absente : la marque par défaut. */
   brandKitId?: string | null;
   ideaId?: string;
-  /** L'idée se monte par-dessus une vidéo : laquelle choisir (mode « Monter par-dessus une vidéo »). */
+  /** L'idée gagnerait une vidéo de l'utilisateur : laquelle (suggestion du champ « Vidéos à utiliser », jamais exigée). */
   sourceVideoHint?: string;
 }
 
@@ -69,10 +70,14 @@ export function prefillFromIdea(idea: Idea): CreatePrefill {
   };
 }
 
-/** Mode de la page de création qui reçoit une idée. */
-export function prefillMode(prefill: Pick<CreatePrefill, "sourceVideoHint">): "assistant" | "overlay" {
-  return prefill.sourceVideoHint ? "overlay" : "assistant";
+/**
+ * Mode de la page de création qui reçoit une idée : toujours l'assistant,
+ * qui monte aussi par-dessus des vidéos (la suggestion vient avec `hint`).
+ */
+export function prefillMode(_prefill: Pick<CreatePrefill, "sourceVideoHint">): "assistant" {
+  return "assistant";
 }
+
 
 /** Adresse de la page de création, préremplie. */
 export function createHref(prefill: CreatePrefill): string {

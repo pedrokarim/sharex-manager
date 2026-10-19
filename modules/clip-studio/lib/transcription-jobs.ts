@@ -26,7 +26,7 @@ const UPLOAD_TRANSCRIPTS_FILE = path.join(DATA_DIR, "transcripts.json");
 const MAX_RUNNING_JOBS = 2;
 const KEPT_JOBS = 30;
 const ASSET_PREFIX = "module:clip-studio/assets/";
-/** Une transcription plus récente que ce délai ne se refait pas (`force`) : chaque essai est payé à OpenAI. */
+/** Une transcription plus récente que ce délai ne se refait pas (`force`) : chaque essai peut être payé à OpenAI. */
 export const RETRANSCRIBE_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 const UPLOAD_PREFIX = "upload:";
 
@@ -49,6 +49,10 @@ export interface TranscriptionJob {
   stage: "extracting" | "transcribing" | "saving" | "done";
   /** Morceaux envoyés à OpenAI, pour un long média découpé. */
   chunks?: { done: number; total: number };
+  /** Moteur qui transcrit (absent : pas encore connu). */
+  engine?: "openai" | "local";
+  /** Moteur local : avancement en pour cent. */
+  percent?: number;
   /** Rendue par `getTranscriptionJob` quand le travail a réussi (pas rangée avec le travail). */
   words?: TimedWord[];
   transcript?: TranscriptInfo;
@@ -254,17 +258,21 @@ export function startTranscriptionJob(request: TranscriptionRequest): Transcript
 
 async function run(job: TranscriptionJob, media: ResolvedMedia, language: string | undefined, signal: AbortSignal) {
   const progress = (update: TranscribeProgress) => {
-    if (update.stage === "extracting") job.stage = "extracting";
+    if (update.stage === "extracting" || update.stage === "downloading") job.stage = "extracting";
+    else if (update.stage === "fallback") job.engine = "local";
     else {
       job.stage = "transcribing";
-      job.chunks = { done: update.done, total: update.total };
+      if (update.engine) job.engine = update.engine;
+      // Moteur local : un pourcentage, pas des morceaux.
+      if (update.engine === "local") job.percent = update.done;
+      else job.chunks = { done: update.done, total: update.total };
     }
     save(job);
   };
   try {
     const result = await transcribeMediaFile(media.path, { language, signal, onProgress: progress });
     job.stage = "saving";
-    const transcript: TranscriptInfo = { provider: "openai", ...(result.language ? { language: result.language } : {}), at: Date.now() };
+    const transcript: TranscriptInfo = { provider: result.provider ?? "openai", ...(result.language ? { language: result.language } : {}), at: Date.now() };
     storeTranscript(media, result.words, transcript);
     job.status = "done";
     job.stage = "done";

@@ -177,7 +177,7 @@ export function buildDownloadArgs(
   url: string,
   outDir: string,
   section: Section | null,
-  limits: { maxHeight?: number; maxFilesizeMb?: number; maxBytes?: number } = {}
+  limits: { maxHeight?: number; maxFilesizeMb?: number; maxBytes?: number; exactCuts?: boolean } = {}
 ): string[] {
   const args = [
     "-f", formatSelector(limits.maxHeight),
@@ -197,6 +197,8 @@ export function buildDownloadArgs(
   // ne vaut que pour un téléchargement direct. ffmpeg s’arrête de lui-même à cette taille.
   if (limits.maxBytes && limits.maxBytes > 0) args.push("--downloader-args", `ffmpeg_o:-fs ${Math.floor(limits.maxBytes)}`);
   if (section) args.push("--download-sections", `*${seconds(section.start)}-${seconds(section.end)}`);
+  // Coupe à l'image près (réencodage autour des bornes) : un extrait cité ne commence pas au milieu d'un mot.
+  if (section && limits.exactCuts) args.push("--force-keyframes-at-cuts");
   args.push("--", url);
   return args;
 }
@@ -294,7 +296,7 @@ export function classifyYtDlpError(stderr: string): YtDlpErrorCode {
   if (text.includes("not available in your country") || text.includes("geo restrict") || text.includes("geo-restrict")) return "geo";
   if (text.includes("is live") || text.includes("live event will begin") || text.includes("premieres in")) return "live";
   if (text.includes("file is larger than max-filesize")) return "too-large";
-  if (/ffmpeg exited with code (-11|139|-6|134)/.test(text) || text.includes("segmentation fault")) return "ffmpeg-crash";
+  if (/ffmpeg exited with code (-11|139|-6|134)\b/.test(text) || text.includes("segmentation fault")) return "ffmpeg-crash";
   if (text.includes("unsupported url") || text.includes("is not a valid url")) return "unsupported";
   if (text.includes("video unavailable") || text.includes("video is unavailable") || text.includes("http error 404") || text.includes("does not exist") || text.includes("has been removed") || text.includes("clip not found")) return "unavailable";
   if (text.includes("timed out") || text.includes("unable to download webpage") || text.includes("connection") || text.includes("http error 5")) return "network";
@@ -559,6 +561,72 @@ export async function probeUrl(
   return info;
 }
 
+// ─── Recherche YouTube ───────────────────────────────────────────
+
+/** Un résultat de recherche YouTube (`ytsearchN:`), lu sans rien télécharger. */
+export interface SearchEntry {
+  id: string;
+  /** Adresse canonique de la vidéo. */
+  url: string;
+  title: string;
+  channel?: string;
+  /** La chaîne porte la coche de YouTube (souvent la chaîne officielle). */
+  verified: boolean;
+  duration?: number;
+  views?: number;
+  /** En direct, à venir, réservé aux membres… : à écarter. */
+  unavailable: boolean;
+}
+
+/** Résultats d'une recherche (`-J --flat-playlist`), filtrés sur des identifiants YouTube valables. */
+export function parseSearchJson(raw: string): SearchEntry[] {
+  let data: { entries?: unknown };
+  try {
+    data = JSON.parse(raw) as { entries?: unknown };
+  } catch {
+    throw new YtDlpError("unknown", ytDlpErrorMessage("unknown"));
+  }
+  const text = (value: unknown, max: number) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : undefined);
+  const entries = Array.isArray(data.entries) ? (data.entries as Record<string, unknown>[]) : [];
+  return entries.flatMap((entry): SearchEntry[] => {
+    const id = text(entry?.id, 20);
+    if (!id || !/^[A-Za-z0-9_-]{11}$/.test(id)) return [];
+    const duration = typeof entry.duration === "number" && Number.isFinite(entry.duration) && entry.duration > 0 ? entry.duration : undefined;
+    const views = typeof entry.view_count === "number" && Number.isFinite(entry.view_count) ? entry.view_count : undefined;
+    const live = entry.live_status === "is_live" || entry.live_status === "is_upcoming" || entry.live_status === "post_live";
+    const availability = typeof entry.availability === "string" ? entry.availability : "public";
+    return [
+      {
+        id,
+        url: `https://www.youtube.com/watch?v=${id}`,
+        title: text(entry.title, 300) || "Vidéo",
+        ...(text(entry.channel, 120) || text(entry.uploader, 120) ? { channel: text(entry.channel, 120) || text(entry.uploader, 120) } : {}),
+        verified: entry.channel_is_verified === true,
+        ...(duration ? { duration } : {}),
+        ...(views !== undefined ? { views } : {}),
+        unavailable: live || !["public", "unlisted"].includes(availability),
+      },
+    ];
+  });
+}
+
+/**
+ * Cherche sur YouTube (`ytsearchN:requête`), sans rien télécharger. La
+ * requête passe après `--` comme une adresse : elle ne peut pas devenir une
+ * option.
+ */
+export async function searchYoutube(
+  query: string,
+  options: { count?: number; signal?: AbortSignal; cookiesFile?: string | null } = {}
+): Promise<SearchEntry[]> {
+  const clean = query.replace(/[\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 150);
+  if (!clean) return [];
+  const count = Math.max(1, Math.min(10, Math.round(options.count ?? 5)));
+  const result = await runYtDlp(["-J", "--flat-playlist", "--", `ytsearch${count}:${clean}`], { signal: options.signal, cookiesFile: options.cookiesFile, timeoutMs: 60_000 });
+  if (result.code !== 0) throw failure(result, { hasCookies: Boolean(options.cookiesFile), site: "YouTube" });
+  return parseSearchJson(result.stdout);
+}
+
 // ─── Téléchargement d'un passage ─────────────────────────────────
 
 export interface DownloadProgress {
@@ -604,6 +672,8 @@ export async function downloadSection(
     maxBytes: number;
     /** Hauteur d'image au plus (1080 par défaut). */
     maxHeight?: number;
+    /** Passage coupé à l'image près (`--force-keyframes-at-cuts`), plus lent. */
+    exactCuts?: boolean;
     site?: string;
     onProgress?: (progress: DownloadProgress) => void;
   }
@@ -644,6 +714,7 @@ export async function downloadSection(
       maxHeight: options.maxHeight,
       maxFilesizeMb: Math.max(1500, Math.ceil(options.maxBytes / (1024 * 1024))),
       maxBytes: options.maxBytes,
+      ...(options.exactCuts ? { exactCuts: true } : {}),
     };
     const result = await runYtDlp(buildDownloadArgs(url, outDir, section, limits), {
       signal: local.signal,

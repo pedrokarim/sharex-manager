@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Captions, Check, Film, HardDrive, Link2, X } from "lucide-react";
+import { Captions, Check, HardDrive, Lightbulb, Link2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,26 +15,34 @@ import { RemoteImportPanel } from "./remote-import-panel";
 
 type Tab = "mine" | "url";
 
+/** Vidéos de l'utilisateur qu'un même clip peut utiliser. */
+export const MAX_SOURCE_VIDEOS = 3;
+
 /**
- * « Vidéo source » de l'assistant (dossier 01 vidéo, V4.3) : une vidéo des
- * médias du module, ou récupérée par son adresse. Le script s'appuie sur sa
- * transcription et en cite des extraits ; sans vidéo choisie, l'assistant
- * travaille comme avant.
+ * « Vidéos à utiliser » de l'assistant (dossier 01 vidéo, V5) : jusqu'à trois
+ * vidéos des médias du module, ou récupérées par leur adresse. Le script
+ * s'appuie d'abord sur ce qui s'y dit et en cite ou en montre des extraits,
+ * puis complète avec ce qu'il trouve. Facultatif : sans vidéo choisie,
+ * l'assistant monte seul.
  */
-export function SourceVideoField({
+export function SourceVideosField({
   value,
   onChange,
-  embedded = false,
+  hint,
+  defaultOpen = false,
 }: {
-  value: MediaSource | null;
-  onChange: (source: MediaSource | null) => void;
-  /** Posé dans un panneau qui porte déjà le titre : ni cadre ni intitulé, la vidéo est demandée. */
-  embedded?: boolean;
+  value: MediaSource[];
+  onChange: (sources: MediaSource[]) => void;
+  /** Vidéo que l'idée suggère de fournir : une suggestion, jamais une condition. */
+  hint?: string;
+  /** Ouvre le choix tout de suite (ancien lien « Monter sur une vidéo »). */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen && value.length === 0);
   const [tab, setTab] = useState<Tab>("mine");
   const [videos, setVideos] = useState<ClipAsset[] | null>(null);
   const feedback = useFeedback();
+  const full = value.length >= MAX_SOURCE_VIDEOS;
 
   const refresh = useCallback(async () => {
     try {
@@ -51,36 +59,51 @@ export function SourceVideoField({
     if (open && videos === null) void refresh();
   }, [open, videos, refresh]);
 
-  const choose = (source: MediaSource) => {
-    onChange(source);
+  const add = (source: MediaSource) => {
+    if (value.some((entry) => entry.ref === source.ref)) {
+      setOpen(false);
+      return;
+    }
+    const next = [...value, source].slice(0, MAX_SOURCE_VIDEOS);
+    onChange(next);
     setOpen(false);
   };
+  const remove = (ref: string) => onChange(value.filter((entry) => entry.ref !== ref));
 
   return (
-    <div className={cn("min-w-0 space-y-2", !embedded && "rounded-lg border p-3")}>
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        {embedded ? (
-          <span className="min-w-0 text-sm text-muted-foreground">{value ? null : "Aucune vidéo choisie : une vidéo de vos médias, ou récupérée par son adresse."}</span>
-        ) : (
-          <span className="min-w-0 text-sm">
-            Vidéo source
-            <span className="block text-xs text-muted-foreground">
-              Facultatif. Montez par-dessus une vidéo&nbsp;: le script s’appuie sur ce qui s’y dit, et en cite ou en montre des extraits.
-            </span>
+    <div className="flex min-w-0 flex-col gap-2">
+      {hint && value.length === 0 ? (
+        <p className="flex min-w-0 items-start gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs">
+          <Lightbulb className="mt-0.5 size-3.5 shrink-0 text-primary" />
+          <span className="min-w-0 [overflow-wrap:anywhere]">
+            <span className="text-muted-foreground">L’idée suggère une vidéo&nbsp;: </span>
+            {/[.!?…]$/.test(hint) ? hint : `${hint}.`}
+            <span className="text-muted-foreground"> Facultatif&nbsp;: sans elle, l’assistant cherche lui-même.</span>
           </span>
-        )}
-        {!value && (
-          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
-            <Film className="h-4 w-4" />
-            {open ? "Fermer" : "Choisir"}
-          </Button>
-        )}
-      </div>
+        </p>
+      ) : null}
 
-      {value && <ChosenVideo source={value} onChange={() => setOpen(true)} onRemove={() => onChange(null)} />}
+      {value.length ? (
+        <ul className="flex min-w-0 flex-col gap-1.5" aria-label="Vidéos à utiliser">
+          {value.map((source, index) => (
+            <li key={source.ref} className="min-w-0">
+              <ChosenVideo source={source} index={value.length > 1 ? index + 1 : undefined} onRemove={() => remove(source.ref)} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {!full ? (
+        <Button type="button" variant="outline" size="sm" className="w-fit max-w-full gap-1.5" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+          {open ? <X className="size-4" /> : <Plus className="size-4" />}
+          <span className="truncate">{open ? "Fermer" : value.length ? "Ajouter une autre vidéo" : "Ajouter une vidéo"}</span>
+        </Button>
+      ) : (
+        <p className="text-xs text-muted-foreground">{MAX_SOURCE_VIDEOS}&nbsp;vidéos au plus.</p>
+      )}
 
       <AnimatePresence initial={false}>
-        {open && (
+        {open && !full && (
           <motion.div
             key="picker"
             initial={{ height: 0, opacity: 0 }}
@@ -90,7 +113,7 @@ export function SourceVideoField({
             className="min-w-0 overflow-hidden"
           >
             <div className="min-w-0 space-y-2 border-t pt-2">
-              <div className="inline-flex rounded-md bg-muted p-0.5" role="tablist" aria-label="D’où vient la vidéo source">
+              <div className="inline-flex max-w-full rounded-md bg-muted p-0.5" role="tablist" aria-label="D’où vient la vidéo">
                 {(
                   [
                     { id: "mine", label: "Mes vidéos", icon: HardDrive },
@@ -107,7 +130,7 @@ export function SourceVideoField({
                       onClick={() => setTab(entry.id)}
                       className={cn(
                         "flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors",
-                        tab === entry.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        tab === entry.id ? "bg-background text-foreground shadow-sm" : "text-foreground/70 hover:text-foreground"
                       )}
                     >
                       <Icon className="h-3.5 w-3.5" />
@@ -131,19 +154,20 @@ export function SourceVideoField({
                       Aucune vidéo dans vos médias. Récupérez-en une par son adresse, ou importez-la dans l’éditeur.
                     </p>
                   ) : (
-                    <div className="grid max-h-64 grid-cols-[repeat(2,minmax(0,1fr))] gap-2 overflow-y-auto pr-1 sm:grid-cols-[repeat(3,minmax(0,1fr))]">
+                    <div className="grid max-h-72 grid-cols-[repeat(2,minmax(0,1fr))] gap-2 overflow-x-hidden overflow-y-auto pr-1 sm:grid-cols-[repeat(3,minmax(0,1fr))]">
                       {videos.map((asset) => {
                         const source = assetToSource(asset);
-                        const selected = value?.ref === source.ref;
+                        const selected = value.some((entry) => entry.ref === source.ref);
                         return (
                           <button
                             key={asset.file}
                             type="button"
-                            onClick={() => choose(source)}
+                            onClick={() => add(source)}
                             title={asset.originalName}
                             aria-pressed={selected}
+                            disabled={selected}
                             className={cn(
-                              "group relative aspect-video min-w-0 overflow-hidden rounded-md border bg-muted text-left",
+                              "group relative aspect-video min-w-0 overflow-hidden rounded-md border bg-muted text-left disabled:opacity-60",
                               selected && "ring-2 ring-primary"
                             )}
                           >
@@ -160,7 +184,7 @@ export function SourceVideoField({
                   )}
                 </>
               ) : (
-                <RemoteImportPanel onAdd={choose} onImported={() => setVideos(null)} addLabel="Utiliser comme source" />
+                <RemoteImportPanel onAdd={add} onImported={() => setVideos(null)} addLabel="Utiliser dans ce clip" />
               )}
             </div>
           </motion.div>
@@ -170,34 +194,28 @@ export function SourceVideoField({
   );
 }
 
-function ChosenVideo({ source, onChange, onRemove }: { source: MediaSource; onChange: () => void; onRemove: () => void }) {
+function ChosenVideo({ source, index, onRemove }: { source: MediaSource; index?: number; onRemove: () => void }) {
   const transcribed = Boolean(source.transcript);
   const silent = source.hasAudio === false;
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-md bg-muted/40 p-2">
-      <video src={`${source.url}#t=0.5`} muted preload="metadata" className="aspect-video w-24 max-w-full shrink-0 rounded object-cover" />
+      <video src={`${source.url}#t=0.5`} muted preload="metadata" className="aspect-video w-20 max-w-full shrink-0 rounded object-cover" />
       <div className="min-w-0 flex-1">
         <p className="min-w-0 truncate text-sm font-medium" title={source.name}>
+          {index ? <span className="mr-1 text-muted-foreground tabular-nums">{index}.</span> : null}
           {source.name}
         </p>
         <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
           {source.durationMs ? <span className="shrink-0 tabular-nums">{formatClock(source.durationMs / 1000)}</span> : null}
-          <span className="min-w-0 truncate">
-            {silent
-              ? "· sans son : ses extraits illustrent, muets"
-              : transcribed
-                ? "· déjà transcrite"
-                : "· transcrite au lancement (OpenAI)"}
+          <span className="min-w-0 truncate" title={silent ? "Sans son : ses extraits illustrent, muets" : transcribed ? "Déjà transcrite" : "Transcrite au lancement"}>
+            {silent ? "· sans son : extraits muets" : transcribed ? "· déjà transcrite" : "· transcrite au lancement"}
           </span>
           {transcribed && <Check className="h-3 w-3 shrink-0 text-emerald-500" />}
         </p>
       </div>
-      <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={onChange}>
-        Changer
-      </Button>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button type="button" variant="ghost" size="icon-xs" className="shrink-0" onClick={onRemove} aria-label="Retirer la vidéo source">
+          <Button type="button" variant="ghost" size="icon-xs" className="shrink-0" onClick={onRemove} aria-label={`Retirer ${source.name}`}>
             <X />
           </Button>
         </TooltipTrigger>

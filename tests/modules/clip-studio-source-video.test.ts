@@ -97,7 +97,7 @@ describe("Script : image ou vidéo, et extraits", () => {
 
   it("la consigne propose la vidéo seulement quand c'est permis", () => {
     const withVideos = scriptPrompt(REQUEST, null, { web: false });
-    expect(withVideos).toContain('"kind": "image" | "video"');
+    expect(withVideos).toContain('"kind": "image" | "stock"');
     expect(withVideos).toContain("Pexels");
     const without = scriptPrompt({ ...REQUEST, videos: false }, null, { web: false });
     expect(without).not.toContain('"kind"');

@@ -75,6 +75,8 @@ export interface SegmentExcerpt {
    * segment attend sa fin. Sinon il illustre, muet, sous la voix off.
    */
   keepAudio: boolean;
+  /** Nom sur la timeline (« Extrait – titre de la vidéo ») ; absent : « Extrait m:ss – m:ss ». */
+  label?: string;
 }
 
 /** Visuels d'un segment en plus de son image : autres plans vidéo du sujet, extrait de la vidéo source. */
@@ -441,6 +443,9 @@ function videoBackground(
   });
 }
 
+/** Nom d'un extrait sur la timeline : celui qu'il porte, sinon ses instants dans la source. */
+const excerptLabel = (excerpt: SegmentExcerpt) => excerpt.label ?? `Extrait ${clock(excerpt.start)} – ${clock(excerpt.end)}`;
+
 /**
  * Extrait cité de la vidéo source : posé avec son son, sans creux sous la
  * voix (la voix off attend sa fin), sous-titré d'après la transcription de la
@@ -462,7 +467,7 @@ function quotedExcerpt(b: Builder, start: number, duration: number, excerpt: Seg
     transform: { x: 0.5, y: 0.5, width: 1, height: 1, rotation: 0, opacity: 1 },
     animIn: { kind: "fade", frames: 6 },
     animOut: { kind: "none", frames: 1 },
-    label: `Extrait ${clock(excerpt.start)} – ${clock(excerpt.end)}`,
+    label: excerptLabel(excerpt),
   } satisfies VideoItem);
   const caption = captionForVoice(b.project, item);
   if (!caption) return;
@@ -498,7 +503,7 @@ function background(
   if (excerpt) {
     const quote = Math.min(duration, b.quoteFrames(excerpt));
     if (quote === 0) {
-      videoBackground(b, start, duration, [excerpt.source], cued, { from: b.seconds(excerpt.start), label: `Extrait ${clock(excerpt.start)} – ${clock(excerpt.end)}` });
+      videoBackground(b, start, duration, [excerpt.source], cued, { from: b.seconds(excerpt.start), label: excerptLabel(excerpt) });
       veil(b, start, duration);
       return;
     }
@@ -509,7 +514,10 @@ function background(
     if (image) {
       background(b, start + quote, duration - quote, image, accent, motionIndex, cue, { alternates: visuals.alternates });
     } else {
-      videoBackground(b, start + quote, duration - quote, [excerpt.source], cued, { from: b.seconds(excerpt.end), label: `Extrait ${clock(excerpt.end)} – suite` });
+      videoBackground(b, start + quote, duration - quote, [excerpt.source], cued, {
+        from: b.seconds(excerpt.end),
+        label: excerpt.label ? `${excerpt.label} (suite)` : `Extrait ${clock(excerpt.end)} – suite`,
+      });
       veil(b, start + quote, duration - quote);
     }
     return;
@@ -540,6 +548,15 @@ function background(
   } else {
     b.add("Principale", { ...box(b, start, duration, { y: 0.5, height: 1, width: 1 }, { paint: "plate", accent }, { radius: 0, animIn: "fade" }), ...cued });
   }
+}
+
+/**
+ * Fond de l'ouverture : l'image du premier segment, sinon la vidéo de son
+ * extrait (posée muette, prise en son milieu) plutôt qu'un aplat, quand le
+ * premier segment s'ouvre sur un extrait cité.
+ */
+function introVisual(segment: (SegmentVisuals & { image?: MediaSource }) | undefined): MediaSource | undefined {
+  return segment?.image ?? segment?.excerpt?.source;
 }
 
 /** Indication de montage d'un segment, sans champ vide. */
@@ -864,7 +881,7 @@ export function buildTop(name: string, aspect: AspectPreset, data: TopData, layo
   let cursor = 0;
 
   const intro = b.fit(2.5, data.voice?.intro, 0.5);
-  background(b, cursor, intro, data.entries[0]?.image, 0, 0, cueOf(0, { emotion: "excitement" }, "hook"));
+  background(b, cursor, intro, introVisual(data.entries[0]), 0, 0, cueOf(0, { emotion: "excitement" }, "hook"));
   b.narrate(data.voice?.intro, cursor + 4);
   b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: reserve ? 0.32 : 0.45, height: 0.26, size: vertical ? 0.07 : 0.1 }));
   cursor += intro;
@@ -914,7 +931,7 @@ export function buildSlideshow(name: string, aspect: AspectPreset, data: Slidesh
   let cursor = 0;
   if (data.title) {
     const intro = b.fit(2.5, data.voice?.intro, 0.5);
-    background(b, cursor, intro, data.slides[0]?.image, 0, 0, cueOf(0, { emotion: "excitement" }, "hook"));
+    background(b, cursor, intro, introVisual(data.slides[0]), 0, 0, cueOf(0, { emotion: "excitement" }, "hook"));
     b.narrate(data.voice?.intro, cursor + 4);
     b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: reserve ? 0.32 : 0.46, height: 0.26, size: vertical ? 0.065 : 0.09 }));
     cursor += intro;
@@ -961,7 +978,7 @@ export function buildFree(name: string, aspect: AspectPreset, data: FreeData, la
 
   if (data.title) {
     const intro = b.fit(2.5, data.voice?.intro, 0.5);
-    background(b, cursor, intro, data.scenes[0]?.image, 0, 0, cueOf(0, { emotion: "excitement" }, "hook"));
+    background(b, cursor, intro, introVisual(data.scenes[0]), 0, 0, cueOf(0, { emotion: "excitement" }, "hook"));
     b.narrate(data.voice?.intro, cursor + 4);
     b.add("Textes", text(b, data.title, cursor, intro, { role: "title", y: reserve ? 0.28 : vertical ? 0.44 : 0.42, height: 0.26, size: vertical ? 0.065 : 0.09 }));
     if (data.subtitle) {

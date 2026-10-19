@@ -76,6 +76,7 @@ function launch(ref: string, apply: (job: TranscriptionJob) => boolean): Run {
 function stageLabel(job: TranscriptionJob | null): string {
   if (!job || job.stage === "extracting") return "Extraction du son…";
   if (job.stage === "saving" || job.stage === "done") return "Enregistrement des mots…";
+  if (job.engine === "local") return job.percent !== undefined ? `Transcription sur le serveur, ${Math.round(job.percent)} %…` : "Transcription sur le serveur…";
   const chunks = job.chunks;
   return chunks && chunks.total > 1 ? `Transcription, morceau ${Math.min(chunks.done + 1, chunks.total)} sur ${chunks.total}…` : "Transcription par OpenAI…";
 }
@@ -189,7 +190,7 @@ export function VideoCaptionsField({
           <Note>
             {transcribed
               ? "La parole de cette vidéo est déjà transcrite : les sous-titres suivent son placement et son rognage."
-              : "La parole est envoyée une fois à OpenAI (Whisper), puis les sous-titres suivent le placement et le rognage de la vidéo."}
+              : "La parole est transcrite une fois (par OpenAI ou sur le serveur, selon le réglage de « Voix en ligne »), puis les sous-titres suivent le placement et le rognage de la vidéo."}
           </Note>
           <Button variant="outline" size="sm" className="w-full gap-2" loading={busy} disabled={!onTranscribed} onClick={start}>
             <Captions className="h-4 w-4" />

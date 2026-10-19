@@ -8,12 +8,23 @@
 
 import { CREATE_PATH, createHref, type CreatePrefill } from "./idea-prefill";
 
-export type CreateMode = "assistant" | "idea" | "overlay" | "template" | "blank" | "subtitle" | "clipping" | "gallery";
+export type CreateMode = "assistant" | "idea" | "template" | "blank" | "subtitle" | "clipping" | "take" | "gallery";
 
-export const CREATE_MODES: readonly CreateMode[] = ["assistant", "idea", "overlay", "template", "blank", "subtitle", "clipping", "gallery"];
+export const CREATE_MODES: readonly CreateMode[] = ["assistant", "idea", "template", "blank", "subtitle", "clipping", "take", "gallery"];
 
 /** Modes de l'assistant : brief, durée, séquences, voix, musique et illustrations. */
-export const ASSISTANT_MODES: readonly CreateMode[] = ["assistant", "overlay"];
+export const ASSISTANT_MODES: readonly CreateMode[] = ["assistant"];
+
+/**
+ * Ancien mode « Monter sur une vidéo » (`?mode=overlay`) : c'est désormais
+ * l'assistant, avec le champ « Vidéos à utiliser » ouvert.
+ */
+export const LEGACY_OVERLAY_MODE = "overlay";
+
+/** L'adresse demande d'ouvrir le choix des vidéos de l'utilisateur (ancien lien « Monter sur une vidéo »). */
+export function opensSourceVideos(params: Pick<URLSearchParams, "get">): boolean {
+  return params.get("mode") === LEGACY_OVERLAY_MODE;
+}
 
 /** Fichiers de la galerie (`files=a.png,b.jpg`), dans l'ordre de la sélection. */
 export function readFiles(params: Pick<URLSearchParams, "get">): string[] {
@@ -31,7 +42,8 @@ export function readFiles(params: Pick<URLSearchParams, "get">): string[] {
 export function readMode(params: Pick<URLSearchParams, "get">): CreateMode {
   const files = readFiles(params);
   const raw = params.get("mode");
-  const mode = CREATE_MODES.includes(raw as CreateMode) ? (raw as CreateMode) : null;
+  // L'ancien « Monter sur une vidéo » est l'assistant, champ des vidéos ouvert.
+  const mode = raw === LEGACY_OVERLAY_MODE ? "assistant" : CREATE_MODES.includes(raw as CreateMode) ? (raw as CreateMode) : null;
   if (mode === "gallery" && files.length === 0) return "assistant";
   return mode ?? (files.length ? "gallery" : "assistant");
 }

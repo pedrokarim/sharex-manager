@@ -583,7 +583,11 @@ export function savePixabayKey(key: string): Promise<import("./video-sources").V
 export type { FoundVideo, ImportedVideo, VideoProviderId } from "./video-search";
 
 /** Banques de vidéos utilisables, dans l'ordre ; Wikimedia Commons l'est toujours (aucune clé ne sort). */
-export function getVideoSearchStatus(): Promise<{ pexels: boolean; providers: import("./video-search").VideoProviderId[] }> {
+export function getVideoSearchStatus(): Promise<{
+  pexels: boolean;
+  providers: import("./video-search").VideoProviderId[];
+  clips?: { youtube: "ok" | "no-cookies" | "refused"; twitch: boolean };
+}> {
   return callModule("getVideoSearchStatus");
 }
 
@@ -682,4 +686,43 @@ export function getClipJob(id: string): Promise<import("./clip-jobs").ClipJob | 
 
 export function cancelClipJob(id: string): Promise<{ success: boolean }> {
   return callModule("cancelClipJob", id);
+}
+
+// ─── Monter une prise de parole ──────────────────────────────────
+
+export type { TakeEditJob, TakeReport } from "./take-edit";
+
+export interface TakeEditOptions {
+  sources: ClipSourceInput[];
+  aspect: import("../engine/types").AspectPreset;
+  brandKitId?: string;
+  speed: number;
+  removeRetakes: boolean;
+  silence: "soft" | "normal" | "tight";
+  music: boolean;
+}
+
+/** « Monter ma prise » ; suivi par `getTakeEditJob`. */
+export function startTakeEdit(options: TakeEditOptions): Promise<import("./take-edit").TakeEditJob> {
+  return callModule("startTakeEdit", options);
+}
+
+export function getTakeEditJob(id: string): Promise<import("./take-edit").TakeEditJob | null> {
+  return callModule("getTakeEditJob", id);
+}
+
+export function cancelTakeEdit(id: string): Promise<{ success: boolean }> {
+  return callModule("cancelTakeEdit", id);
+}
+
+// ─── Moteur de transcription (administrateurs) ───────────────────
+
+export type TranscriptionSettings = import("./transcription-settings").TranscriptionSettings;
+
+export function getTranscriptionSettings(): Promise<TranscriptionSettings> {
+  return callModule("getTranscriptionSettings");
+}
+
+export function saveTranscriptionSettings(input: { engine?: "auto" | "openai" | "local"; install?: boolean }): Promise<TranscriptionSettings> {
+  return callModule("saveTranscriptionSettings", input);
 }

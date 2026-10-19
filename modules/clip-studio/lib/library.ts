@@ -147,9 +147,9 @@ export function cleanTags(input: unknown): string[] {
 // ─── Projets ─────────────────────────────────────────────────────
 
 /** D'où vient un projet : la fenêtre « Nouveau clip », une création à partir d'une vidéo, un import. */
-export type ProjectOrigin = "assistant" | "template" | "blank" | "gallery" | "subtitle" | "clipping" | "import";
+export type ProjectOrigin = "assistant" | "template" | "blank" | "gallery" | "subtitle" | "clipping" | "take" | "import";
 
-export const PROJECT_ORIGINS: readonly ProjectOrigin[] = ["assistant", "template", "blank", "gallery", "subtitle", "clipping", "import"];
+export const PROJECT_ORIGINS: readonly ProjectOrigin[] = ["assistant", "template", "blank", "gallery", "subtitle", "clipping", "take", "import"];
 
 export const ORIGIN_LABELS: Record<ProjectOrigin, string> = {
   assistant: "Assistant",
@@ -158,6 +158,7 @@ export const ORIGIN_LABELS: Record<ProjectOrigin, string> = {
   gallery: "Galerie",
   subtitle: "Sous-titré",
   clipping: "Découpé",
+  take: "Prise montée",
   import: "Importé",
 };
 

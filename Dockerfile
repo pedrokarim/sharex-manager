@@ -148,8 +148,12 @@ RUN mkdir -p /app/.next/static \
 # (`src/lib/media/ffmpeg.ts`) plante dès qu'elle doit résoudre un nom de
 # domaine (erreur de segmentation, vu le 19/10/2026) ; elle reste utilisée pour
 # les fichiers locaux.
+#
+# Enfin libstdc++6 et libgomp1 : la transcription locale de Clip Studio
+# (whisper.cpp, téléchargé et vérifié au premier usage par
+# `src/lib/media/whisper-cpp.ts`) est liée à ces deux bibliothèques.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates fontconfig fonts-dejavu-core ffmpeg \
+    && apt-get install -y --no-install-recommends ca-certificates fontconfig fonts-dejavu-core ffmpeg libstdc++6 libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Codex, plus son `rg` et son `bwrap`. Le PATH plutôt qu'un lien symbolique :

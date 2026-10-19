@@ -111,7 +111,8 @@ export interface MediaSource {
 
 /** Transcription d'une vidéo : moteur, langue reconnue, date. */
 export interface TranscriptInfo {
-  provider: "openai";
+  /** Moteur : Whisper d'OpenAI, ou whisper.cpp sur le serveur (`local`). */
+  provider: "openai" | "local";
   language?: string;
   at: number;
 }
@@ -361,6 +362,8 @@ export interface Karaoke {
   groupSize: number;
   /** Élément audio sous-titré, pour ne pas le sous-titrer deux fois. */
   voiceId?: string;
+  /** Mots mis en valeur (indices dans `words`), dessinés dans leur couleur quand ils ne sont pas prononcés. */
+  emphasis?: { indices: number[]; color: string };
 }
 
 export interface TextItem extends VisualBase {

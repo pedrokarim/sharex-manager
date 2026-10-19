@@ -658,6 +658,15 @@ export function createProbeGate(limits = PROBE_LIMITS, now: () => number = Date.
 
 const probeGate = ((globalThis as any).__sxmRemoteProbeGate ??= createProbeGate()) as ProbeGate;
 
+/**
+ * Porte des lectures d'adresse, partagée avec la recherche d'extraits de
+ * l'assistant (`clip-sourcing.ts`) : ses recherches et lectures comptent dans
+ * les mêmes bornes (deux à la fois, vingt par minute pour tout le serveur).
+ */
+export function sharedProbeGate(): ProbeGate {
+  return probeGate;
+}
+
 /** Rejette dès que `signal` est levé, sans arrêter la lecture partagée (bornée à 90 secondes). */
 function untilAborted<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) return promise;

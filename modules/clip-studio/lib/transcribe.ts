@@ -1,7 +1,14 @@
 /**
  * Transcription de la parole d’une vidéo ou d’un son (serveur seulement).
  *
- * Moteur : Whisper d’OpenAI (`whisper-1`), avec la clé des voix en ligne
+ * Deux moteurs, choisis par le réglage de Clip Studio
+ * (`transcription-settings.ts`) : whisper.cpp sur le serveur, gratuit
+ * (`transcribe-local.ts`), et Whisper d’OpenAI (`whisper-1`), décrit ici. En
+ * « Automatique », OpenAI passe d’abord quand une clé est enregistrée, et le
+ * moteur local prend le relais si OpenAI échoue (crédit épuisé, clé
+ * refusée, réseau, délai) : chaque essai est noté au registre des services.
+ *
+ * OpenAI : la clé des voix en ligne
  * (`data/secrets.json` ou `OPENAI_API_KEY`). Le son est extrait par ffmpeg,
  * mono 16 kHz en Opus à 32 kb/s : une heure tient en 15 Mo, loin de la limite
  * de 25 Mo de l’API. Au-delà, il est découpé en morceaux à bornes fixes, dont
@@ -27,6 +34,11 @@ import { childEnv } from "@/lib/child-env";
 import { recordAiUsage, usageError } from "@/lib/ai-usage";
 import { redactSecrets } from "@/lib/ai-usage/store";
 import { holdWorkDir, stripServerPaths } from "./job-safety";
+import { TranscriptionError, type TranscribeOptions, type TranscriptionResult } from "./transcription-types";
+import { enginePlan, transcriptionEngine } from "./transcription-settings";
+import { transcribeLocalFile, VERBATIM_HINTS } from "./transcribe-local";
+
+export { TranscriptionError, type TranscribeOptions, type TranscribeProgress, type TranscriptionResult } from "./transcription-types";
 
 export const TRANSCRIPTION_MODEL = "whisper-1";
 const ENDPOINT = "https://api.openai.com/v1/audio/transcriptions";
@@ -44,37 +56,7 @@ const TEMP_ROOT = path.join(DATA_DIR, ".transcribe-tmp");
  */
 export const MAX_TRANSCRIPTION_SECONDS = 3 * 60 * 60;
 
-export interface TranscribeOptions {
-  /** Langue parlée (ISO 639-1 : « fr », « en »…) ; absente : reconnue par Whisper. */
-  language?: string;
-  signal?: AbortSignal;
-  /** Avancement : extraction du son, puis morceau `done` sur `total`. */
-  onProgress?: (progress: TranscribeProgress) => void;
-  /** Fonctionnalité notée au registre des IA. */
-  feature?: string;
-}
-
-export type TranscribeProgress = { stage: "extracting" } | { stage: "transcribing"; done: number; total: number };
-
-export interface TranscriptionResult {
-  words: TimedWord[];
-  /** Texte complet, ponctué. */
-  text: string;
-  /** Langue reconnue, en code ISO 639-1 quand il est connu. */
-  language?: string;
-  /** Durée du son transcrit, en secondes. */
-  durationSec: number;
-}
-
-/** Erreur lisible à montrer telle quelle (sans secret). */
-export class TranscriptionError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TranscriptionError";
-  }
-}
-
-const NO_KEY_MESSAGE = "Ajoutez une clé OpenAI dans « Voix en ligne » (réglages de Clip Studio) pour transcrire la parole.";
+const NO_KEY_MESSAGE = "Ajoutez une clé OpenAI dans « Voix en ligne » (réglages de Clip Studio), ou choisissez le moteur local, pour transcrire la parole.";
 
 // ─── Ponctuation et majuscules ───────────────────────────────────
 
@@ -360,8 +342,8 @@ function lastLine(stderr: string): string {
 
 // ─── Appel de l’API ──────────────────────────────────────────────
 
-/** Message d’une réponse en erreur, sans secret. */
-async function apiError(response: Response): Promise<string> {
+/** Message d’une réponse en erreur, sans secret, et sa famille (pour décider d’un repli). */
+async function apiError(response: Response): Promise<{ message: string; kind?: TranscriptionError["kind"] }> {
   const body = await response.text().catch(() => "");
   let detail = "";
   let code = "";
@@ -373,13 +355,13 @@ async function apiError(response: Response): Promise<string> {
     detail = body.slice(0, 200);
   }
   detail = redactSecrets(detail.replace(/\s+/g, " ").trim()).slice(0, 200);
-  if (response.status === 401) return "Clé OpenAI refusée : vérifiez-la dans « Voix en ligne ».";
+  if (response.status === 401 || response.status === 403) return { message: "Clé OpenAI refusée : vérifiez-la dans « Voix en ligne ».", kind: "auth" };
   if (response.status === 429 && /insufficient_quota|credit_balance|billing/.test(code)) {
-    return "Crédit OpenAI épuisé : rechargez le compte OpenAI de la clé, puis relancez la transcription.";
+    return { message: "Crédit OpenAI épuisé : rechargez le compte OpenAI de la clé, puis relancez la transcription.", kind: "quota" };
   }
-  if (response.status === 429) return "OpenAI refuse la demande (429) : trop de demandes à la fois. Réessayez dans un instant.";
-  if (response.status === 413) return "Son trop lourd pour OpenAI (25 Mo au plus).";
-  return `OpenAI n’a pas pu transcrire (HTTP ${response.status})${detail ? ` : ${detail}` : "."}`;
+  if (response.status === 429) return { message: "OpenAI refuse la demande (429) : trop de demandes à la fois. Réessayez dans un instant.", kind: "rate-limit" };
+  if (response.status === 413) return { message: "Son trop lourd pour OpenAI (25 Mo au plus)." };
+  return { message: `OpenAI n’a pas pu transcrire (HTTP ${response.status})${detail ? ` : ${detail}` : "."}`, ...(response.status >= 500 ? { kind: "network" as const } : {}) };
 }
 
 export interface RequestOptions {
@@ -388,6 +370,8 @@ export interface RequestOptions {
   /** Durée du son envoyé, en secondes : délai de la demande et registre. */
   durationSec?: number;
   feature?: string;
+  /** Garder hésitations et reprises (consigne donnée à Whisper). */
+  verbatim?: boolean;
 }
 
 /**
@@ -411,6 +395,8 @@ export async function requestTranscription(
   form.append("timestamp_granularities[]", "segment");
   const language = options.language && /^[a-z]{2}$/.test(options.language) ? options.language : undefined;
   if (language) form.append("language", language);
+  const hint = options.verbatim ? VERBATIM_HINTS[language ?? "fr"] : undefined;
+  if (hint) form.append("prompt", hint);
 
   const timeout = AbortSignal.timeout(requestTimeoutMs(expected));
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
@@ -421,7 +407,10 @@ export async function requestTranscription(
       headers: { Authorization: `Bearer ${key}` },
       body: form,
     });
-    if (!response.ok) throw new TranscriptionError(await apiError(response));
+    if (!response.ok) {
+      const failure = await apiError(response);
+      throw new TranscriptionError(failure.message, failure.kind);
+    }
     const result = parseVerboseTranscription(await response.json());
     recordAiUsage({
       provider: "openai",
@@ -439,9 +428,9 @@ export async function requestTranscription(
     if (error instanceof SyntaxError) throw new TranscriptionError("Réponse illisible d’OpenAI : réessayez.");
     if (error instanceof Error && error.name === "AbortError" && options.signal?.aborted) throw abortError();
     if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      throw new TranscriptionError("OpenAI n’a pas répondu à temps : réessayez.");
+      throw new TranscriptionError("OpenAI n’a pas répondu à temps : réessayez.", "timeout");
     }
-    throw new TranscriptionError("OpenAI est injoignable : vérifiez la connexion du serveur, puis réessayez.");
+    throw new TranscriptionError("OpenAI est injoignable : vérifiez la connexion du serveur, puis réessayez.", "network");
   }
 }
 
@@ -465,6 +454,7 @@ export async function transcribeChunks(
       signal: options.signal,
       durationSec: entry.chunk.durationSec,
       feature: options.feature,
+      verbatim: options.verbatim,
     });
     words.push(...shiftWords(result.words, Math.round(entry.chunk.startSec * 1000)));
     if (result.text) texts.push(result.text);
@@ -472,19 +462,47 @@ export async function transcribeChunks(
     durationSec = Math.max(durationSec, entry.chunk.startSec + (result.durationSec || entry.chunk.durationSec));
   }
   options.onProgress?.({ stage: "transcribing", done: chunks.length, total: chunks.length });
-  return { words, text: texts.join(" "), ...(language ? { language } : {}), durationSec };
+  return { words, text: texts.join(" "), ...(language ? { language } : {}), durationSec, provider: "openai" };
 }
 
 // ─── Point d’entrée ──────────────────────────────────────────────
 
+/** Échecs d’OpenAI après lesquels le moteur local prend le relais, en « Automatique ». */
+const FALLBACK_KINDS = new Set<TranscriptionError["kind"]>(["quota", "auth", "network", "timeout", "rate-limit"]);
+
+/** Un échec d’OpenAI qui laisse sa chance au moteur local : crédit, clé, réseau, délai, limite de débit. */
+export function canFallBack(error: unknown): boolean {
+  return error instanceof TranscriptionError && FALLBACK_KINDS.has(error.kind);
+}
+
 /**
  * Transcrit la parole d’un fichier vidéo ou audio du serveur. Rend les mots
- * en millisecondes de la source. Sert au bouton « Transcrire et sous-titrer »
- * et aux créations à partir d’une vidéo.
+ * en millisecondes de la source, et le moteur qui a transcrit (`provider`).
+ * Sert au bouton « Transcrire et sous-titrer » et aux créations à partir
+ * d’une vidéo. Le moteur suit le réglage (ou `options.engine`) ; en
+ * « Automatique », un échec d’OpenAI passe la main au moteur local.
  */
 export async function transcribeMediaFile(input: string, options: TranscribeOptions = {}): Promise<TranscriptionResult> {
   const key = openAiApiKey();
-  if (!key) throw new TranscriptionError(NO_KEY_MESSAGE);
+  const plan = options.engine ? [options.engine] : enginePlan(transcriptionEngine(), Boolean(key));
+  for (const [index, engine] of plan.entries()) {
+    const last = index === plan.length - 1;
+    try {
+      if (engine === "local") {
+        return await transcribeLocalFile(input, { ...options, maxSeconds: MAX_TRANSCRIPTION_SECONDS, assertDuration: (seconds) => assertTranscribableDuration(seconds) });
+      }
+      if (!key) throw new TranscriptionError(NO_KEY_MESSAGE, "no-key");
+      return await transcribeWithOpenAi(input, key, options);
+    } catch (error) {
+      if (last || options.signal?.aborted || !canFallBack(error)) throw error;
+      options.onProgress?.({ stage: "fallback", reason: (error as Error).message });
+    }
+  }
+  throw new TranscriptionError("Aucun moteur de transcription n’est réglé.");
+}
+
+/** Transcription par OpenAI : extraction du son compressé, morceaux au besoin, envoi. */
+async function transcribeWithOpenAi(input: string, key: string, options: TranscribeOptions): Promise<TranscriptionResult> {
   if (!fs.existsSync(input)) throw new TranscriptionError("Fichier introuvable.");
   const binary = await ensureFfmpeg();
   if (!binary) throw new TranscriptionError("ffmpeg n’est pas disponible pour extraire le son : réessayez dans un instant.");

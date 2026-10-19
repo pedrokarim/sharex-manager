@@ -116,13 +116,23 @@ function isVoice(item: AudioItem | VideoItem, trackName: string): boolean {
   return Boolean(item.source.words?.length || item.source.speech) || /^Voix\b/.test(trackName);
 }
 
-/** Moments où une voix parle, en secondes sur la timeline, fusionnés. */
+/**
+ * Extrait cité d'une vidéo (« Extrait … » posé par l'assistant, son gardé) :
+ * on y entend une parole ou un son qui compte, la musique s'efface dessous
+ * comme sous une voix off.
+ */
+function isQuotedExcerpt(item: AudioItem | VideoItem): boolean {
+  return item.type === "video" && item.duck === undefined && isAudible(item) && /^Extrait\b/.test(item.label ?? "");
+}
+
+/** Moments où une voix parle (ou un extrait cité), en secondes sur la timeline, fusionnés. */
 export function voiceWindows(project: ClipProject): [number, number][] {
   const raw: [number, number][] = [];
   for (const track of project.tracks) {
-    if (track.muted || track.kind !== "audio") continue;
+    if (track.muted) continue;
     for (const item of track.items) {
-      if (!hasAudio(item) || item.volume <= 0 || !isVoice(item, track.name)) continue;
+      if (!hasAudio(item) || item.volume <= 0) continue;
+      if (track.kind === "audio" ? !isVoice(item, track.name) : !isQuotedExcerpt(item)) continue;
       raw.push([item.start / project.fps, (item.start + item.duration) / project.fps]);
     }
   }

@@ -6,7 +6,7 @@ vi.mock("@/lib/modules/module-manager.api", () => ({ apiModuleManager: { callMod
 import { cleanRequest, sanitize, scriptDoneDetail, scriptPrompt, type AssistantRequest } from "@/modules/clip-studio/lib/assistant";
 import { AUTO_SEGMENTS, cleanCount, segmentCap, suggestedSegments } from "@/modules/clip-studio/lib/segment-count";
 import { CREATE_PATH, createHref, prefillFromIdea, prefillMode, readCount, readCreatePrefill } from "@/modules/clip-studio/lib/idea-prefill";
-import { createRequestHref, legacyCreateHref, modeHref, readFiles, readMode } from "@/modules/clip-studio/lib/create-mode";
+import { createRequestHref, legacyCreateHref, modeHref, opensSourceVideos, readFiles, readMode } from "@/modules/clip-studio/lib/create-mode";
 import { ideaCount, ideasPrompt, mixTargets, parseIdeas, topicLines, type IdeaContext } from "@/modules/clip-studio/lib/ideas";
 import { DEFAULT_IDEA_SETTINGS, type Idea } from "@/modules/clip-studio/lib/idea-types";
 
@@ -197,16 +197,25 @@ describe("créer depuis une idée", () => {
     });
   });
 
-  it("un nombre d'éléments et une vidéo source passent aussi, en mode « Monter sur une vidéo »", () => {
+  it("un nombre d'éléments et une suggestion de vidéo passent aussi, toujours vers l'assistant", () => {
     const prefill = prefillFromIdea({ ...IDEA, count: 5, template: "top", sourceVideoHint: "Un forgeron japonais au travail" });
-    expect(prefillMode(prefill)).toBe("overlay");
+    expect(prefillMode(prefill)).toBe("assistant");
     const params = new URL(createHref(prefill), "https://sxm.test").searchParams;
-    expect(params.get("mode")).toBe("overlay");
+    expect(params.get("mode")).toBe("assistant");
     const read = readCreatePrefill(params)!;
     expect(read.count).toBe(5);
     expect(read.template).toBe("top");
+    // La suggestion reste, sans rien exiger : « Créer » n'attend pas de vidéo.
     expect(read.sourceVideoHint).toBe("Un forgeron japonais au travail");
-    expect(readMode(params)).toBe("overlay");
+    expect(readMode(params)).toBe("assistant");
+    expect(opensSourceVideos(params)).toBe(false);
+  });
+
+  it("l'ancien lien « Monter sur une vidéo » ouvre l'assistant, choix des vidéos ouvert", () => {
+    const params = new URLSearchParams({ mode: "overlay", brief: "Le forgeron", hint: "Un forgeron" });
+    expect(readMode(params)).toBe("assistant");
+    expect(opensSourceVideos(params)).toBe(true);
+    expect(readCreatePrefill(params)?.sourceVideoHint).toBe("Un forgeron");
   });
 
   it("lit « auto », un nombre borné, ou rien", () => {

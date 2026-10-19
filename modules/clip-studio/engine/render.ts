@@ -1797,7 +1797,8 @@ function drawKaraoke(
         ctx.shadowBlur = style.shadow.blur * fontPx;
         ctx.shadowOffsetY = style.shadow.offsetY * fontPx;
       }
-      ctx.fillStyle = current ? karaoke.highlight : (state?.color ?? color ?? style.color);
+      const emphasized = !current && karaoke.emphasis?.indices.includes(wordIndex);
+      ctx.fillStyle = current ? karaoke.highlight : emphasized ? karaoke.emphasis!.color : (state?.color ?? color ?? style.color);
       ctx.fillText(text, -widths[index] / 2, 0);
       ctx.restore();
       x += widths[index] + space;

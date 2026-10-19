@@ -29,7 +29,7 @@ import { askCodex } from "./codex";
 import { assertDiskSpace, holdWorkDir, publicErrorMessage } from "./job-safety";
 import { cancelRemoteImportJob, getRemoteImportJob, inspect, remoteAssetGuards, runFfmpeg, startRemoteImport, type MediaStreams } from "./remote-import";
 import { ASSETS_DIR, DATA_DIR, ensureDirs, listProjectFiles, readAssets, writeAssets, writeProject } from "./store";
-import { TranscriptionError, transcribeMediaFile } from "./transcribe";
+import { TranscriptionError, transcribeMediaFile, type TranscribeProgress } from "./transcribe";
 import { resolveMedia, storedTranscript, storeTranscript } from "./transcription-jobs";
 
 const JOBS_FILE = path.join(DATA_DIR, "clip-jobs.json");
@@ -454,6 +454,22 @@ async function resolveSource(job: ClipJob, signal: AbortSignal, step: ReturnType
   }
 }
 
+/**
+ * Détail d'une étape de transcription, selon le moteur : morceaux envoyés à
+ * OpenAI, téléchargement puis pourcentage du moteur local, repli. `null` :
+ * rien de neuf à dire.
+ */
+export function transcriptionDetail(progress: TranscribeProgress): string | null {
+  if (progress.stage === "extracting") return null;
+  if (progress.stage === "fallback") return "OpenAI indisponible : transcription sur le serveur…";
+  if (progress.stage === "downloading") {
+    const mb = (bytes: number) => Math.round(bytes / (1024 * 1024));
+    return `Installation du moteur local (une seule fois) : ${mb(progress.received)} Mo sur ${mb(progress.total)}…`;
+  }
+  if (progress.engine === "local") return `Transcription sur le serveur : ${Math.round(progress.done)} %…`;
+  return progress.total > 1 ? `Envoi à OpenAI, partie ${Math.min(progress.done + 1, progress.total)} sur ${progress.total}…` : "Envoi à OpenAI…";
+}
+
 /** Mots de la vidéo : sa transcription rangée si elle existe, sinon Whisper (rangée ensuite avec le média). */
 async function transcribeSource(asset: ClipAsset, signal: AbortSignal, step: ReturnType<typeof stepper>, feature: string): Promise<{ words: TimedWord[]; transcript: TranscriptInfo }> {
   const media = resolveMedia({ assetId: asset.file });
@@ -467,12 +483,12 @@ async function transcribeSource(asset: ClipAsset, signal: AbortSignal, step: Ret
     signal,
     feature,
     onProgress: (progress) => {
-      if (progress.stage === "extracting") return;
-      step("transcribe", "running", progress.total > 1 ? `Envoi à OpenAI, partie ${Math.min(progress.done + 1, progress.total)} sur ${progress.total}…` : "Envoi à OpenAI…");
+      const detail = transcriptionDetail(progress);
+      if (detail) step("transcribe", "running", detail);
     },
   });
   if (signal.aborted) throw abortError();
-  const transcript: TranscriptInfo = { provider: "openai", ...(result.language ? { language: result.language } : {}), at: Date.now() };
+  const transcript: TranscriptInfo = { provider: result.provider ?? "openai", ...(result.language ? { language: result.language } : {}), at: Date.now() };
   storeTranscript(media, result.words, transcript);
   step("transcribe", "done", `${result.words.length} mots`);
   return { words: result.words, transcript };

@@ -31,7 +31,8 @@ export type AiProviderId =
   | "openverse"
   | "pexels"
   | "pixabay"
-  | "wikimedia";
+  | "wikimedia"
+  | "whisper-local";
 
 /** Unité de ce qui est consommé ; un même fournisseur peut en compter plusieurs. */
 /**

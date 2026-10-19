@@ -3,10 +3,11 @@
 /**
  * Page « Nouveau clip » : l'espace de création, en pleine largeur.
  *
- * - À gauche, le point de départ (Assistant IA, Depuis une idée, Monter
- *   par-dessus une vidéo, Modèle, Vide, Sous-titrer un clip, Découper une
- *   vidéo, et la sélection de la galerie quand il y en a une), puis ce que le
- *   mode demande : le sujet, l'idée, la vidéo, le modèle.
+ * - À gauche, le point de départ (Assistant IA, Depuis une idée, Modèle,
+ *   Vide, Sous-titrer un clip, Découper une vidéo, et la sélection de la
+ *   galerie quand il y en a une), puis ce que le mode demande : le sujet, la
+ *   forme et les vidéos de l'assistant (extraits du web, vos vidéos), l'idée,
+ *   le modèle.
  * - À droite, « Réglages » : format, marque, durée visée, découpage
  *   (« Auto » par défaut), voix, musique, illustrations ; le résumé de ce qui
  *   sera créé et « Créer », toujours visibles au pied de la colonne.
@@ -15,6 +16,8 @@
  *
  * L'adresse porte le mode (`?mode=`), une idée préremplie
  * (`readCreatePrefill`) et la sélection de la galerie (`?files=`).
+ * L'ancien `?mode=overlay` (« Monter sur une vidéo ») ouvre l'assistant,
+ * champ « Vidéos à utiliser » ouvert.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -62,12 +65,14 @@ import { IMAGE_SOURCE_MODES, type ImageSourceMode } from "../lib/image-search-ty
 import { MIN_TARGET_SECONDS, brandVoicePrefill, defaultTargetSeconds, maxTargetSeconds, voiceSourceOf } from "../lib/voice-settings";
 import { CHOSEN_SEGMENTS, suggestedSegments } from "../lib/segment-count";
 import { createHref, prefillFromIdea, readCreatePrefill, type CreatePrefill } from "../lib/idea-prefill";
-import { ASSISTANT_MODES, modeHref, readFiles, readMode, type CreateMode } from "../lib/create-mode";
+import { ASSISTANT_MODES, modeHref, opensSourceVideos, readFiles, readMode, type CreateMode } from "../lib/create-mode";
+import { useSession } from "@/lib/auth-client";
 import type { Idea } from "../lib/idea-types";
 import { ScreenHeader } from "../components/screen-header";
 import { BrandKitMark } from "../components/inspector";
-import { SourceVideoField } from "../components/source-video-field";
+import { SourceVideosField } from "../components/source-video-field";
 import { ClipModePanel } from "../components/clip-modes";
+import { TAKE_MODE_ICON, TakeEditPanel } from "../components/take-edit-mode";
 import { IdeaStarter } from "../components/idea-starter";
 import { TemplatePreview } from "../components/template-preview";
 import { MOOD_LABELS } from "../components/music-panel";
@@ -101,11 +106,11 @@ const HUB_HREF = "/m/clip-studio";
 const MODES: { id: CreateMode; label: string; description: string; icon: LucideIcon }[] = [
   { id: "assistant", label: "Assistant IA", description: "Décrivez le sujet : l’IA écrit, illustre, lit et monte.", icon: Sparkles },
   { id: "idea", label: "Depuis une idée", description: "Lancez une phrase : des idées prêtes à créer.", icon: Lightbulb },
-  { id: "overlay", label: "Monter sur une vidéo", description: "L’assistant commente une vidéo et en cite des extraits.", icon: Film },
   { id: "template", label: "Modèle", description: "Une forme toute prête, remplie d’un exemple.", icon: LayoutTemplate },
   { id: "blank", label: "Vide", description: "Une timeline vide, à monter à la main.", icon: FileVideo },
   { id: "subtitle", label: "Sous-titrer un clip", description: "Les paroles d’une vidéo en sous-titres animés.", icon: Captions },
   { id: "clipping", label: "Découper une vidéo", description: "Les passages forts d’une longue vidéo, en clips.", icon: Scissors },
+  { id: "take", label: "Monter ma prise", description: "Votre prise face caméra, coupée, rythmée, avec planches et sous-titres.", icon: TAKE_MODE_ICON },
 ];
 
 const MUSIC_CHOICES: [string, string][] = [["none", "Aucune"], ["auto", "Choisie par l’IA"], ...Object.entries(MOOD_LABELS)];
@@ -132,10 +137,19 @@ export default function CreatePage() {
   const [lastCount, setLastCount] = useState(5);
   const [targetChoice, setTargetChoice] = useState<number | null>(null);
   const [imageSource, setImageSource] = useState<ImageSourceMode>("find-then-generate");
+  // Vidéos (extraits du web, plans libres) : cherchées seulement quand les illustrations le sont.
+  const findsImages = imageSource === "find" || imageSource === "find-then-generate";
   const [webSearch, setWebSearch] = useState(true);
-  const [sourceVideo, setSourceVideo] = useState<MediaSource | null>(null);
+  const [sourceVideos, setSourceVideos] = useState<MediaSource[]>([]);
   const [stockVideos, setStockVideos] = useState(true);
+  const [webClips, setWebClips] = useState(true);
+  const [clipAudio, setClipAudio] = useState(true);
   const [videoProviders, setVideoProviders] = useState<VideoProviderId[]>(["wikimedia"]);
+  const [clipSources, setClipSources] = useState<{ youtube: "ok" | "no-cookies" | "refused"; twitch: boolean } | null>(null);
+  // Ancien lien « Monter sur une vidéo » : l'assistant, avec le choix des vidéos ouvert.
+  const openSources = opensSourceVideos(params);
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
   const [withVoice, setWithVoice] = useState(true);
   const [voice, setVoice] = useState("siwis");
   const [speed, setSpeed] = useState(1);
@@ -157,7 +171,10 @@ export default function CreatePage() {
     setTone(prefs.tone);
     setVoice(lastPickedVoice() ?? "siwis");
     getVideoSearchStatus()
-      .then((status) => Array.isArray(status.providers) && status.providers.length > 0 && setVideoProviders(status.providers))
+      .then((status) => {
+        if (Array.isArray(status.providers) && status.providers.length > 0) setVideoProviders(status.providers);
+        if (status.clips) setClipSources(status.clips);
+      })
       .catch(() => undefined);
   }, []);
 
@@ -284,6 +301,7 @@ export default function CreatePage() {
   const [busy, setBusy] = useState(false);
   const feedback = useFeedback();
   const clipMode = mode === "subtitle" || mode === "clipping";
+  const takeMode = mode === "take";
   const [clipActive, setClipActive] = useState(false);
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);
 
@@ -339,8 +357,10 @@ export default function CreatePage() {
         targetSeconds,
         music: music === "none" ? undefined : music,
         brandKitId: chosenKitId ?? undefined,
-        ...(videoProviders.length > 0 && stockVideos && (imageSource === "find" || imageSource === "find-then-generate") ? { videos: true } : {}),
-        ...(mode === "overlay" && sourceVideo ? { sourceVideo: { ref: sourceVideo.ref } } : {}),
+        ...(videoProviders.length > 0 && stockVideos && findsImages ? { videos: true } : {}),
+        // Extraits de vraies vidéos : seulement quand les illustrations se cherchent.
+        ...(webClips && findsImages ? { webClips: true, clipAudio } : {}),
+        ...(sourceVideos.length ? { sourceVideos: sourceVideos.map((source) => ({ ref: source.ref })) } : {}),
         ...(ideaId ? { ideaId } : {}),
       });
       const next = new URLSearchParams(query);
@@ -360,11 +380,9 @@ export default function CreatePage() {
       ? "Choisissez une idée pour préremplir l’assistant."
       : assistantMode && brief.trim().length < 3
         ? "Décrivez le sujet du clip (3 caractères au moins)."
-        : mode === "overlay" && !sourceVideo
-          ? "Choisissez la vidéo source."
-          : beforeAfterShort
-            ? "Sélectionnez au moins deux images pour un avant / après."
-            : null;
+        : beforeAfterShort
+          ? "Sélectionnez au moins deux images pour un avant / après."
+          : null;
 
   const summary = summaryLines({
     mode,
@@ -381,7 +399,9 @@ export default function CreatePage() {
     showBrands,
     files,
     recipe,
-    sourceVideo,
+    sourceVideos,
+    webClips: webClips && findsImages,
+    clipAudio,
   });
 
   if (jobId) {
@@ -414,23 +434,6 @@ export default function CreatePage() {
 
                 {assistantMode ? (
                   <>
-                    {mode === "overlay" ? (
-                      <Panel>
-                        <PanelHeader icon={Film} title="Vidéo source" description="Le script s’appuie sur ce qui s’y dit, et en cite ou en montre des extraits." />
-                        <PanelBody className="flex min-w-0 flex-col gap-3">
-                          {videoHint ? (
-                            <p className="flex min-w-0 items-start gap-2 rounded-lg bg-muted/50 px-3 py-2 text-sm">
-                              <Lightbulb className="mt-0.5 size-4 shrink-0 text-primary" />
-                              <span className="min-w-0 [overflow-wrap:anywhere]">
-                                <span className="text-muted-foreground">L’idée demande&nbsp;: </span>
-                                {videoHint}
-                              </span>
-                            </p>
-                          ) : null}
-                          <SourceVideoField value={sourceVideo} onChange={setSourceVideo} embedded />
-                        </PanelBody>
-                      </Panel>
-                    ) : null}
                     <Panel>
                       <PanelHeader icon={Sparkles} title="Sujet" description="Une phrase suffit : le sujet, l’angle, le ton. L’assistant écrit le script, cherche ou crée les images, enregistre la voix et monte le clip." />
                       <PanelBody className="flex min-w-0 flex-col gap-3">
@@ -462,6 +465,57 @@ export default function CreatePage() {
                       <PanelHeader icon={LayoutTemplate} title="Forme" description="Ce que l’assistant écrit : des séquences libres, un quiz, un classement ou un diaporama." />
                       <PanelBody>
                         <TemplatePicker value={template} onChange={setTemplate} only={ASSISTANT_TEMPLATE_IDS} />
+                      </PanelBody>
+                    </Panel>
+                    <Panel>
+                      <PanelHeader
+                        icon={Film}
+                        title="Vidéos"
+                        description="L’assistant monte de la vidéo : il cherche les vrais extraits (bandes-annonces, interviews, clips de stream), coupe le bon passage et le pose sur la timeline, muet sous la voix ou avec son son quand l’entendre compte."
+                      />
+                      <PanelBody className="flex min-w-0 flex-col gap-4">
+                        {!findsImages ? (
+                          <p className="text-xs text-pretty text-muted-foreground">
+                            Les vidéos se cherchent avec les illustrations : choisissez « {IMAGE_SOURCE_LABELS["find-then-generate"]} » ou « {IMAGE_SOURCE_LABELS.find} » dans les réglages.
+                          </p>
+                        ) : null}
+                        <label className="flex min-w-0 items-start justify-between gap-3">
+                          <span className="min-w-0 text-sm">
+                            Chercher des extraits sur le web
+                            <span className="block text-xs text-pretty text-muted-foreground">
+                              Pour chaque sujet nommé (jeu, film, personne, événement, stream), un passage de sa vraie vidéo. Droits à vérifier avant de publier.
+                            </span>
+                            <ClipSourcesLine status={clipSources} providers={stockVideos ? videoProviders : []} isAdmin={isAdmin} />
+                          </span>
+                          <Switch checked={webClips && findsImages} disabled={!findsImages} onCheckedChange={setWebClips} aria-label="Chercher des extraits sur le web" />
+                        </label>
+                        <label className="flex min-w-0 items-start justify-between gap-3">
+                          <span className="min-w-0 text-sm">
+                            Garder le son des extraits quand il compte
+                            <span className="block text-xs text-pretty text-muted-foreground">
+                              Une réplique, une réaction, une citation : on l’entend, sous-titrée, puis la voix off reprend. Sinon l’extrait passe muet sous la voix.
+                            </span>
+                          </span>
+                          <Switch checked={clipAudio} disabled={!webClips || !findsImages} onCheckedChange={setClipAudio} aria-label="Garder le son des extraits quand il compte" />
+                        </label>
+                        {videoProviders.length > 0 ? (
+                          <label className="flex min-w-0 items-start justify-between gap-3">
+                            <span className="min-w-0 text-sm">
+                              Plans filmés libres
+                              <span className="block text-xs text-pretty text-muted-foreground">Pour une action ou une ambiance sans nom propre, un plan des banques libres, sans son. Auteur et licence cités.</span>
+                            </span>
+                            <Switch checked={stockVideos && findsImages} disabled={!findsImages} onCheckedChange={setStockVideos} aria-label="Plans filmés libres" />
+                          </label>
+                        ) : null}
+                        <div className="flex min-w-0 flex-col gap-2 border-t pt-3">
+                          <span className="min-w-0 text-sm">
+                            Vidéos à utiliser
+                            <span className="block text-xs text-pretty text-muted-foreground">
+                              Facultatif, trois au plus. Vos vidéos passent en premier : le script s’appuie sur ce qui s’y dit et en cite des extraits, puis complète avec ce qu’il trouve.
+                            </span>
+                          </span>
+                          <SourceVideosField value={sourceVideos} onChange={setSourceVideos} hint={videoHint} defaultOpen={openSources} />
+                        </div>
                       </PanelBody>
                     </Panel>
                   </>
@@ -530,6 +584,30 @@ export default function CreatePage() {
                       <ClipModePanel
                         key={mode}
                         kind={mode}
+                        aspect={aspect}
+                        brandKitId={chosenKitId}
+                        onCreated={(id) => router.push(`/m/clip-studio/edit?id=${encodeURIComponent(id)}`)}
+                        onClose={() => router.push(HUB_HREF)}
+                        onActiveChange={setClipActive}
+                        actionsTarget={actionsTarget}
+                      />
+                    </PanelBody>
+                  </Panel>
+                ) : null}
+
+                {takeMode ? (
+                  <Panel>
+                    <PanelHeader
+                      icon={TAKE_MODE_ICON}
+                      title="Monter ma prise"
+                      description={
+                        clipActive
+                          ? undefined
+                          : "Une ou plusieurs prises de vous face caméra : blancs et reprises coupés, planches qui illustrent ce que vous dites (chiffres, logos, listes), sous-titres mot à mot, musique. Tout reste modifiable dans l’éditeur."
+                      }
+                    />
+                    <PanelBody>
+                      <TakeEditPanel
                         aspect={aspect}
                         brandKitId={chosenKitId}
                         onCreated={(id) => router.push(`/m/clip-studio/edit?id=${encodeURIComponent(id)}`)}
@@ -707,23 +785,6 @@ export default function CreatePage() {
                           </span>
                           <Switch checked={webSearch} onCheckedChange={chooseWebSearch} />
                         </label>
-                        {videoProviders.length > 0 && (imageSource === "find" || imageSource === "find-then-generate") ? (
-                          <label className="flex min-w-0 items-start justify-between gap-3 pt-1">
-                            <span className="min-w-0 text-sm">
-                              Illustrer aussi en vidéo
-                              <span className="block text-xs text-muted-foreground">Segment par segment, une image ou un plan filmé, sans son. Auteur et licence cités.</span>
-                              <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
-                                {videoProviders.map((provider) => (
-                                  <span key={provider} className="inline-flex min-w-0 items-center gap-1">
-                                    <BrandLogo brand={VIDEO_PROVIDER_BRANDS[provider].brand} className="size-3.5" />
-                                    <span className="truncate">{VIDEO_PROVIDER_BRANDS[provider].label}</span>
-                                  </span>
-                                ))}
-                              </span>
-                            </span>
-                            <Switch checked={stockVideos} onCheckedChange={setStockVideos} />
-                          </label>
-                        ) : null}
                       </SettingsSection>
                     </>
                   ) : null}
@@ -740,7 +801,7 @@ export default function CreatePage() {
                     ))}
                   </ul>
                 ) : null}
-                {clipMode ? (
+                {clipMode || takeMode ? (
                   <div ref={setActionsTarget} className="min-w-0" />
                 ) : (
                   <>
@@ -800,6 +861,45 @@ export default function CreatePage() {
   );
 }
 
+// ─── Sources des extraits ────────────────────────────────────────
+
+/**
+ * Ce que la recherche d'extraits peut utiliser : YouTube (sans cookies, un
+ * serveur peut être refusé), Twitch (par la recherche web de Codex), les
+ * banques libres en repli. Un administrateur a le lien vers les réglages.
+ */
+function ClipSourcesLine({ status, providers, isAdmin }: { status: { youtube: "ok" | "no-cookies" | "refused"; twitch: boolean } | null; providers: VideoProviderId[]; isAdmin: boolean }) {
+  if (!status) return null;
+  const youtubeNote = status.youtube === "refused" ? "YouTube indisponible (cookies non configurés)" : status.youtube === "no-cookies" ? "YouTube sans cookies" : "YouTube";
+  return (
+    <span className="mt-1.5 flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+        <span className={cn("inline-flex min-w-0 items-center gap-1", status.youtube === "refused" && "text-amber-700 dark:text-amber-400")}>
+          <BrandLogo brand="youtube" className="size-3.5 shrink-0" />
+          <span className="min-w-0 [overflow-wrap:anywhere]">{youtubeNote}</span>
+        </span>
+        {status.twitch ? (
+          <span className="inline-flex min-w-0 items-center gap-1">
+            <BrandLogo brand="twitch" className="size-3.5 shrink-0" />
+            <span className="truncate">Twitch</span>
+          </span>
+        ) : null}
+        {providers.map((provider) => (
+          <span key={provider} className="inline-flex min-w-0 items-center gap-1">
+            <BrandLogo brand={VIDEO_PROVIDER_BRANDS[provider].brand} className="size-3.5 shrink-0" />
+            <span className="truncate">{VIDEO_PROVIDER_BRANDS[provider].label}</span>
+          </span>
+        ))}
+      </span>
+      {status.youtube !== "ok" && isAdmin ? (
+        <Link href="/m/clip-studio/voices#video-sources-title" className="w-fit max-w-full text-primary hover:underline">
+          {status.youtube === "refused" ? "Ajouter les cookies YouTube dans les réglages" : "Cookies YouTube : réglages des sources vidéo"}
+        </Link>
+      ) : null}
+    </span>
+  );
+}
+
 // ─── Point de départ ─────────────────────────────────────────────
 
 function ModeChooser({ mode, onChange, galleryCount }: { mode: CreateMode; onChange: (mode: CreateMode) => void; galleryCount: number }) {
@@ -808,9 +908,9 @@ function ModeChooser({ mode, onChange, galleryCount }: { mode: CreateMode; onCha
     ? { id: "gallery" as const, label: "Sélection de la galerie", description: `${galleryCount}\u00a0média${galleryCount > 1 ? "s" : ""} à monter en diaporama ou en avant / après.`, icon: Images }
     : null;
   const groups = [
-    { label: "Avec l’assistant", modes: [byId.get("assistant")!, byId.get("idea")!, byId.get("overlay")!] },
+    { label: "Avec l’assistant", modes: [byId.get("assistant")!, byId.get("idea")!] },
     { label: "À la main", modes: [...(gallery ? [gallery] : []), byId.get("template")!, byId.get("blank")!] },
-    { label: "Depuis une vidéo", modes: [byId.get("subtitle")!, byId.get("clipping")!] },
+    { label: "Depuis une vidéo", modes: [byId.get("subtitle")!, byId.get("clipping")!, byId.get("take")!] },
   ];
   return (
     <nav aria-label="Point de départ" className="flex min-w-0 flex-col gap-4">
@@ -921,7 +1021,9 @@ function summaryLines(input: {
   showBrands: boolean;
   files: string[];
   recipe: Recipe;
-  sourceVideo: MediaSource | null;
+  sourceVideos: MediaSource[];
+  webClips: boolean;
+  clipAudio: boolean;
 }): { lines: string[]; voice: string } {
   const unit = COUNT_LABELS[input.template]?.many ?? "séquences";
   const brand = input.showBrands ? (input.kitName ? `Marque « ${input.kitName} »` : "Sans marque") : null;
@@ -932,7 +1034,12 @@ function summaryLines(input: {
     lines.push(input.count === null ? `Découpage auto (environ ${input.estimate} ${unit})` : `${input.count} ${unit}`);
     lines.push(`Voix : ${voice} · Musique : ${input.music === "none" ? "aucune" : input.music === "auto" ? "choisie par l’IA" : (MOOD_LABELS[input.music] ?? input.music).toLowerCase()}`);
     lines.push(`Illustrations : ${IMAGE_SOURCE_LABELS[input.imageSource].toLowerCase()}`);
-    if (input.mode === "overlay") lines.push(input.sourceVideo ? `Sur « ${input.sourceVideo.name} »` : "Vidéo source à choisir");
+    const videos = [
+      input.webClips ? `extraits du web${input.clipAudio ? ", son gardé quand il compte" : ", muets"}` : "",
+      input.sourceVideos.length ? `${input.sourceVideos.length} vidéo${input.sourceVideos.length > 1 ? "s" : ""} fournie${input.sourceVideos.length > 1 ? "s" : ""}` : "",
+    ].filter(Boolean);
+    lines.push(`Vidéos : ${videos.length ? videos.join(" · ") : "aucune"}`);
+
   } else if (input.mode === "template") {
     lines.push(`${ASPECT_WORDS[input.aspect]}, modèle «\u00a0${TEMPLATES.find((entry) => entry.id === input.template)?.label ?? input.template}\u00a0» rempli d’un exemple`);
   } else if (input.mode === "gallery") {
@@ -940,7 +1047,7 @@ function summaryLines(input: {
   } else if (input.mode === "blank") {
     lines.push(`${ASPECT_WORDS[input.aspect]}, timeline vide`);
   } else {
-    lines.push(`${ASPECT_WORDS[input.aspect]}, ${input.mode === "subtitle" ? "un clip sous-titré" : "un clip par passage gardé"}`);
+    lines.push(`${ASPECT_WORDS[input.aspect]}, ${input.mode === "subtitle" ? "un clip sous-titré" : input.mode === "take" ? "une prise montée, avec planches et sous-titres" : "un clip par passage gardé"}`);
   }
   if (brand) lines.push(brand);
   return { lines, voice };
