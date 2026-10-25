@@ -6,6 +6,7 @@
  * est donc exactement ce qui sort dans le MP4.
  */
 
+import { itemAtFrame } from "./keys";
 import { formatColor, parseColor } from "./motion/color";
 import { caretVisible, counterText, scrambleLines, scrambleTick, scrambleUnit } from "./motion/effects";
 import { getShotFx, getTransition, shotBlendAt, shotFxValues, type ShotTracks } from "./motion/scenes";
@@ -50,12 +51,15 @@ import type {
   ImageItem,
   ShotEffect,
   ShapeItem,
+  StrokePath,
+  TextMark,
   TextItem,
   TextStyle,
   TimedWord,
   VideoItem,
   VisualItem,
 } from "./types";
+import { MAX_STROKE_PATHS, MAX_STROKE_POINTS, MAX_TEXT_MARKS } from "./types";
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -271,15 +275,20 @@ function withBlend(base: AnimState, blend: Blend, unit: number, frameUnit: numbe
 function drawItem(
   ctx: Ctx,
   project: ClipProject,
-  item: VisualItem,
+  original: VisualItem,
   frame: number,
   resolve: VisualResolver,
   blend: Blend = {}
 ) {
   const { width: W, height: H } = project;
+  // Images clés : le cadre de l'élément à cette image, et son agrandissement.
+  const keyed = itemAtFrame(original, frame);
+  const item = keyed.item;
+  if (item.type === "text" && (item.marks?.length || item.count)) textLocalFrame.set(item, frame - item.start);
   const motion = motionAt(item, frame);
   const base = motion.state;
-  const anim = withBlend(base, blend, lengthUnit(item, base, W, H), Math.min(W, H));
+  const blended = withBlend(base, blend, lengthUnit(item, base, W, H), Math.min(W, H));
+  const anim = keyed.scale === 1 ? blended : { ...blended, scale: blended.scale * keyed.scale };
   const t = item.transform;
   const opacity = t.opacity * anim.opacity;
   const layers = motion.layers;
@@ -420,7 +429,7 @@ function paintContent(scene: Scene, anim: AnimState) {
       break;
     }
     case "shape":
-      drawShape(ctx, item, frame, w, h, anim.color);
+      drawShape(ctx, item, frame, w, h, anim.color, Math.min(W, H));
       break;
   }
 }
@@ -960,7 +969,7 @@ function paintSilhouette(
       drawTextBlock(ctx, item, box.text!.style, w, scene.project.height, anim.reveal, undefined, anim.tracking, { fx: scene.fx, fill: paint });
       return;
     case "shape":
-      drawShape(ctx, item, frame, w, h, paint);
+      drawShape(ctx, item, frame, w, h, paint, Math.min(scene.project.width, scene.project.height));
       return;
     default: {
       if (typeof channel === "string" && CHANNEL_FILTERS[channel]) {
@@ -1134,7 +1143,7 @@ function fittedStyle(ctx: Ctx, item: TextItem, w: number, h: number, canvasHeigh
     applyFont(ctx, style, canvasHeight);
     const fontPx = style.size * canvasHeight;
     const padding = style.background ? style.background.padding * fontPx : 0;
-    const maxWidth = Math.max(10, w - padding * 2);
+    const maxWidth = Math.max(10, w - padding * 2 - tailRoom(ctx, item, style, canvasHeight) - pillRoom(item, fontPx));
     const lines = wrapText(ctx, content, maxWidth);
     const widest = Math.max(0, ...lines.map((line) => ctx.measureText(line).width));
     const fits = widest <= maxWidth + 0.5 && lines.length * fontPx * style.lineHeight <= h + 0.5;
@@ -1160,6 +1169,24 @@ function drawText(
   drawTextBlock(ctx, item, style, w, canvasHeight, reveal, color, tracking, fx ? { fx } : undefined);
 }
 
+/**
+ * Décalage qui centre les capitales d'une ligne sur son milieu, la police
+ * déjà posée : avec `textBaseline: "middle"`, c'est la boîte de la police
+ * qui est centrée, et des capitales paraissent plus basses ou plus hautes
+ * selon la police. Mesuré sur un « H » : ni accent ni jambage ne déplacent
+ * le texte d'une ligne à l'autre.
+ */
+export function opticalShift(ctx: Ctx): number {
+  const previous = ctx.textBaseline;
+  ctx.textBaseline = "middle";
+  const metrics = ctx.measureText("H");
+  ctx.textBaseline = previous;
+  const ascent = metrics.actualBoundingBoxAscent;
+  const descent = metrics.actualBoundingBoxDescent;
+  if (!Number.isFinite(ascent) || !Number.isFinite(descent)) return 0;
+  return (ascent - descent) / 2;
+}
+
 /** Retouches du dessin d'un bloc de texte. */
 interface TextPaint {
   fx?: Fx | null;
@@ -1173,7 +1200,270 @@ interface TextPaint {
 /** Texte affiché : capitales du style, et compteur en cours. */
 function textContent(item: TextItem, style: TextStyle, fx: Fx | null | undefined): string {
   const content = style.uppercase ? item.text.toUpperCase() : item.text;
+  if (item.count) {
+    const local = textLocalFrame.get(item);
+    const raw = local === undefined ? 1 : Math.min(1, Math.max(0, (local - item.count.at) / Math.max(1, item.count.frames)));
+    return counterText(content, raw, { from: item.count.from, ease: "outCubic" });
+  }
   return fx?.counter ? counterText(content, fx.counter.progress, fx.counter.options) : content;
+}
+
+/**
+ * Image dessinée d'un texte, comptée depuis son début : l'instant de ses
+ * marques et de son compteur. Rempli par `drawItem` juste avant le dessin ;
+ * un texte dessiné hors de lui montre ses marques posées et son compteur
+ * arrivé.
+ */
+const textLocalFrame = new WeakMap<TextItem, number>();
+
+/** Avancement adouci d'une marque, de 0 à 1, à l'image dessinée. */
+function markProgress(item: TextItem, mark: TextMark): number {
+  if (mark.at === undefined) return 1;
+  const local = textLocalFrame.get(item);
+  if (local === undefined) return 1;
+  const raw = Math.min(1, Math.max(0, (local - mark.at) / Math.max(1, mark.frames ?? 1)));
+  return raw * raw * (3 - 2 * raw);
+}
+
+/** Place à garder en fin de ligne pour l'unité d'un compteur (espace compris). */
+function tailRoom(ctx: Ctx, item: TextItem, style: TextStyle, canvasHeight: number): number {
+  if (!item.tail?.text) return 0;
+  const font = ctx.font;
+  const space = ctx.measureText(" ").width;
+  ctx.font = fontString({ ...style, size: style.size * item.tail.scale }, canvasHeight);
+  const width = ctx.measureText(item.tail.text).width;
+  ctx.font = font;
+  return space + width;
+}
+
+/** Hauteur des capitales autour du milieu d'une ligne (ligne de base au milieu) : au-dessus, en dessous. */
+function capBox(ctx: Ctx): { ascent: number; descent: number } {
+  const previous = ctx.textBaseline;
+  ctx.textBaseline = "middle";
+  const metrics = ctx.measureText("H");
+  ctx.textBaseline = previous;
+  return { ascent: metrics.actualBoundingBoxAscent || 0, descent: metrics.actualBoundingBoxDescent || 0 };
+}
+
+/** Marge d'un pavé autour de ses mots, en part du corps : sur les côtés, au-dessus et en dessous des capitales. */
+const PILL_PAD_X = 0.2;
+const PILL_PAD_Y = 0.18;
+
+/** Étendue d'un mot sur sa ligne, en pixels depuis le début de la ligne. */
+interface WordSpan {
+  line: number;
+  word: number;
+  text: string;
+  /** Rang de son premier caractère dans la ligne. */
+  offset: number;
+  x0: number;
+  x1: number;
+}
+
+interface MarkedLayout {
+  spans: WordSpan[];
+  /** Largeur de chaque ligne, marges des pavés et unité comprises. */
+  widths: number[];
+}
+
+/** Vrai si le mot `word` est sous un pavé (posé ou à venir : sa place est gardée dès le début). */
+const inPill = (marks: TextMark[], word: number) => marks.some((mark) => mark.kind === "pill" && word >= (mark.from ?? 0) && word < (mark.to ?? Infinity));
+
+/**
+ * Place de chaque mot des lignes d'un texte marqué. Un mot sous un pavé
+ * reçoit la marge du pavé avant le premier et après le dernier mot du
+ * pavé, en plus de l'espace : entre le bord du pavé et le mot voisin, il
+ * reste exactement une espace.
+ */
+function layoutMarked(ctx: Ctx, lines: string[], marks: TextMark[], fontPx: number, tailWidth: number): MarkedLayout {
+  const spans: WordSpan[] = [];
+  const widths: number[] = [];
+  const space = ctx.measureText(" ").width;
+  const pad = fontPx * PILL_PAD_X;
+  let word = 0;
+  lines.forEach((line, lineIndex) => {
+    let cursor = 0;
+    let offset = 0;
+    const tokens = line.split(" ");
+    tokens.forEach((token, index) => {
+      if (token) {
+        const pill = inPill(marks, word);
+        if (pill && !inPill(marks, word - 1)) cursor += pad;
+        const width = ctx.measureText(token).width;
+        spans.push({ line: lineIndex, word, text: token, offset, x0: cursor, x1: cursor + width });
+        cursor += width;
+        if (pill && !inPill(marks, word + 1)) cursor += pad;
+        word++;
+      }
+      offset += token.length + 1;
+      if (index < tokens.length - 1 && token) cursor += space;
+    });
+    widths.push(cursor + (lineIndex === lines.length - 1 ? tailWidth : 0));
+  });
+  return { spans, widths };
+}
+
+/** Largeur gardée en fin de ligne pour les marges des pavés d'un texte. */
+function pillRoom(item: TextItem, fontPx: number): number {
+  const pills = (item.marks ?? []).filter((mark) => mark.kind === "pill").length;
+  return pills * 2 * fontPx * PILL_PAD_X;
+}
+
+/** Étendue d'une marque sur chaque ligne qu'elle touche : du premier au dernier de ses mots. */
+function markRanges(spans: WordSpan[], mark: TextMark): { line: number; x0: number; x1: number }[] {
+  const from = mark.from ?? 0;
+  const to = mark.to ?? Infinity;
+  const ranges = new Map<number, { line: number; x0: number; x1: number }>();
+  for (const span of spans) {
+    if (span.word < from || span.word >= to) continue;
+    const range = ranges.get(span.line);
+    if (range) range.x1 = span.x1;
+    else ranges.set(span.line, { line: span.line, x0: span.x0, x1: span.x1 });
+  }
+  return [...ranges.values()];
+}
+
+/**
+ * Lignes d'un texte marqué (pavé, soulignement, barre, cercle, couleur) ou
+ * suivi d'une unité. Chaque mot est posé à sa place mesurée, et la ligne
+ * entière (marges des pavés et unité comprises) suit l'alignement du texte :
+ * un texte centré l'est au pixel près, et un texte qui se tape ne se
+ * recentre pas à chaque lettre. Les marques suivent la hauteur réelle des
+ * capitales : un pavé a autant de marge au-dessus qu'en dessous des lettres.
+ */
+function drawMarkedLines(
+  ctx: Ctx,
+  item: TextItem,
+  style: TextStyle,
+  lines: string[],
+  visible: string[],
+  firstY: number,
+  lineHeight: number,
+  anchorX: number,
+  fontPx: number,
+  canvasHeight: number,
+  fill: string | CanvasGradient | undefined,
+  color: string | undefined
+) {
+  const marks = (item.marks ?? []).slice(0, MAX_TEXT_MARKS);
+  const tail = item.tail?.text ? item.tail : null;
+  const tailWidth = tail ? tailRoom(ctx, item, style, canvasHeight) : 0;
+  const last = lines.length - 1;
+  const { spans, widths } = layoutMarked(ctx, lines, marks, fontPx, tailWidth);
+  const starts = widths.map((width) => (style.align === "left" ? anchorX : style.align === "right" ? anchorX - width : -width / 2));
+  const cap = capBox(ctx);
+  const lineY = (index: number) => firstY + index * lineHeight;
+  const ink = fill ?? color ?? style.color;
+  const padX = fontPx * PILL_PAD_X;
+  const padY = fontPx * PILL_PAD_Y;
+  ctx.textAlign = "left";
+
+  // Pavés, sous les lettres : autant de marge au-dessus qu'en dessous des capitales.
+  for (const mark of marks) {
+    if (mark.kind !== "pill" || fill) continue;
+    const progress = markProgress(item, mark);
+    if (progress <= 0) continue;
+    ctx.save();
+    ctx.fillStyle = mark.color;
+    for (const range of markRanges(spans, mark)) {
+      const y = lineY(range.line);
+      const width = (range.x1 - range.x0 + padX * 2) * progress;
+      roundedRect(ctx, starts[range.line] + range.x0 - padX, y - cap.ascent - padY, width, cap.ascent + cap.descent + padY * 2, fontPx * 0.16);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** Mots d'une ligne, coupés à ce que la machine à écrire en montre. */
+  const paintLine = (index: number, paintColor: string | CanvasGradient, withEffects: boolean) => {
+    const shown = visible[index]?.length ?? 0;
+    if (!shown) return;
+    const y = lineY(index);
+    const words = spans.filter((span) => span.line === index && span.offset < shown).map((span) => ({ ...span, text: span.text.slice(0, shown - span.offset) }));
+    if (withEffects && !fill && style.stroke && style.stroke.width > 0) {
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.miterLimit = 2;
+      ctx.strokeStyle = style.stroke.color;
+      ctx.lineWidth = style.stroke.width * fontPx * 2;
+      for (const word of words) ctx.strokeText(word.text, starts[index] + word.x0, y);
+      ctx.restore();
+    }
+    ctx.save();
+    if (withEffects && !fill && style.shadow) {
+      ctx.shadowColor = style.shadow.color;
+      ctx.shadowBlur = style.shadow.blur * fontPx;
+      ctx.shadowOffsetY = style.shadow.offsetY * fontPx;
+    }
+    ctx.fillStyle = paintColor;
+    for (const word of words) ctx.fillText(word.text, starts[index] + word.x0, y);
+    ctx.restore();
+  };
+  for (let index = 0; index < visible.length; index++) paintLine(index, ink, true);
+
+  // Unité du compteur : même ligne de base que le nombre, dans son propre corps, une espace après lui.
+  if (tail && visible[last] === lines[last]) {
+    const lastWord = [...spans].reverse().find((span) => span.line === last);
+    const x = starts[last] + (lastWord?.x1 ?? 0) + ctx.measureText(" ").width;
+    ctx.save();
+    ctx.font = fontString({ ...style, size: style.size * tail.scale }, canvasHeight);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = fill ?? tail.color ?? ink;
+    ctx.fillText(tail.text, x, lineY(last) + cap.descent);
+    ctx.restore();
+  }
+
+  // Mots recolorés (couleur, ou mots posés sur un pavé) : les mêmes lettres, redessinées dans leur cadre.
+  for (const mark of marks) {
+    const recolor = mark.kind === "color" ? mark.color : mark.kind === "pill" ? mark.textColor : undefined;
+    if (!recolor || fill) continue;
+    const progress = markProgress(item, mark);
+    if (progress <= 0) continue;
+    for (const range of markRanges(spans, mark)) {
+      const y = lineY(range.line);
+      const full = range.x1 - range.x0 + padX * 2;
+      ctx.save();
+      if (mark.kind === "color") ctx.globalAlpha *= progress;
+      ctx.beginPath();
+      ctx.rect(starts[range.line] + range.x0 - padX, y - lineHeight / 2, mark.kind === "pill" ? full * progress : full, lineHeight);
+      ctx.clip();
+      paintLine(range.line, recolor, false);
+      ctx.restore();
+    }
+  }
+
+  // Traits : soulignement sous la ligne de base, barre au milieu des capitales, cercle autour des mots.
+  for (const mark of marks) {
+    if (mark.kind !== "underline" && mark.kind !== "strike" && mark.kind !== "circle") continue;
+    const progress = markProgress(item, mark);
+    if (progress <= 0) continue;
+    ctx.save();
+    ctx.strokeStyle = mark.color;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = Math.max(1, fontPx * (mark.kind === "circle" ? 0.06 : 0.075));
+    for (const range of markRanges(spans, mark)) {
+      const y = lineY(range.line);
+      const x0 = starts[range.line] + range.x0;
+      const x1 = starts[range.line] + range.x1;
+      ctx.beginPath();
+      if (mark.kind === "circle") {
+        const cx = (x0 + x1) / 2;
+        const cy = y + (cap.descent - cap.ascent) / 2;
+        const rx = (x1 - x0) / 2 + fontPx * 0.4;
+        const ry = (cap.ascent + cap.descent) / 2 + fontPx * 0.36;
+        const begin = -Math.PI * 0.6;
+        ctx.ellipse(cx, cy, rx, ry, -0.04, begin, begin + Math.PI * 2.08 * progress);
+      } else {
+        const overhang = mark.kind === "strike" ? fontPx * 0.08 : 0;
+        const markY = mark.kind === "strike" ? y + (cap.descent - cap.ascent) / 2 : y + cap.descent + fontPx * 0.14;
+        ctx.moveTo(x0 - overhang, markY);
+        ctx.lineTo(x0 - overhang + (x1 - x0 + overhang * 2) * progress, markY);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 }
 
 /** Dessin en bloc, la police du style déjà posée sur le contexte. */
@@ -1196,7 +1486,7 @@ function drawTextBlock(
 
   const content = textContent(item, style, fx);
   const padding = style.background ? style.background.padding * fontPx : 0;
-  const lines = wrapText(ctx, content, Math.max(10, w - padding * 2));
+  const lines = wrapText(ctx, content, Math.max(10, w - padding * 2 - tailRoom(ctx, item, style, canvasHeight) - pillRoom(item, fontPx)));
   const lineHeight = fontPx * style.lineHeight;
   const blockHeight = lines.length * lineHeight;
 
@@ -1226,7 +1516,7 @@ function drawTextBlock(
   }
 
   const anchorX = style.align === "left" ? -w / 2 + padding : style.align === "right" ? w / 2 - padding : 0;
-  const firstY = -blockHeight / 2 + lineHeight / 2;
+  const firstY = -blockHeight / 2 + lineHeight / 2 + (item.opticalCenter ? opticalShift(ctx) : 0);
 
   if (style.background && !fill && !fx?.noBackground) {
     ctx.save();
@@ -1244,7 +1534,9 @@ function drawTextBlock(
     ctx.restore();
   }
 
-  for (let index = 0; index < visible.length; index++) {
+  if (item.marks?.length || item.tail?.text) {
+    drawMarkedLines(ctx, item, style, lines, visible, firstY, lineHeight, anchorX, fontPx, canvasHeight, fill, color);
+  } else for (let index = 0; index < visible.length; index++) {
     const text = visible[index];
     if (!text) continue;
     const y = firstY + index * lineHeight;
@@ -1313,10 +1605,10 @@ function textGeometry(ctx: Ctx, item: TextItem, w: number, h: number, canvasHeig
   const fontPx = style.size * canvasHeight;
   const content = textContent(item, style, fx);
   const padding = style.background ? style.background.padding * fontPx : 0;
-  const lines = wrapText(ctx, content, Math.max(10, w - padding * 2));
+  const lines = wrapText(ctx, content, Math.max(10, w - padding * 2 - tailRoom(ctx, item, style, canvasHeight) - pillRoom(item, fontPx)));
   const widths = lines.map((line) => ctx.measureText(line).width);
   const lineHeight = fontPx * style.lineHeight;
-  const firstY = -(lines.length * lineHeight) / 2 + lineHeight / 2;
+  const firstY = -(lines.length * lineHeight) / 2 + lineHeight / 2 + (item.opticalCenter ? opticalShift(ctx) : 0);
   const lineBoxes = widths.map((width, index) => {
     const boxWidth = width + padding * 2;
     const x = style.align === "left" ? -w / 2 : style.align === "right" ? w / 2 - boxWidth : -boxWidth / 2;
@@ -1598,7 +1890,7 @@ function drawSplitText(
   ctx.textAlign = "left";
 
   const lineHeight = fontPx * style.lineHeight;
-  const firstY = -(lines.length * lineHeight) / 2 + lineHeight / 2;
+  const firstY = -(lines.length * lineHeight) / 2 + lineHeight / 2 + (item.opticalCenter ? opticalShift(ctx) : 0);
 
   for (let index = 0; index < lines.length; index++) lineAlphas[index] = 0;
   for (let index = 0; index < count; index++) {
@@ -1751,7 +2043,7 @@ function drawKaraoke(
   if (line.length) lines.push(line);
 
   const lineHeight = fontPx * style.lineHeight;
-  const firstY = -(lines.length * lineHeight) / 2 + lineHeight / 2;
+  const firstY = -(lines.length * lineHeight) / 2 + lineHeight / 2 + (item.opticalCenter ? opticalShift(ctx) : 0);
 
   lines.forEach((entries, lineIndex) => {
     const total = entries.reduce((sum, index, position) => sum + widths[index] + (position ? space : 0), 0);
@@ -1808,8 +2100,12 @@ function drawKaraoke(
 
 // ─── Formes ──────────────────────────────────────────────────────
 
-function drawShape(ctx: Ctx, item: ShapeItem, frame: number, w: number, h: number, color?: string | CanvasGradient) {
+function drawShape(ctx: Ctx, item: ShapeItem, frame: number, w: number, h: number, color?: string | CanvasGradient, minSide = Math.min(w, h)) {
   const fill = color ?? item.fill;
+  if (item.shape === "stroke") {
+    drawStroke(ctx, item, frame, w, h, fill, minSide);
+    return;
+  }
   const radius = Math.min(item.radius * Math.min(w, h), Math.min(w, h) / 2);
   if (item.shape === "ellipse") {
     ctx.beginPath();
@@ -1835,7 +2131,14 @@ function drawShape(ctx: Ctx, item: ShapeItem, frame: number, w: number, h: numbe
   }
   roundedRect(ctx, -w / 2, -h / 2, w, h, radius);
   ctx.fillStyle = fill;
-  ctx.fill();
+  if (item.shadow && !color) {
+    ctx.save();
+    ctx.shadowColor = item.shadow.color;
+    ctx.shadowBlur = item.shadow.blur * minSide;
+    ctx.shadowOffsetY = item.shadow.offsetY * minSide;
+    ctx.fill();
+    ctx.restore();
+  } else ctx.fill();
   if (item.pattern && !color) paintDots(ctx, item, w, h, radius);
 }
 
@@ -1862,6 +2165,117 @@ function paintDots(ctx: Ctx, item: ShapeItem, w: number, h: number, radius: numb
     }
   }
   ctx.fill();
+  ctx.restore();
+}
+
+// ─── Tracés ──────────────────────────────────────────────────────
+
+/** Points par segment d'une courbe lissée : assez pour qu'aucun angle ne se voie à 1080 px. */
+const CURVE_STEPS = 14;
+
+/**
+ * Points d'un tracé dans la boîte de l'élément, centrée sur l'origine. Une
+ * courbe lissée passe par chaque point (Catmull-Rom) ; un tracé fermé
+ * revient à son premier point.
+ */
+export function strokePolyline(path: StrokePath, w: number, h: number): [number, number][] {
+  const points = path.points.slice(0, MAX_STROKE_POINTS).map(([x, y]): [number, number] => [(x - 0.5) * w, (y - 0.5) * h]);
+  if (points.length < 2 || !path.smooth) return path.closed && points.length > 2 ? [...points, points[0]] : points;
+  const count = points.length;
+  const at = (index: number): [number, number] => {
+    if (path.closed) return points[((index % count) + count) % count];
+    return points[Math.min(count - 1, Math.max(0, index))];
+  };
+  const result: [number, number][] = [points[0]];
+  const segments = path.closed ? count : count - 1;
+  for (let index = 0; index < segments; index++) {
+    const [p0, p1, p2, p3] = [at(index - 1), at(index), at(index + 1), at(index + 2)];
+    for (let step = 1; step <= CURVE_STEPS; step++) {
+      const t = step / CURVE_STEPS;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const blend = (a: number, b: number, c: number, d: number) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+      result.push([blend(p0[0], p1[0], p2[0], p3[0]), blend(p0[1], p1[1], p2[1], p3[1])]);
+    }
+  }
+  return result;
+}
+
+/** Les premiers `fraction` de la longueur d'une ligne brisée (le dernier point coupé au bon endroit). */
+export function partialPolyline(points: [number, number][], fraction: number): [number, number][] {
+  if (fraction >= 1 || points.length < 2) return points;
+  const lengths = [0];
+  for (let index = 1; index < points.length; index++) {
+    lengths.push(lengths[index - 1] + Math.hypot(points[index][0] - points[index - 1][0], points[index][1] - points[index - 1][1]));
+  }
+  const target = lengths[lengths.length - 1] * Math.max(0, fraction);
+  const result: [number, number][] = [points[0]];
+  for (let index = 1; index < points.length; index++) {
+    if (lengths[index] < target) {
+      result.push(points[index]);
+      continue;
+    }
+    const span = lengths[index] - lengths[index - 1];
+    const t = span > 0 ? (target - lengths[index - 1]) / span : 0;
+    result.push([points[index - 1][0] + (points[index][0] - points[index - 1][0]) * t, points[index - 1][1] + (points[index][1] - points[index - 1][1]) * t]);
+    break;
+  }
+  return result;
+}
+
+/** Pointe de flèche ouverte en `tip`, dans le sens qui va de `from` à `tip`. */
+function arrowHead(ctx: Ctx, from: [number, number], tip: [number, number], length: number) {
+  const angle = Math.atan2(tip[1] - from[1], tip[0] - from[0]);
+  const spread = 0.52;
+  ctx.beginPath();
+  ctx.moveTo(tip[0] - length * Math.cos(angle - spread), tip[1] - length * Math.sin(angle - spread));
+  ctx.lineTo(tip[0], tip[1]);
+  ctx.lineTo(tip[0] - length * Math.cos(angle + spread), tip[1] - length * Math.sin(angle + spread));
+  ctx.stroke();
+}
+
+/** Point de la ligne brisée assez loin de son bout pour donner le sens de la pointe. */
+function headBase(points: [number, number][], fromEnd: boolean, distance: number): [number, number] {
+  const ordered = fromEnd ? [...points].reverse() : points;
+  const tip = ordered[0];
+  for (const point of ordered) if (Math.hypot(point[0] - tip[0], point[1] - tip[1]) >= distance) return point;
+  return ordered[ordered.length - 1];
+}
+
+/**
+ * Tracé : chaque trait se dessine sur sa longueur réelle entre ses deux
+ * instants (adouci aux deux bouts), avec des bouts arrondis. La pointe d'une
+ * flèche pousse pendant le dernier cinquième du tracé.
+ */
+function drawStroke(ctx: Ctx, item: ShapeItem, frame: number, w: number, h: number, color: string | CanvasGradient, minSide: number) {
+  const stroke = item.stroke;
+  if (!stroke?.paths?.length) return;
+  const lineWidth = Math.max(1, stroke.width * minSide);
+  const local = frame - item.start;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (const path of stroke.paths.slice(0, MAX_STROKE_PATHS)) {
+    const raw = path.draw ? Math.min(1, Math.max(0, (local - path.draw.at) / Math.max(1, path.draw.frames))) : 1;
+    if (raw <= 0) continue;
+    const progress = raw * raw * (3 - 2 * raw);
+    const points = partialPolyline(strokePolyline(path, w, h), progress);
+    if (points.length < 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], points[0][1]);
+    for (let index = 1; index < points.length; index++) ctx.lineTo(points[index][0], points[index][1]);
+    ctx.stroke();
+    const headLength = lineWidth * 3.4 * Math.min(1, Math.max(0, (progress - 0.8) / 0.2));
+    if (headLength > 0.5 && (path.head === "end" || path.head === "both")) {
+      arrowHead(ctx, headBase(points, true, lineWidth * 2), points[points.length - 1], headLength);
+    }
+    if (path.head === "start" || path.head === "both") {
+      const startLength = lineWidth * 3.4 * Math.min(1, progress / 0.2);
+      arrowHead(ctx, headBase(points, false, lineWidth * 2), points[0], startLength);
+    }
+  }
   ctx.restore();
 }
 

@@ -44,6 +44,13 @@ export interface ClipProject {
     sources?: { segment: number; url: string; title: string }[];
     /** Date de la vérification des faits (ms), absente si elle n'a pas eu lieu. */
     checkedAt?: number;
+    /**
+     * Notes visuelles du script, à part des phrases dites : `line` est l'index
+     * de la ligne dans `script` ; `board` donne 1 à 4 mots à écrire sur la
+     * planche, `show` ce qu'il faut montrer. Le montage s'en sert pour placer
+     * ses illustrations sur les bons mots.
+     */
+    visualNotes?: { line: number; kind: "board" | "show"; text: string }[];
   };
   /**
    * Pistes de haut en bas, comme dans la timeline : la première piste
@@ -276,6 +283,34 @@ interface ItemBase {
   cue?: SegmentCue;
 }
 
+/**
+ * Image clé : à partir de l'image `at` (comptée depuis le début de
+ * l'élément), l'élément rejoint ces valeurs en `frames` images. Une valeur
+ * absente ne bouge pas. Avant la première image clé, l'élément est à son
+ * `transform` ; ensuite, à la dernière valeur atteinte.
+ */
+export interface MoveKey {
+  at: number;
+  frames: number;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  opacity?: number;
+  /** Agrandissement autour du centre (1 : taille du cadre). */
+  scale?: number;
+  /** Courbe : ressort sans rebond (par défaut), adoucie aux deux bouts, accélérée (un départ), constante. */
+  ease?: MoveEase;
+}
+
+export type MoveEase = "spring" | "smooth" | "in" | "linear";
+
+/** Bornes des images clés et des tracés, pour qu'un projet ne fige pas l'éditeur. */
+export const MAX_MOVE_KEYS = 64;
+export const MAX_STROKE_PATHS = 16;
+export const MAX_STROKE_POINTS = 256;
+
 interface VisualBase extends ItemBase {
   transform: Transform;
   animIn: Anim;
@@ -283,6 +318,8 @@ interface VisualBase extends ItemBase {
   animEmphasis?: AnimEmphasis;
   /** Transition depuis le plan qui précède, sur la même piste. */
   transition?: Transition;
+  /** Mouvements dans le temps (glisser, grandir, pâlir) ; absents : l'élément reste à son `transform`. */
+  keys?: MoveKey[];
 }
 
 export interface ImageItem extends VisualBase {
@@ -377,17 +414,85 @@ export interface TextItem extends VisualBase {
    * pas (nom de marque, accroche) : un nom long ne déborde plus du carton.
    */
   fit?: "shrink";
+  /**
+   * Centre le bloc sur la hauteur réelle des capitales, mesurée sur la
+   * police, au lieu du milieu de sa boîte : un texte centré dans une carte
+   * l'est à l'œil, sans paraître enfoncé ni remonté. Absent : le centrage
+   * d'origine.
+   */
+  opticalCenter?: boolean;
+  /** Marques posées sur des mots du texte (pavé, soulignement, barre, cercle, couleur), mesurées au rendu. */
+  marks?: TextMark[];
+  /**
+   * Fin de ligne dans un autre corps (l'unité d'un compteur : « 16 709
+   * réels ») : collée au dernier mot, et la ligne entière, unité comprise,
+   * reste centrée. Texte d'une seule ligne seulement.
+   */
+  tail?: { text: string; scale: number; color?: string };
+  /**
+   * Compteur : le premier nombre du texte défile de `from` à sa valeur,
+   * de l'image `at` à `at + frames` (comptées depuis le début de l'élément).
+   */
+  count?: { from: number; at: number; frames: number };
+}
+
+/** Bornes des marques d'un texte. */
+export const MAX_TEXT_MARKS = 12;
+
+/**
+ * Marque sur des mots d'un texte. `from` et `to` désignent des mots (le
+ * texte coupé aux espaces, `to` exclu) ; absents : tout le texte. La marque
+ * se pose de l'image `at` à `at + frames`, comptées depuis le début de
+ * l'élément ; sans `at`, elle est là dès l'apparition du texte.
+ */
+export interface TextMark {
+  kind: "pill" | "underline" | "strike" | "circle" | "color";
+  from?: number;
+  to?: number;
+  /** Couleur du pavé, du trait ou des mots recolorés. */
+  color: string;
+  /** Pavé : couleur des mots posés dessus. */
+  textColor?: string;
+  at?: number;
+  frames?: number;
 }
 
 export interface ShapeItem extends VisualBase {
   type: "shape";
-  shape: "rect" | "ellipse" | "progress";
+  shape: "rect" | "ellipse" | "progress" | "stroke";
+  /** Couleur de l'aplat, ou du trait pour un tracé. */
   fill: string;
   radius: number;
   /** Barre de progression : couleur du fond et sens du remplissage. */
   progress?: { track: string; reverse: boolean };
   /** Trame d’imprimerie posée sur l’aplat (rectangle seulement) ; absente : l’aplat reste uni. */
   pattern?: ShapePattern;
+  /** Tracé (`shape: "stroke"`) : flèche, croix, barre, soulignement, cercle, liaison. */
+  stroke?: StrokeShape;
+  /** Ombre douce sous un aplat (carte posée sur le papier) ; flou et décalage en part du petit côté du canevas. */
+  shadow?: { color: string; blur: number; offsetY: number };
+}
+
+/** Traits d'un tracé, dessinés dans la boîte de l'élément. */
+export interface StrokeShape {
+  paths: StrokePath[];
+  /** Épaisseur, en part du petit côté du canevas. */
+  width: number;
+}
+
+export interface StrokePath {
+  /** Points dans la boîte de l'élément, de 0 à 1 (x vers la droite, y vers le bas). */
+  points: [number, number][];
+  /** Courbe lissée qui passe par les points ; sinon une ligne brisée. */
+  smooth?: boolean;
+  closed?: boolean;
+  /** Pointe de flèche au bout du tracé, au début, ou aux deux. */
+  head?: "end" | "start" | "both";
+  /**
+   * Tracé qui se dessine peu à peu, de l'image `at` à `at + frames`, comptées
+   * depuis le début de l'élément. Absent : entier dès son apparition.
+   */
+  draw?: { at: number; frames: number };
 }
 
 /**

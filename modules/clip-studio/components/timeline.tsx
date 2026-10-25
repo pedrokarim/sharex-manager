@@ -852,7 +852,7 @@ function SoundBadges({ item, linked }: { item: ClipItem; linked: boolean }) {
 function itemLabel(item: ClipItem) {
   if (item.label) return item.label;
   if (item.type === "text") return item.text;
-  if (item.type === "shape") return item.shape === "progress" ? "Barre de progression" : "Forme";
+  if (item.type === "shape") return item.shape === "progress" ? "Barre de progression" : item.shape === "stroke" ? "Tracé" : "Forme";
   return item.source.name;
 }
 

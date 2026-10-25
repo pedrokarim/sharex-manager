@@ -217,6 +217,8 @@ export function backdropOf(project: ClipProject, trackIndex: number, item: TextI
     for (const track of lower) {
       const other = track.items.find((candidate) => candidate.start <= at && at < candidate.start + candidate.duration) as VisualItem | undefined;
       if (!other || other.type === "text" || !intersects(boxOf(other), area)) continue;
+      // Un tracé (barre, soulignement, flèche) est un trait, pas un fond : le texte garde le fond d'en dessous.
+      if (other.type === "shape" && other.shape === "stroke") continue;
       if (other.type !== "shape") return { kind: "busy" };
       const shape = other as ShapeItem;
       const parsed = parseColor(shape.fill);

@@ -3,6 +3,7 @@
  * renvoie un nouveau projet. C'est ce qui rend « Annuler » trivial.
  */
 
+import { shiftTimed } from "./keys";
 import { msToFrames, projectDuration, speedOf } from "./timeline";
 import {
   ASPECTS,
@@ -699,6 +700,8 @@ export function trimItem(
       ...(current.type === "text" && current.karaoke
         ? { karaoke: { ...current.karaoke, offset: current.karaoke.offset + delta } }
         : {}),
+      // Images clés et tracés restent à leur instant dans le clip.
+      ...(current.type !== "audio" ? shiftTimed(current, delta) : {}),
     }) as ClipItem);
   }
 
@@ -759,6 +762,7 @@ function splitParts(item: ClipItem, cut: number): [ClipItem, ClipItem] {
     ...(item.type === "text" && item.karaoke
       ? { karaoke: { ...structuredClone(item.karaoke), offset: item.karaoke.offset + (cut - item.start) } }
       : {}),
+    ...(item.type !== "audio" ? shiftTimed(structuredClone(item), cut - item.start) : {}),
   } as ClipItem;
   if ("animOut" in left) (left as VisualItem).animOut = { kind: "none", frames: 10 };
   if ("animIn" in right) {

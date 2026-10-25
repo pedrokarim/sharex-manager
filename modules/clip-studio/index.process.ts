@@ -15,6 +15,7 @@ import { getAbsoluteUploadPath } from "@/lib/config";
 import { announceNewUpload } from "@/lib/gallery-events";
 import { prepareVideo } from "@/lib/media/video";
 import type { ClipAsset, ClipExport, ClipProject } from "./engine/types";
+import { MAX_MOVE_KEYS, MAX_STROKE_PATHS, MAX_STROKE_POINTS, MAX_TEXT_MARKS } from "./engine/types";
 import {
   ASSETS_DIR,
   EXPORTS_DIR,
@@ -252,6 +253,19 @@ function validateProject(project: ClipProject) {
       if (item.type === "text" && (typeof item.text !== "string" || item.text.length > 5000)) {
         throw new Error("Texte invalide");
       }
+      // Images clés, tracés et marques : bornés, pour qu'un projet ne fige pas l'aperçu.
+      if ("keys" in item && item.keys !== undefined && (!Array.isArray(item.keys) || item.keys.length > MAX_MOVE_KEYS)) {
+        throw new Error("Images clés invalides");
+      }
+      if (item.type === "shape" && item.stroke !== undefined) {
+        const paths = item.stroke?.paths;
+        if (!Array.isArray(paths) || paths.length > MAX_STROKE_PATHS || paths.some((entry) => !Array.isArray(entry?.points) || entry.points.length > MAX_STROKE_POINTS)) {
+          throw new Error("Tracé invalide");
+        }
+      }
+      if (item.type === "text" && item.marks !== undefined && (!Array.isArray(item.marks) || item.marks.length > MAX_TEXT_MARKS)) {
+        throw new Error("Marques de texte invalides");
+      }
     }
   }
   if (count > 2000) throw new Error("Trop d'éléments dans le projet");
@@ -271,7 +285,8 @@ function validateProject(project: ClipProject) {
       (brief.title !== undefined && (typeof brief.title !== "string" || brief.title.length > 200)) ||
       (brief.script !== undefined && (!Array.isArray(brief.script) || brief.script.length > 100 || brief.script.some((line) => typeof line !== "string" || line.length > 2000))) ||
       (brief.checkedAt !== undefined && (typeof brief.checkedAt !== "number" || !Number.isFinite(brief.checkedAt))) ||
-      (brief.sources !== undefined && !validBriefSources(brief.sources))
+      (brief.sources !== undefined && !validBriefSources(brief.sources)) ||
+      (brief.visualNotes !== undefined && (!Array.isArray(brief.visualNotes) || brief.visualNotes.length > 200 || brief.visualNotes.some((note) => !note || typeof note.text !== "string" || note.text.length > 200 || !Number.isInteger(note.line) || (note.kind !== "board" && note.kind !== "show"))))
     ) {
       throw new Error("Demande de l'assistant invalide");
     }
