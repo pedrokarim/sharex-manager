@@ -217,6 +217,7 @@ deux enregistrements, l’éditeur le dit au lieu d’écraser.
 | Mascotte | Nom, bloc d’identité texte, feuille de modèle et poses détourées ; tout est joint aux générations |
 | Vidéo | Filigrane (image, coin, taille, opacité, marge, apparition), carton de fin (durée, accroche, appel à l’action, pose de la mascotte) |
 | Assistant IA | Notes de style des illustrations, ton du script, voix off de la marque (source et voix avec écoute, débit, intonation d’une voix locale), collection AI Image Gen liée |
+| Voix du créateur | Fiche de voix (dossier 01 illustrations, S1) : ce qu’il fait et pour qui, son débit, ses mots et ceux qu’il n’emploie jamais, ce qu’il défend et ce contre quoi il se bat, ses preuves, ses demandes au spectateur ; chaque question avec un exemple, et « Proposer à partir de mes textes » (proposition de Codex relue avant d’être reprise) |
 | Publication | Comptes liés (un ou plusieurs, tous services confondus, choisis parmi les comptes connectés), modèles de titre et de description, tags, catégorie, visibilité par défaut, déclaration de contenu synthétique, public enfant |
 
 ### 4.3 Aperçu des formats
@@ -471,6 +472,8 @@ interface BrandKit {
   ai: { styleNotes: string; collectionId?: string; scriptTone: string };
   /** Voix off (6.4) : « siwis » ou « azure:fr-FR-DeniseNeural », débit de 0,7 à 1,6, intonation d'une voix locale. */
   voice?: { voice: string; speed: number; tone?: "steady" | "balanced" | "expressive" };
+  /** Fiche de voix du créateur (6.4) ; absente quand elle est vide. */
+  voiceSheet?: { pitch: string; audience: string; wordsPerMinute: number; words: string[]; bannedWords: string[]; stands: string; against: string; proofs: string[]; asks: string[] };
   publishing: BrandPublishing;
   isDefault: boolean;
   createdAt: number;
@@ -779,6 +782,12 @@ reprend le modèle de Scan Studio :
   aucune voix. Si elle n’est pas disponible (clé Azure absente, Edge en
   panne), la voix locale par défaut la remplace et le suivi le dit, sans
   échec du clip (dossier 01, étape 13).
+- **Fiche de voix du créateur** (`voiceSheet`, section « Voix du créateur »,
+  dossier 01 illustrations, S1) : lue par `toCreatorVoice`, elle entre dans
+  la consigne du script comme des données (`<voix>`), avec ses preuves pour
+  seuls faits citables sans vérification ; sans fiche, la marque tient lieu
+  de voix comme avant. Son débit n’entre pas dans la consigne : la voix de
+  synthèse a le sien.
 
 ### 6.5 Contrôle de cohérence des images
 
@@ -1648,6 +1657,7 @@ relecture), 102 si les traductions changent avec.
 | `getBrandTheme(kitId)` | user | Thème résolu pour Clip Studio (5.3) |
 | `startKitAssistant({ brief, references })` / `getKitAssistantJob(id)` | user | Assistant de création |
 | `regenerateAsset(kitId, assetId, note?)` | user | Refaire un visuel avec tout le contexte |
+| `startVoiceDraft(kitId, { text })` / `getVoiceDraftJob(id)` / `cancelVoiceDraft(id)` | user | « Proposer à partir de mes textes » : proposition de fiche de voix par Codex, en arrière-plan, jamais enregistrée d’office |
 | `exportKit(id)` / `importKit(archive)` | user | ZIP au format `brand.json` |
 | `saveFormatExport(kitId, format, png)` / `sendFormatToGallery(kitId, file)` | user | Formats rendus par le navigateur |
 | `setFormatImage(kitId, format, { file } \| { gallery })` / `clearFormatImage(kitId, format)` | user | Image finie d’un format (fichier déposé ou image de la galerie), contrôlée et ré-encodée ; retour au rendu composé |

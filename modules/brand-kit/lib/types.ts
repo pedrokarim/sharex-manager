@@ -14,6 +14,8 @@ export type { TextRole, TextStyle } from "@/modules/clip-studio/engine/types";
 import type { HashtagRule } from "@/modules/clip-studio/lib/post-types";
 export type { HashtagRule } from "@/modules/clip-studio/lib/post-types";
 import type { VoiceSettings } from "@/modules/clip-studio/lib/voice-settings";
+import type { VoiceSheet } from "./voice-sheet";
+export type { VoiceSheet } from "./voice-sheet";
 
 /**
  * Voix de la marque : la voix (sa source se lit dans son identifiant,
@@ -246,6 +248,12 @@ export interface BrandKit {
   ai: { styleNotes: string; collectionId?: string; scriptTone: string };
   /** Voix off de la marque ; absente : chaque clip choisit la sienne. */
   voice?: BrandVoice;
+  /**
+   * Fiche de voix du créateur (dossier 01 illustrations, étape S1) : ses
+   * mots, ses combats, ses preuves, ce qu'il demande au spectateur, donnés à
+   * chaque script de l'assistant. Absente : la marque en tient lieu.
+   */
+  voiceSheet?: VoiceSheet;
   publishing: BrandPublishing;
   isDefault: boolean;
   createdAt: number;

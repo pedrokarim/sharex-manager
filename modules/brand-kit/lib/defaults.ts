@@ -9,6 +9,7 @@ import { DEFAULT_TEXT_FONT, isCatalogTextFont, nearestCatalogWeight } from "@/mo
 import { cleanVoiceSettings } from "@/modules/clip-studio/lib/voice-settings";
 import { upgradePoseAssets } from "./mascot";
 import { repairNotice, repairTypography, TEXT_FONT_ROLES } from "./typography";
+import { sanitizeVoiceSheet } from "./voice-sheet";
 import type { BrandKit, BrandPalette, BrandPublishing, TextRole, TextStyle } from "./types";
 
 export const DEFAULT_PALETTE: BrandPalette = {
@@ -134,14 +135,17 @@ export function upgradePublishing(input: unknown): BrandPublishing {
  * police de texte lisible, avec un avertissement pour l'éditeur.
  */
 export function upgradeKit(kit: BrandKit): BrandKit {
-  const { voice: stored, typographyNotice: _stale, ...rest } = kit;
+  const { voice: stored, voiceSheet: storedSheet, typographyNotice: _stale, ...rest } = kit;
   const voice = cleanVoiceSettings(stored);
+  // Fiche de voix (S1) : une marque d'avant, ou une fiche abîmée, n'en a pas.
+  const voiceSheet = sanitizeVoiceSheet(storedSheet);
   const typography = kit.textStyles ? repairTypography(kit) : null;
   const notice = typography ? repairNotice(kit, typography) : undefined;
   // Poses d'avant la bibliothèque (D2) : étiquettes proposées d'après leur libellé et leur note.
   return {
     ...rest,
     ...(voice ? { voice } : {}),
+    ...(voiceSheet ? { voiceSheet } : {}),
     ...(typography ? { textStyles: typography.textStyles } : {}),
     ...(notice ? { typographyNotice: notice } : {}),
     assets: upgradePoseAssets(kit.assets),

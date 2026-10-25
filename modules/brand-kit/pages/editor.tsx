@@ -11,6 +11,7 @@ import {
   Clapperboard,
   Download,
   IdCard,
+  MessageSquareQuote,
   Image as ImageIcon,
   Palette,
   RefreshCw,
@@ -42,6 +43,7 @@ import { MascotSection } from "../components/sections/mascot-section";
 import { PublishingSection } from "../components/sections/publishing-section";
 import { TypographySection } from "../components/sections/typography-section";
 import { VideoSection } from "../components/sections/video-section";
+import { VoiceSheetSection } from "../components/sections/voice-sheet-section";
 import { ReferenceStyleSection } from "../components/sections/reference-style-section";
 import { api, downloadBase64, errorMessage } from "../lib/client";
 import type { FormatId } from "../lib/formats";
@@ -49,7 +51,7 @@ import { MODULE_PATH } from "../lib/types";
 import { useElementWidth, useFillHeight, useStoredLayout } from "../lib/use-editor-layout";
 import { useKitEditor, type SaveState } from "../lib/use-kit-editor";
 
-type SectionId = "identity" | "colors" | "typography" | "logos" | "mascot" | "video" | "ai" | "publishing" | "style";
+type SectionId = "identity" | "colors" | "typography" | "logos" | "mascot" | "video" | "ai" | "voice" | "publishing" | "style";
 
 /**
  * Sections de l'éditeur, et le format où chacune se voit le mieux : en
@@ -65,10 +67,15 @@ const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; format?: Forma
   { id: "mascot", label: "Mascotte", icon: Smile, format: "endcard-vertical" },
   { id: "video", label: "Vidéo", icon: Clapperboard, format: "endcard-vertical" },
   { id: "ai", label: "Assistant IA", icon: Sparkles },
+  // Fiche de voix du créateur, donnée à chaque script (dossier 01 illustrations, S1).
+  { id: "voice", label: "Voix du créateur", icon: MessageSquareQuote },
   { id: "publishing", label: "Publication", icon: Send },
   // Style mesuré sur une vidéo de référence (07 sexies, D4).
   { id: "style", label: "Référence", icon: Ruler, format: "endcard-vertical" },
 ];
+
+/** Touche d'une section : 1 à 9, puis 0 pour la dixième ; aucune au-delà. */
+const sectionKey = (index: number): string | undefined => (index < 9 ? String(index + 1) : index === 9 ? "0" : undefined);
 
 /** En dessous, les trois panneaux ne tiennent plus côte à côte. */
 const WIDE = 1000;
@@ -112,13 +119,13 @@ export default function EditorPage() {
     if (target) setFormat(target);
   }, []);
 
-  // Touches 1 à 9 : une section, hors d'un champ de saisie.
+  // Touches 1 à 9, puis 0 pour la dixième : une section, hors d'un champ de saisie.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey || event.repeat || isEditable(event.target)) return;
       if (document.querySelector("[role=dialog][data-state=open],[role=alertdialog][data-state=open]")) return;
-      const index = Number(event.key) - 1;
-      if (Number.isInteger(index) && index >= 0 && index < SECTIONS.length) {
+      const index = SECTIONS.findIndex((_, position) => sectionKey(position) === event.key);
+      if (index >= 0) {
         event.preventDefault();
         goTo(SECTIONS[index].id);
       }
@@ -177,7 +184,7 @@ export default function EditorPage() {
   const sectionProps = useMemo(() => (kit ? { kit, update: editor.update, runOperation: editor.runOperation } : null), [kit, editor.update, editor.runOperation]);
 
   const paletteActions: PaletteAction[] = [
-    ...SECTIONS.map((entry, index) => ({ id: `section-${entry.id}`, label: entry.label, icon: entry.icon, shortcut: String(index + 1), onSelect: () => goTo(entry.id) })),
+    ...SECTIONS.map((entry, index) => ({ id: `section-${entry.id}`, label: entry.label, icon: entry.icon, shortcut: sectionKey(index), onSelect: () => goTo(entry.id) })),
     ...(kit && !kit.isDefault ? [{ id: "default", label: "Définir par défaut", icon: Star, onSelect: () => void makeDefault() }] : []),
     { id: "zip", label: "Exporter l’archive ZIP", icon: Download, onSelect: () => void exportZip() },
   ];
@@ -231,6 +238,7 @@ export default function EditorPage() {
             {section === "mascot" && <MascotSection {...sectionProps} fontsVersion={fontsVersion} fontsReady={fontsReady} onShowFormat={setFormat} />}
             {section === "video" && <VideoSection {...sectionProps} />}
             {section === "ai" && <AiSection {...sectionProps} />}
+            {section === "voice" && <VoiceSheetSection {...sectionProps} />}
             {section === "publishing" && <PublishingSection {...sectionProps} />}
             {section === "style" && <ReferenceStyleSection {...sectionProps} />}
           </motion.div>
@@ -383,7 +391,7 @@ function SectionNav({ section, onSelect, vertical = false }: { section: SectionI
             type="button"
             onClick={() => onSelect(entry.id)}
             aria-current={active ? "true" : undefined}
-            aria-keyshortcuts={String(index + 1)}
+            aria-keyshortcuts={sectionKey(index)}
             className={cn(
               "flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
               vertical && "w-full",
@@ -392,7 +400,7 @@ function SectionNav({ section, onSelect, vertical = false }: { section: SectionI
           >
             <Icon aria-hidden className={cn("size-4 shrink-0", active && "text-primary")} />
             <span className={cn("whitespace-nowrap", vertical && "min-w-0 flex-1 truncate")}>{entry.label}</span>
-            {vertical && <Kbd className="shrink-0 text-foreground/75">{index + 1}</Kbd>}
+            {vertical && sectionKey(index) && <Kbd className="shrink-0 text-foreground/75">{sectionKey(index)}</Kbd>}
           </button>
         );
       })}

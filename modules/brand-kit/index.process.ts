@@ -62,6 +62,7 @@ import {
   listStyleJobs as readStyleJobs,
   startStyleAnalysis as launchStyleAnalysis,
 } from "./lib/server/reference-video";
+import { cancelVoiceDraft as stopVoiceDraft, getVoiceDraftJob as readVoiceDraft, startVoiceDraft as launchVoiceDraft, type VoiceDraftJob } from "./lib/server/voice-draft";
 import type { AiModuleReport } from "@/lib/ai-usage/types";
 
 // ─── Consommation des IA (écran `/admin/services`) ─────────────────────
@@ -240,6 +241,22 @@ export async function cancelStyleAnalysis(jobId: string) {
 /** La marque adopte le relevé ; ses clips suivent alors « D'après la vidéo de référence ». */
 export async function applyStyleAnalysis(kitId: string, jobId: string): Promise<BrandKit> {
   return adoptStyle(kitId, jobId);
+}
+
+// ─── Fiche de voix (S1) ──────────────────────────────────────────
+
+/** « Proposer à partir de mes textes » : une proposition de fiche, jamais enregistrée d'office. */
+export async function startVoiceDraft(kitId: string, input: { text: string }): Promise<VoiceDraftJob> {
+  return launchVoiceDraft(kitId, input);
+}
+
+export async function getVoiceDraftJob(jobId: string): Promise<VoiceDraftJob | null> {
+  return readVoiceDraft(jobId);
+}
+
+export async function cancelVoiceDraft(jobId: string): Promise<{ success: boolean }> {
+  stopVoiceDraft(jobId);
+  return { success: true };
 }
 
 // ─── Comptes connectés (cœur) ────────────────────────────────────

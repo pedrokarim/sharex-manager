@@ -15,6 +15,7 @@ import { HASHTAG_RULES } from "@/modules/clip-studio/lib/post-types";
 import { cleanVoiceSettings } from "@/modules/clip-studio/lib/voice-settings";
 import { DEFAULT_PALETTE, defaultTextStyles, upgradePublishing } from "./defaults";
 import { proposePoseTags, sanitizePoseTags } from "./mascot";
+import { sanitizeVoiceSheet } from "./voice-sheet";
 import {
   FORMAT_IDS,
   KIT_LIMITS,
@@ -294,6 +295,8 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
   const rules = kit.rules && typeof kit.rules === "object" ? kit.rules : stored.rules;
   // Comme le filigrane : une voix absente de ce qu'envoie l'éditeur a été retirée.
   const voice = cleanVoiceSettings(kit.voice);
+  // Fiche de voix du créateur (S1) : bornée champ par champ, absente quand elle est vide.
+  const voiceSheet = sanitizeVoiceSheet(kit.voiceSheet);
 
   return {
     version: 1,
@@ -332,6 +335,7 @@ export function sanitizeKit(input: unknown, stored: BrandKit): BrandKit {
       scriptTone: text(ai.scriptTone, KIT_LIMITS.scriptTone),
     },
     ...(voice ? { voice } : {}),
+    ...(voiceSheet ? { voiceSheet } : {}),
     publishing: {
       accountIds: (Array.isArray(publishing.accountIds) ? publishing.accountIds : [])
         .filter((id: unknown) => typeof id === "string" && /^acc-[a-z0-9]{4,40}$/.test(id))

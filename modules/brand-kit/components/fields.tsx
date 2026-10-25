@@ -207,6 +207,9 @@ export function StringListEditor({
   max,
   itemMax,
   placeholder,
+  hint,
+  itemName = "règle",
+  addLabel = "Ajouter la règle",
 }: {
   label: string;
   items: string[];
@@ -214,6 +217,11 @@ export function StringListEditor({
   max: number;
   itemMax: number;
   placeholder: string;
+  /** Sous le libellé : un exemple, une précision. */
+  hint?: string;
+  /** Nom d'un élément, pour les libellés accessibles (une règle, un mot, une preuve). */
+  itemName?: string;
+  addLabel?: string;
 }) {
   const [draft, setDraft] = useState("");
   const inputId = useId();
@@ -227,9 +235,12 @@ export function StringListEditor({
 
   return (
     <div className="grid gap-2">
-      <Label htmlFor={inputId} className="text-xs font-medium">
-        {label}
-      </Label>
+      <div className="grid gap-0.5">
+        <Label htmlFor={inputId} className="text-xs font-medium">
+          {label}
+        </Label>
+        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+      </div>
       <ul className="grid gap-1.5">
         <AnimatePresence initial={false}>
           {items.map((item, index) => (
@@ -243,7 +254,7 @@ export function StringListEditor({
               className="flex items-center gap-1.5"
             >
               <Input
-                aria-label={`${label}, règle ${index + 1}`}
+                aria-label={`${label}, ${itemName} ${index + 1}`}
                 value={item}
                 maxLength={itemMax}
                 onChange={(event) => onChange(items.map((entry, position) => (position === index ? event.target.value : entry)))}
@@ -282,7 +293,7 @@ export function StringListEditor({
             }}
             className="h-8 text-sm"
           />
-          <Button type="button" variant="outline" size="icon" className="size-8 shrink-0" aria-label="Ajouter la règle" onClick={add} disabled={!draft.trim()}>
+          <Button type="button" variant="outline" size="icon" className="size-8 shrink-0" aria-label={addLabel} onClick={add} disabled={!draft.trim()}>
             <Plus className="size-4" />
           </Button>
         </div>

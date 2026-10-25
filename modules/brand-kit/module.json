@@ -51,6 +51,9 @@
     "listStyleJobs": "user",
     "cancelStyleAnalysis": "user",
     "applyStyleAnalysis": "user",
+    "startVoiceDraft": "user",
+    "getVoiceDraftJob": "user",
+    "cancelVoiceDraft": "user",
     "listPublishAccounts": "user",
     "listPublishServices": "user",
     "getWatermarkImage": "public"

@@ -3,6 +3,7 @@
 import type { PublishField, TextCount } from "@/lib/connections/types";
 import type { BrandKit, BrandTheme, HashtagRule, KitSummary, MeasuredStyle, PoseTags } from "./types";
 import { MODULE_NAME, MODULE_PATH } from "./types";
+import type { VoiceSheetDraft } from "./voice-sheet";
 
 export { MODULE_NAME, MODULE_PATH };
 
@@ -62,6 +63,17 @@ export interface StyleJob {
   referenceName: string;
   style?: MeasuredStyle;
   applied?: boolean;
+  error?: string;
+  createdAt: number;
+  finishedAt?: number;
+}
+
+/** Proposition de fiche de voix (`lib/server/voice-draft.ts`, S1) : relue avant d'être reprise. */
+export interface VoiceDraftJob {
+  id: string;
+  kitId: string;
+  status: "running" | "done" | "error" | "canceled";
+  draft?: VoiceSheetDraft;
   error?: string;
   createdAt: number;
   finishedAt?: number;
@@ -156,6 +168,9 @@ export const api = {
   listStyleJobs: (kitId: string) => call<StyleJob[]>("listStyleJobs", kitId),
   cancelStyleAnalysis: (jobId: string) => call<{ success: boolean }>("cancelStyleAnalysis", jobId),
   applyStyleAnalysis: (kitId: string, jobId: string) => call<BrandKit>("applyStyleAnalysis", kitId, jobId),
+  startVoiceDraft: (kitId: string, text: string) => call<VoiceDraftJob>("startVoiceDraft", kitId, { text }),
+  getVoiceDraftJob: (jobId: string) => call<VoiceDraftJob | null>("getVoiceDraftJob", jobId),
+  cancelVoiceDraft: (jobId: string) => call<{ success: boolean }>("cancelVoiceDraft", jobId),
   listPublishAccounts: () => call<PublishAccount[]>("listPublishAccounts"),
   listPublishServices: () => call<PublishService[]>("listPublishServices"),
 };
