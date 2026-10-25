@@ -359,10 +359,12 @@ restent dans le navigateur.
 **Microsoft Edge.** Clip Studio parle le protocole de la lecture à voix haute
 du navigateur Edge (`lib/edge-tts.ts`) : liste des voix en HTTPS, synthèse par
 WebSocket avec la clé publique du client Edge, un jeton `Sec-MS-GEC` recalculé
-toutes les cinq minutes et l’en-tête `Origin` d’Edge. Depuis octobre 2026,
-Microsoft synthétise par `api.msedgeservices.com` ; l’ancien hôte
-`speech.platform.bing.com` répond 403 dans beaucoup de pays et ne sert plus
-que de second essai. **Accès non officiel :** il peut cesser du jour au
+toutes les cinq minutes et l’en-tête `Origin` d’Edge. Depuis la mi-octobre
+2026, Microsoft n’accepte plus que le jeton **v2** (`lib/edge-gec.ts`, portage
+de `drm.py` d’edge-tts 7.3) : avec l’ancien SHA-256 nu, la poignée de main
+échoue partout (403 ou réponse 200 vide), en production comme en local. La
+synthèse passe par `speech.platform.bing.com` ; `api.msedgeservices.com`
+refuse et ne sert plus que de second essai. **Accès non officiel :** il peut cesser du jour au
 lendemain. Chaque hôte est essayé une fois, l’horloge est recalée une fois sur
 l’heure de Microsoft si elle était décalée, puis l’erreur dit « Microsoft a
 changé l’accès de lecture d’Edge : passez par Azure ou une voix locale ».

@@ -65,13 +65,19 @@ describe("lecture à voix haute d’Edge", () => {
     vi.unstubAllGlobals();
   });
 
-  it("calcule le jeton Sec-MS-GEC de façon déterministe, par tranche de cinq minutes", () => {
+  it("calcule le jeton Sec-MS-GEC v2 de façon déterministe, par tranche de cinq minutes", () => {
     const token = secMsGec(Date.parse("2026-10-12T21:48:00Z"));
-    expect(token).toBe("213C134638D91CAD593AEDE249793638B951F0B2D2A63FC3CDF6E25DA413332F");
     expect(secMsGec(Date.parse("2026-10-12T21:45:00Z"))).toBe(token);
     expect(secMsGec(Date.parse("2026-10-12T21:49:59Z"))).toBe(token);
     expect(secMsGec(Date.parse("2026-10-12T21:50:00Z"))).not.toBe(token);
-    expect(token).toMatch(/^[0-9A-F]{64}$/);
+    expect(token).toMatch(/^[0-9A-F]{16}-[0-9A-F]{64}$/);
+  });
+
+  it("donne les mêmes jetons v2 que la bibliothèque edge-tts 7.3", () => {
+    // Valeurs de `generate_sec_ms_gec_v2` (rany2/edge-tts, drm.py) pour ces instants Unix.
+    expect(secMsGec(0)).toBe("52BC7A17B50DFEC9-28C4394775C8751CD2F6859C030C06DB1489ACAB3B3A7651831FC26895177ED6");
+    expect(secMsGec(1_761_000_000_000)).toBe("9875C7D8BB340E51-4AC084DC23E2DEA93DF952AE15BE8A23A325A2F010C0C277FBC15644D5A006C9");
+    expect(secMsGec(1_792_915_443_000)).toBe("7513C88FFF119E09-450A51504FDEBA1C2D754708237803BEA421E5F1FE8939DBC707E1D2034A789C");
   });
 
   it("lit les messages texte, binaires et les instants des mots", () => {
@@ -122,8 +128,8 @@ describe("lecture à voix haute d’Edge", () => {
 
     expect(service.opened).toHaveLength(1);
     const [{ url, headers, sent }] = service.opened;
-    expect(url).toContain("wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1?Ocp-Apim-Subscription-Key=");
-    expect(url).toMatch(/&Sec-MS-GEC=[0-9A-F]{64}&Sec-MS-GEC-Version=1-/);
+    expect(url).toContain("wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=");
+    expect(url).toMatch(/&Sec-MS-GEC=[0-9A-F]{16}-[0-9A-F]{64}&Sec-MS-GEC-Version=2-/);
     expect(url).toMatch(/&ConnectionId=[0-9a-f]{32}/);
     expect(headers.Origin).toBe("chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold");
     expect(sent[0]).toContain("Path:speech.config");

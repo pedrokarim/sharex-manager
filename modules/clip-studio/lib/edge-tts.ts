@@ -8,9 +8,10 @@
  * de synthèse). Chaque échec renvoie donc un message clair et ne boucle pas.
  *
  * Déroulé d’une synthèse :
- * 1. jeton `Sec-MS-GEC` : empreinte SHA-256 de l’heure (en tranches de cinq
+ * 1. jeton `Sec-MS-GEC` v2 (`edge-gec.ts`) de l’heure (en tranches de cinq
  *    minutes, comptée en centaines de nanosecondes depuis 1601) suivie de la
- *    clé publique du client ;
+ *    clé publique du client ; le v1, un SHA-256 nu, est refusé depuis la
+ *    mi-octobre 2026 ;
  * 2. connexion WebSocket, puis deux messages texte : la configuration (format
  *    MP3 24 kHz mono, instants des mots demandés) et le SSML à lire ;
  * 3. réponses : messages texte (`turn.start`, `audio.metadata` avec les
@@ -18,25 +19,27 @@
  *    longueur d’en-tête, l’en-tête `Path:audio`, puis le son).
  */
 
-import { createHash, randomBytes, randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import type { TimedWord } from "../engine/types";
+import { secMsGecV2 } from "./edge-gec";
 
 /** Clé publique du client de lecture d’Edge, la même pour tous les navigateurs. */
 export const EDGE_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 const EDGE_VERSION = "143.0.3650.75";
 const EDGE_MAJOR = EDGE_VERSION.split(".")[0];
-export const EDGE_GEC_VERSION = `1-${EDGE_VERSION}`;
+export const EDGE_GEC_VERSION = `2-${EDGE_VERSION}`;
 const USER_AGENT = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${EDGE_MAJOR}.0.0.0 Safari/537.36 Edg/${EDGE_MAJOR}.0.0.0`;
 const ORIGIN = "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold";
 
 /**
- * Hôtes de synthèse, essayés dans l’ordre, une fois chacun. Edge synthétise
- * par `api.msedgeservices.com` depuis octobre 2026 ; l’ancien hôte répond
- * encore dans certains pays.
+ * Hôtes de synthèse, essayés dans l’ordre, une fois chacun. Avec le jeton v2,
+ * `speech.platform.bing.com` répond (vérifié le 25/10/2026) ;
+ * `api.msedgeservices.com` refuse la poignée de main et ne reste qu’en second
+ * essai.
  */
 const SYNTHESIS_ENDPOINTS = [
-  `wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1?Ocp-Apim-Subscription-Key=${EDGE_CLIENT_TOKEN}`,
   `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${EDGE_CLIENT_TOKEN}`,
+  `wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1?Ocp-Apim-Subscription-Key=${EDGE_CLIENT_TOKEN}`,
 ];
 const VOICES_URL = `https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=${EDGE_CLIENT_TOKEN}`;
 
@@ -103,7 +106,7 @@ export function secMsGec(nowMs: number): string {
   let seconds = Math.floor(nowMs / 1000) + WINDOWS_EPOCH_SECONDS;
   seconds -= seconds % 300;
   const ticks = BigInt(seconds) * BigInt(10_000_000);
-  return createHash("sha256").update(`${ticks}${EDGE_CLIENT_TOKEN}`, "ascii").digest("hex").toUpperCase();
+  return secMsGecV2(`${ticks}${EDGE_CLIENT_TOKEN}`);
 }
 
 function currentGec(): string {
