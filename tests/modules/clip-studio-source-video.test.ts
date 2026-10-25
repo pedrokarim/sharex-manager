@@ -99,10 +99,11 @@ describe("Script : image ou vidéo, et extraits", () => {
     const withVideos = scriptPrompt(REQUEST, null, { web: false });
     expect(withVideos).toContain('"kind": "image" | "stock"');
     expect(withVideos).toContain("Pexels");
+    // Le genre d'illustration n'est pas proposé ; le "kind" des notes visuelles, lui, reste.
     const without = scriptPrompt({ ...REQUEST, videos: false }, null, { web: false });
-    expect(without).not.toContain('"kind"');
+    expect(without).not.toContain('"kind": "image"');
     const generating = scriptPrompt({ ...REQUEST, imageSource: "generate" }, null, { web: false });
-    expect(generating).not.toContain('"kind"');
+    expect(generating).not.toContain('"kind": "image"');
   });
 
   it("donne la transcription comme une donnée, avec le schéma des extraits", () => {

@@ -127,17 +127,27 @@ describe("assistant : illustrations dans la marque", () => {
 });
 
 describe("assistant : accroches et nettoyage du script", () => {
-  it("ouvre sur l'accroche la mieux notée", () => {
+  it("dit l'accroche la mieux notée et affiche le titre qui la complète", () => {
     const script = sanitize(REQUEST, {
-      title: "Les volcans",
+      title: "Pompéi, 79 après J.-C.",
       hooks: [
         { text: "Un volcan peut-il dormir 600 ans ?", family: "their-question", score: 6 },
         { text: "Ce volcan a rasé Pompéi en un jour", family: "mid-scene", score: 9 },
       ],
       scenes: [{ heading: "Le magma", text: "Il remonte de très loin sous nos pieds." }],
     });
-    expect(script.title).toBe("Ce volcan a rasé Pompéi en un jour");
+    expect(script.title).toBe("Pompéi, 79 après J.-C.");
     expect(script.hook).toEqual({ text: "Ce volcan a rasé Pompéi en un jour", family: "mid-scene", score: 9 });
+    // La voix dit l'accroche (8 mots), pas le titre : 8 + 2 + 8 = 18 mots à 160 par minute.
+    expect(script.spokenSeconds).toBe(7);
+  });
+
+  it("affiche l'accroche quand Codex ne donne pas de titre", () => {
+    const script = sanitize(REQUEST, {
+      hooks: [{ text: "Ce volcan a rasé Pompéi en un jour", family: "mid-scene", score: 9 }],
+      scenes: [{ heading: "Le magma" }],
+    });
+    expect(script.title).toBe("Ce volcan a rasé Pompéi en un jour");
   });
 
   it("garde le titre proposé quand Codex ne renvoie pas d'accroches", () => {

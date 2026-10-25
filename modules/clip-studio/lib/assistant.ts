@@ -74,7 +74,26 @@ import { findSegmentIcon, findSegmentImage, type FoundForSegment } from "./image
 import { FOUND_LIMITS, IMAGE_SOURCE_MODES, type ImageSourceMode, type SegmentImageSource } from "./image-search-types";
 import { MOODS, pickTrack } from "./music";
 import { AUTO_SEGMENTS, SEGMENT_WORDS, FRAME_WORDS, cleanCount, segmentCap, suggestedSegments } from "./segment-count";
-import { SPEAKING_RATE_WPM, cleanScriptText, frenchTypography, pickBestHook, scriptRuleLines, spokenSeconds, type ScriptHook } from "./script-rules";
+import {
+  SPEAKING_RATE_WPM,
+  cleanScriptText,
+  frenchTypography,
+  pickBestHook,
+  readAim,
+  readGates,
+  scriptReasoningLines,
+  scriptRuleLines,
+  segmentVisualNotes,
+  spokenSeconds,
+  visualNotesByLine,
+  withoutPlaceholders,
+  type CreatorVoice,
+  type ScriptAim,
+  type ScriptGates,
+  type ScriptHook,
+  type SegmentVisualNote,
+  type VisualNote,
+} from "./script-rules";
 import { DEFAULT_VOICE, VOICES, isKnownVoice, synthesize, type SpeakInput, type SpeechResult } from "./tts";
 import { parseCloudVoice, providerLabel } from "./cloud-tts";
 import {
@@ -184,6 +203,10 @@ export interface AssistantJob {
   title?: string;
   /** Accroche retenue et sa note sur 10. */
   hook?: ScriptHook;
+  /** Visée que le script dit poursuivre (spectateur, croyance, preuve, promesse, type), pour information. */
+  aim?: ScriptAim;
+  /** Verdicts de ses quatre contrôles, tels que Codex les rend : informatifs, jamais une garantie. */
+  gates?: ScriptGates;
   /** Durée estimée de la voix off, en secondes (mots ÷ 160 par minute). */
   spokenSeconds?: number;
   /**
@@ -496,6 +519,8 @@ async function run(job: AssistantJob, signal: AbortSignal) {
     let script = sanitize(job.request, extractJson<RawScript>(answer), brand?.language);
     job.title = script.title;
     job.hook = script.hook;
+    job.aim = script.aim;
+    job.gates = script.gates;
     job.spokenSeconds = script.spokenSeconds;
     step("script", "done", scriptDoneDetail(job.request, script));
 
@@ -668,19 +693,30 @@ interface RawExcerpt {
   excerpt?: unknown;
 }
 
+/** Notes visuelles rangées sur un segment : la forme que relisent la vérification et le raccourcissement. */
+interface RawNotes {
+  visualNotes?: unknown;
+}
+
 interface RawScript {
   title?: string;
   subtitle?: string;
   outro?: string;
   mood?: string;
-  questions?: ({ question?: string; choices?: string[]; answer?: number; explanation?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection & RawExcerpt)[];
-  entries?: ({ title?: string; detail?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection & RawExcerpt)[];
-  slides?: ({ caption?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection & RawExcerpt)[];
-  scenes?: ({ heading?: string; text?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection & RawExcerpt)[];
+  questions?: ({ question?: string; choices?: string[]; answer?: number; explanation?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection & RawExcerpt & RawNotes)[];
+  entries?: ({ title?: string; detail?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection & RawExcerpt & RawNotes)[];
+  slides?: ({ caption?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection & RawExcerpt & RawNotes)[];
+  scenes?: ({ heading?: string; text?: string; imagePrompt?: string; image?: RawImage; mascot?: boolean } & RawDirection & RawExcerpt & RawNotes)[];
   /** Émotion de la mascotte pendant la conclusion. */
   outroEmotion?: unknown;
   /** Accroches proposées et notées ; lues par `pickBestHook`. */
   hooks?: unknown;
+  /** Visée écrite avant le script ; lue par `readAim`. */
+  aim?: unknown;
+  /** Notes visuelles du script, `line` étant l'index du segment ; lues par `visualNotesByLine`. */
+  visualNotes?: unknown;
+  /** Verdicts des contrôles ; lus par `readGates`, pour information. */
+  gates?: unknown;
 }
 
 const IMAGE_GUIDE =
@@ -810,12 +846,14 @@ const SEGMENT_LIMITS: Record<AssistantTemplate, string> = {
 /**
  * Consigne du script. `web` : Codex peut chercher sur le web en écrivant
  * (par défaut, `scriptUsesWeb`) ; `now` : la date du jour, donnée dans la
- * consigne pour que rien de ce qui dépend du temps ne vienne de sa mémoire.
+ * consigne pour que rien de ce qui dépend du temps ne vienne de sa mémoire ;
+ * `voice` : la voix du créateur quand sa fiche existe (étape S1), sans quoi
+ * la marque en tient lieu.
  */
 export function scriptPrompt(
   request: AssistantRequest,
   brand: AssistantBrand | null = null,
-  options: { web?: boolean; now?: Date; source?: ScriptSource; sources?: ScriptSource[] } = {}
+  options: { web?: boolean; now?: Date; source?: ScriptSource; sources?: ScriptSource[]; voice?: CreatorVoice | null } = {}
 ): string {
   const foreign = brand?.language && !/^fr\b/i.test(brand.language) ? brand.language : null;
   const web = options.web ?? scriptUsesWeb(request);
@@ -841,6 +879,8 @@ export function scriptPrompt(
     ...(request.music === "auto"
       ? [`Ajoute au JSON une clé "mood" : l'ambiance musicale la plus adaptée, parmi ${MOODS.join(", ")}.`]
       : []),
+    // Le raisonnement d'abord (visée, accroches, corps, notes, contrôles), puis les règles de style.
+    ...scriptReasoningLines({ french: !foreign, format: request.template, brand: Boolean(brand), voice: options.voice ?? null }),
     ...scriptRuleLines({ french: !foreign }),
     ...(request.targetSeconds ? [durationLine(request.targetSeconds)] : []),
     ...(brand ? brandLines(brand, finds(resolveImageSource(request))) : []),
@@ -892,7 +932,7 @@ export function scriptPrompt(
 /** Durée visée, donnée au script : le calage après l'enregistrement n'a alors que peu à faire. */
 function durationLine(seconds: number): string {
   const words = Math.floor((seconds * SPEAKING_RATE_WPM) / 60);
-  return `Durée : toute la voix off (titre, chaque segment et conclusion, lus à la suite) doit tenir en ${seconds} secondes au plus, soit ${words} mots au total environ.`;
+  return `Durée : toute la voix off (l'accroche, chaque segment et la conclusion, lus à la suite) doit tenir en ${seconds} secondes au plus, soit ${words} mots au total environ.`;
 }
 
 /** Texte de la fiche transmis tel quel, sauf « < » : il ne peut pas refermer la balise qui l'encadre. */
@@ -987,14 +1027,20 @@ type ScriptContent = TemplateData & {
   segmentTexts: string[];
   /** Extrait de la vidéo source demandé pour chaque segment, avant son contrôle sur la source. */
   sourceExcerpts?: (ScriptExcerpt | undefined)[];
+  /** Notes visuelles, à part des phrases dites ; `line` est l'index du segment dans `segmentTexts`. */
+  visualNotes: VisualNote[];
   mood?: string;
   /** Émotion de la mascotte pendant la conclusion (D2). */
   outroEmotion?: PoseEmotion;
 };
 
 type CleanScript = ScriptContent & {
-  /** Accroche retenue, la mieux notée parmi celles proposées par Codex. */
+  /** Accroche retenue, la mieux notée parmi celles proposées par Codex : la première phrase dite. */
   hook?: ScriptHook;
+  /** Visée écrite avant le script, pour information. */
+  aim?: ScriptAim;
+  /** Verdicts des contrôles, pour information : le serveur ne s'y fie pas. */
+  gates?: ScriptGates;
   /** Durée estimée de la voix off, au débit habituel. */
   spokenSeconds: number;
 };
@@ -1049,9 +1095,24 @@ function imageFields(segment: { imagePrompt?: unknown; image?: RawImage; mascot?
 
 type ImageFields = ReturnType<typeof imageFields>;
 
-/** Tableaux d'images d'un script, relus sur ses segments. */
-function imageArrays(segments: ImageFields[], texts: string[]) {
+/** Notes visuelles gardées sur un segment nettoyé. */
+type NoteFields = { visualNotes?: SegmentVisualNote[] };
+
+/**
+ * Notes visuelles d'un segment : celles qu'il porte déjà (relecture après la
+ * vérification ou le raccourcissement), puis celles que la liste du script
+ * lui adresse ; nettoyées, sans doublon, bornées.
+ */
+function noteFields(segment: RawNotes, listed: unknown[] | undefined, line: LineCleaner): NoteFields {
+  const own = Array.isArray(segment.visualNotes) ? (segment.visualNotes as unknown[]) : [];
+  const notes = segmentVisualNotes([...own, ...(listed ?? [])], line);
+  return notes.length ? { visualNotes: notes } : {};
+}
+
+/** Tableaux d'un script relus sur ses segments : images, textes et notes visuelles, dans l'ordre. */
+function segmentArrays(segments: (ImageFields & NoteFields)[], texts: string[]) {
   return {
+    visualNotes: segments.flatMap((segment, index) => (segment.visualNotes ?? []).map((note): VisualNote => ({ line: index, ...note }))),
     prompts: segments.map((segment) => segment.imagePrompt),
     mascots: segments.map((segment) => segment.mascot),
     imagePlans: segments.map(
@@ -1071,20 +1132,33 @@ function imageArrays(segments: ImageFields[], texts: string[]) {
 }
 
 /**
- * Script renvoyé par Codex, nettoyé et borné. La meilleure accroche devient
- * le titre, donc l'ouverture lue ; sans `hooks`, le titre proposé reste.
- * `language` : langue du script (celle de la marque), le français sans elle.
+ * Script renvoyé par Codex, nettoyé et borné. La meilleure accroche est la
+ * première phrase dite ; le titre, affiché pendant qu'elle est dite, la
+ * complète. Sans titre, l'accroche s'affiche aussi ; sans `hooks` (une
+ * réponse d'avant), le titre proposé est à la fois affiché et lu. Visée et
+ * contrôles sont gardés pour information. `language` : langue du script
+ * (celle de la marque), le français sans elle.
  */
 export function sanitize(request: AssistantRequest, raw: RawScript, language?: string): CleanScript {
   const french = !language || /^fr\b/i.test(language);
-  const line: LineCleaner = (value, max) => (french ? frenchTypography(cut(value, max)) : cut(value, max));
-  const hook = pickBestHook(raw.hooks, 60);
-  const title = (hook ? line(hook.text, 60) : line(raw.title, 60)) || "Mon short";
+  // Une case à remplir laissée par Codex serait lue telle quelle par la voix : elle est retirée.
+  const line: LineCleaner = (value, max) => {
+    const text = withoutPlaceholders(cut(value, max));
+    return french ? frenchTypography(text) : text;
+  };
+  const best = pickBestHook(raw.hooks, 60);
+  const opening = best ? line(best.text, 60) : "";
+  const hook = best && opening ? { ...best, text: opening } : undefined;
+  const title = line(raw.title, 60) || opening || "Mon short";
   const content = sanitizeSegments(request, raw, title, line);
+  const aim = readAim(raw.aim, line);
+  const gates = readGates(raw.gates, line);
   return {
     ...content,
-    hook: hook ? { ...hook, text: title } : undefined,
-    spokenSeconds: Math.round(spokenSeconds(narrationLines(request.template, content).join(" "))),
+    hook,
+    ...(aim ? { aim } : {}),
+    ...(gates ? { gates } : {}),
+    spokenSeconds: Math.round(spokenSeconds(narrationLines(request.template, content, hook?.text).join(" "))),
   };
 }
 
@@ -1102,9 +1176,12 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
   const mood = (MOODS as readonly string[]).includes(String(raw.mood)) ? String(raw.mood) : undefined;
   const outroEmotion = raw.outroEmotion === undefined ? undefined : readEmotion(raw.outroEmotion);
   const direction = outroEmotion ? { outroEmotion } : {};
+  // Les notes visuelles suivent leur segment : un segment écarté plus bas emporte les siennes, les index se recalent.
+  const listed = (segments: unknown[] | undefined) => visualNotesByLine(raw.visualNotes, segments?.length ?? 0);
   if (request.template === "quiz") {
+    const notes = listed(raw.questions);
     const questions = (raw.questions ?? [])
-      .map((question) => {
+      .map((question, index) => {
         const choices = (question.choices ?? []).map((choice) => line(choice, 40)).filter(Boolean).slice(0, 4);
         const answer = Math.round(Number(question.answer));
         return {
@@ -1114,6 +1191,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
           explanation: line(question.explanation, 110) || undefined,
           ...imageFields(question),
           ...directionFields(question),
+          ...noteFields(question, notes[index], line),
         };
       })
       .filter((question) => question.question && question.choices.length >= 2)
@@ -1126,16 +1204,18 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
       outro: line(raw.outro, 60) || undefined,
       questions,
       ...direction,
-      ...imageArrays(questions, questions.map((question) => question.question)),
+      ...segmentArrays(questions, questions.map((question) => question.question)),
     };
   }
   if (request.template === "free") {
+    const notes = listed(raw.scenes);
     const scenes = (raw.scenes ?? [])
-      .map((scene) => ({
+      .map((scene, index) => ({
         heading: line(scene.heading, 50) || undefined,
         text: line(scene.text, 160) || undefined,
         ...imageFields(scene),
         ...directionFields(scene),
+        ...noteFields(scene, notes[index], line),
       }))
       .filter((scene) => scene.heading || scene.text)
       .slice(0, segmentCap(request));
@@ -1147,16 +1227,18 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
       outro: line(raw.outro, 60) || undefined,
       scenes,
       ...direction,
-      ...imageArrays(scenes, scenes.map((scene) => [scene.heading, scene.text].filter(Boolean).join(". "))),
+      ...segmentArrays(scenes, scenes.map((scene) => [scene.heading, scene.text].filter(Boolean).join(". "))),
     };
   }
   if (request.template === "top") {
+    const notes = listed(raw.entries);
     const entries = (raw.entries ?? [])
-      .map((entry) => ({
+      .map((entry, index) => ({
         title: line(entry.title, 50),
         detail: line(entry.detail, 80) || undefined,
         ...imageFields(entry),
         ...directionFields(entry),
+        ...noteFields(entry, notes[index], line),
       }))
       .filter((entry) => entry.title)
       .slice(0, segmentCap(request))
@@ -1169,11 +1251,12 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
       outro: line(raw.outro, 60) || undefined,
       entries,
       ...direction,
-      ...imageArrays(entries, entries.map((entry) => [entry.title, entry.detail].filter(Boolean).join(". "))),
+      ...segmentArrays(entries, entries.map((entry) => [entry.title, entry.detail].filter(Boolean).join(". "))),
     };
   }
+  const notes = listed(raw.slides);
   const slides = (raw.slides ?? [])
-    .map((slide) => ({ caption: line(slide.caption, 110) || undefined, ...imageFields(slide), ...directionFields(slide) }))
+    .map((slide, index) => ({ caption: line(slide.caption, 110) || undefined, ...imageFields(slide), ...directionFields(slide), ...noteFields(slide, notes[index], line) }))
     .slice(0, segmentCap(request));
   if (slides.length === 0) throw new Error("Le script reçu ne contient aucune diapositive.");
   return {
@@ -1182,7 +1265,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
     outro: line(raw.outro, 60) || undefined,
     slides,
     ...direction,
-    ...imageArrays(slides, slides.map((slide) => slide.caption ?? "")),
+    ...segmentArrays(slides, slides.map((slide) => slide.caption ?? "")),
   };
 }
 
@@ -1252,12 +1335,14 @@ function rawImage(request: AssistantRequest, segment: ImageFields): Record<strin
 /** Segments d'un script nettoyé, dans le schéma du script brut : ce que la vérification relit et renvoie. */
 function rawSegments(request: AssistantRequest, script: CleanScript): Record<string, unknown>[] {
   // Émotion et geste suivent le segment : la vérification et le raccourcissement les rendent tels quels.
-  const mascot = (segment: ImageFields & RawDirection) => ({
+  const mascot = (segment: ImageFields & RawDirection & NoteFields) => ({
     ...(segment.mascot ? { mascot: true } : {}),
     ...(segment.emotion ? { emotion: segment.emotion } : {}),
     ...(segment.gesture ? { gesture: segment.gesture } : {}),
     // L'extrait de la vidéo source suit aussi le segment.
     ...(segment.sourceExcerpt ? { excerpt: segment.sourceExcerpt } : {}),
+    // Les notes visuelles aussi : un segment remplacé repart sans elles.
+    ...(segment.visualNotes?.length ? { visualNotes: segment.visualNotes } : {}),
   });
   if (request.template === "quiz") {
     return (script as CleanScript & QuizData).questions.map((question) => {
@@ -1295,7 +1380,8 @@ function rawSegments(request: AssistantRequest, script: CleanScript): Record<str
  * (un remplaçant ne garde rien de l'ancien, pas même son image), « removed »
  * disparaît, le reste est gardé tel quel. Le script repasse par `sanitize` :
  * bornes, typographie et requêtes d'images sortent du segment corrigé.
- * L'accroche retenue reste, au texte du titre près.
+ * L'accroche retenue, la visée et les contrôles restent tels quels ; seul le
+ * titre affiché peut être corrigé.
  */
 export function applyFactCheck(request: AssistantRequest, script: CleanScript, report: FactCheckReport, language?: string): CleanScript {
   const originals = rawSegments(request, script);
@@ -1318,10 +1404,23 @@ export function applyFactCheck(request: AssistantRequest, script: CleanScript, r
     outro: script.outro,
     mood: script.mood,
     outroEmotion: script.outroEmotion,
+    ...keptReasoning(script),
     [SEGMENT_KEYS[request.template]]: segments,
   } as RawScript;
-  const rebuilt = sanitize({ ...request, count: segments.length }, raw, language);
-  return { ...rebuilt, hook: script.hook ? { ...script.hook, text: rebuilt.title } : undefined };
+  return sanitize({ ...request, count: segments.length }, raw, language);
+}
+
+/**
+ * Accroche, visée et contrôles d'un script nettoyé, remis dans le script brut
+ * qu'une relecture repasse par `sanitize` : l'accroche reste la première
+ * phrase dite et compte dans la durée de la voix.
+ */
+function keptReasoning(script: CleanScript): Pick<RawScript, "hooks" | "aim" | "gates"> {
+  return {
+    ...(script.hook ? { hooks: [script.hook] } : {}),
+    ...(script.aim ? { aim: script.aim } : {}),
+    ...(script.gates ? { gates: script.gates } : {}),
+  };
 }
 
 /** Sources du rapport, rattachées à l'index de leur segment dans le script final. */
@@ -1411,12 +1510,24 @@ export async function verifyScript(
 /**
  * Demande, script et sources rangés dans le projet : l'assistant de
  * publication les relit pour rédiger les textes, et peut citer les sources.
+ * Les notes visuelles suivent les lignes du script gardées : le montage part
+ * d'elles pour savoir quoi écrire et quoi montrer sur chaque ligne.
  */
-export function projectBrief(request: Pick<AssistantRequest, "brief">, script: Pick<CleanScript, "title" | "segmentTexts">, facts: FactCheckOutcome | null): NonNullable<ClipProject["brief"]> {
+export function projectBrief(
+  request: Pick<AssistantRequest, "brief">,
+  script: Pick<CleanScript, "title" | "segmentTexts"> & { visualNotes?: VisualNote[] },
+  facts: FactCheckOutcome | null
+): NonNullable<ClipProject["brief"]> {
+  const lines = script.segmentTexts.slice(0, 100).map((line) => String(line ?? "").slice(0, 2000));
+  const visualNotes = (script.visualNotes ?? [])
+    .filter((note) => Number.isInteger(note.line) && note.line >= 0 && note.line < lines.length)
+    .slice(0, 300)
+    .map((note) => ({ line: note.line, kind: note.kind, text: note.text.slice(0, 200) }));
   return {
     prompt: String(request.brief ?? "").slice(0, 4000),
     title: script.title.slice(0, 200),
-    script: script.segmentTexts.slice(0, 100).map((line) => String(line ?? "").slice(0, 2000)),
+    script: lines,
+    ...(visualNotes.length ? { visualNotes } : {}),
     ...(facts
       ? {
           sources: facts.sources.map((source: { segment: number } & FactSource) => ({
@@ -1766,18 +1877,21 @@ function attachImages(
  * - classement : intro, un texte par élément, outro ;
  * - diaporama : intro, une légende par diapositive, outro ;
  * - libre : intro, titre et texte de chaque séquence, outro.
+ * L'intro dit `opening`, l'accroche du script, quand il en a une : le titre
+ * reste à l'écran sans être lu. Sans accroche, le titre est lu.
  * Une chaîne vide garde sa place mais ne sera pas lue.
  */
-function narrationLines(template: TemplateId, data: FreeData | QuizData | TopData | SlideshowData): string[] {
+function narrationLines(template: TemplateId, data: FreeData | QuizData | TopData | SlideshowData, opening?: string): string[] {
   const sentence = (value: string | undefined) => {
     const text = (value ?? "").trim();
     return text && !/[.!?…]$/.test(text) ? `${text}.` : text;
   };
+  const head = opening?.trim() || data.title;
   if (template === "quiz") {
     const quiz = data as QuizData;
     const letters = ["A", "B", "C", "D"];
     return [
-      [sentence(quiz.title), sentence(quiz.subtitle)].filter(Boolean).join(" "),
+      [sentence(head), sentence(quiz.subtitle)].filter(Boolean).join(" "),
       ...quiz.questions.flatMap((question, index) => [
         `Question ${index + 1}. ${sentence(question.question)} ${question.choices
           .map((choice, choiceIndex) => `${letters[choiceIndex]}, ${sentence(choice)}`)
@@ -1790,7 +1904,7 @@ function narrationLines(template: TemplateId, data: FreeData | QuizData | TopDat
   if (template === "free") {
     const free = data as FreeData;
     return [
-      [sentence(free.title), sentence(free.subtitle)].filter(Boolean).join(" "),
+      [sentence(head), sentence(free.subtitle)].filter(Boolean).join(" "),
       ...free.scenes.map((scene) => [sentence(scene.heading), sentence(scene.text)].filter(Boolean).join(" ")),
       sentence(free.outro),
     ];
@@ -1799,13 +1913,13 @@ function narrationLines(template: TemplateId, data: FreeData | QuizData | TopDat
     const top = data as TopData;
     const count = top.entries.length;
     return [
-      sentence(top.title),
+      sentence(head),
       ...top.entries.map((entry, index) => `Numéro ${count - index}. ${sentence(entry.title)} ${sentence(entry.detail)}`.trim()),
       sentence(top.outro),
     ];
   }
   const slideshow = data as SlideshowData;
-  return [sentence(slideshow.title), ...slideshow.slides.map((slide) => sentence(slide.caption)), sentence(slideshow.outro)];
+  return [sentence(head), ...slideshow.slides.map((slide) => sentence(slide.caption)), sentence(slideshow.outro)];
 }
 
 /** Moteur de synthèse : celui de `tts.ts`, remplaçable par les tests. */
@@ -1980,7 +2094,7 @@ export async function recordNarration(
 
   const record = async (current: CleanScript, label: string, firstTake = false): Promise<Take> => {
     const base = attachImages(request.template, current, media.images, media.icons, media.extras);
-    const lines = narrationLines(request.template, base);
+    const lines = narrationLines(request.template, base, current.hook?.text);
     const clips: (VoiceClip | undefined)[] = [];
     const progress = () => onStep("running", `${label ? `${label}, ` : ""}${clips.length} sur ${lines.length}`);
     progress();
@@ -2176,12 +2290,13 @@ export function applyShortening(request: AssistantRequest, script: CleanScript, 
     outro: keep(parsed.outro, script.outro),
     mood: script.mood,
     outroEmotion: script.outroEmotion,
+    ...keptReasoning(script),
     [SEGMENT_KEYS[request.template]]: segments,
   } as RawScript;
   const rebuilt = sanitize({ ...request, count: segments.length }, raw, language);
   if (rebuilt.segmentTexts.length !== originals.length) throw new Error("Le script raccourci a perdu des éléments");
   if (rebuilt.spokenSeconds >= script.spokenSeconds) throw new Error("Codex n’a pas raccourci le script");
-  return { ...rebuilt, hook: script.hook ? { ...script.hook, text: rebuilt.title } : undefined };
+  return rebuilt;
 }
 
 async function shortenScript(
