@@ -291,7 +291,9 @@ export function applyLegibility(project: ClipProject, theme: BrandTheme): ClipPr
         changed = true;
         return { ...item, style: fixed.style, karaoke: { ...item.karaoke, highlight: fixed.highlight } };
       }
-      if (!item.theme?.role) return item;
+      // La planche pose chaque texte sur sa propre couleur de palette (encre sur papier, texte sur carte ou sur
+      // l'accent) : une étiquette de lisibilité mettrait un fond derrière chaque ligne d'une note ou d'une carte.
+      if (!item.theme?.role || item.theme.board) return item;
       changed = true;
       const backdrop: Backdrop = backdropOf(project, trackIndex, item);
       const keepColor = item.theme.paint === "success" || item.theme.paint === "highlight";

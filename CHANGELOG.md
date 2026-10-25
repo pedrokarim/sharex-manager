@@ -7,6 +7,35 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Clip Studio, vidéos de l’assistant en tableaux (dossier 01 illustrations) :
+  les modèles « libre » et « diaporama », racontés par une voix off, se
+  montent désormais comme « Monter ma prise ». Codex lit les mots de la voix
+  enregistrée, ce que montre chaque image trouvée et les notes visuelles du
+  script, puis compose les tableaux : planche en haut et image de la phrase
+  en bas, image plein cadre quand elle parle d’elle-même, planche seule ;
+  compteurs, listes, logos, notes et mascotte de la marque qui réagit, en
+  grand. Les textes, voiles et icônes d’avant sont remplacés ; un passage
+  sans image garde l’image d’avant. Sans réponse de Codex, le montage
+  d’avant reste, et l’étape « Montage » le dit.
+- Clip Studio, éditeur : une poignée sur le bord haut de la chronologie
+  règle la hauteur de l’aperçu et de la chronologie (retenue d’une visite à
+  l’autre, double-clic pour revenir à la taille par défaut).
+
+- Clip Studio, assistant dans l’éditeur : un panneau « Assistant » dans le
+  rail de gauche, où l’on décrit en langage courant plusieurs problèmes à la
+  fois (« le titre du début est trop gros, la musique couvre la voix »).
+  Codex lit le projet, la conversation passée et l’image de l’aperçu à la
+  tête de lecture, puis propose des changements sur une liste fermée
+  (texte, style, cadre, timing, animations, transitions, suppression, ajout
+  d’un texte, son d’un élément ou d’une piste, cadrage et vitesse d’un
+  média, fond). Ils s’appliquent en une seule étape : un Ctrl Z les annule
+  tous, comme le bouton « Annuler ces changements ». La réponse dit ce qui a
+  été compris, point par point, et numérote les changements appliqués
+  (un clic sélectionne l’élément et y amène la tête de lecture) et ceux
+  écartés, avec leur raison. La conversation est gardée par projet, reprise
+  à la réouverture, effaçable, et supprimée avec le projet ; une demande se
+  suit en arrière-plan, annulable, même panneau fermé.
+
 - Outil « Origine d’une image » : un encadré présente SynthID Detector, le
   détecteur officiel de Google DeepMind, qui lit le filigrane invisible que
   l’outil ne voit pas. Simple lien vers synthid.com, en trois étapes (ouvrir,
@@ -1136,6 +1165,16 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   inutilisée.
 
 ### Fixed
+
+- Clip Studio, éditeur : l’aperçu avait rétréci depuis l’arrivée des outils
+  de tracé (leur barre lui retirait une bande en haut et en bas) ; ils
+  forment maintenant une colonne étroite à gauche, qui ne lui prend plus de
+  hauteur.
+- Clip Studio, planche : plus d’étiquette de lisibilité derrière chaque
+  ligne d’une note ou d’une carte, plus de coche dessinée comme un carré
+  vide, ponctuation double jamais seule en début de ligne, pense-bête qui ne
+  recouvre plus le texte d’une liste, mascotte à sa vraie taille, rangée de
+  phrases rangée en liste.
 
 - Clip Studio, voix Microsoft Edge : Microsoft n’accepte plus que le jeton
   `Sec-MS-GEC` v2 depuis la mi-octobre 2026 ; la synthèse, refusée partout

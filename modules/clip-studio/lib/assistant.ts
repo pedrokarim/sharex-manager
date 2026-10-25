@@ -128,6 +128,7 @@ import { scriptNiche } from "./niche-context";
 import { readScriptRecords, recentScripts, recordScript } from "./script-history";
 import type { ScriptNiche } from "./script-rules";
 import { listProjectFiles } from "./store";
+import { BOARD_TEMPLATES, findOfficialLogo, narratedMontage, type NarratedMontage, type NarratedMontageDeps } from "./board-montage";
 
 /** L'assistant écrit et illustre lui-même : l'Avant / Après, fait d'images fournies, n'en fait pas partie. */
 export type AssistantTemplate = Exclude<TemplateId, "before-after">;
@@ -491,6 +492,12 @@ function scriptNicheFor(kitId: string | undefined, now = Date.now()): ScriptNich
   }
 }
 
+/** Codex et les logos officiels des tableaux d'une voix off (remplaçables dans les tests). */
+export const boardDeps: NarratedMontageDeps = {
+  ask: (prompt, signal) => askCodex(prompt, { signal, origin: { module: "clip-studio", feature: "Tableaux" } }),
+  logo: findOfficialLogo,
+};
+
 async function run(job: AssistantJob, signal: AbortSignal) {
   const step = (id: StepId, state: StepState, detail?: string, label?: string) => {
     job.steps = job.steps.map((entry) => (entry.id === id ? { ...entry, state, detail, ...(label ? { label } : {}) } : entry));
@@ -645,11 +652,40 @@ async function run(job: AssistantJob, signal: AbortSignal) {
       step("narration", "skipped", "Ni voix choisie, ni voix de la marque");
     }
 
-    // 4. Montage
+    // 4. Montage : une voix off qui raconte d'un bout à l'autre (libre, diaporama) se monte en tableaux,
+    // comme une prise (dossier 01, illustrations) ; le quiz et le classement gardent leur construction.
     step("montage", "running");
-    // La musique est posée après la marque : elle couvre aussi le carton de fin.
-    // L'assistant crée le clip : le montage prend le rythme (D3), celui de la marque ou le rythme normal.
-    let project = buildFromTemplate(job.request.template, script.title, job.request.aspect, data, brand?.theme ?? null, { pace: assistantPace(brand) });
+    let boards: NarratedMontage | null = null;
+    let boardsNote: string | undefined;
+    if (BOARD_TEMPLATES.includes(job.request.template)) {
+      try {
+        boards = await narratedMontage(
+          {
+            template: job.request.template,
+            title: script.title,
+            aspect: job.request.aspect,
+            data: data as FreeData | SlideshowData,
+            theme: brand?.theme ?? null,
+            brandKitId: job.request.brandKitId,
+            language: brand?.language,
+            segmentTexts: script.segmentTexts,
+            visualNotes: script.visualNotes,
+            illustrations: images.map((image) => image?.name),
+          },
+          boardDeps,
+          signal,
+          (detail) => step("montage", "running", detail)
+        );
+        if (!boards) boardsNote = "Voix sans mots horodatés : montage sans tableaux";
+      } catch (error) {
+        if (signal.aborted) throw error;
+        console.error("[clip-studio] tableaux d’une voix off :", error instanceof Error ? error.message : error);
+        boardsNote = "Codex n’a pas composé les tableaux : montage sans tableaux";
+      }
+    }
+    // La musique est posée après la marque : elle couvre aussi le carton de fin.
+    // Sans tableaux, l'assistant monte le modèle au rythme (D3), celui de la marque ou le rythme normal.
+    let project = boards?.project ?? buildFromTemplate(job.request.template, script.title, job.request.aspect, data, brand?.theme ?? null, { pace: assistantPace(brand) });
     if (job.request.music) {
       const mood = job.request.music === "auto" ? script.mood : job.request.music;
       const end = projectDuration(project);
@@ -664,7 +700,8 @@ async function run(job: AssistantJob, signal: AbortSignal) {
       }
     }
     // La demande, le script et ses sources suivent le projet : l'assistant de publication les relit pour rédiger les textes.
-    project = { ...project, brief: projectBrief(job.request, script, facts), origin: "assistant" };
+    const brief = projectBrief(job.request, script, facts);
+    project = { ...project, brief: boards ? { ...brief, montage: boards.montage } : brief, origin: "assistant" };
     writeProject(project);
     job.projectId = project.id;
     recordScript({
@@ -683,7 +720,12 @@ async function run(job: AssistantJob, signal: AbortSignal) {
     step(
       "montage",
       "done",
-      brand ? `Marque « ${brand.name} »` :job.request.brandKitId ? "Sans marque : image de marque introuvable" : undefined
+      [
+        boards ? `${boards.plan.beats.length} tableau${boards.plan.beats.length > 1 ? "x" : ""} : ${boards.montage}` : boardsNote,
+        brand ? `Marque « ${brand.name} »` : job.request.brandKitId ? "Sans marque : image de marque introuvable" : undefined,
+      ]
+        .filter(Boolean)
+        .join(" · ") || undefined
     );
   } catch (error) {
     const aborted = signal.aborted || (error as Error)?.name === "AbortError";

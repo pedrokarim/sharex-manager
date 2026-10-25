@@ -14,6 +14,7 @@ import {
   Music,
   PenTool,
   Redo2,
+  Sparkles,
   Type,
   Undo2,
 } from "lucide-react";
@@ -95,7 +96,10 @@ import { MusicPanel } from "../components/music-panel";
 import { IllustratePanel } from "../components/illustrate-panel";
 import { useBoardStyle } from "../components/use-board-style";
 import { Timeline } from "../components/timeline";
+import { TimelineResizeHandle, useTimelineHeight } from "../components/timeline-resize";
 import { TrackVoiceDialog } from "../components/track-voice-dialog";
+import { AssistantPanel, capturePreview, useEditorChat } from "../components/assistant-panel";
+import { applyEditorOps, type EditorApplyResult, type EditorChange, type EditorOpEntry } from "../engine/editor-ops";
 import { applyVoiceReplacements } from "../engine/revoice";
 import { useProjectHistory, type SaveState } from "../components/use-project-history";
 
@@ -136,7 +140,11 @@ export default function EditorPage() {
   );
 }
 
-type Panel = "media" | "text" | "illustrate" | "voice" | "music";
+type Panel = "media" | "text" | "illustrate" | "voice" | "music" | "assistant";
+
+/** Largeur des panneaux de gauche ; une conversation demande un peu plus de place. */
+const PANEL_WIDTH = 300;
+const ASSISTANT_PANEL_WIDTH = 360;
 
 function Editor({ initial }: { initial: ClipProject }) {
   const { project, commit, undo, redo, canUndo, canRedo, saveState } = useProjectHistory(initial);
@@ -298,6 +306,7 @@ function Editor({ initial }: { initial: ClipProject }) {
   // ─── Illustrer ─────────────────────────────────────────────────
   // Palette de planche et polices de la marque : ce qui s'illustre à la main parle la langue de la planche.
   const boardStyle = useBoardStyle(project.brandKitId);
+  const [timelineHeight, setTimelineHeight] = useTimelineHeight();
   /** Outil de tracé actif sur l'aperçu, ou `null` (sélection). */
   const [tool, setTool] = useState<DrawTool | null>(null);
   /** « Animer » : un déplacement à un autre instant que le début pose une image clé. */
@@ -366,6 +375,43 @@ function Editor({ initial }: { initial: ClipProject }) {
       if (videoId && findItem(projectRef.current, videoId)) setSelectedId(videoId);
     },
     [commit]
+  );
+
+  // ─── Assistant ─────────────────────────────────────────────────
+  /** Applique une réponse de l'assistant : un seul `commit`, donc un seul Ctrl Z pour toute la réponse. */
+  const applyAssistantOps = useCallback(
+    (ops: EditorOpEntry[]): EditorApplyResult => {
+      const base = projectRef.current;
+      const result = applyEditorOps(base, ops);
+      if (result.applied.length) commit((current) => (current === base ? result.project : applyEditorOps(current, ops).project));
+      return result;
+    },
+    [commit]
+  );
+
+  const assistant = useEditorChat({
+    projectId: project.id,
+    project,
+    // Codex lit le projet enregistré, et l'image de l'aperçu à l'arrêt, tels qu'on les voit.
+    prepare: async (withImage) => {
+      playerRef.current?.pause();
+      await callModule("saveProject", projectRef.current);
+      return withImage ? capturePreview(canvasRef.current) : null;
+    },
+    apply: applyAssistantOps,
+    undo,
+    visible: panel === "assistant",
+    onOpen: () => setPanel("assistant"),
+  });
+
+  /** Un changement cliqué dans la conversation : son élément sélectionné, la tête de lecture dessus. */
+  const focusChange = useCallback(
+    (change: EditorChange) => {
+      playerRef.current?.pause();
+      if (change.itemId && findItem(projectRef.current, change.itemId)) setSelectedId(change.itemId);
+      if (change.seconds !== undefined) seek(Math.round(change.seconds * projectRef.current.fps));
+    },
+    [seek]
   );
 
   // ─── Clavier ───────────────────────────────────────────────────
@@ -507,7 +553,8 @@ function Editor({ initial }: { initial: ClipProject }) {
 
       {/* ─── Espace de travail ──────────────────────────────────── */}
       <div className="relative flex min-h-0 flex-1">
-        <nav className="flex w-14 shrink-0 flex-col items-center gap-1 border-r py-2" aria-label="Panneaux">
+        {/* Six boutons : quand la chronologie est haute, le rail défile au lieu de couper le dernier. */}
+        <nav className="flex min-h-0 w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden border-r py-2 [scrollbar-width:none]" aria-label="Panneaux">
           <RailButton label="Médias" shortcut="M" active={panel === "media"} onClick={() => setPanel(panel === "media" ? null : "media")}>
             <FolderOpen className="h-5 w-5" />
           </RailButton>
@@ -523,6 +570,14 @@ function Editor({ initial }: { initial: ClipProject }) {
           <RailButton label="Musique" active={panel === "music"} onClick={() => setPanel(panel === "music" ? null : "music")}>
             <Music className="h-5 w-5" />
           </RailButton>
+          <RailButton label="Assistant" active={panel === "assistant"} onClick={() => setPanel(panel === "assistant" ? null : "assistant")}>
+            <span className="relative block">
+              <Sparkles className="h-5 w-5" />
+              {/* Une demande en cours se voit même panneau fermé. */}
+              {assistant.pending && <span className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-primary" aria-hidden />}
+              {assistant.pending && <span className="sr-only">(réponse en cours)</span>}
+            </span>
+          </RailButton>
         </nav>
 
         <AnimatePresence initial={false}>
@@ -530,13 +585,13 @@ function Editor({ initial }: { initial: ClipProject }) {
             <motion.aside
               key="panel"
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 300, opacity: 1 }}
+              animate={{ width: panel === "assistant" ? ASSISTANT_PANEL_WIDTH : PANEL_WIDTH, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className={cn("shrink-0 overflow-hidden border-r", narrow && "absolute inset-y-0 left-14 z-20 bg-background shadow-lg")}
+              className={cn("shrink-0 overflow-hidden border-r", narrow && "absolute inset-y-0 left-14 z-20 max-w-[calc(100vw-3.5rem)] bg-background shadow-lg")}
             >
-              {/* 299 px : le panneau mesure 300 px, bordure comprise ; son contenu ne passe pas sous elle. */}
-              <div className="h-full w-[299px] max-w-[calc(100vw-3.5rem)]">
+              {/* Un pixel de moins que le panneau : son contenu ne passe pas sous la bordure. */}
+              <div className="h-full max-w-[calc(100vw-3.5rem)]" style={{ width: (panel === "assistant" ? ASSISTANT_PANEL_WIDTH : PANEL_WIDTH) - 1 }}>
                 {panel === "media" && <MediaPanel onAdd={(source) => addSource(source)} aspect={project.aspect} />}
                 {panel === "text" && <TextPanel onAddText={addText} onAddShape={addShape} />}
                 {panel === "illustrate" && (
@@ -549,6 +604,7 @@ function Editor({ initial }: { initial: ClipProject }) {
                   />
                 )}
                 {panel === "music" && <MusicPanel onAdd={addMusic} />}
+                {panel === "assistant" && <AssistantPanel state={assistant} project={project} frame={frame} selectedId={selectedId} onFocus={focusChange} />}
                 {panel === "voice" && (
                   <VoicePanel
                     selectedText={selected?.type === "text" && !selected.karaoke ? selected.text : undefined}
@@ -648,7 +704,8 @@ function Editor({ initial }: { initial: ClipProject }) {
       </div>
 
       {/* ─── Timeline ───────────────────────────────────────────── */}
-      <div className="h-[280px] shrink-0 border-t bg-card/30">
+      <div className="relative shrink-0 border-t bg-card/30" style={{ height: timelineHeight }}>
+        <TimelineResizeHandle height={timelineHeight} onResize={setTimelineHeight} />
         <Timeline
           project={project}
           frame={frame}

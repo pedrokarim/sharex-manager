@@ -173,20 +173,23 @@ export function PreviewStage({
     const node = area.current;
     if (!node) return;
     const fit = () => {
-      const scaleFor = (marginY: number) =>
-        Math.min((node.clientWidth - 32) / project.width, (node.clientHeight - marginY * 2) / project.height);
-      let scale = scaleFor(16);
-      // Les outils (en haut à gauche) et le bouton « Zone de sécurité » (en haut à droite) : si le
-      // canevas passerait dessous, on lui laisse une bande libre en haut (et en bas, pour rester centré).
-      const left = (node.clientWidth - project.width * scale) / 2;
-      const right = (node.clientWidth + project.width * scale) / 2;
-      const top = (node.clientHeight - project.height * scale) / 2;
-      let clearance = 0;
+      const scaleFor = (marginX: number, marginY: number) =>
+        Math.min((node.clientWidth - marginX * 2) / project.width, (node.clientHeight - marginY * 2) / project.height);
+      let scale = scaleFor(16, 16);
+      // Les outils forment une colonne étroite à gauche : si le canevas passerait dessous, il se retire
+      // sur les côtés (des deux, pour rester centré), jamais en hauteur.
       const bar = toolbar.current;
-      if (bar && left < bar.offsetLeft + bar.offsetWidth + 8) clearance = Math.max(clearance, bar.offsetTop + bar.offsetHeight + 8);
+      if (bar && (node.clientWidth - project.width * scale) / 2 < bar.offsetLeft + bar.offsetWidth + 8) {
+        scale = Math.min(scale, scaleFor(bar.offsetLeft + bar.offsetWidth + 8, 16));
+      }
+      // Le bouton « Zone de sécurité » (en haut à droite) : une bande libre en haut (et en bas) s'il tombe sur le canevas.
       const button = safeZoneButton.current;
-      if (button && right > button.offsetLeft - 8) clearance = Math.max(clearance, button.offsetTop + button.offsetHeight + 8);
-      if (top < clearance) scale = scaleFor(clearance);
+      if (button) {
+        const right = (node.clientWidth + project.width * scale) / 2;
+        const top = (node.clientHeight - project.height * scale) / 2;
+        const clearance = button.offsetTop + button.offsetHeight + 8;
+        if (right > button.offsetLeft - 8 && top < clearance) scale = Math.min(scale, scaleFor(16, clearance));
+      }
       setBox({
         width: Math.max(0, Math.floor(project.width * scale)),
         height: Math.max(0, Math.floor(project.height * scale)),
@@ -336,33 +339,33 @@ export function PreviewStage({
         if (event.target === area.current) onSelect(null);
       }}
     >
-      <div ref={toolbar} className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-lg border bg-background/90 p-1 shadow-sm backdrop-blur">
+      {/* Colonne d'icônes : elle ne prend que 38 px de large et ne retire jamais de hauteur à l'aperçu. */}
+      <div ref={toolbar} className="absolute top-3 left-3 z-10 flex flex-col items-center gap-1 rounded-lg border bg-background/90 p-1 shadow-sm backdrop-blur">
         <ToggleGroup
           type="single"
           size="sm"
           value={tool ?? ""}
           onValueChange={(value) => onToolChange((value || null) as DrawTool | null)}
           aria-label="Tracer sur l’aperçu"
-          className="gap-0.5"
+          orientation="vertical"
+          className="flex-col gap-0.5"
         >
           {DRAW_TOOLS.map(({ id, label, Icon }) => (
-            <ToggleGroupItem key={id} value={id} aria-label={label} title={`${label} : appuyez au départ, relâchez à l’arrivée (Échap pour revenir à la sélection)`} className="h-7 gap-1.5 rounded-md px-2 data-[state=on]:bg-primary/15 data-[state=on]:text-foreground">
+            <ToggleGroupItem key={id} value={id} aria-label={label} title={`${label} : appuyez au départ, relâchez à l’arrivée (Échap pour revenir à la sélection)`} className="size-7 min-w-7 rounded-md p-0 data-[state=on]:bg-primary/15 data-[state=on]:text-foreground">
               <Icon className="h-4 w-4" />
-              <span className="hidden text-xs @2xl:inline">{label}</span>
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        <span aria-hidden className="mx-0.5 h-5 w-px bg-border" />
+        <span aria-hidden className="my-0.5 h-px w-5 bg-border" />
         <Toggle
           size="sm"
           pressed={animate}
           onPressedChange={onAnimateChange}
           aria-label="Animer"
           title="Animer : déplacer ou redimensionner un élément ailleurs qu’à son début pose une image clé à la tête de lecture"
-          className="h-7 gap-1.5 rounded-md px-2 data-[state=on]:bg-primary/15 data-[state=on]:text-foreground"
+          className="size-7 min-w-7 rounded-md p-0 data-[state=on]:bg-primary/15 data-[state=on]:text-foreground"
         >
           <Diamond className={cn("h-4 w-4", animate && "fill-current")} />
-          <span className="hidden text-xs @md:inline">Animer</span>
         </Toggle>
       </div>
       {vertical && (
@@ -379,7 +382,7 @@ export function PreviewStage({
         >
           <ScanLine className="h-4 w-4" />
           {/* Scène étroite (panneaux ouverts sur un petit écran) : l'icône seule, le libellé ne serait plus qu'à moitié visible. */}
-          <span className="hidden @xl:inline">Zone de sécurité</span>
+          <span className="hidden @sm:inline">Zone de sécurité</span>
         </Button>
       )}
       <div className="relative shadow-2xl shadow-black/30" style={{ width: box.width, height: box.height }}>

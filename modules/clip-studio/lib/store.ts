@@ -20,6 +20,8 @@ export const EXPORTS_DIR = path.join(DATA_DIR, "exports");
 /** Vignettes des projets : une image du clip rendue par le navigateur, servie par la route des données. */
 export const THUMBS_DIR = path.join(DATA_DIR, "thumbs");
 const THUMBS_FILE = path.join(DATA_DIR, "thumbs.json");
+/** Conversations de l'assistant de l'éditeur : un fichier par projet (`editor-chat.ts`). */
+export const EDITOR_CHATS_DIR = path.join(DATA_DIR, "editor-chats");
 const ASSETS_FILE = path.join(DATA_DIR, "assets.json");
 const EXPORTS_FILE = path.join(DATA_DIR, "exports.json");
 
@@ -94,6 +96,8 @@ export function listProjectFiles(): ClipProject[] {
 export function removeProject(id: string) {
   fs.rmSync(projectFile(id), { force: true });
   removeThumb(id);
+  // Sa conversation avec l'assistant de l'éditeur part avec lui.
+  fs.rmSync(path.join(EDITOR_CHATS_DIR, `${id}.json`), { force: true });
 }
 
 // ─── Vignettes ───────────────────────────────────────────────────

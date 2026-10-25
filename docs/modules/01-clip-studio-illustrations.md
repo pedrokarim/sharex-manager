@@ -578,3 +578,31 @@ porte bien les nouveaux champs. Pas encore fait : marques alignées sur les
 mots d’une voix (un décalage seulement), poignées de bouts sur une croix ou
 un cercle, mesure à 1024 px, avec une marque, et de l’export dans un vrai
 navigateur.
+
+**Voix off en tableaux, fait le 25/10/2026.** Karim a sorti une vidéo de
+l’assistant (modèle « libre ») le jour même : rien n’avait changé, car les
+planches n’étaient branchées que sur « Monter ma prise ». Les modèles
+« libre » et « diaporama », racontés par une voix off d’un bout à l’autre,
+passent maintenant par le même plan et les mêmes planches
+(`engine/narrated-board.ts`, `lib/board-montage.ts`) : le modèle est d’abord
+monté nu (voix posées, une illustration par segment), Codex lit les mots
+horodatés de la voix, ce que montre chaque illustration et les notes
+visuelles du script, et compose les tableaux. Sous la planche passe
+l’illustration de la phrase, à la place de la caméra : dans la carte du bas
+(`split`), plein cadre dès 3 s (`full`) ou sous le papier (`board`), avec le
+même glissement d’une mise en page à l’autre ; un passage sans illustration
+garde celle d’avant. Sans visage à l’écran, la mascotte réagit au moins une
+fois. Le quiz et le classement gardent leur construction (leurs textes sont
+le jeu). Si Codex ne répond pas, le montage d’avant reste et l’étape le dit.
+
+Vérifié sur le banc `scripts/narrated-stills.ts`, sur la vraie vidéo de
+Karim (ses voix, ses images, sa fiche de marque, le vrai Codex) : six
+tableaux sans défaut de placement. Le banc a fait corriger, dans le moteur
+commun : l’étiquette de lisibilité posée derrière chaque ligne d’une note,
+les coches et émojis sans dessin dans la police (retirés), le « ? » seul en
+début de ligne (espace insécable), la mascotte trop petite (12 % de la
+hauteur de l’image, désormais 500 à 700 px de haut), une rangée de phrases
+illisible côte à côte (rangée en liste), la double numérotation d’une liste
+et ses cartes hors de l’ordre d’entrée, un pense-bête qui recouvrait le
+texte d’une carte. Constat à reprendre : sur cette vidéo, l’assistant n’a
+trouvé que deux images pour quatre segments.

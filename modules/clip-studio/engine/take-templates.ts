@@ -172,7 +172,7 @@ interface CameraPiece {
   zoomStep: number;
 }
 
-const layoutAt = (spans: BeatSpan[], frame: number) => spans.find((span) => frame >= span.start && frame < span.end)?.beat.layout ?? "split";
+export const layoutAt = (spans: BeatSpan[], frame: number) => spans.find((span) => frame >= span.start && frame < span.end)?.beat.layout ?? "split";
 
 /** Plans de caméra : chaque passage, coupé là où la mise en page change. */
 export function cameraPieces(segments: KeptSegment[], spans: BeatSpan[]): CameraPiece[] {
@@ -330,7 +330,7 @@ export function lanes(items: ClipItem[], name: string): Track[] {
  * coups sourds, six au plus sur la vidéo). Une piste par son : leurs écarts
  * minimaux font qu'aucun ne chevauche le suivant.
  */
-function boardSounds(boards: CompiledBoard[], fps: number): Track[] {
+export function boardSounds(boards: CompiledBoard[], fps: number): Track[] {
   const cues = boards.flatMap((board) => board.cues);
   const ticks = sfxSeries("tick", cues.filter((cue) => cue.sound === "tick").map((cue) => cue.frame), fps, { label: "Bruitage – compteur", minGapMs: 90 });
   const thuds = sfxSeries("thud", cues.filter((cue) => cue.sound === "thud").map((cue) => cue.frame), fps, { label: "Bruitage – temps posé", minGapMs: 1000, max: 6 });
@@ -348,33 +348,26 @@ function boardSounds(boards: CompiledBoard[], fps: number): Track[] {
   ];
 }
 
-/** Région de la caméra d'une mise en page : le cadre entier en plein cadre, la carte du bas sinon (cachée par le papier sur la planche seule). */
-const cameraRegion = (geometry: TakeGeometry, layout: TakeLayout): Box => (layout === "full" ? { left: 0, top: 0, width: 1, height: 1 } : geometry.camera);
-
-/** Durée du glissement de la caméra et du papier d'une mise en page à l'autre. */
-const LAYOUT_GLIDE_SECONDS = 0.4;
-
 /**
- * Projet d'une prise montée. Pistes, de haut en bas : « Sous-titres », les
- * pistes de la planche (traits, devant, textes, images, cartes, liaisons,
- * papier), « Principale » (la caméra), puis « Voix – prise » (le son de la
- * prise, lié aux plans). La marque habille le tout (filigrane, carton de
- * fin, police, couleurs et lisibilité), sans mascotte.
+ * Planches d'un plan : une par tableau qui en a une, dans la palette et avec
+ * la mascotte de la marque ; le papier glisse depuis la mise en page d'avant.
+ * Commun au montage d'une prise et à celui d'une voix off.
  */
-export function buildTakeProject(input: TakeProjectInput): ClipProject {
-  const base = createProject(input.name.slice(0, 200) || "Prise montée", input.aspect);
-  const fps = base.fps;
-  const frame = { width: base.width, height: base.height };
-  const geometry = takeGeometry(input.aspect);
-  const last = input.segments[input.segments.length - 1];
-  const totalFrames = last ? last.start + last.duration : fps;
-  const spans = beatSpans(input.plan, input.words, totalFrames, fps);
+export function planBoards(input: {
+  spans: BeatSpan[];
+  plan: TakePlan;
+  words: TimedWord[];
+  fps: number;
+  frame: { width: number; height: number };
+  geometry: TakeGeometry;
+  logos?: Map<string, MediaSource>;
+  theme?: BrandTheme | null;
+}): CompiledBoard[] {
+  const { spans, fps, frame, geometry } = input;
   const palette = boardPaletteOf(input.theme ? input.theme.palette : null);
-  // La mascotte n'est plus posée d'office sur la vidéo filmée : elle réagit sur la planche, quand le plan le demande.
+  // La mascotte n'est plus posée d'office : elle réagit sur la planche, quand le plan le demande.
   const mascot = input.theme?.mascot ? { library: input.theme.mascot.library, reactions: input.theme.mascot.reactions } : undefined;
   const usedPoses: string[] = [];
-
-  // Planches : une par tableau qui en a une ; le papier glisse depuis la mise en page d'avant.
   const boards: CompiledBoard[] = [];
   spans.forEach((span, index) => {
     const spec = sceneBoard(span, {
@@ -391,6 +384,31 @@ export function buildTakeProject(input: TakeProjectInput): ClipProject {
     });
     if (spec) boards.push(compileBoard(spec, { fps, frame, words: input.words, palette }));
   });
+  return boards;
+}
+
+/** Région de la caméra d'une mise en page : le cadre entier en plein cadre, la carte du bas sinon (cachée par le papier sur la planche seule). */
+export const cameraRegion = (geometry: TakeGeometry, layout: TakeLayout): Box => (layout === "full" ? { left: 0, top: 0, width: 1, height: 1 } : geometry.camera);
+
+/** Durée du glissement de la caméra et du papier d'une mise en page à l'autre. */
+export const LAYOUT_GLIDE_SECONDS = 0.4;
+
+/**
+ * Projet d'une prise montée. Pistes, de haut en bas : « Sous-titres », les
+ * pistes de la planche (traits, devant, textes, images, cartes, liaisons,
+ * papier), « Principale » (la caméra), puis « Voix – prise » (le son de la
+ * prise, lié aux plans). La marque habille le tout (filigrane, carton de
+ * fin, police, couleurs et lisibilité), sans mascotte.
+ */
+export function buildTakeProject(input: TakeProjectInput): ClipProject {
+  const base = createProject(input.name.slice(0, 200) || "Prise montée", input.aspect);
+  const fps = base.fps;
+  const frame = { width: base.width, height: base.height };
+  const geometry = takeGeometry(input.aspect);
+  const last = input.segments[input.segments.length - 1];
+  const totalFrames = last ? last.start + last.duration : fps;
+  const spans = beatSpans(input.plan, input.words, totalFrames, fps);
+  const boards = planBoards({ spans, plan: input.plan, words: input.words, fps, frame, geometry, logos: input.logos, theme: input.theme });
   const changes = boards.flatMap((board) => board.changes);
 
   // Caméra : un plan par passage gardé, recadré à chaque coupe, sans moment figé de plus de 4 s.
@@ -461,21 +479,29 @@ export function buildTakeProject(input: TakeProjectInput): ClipProject {
     script: (input.script ?? []).slice(0, 100).map((line) => line.slice(0, 2000)),
     montage: planSignature(input.plan).slice(0, 400),
   };
-  let project: ClipProject = { ...base, tracks, brief, origin: "take" };
-  // La marque habille sans poser sa mascotte d'office (elle n'apparaît que sur la planche, ci-dessus).
-  if (input.theme) {
-    const { mascot: _mascot, ...theme } = input.theme;
-    project = applyBrandTheme(project, theme);
+  return dressBoardProject({ ...base, tracks, brief, origin: "take" }, input.theme);
+}
+
+/**
+ * Habillage d'un montage en planches : la marque donne filigrane, carton de
+ * fin, police, couleurs et lisibilité, sans poser sa mascotte d'office (elle
+ * n'apparaît que sur la planche, quand le plan la fait réagir) ; puis les
+ * mots mis en valeur prennent une couleur de la marque lisible sur le
+ * contour des sous-titres.
+ */
+export function dressBoardProject(project: ClipProject, theme: BrandTheme | null | undefined): ClipProject {
+  let dressed = project;
+  if (theme) {
+    const { mascot: _mascot, ...rest } = theme;
+    dressed = applyBrandTheme(dressed, rest);
   }
-  // Mots mis en valeur : une couleur de la marque lisible sur le contour, une fois la marque appliquée.
-  project = {
-    ...project,
-    tracks: project.tracks.map((track) => ({
+  return {
+    ...dressed,
+    tracks: dressed.tracks.map((track) => ({
       ...track,
-      items: track.items.map((item) => (item.type === "text" && item.karaoke?.emphasis ? { ...item, karaoke: { ...item.karaoke, emphasis: { ...item.karaoke.emphasis, color: emphasisColor(item, input.theme) } } } : item)),
+      items: track.items.map((item) => (item.type === "text" && item.karaoke?.emphasis ? { ...item, karaoke: { ...item.karaoke, emphasis: { ...item.karaoke.emphasis, color: emphasisColor(item, theme) } } } : item)),
     })),
   };
-  return project;
 }
 
 /**

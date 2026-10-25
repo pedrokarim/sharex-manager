@@ -46,12 +46,11 @@ import {
   type SilenceMode,
 } from "../engine/take-cut";
 import { beatPlanPrompt, readBeatPlan, type TakeLayout, type TakePlan } from "../engine/take-plan";
-import { logoKey } from "../engine/take-scenes";
 import { buildTakeProject, takeBeatSounds, type TakeSource } from "../engine/take-templates";
 import { ASPECTS, type AspectPreset, type ClipAsset, type ClipProject, type MediaSource, type TimedWord, type Track } from "../engine/types";
 import { assetSource, clipDeps, transcriptionDetail, type ClipSource } from "./clip-jobs";
 import { extractJson } from "./codex";
-import { findSegmentIcon } from "./image-search";
+import { findOfficialLogo, findPlanLogos, recentMontages } from "./board-montage";
 import { assertDiskSpace, holdWorkDir, publicErrorMessage } from "./job-safety";
 import { pickTrack } from "./music";
 import { inspect, runFfmpeg, type MediaStreams } from "./remote-import";
@@ -125,13 +124,7 @@ export const takeDeps = {
    * y en a une), du plus récent au plus ancien : Codex ne refait ni la même
    * ouverture ni la même suite.
    */
-  recentMontages(brandKitId: string | undefined): string[] {
-    return listProjectFiles()
-      .filter((project) => project.origin === "take" && typeof project.brief?.montage === "string" && (!brandKitId || project.brandKitId === brandKitId))
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 3)
-      .map((project) => project.brief!.montage!);
-  },
+  recentMontages: (brandKitId: string | undefined): string[] => recentMontages(brandKitId),
   /** Codex : le plan des temps forts. */
   ask(prompt: string, signal: AbortSignal): Promise<string> {
     return clipDeps.ask(prompt, signal);
@@ -149,12 +142,7 @@ export const takeDeps = {
   /** Prise entière accélérée, son sans changement de hauteur. */
   stretch: stretchTake,
   /** Logo officiel d'un outil nommé, ou `null` : jamais un sosie. */
-  async logo(name: string, text: string, signal: AbortSignal): Promise<MediaSource | null> {
-    const found = await findSegmentIcon({ query: `${name} logo`, text, signal });
-    if (!found) return null;
-    const image = found.image;
-    return { url: image.url, ref: image.ref, name: image.name, kind: "image", width: image.width, height: image.height, credit: image.credit, rights: image.rights };
-  },
+  logo: (name: string, text: string, signal: AbortSignal): Promise<MediaSource | null> => findOfficialLogo(name, text, signal),
   music(mood: string, minMs: number): MediaSource | null {
     const track = pickTrack(mood, minMs);
     if (!track?.url) return null;
@@ -576,29 +564,11 @@ async function runTakeEdit(job: TakeEditJob, signal: AbortSignal) {
       report.faces.push(take.focus !== null);
     }
     // Un logo par outil nommé ; un même nom n'est cherché qu'une fois.
-    const logos = new Map<string, MediaSource>();
-    const searched = new Map<string, MediaSource | null>();
-    for (const [index, beat] of plan.beats.entries()) {
-      for (const [itemIndex, item] of (beat.items ?? []).entries()) {
-        if (item.kind !== "logo") continue;
-        if (signal.aborted) throw abortError();
-        const name = item.text;
-        const key = name.toLowerCase();
-        if (!searched.has(key)) {
-          step("visuals", "running", `Logo officiel de « ${name} »…`);
-          const around = item.word ?? beat.word;
-          const context = editWords.slice(Math.max(0, around - 8), around + 12).map((word) => word.text).join(" ");
-          const found = await takeDeps.logo(name, context, signal).catch((error) => {
-            if (signal.aborted) throw error;
-            return null;
-          });
-          searched.set(key, found);
-          report.logos.push({ name, found: Boolean(found) });
-        }
-        const found = searched.get(key);
-        if (found) logos.set(logoKey(index, itemIndex), found);
-      }
-    }
+    if (signal.aborted) throw abortError();
+    const { logos, searched } = await findPlanLogos(plan, editWords, (name, context, logoSignal) => takeDeps.logo(name, context, logoSignal), signal, (name) =>
+      step("visuals", "running", `Logo officiel de « ${name} »…`)
+    );
+    report.logos.push(...searched);
     const faceCount = report.faces.filter(Boolean).length;
     step(
       "visuals",

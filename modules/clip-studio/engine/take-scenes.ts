@@ -83,7 +83,16 @@ export function mascotPose(context: SceneContext, emotion: string, gesture?: Pos
 export const logoKey = (sceneIndex: number, itemIndex: number) => `${sceneIndex}:${itemIndex}`;
 
 /** Corps des textes, en part de la hauteur du cadre. */
-const SIZE = { heading: 0.046, single: 0.06, counter: 0.085, card: 0.03, chip: 0.026, note: 0.028, stackText: 0.04 } as const;
+const SIZE = { heading: 0.046, single: 0.06, counter: 0.085, card: 0.03, chip: 0.026, note: 0.028, stackText: 0.048 } as const;
+
+/**
+ * Hauteur de la mascotte, en pixels d'un cadre de 1080 de large : seule, en
+ * pile ou dans une rangée. Elle réagit : on la voit, elle n'est pas un timbre.
+ */
+const MASCOT_HEIGHT = { single: 700, stack: 500, row: 440 } as const;
+
+/** Numérotation écrite par le modèle (« 1. », « 2) ») : la liste numérote déjà ses cartes. */
+const stripNumbering = (text: string) => text.replace(/^\s*\d{1,2}\s*[.)\-–:]\s+/, "");
 
 /** Nombre de lignes probable d'un texte dans une largeur (une lettre grasse fait environ 0,56 em). */
 function estimateLines(text: string, sizePx: number, widthPx: number, max = 2): number {
@@ -264,10 +273,11 @@ function bodyOf(items: SceneItem[], arrangement: string, s: (px: number) => numb
       case "mascot": {
         const source = mascotPose(context, item.text, item.gesture);
         if (!source) return { height: 0, place: () => undefined };
-        const side = s(inStack ? 240 : 340);
+        const side = s(inStack ? MASCOT_HEIGHT.stack : MASCOT_HEIGHT.single);
         const ratio = (source.width ?? 1) / Math.max(1, source.height ?? 1);
-        const width = ratio >= 1 ? side : side * ratio;
-        const height = ratio >= 1 ? side / ratio : side;
+        // Une pose large tient dans la largeur de la zone ; une pose haute prend toute la hauteur voulue.
+        const width = Math.min(ratio >= 1 ? side : side * ratio, areaPx.width);
+        const height = width / ratio;
         return { height, place: (y) => actors.push({ id, kind: "image", source, x: 0.5, y: ay(y), w: ax(width), h: ay(height), label: `Mascotte – ${item.text}`, enter: enter(item.word, "pop") }) };
       }
       case "terminal": {
@@ -318,8 +328,8 @@ function bodyOf(items: SceneItem[], arrangement: string, s: (px: number) => numb
         return { height, place: (y) => actors.push({ id, kind: "note", text: item.text, x: 0.5, y: ay(y), w: ax(width), h: ay(height), tilt: -3, size: size(SIZE.note) * 1.15, enter: enter(item.word, "pop") }) };
       }
       default: {
-        const fontSize = size(inStack ? SIZE.stackText : SIZE.single);
-        const height = estimateLines(item.text, fontSize * frame.height, areaPx.width) * fontSize * frame.height * 1.12;
+        const fontSize = size(inStack ? SIZE.stackText / 0.8 * 0.9 : SIZE.single);
+        const height = estimateLines(item.text, fontSize * frame.height, areaPx.width, 3) * fontSize * frame.height * 1.12;
         return { height, place: (y) => (actors.push({ id, kind: "text", text: item.text, size: fontSize, x: 0.5, y: ay(y), w: 1, h: ay(height), marks: marksOf(item.text, item.pill, item.underline, item.underlineWord), enter: enter(item.word, "rise") }), verbs(id, item)) };
       }
     }
@@ -330,47 +340,61 @@ function bodyOf(items: SceneItem[], arrangement: string, s: (px: number) => numb
       const count = items.length;
       const gap = s(count > 3 ? SPACE.m : SPACE.l);
       const logos = items.every((item) => item.kind === "logo");
-      const side = Math.min(s(230), (areaPx.width - gap * (count - 1)) / count);
+      // Les cartes se partagent toute la largeur ; des logos seuls restent carrés, jamais plus de 300 px.
+      const share = (areaPx.width - gap * (count - 1)) / count;
+      const side = logos ? Math.min(s(300), share) : share;
       const crossRoom = items.some((item) => item.cross !== undefined) ? s(SPACE.m + 18) : 0;
-      const cellHeight = logos ? side : s(170);
+      const cellHeight = logos ? side : s(230);
+      // Une mascotte dans la rangée y garde sa hauteur : la rangée s'aligne sur elle.
+      const mascotHeight = items.some((item) => item.kind === "mascot") ? s(MASCOT_HEIGHT.row) : 0;
+      const rowHeight = Math.max(cellHeight, mascotHeight);
       const xs = stack(count, ax(side), ax(gap), 0.5);
       return {
-        height: cellHeight + crossRoom,
+        height: rowHeight + crossRoom,
         build: (top) => {
-          const y = ay(top + cellHeight / 2);
+          const y = ay(top + rowHeight / 2);
           items.forEach((item, index) => {
             const id = `item-${index}`;
             if (item.kind === "mascot") {
               const pose = mascotPose(context, item.text, item.gesture);
-              if (pose) actors.push({ id, kind: "image", source: pose, x: xs[index], y, w: ax(side), h: ay(side), label: `Mascotte – ${item.text}`, enter: enter(item.word, "pop") });
+              if (!pose) return;
+              const ratio = (pose.width ?? 1) / Math.max(1, pose.height ?? 1);
+              const width = Math.min(side, mascotHeight * ratio);
+              actors.push({ id, kind: "image", source: pose, x: xs[index], y, w: ax(width), h: ay(width / ratio), label: `Mascotte – ${item.text}`, enter: enter(item.word, "pop") });
               return;
             }
             const source = item.kind === "logo" ? logoSource(index) : undefined;
-            if (source) actors.push({ id, kind: "image", source, x: xs[index], y, w: ax(side), h: ay(side), tile: true, label: `Logo – ${item.text}`, enter: enter(item.word, "pop") });
-            else actors.push({ id, kind: "card", text: item.text, x: xs[index], y, w: ax(side), h: ay(cellHeight), size: SIZE.card * (side / s(230)) * 0.9, enter: enter(item.word, "pop") });
+            const square = Math.min(side, s(300));
+            if (source) actors.push({ id, kind: "image", source, x: xs[index], y, w: ax(square), h: ay(square), tile: true, label: `Logo – ${item.text}`, enter: enter(item.word, "pop") });
+            else actors.push({ id, kind: "card", text: item.text, x: xs[index], y, w: ax(side), h: ay(cellHeight), size: SIZE.card * Math.min(1.15, side / s(260)), enter: enter(item.word, "pop") });
             verbs(id, item, "below");
           });
         },
       };
     }
     case "list": {
-      const cards = items.filter((item) => item.kind !== "note");
+      // Les cartes se rangent dans l'ordre où elles entrent : la n-ième dite est la n-ième de la liste.
+      const cards = items.filter((item) => item.kind !== "note").sort((a, b) => (a.word ?? -1) - (b.word ?? -1));
       const notes = items.filter((item) => item.kind === "note");
       const height = cards.length > 3 ? s(124) : cardHeight;
       const gap = s(28);
-      const total = cards.length * height + (cards.length - 1) * gap;
+      // Un pense-bête se pose au-dessus de la liste, à droite et en biais : il ne cache jamais le texte d'une carte.
+      const note = notes[0];
+      const noteHeight = note ? s(190) : 0;
+      const noteRoom = note ? noteHeight + s(SPACE.m) : 0;
+      const cardsHeight = cards.length * height + (cards.length - 1) * gap;
+      const total = noteRoom + cardsHeight;
       return {
         height: total,
         build: (top) => {
-          const ys = column(cards.map(() => ay(height)), ay(gap), ay(top + total / 2));
+          if (note) {
+            actors.push({ id: `item-${items.indexOf(note)}`, kind: "note", text: note.text, x: 1 - ax(s(360)) / 2, y: ay(top + noteHeight / 2), w: ax(s(360)), h: ay(noteHeight), tilt: 4, size: SIZE.note, enter: enter(note.word, "pop") });
+          }
+          const ys = column(cards.map(() => ay(height)), ay(gap), ay(top + noteRoom + cardsHeight / 2));
           cards.forEach((item, index) => {
             const id = `item-${items.indexOf(item)}`;
-            actors.push({ id, kind: "card", index: String(index + 1).padStart(2, "0"), text: item.text, x: 0.5, y: ys[index], w: 1, h: ay(height), size: SIZE.card, marks: marksOf(item.text, item.pill, item.underline, item.underlineWord), enter: enter(item.word, "rise") });
+            actors.push({ id, kind: "card", index: String(index + 1).padStart(2, "0"), text: stripNumbering(item.text), x: 0.5, y: ys[index], w: 1, h: ay(height), size: SIZE.card, marks: marksOf(item.text, item.pill, item.underline, item.underlineWord), enter: enter(item.word, "rise") });
             verbs(id, item);
-          });
-          // Un pense-bête se colle sur le coin haut droit de la liste : un recouvrement voulu.
-          notes.slice(0, 1).forEach((item) => {
-            actors.push({ id: `item-${items.indexOf(item)}`, kind: "note", text: item.text, x: 1 - ax(s(330)) / 2, y: ys[0] - ay(height) / 2, w: ax(s(330)), h: ay(s(190)), tilt: 5, size: SIZE.note, overlap: true, enter: enter(item.word, "pop") });
           });
         },
       };

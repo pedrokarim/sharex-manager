@@ -81,6 +81,14 @@ import {
   type ClipJob,
 } from "./lib/clip-jobs";
 import { cancelTakeEditJob, getTakeEditJob as readTakeEditJob, startTakeEdit as launchTakeEdit, type TakeEditJob } from "./lib/take-edit";
+import {
+  cancelEditorChat as stopEditorChat,
+  clearEditorChat as emptyEditorChat,
+  getEditorChat as readEditorChat,
+  recordEditorChatOutcome as storeEditorChatOutcome,
+  sendEditorChat as askEditorChat,
+  type EditorChat,
+} from "./lib/editor-chat";
 import { isTranscriptionEngine, saveTranscriptionEngine, transcriptionEngine, type TranscriptionSettings } from "./lib/transcription-settings";
 import { ensureWhisperCpp, whisperCppStatus } from "@/lib/media/whisper-cpp";
 import {
@@ -994,6 +1002,36 @@ export async function getTakeEditJob(id: string): Promise<TakeEditJob | null> {
 
 export async function cancelTakeEdit(id: string): Promise<{ success: boolean }> {
   return { success: cancelTakeEditJob(id) };
+}
+
+// ─── Assistant de l'éditeur ──────────────────────────────────────
+
+/** La conversation de l'assistant de l'éditeur pour un projet, avec la demande en cours. */
+export async function getEditorChat(projectId: string): Promise<EditorChat> {
+  return readEditorChat(projectId);
+}
+
+/**
+ * Envoie une demande à l'assistant de l'éditeur (le projet a été enregistré
+ * juste avant). `image` : l'aperçu à la tête de lecture, en JPEG. Suivi par
+ * `getEditorChat`.
+ */
+export async function sendEditorChat(request: unknown, image?: unknown): Promise<EditorChat> {
+  return askEditorChat(request, image);
+}
+
+export async function cancelEditorChat(projectId: string): Promise<{ success: boolean }> {
+  return stopEditorChat(projectId);
+}
+
+/** Ce que l'éditeur a appliqué ou écarté d'une réponse, ou son annulation. */
+export async function recordEditorChatOutcome(input: unknown): Promise<EditorChat> {
+  return storeEditorChatOutcome(input);
+}
+
+/** Repart d'une conversation vide. */
+export async function clearEditorChat(projectId: string): Promise<EditorChat> {
+  return emptyEditorChat(projectId);
 }
 
 // ─── Moteur de transcription ─────────────────────────────────────
