@@ -181,9 +181,11 @@ import {
   startHookVariants,
   startIdeaSearch as launchIdeaSearch,
   startStudy,
+  cancelTask as stopIdeaTask,
   type IdeaDeps,
   type IdeasBoard,
 } from "./lib/idea-service";
+import { youtubePublicReader } from "./lib/niche-public-default";
 
 export type { ProjectSummary } from "./lib/library";
 
@@ -1090,6 +1092,8 @@ const ideaDeps: IdeaDeps = {
   channelCost: (accountId, options) => channelReadCost(accountId, options),
   quota: (accountId) => quotaForAccount(accountId),
   assistantJob: (id) => readAssistantJob(id),
+  // Lecture publique des chaînes (yt-dlp, sans compte connecté), un lecteur neuf par étude.
+  publicReader: youtubePublicReader,
   now: () => new Date(),
 };
 
@@ -1140,8 +1144,14 @@ export async function suggestReferenceChannels(input: { kitId?: string | null; t
 }
 
 /** « Étudier la niche » : lecture des chaînes par l'API YouTube, puis rangement des succès en concepts. */
-export async function startNicheStudy(input: { kitId?: string | null; accountId: string }): Promise<IdeaTask> {
-  return startStudy(input?.kitId, input?.accountId, ideaDeps);
+export async function startNicheStudy(input: { kitId?: string | null; accountId?: string; source?: string; force?: boolean; spoken?: boolean }): Promise<IdeaTask> {
+  // `source` : « public » (yt-dlp) ou un compte connecté ; `accountId` seul reste compris (forme d'avant).
+  return startStudy(input?.kitId, input?.source === "public" ? "public" : input?.accountId ?? input?.source, ideaDeps, { force: input?.force, spoken: input?.spoken });
+}
+
+/** Arrête un travail des idées en cours (l'étude de la niche surtout) ; rien n'est enregistré. */
+export async function cancelIdeaTask(id: string): Promise<{ success: boolean }> {
+  return { success: stopIdeaTask(id) };
 }
 
 export async function removeConcept(input: { kitId?: string | null; conceptId: string }): Promise<ConceptBank> {

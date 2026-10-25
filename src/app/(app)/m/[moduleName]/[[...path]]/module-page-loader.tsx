@@ -31,6 +31,7 @@ const MODULE_PAGES: Record<string, Record<string, PageLoader>> = {
     new: () => import("@/modules/clip-studio/pages/create"),
     edit: () => import("@/modules/clip-studio/pages/editor"),
     ideas: () => import("@/modules/clip-studio/pages/ideas"),
+    niche: () => import("@/modules/clip-studio/pages/niche"),
     voices: () => import("@/modules/clip-studio/pages/voices"),
     export: () => import("@/modules/clip-studio/pages/export"),
     exports: () => import("@/modules/clip-studio/pages/exports"),

@@ -90,6 +90,7 @@
     "answerChannelSuggestion": "user",
     "suggestReferenceChannels": "admin",
     "startNicheStudy": "admin",
+    "cancelIdeaTask": "admin",
     "removeConcept": "user",
     "resolveExportFile": "public"
   },
@@ -100,6 +101,7 @@
     { "path": "new", "title": "Nouveau clip", "component": "pages/create.tsx", "menu": false },
     { "path": "edit", "title": "Éditeur", "component": "pages/editor.tsx" },
     { "path": "ideas", "title": "Idées", "component": "pages/ideas.tsx" },
+    { "path": "niche", "title": "Niche", "component": "pages/niche.tsx", "menu": false },
     { "path": "voices", "title": "Voix en ligne", "component": "pages/voices.tsx" },
     { "path": "export", "title": "Exporter", "component": "pages/export.tsx", "menu": false },
     { "path": "exports", "title": "Exports", "component": "pages/exports.tsx" },

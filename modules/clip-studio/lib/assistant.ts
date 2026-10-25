@@ -40,6 +40,7 @@
 import fs from "fs";
 import path from "path";
 import { apiModuleManager } from "@/lib/modules/module-manager.api";
+import { toCreatorVoice } from "@/modules/brand-kit/lib/voice-sheet";
 import {
   buildFromTemplate,
   type FreeData,
@@ -122,6 +123,11 @@ import {
   type ClipRequest,
   type SourcedClip,
 } from "./clip-sourcing";
+import { readBank } from "./idea-store";
+import { scriptNiche } from "./niche-context";
+import { readScriptRecords, recentScripts, recordScript } from "./script-history";
+import type { ScriptNiche } from "./script-rules";
+import { listProjectFiles } from "./store";
 
 /** L'assistant écrit et illustre lui-même : l'Avant / Après, fait d'images fournies, n'en fait pas partie. */
 export type AssistantTemplate = Exclude<TemplateId, "before-after">;
@@ -471,6 +477,20 @@ export function assistantPace(brand: Pick<AssistantBrand, "theme"> | null): Edit
   return brand?.theme.pace ?? "normal";
 }
 
+/**
+ * Concepts de la niche (banque de la marque) et scripts des quatre dernières
+ * semaines (journal, travaux, projets) pour la consigne du script. `null`
+ * sans données, ou si leur lecture échoue : le script s'écrit comme avant.
+ */
+function scriptNicheFor(kitId: string | undefined, now = Date.now()): ScriptNiche | null {
+  try {
+    const recent = recentScripts({ kitId: kitId ?? null, now, records: readScriptRecords(), jobs: readJobs(), projects: listProjectFiles() });
+    return scriptNiche(readBank(kitId ?? null), recent);
+  } catch {
+    return null;
+  }
+}
+
 async function run(job: AssistantJob, signal: AbortSignal) {
   const step = (id: StepId, state: StepState, detail?: string, label?: string) => {
     job.steps = job.steps.map((entry) => (entry.id === id ? { ...entry, state, detail, ...(label ? { label } : {}) } : entry));
@@ -511,12 +531,14 @@ async function run(job: AssistantJob, signal: AbortSignal) {
     // 1. Script : avec le web quand la demande porte sur des faits réels et que l'utilisateur l'a permis.
     const web = scriptUsesWeb(job.request);
     step("script", "running", web ? "Codex rédige le contenu et vérifie sur le web…" : "Codex rédige le contenu…");
-    const answer = await askCodex(scriptPrompt(job.request, brand, { web, ...(sources.length ? { sources: sources.map(scriptSource) } : {}) }), {
+    // Concepts qui marchent dans la niche et scripts récents de la marque (étape S3) ; sans données, la consigne reste celle d'avant.
+    const niche = scriptNicheFor(job.request.brandKitId);
+    const answer = await askCodex(scriptPrompt(job.request, brand, { web, ...(sources.length ? { sources: sources.map(scriptSource) } : {}), ...(niche ? { niche } : {}) }), {
       signal,
       origin: { module: "clip-studio", feature: "Script" },
       ...(web ? { search: true, timeoutMs: SCRIPT_WEB_TIMEOUT_MS } : {}),
     });
-    let script = sanitize(job.request, extractJson<RawScript>(answer), brand?.language);
+    let script = sanitize(job.request, extractJson<RawScript>(answer), brand?.language, niche?.lastFamily);
     job.title = script.title;
     job.hook = script.hook;
     job.aim = script.aim;
@@ -645,6 +667,17 @@ async function run(job: AssistantJob, signal: AbortSignal) {
     project = { ...project, brief: projectBrief(job.request, script, facts), origin: "assistant" };
     writeProject(project);
     job.projectId = project.id;
+    recordScript({
+      at: Date.now(),
+      ...(job.request.brandKitId ? { kitId: job.request.brandKitId } : {}),
+      title: script.title,
+      ...(script.hook ? { hook: script.hook.text, ...(script.hook.family ? { family: script.hook.family } : {}) } : {}),
+      ...(script.aim?.concept ? { concept: script.aim.concept } : {}),
+      ...(script.aim?.promise ? { promise: script.aim.promise } : {}),
+      prompt: job.request.brief,
+      jobId: job.id,
+      projectId: project.id,
+    });
     job.status = "done";
     job.finishedAt = Date.now();
     step(
@@ -847,13 +880,14 @@ const SEGMENT_LIMITS: Record<AssistantTemplate, string> = {
  * Consigne du script. `web` : Codex peut chercher sur le web en écrivant
  * (par défaut, `scriptUsesWeb`) ; `now` : la date du jour, donnée dans la
  * consigne pour que rien de ce qui dépend du temps ne vienne de sa mémoire ;
- * `voice` : la voix du créateur quand sa fiche existe (étape S1), sans quoi
- * la marque en tient lieu.
+ * `voice` : la voix du créateur, par défaut celle de la fiche de voix de la
+ * marque (étape S1, `brand.creatorVoice`) ; sans fiche, la marque en tient
+ * lieu.
  */
 export function scriptPrompt(
   request: AssistantRequest,
   brand: AssistantBrand | null = null,
-  options: { web?: boolean; now?: Date; source?: ScriptSource; sources?: ScriptSource[]; voice?: CreatorVoice | null } = {}
+  options: { web?: boolean; now?: Date; source?: ScriptSource; sources?: ScriptSource[]; voice?: CreatorVoice | null; niche?: ScriptNiche | null } = {}
 ): string {
   const foreign = brand?.language && !/^fr\b/i.test(brand.language) ? brand.language : null;
   const web = options.web ?? scriptUsesWeb(request);
@@ -880,7 +914,7 @@ export function scriptPrompt(
       ? [`Ajoute au JSON une clé "mood" : l'ambiance musicale la plus adaptée, parmi ${MOODS.join(", ")}.`]
       : []),
     // Le raisonnement d'abord (visée, accroches, corps, notes, contrôles), puis les règles de style.
-    ...scriptReasoningLines({ french: !foreign, format: request.template, brand: Boolean(brand), voice: options.voice ?? null }),
+    ...scriptReasoningLines({ french: !foreign, format: request.template, brand: Boolean(brand), voice: options.voice ?? brand?.creatorVoice ?? null, niche: options.niche ?? null }),
     ...scriptRuleLines({ french: !foreign }),
     ...(request.targetSeconds ? [durationLine(request.targetSeconds)] : []),
     ...(brand ? brandLines(brand, finds(resolveImageSource(request))) : []),
@@ -1139,14 +1173,15 @@ function segmentArrays(segments: (ImageFields & NoteFields)[], texts: string[]) 
  * contrôles sont gardés pour information. `language` : langue du script
  * (celle de la marque), le français sans elle.
  */
-export function sanitize(request: AssistantRequest, raw: RawScript, language?: string): CleanScript {
+export function sanitize(request: AssistantRequest, raw: RawScript, language?: string, avoidFamily?: string): CleanScript {
   const french = !language || /^fr\b/i.test(language);
   // Une case à remplir laissée par Codex serait lue telle quelle par la voix : elle est retirée.
   const line: LineCleaner = (value, max) => {
     const text = withoutPlaceholders(cut(value, max));
     return french ? frenchTypography(text) : text;
   };
-  const best = pickBestHook(raw.hooks, 60);
+  // Jamais la forme d'accroche du script précédent quand Codex en propose une autre (étape S3).
+  const best = pickBestHook(raw.hooks, 60, avoidFamily);
   const opening = best ? line(best.text, 60) : "";
   const hook = best && opening ? { ...best, text: opening } : undefined;
   const title = line(raw.title, 60) || opening || "Mon short";
@@ -2886,6 +2921,8 @@ export interface AssistantBrand {
   mascotPlaced?: boolean;
   /** Voix de la marque : prise par l'assistant quand la demande n'en précise aucune. */
   voice?: VoiceSettings;
+  /** Fiche de voix du créateur (S1) : ses mots, ses combats, ses preuves, ses demandes. */
+  creatorVoice?: CreatorVoice;
   theme: BrandTheme;
 }
 
@@ -2900,6 +2937,8 @@ export interface BrandKitRecord {
   mascot?: { name?: string; identityPrompt?: string };
   /** Voix de la marque, lue avec tolérance (`cleanVoiceSettings`). */
   voice?: unknown;
+  /** Fiche de voix du créateur, lue avec tolérance (`toCreatorVoice`). */
+  voiceSheet?: unknown;
 }
 
 const COLLECTION_ID = /^col-[A-Za-z0-9-]{1,60}$/;
@@ -2919,6 +2958,7 @@ export function toAssistantBrand(kit: BrandKitRecord, theme: BrandTheme): Assist
   // Des poses de la marque à chaque segment : pas d'image générée de la mascotte par-dessus.
   const placed = (theme.mascot?.reactions.length ?? 0) > 0;
   const voice = cleanVoiceSettings(kit.voice);
+  const creatorVoice = toCreatorVoice(kit.voiceSheet);
   return {
     name: cut(kit.name, 80) || cut(theme.name, 80) || "Marque",
     tagline: cut(kit.tagline, 140) || undefined,
@@ -2932,6 +2972,7 @@ export function toAssistantBrand(kit: BrandKitRecord, theme: BrandTheme): Assist
     mascot: identityPrompt && !placed ? { name: cut(kit.mascot?.name, 60) || undefined, identityPrompt } : undefined,
     ...(placed ? { mascotPlaced: true } : {}),
     ...(voice ? { voice } : {}),
+    ...(creatorVoice ? { creatorVoice } : {}),
     theme,
   };
 }

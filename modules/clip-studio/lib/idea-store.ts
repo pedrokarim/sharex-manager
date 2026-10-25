@@ -18,9 +18,12 @@ import {
   IDEA_LIMITS,
   IDEA_STATUSES,
   IDEA_TEMPLATES,
+  NICHE_SERVICES,
   NO_KIT,
   cleanChannelHandle,
   type ChannelStat,
+  type NicheOutlier,
+  type NicheService,
   type Concept,
   type ConceptBank,
   type Idea,
@@ -190,6 +193,7 @@ function cleanChannel(raw: unknown): ReferenceChannel | null {
   if (!handle) return null;
   return {
     handle,
+    ...(entry.service !== undefined && NICHE_SERVICES.includes(entry.service as NicheService) ? { service: entry.service as NicheService } : {}),
     ...(text(entry.title, 100) ? { title: text(entry.title, 100) } : {}),
     origin: entry.origin === "suggested" ? "suggested" : "user",
     state: entry.state === "pending" ? "pending" : "active",
@@ -266,14 +270,48 @@ function cleanStat(raw: unknown): ChannelStat | null {
   };
 }
 
+/** Une vidéo au-dessus de sa médiane relue : identifiant et adresse https contrôlés, nombres finis, textes bornés. */
+function cleanOutlier(raw: unknown): NicheOutlier | null {
+  if (!raw || typeof raw !== "object") return null;
+  const item = raw as Record<string, unknown>;
+  const url = httpsUrl(item.url);
+  if (typeof item.videoId !== "string" || !VIDEO_ID.test(item.videoId) || !url) return null;
+  const channel = text(item.channel, 100);
+  const score = Math.round(finite(item.score) * 100) / 100;
+  if (!channel || score <= 0) return null;
+  const duration = Math.round(finite(item.durationSeconds));
+  return {
+    videoId: item.videoId,
+    service: NICHE_SERVICES.includes(item.service as NicheService) ? (item.service as NicheService) : "youtube",
+    channel,
+    title: text(item.title, 200),
+    url,
+    views: Math.max(0, Math.round(finite(item.views))),
+    score,
+    median: Math.max(0, Math.round(finite(item.median))),
+    ...(typeof item.publishedAt === "string" && item.publishedAt.length <= 40 && Number.isFinite(Date.parse(item.publishedAt)) ? { publishedAt: item.publishedAt } : {}),
+    ...(duration > 0 ? { durationSeconds: duration } : {}),
+    young: item.young === true,
+    ...(text(item.spoken, BANK_LIMITS.spoken) ? { spoken: text(item.spoken, BANK_LIMITS.spoken) } : {}),
+    ...(typeof item.spokenLanguage === "string" && /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(item.spokenLanguage) ? { spokenLanguage: item.spokenLanguage } : {}),
+    ...(typeof item.conceptId === "string" && CONCEPT_ID.test(item.conceptId) ? { conceptId: item.conceptId } : {}),
+    ...(item.own === true ? { own: true } : {}),
+  };
+}
+
 function cleanStudy(raw: unknown): NicheStudy | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const entry = raw as Record<string, unknown>;
   const own = cleanStat(entry.own);
   const ownRaw = (entry.own && typeof entry.own === "object" ? entry.own : {}) as Record<string, unknown>;
+  const outliers = (Array.isArray(entry.outliers) ? entry.outliers : []).map(cleanOutlier).filter((outlier): outlier is NicheOutlier => outlier !== null).slice(0, BANK_LIMITS.outliers);
   return {
     at: finite(entry.at),
     ...(typeof entry.accountId === "string" && entry.accountId.length <= 80 ? { accountId: entry.accountId } : {}),
+    ...(entry.source === "public" || entry.source === "account" ? { source: entry.source } : {}),
+    ...(entry.spoken === true ? { spoken: true } : {}),
+    ...(Array.isArray(entry.outliers) ? { outliers } : {}),
+    ...(finite(entry.reads) > 0 ? { reads: Math.round(finite(entry.reads)) } : {}),
     channels: (Array.isArray(entry.channels) ? entry.channels : []).map(cleanStat).filter((stat): stat is ChannelStat => stat !== null).slice(0, BANK_LIMITS.studied),
     ...(own
       ? {

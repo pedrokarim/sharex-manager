@@ -103,8 +103,13 @@ export function signalOf(score: number | null | undefined): SignalLevel {
   return "none";
 }
 
+/** Ce qu'un résumé de chaîne lit d'une mesure, qu'elle vienne de l'API ou de la lecture publique. */
+export type MeasureSummary = Pick<ChannelMeasure, "median" | "small"> & {
+  shorts: Pick<ScoredShort, "title" | "url" | "score" | "views" | "young">[];
+};
+
 /** Résumé rangé dans l'étude : les cinq meilleurs scores. */
-export function channelStat(handle: string, title: string, measure: ChannelMeasure): ChannelStat {
+export function channelStat(handle: string, title: string, measure: MeasureSummary): ChannelStat {
   const top = measure.shorts
     .filter((video) => video.score !== null)
     .sort((a, b) => (b.score as number) - (a.score as number))

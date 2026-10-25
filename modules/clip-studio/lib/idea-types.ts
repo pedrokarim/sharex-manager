@@ -197,6 +197,12 @@ export type ChannelRelation = "direct" | "neighbor" | "bigger";
 
 export interface ReferenceChannel {
   handle: string;
+  /**
+   * Service du compte (`NICHE_SERVICES`) ; absent : YouTube, le seul lu
+   * aujourd'hui. Un autre service (TikTok, Instagram) viendra avec son
+   * identifiant de compte et sa lecture, par les comptes connectés.
+   */
+  service?: NicheService;
   title?: string;
   /** Ajoutée à la main, ou proposée par Codex et validée. */
   origin: "user" | "suggested";
@@ -225,6 +231,14 @@ export interface ChannelStat {
 export interface NicheStudy {
   at: number;
   accountId?: string;
+  /** Lecture faite : par un compte connecté (API du service) ou publique (yt-dlp, sans compte). Absent : compte (études d'avant). */
+  source?: StudySourceKind;
+  /** Premières paroles demandées à l'étude (sous-titres automatiques). */
+  spoken?: boolean;
+  /** Vidéos au-dessus de leur médiane, les plus fortes d'abord (`OUTLIER_SCORE`). */
+  outliers?: NicheOutlier[];
+  /** Lectures publiques faites (appels de yt-dlp). */
+  reads?: number;
   channels: ChannelStat[];
   /** Sa propre chaîne, mesurée de la même façon, quand le compte est connecté. */
   own?: ChannelStat & {
@@ -234,6 +248,48 @@ export interface NicheStudy {
   hits: number;
   unitsUsed: number;
   notes: string[];
+}
+
+/**
+ * Services dont on sait mesurer les comptes. YouTube seulement : ses vidéos
+ * courtes se lisent en public (yt-dlp) ou par un compte connecté.
+ */
+export const NICHE_SERVICES = ["youtube"] as const;
+export type NicheService = (typeof NICHE_SERVICES)[number];
+
+/** Une étude lit par un compte connecté (API) ou en public (yt-dlp, sans compte). */
+export type StudySourceKind = "account" | "public";
+export type StudySource = { kind: "account"; accountId: string } | { kind: "public" };
+
+/**
+ * Une vidéo au-dessus de la médiane de son propre compte : la preuve qu'un
+ * sujet, ou une façon de l'ouvrir, a mieux marché que d'habitude. Vues et
+ * multiple viennent de la mesure, jamais d'un modèle.
+ */
+export interface NicheOutlier {
+  videoId: string;
+  service: NicheService;
+  /** Compte mesuré : `@nom`, ou le nom de sa propre chaîne. */
+  channel: string;
+  title: string;
+  url: string;
+  views: number;
+  /** Vues ÷ médiane du compte. */
+  score: number;
+  /** Médiane des vues du compte, au moment de la mesure. */
+  median: number;
+  publishedAt?: string;
+  durationSeconds?: number;
+  /** Une des trois plus récentes du compte : ses vues grimpent encore, le multiple est provisoire. */
+  young: boolean;
+  /** Premières paroles, lues dans les sous-titres (automatiques d'origine d'abord). */
+  spoken?: string;
+  /** Langue de ces sous-titres. */
+  spokenLanguage?: string;
+  /** Concept dans lequel Codex l'a rangée. */
+  conceptId?: string;
+  /** Vidéo de la marque elle-même. */
+  own?: boolean;
 }
 
 export interface ConceptBank {
@@ -257,6 +313,10 @@ export const BANK_LIMITS = {
   moldHook: 160,
   beat: 140,
   note: 200,
+  /** Vidéos au-dessus de leur médiane gardées avec l'étude. */
+  outliers: 150,
+  /** Premières paroles d'une vidéo. */
+  spoken: 160,
 } as const;
 
 /** Une étude par mois suffit : les signaux bougent lentement. */
@@ -288,12 +348,27 @@ export const NO_KIT = "none";
 
 export type IdeaTaskKind = "ideas" | "hooks" | "channels" | "study";
 
+export type IdeaTaskStepState = "pending" | "running" | "done" | "error" | "skipped";
+
+/** Une étape d'un travail long (une chaîne lue, le rangement en concepts…). */
+export interface IdeaTaskStep {
+  id: string;
+  label: string;
+  state: IdeaTaskStepState;
+  detail?: string;
+}
+
 export interface IdeaTask {
   id: string;
   kind: IdeaTaskKind;
-  status: "running" | "done" | "error";
+  /** `canceled` : arrêté à la demande, rien n'a été enregistré. */
+  status: "running" | "done" | "error" | "canceled";
   /** Étape en cours, en clair. */
   step: string;
+  /** Étapes d'un travail qui en a plusieurs (l'étude de la niche), dans l'ordre. */
+  steps?: IdeaTaskStep[];
+  /** Avancement : étapes terminées sur le total. */
+  progress?: { done: number; total: number };
   kitId?: string;
   ideaId?: string;
   error?: string;

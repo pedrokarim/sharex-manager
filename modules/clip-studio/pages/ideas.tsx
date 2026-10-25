@@ -12,8 +12,9 @@
  * - Chaque idée : « Créer depuis cette idée » (page « Nouveau clip »
  *   préremplie, tout reste modifiable), « Garder », « Écarter »,
  *   « Autres accroches ».
- * - Banque de concepts de la marque, nourrie par « Étudier la niche »
- *   (tiroir latéral : chaînes de référence, coût en quota, limites).
+ * - Banque de concepts de la marque, nourrie par l'écran « Niche »
+ *   (`pages/niche.tsx` : comptes de référence, mesure, vidéos qui sortent
+ *   du lot).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -45,9 +46,6 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useSession } from "@/lib/auth-client";
-import { BrandLogo, isBrand } from "@/components/brand-logo";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ActionStatus, FormStatus, errorMessage, useFeedback, type FeedbackState } from "@/components/feedback";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
@@ -56,8 +54,6 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -190,9 +186,7 @@ export default function IdeasPage() {
   const [kitReady, setKitReady] = useState(false);
   const [board, setBoard] = useState<IdeasBoard | null>(null);
   const [tab, setTab] = useState<IdeaStatus>("new");
-  const [nicheOpen, setNicheOpen] = useState(false);
   const [lastNotes, setLastNotes] = useState<string[]>([]);
-  const [accountId, setAccountId] = useState<string | undefined>(undefined);
 
   // Réglages du navigateur, puis la marque par défaut dès que la liste des marques est connue.
   useEffect(() => {
@@ -211,16 +205,18 @@ export default function IdeasPage() {
 
   const kitId = settings.kitId;
   const refresh = useCallback(async () => {
-    const next = await callModule<IdeasBoard>("getIdeasBoard", { kitId, ...(accountId ? { accountId } : {}) });
+    const next = await callModule<IdeasBoard>("getIdeasBoard", { kitId });
     setBoard(next);
     return next;
-  }, [kitId, accountId]);
+  }, [kitId]);
 
   // Travaux de fond (étude, propositions de chaînes, accroches) : leur fin se
   // notifie par un toast, l'utilisateur a pu changer d'écran entre-temps. La
   // recherche d'idées, elle, répond dans son panneau (bilan ou erreur).
-  const { tasks, track, running } = useTasks((task) => {
-    if (task.kind === "ideas") {
+  const { track, running } = useTasks((task) => {
+    if (task.status === "canceled") {
+      // Une étude annulée depuis l'écran Niche : rien n'a changé, rien à annoncer ici.
+    } else if (task.kind === "ideas") {
       if (task.status === "error") searchFeedback.error(task.error ?? "La recherche n’a pas abouti. Réessayez dans un instant.");
       else {
         setLastNotes(task.notes ?? []);
@@ -237,7 +233,7 @@ export default function IdeasPage() {
   useEffect(() => {
     if (!kitReady) return;
     let alive = true;
-    void callModule<IdeasBoard>("getIdeasBoard", { kitId, ...(accountId ? { accountId } : {}) })
+    void callModule<IdeasBoard>("getIdeasBoard", { kitId })
       .then((next) => {
         if (!alive) return;
         setLoadError(null);
@@ -250,10 +246,13 @@ export default function IdeasPage() {
     return () => {
       alive = false;
     };
-  }, [kitReady, kitId, accountId, track]);
+  }, [kitReady, kitId, track]);
 
   const searchFeedback = useFeedback();
+  const router = useRouter();
   const kit = kits?.find((entry) => entry.id === kitId);
+  // L'écran Niche s'ouvre sur la marque de la série.
+  const nicheHref = `/m/clip-studio/niche?kit=${encodeURIComponent(kitId ?? "none")}`;
   const searching = running.find((task) => task.kind === "ideas" && (task.kitId ?? null) === kitId);
   const ideas = board?.kitId === kitId ? board.ideas : null;
   const counts = useMemo(() => Object.fromEntries(TABS.map((entry) => [entry.id, ideas?.filter((idea) => idea.status === entry.id).length ?? 0])) as Record<IdeaStatus, number>, [ideas]);
@@ -283,10 +282,12 @@ export default function IdeasPage() {
           description="Des sujets de vidéos partis de ce qui a déjà marché, avec titre, accroche et prompt prêt pour l'assistant."
           actions={
             <>
-              <Button variant="outline" className="gap-2" onClick={() => setNicheOpen(true)}>
-                <Telescope className="size-4" />
-                Étudier la niche
-                {board?.studyDue ? <span className="size-2 rounded-full bg-primary" aria-label="Étude conseillée" /> : null}
+              <Button asChild variant="outline" className="gap-2">
+                <Link href={nicheHref}>
+                  <Telescope className="size-4" />
+                  Étudier la niche
+                  {board?.studyDue ? <span className="size-2 rounded-full bg-primary" aria-label="Étude conseillée" /> : null}
+                </Link>
               </Button>
               <Button asChild variant="ghost" className="gap-2">
                 <Link href="/m/clip-studio/new">
@@ -309,7 +310,7 @@ export default function IdeasPage() {
           feedback={searchFeedback.state}
           notes={lastNotes}
           onCloseNotes={() => setLastNotes([])}
-          aside={<ConceptPanel bank={board?.bank ?? null} kitName={kit?.name} studyDue={board?.studyDue ?? false} onStudy={() => setNicheOpen(true)} onChanged={(bank) => setBoard((current) => (current ? { ...current, bank } : current))} />}
+          aside={<ConceptPanel bank={board?.bank ?? null} kitName={kit?.name} studyDue={board?.studyDue ?? false} onStudy={() => router.push(nicheHref)} onChanged={(bank) => setBoard((current) => (current ? { ...current, bank } : current))} />}
         >
           <section className="flex min-w-0 flex-col gap-4">
             <FormStatus state={loadError ? { tone: "error", message: loadError, id: 0 } : null} />
@@ -350,9 +351,11 @@ export default function IdeasPage() {
                         Trouver des idées
                       </Button>
                       {board && board.bank.concepts.length === 0 ? (
-                        <Button variant="outline" className="gap-2" onClick={() => setNicheOpen(true)}>
-                          <Telescope className="size-4" />
-                          Étudier la niche
+                        <Button asChild variant="outline" className="gap-2">
+                          <Link href={nicheHref}>
+                            <Telescope className="size-4" />
+                            Étudier la niche
+                          </Link>
                         </Button>
                       ) : null}
                     </div>
@@ -387,18 +390,6 @@ export default function IdeasPage() {
         </SearchPanel>
       </div>
 
-      <NicheSheet
-        open={nicheOpen}
-        onOpenChange={setNicheOpen}
-        board={board}
-        kitName={kit?.name}
-        topic={settings.topic}
-        tasks={tasks}
-        onTask={track}
-        accountId={accountId ?? board?.accountId}
-        onAccount={setAccountId}
-        onBank={(bank) => setBoard((current) => (current ? { ...current, bank } : current))}
-      />
     </MotionConfig>
   );
 }
@@ -1002,275 +993,5 @@ function ConceptPanel({
         </Button>
       ) : null}
     </aside>
-  );
-}
-
-// ─── Étude de la niche ───────────────────────────────────────────
-
-function NicheSheet({
-  open,
-  onOpenChange,
-  board,
-  kitName,
-  topic,
-  tasks,
-  onTask,
-  accountId,
-  onAccount,
-  onBank,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  board: IdeasBoard | null;
-  kitName?: string;
-  topic: string;
-  tasks: IdeaTask[];
-  onTask: (task: IdeaTask) => void;
-  accountId?: string;
-  onAccount: (id: string) => void;
-  onBank: (bank: ConceptBank) => void;
-}) {
-  const [handle, setHandle] = useState("");
-  const [busy, setBusy] = useState(false);
-  const kitId = board?.kitId ?? null;
-  const bank = board?.bank;
-  const study = tasks.find((task) => task.kind === "study" && task.status === "running");
-  // L'étude dépense le quota du compte YouTube connecté par un administrateur : réservée aux administrateurs.
-  const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "admin";
-  const adminOnly = isAdmin ? undefined : "Réservé aux administrateurs : l’étude dépense le quota YouTube du compte connecté.";
-  const suggesting = tasks.find((task) => task.kind === "channels" && task.status === "running" && (task.kitId ?? null) === kitId);
-  const active = bank?.channels.filter((channel) => channel.state === "active") ?? [];
-  const pending = bank?.channels.filter((channel) => channel.state === "pending") ?? [];
-  const estimate = board?.estimate;
-  const account = board?.accounts.find((entry) => entry.id === accountId);
-  // Les gestes sur les chaînes répondent sous le champ d'ajout ; le lancement de l'étude, au-dessus de son bouton.
-  const channelsFeedback = useFeedback();
-  const studyFeedback = useFeedback();
-
-  const run = async (call: () => Promise<ConceptBank>) => {
-    setBusy(true);
-    channelsFeedback.clear();
-    try {
-      onBank(await call());
-      return true;
-    } catch (error) {
-      channelsFeedback.error(errorMessage(error, "La liste des chaînes n’a pas pu être modifiée. Réessayez."));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const add = async () => {
-    if (!handle.trim()) return;
-    if (await run(() => callModule<ConceptBank>("addReferenceChannel", { kitId, handle }))) setHandle("");
-  };
-
-  const suggest = async () => {
-    channelsFeedback.clear();
-    try {
-      onTask(await callModule<IdeaTask>("suggestReferenceChannels", { kitId, topic }));
-    } catch (error) {
-      channelsFeedback.error(errorMessage(error, "Les propositions de chaînes n’ont pas pu démarrer. Réessayez dans un instant."));
-    }
-  };
-
-  const launch = async () => {
-    if (!accountId) return;
-    studyFeedback.clear();
-    try {
-      onTask(await callModule<IdeaTask>("startNicheStudy", { kitId, accountId }));
-    } catch (error) {
-      studyFeedback.error(errorMessage(error, "L’étude n’a pas pu démarrer. Réessayez dans un instant."));
-    }
-  };
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-xl">
-        <SheetHeader className="border-b p-4 pr-12">
-          <SheetTitle className="flex items-center gap-2">
-            <Telescope className="size-5 text-primary" />
-            Étudier la niche
-          </SheetTitle>
-          <SheetDescription>
-            Mesure les vidéos courtes de chaînes de référence{kitName ? ` pour « ${kitName} »` : ""}, puis range leurs succès en concepts. Une fois par mois suffit.
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto p-4">
-          <section className="grid min-w-0 gap-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold">
-              <BrandLogo brand="youtube" />
-              Compte de lecture
-            </h3>
-            {board && board.accounts.length === 0 ? (
-              <Alert>
-                <AlertTitle>Aucun compte YouTube connecté</AlertTitle>
-                <AlertDescription>
-                  L&apos;étude par l&apos;API YouTube est indisponible sans compte connecté avec une portée de lecture. Les idées restent possibles, au web seul. Un administrateur peut connecter une chaîne dans les comptes connectés.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <>
-                <Select value={accountId ?? ""} onValueChange={onAccount} disabled={!board}>
-                  <SelectTrigger className="w-full min-w-0">
-                    <SelectValue placeholder="Choisir un compte" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {board?.accounts.map((entry) => (
-                      <SelectItem key={entry.id} value={entry.id}>
-                        <span className="flex min-w-0 items-center gap-2">
-                          {isBrand(entry.logo) ? <BrandLogo brand={entry.logo} /> : null}
-                          <span className="truncate">{entry.name}</span>
-                          {entry.linked ? <span className="shrink-0 text-xs text-muted-foreground">compte de la marque</span> : null}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Données publiques lues avec le jeton de ce compte.
-                  {account && estimate?.own ? " Sa propre chaîne est mesurée aussi\u00a0: ses succès récents deviennent des reprises." : kitName ? " Ce compte n'est pas rattaché à la marque\u00a0: sa chaîne ne sera pas mesurée." : ""}
-                </p>
-              </>
-            )}
-          </section>
-
-          <Separator />
-
-          <section className="grid min-w-0 gap-3">
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold">
-                Chaînes de référence <span className="font-normal text-muted-foreground tabular-nums">({active.length})</span>
-              </h3>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={suggest} loading={Boolean(suggesting)} disabled={!isAdmin} title={adminOnly}>
-                <Sparkles className="size-4" />
-                Proposer des chaînes
-              </Button>
-            </div>
-            <form
-              className="flex min-w-0 gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void add();
-              }}
-            >
-              <Input
-                value={handle}
-                onChange={(event) => {
-                  setHandle(event.target.value);
-                  if (channelsFeedback.state?.tone === "error") channelsFeedback.clear();
-                }}
-                placeholder="@chaine ou adresse youtube.com/@…"
-                className="min-w-0 flex-1"
-                aria-label="Chaîne à ajouter"
-              />
-              <Button type="submit" variant="secondary" className="shrink-0 gap-1.5" disabled={busy || !handle.trim()}>
-                <Plus className="size-4" />
-                Ajouter
-              </Button>
-            </form>
-            <FormStatus state={channelsFeedback.state} />
-            {suggesting ? <TaskLine task={suggesting} /> : null}
-            <AnimatePresence initial={false}>
-              {pending.map((channel) => (
-                <motion.div key={channel.handle} layout initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} className="flex min-w-0 items-start gap-2 rounded-lg bg-primary/5 px-3 py-2 text-sm">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium" title={channel.handle}>
-                      {channel.handle}
-                      {channel.title ? <span className="font-normal text-muted-foreground"> · {channel.title}</span> : null}
-                    </span>
-                    <span className="block text-xs text-muted-foreground [overflow-wrap:anywhere]">
-                      {channel.relation === "bigger" ? "Beaucoup plus grosse" : channel.relation === "neighbor" ? "Voisine" : "Directe"}
-                      {channel.note ? ` · ${channel.note}` : ""}
-                    </span>
-                  </span>
-                  <Button size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-xs" disabled={busy} onClick={() => run(() => callModule<ConceptBank>("answerChannelSuggestion", { kitId, handle: channel.handle, accept: true }))}>
-                    Valider
-                  </Button>
-                  <Button size="icon" variant="ghost" className="size-7 shrink-0" disabled={busy} aria-label={`Refuser ${channel.handle}`} onClick={() => run(() => callModule<ConceptBank>("answerChannelSuggestion", { kitId, handle: channel.handle, accept: false }))}>
-                    <X className="size-4" />
-                  </Button>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            {active.length === 0 && pending.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Ajoutez 10 à 12 chaînes&nbsp;: directes (même sujet), voisines et beaucoup plus grosses. Les 12 premières sont mesurées.</p>
-            ) : (
-              <ul className="flex min-w-0 flex-col divide-y rounded-lg border">
-                <AnimatePresence initial={false}>
-                  {active.map((channel, index) => {
-                    const stat = bank?.study?.channels.find((entry) => entry.handle.toLowerCase() === channel.handle.toLowerCase());
-                    return (
-                      <motion.li key={channel.handle} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} className="flex min-w-0 items-center gap-2 px-3 py-2 text-sm">
-                        <span className="min-w-0 flex-1">
-                          <a href={`https://www.youtube.com/${encodeURIComponent(channel.handle)}`} target="_blank" rel="noopener noreferrer nofollow" className="block truncate hover:underline" title={channel.title ? `${channel.handle} · ${channel.title}` : channel.handle}>
-                            {channel.handle}
-                            {channel.title ? <span className="text-muted-foreground"> · {channel.title}</span> : null}
-                          </a>
-                          {stat ? (
-                            <span className={cn("block text-xs [overflow-wrap:anywhere]", stat.error ? "text-destructive" : "text-muted-foreground")}>
-                              {stat.error
-                                ? stat.error
-                                : `${stat.shorts} vidéos courtes · médiane ${stat.median === null ? "inconnue" : stat.median.toLocaleString("fr-FR")} vues${stat.top[0] ? ` · meilleur ${formatScore(stat.top[0].score)}` : ""}${stat.small ? " · médiane fragile" : ""}`}
-                            </span>
-                          ) : null}
-                        </span>
-                        {index >= 12 ? <span className="shrink-0 text-xs text-muted-foreground">non mesurée</span> : null}
-                        <Button size="icon" variant="ghost" className="size-7 shrink-0 text-muted-foreground" disabled={busy} aria-label={`Retirer ${channel.handle}`} onClick={() => run(() => callModule<ConceptBank>("removeReferenceChannel", { kitId, handle: channel.handle }))}>
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      </motion.li>
-                    );
-                  })}
-                </AnimatePresence>
-              </ul>
-            )}
-          </section>
-
-          <Separator />
-
-          <section className="grid min-w-0 gap-2 text-sm">
-            <h3 className="text-sm font-semibold">Coût et limites</h3>
-            {estimate ? (
-              <p className="[overflow-wrap:anywhere]">
-                Environ <strong className="tabular-nums">{estimate.min === estimate.max ? estimate.min : `${estimate.min} à ${estimate.max}`}</strong> unités du quota de l&apos;API YouTube
-                {estimate.remaining !== undefined ? (
-                  <>
-                    , sur <span className="tabular-nums">{estimate.remaining.toLocaleString("fr-FR")}</span> restantes aujourd&apos;hui
-                  </>
-                ) : null}
-                &nbsp;: 3 à 5 lectures à 1 unité par chaîne ({estimate.channels} chaîne{estimate.channels > 1 ? "s" : ""}
-                {estimate.own ? " et la vôtre" : ""}), jamais la recherche, bien plus chère.
-              </p>
-            ) : (
-              <p className="text-muted-foreground">Le coût s&apos;affiche dès qu&apos;un compte YouTube est choisi.</p>
-            )}
-            <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-              <li>Score d&apos;une vidéo&nbsp;: ses vues divisées par la médiane des 12 vidéos courtes qui suivent les 3 plus récentes de sa chaîne. 3 et plus&nbsp;: un vrai signal&nbsp;; de 1,5 à 3&nbsp;: peut-être.</li>
-              <li>Ce sont des seuils éditoriaux, pas une preuve&nbsp;: un succès peut venir d&apos;autre chose que le sujet ou l&apos;accroche (tendance du moment, collaboration, publicité).</li>
-              <li>Les vues des vidéos récentes grimpent encore&nbsp;: leur score est provisoire.</li>
-              <li>Une chaîne de moins de 15 vidéos courtes donne une médiane fragile. Une vidéo courte dure ici 3 minutes au plus.</li>
-            </ul>
-            {bank?.study ? (
-              <p className="text-xs text-muted-foreground">
-                Dernière étude le {new Date(bank.study.at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}&nbsp;: {bank.study.hits} succès, {bank.study.unitsUsed} unités.
-              </p>
-            ) : null}
-          </section>
-        </div>
-
-        <SheetFooter className="border-t p-4">
-          <FormStatus state={studyFeedback.state} />
-          {study ? <TaskLine task={study} /> : null}
-          <Button className="gap-2" onClick={launch} loading={Boolean(study)} disabled={!isAdmin || !accountId || active.length === 0} title={adminOnly}>
-            <Telescope className="size-4" />
-            Lancer l&apos;étude
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
   );
 }

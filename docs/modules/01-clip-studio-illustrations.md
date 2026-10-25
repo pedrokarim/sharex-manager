@@ -259,12 +259,12 @@ remplir.
 | I1 – Moteur de planche | Type `board`, acteurs de base (carte, titre, pastille, liste, compteur, logo, image), traits (flèche, croix, barre, soulignement, liaison), verbes, partition sur les mots, jointure caméra animée ; images clés sur tout élément (moteur fait, jointure et geste d’interface à venir, voir § 7) | Une partition écrite à la main reproduit les séquences 0–3 s, 8–18 s et 18–23 s de la référence ; aucun saut d’image, aperçu et export identiques |
 | I2 – Assistant | « Monter ma prise » écrit une partition depuis la transcription (et les notes visuelles quand le script vient de Clip Studio) ; règles « une idée, un tableau » ; vérification et correction des places ; sons des verbes ; mémoire des derniers montages | Trois prises montées à la suite : trois ouvertures et trois enchaînements de tableaux différents ; aucun plan de plus de 4 s sans action |
 | I3 – Marque réservoir | Mascotte en acteur, carton de fin facultatif, ouverture libre ; papier et accent de la marque comme fond de planche | Un montage avec marque n’a aucune place imposée hormis le filigrane |
-| I4 – Ressources | Logos SVG officiels, découpes, bibliothèque d’illustrations de la marque, nouveaux bruitages | Chaque outil nommé dans les trois prises de I2 a son vrai logo |
+| I4 – Ressources | Logos SVG officiels, découpes, bibliothèque d’illustrations de la marque, nouveaux bruitages (logos SVG et bruitages faits, voir § 7) | Chaque outil nommé dans les trois prises de I2 a son vrai logo |
 | I5 – Interfaces recréées | Terminal, champ de saisie, téléphone (statistiques), arborescence, fiche de compte, dessinés par le moteur et animés | Les séquences 40–46 s et 49–55 s de la référence reproduites |
 | I6 – Éditeur | Panneau « Illustrer », tracé à la souris, actions sur la chronologie, inspecteur | Karim pose une flèche et une barre sur un mot sans aide |
-| S1 – Fiche de voix | Questions guidées, fiche dans la marque, relue par le créateur | Les scripts citent ses vrais chiffres et ses mots |
+| S1 – Fiche de voix | Questions guidées, fiche dans la marque, relue par le créateur (fait, voir § 7) | Les scripts citent ses vrais chiffres et ses mots |
 | S2 – Raisonnement | Nouvelles consignes (§ 4.2), notes visuelles, faits sans case à remplir, quatre contrôles (fait, voir § 7) | Sur cinq sujets, aucun script ne passe le contrôle « interchangeable » à l’aveugle |
-| S3 – Niche et historique | Concepts de la niche mesurés, historique des sujets et accroches | Une semaine de cinq scripts : cinq concepts prouvés, aucune forme d’accroche deux fois de suite |
+| S3 – Niche et historique | Concepts de la niche mesurés, historique des sujets et accroches (fait, voir § 7) | Une semaine de cinq scripts : cinq concepts prouvés, aucune forme d’accroche deux fois de suite |
 
 S1 et S2 ne dépendent pas de la planche et peuvent partir en premier. I1 est
 le socle de tout le reste du montage.
@@ -297,6 +297,97 @@ une `voice`, la marque en tient lieu d’ici là), les concepts de la niche
 (S3, d’où l’absence du « concept prouvé » dans la visée) et la relecture
 des faits de l’accroche dite : la vérification ne contrôle encore que le
 titre affiché.
+
+**S1 – Fiche de voix, fait le 25/10/2026.** La marque gagne `voiceSheet`
+(`modules/brand-kit/lib/voice-sheet.ts`), remplie dans la section
+« Voix du créateur » de l’éditeur (touche 8) : ce qu’il fait (`pitch`,
+200 caractères), pour qui (`audience`, 300), son débit (`wordsPerMinute`,
+de 100 à 240 mots par minute, 160 par défaut), les mots qu’il emploie et
+ceux qu’il n’emploie jamais (`words`, `bannedWords`, 20 de 60 caractères
+chacun), ce qu’il défend (`stands`, 300) et ce contre quoi il se bat
+(`against`, 300 : une habitude, un mythe, un outil, jamais le spectateur),
+ses preuves (`proofs`, 10 lignes de 200 caractères) et ce qu’il demande au
+spectateur (`asks`, trois échelons de 160 caractères, du plus léger au plus
+engageant). Chaque question porte un exemple et une jauge dit combien ont
+leur réponse. La fiche est bornée par `sanitizeKit` et à la lecture
+(`upgradeKit`) ; vide, elle n’est pas enregistrée.
+
+« Proposer à partir de mes textes » ouvre un tiroir où coller une bio, des
+descriptions, des transcriptions : Codex en tire une proposition en
+arrière-plan (`startVoiceDraft`, `getVoiceDraftJob`, `cancelVoiceDraft`),
+sans chiffre absent des textes, montrée réponse par réponse. Ce qui remplit
+une question vide part coché, ce qui remplacerait une réponse part décoché,
+la réponse actuelle affichée à côté ; rien n’entre dans la fiche sans
+« Reprendre ».
+
+`toAssistantBrand` lit la fiche (`toCreatorVoice`, seulement les réponses
+données) dans `AssistantBrand.creatorVoice`, et `scriptPrompt` la passe à
+`scriptReasoningLines` quand la demande n’en fournit pas une autre : le bloc
+`<voix>` en données, plus une consigne par réponse qui oriente le
+raisonnement (le spectateur de la visée part de `audience`, la croyance à
+casser de `against`, la fin choisit une seule des `asks`). Sans fiche, rien
+ne change : la marque tient lieu de voix.
+
+Le débit n’entre pas dans la consigne : les scripts de l’assistant sont lus
+par la voix de synthèse de la marque, dont le débit se règle à part (section
+Assistant IA) ; caler `SPEAKING_RATE_WPM` sur le débit du créateur
+allongerait des scripts lus plus lentement. Il servira quand le créateur
+lira lui-même un script. La langue n’est pas une question de la fiche :
+c’est celle de la marque (Identité). Le critère du § 5 (des scripts qui
+citent ses vrais chiffres et ses mots) reste à juger sur des scripts
+réellement écrits avec une fiche remplie.
+
+**S3 – Niche et historique, fait le 25/10/2026.** L’écran « Niche »
+(`pages/niche.tsx`, ouvert depuis « Idées ») remplace le tiroir « Étudier
+la niche » : les réglages à droite (marque, lecture, premières paroles,
+lancement avec ses étapes, son avancement et « Annuler », comptes de
+référence), le résultat à gauche (concepts qui marchent avec leurs
+meilleurs exemples, tableau filtrable des vidéos qui sortent du lot,
+comptes mesurés). La banque reste celle des idées
+(`data/concepts/<marque>.json`) : une seule liste de comptes et de concepts
+par marque, que les idées et les scripts lisent.
+
+- **Lecture publique** (`lib/niche-public.ts`) : sans compte connecté ni
+  quota, yt-dlp lit l’onglet « Shorts » de chaque chaîne en liste plate (un
+  appel, 30 vidéos, vues arrondies par YouTube, ni date ni durée), puis le
+  détail (`-j`) des plus fortes, trois par compte et vingt-quatre par
+  étude, pour leur date, leur durée et, sur demande, leurs premières
+  paroles (sous-titres d’origine, français ou anglais, ce qui est dit dans
+  les 3,5 premières secondes). Un appel à la fois, quatre secondes au moins
+  entre deux, par la porte commune des lectures d’adresse (vingt par minute
+  pour tout le serveur) ; arguments fixés, adresse après `--`. La lecture
+  par un compte YouTube connecté (API) reste possible et mesure aussi sa
+  propre chaîne. Le champ `service` d’un compte de référence prépare les
+  autres services, qui passeront par les comptes connectés.
+- **Mesure** (`lib/niche-measure.ts`) : chaque vidéo est divisée par la
+  médiane de son propre compte (les 12 vidéos qui suivent les 3 plus
+  récentes) ; elle sort du lot à 2 × ou plus, si cette médiane repose sur 8
+  vidéos au moins. Ce seuil remplace les 3 × de l’étape 14 pour ce qui part
+  à Codex ; une recette demande toujours trois succès sur deux comptes.
+- **Concepts** : Codex range les vidéos qui sortent du lot (titres et
+  premières paroles, en données) dans la banque ; il nomme et regroupe,
+  vues et multiples viennent de la mesure. Chaque vidéo garde son concept
+  (`conceptId`). Rien n’est écrit avant la fin : une étude annulée laisse la
+  banque telle qu’elle était. Moins de trente jours après la précédente, il
+  faut confirmer.
+- **Historique** (`lib/script-history.ts`) : le journal
+  `data/script-history.json` reçoit chaque script devenu projet (titre,
+  accroche dite et sa famille, concept suivi, promesse), complété par les
+  travaux de l’assistant et les projets plus anciens. Les quatre dernières
+  semaines de la marque partent dans la consigne.
+- **Consigne** (`nicheLines` dans `lib/script-rules.ts`) : concepts et
+  scripts récents en données entre balises ; la visée gagne `concept`, le
+  nom du concept sur lequel repose le script ; jamais la même forme
+  d’accroche que le dernier script, jamais un sujet de ces quatre semaines
+  sauf si la demande le réclame ; le contrôle « hors concept » vérifie le
+  concept nommé. L’accroche retenue n’est pas de la famille du script
+  précédent quand Codex en propose une autre (`pickBestHook`). Sans banque
+  ni historique, la consigne reste celle de S2.
+
+Reste hors de S3 : TikTok et Instagram (le modèle de données est prêt, pas
+la lecture), ce qui a marché chez le créateur sans compte connecté (sa
+chaîne n’est mesurée que par l’API), et le critère jugé sur une vraie
+semaine de cinq scripts.
 
 **I1 – Moteur de planche, fait le 25/10/2026, sans encore de geste dans
 l’interface.** Le choix final diffère du § 3.1 sur un point : la planche
@@ -347,3 +438,124 @@ Pas encore fait : la jointure caméra animée (prévue avec I2, quand
 l’assistant choisit la mise en page), le rendu dans l’export du navigateur
 (même fonction de dessin, mais non mesuré dans un vrai navigateur), et tout
 geste de l’interface : rien ne crée encore de planche hors du banc.
+
+**I4 (logos, sons), fait le 25/10/2026 pour les logos SVG et les
+bruitages.** La recherche d’icônes accepte un logo officiel en SVG
+(`lib/svg-logo.ts`). Le fichier n’est jamais servi ni dessiné tel qu’il
+arrive : lu par un analyseur XML strict (saxes), il est réécrit à partir
+d’une liste fermée d’éléments de dessin (formes, textes, dégradés, motifs,
+masques, marqueurs, filtres simples, `use` interne) et d’attributs de
+présentation. Disparaissent les scripts, les gestionnaires d’évènements,
+`foreignObject`, les animations, les éléments et attributs des logiciels de
+dessin, les instructions de traitement et toute référence qui ne désigne
+pas un élément du document (`href`, `url()`, `@import`, échappements CSS),
+sauf une image incorporée en PNG, JPEG, GIF ou WebP. Sont refusés un
+DOCTYPE (entités), un XML invalide, plus de 1,5 Mo, plus de 5 000 éléments
+ou de 48 niveaux, plus de 20 000 éléments une fois les références
+développées, une boucle de références, un SVG sans viewBox ni dimensions
+absolues et un rendu vide (moins de 0,2 % de pixels visibles).
+
+Le SVG nettoyé est rastérisé en PNG transparent par sharp (librsvg), 512 px
+sur le grand côté (un logo allongé garde 128 px sur le petit, dans la limite
+de 1 024 px), puis contrôlé comme une image en pixels : le canevas, l’export
+et tous les consommateurs ne reçoivent que des pixels. `@napi-rs/canvas`
+sait aussi dessiner un SVG, mais il ignore les feuilles de style, fréquentes
+dans les logos exportés. `fetchRemoteImage` accepte `image/svg+xml` sur
+demande (`allowSvg`), pour ce seul appelant ; une illustration reste en
+pixels seulement.
+
+Un logo n’est cherché qu’une fois. Une icône reconnue garde, dans les
+médias du module (communs à tous les projets et à toutes les marques), son
+adresse d’origine et les sujets pour lesquels elle a été reconnue
+(`iconCacheKey` : sans accents, casse ni ponctuation). `findSegmentIcon` la
+reprend sans recherche ni téléchargement ; une adresse déjà téléchargée
+n’est pas retéléchargée, et son import retombe sur le même média. Source et
+mention (`credit`, `rights`) ne changent pas.
+
+Cinq bruitages de planche rejoignent les quatre de D3 dans `engine/sfx.ts`,
+synthétisés de la même façon, donc sans licence : `type` (boucle de quatre
+touches douces, 400 ms, qui commence et finit dans le silence),
+`type-burst` (six touches dont une barre d’espace, 640 ms), `tick` (60 ms),
+`thud` (papier posé sur un bureau, 320 ms, 99,7 % de l’énergie sous
+300 Hz) et `click` (pavé tactile, 30 ms). Chacun a son volume
+(`SFX_VOLUMES` : 0,35 pour la frappe, 0,25 pour le tic, 0,2 pour le coup
+sourd, 0,3 pour le clic), de 3,6 à 14 dB sous l’impact, mesuré sur 50 ms
+glissantes. Pour le compilateur de planche : `sfxItem(kind, …)` comme
+avant, `sfxSeries` (le même son à plusieurs instants, écart minimal, 24 au
+plus) et `typingSfx` (une frappe de durée quelconque, coupée entre deux
+touches). `ensureSfxBank` écrit les nouveaux fichiers au démarrage.
+
+Pas encore fait : l’appel de ces sons par les verbes de la planche
+(`engine/board.ts`, avec I2), une écoute par une oreille humaine (les tests
+ne mesurent que crête, niveau, durée et spectre), les découpes et la
+bibliothèque d’illustrations de la marque. Le critère du § 5 se jugera sur
+les prises de I2.
+
+**I2 – Assistant, fait le 25/10/2026.** « Monter ma prise » ne choisit plus
+une planche parmi six : Codex découpe la prise en **tableaux**, un par idée
+(`engine/take-plan.ts`). Chaque tableau a une mise en page (`split`,
+`full`, ou `board`, la planche seule pendant que la voix continue), une
+disposition (`single`, `row`, `list`, `hub`, `versus`, `stack`), un titre
+facultatif (un mot sur pavé, un mot souligné sur son mot dit) et des objets
+(texte, compteur, logo, carte, pastille, note) qui entrent chacun sur leur
+mot, et peuvent s’y barrer ou s’y croiser. La consigne dit pourquoi : une
+idée qui se construit retient, une image qui change sans lien épuise.
+Codex choisit le sens, jamais une coordonnée : `engine/take-scenes.ts`
+calcule les places sur la grille, centre titre et corps ensemble dans la
+zone sûre, réduit un tableau trop haut et agrandit (d’un tiers au plus) un
+tableau qui ne remplit pas sa zone. Le lecteur répare le plan : accroche
+lisible dès la première image, plein cadre de 5 s au moins, un tableau
+sans titre commence au mot de son premier objet (jamais de papier vide, la
+caméra reste jusque-là), un tableau resté vide disparaît ; une réponse de
+l’ancienne forme se lit encore. D’une mise en page à l’autre, le papier
+glisse (descend pour la planche seule) et la caméra glisse du plein cadre à
+la carte du bas. Les enchaînements des trois derniers montages de la marque
+(`brief.montage`) sont donnés à Codex pour qu’il ne refasse ni la même
+ouverture ni la même suite. Un même logo n’est cherché qu’une fois par
+montage.
+
+**I3 – Marque réservoir, fait le 25/10/2026 pour les montages de prise.**
+La planche prend de la marque sa police et une palette tirée de ses couleurs
+(`engine/board-palette.ts`), jamais ses autres styles de texte (une
+étiquette de marque aurait posé un fond derrière le repère d’une carte) ;
+chaque élément garde le nom de sa couleur, un changement de marque le
+recolore. La mascotte n’est plus posée d’office ni retirée d’office : elle
+**réagit** sur la planche quand le plan le demande (une émotion de la liste
+fermée des poses, trois fois par vidéo au plus, une fois par tableau, dans
+une disposition où elle a sa place), avec la pose de la bibliothèque qui va
+avec, jamais deux fois de suite la même. Le carton de fin reste celui que la
+marque active ou non. La lisibilité de D1 lit chaque élément à sa place
+posée, images clés comprises : une carte encore transparente pendant son
+entrée n’est plus prise pour un fond chargé. Pas encore fait : les modèles
+de l’assistant sans prise (libre, quiz, classement, diaporama) gardent leur
+construction d’avant (mascotte par segment) ; ils passeront aux planches
+dans une étape à part.
+
+Vérifié avec le banc `scripts/take-stills.ts` : un plan qui passe par
+toutes les dispositions et les trois mises en page, monté par
+`buildTakeProject`, sans marque puis avec une marque sombre
+(`--brand sombre`) ; aucun défaut de placement relevé, papier et caméra qui
+glissent, traits qui partent avant les cartes en fin de tableau. Chaque
+disposition, en `split` comme en `board`, est posée sans chevauchement ni
+débordement dans les tests.
+
+**I5 – Interfaces recréées, fait le 25/10/2026.** Quatre acteurs de
+planche (`engine/board.ts`), faits des mêmes briques que les autres, que
+« Monter ma prise » sait demander (`terminal`, `prompt`, `phone`, `tree`,
+seuls ou en pile) :
+
+- **terminal** : fenêtre sombre à trois points et titre, police de code
+  embarquée (JetBrains Mono, hors des sélecteurs de polices : jamais pour un
+  texte courant) ; une commande se tape lettre à lettre sur son mot, au son
+  des touches, une réponse arrive d’un coup, une réussite reçoit une coche
+  dessinée, alignée sur les autres lignes ;
+- **champ de saisie** : la demande se tape, bouton d’envoi à flèche ;
+- **téléphone** : écran de statistiques, chiffre qui défile avec ses tics et
+  son coup sourd, courbe qui se trace pendant ce temps ;
+- **arborescence** : le dossier en titre, les fichiers qui arrivent un à un,
+  reliés par des branches qui poussent avec eux.
+
+Vérifié sur le banc `scripts/take-stills.ts` (trois tableaux d’interfaces
+ajoutés) et dans les tests : chaque interface posée sans chevauchement ni
+débordement, en `split` comme en `board`, la frappe calée sur le mot de la
+commande.
