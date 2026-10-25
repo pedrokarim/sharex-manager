@@ -7,6 +7,54 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Clip Studio, planche d’illustrations (dossier 01 illustrations, I1 à I5) :
+  « Monter ma prise » découpe la vidéo en tableaux, un par idée, qui
+  grandissent sur les mots : planche au-dessus de la caméra, caméra plein
+  cadre ou planche seule ; une chose seule, une rangée de logos, une liste
+  qui se construit puis se barre, un centre entouré de pastilles reliées, un
+  avant / après, une pile. Les objets entrent sur le mot qui les nomme, se
+  barrent, se croisent, se relient ; un compteur défile au son de ses tics et
+  se pose sur un coup sourd ; papier et caméra glissent d’une mise en page à
+  l’autre ; les derniers montages de la marque sont évités. Quatre
+  interfaces recréées et animées : terminal (la commande se tape au son des
+  touches), champ de saisie, écran de statistiques d’un téléphone,
+  arborescence. Les places sont calculées sur une grille, un texte se
+  centre sur la hauteur réelle de ses capitales, et le moteur signale tout
+  chevauchement, débordement ou papier vide. La marque donne sa police et
+  ses couleurs à la planche ; sa mascotte y réagit quand le plan le demande.
+- Clip Studio, logos officiels en SVG (nettoyés puis convertis en PNG par
+  le serveur) et cinq bruitages synthétisés pour la planche : frappe en
+  boucle et en rafale, tic, coup sourd, clic.
+- Clip Studio, scripts de l’assistant (dossier 01 illustrations, S1 à S3) :
+  le modèle raisonne avant d’écrire (spectateur, croyance cassée, preuve,
+  promesse, type de vidéo), écrit des notes visuelles par ligne et passe
+  quatre contrôles ; le titre affiché complète l’accroche au lieu de la
+  répéter. Une fiche « Voix du créateur » dans l’image de marque (avec un
+  brouillon proposé à partir de ses textes) et un écran « Niche » qui
+  mesure les shorts des comptes de référence contre leur propre médiane et
+  en tire les concepts qui marchent ; un script repose sur l’un d’eux et ne
+  reprend ni un sujet des quatre dernières semaines ni la forme d’accroche
+  du script précédent.
+- Clip Studio, illustrer à la main dans l’éditeur (dossier 01 illustrations,
+  I6) : un panneau « Illustrer » pose à la tête de lecture, au centre de
+  la zone d’écriture, les traits de la planche (flèche, croix, barre,
+  soulignement, cercle à main levée, liaison) et ses acteurs (carte, carte
+  numérotée, pastille, note collée, compteur avec son unité, titre dont un
+  mot est sur un pavé), dans la palette et les polices de la marque du
+  projet. Sur l’aperçu, une flèche, un trait ou une liaison se tracent à la
+  souris (appuyer au départ, relâcher à l’arrivée) et se dessinent en
+  0,45 s ; un tracé sélectionné a des poignées à ses bouts et une poignée
+  de courbe, et ne se prend que près de son trait. « Animer » : déplacer
+  ou redimensionner un élément ailleurs qu’à son début pose une image clé
+  atteinte à la tête de lecture (mouvement de 0,6 s sur un ressort sans
+  rebond) ; le cadre de sélection suit l’élément à sa place animée. Les
+  images clés sont des losanges sur la chronologie, à tirer dans le temps,
+  et une liste dans l’inspecteur (aller à l’une, régler sa durée, la
+  retirer). L’inspecteur pose des marques sur les mots d’un texte (pavé,
+  soulignement, barre, cercle, couleur), tout de suite ou à un instant
+  choisi, et règle l’épaisseur, la pointe, la courbure et le dessin d’un
+  tracé, l’ombre d’une carte, le compteur et son unité. Les pièces d’un même
+  acteur (une carte et son texte) bougent ensemble.
 - Clip Studio, « Monter ma prise » (dossier 01 vidéo, V6) : une ou plusieurs
   prises de vous face caméra (adresse, Mes médias ou fichier) deviennent un
   short monté. Transcription mot pour mot, puis coupe des blancs et des
@@ -1084,6 +1132,9 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Clip Studio, voix Microsoft Edge : Microsoft n’accepte plus que le jeton
+  `Sec-MS-GEC` v2 depuis la mi-octobre 2026 ; la synthèse, refusée partout
+  avec l’ancien, refonctionne.
 - AI Image Gen : le rôle d’une image jointe était ignoré par OpenAI et
   Gemini. Toute image partait vers l’API de retouche d’OpenAI, si bien
   qu’une simple inspiration était retouchée ; Gemini recevait les images

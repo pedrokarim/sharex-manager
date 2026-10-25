@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import {
   AudioLines,
   Copy,
+  Diamond,
   Eye,
   EyeOff,
   Film,
@@ -58,6 +59,7 @@ import { ScenePickerDialog, SceneSubmenu, useSceneFavorites } from "./scene-pick
 import { ShotFxMarker } from "./scene-fx";
 import type { ClipItem, ClipProject, ShotEffect, Track, VisualItem } from "../engine/types";
 import { isVoiceItem } from "../engine/revoice";
+import { keyFrames, keysByArrival, keySummary, moveKeyTo, removeKey } from "../engine/key-edit";
 
 export const MEDIA_DRAG_TYPE = "application/x-clip-media";
 
@@ -109,6 +111,7 @@ type Drag =
   | { kind: "trim"; itemId: string; edge: "start" | "end" }
   | { kind: "anim"; itemId: string; phase: "in" | "out"; frames: number }
   | { kind: "fx"; trackId: string; index: number; at: number; offsetFrames: number; startX: number; moved: boolean }
+  | { kind: "key"; itemId: string; index: number; arrival: number; offsetFrames: number; startX: number; moved: boolean }
   | { kind: "scrub" };
 
 /** Durée d'une phase en cours de réglage, montrée sur le bloc avant d'être enregistrée. */
@@ -270,7 +273,17 @@ export function Timeline(props: TimelineProps) {
     if (track.locked) return;
     const edge = (event.target as HTMLElement).dataset.edge as "start" | "end" | undefined;
     const animEdge = (event.target as HTMLElement).dataset.animEdge as "in" | "out" | undefined;
+    const keyIndex = (event.target as HTMLElement).dataset.keyIndex;
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    if (keyIndex !== undefined && item.type !== "audio") {
+      // Une image clé se tire dans le temps ; un simple clic y place la tête de lecture.
+      const index = Number(keyIndex);
+      const arrival = keysByArrival(item).find((entry) => entry.index === index)?.arrival;
+      if (arrival !== undefined) {
+        setDrag({ kind: "key", itemId: item.id, index, arrival, offsetFrames: frameAtClientX(event.clientX) - (item.start + arrival), startX: event.clientX, moved: false });
+        return;
+      }
+    }
     if (animEdge && item.type !== "audio") {
       const spans = phaseSpans(item);
       setDrag({ kind: "anim", itemId: item.id, phase: animEdge, frames: animEdge === "in" ? spans.inFrames : spans.outFrames });
@@ -310,6 +323,13 @@ export function Timeline(props: TimelineProps) {
     }
     const item = trackOf(drag.itemId)?.items.find((entry) => entry.id === drag.itemId);
     if (!item) return;
+    if (drag.kind === "key") {
+      // L'arrivée de la clé se cale sur la tête de lecture et les bords des plans, dans l'élément.
+      const moved = drag.moved || Math.abs(event.clientX - drag.startX) > 3;
+      const arrival = Math.min(item.duration, Math.max(1, Math.round(snap(pointerFrame - drag.offsetFrames) - item.start)));
+      if (moved !== drag.moved || arrival !== drag.arrival) setDrag({ ...drag, moved, arrival });
+      return;
+    }
     if (drag.kind === "anim") {
       if (item.type === "audio") return;
       // L'entrée et la sortie se partagent l'élément : chacune garde au moins une image, sans empiéter sur l'autre.
@@ -344,6 +364,14 @@ export function Timeline(props: TimelineProps) {
       const track = project.tracks.find((entry) => entry.id === drag.trackId);
       if (track && Math.round(track.effects?.[drag.index]?.at ?? -1) !== drag.at) {
         props.onTrackPatch(track.id, { effects: updateShotEffect(track.effects, drag.index, { at: drag.at }, project.fps) });
+      }
+    }
+    if (drag?.kind === "key") {
+      const item = trackOf(drag.itemId)?.items.find((entry) => entry.id === drag.itemId);
+      if (item && item.type !== "audio" && item.keys) {
+        // Une seule modification au lâcher : une seule étape d'annulation.
+        if (drag.moved) props.onItemPatch(item.id, { keys: moveKeyTo(item.keys, drag.index, drag.arrival, item.duration) } as Partial<ClipItem>);
+        else props.onSeek(item.start + drag.arrival);
       }
     }
     if (drag?.kind === "move" && drag.valid) props.onMove(drag.itemId, drag.start, drag.trackId);
@@ -564,6 +592,7 @@ export function Timeline(props: TimelineProps) {
                           selected={item.id === selectedId}
                           dimmed={Boolean(ghost)}
                           animOverride={drag?.kind === "anim" && drag.itemId === item.id ? drag : null}
+                          keyOverride={drag?.kind === "key" && drag.itemId === item.id ? drag : null}
                           favorites={favorites}
                           sceneFavorites={sceneFavorites}
                           contextFrame={contextFrame}
@@ -863,6 +892,7 @@ function TimelineItem({
   selected,
   dimmed,
   animOverride,
+  keyOverride,
   favorites,
   sceneFavorites,
   contextFrame,
@@ -879,6 +909,8 @@ function TimelineItem({
   dimmed: boolean;
   /** Durée d'entrée ou de sortie en cours de réglage au bord du bloc. */
   animOverride: AnimOverride | null;
+  /** Image clé en cours de déplacement : son rang et son arrivée. */
+  keyOverride: { index: number; arrival: number } | null;
   favorites: string[];
   sceneFavorites: Record<"transition" | "camera" | "shotfx", string[]>;
   /** Image visée par le dernier clic droit. */
@@ -909,6 +941,11 @@ function TimelineItem({
   const partner = item.type === "video" || item.type === "audio" ? linkedItem(props.project, item) : null;
   const linkedAudio = item.type === "audio" && partner !== null;
   const videoSound = item.type === "video" && item.source.hasAudio !== false && !item.audioLinkId;
+  // Images clés : un losange à l'instant où chacune arrive, un trait fin pour son mouvement.
+  const keys = item.type !== "audio" && width >= 24 ? keysByArrival(item) : [];
+  /** Image clé visée par le dernier clic droit, pour la retirer depuis le menu. */
+  const [menuKey, setMenuKey] = useState<number | null>(null);
+  const menuEntry = menuKey !== null ? keys.find((entry) => entry.index === menuKey) : undefined;
 
   return (
     <ContextMenu>
@@ -917,6 +954,10 @@ function TimelineItem({
           layout="position"
           transition={{ type: "spring", stiffness: 500, damping: 40 }}
           onPointerDown={onPointerDown}
+          onContextMenu={(event) => {
+            const index = (event.target as HTMLElement).dataset.keyIndex;
+            setMenuKey(index === undefined ? null : Number(index));
+          }}
           data-item-id={item.id}
           className={cn(
             "group absolute top-1 bottom-1 flex cursor-grab items-center gap-1.5 overflow-hidden rounded-md border px-2 text-xs select-none active:cursor-grabbing",
@@ -1005,9 +1046,43 @@ function TimelineItem({
               <span data-edge="end" className="absolute inset-y-0 right-0 w-2 cursor-ew-resize bg-foreground/0 transition-colors hover:bg-foreground/25" />
             </>
           )}
+          {keys.map(({ key, index, arrival }) => {
+            const shown = keyOverride?.index === index ? keyOverride.arrival : arrival;
+            if (shown < 0 || shown > item.duration) return null;
+            // Le losange reste entier dans le bloc, même sur une clé qui arrive à son tout dernier instant.
+            const x = Math.min(width - 6, Math.max(6, shown * ppf));
+            const span = Math.min(x, keyFrames(key) * ppf);
+            const label = `Image clé à ${secondsLabel(shown, fps)} · ${keySummary(key)}`;
+            return (
+              <span key={index} className="contents">
+                <span aria-hidden className="pointer-events-none absolute bottom-[6.5px] h-px bg-foreground/40" style={{ left: x - span, width: span }} />
+                <span
+                  data-key-index={index}
+                  role="img"
+                  aria-label={label}
+                  title={`${label} : tirer pour la déplacer, cliquer pour y aller`}
+                  className={cn(
+                    "absolute bottom-[2px] z-[2] size-2.5 -translate-x-1/2 rotate-45 rounded-[1px] border border-background bg-foreground shadow-sm",
+                    track.locked ? "cursor-not-allowed" : "cursor-ew-resize",
+                    keyOverride?.index === index && "bg-primary"
+                  )}
+                  style={{ left: x }}
+                />
+              </span>
+            );
+          })}
         </motion.div>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-72">
+        {menuEntry && item.type !== "audio" && (
+          <>
+            <ContextMenuItem variant="destructive" disabled={track.locked} onClick={() => props.onItemPatch(item.id, { keys: removeKey(item.keys, menuEntry.index) } as Partial<ClipItem>)}>
+              <Diamond className="mr-2 h-4 w-4" />
+              Retirer l’image clé à {secondsLabel(menuEntry.arrival, fps)}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
         <ContextMenuItem onClick={() => props.onSplit(item.id)}>
           <Scissors className="mr-2 h-4 w-4" />
           Scinder à la tête de lecture

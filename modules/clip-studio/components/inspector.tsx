@@ -9,13 +9,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Toggle } from "@/components/ui/toggle";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { TEXT_PRESETS, linkedItem, videoSpeedPatch } from "../engine/edit";
 import { DEFAULT_DUCK, DUCK_DB_MAX, DUCK_DB_MIN, canDuck, decibelsToDuck, duckToDecibels, voiceWindows } from "../engine/mix";
@@ -35,7 +28,13 @@ import type {
 import { FONTS } from "../lib/fonts";
 import type { BrandFontChoice, BrandKitChoice } from "../lib/client";
 import { cameraPatch, transitionPatch } from "../lib/scene-catalog";
+import type { BoardPalette } from "../engine/board-palette";
+import { DEFAULT_BOARD_PALETTE } from "../engine/board-palette";
+import type { Placement } from "../engine/key-edit";
+import { keyedFrame } from "../engine/keys";
 import { AnimationFields } from "./motion-fields";
+import { CounterFields, KeysField, MarksField, ShadowField, StrokeFields } from "./illustrate-fields";
+import { Choice, ColorField, FieldLabel, Row, Section, Slider } from "./inspector-parts";
 import { SceneField } from "./scene-picker";
 import { VideoCaptionsField, type TranscribedHandler } from "./video-captions-field";
 
@@ -62,13 +61,32 @@ interface InspectorProps {
   onReattachAudio?: (itemId: string) => void;
   /** Range la transcription d'une vidéo dans le projet et pose ses sous-titres. */
   onTranscribed?: TranscribedHandler;
+  /** Tête de lecture : là où « Animer » pose une image clé, là où se lisent les valeurs animées. */
+  frame?: number;
+  /** « Animer » : les réglages de disposition posent une image clé à la tête de lecture. */
+  animate?: boolean;
+  /** Pose l'élément (et les pièces de son acteur) : position, taille, rotation, opacité. Absent : `onPatch` sur son cadre. */
+  onPlace?: (next: Placement, key: string) => void;
+  /** Place la tête de lecture (une image clé de la liste). */
+  onSeek?: (frame: number) => void;
+  /** Palette de planche de la marque du projet, pour les marques, ombres et unités. */
+  palette?: BoardPalette;
 }
 
-export function Inspector({ project, item, onPatch, onClose, onCaption, brandFonts = [], onChangeTrackVoice, onSetTrackDuck, onDetachAudio, onReattachAudio, onTranscribed }: InspectorProps) {
+export function Inspector({ project, item, onPatch, onClose, onCaption, brandFonts = [], onChangeTrackVoice, onSetTrackDuck, onDetachAudio, onReattachAudio, onTranscribed, frame = item.start, animate = false, onPlace, onSeek, palette = DEFAULT_BOARD_PALETTE }: InspectorProps) {
   const fps = project.fps;
+  const size = { width: project.width, height: project.height };
   const track = project.tracks.find((entry) => entry.items.some((other) => other.id === item.id));
   const title =
-    item.type === "text" ? "Texte" : item.type === "image" ? "Image" : item.type === "video" ? "Vidéo" : item.type === "shape" ? "Forme" : "Son";
+    item.type === "text"
+      ? "Texte"
+      : item.type === "image"
+        ? "Image"
+        : item.type === "video"
+          ? "Vidéo"
+          : item.type === "shape"
+            ? item.shape === "stroke" ? "Tracé" : "Forme"
+            : "Son";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -80,9 +98,12 @@ export function Inspector({ project, item, onPatch, onClose, onCaption, brandFon
       </div>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
         {item.type === "text" && <TextFields item={item} onPatch={onPatch} brandFonts={brandFonts} />}
+        {item.type === "text" && <CounterFields item={item} fps={fps} palette={palette} onPatch={onPatch} />}
+        {item.type === "text" && !item.karaoke && <MarksField item={item} fps={fps} frame={frame} palette={palette} onPatch={onPatch} />}
         {item.type === "image" && <ImageFields item={item} onPatch={onPatch} />}
         {item.type === "video" && <VideoFields item={item} project={project} onPatch={onPatch} />}
-        {item.type === "shape" && <ShapeFields item={item} onPatch={onPatch} />}
+        {item.type === "shape" && item.shape === "stroke" && item.stroke && <StrokeFields item={item} fps={fps} frame={frame} size={size} onPatch={onPatch} />}
+        {item.type === "shape" && item.shape !== "stroke" && <ShapeFields item={item} palette={palette} size={size} onPatch={onPatch} />}
         {item.type === "video" && (
           <VideoSoundFields item={item} project={project} fps={fps} onPatch={onPatch} onDetach={onDetachAudio} onReattach={onReattachAudio} />
         )}
@@ -150,121 +171,18 @@ export function Inspector({ project, item, onPatch, onClose, onCaption, brandFon
           />
         </Section>
 
-        {item.type !== "audio" && <VisualFields item={item} fps={fps} onPatch={onPatch} />}
+        {item.type !== "audio" && (
+          <VisualFields
+            item={item}
+            fps={fps}
+            frame={frame}
+            animate={animate}
+            onPatch={onPatch}
+            onPlace={onPlace ?? ((next, key) => onPatch({ transform: { ...item.transform, ...next } } as Partial<ClipItem>, key))}
+            onSeek={onSeek}
+          />
+        )}
       </div>
-    </div>
-  );
-}
-
-// ─── Blocs communs ───────────────────────────────────────────────
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-2.5">
-      <h3 className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex min-w-0 items-center justify-between gap-3">
-      <span className="min-w-0 text-xs text-muted-foreground">{label}</span>
-      <div className="flex shrink-0 items-center gap-2">{children}</div>
-    </div>
-  );
-}
-
-function Slider({
-  label,
-  value,
-  min,
-  max,
-  step,
-  unit,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  unit?: string;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="block space-y-1">
-      <span className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-mono tabular-nums">
-          {Number(value.toFixed(step < 1 ? 2 : 0)).toLocaleString("fr-FR")}
-          {unit ? ` ${unit}` : ""}
-        </span>
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full accent-primary"
-      />
-    </label>
-  );
-}
-
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  const hex = /^#[0-9a-f]{6}$/i.test(value) ? value : "#ffffff";
-  return (
-    <Row label={label}>
-      <input
-        type="color"
-        value={hex}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-7 w-10 cursor-pointer rounded border bg-transparent"
-        aria-label={label}
-      />
-    </Row>
-  );
-}
-
-function Choice<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: Record<T, string>;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <Row label={label}>
-      <Select value={value} onValueChange={(next) => onChange(next as T)}>
-        <SelectTrigger size="sm" className="w-48 max-w-full px-2 text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {(Object.keys(options) as T[]).map((key) => (
-            <SelectItem key={key} value={key} className="text-xs">
-              {options[key]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </Row>
-  );
-}
-
-/** Libellé au-dessus d'un champ qui prend toute la largeur (sélecteur à vignette). */
-function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0 space-y-1">
-      <span className="block text-xs text-muted-foreground">{label}</span>
-      {children}
     </div>
   );
 }
@@ -287,15 +205,23 @@ function CameraField({ item, onPatch }: { item: ImageItem | VideoItem; onPatch: 
 function VisualFields({
   item,
   fps,
+  frame,
+  animate,
   onPatch,
+  onPlace,
+  onSeek,
 }: {
   item: VisualItem;
   fps: number;
+  frame: number;
+  animate: boolean;
   onPatch: InspectorProps["onPatch"];
+  onPlace: (next: Placement, key: string) => void;
+  onSeek?: (frame: number) => void;
 }) {
-  const t = item.transform;
-  const setTransform = (patch: Partial<VisualItem["transform"]>, key: string) =>
-    onPatch({ transform: { ...t, ...patch } } as Partial<ClipItem>, key);
+  // Avec « Animer », les curseurs montrent l'élément tel qu'il est à la tête de lecture, là où ils posent une clé.
+  const t = animate ? keyedFrame(item, frame).transform : item.transform;
+  const setTransform = (patch: Placement, key: string) => onPlace(patch, key);
 
   return (
     <>
@@ -316,6 +242,8 @@ function VisualFields({
           ))}
         </div>
       </Section>
+
+      <KeysField item={item} fps={fps} animate={animate} onPatch={onPatch} onSeek={onSeek ?? (() => undefined)} />
 
       <Section title="Transition">
         <FieldLabel label="Depuis le plan précédent">
@@ -688,7 +616,7 @@ function LinkedSoundNote({ item, project, onReattach }: { item: AudioItem; proje
   );
 }
 
-function ShapeFields({ item, onPatch }: { item: ShapeItem; onPatch: InspectorProps["onPatch"] }) {
+function ShapeFields({ item, palette, size, onPatch }: { item: ShapeItem; palette: BoardPalette; size: { width: number; height: number }; onPatch: InspectorProps["onPatch"] }) {
   return (
     <Section title="Forme">
       <ColorField label="Remplissage" value={item.fill} onChange={(fill) => onPatch({ fill } as Partial<ClipItem>, "fill")} />
@@ -703,6 +631,7 @@ function ShapeFields({ item, onPatch }: { item: ShapeItem; onPatch: InspectorPro
           />
         </Row>
       )}
+      {item.shape === "rect" && <ShadowField item={item} palette={palette} size={size} onPatch={onPatch} />}
     </Section>
   );
 }

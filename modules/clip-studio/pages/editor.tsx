@@ -12,6 +12,7 @@ import {
   FolderOpen,
   Mic,
   Music,
+  PenTool,
   Redo2,
   Type,
   Undo2,
@@ -68,7 +69,20 @@ import {
   type ClipProject,
   type MediaSource,
   type ShapeItem,
+  type VisualItem,
 } from "../engine/types";
+import {
+  createActor,
+  createDrawnStroke,
+  createStroke,
+  insertIllustration,
+  placeWithGroup,
+  type ActorKind,
+  type DrawTool,
+  type IllustrateContext,
+  type StrokeKind,
+} from "../engine/illustrate";
+import type { Placement } from "../engine/key-edit";
 import { applyBrandTheme } from "../engine/brand";
 import { callModule, fetchBrandTheme, useBrandFonts, useBrandKits } from "../lib/client";
 import { brandFontsOf, ensureBrandFonts, ensureProjectFonts } from "../lib/fonts";
@@ -78,6 +92,8 @@ import { PreviewStage } from "../components/preview-stage";
 import { TextPanel } from "../components/text-panel";
 import { VoicePanel } from "../components/voice-panel";
 import { MusicPanel } from "../components/music-panel";
+import { IllustratePanel } from "../components/illustrate-panel";
+import { useBoardStyle } from "../components/use-board-style";
 import { Timeline } from "../components/timeline";
 import { TrackVoiceDialog } from "../components/track-voice-dialog";
 import { applyVoiceReplacements } from "../engine/revoice";
@@ -120,7 +136,7 @@ export default function EditorPage() {
   );
 }
 
-type Panel = "media" | "text" | "voice" | "music";
+type Panel = "media" | "text" | "illustrate" | "voice" | "music";
 
 function Editor({ initial }: { initial: ClipProject }) {
   const { project, commit, undo, redo, canUndo, canRedo, saveState } = useProjectHistory(initial);
@@ -278,6 +294,35 @@ function Editor({ initial }: { initial: ClipProject }) {
     commit((current) => addItem(current, item, textTrack?.id));
     setSelectedId(item.id);
   };
+
+  // ─── Illustrer ─────────────────────────────────────────────────
+  // Palette de planche et polices de la marque : ce qui s'illustre à la main parle la langue de la planche.
+  const boardStyle = useBoardStyle(project.brandKitId);
+  /** Outil de tracé actif sur l'aperçu, ou `null` (sélection). */
+  const [tool, setTool] = useState<DrawTool | null>(null);
+  /** « Animer » : un déplacement à un autre instant que le début pose une image clé. */
+  const [animate, setAnimate] = useState(false);
+
+  const illustrateContext = (): IllustrateContext => ({
+    aspect: project.aspect,
+    width: project.width,
+    height: project.height,
+    fps: project.fps,
+    start: frame,
+    palette: boardStyle.palette,
+    fonts: boardStyle.fonts,
+  });
+
+  /** Ajoute une illustration (du plus haut au plus bas) et sélectionne son texte, sinon sa seule pièce. */
+  const addIllustration = (items: VisualItem[]) => {
+    if (items.length === 0) return;
+    commit((current) => insertIllustration(current, items));
+    setSelectedId((items.find((item) => item.type === "text") ?? items[0]).id);
+  };
+
+  /** Pose un élément (et les pièces de son acteur) à la tête de lecture, avec ou sans image clé. */
+  const placeItem = (itemId: string, next: Placement, key: string) =>
+    commit((current) => placeWithGroup(current, itemId, frame, next, { animate, fps: current.fps }), key);
 
   const deleteSelected = useCallback(
     (itemId: string) => {
@@ -469,6 +514,9 @@ function Editor({ initial }: { initial: ClipProject }) {
           <RailButton label="Texte" active={panel === "text"} onClick={() => setPanel(panel === "text" ? null : "text")}>
             <Type className="h-5 w-5" />
           </RailButton>
+          <RailButton label="Illustrer" active={panel === "illustrate"} onClick={() => setPanel(panel === "illustrate" ? null : "illustrate")}>
+            <PenTool className="h-5 w-5" />
+          </RailButton>
           <RailButton label="Voix" active={panel === "voice"} onClick={() => setPanel(panel === "voice" ? null : "voice")}>
             <Mic className="h-5 w-5" />
           </RailButton>
@@ -487,9 +535,19 @@ function Editor({ initial }: { initial: ClipProject }) {
               transition={{ duration: 0.2, ease: "easeOut" }}
               className={cn("shrink-0 overflow-hidden border-r", narrow && "absolute inset-y-0 left-14 z-20 bg-background shadow-lg")}
             >
-              <div className="h-full w-[300px] max-w-[calc(100vw-3.5rem)]">
+              {/* 299 px : le panneau mesure 300 px, bordure comprise ; son contenu ne passe pas sous elle. */}
+              <div className="h-full w-[299px] max-w-[calc(100vw-3.5rem)]">
                 {panel === "media" && <MediaPanel onAdd={(source) => addSource(source)} aspect={project.aspect} />}
                 {panel === "text" && <TextPanel onAddText={addText} onAddShape={addShape} />}
+                {panel === "illustrate" && (
+                  <IllustratePanel
+                    palette={boardStyle.palette}
+                    tool={tool}
+                    onToolChange={setTool}
+                    onAddStroke={(kind: StrokeKind) => addIllustration([createStroke(kind, illustrateContext())])}
+                    onAddActor={(kind: ActorKind) => addIllustration(createActor(kind, illustrateContext()))}
+                  />
+                )}
                 {panel === "music" && <MusicPanel onAdd={addMusic} />}
                 {panel === "voice" && (
                   <VoicePanel
@@ -513,9 +571,20 @@ function Editor({ initial }: { initial: ClipProject }) {
           selectedId={selectedId}
           onSelect={setSelectedId}
           canvasRef={canvasRef}
-          onTransform={(itemId, transform) =>
-            commit((current) => updateItem(current, itemId, { transform } as Partial<ClipItem>), `transform-${itemId}`)
-          }
+          onPlace={(itemId, next) => placeItem(itemId, next, `transform-${itemId}`)}
+          onPatchItem={(itemId, patch) => commit((current) => updateItem(current, itemId, patch), `stroke-point-${itemId}`)}
+          onRestore={(items) => commit((current) => items.reduce((next, item) => updateItem(next, item.id, () => item), current))}
+          onDraw={(drawn, from, to) => {
+            const item = createDrawnStroke(drawn, from, to, illustrateContext());
+            if (!item) return;
+            addIllustration([item]);
+            // Le trait posé, on repasse en sélection : ses poignées se montrent.
+            setTool(null);
+          }}
+          tool={tool}
+          onToolChange={setTool}
+          animate={animate}
+          onAnimateChange={setAnimate}
         />
 
         <AnimatePresence initial={false}>
@@ -528,7 +597,7 @@ function Editor({ initial }: { initial: ClipProject }) {
               transition={{ duration: 0.2, ease: "easeOut" }}
               className={cn("shrink-0 overflow-hidden border-l", narrow && "absolute inset-y-0 right-0 z-20 bg-background shadow-lg")}
             >
-              <div className="h-full w-[300px] max-w-[100vw]">
+              <div className="h-full w-[299px] max-w-[100vw]">
                 {selected ? (
                   <Inspector
                     project={project}
@@ -546,6 +615,11 @@ function Editor({ initial }: { initial: ClipProject }) {
                     onPatch={(patch, key) =>
                       commit((current) => updateItem(current, selected.id, patch), `inspect-${selected.id}-${key}`)
                     }
+                    frame={frame}
+                    animate={animate}
+                    onPlace={(next, key) => placeItem(selected.id, next, `inspect-${selected.id}-${key}`)}
+                    onSeek={seek}
+                    palette={boardStyle.palette}
                     onChangeTrackVoice={setVoiceTrackId}
                     onSetTrackDuck={(trackId, duck, key) => commit((current) => setTrackDuck(current, trackId, duck), `track-${trackId}-${key}`)}
                     onDetachAudio={(videoId) => commit((current) => detachVideoAudio(current, videoId).project)}

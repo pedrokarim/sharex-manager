@@ -559,3 +559,22 @@ Vérifié sur le banc `scripts/take-stills.ts` (trois tableaux d’interfaces
 ajoutés) et dans les tests : chaque interface posée sans chevauchement ni
 débordement, en `split` comme en `board`, la frappe calée sur le mot de la
 commande.
+
+**I6 – Éditeur, fait le 25/10/2026.** Un panneau « Illustrer » dans le rail
+de l’éditeur pose à la tête de lecture, au centre de la zone d’écriture,
+les traits (flèche, croix, barre, soulignement, cercle, liaison) et les
+acteurs de la planche (carte, carte numérotée, pastille, note, compteur,
+titre à pavé), compilés par `compileBoard` dans la palette et les polices
+de la marque. Sur l’aperçu, une flèche, un trait ou une liaison se tracent
+à la souris, puis se reprennent par leurs bouts et leur poignée de courbe.
+« Animer » transforme un déplacement ou un redimensionnement à un autre
+instant en image clé (`engine/key-edit.ts`) ; le cadre de sélection suit
+l’élément à sa place animée ; les images clés sont des losanges sur la
+chronologie et une liste dans l’inspecteur. L’inspecteur pose des marques
+sur les mots d’un texte et règle tracés, ombres et compteurs. Mesuré sur
+l’application compilée à 390 et 1440 px : ni débordement ni chevauchement,
+placements et poignées au centième de pixel ; la requête d’enregistrement
+porte bien les nouveaux champs. Pas encore fait : marques alignées sur les
+mots d’une voix (un décalage seulement), poignées de bouts sur une croix ou
+un cercle, mesure à 1024 px, avec une marque, et de l’export dans un vrai
+navigateur.
