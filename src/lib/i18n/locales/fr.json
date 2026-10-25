@@ -704,7 +704,21 @@
       "error": "Analyse impossible.",
       "unknown_format": "Format inconnu",
       "note_limits": "Cet outil lit ce qui est écrit dans le fichier. Il ne reconnaît pas une image générée à ses pixels, ne voit pas les filigranes invisibles (SynthID et équivalents), et une image sans signature n’est pas pour autant une vraie photo : les marques d’origine se retirent.",
-      "note_privacy": "L’image est envoyée au serveur le temps de la lecture, puis oubliée : elle n’est ni enregistrée ni journalisée."
+      "note_privacy": "L’image est envoyée au serveur le temps de la lecture, puis oubliée : elle n’est ni enregistrée ni journalisée.",
+      "synthid": {
+        "kicker": "Service officiel de Google DeepMind",
+        "intro": "Certains générateurs cachent dans les pixels un filigrane invisible que cet outil ne sait pas lire : SynthID, conçu par Google DeepMind. Google propose un détecteur officiel et gratuit, sur son propre site : vous y déposez vous-même votre fichier.",
+        "step1_title": "Ouvrez le détecteur",
+        "step1_text": "Le lien ouvre synthid.com dans un nouvel onglet. Acceptez les conditions d’utilisation de Google.",
+        "step2_title": "Connectez-vous",
+        "step2_text": "Avec un compte Google, ou un autre compte proposé sur la page. Le nombre d’analyses par jour est limité.",
+        "step3_title": "Déposez votre fichier",
+        "step3_text": "Image, vidéo ou audio, dans sa meilleure qualité. Le détecteur répond : filigrane détecté, ou non détecté.",
+        "partners": "Lit les filigranes de",
+        "open": "Ouvrir SynthID Detector",
+        "caveat": "Ce n’est pas un détecteur d’IA général : une image venue d’un autre générateur ressortira « non détectée ».",
+        "privacy": "ShareX Manager n’envoie rien à Google. Le lien mène au service, que vous utilisez avec votre propre compte."
+      }
     },
     "hub": {
       "local_title": "Sur place",

@@ -7,6 +7,11 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Outil « Origine d’une image » : un encadré présente SynthID Detector, le
+  détecteur officiel de Google DeepMind, qui lit le filigrane invisible que
+  l’outil ne voit pas. Simple lien vers synthid.com, en trois étapes (ouvrir,
+  se connecter, déposer le fichier), avec les éditeurs dont il lit les
+  filigranes (Google, OpenAI, NVIDIA, Kakao). Rien n’est envoyé à Google.
 - Clip Studio, planche d’illustrations (dossier 01 illustrations, I1 à I5) :
   « Monter ma prise » découpe la vidéo en tableaux, un par idée, qui
   grandissent sur les mots : planche au-dessus de la caméra, caméra plein

@@ -11,6 +11,7 @@ import { PhotoHeader } from "@/components/front/photo-header";
 import { Orb } from "@/components/loading";
 import { ACCENT, PILL_SOLID } from "@/components/front/styles";
 import { ProvenanceDetails } from "@/components/provenance/provenance-view";
+import { SynthIdPanel } from "@/components/tools/synthid-panel";
 import { useTranslation } from "@/lib/i18n";
 import type { ProvenanceReport, ProvenanceVerdict } from "@/lib/provenance/types";
 import { cn } from "@/lib/utils";
@@ -175,7 +176,12 @@ export function ImageOriginTool() {
         )}
       </AnimatePresence>
 
-      <footer className={cn(FRONT_NARROW, "space-y-3 pt-14 pb-24 text-sm text-muted-foreground sm:pb-32")}>
+      {/* Ce que l'outil ne voit pas, le détecteur de Google le lit : on y renvoie le visiteur. */}
+      <div className={cn(FRONT_NARROW, "pt-14")}>
+        <SynthIdPanel />
+      </div>
+
+      <footer className={cn(FRONT_NARROW, "space-y-3 pt-10 pb-24 text-sm text-muted-foreground sm:pb-32")}>
         <p className="text-pretty">{t("tools.origin.note_limits")}</p>
         <p className="text-pretty">{t("tools.origin.note_privacy")}</p>
       </footer>

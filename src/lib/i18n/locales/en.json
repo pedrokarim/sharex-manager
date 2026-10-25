@@ -687,7 +687,21 @@
       "error": "Analysis failed.",
       "unknown_format": "Unknown format",
       "note_limits": "This tool reads what is written in the file. It does not recognise a generated image from its pixels, cannot see invisible watermarks (SynthID and the like), and an image without a signature is not necessarily a real photo: provenance marks can be removed.",
-      "note_privacy": "The image is sent to the server while it is read, then forgotten: it is neither stored nor logged."
+      "note_privacy": "The image is sent to the server while it is read, then forgotten: it is neither stored nor logged.",
+      "synthid": {
+        "kicker": "Official Google DeepMind service",
+        "intro": "Some generators hide an invisible watermark in the pixels that this tool cannot read: SynthID, built by Google DeepMind. Google offers an official, free detector on its own site, where you upload your file yourself.",
+        "step1_title": "Open the detector",
+        "step1_text": "The link opens synthid.com in a new tab. Accept Google’s terms of service.",
+        "step2_title": "Sign in",
+        "step2_text": "With a Google account, or another account offered on the page. The number of checks per day is limited.",
+        "step3_title": "Upload your file",
+        "step3_text": "Image, video or audio, in its best quality. The detector answers: watermark detected, or not detected.",
+        "partners": "Reads watermarks from",
+        "open": "Open SynthID Detector",
+        "caveat": "It is not a general AI detector: an image from another generator will come back “not detected”.",
+        "privacy": "ShareX Manager sends nothing to Google. The link simply leads to the service, which you use with your own account."
+      }
     },
     "hub": {
       "local_title": "Hosted here",
