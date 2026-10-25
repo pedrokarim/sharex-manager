@@ -1,5 +1,6 @@
 /**
- * Banque de bruitages sur le disque (dossier 07 sexies, D3).
+ * Banque de bruitages sur le disque (dossier 07 sexies, D3 ; sons de la
+ * planche : dossier 01, « illustrations animées », étape I4).
  *
  * Les sons sont synthétisés par le moteur (`engine/sfx.ts`) et écrits une
  * fois dans `data/resources/sfx/`, d'où la route des données du module les

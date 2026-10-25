@@ -29,7 +29,16 @@ export interface RemoteImage {
   name: string;
 }
 
-export async function fetchRemoteImage(rawUrl: string): Promise<RemoteImage> {
+export interface FetchRemoteImageOptions {
+  /**
+   * Accepte aussi `image/svg+xml`. Réservé à un appelant qui nettoie le SVG
+   * puis le rastérise avant tout usage (logos officiels de Clip Studio,
+   * `modules/clip-studio/lib/svg-logo.ts`) : un SVG n'est jamais servi tel quel.
+   */
+  allowSvg?: boolean;
+}
+
+export async function fetchRemoteImage(rawUrl: string, options: FetchRemoteImageOptions = {}): Promise<RemoteImage> {
   let url = parseUrl(rawUrl);
   const deadline = Date.now() + DEADLINE_MS;
 
@@ -37,7 +46,7 @@ export async function fetchRemoteImage(rawUrl: string): Promise<RemoteImage> {
     const literal = url.hostname.replace(/^\[|\]$/g, "");
     if (isIP(literal) && isPrivateAddress(literal)) throw internalRefused();
 
-    const response = await request(url, deadline);
+    const response = await request(url, deadline, options.allowSvg === true);
 
     if (response.status >= 300 && response.status < 400) {
       response.discard();
@@ -56,7 +65,7 @@ export async function fetchRemoteImage(rawUrl: string): Promise<RemoteImage> {
       .split(";")[0]
       .trim()
       .toLowerCase();
-    if (!mimeType.startsWith("image/") || mimeType === "image/svg+xml") {
+    if (!mimeType.startsWith("image/") || (mimeType === "image/svg+xml" && options.allowSvg !== true)) {
       response.discard();
       throw new Error("Ce lien ne pointe pas vers une image (PNG, JPEG, WebP…)");
     }
@@ -124,7 +133,7 @@ interface RawResponse {
   discard: () => void;
 }
 
-function request(url: URL, deadline: number): Promise<RawResponse> {
+function request(url: URL, deadline: number, allowSvg = false): Promise<RawResponse> {
   const remaining = deadline - Date.now();
   if (remaining <= 0) return Promise.reject(new Error("Le site met trop de temps à répondre"));
 
@@ -138,7 +147,7 @@ function request(url: URL, deadline: number): Promise<RawResponse> {
         // Plusieurs hébergeurs (Wikimedia, certains CDN) refusent une requête
         // sans agent identifié.
         headers: {
-          accept: "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8",
+          accept: allowSvg ? "image/svg+xml,image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8" : "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8",
           "user-agent": "ShareX-Manager/ai-image-gen (image import)",
         },
       },

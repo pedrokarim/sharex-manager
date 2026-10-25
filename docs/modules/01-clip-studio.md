@@ -163,9 +163,13 @@ identifiable (jeu, film, série, marque, appli, personnage, lieu) une requête
 illustration. L’icône est cherchée sur le web seulement (`findSegmentIcon`),
 avec sa propre consigne : icône d’appli du store, logo du kit presse ou du
 site officiel, avatar du compte officiel ; format carré ou logo détouré, PNG
-transparent accepté, SVG refusé (le téléchargement et sharp n’acceptent que
-des pixels), petit côté d’au moins 128 px au lieu de 640. Les candidates sont
-posées sur un fond gris (un logo noir comme un logo blanc y restent visibles)
+transparent ou SVG officiel acceptés, petit côté d’au moins 128 px au lieu de
+640. Un SVG est nettoyé puis rastérisé en PNG transparent de 512 px par le
+serveur (`lib/svg-logo.ts`, voir le dossier des illustrations, I4) : il n’est
+jamais servi tel quel, et le rendu ne reçoit que des pixels. Un logo n’est
+cherché qu’une fois : une icône déjà reconnue pour le même sujet est reprise
+des médias du module, une adresse déjà téléchargée n’est pas retéléchargée.
+Les candidates sont posées sur un fond gris (un logo noir comme un logo blanc y restent visibles)
 et montrées à Codex, qui doit reconnaître l’icône officielle de CE sujet :
 sans Codex, s’il échoue ou s’il hésite, la réponse est 0 et le segment reste
 sans icône. Rien plutôt qu’un faux. Les icônes partagent la file du web
@@ -230,8 +234,11 @@ dans la description.
   segment, cinq recherches web à la fois au plus
   (`FOUND_LIMITS.webConcurrency`).
 - Les adresses rendues par Codex sont des données : elles passent toutes par
-  `fetchRemoteImage`, jamais par le navigateur ; un SVG ou un fichier qui
-  n’est pas une image est refusé.
+  `fetchRemoteImage`, jamais par le navigateur ; un fichier qui n’est pas
+  une image est refusé, et un SVG aussi, sauf pour une icône : nettoyé par
+  liste fermée (ni script, ni gestionnaire d’évènements, ni `foreignObject`,
+  ni référence extérieure, poids et complexité bornés) puis rastérisé, il ne
+  sort du serveur qu’en PNG.
 - Les candidates téléchargées pour l’onglet « Trouver » vivent dans
   `data/found/` et sont effacées après vingt-quatre heures si elles n’ont pas
   été importées.
@@ -1065,6 +1072,14 @@ Le module ne fournit **aucune musique** : aucune banque de sons n’est
 embarquée, pour ne pas avoir à gérer de licences. L’utilisateur importe ses
 propres fichiers (MP3, M4A, WAV, OGG). La page d’import le rappelle en une
 phrase.
+
+Les bruitages ne sont pas une banque de sons : ils sont synthétisés par
+le code d’après une recette fixe (`engine/sfx.ts`), écrits au démarrage dans
+`data/resources/sfx/` (`lib/sfx.ts`), sans enregistrement d’autrui, donc
+sans licence ni mention. Quatre servent aux temps forts (impact, whoosh,
+pop, révélation, voir 07 sexies, D3), cinq à la planche d’illustrations
+(frappe en boucle et en rafale, tic, coup sourd, clic, voir le dossier des
+illustrations, I4) ; chacun a son volume, toujours sous la voix.
 
 ## 9. Performances
 

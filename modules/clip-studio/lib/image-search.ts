@@ -11,7 +11,10 @@
  * un sujet nommé (jeu, film, appli, marque…), son icône ou son logo
  * officiel, posé en petit à côté de son nom. Les icônes ne se cherchent que
  * sur le web, et une icône dont Codex n'est pas sûr est écartée : rien plutôt
- * qu'un faux.
+ * qu'un faux. Un logo officiel en SVG est accepté : nettoyé puis rastérisé
+ * en PNG transparent par le serveur (`lib/svg-logo.ts`), il n'est jamais
+ * servi tel quel. Une icône déjà trouvée (même sujet, ou même adresse) est
+ * reprise des médias du module au lieu d'être cherchée à nouveau.
  *
  * Toute candidate est téléchargée et contrôlée par le serveur
  * (`@/lib/image-search/download`) avant d'être montrée ou retenue. Les
@@ -32,12 +35,13 @@ import { getOpenverseImage, searchOpenverseImages, type FetchLike, type Openvers
 /** Origine des recherches Openverse dans le registre de consommation des IA. */
 const OPENVERSE_ORIGIN = { module: "clip-studio", feature: "Recherche d'images" };
 import { httpUrl, imageCredit } from "@/lib/image-search/types";
-import type { RemoteImage } from "@/lib/remote-image";
+import { fetchRemoteImage, type RemoteImage } from "@/lib/remote-image";
 import type { ClipAsset } from "../engine/types";
 import sharp from "sharp";
 import { askCodex, extractJson, findCodex, type CodexOptions } from "./codex";
 import { FOUND_LIMITS, type FoundImage, type FoundImageKind, type ImageProvider, type ImportedImage } from "./image-search-types";
 import { ASSETS_DIR, DATA_DIR, assertFileName, ensureDirs, readAssets, writeAssets } from "./store";
+import { looksLikeSvg, rasterizeSvg } from "./svg-logo";
 
 export const FOUND_DIR = path.join(DATA_DIR, "found");
 /** Index des candidates du web : un `.json` que la route des données ne sert jamais. */
@@ -62,6 +66,8 @@ export interface ImageSearchDeps {
 export interface CheckedCandidate {
   found: FoundImage;
   image: DownloadedImage;
+  /** Adresse d'origine du fichier (le web), clé du cache des icônes. */
+  imageUrl?: string;
 }
 
 /** Texte transmis tel quel à Codex, sauf « < » : il ne peut pas refermer la balise qui l'encadre. */
@@ -226,7 +232,7 @@ export function iconSearchPrompt(subject: string): string {
     ...subjectLines(subject),
     "Trouve jusqu'à 3 images qui sont exactement l'identité visuelle de CE sujet : l'icône d'appli du jeu ou de l'appli (App Store, Google Play, Steam, site officiel), son logo officiel (kit presse, site de l'éditeur ou de la marque, wiki officiel, Wikimedia Commons) ou l'avatar de son compte officiel. Pour un personnage : son portrait officiel. Pour un lieu : son emblème, son blason ou son logo officiel.",
     "Jamais un sujet voisin (un autre jeu de la même licence, une autre saison, un homonyme), un fan art, une icône générique ou une image générée par IA.",
-    "Formats : de préférence carré (icône d'appli) ou un logo détouré ; un PNG transparent est bienvenu. imageUrl est l'adresse DIRECTE du fichier, en https, en PNG, JPEG ou WebP : jamais un SVG ni une page HTML. Au moins 256 pixels sur le petit côté, 512 ou plus de préférence.",
+    "Formats : de préférence carré (icône d'appli) ou un logo détouré ; un SVG officiel ou un PNG transparent sont bienvenus. imageUrl est l'adresse DIRECTE du fichier, en https, en SVG, PNG, JPEG ou WebP : jamais une page HTML ni la page d'un fichier sur un wiki (pour Wikimedia Commons, l'adresse du fichier sur upload.wikimedia.org). Pour une image en pixels, au moins 256 pixels sur le petit côté, 512 ou plus de préférence.",
     "pageUrl est la page où l'image est publiée, citée comme source ; title dit ce que montre l'image en quelques mots (par exemple « Icône de l'appli Genshin Impact »).",
     WEB_ANSWER_FORMAT,
   ].join("\n");
@@ -260,8 +266,9 @@ export function parseWebAnswer(answer: string): { imageUrl: string; pageUrl?: st
  * petite, pas une image…) est simplement écartée.
  *
  * `kind` : « icon » cherche l'icône ou le logo officiel du sujet, avec sa
- * propre consigne et un petit côté minimal plus bas (un SVG reste refusé :
- * `fetchRemoteImage` et sharp n'acceptent que des pixels).
+ * propre consigne et un petit côté minimal plus bas ; un SVG y est accepté,
+ * nettoyé puis rastérisé (`downloadIcon`), et une adresse déjà téléchargée
+ * n'est pas retéléchargée. Une illustration reste en pixels seulement.
  */
 export async function searchWeb(
   subject: string,
@@ -281,22 +288,90 @@ export async function searchWeb(
   });
   const proposals = parseWebAnswer(answer);
   const checked = await Promise.all(
-    proposals.map(async (proposal) => {
+    proposals.map(async (proposal): Promise<CheckedCandidate | null> => {
       try {
-        const image = await downloadImage(proposal.imageUrl, { fetchImage: deps.fetchImage, minShortSide: minShortSideOf(kind) });
-        return { image, proposal };
+        if (kind === "icon") {
+          const cached = await cachedIconCandidate(proposal.imageUrl);
+          if (cached) return cached;
+        }
+        const image =
+          kind === "icon"
+            ? await downloadIcon(proposal.imageUrl, deps)
+            : await downloadImage(proposal.imageUrl, { fetchImage: deps.fetchImage, minShortSide: minShortSideOf(kind) });
+        signal?.throwIfAborted();
+        return {
+          found: storeWebCandidate(image, { title: proposal.title, sourcePage: proposal.pageUrl, imageUrl: proposal.imageUrl }, kind),
+          image,
+          imageUrl: proposal.imageUrl,
+        };
       } catch {
         return null;
       }
     })
   );
   signal?.throwIfAborted();
-  return checked
-    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-    .map(({ image, proposal }) => ({
-      found: storeWebCandidate(image, { title: proposal.title, sourcePage: proposal.pageUrl, imageUrl: proposal.imageUrl }, kind),
-      image,
-    }));
+  return checked.filter((entry): entry is CheckedCandidate => entry !== null);
+}
+
+// ─── Icônes : SVG et cache ───────────────────────────────────────
+
+/** Téléchargement d'une icône : le SVG est permis, puisqu'il ne sort d'ici que rastérisé. */
+const fetchIconFile = (url: string) => fetchRemoteImage(url, { allowSvg: true });
+
+/**
+ * Télécharge et contrôle une icône. Un SVG (type annoncé ou contenu) est
+ * nettoyé puis rastérisé en PNG transparent, 512 px sur le grand côté
+ * (`rasterizeSvg`) ; le PNG passe ensuite les mêmes contrôles qu'une image
+ * en pixels. Ce qui est gardé ne contient que des pixels.
+ */
+export async function downloadIcon(url: string, deps: Pick<ImageSearchDeps, "fetchImage"> = {}): Promise<DownloadedImage> {
+  const remote = await (deps.fetchImage ?? fetchIconFile)(url);
+  const buffer = Buffer.from(remote.b64, "base64");
+  const pixels = looksLikeSvg(buffer, remote.mimeType) ? (await rasterizeSvg(buffer)).buffer : buffer;
+  return checkImage(pixels, { minShortSide: FOUND_LIMITS.iconMinShortSide });
+}
+
+/**
+ * Clé du cache des icônes : le sujet cherché, sans accents, casse ni
+ * ponctuation (« Pokémon GO – logo » et « pokemon go logo » sont la
+ * même clé).
+ */
+export function iconCacheKey(query: string): string {
+  return String(query ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
+/** Icônes déjà importées dans les médias du module, dont le fichier existe encore. */
+function importedIcons(): FoundAsset[] {
+  return (readAssets() as FoundAsset[]).filter((asset) => asset.foundKind === "icon" && fs.existsSync(path.join(ASSETS_DIR, asset.file)));
+}
+
+/**
+ * Une adresse déjà téléchargée n'est pas retéléchargée : candidate encore
+ * valide de `data/found/`, ou icône déjà importée dans les médias du module.
+ * Le fichier local est relu et recontrôlé.
+ */
+async function cachedIconCandidate(imageUrl: string): Promise<CheckedCandidate | null> {
+  const now = Date.now();
+  const record = readFoundIndex().find(
+    (entry) => entry.kind === "icon" && entry.imageUrl === imageUrl && now - entry.createdAt < FOUND_LIMITS.foundTtlMs && fs.existsSync(path.join(FOUND_DIR, entry.file))
+  );
+  if (record) {
+    const image = await checkImage(fs.readFileSync(path.join(FOUND_DIR, record.file)), { minShortSide: FOUND_LIMITS.iconMinShortSide });
+    return { found: foundFromRecord(record), image, imageUrl };
+  }
+  const asset = importedIcons().find((entry) => entry.sourceUrl === imageUrl);
+  if (!asset) return null;
+  const image = await checkImage(fs.readFileSync(path.join(ASSETS_DIR, asset.file)), { minShortSide: FOUND_LIMITS.iconMinShortSide });
+  // Une candidate locale, pour l'onglet « Trouver » ; l'import retombera sur le média existant.
+  const title = asset.originalName.replace(/\.[a-z0-9]+$/i, "");
+  const found = storeWebCandidate(image, { title, sourcePage: asset.sourcePage, imageUrl }, "icon");
+  return { found, image, imageUrl };
 }
 
 // ─── Openverse ───────────────────────────────────────────────────
@@ -397,7 +472,17 @@ export async function pickBest(
 // ─── Import dans les médias du module ────────────────────────────
 
 /** Média trouvé : la fiche des médias garde aussi l'état des droits, la candidate d'origine et sa sorte. */
-type FoundAsset = ClipAsset & { rights?: "free" | "unverified"; foundId?: string; foundKind?: "icon" };
+type FoundAsset = ClipAsset & {
+  rights?: "free" | "unverified";
+  foundId?: string;
+  foundKind?: "icon";
+  /** Icône : adresse d'origine du fichier, pour ne pas le télécharger deux fois. */
+  sourceUrl?: string;
+  /** Icône : page source, reprise quand l'icône est reproposée. */
+  sourcePage?: string;
+  /** Icône : sujets (clés de `iconCacheKey`) pour lesquels elle a été reconnue. */
+  foundQueries?: string[];
+};
 
 function toImported(asset: FoundAsset): ImportedImage {
   return {
@@ -416,15 +501,27 @@ function toImported(asset: FoundAsset): ImportedImage {
 /**
  * Copie une candidate contrôlée dans `data/assets/`, comme un média déposé,
  * avec sa mention (« Titre – Auteur, licence, page source ») et l'état de
- * ses droits. Une candidate déjà importée n'est pas copiée deux fois.
+ * ses droits. Une candidate déjà importée n'est pas copiée deux fois ; une
+ * icône venue d'une adresse déjà importée non plus.
+ *
+ * `query` : pour une icône reconnue, le sujet cherché, gardé comme clé du
+ * cache (`findSegmentIcon` la reprend sans relancer de recherche).
  */
-export function importFoundImage(candidate: CheckedCandidate): ImportedImage {
+export function importFoundImage(candidate: CheckedCandidate, options: { query?: string } = {}): ImportedImage {
   ensureDirs();
   const assets = readAssets() as FoundAsset[];
-  const existing = assets.find((asset) => asset.foundId === candidate.found.id && fs.existsSync(path.join(ASSETS_DIR, asset.file)));
-  if (existing) return toImported(existing);
-
   const icon = candidate.found.kind === "icon";
+  const key = icon && options.query ? iconCacheKey(options.query) : "";
+  const sameSource = (asset: FoundAsset) => icon && asset.foundKind === "icon" && !!candidate.imageUrl && asset.sourceUrl === candidate.imageUrl;
+  const existing = assets.find((asset) => (asset.foundId === candidate.found.id || sameSource(asset)) && fs.existsSync(path.join(ASSETS_DIR, asset.file)));
+  if (existing) {
+    if (key && !existing.foundQueries?.includes(key)) {
+      existing.foundQueries = [...(existing.foundQueries ?? []), key].slice(-20);
+      writeAssets(assets);
+    }
+    return toImported(existing);
+  }
+
   const file = `found-${Date.now().toString(36)}${randomBytes(4).toString("hex")}.${candidate.image.extension}`;
   fs.writeFileSync(path.join(ASSETS_DIR, file), candidate.image.buffer);
   const title = candidate.found.title.replace(/[\\/:*?"<>|]+/g, " ").trim() || (icon ? "Icône trouvée" : "Image trouvée");
@@ -438,7 +535,14 @@ export function importFoundImage(candidate: CheckedCandidate): ImportedImage {
     credit: imageCredit(candidate.found).slice(0, 600),
     rights: candidate.found.rights,
     foundId: candidate.found.id,
-    ...(icon ? { foundKind: "icon" as const } : {}),
+    ...(icon
+      ? {
+          foundKind: "icon" as const,
+          ...(candidate.imageUrl ? { sourceUrl: candidate.imageUrl } : {}),
+          ...(candidate.found.sourcePage ? { sourcePage: candidate.found.sourcePage } : {}),
+          ...(key ? { foundQueries: [key] } : {}),
+        }
+      : {}),
     createdAt: Date.now(),
   };
   writeAssets([asset, ...assets]);
@@ -473,7 +577,7 @@ export async function importFoundImageById(id: string, deps: ImageSearchDeps = {
   }
   // Le fichier a été réencodé à la recherche ; il est relu pour en reprendre les dimensions exactes.
   const image = await checkImage(fs.readFileSync(full), { minShortSide: minShortSideOf(record.kind) });
-  return importFoundImage({ found: foundFromRecord(record), image });
+  return importFoundImage({ found: foundFromRecord(record), image, imageUrl: record.imageUrl });
 }
 
 // ─── Recherche à la main (onglet « Trouver ») ────────────────────
@@ -569,12 +673,20 @@ export async function findSegmentImage(
  * candidate, ou si aucune n'est reconnue avec certitude : rien plutôt
  * qu'un faux. Les recherches partagent la file du web
  * (`FOUND_LIMITS.webConcurrency`).
+ *
+ * Cache : une icône déjà reconnue pour le même sujet (`iconCacheKey`), et
+ * toujours dans les médias du module, est reprise telle quelle, sans
+ * recherche ni téléchargement. Les médias du module sont communs à tous les
+ * projets et à toutes les marques : un logo n'est cherché qu'une fois.
  */
 export async function findSegmentIcon(
   input: { query: string; text: string; signal?: AbortSignal },
   deps: ImageSearchDeps = {}
 ): Promise<FoundForSegment | null> {
   const { query, text, signal } = input;
+  const key = iconCacheKey(query);
+  const cached = key ? importedIcons().find((asset) => asset.foundQueries?.includes(key)) : undefined;
+  if (cached) return { image: toImported(cached), provider: "web" };
   let candidates: CheckedCandidate[];
   try {
     candidates = await searchWeb(query, signal, deps, "icon");
@@ -584,5 +696,5 @@ export async function findSegmentIcon(
   }
   if (candidates.length === 0) return null;
   const choice = await pickBest(candidates, text, signal, { ...deps, query, kind: "icon" });
-  return choice > 0 ? { image: importFoundImage(candidates[choice - 1]), provider: "web" } : null;
+  return choice > 0 ? { image: importFoundImage(candidates[choice - 1], { query }), provider: "web" } : null;
 }
