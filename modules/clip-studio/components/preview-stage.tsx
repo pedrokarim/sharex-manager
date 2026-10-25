@@ -2,7 +2,6 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Diamond, MoveUpRight, ScanLine, Slash, Spline } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
@@ -145,7 +144,6 @@ export function PreviewStage({
 }: PreviewStageProps) {
   const area = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
-  const safeZoneButton = useRef<HTMLButtonElement>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
@@ -181,14 +179,6 @@ export function PreviewStage({
       const bar = toolbar.current;
       if (bar && (node.clientWidth - project.width * scale) / 2 < bar.offsetLeft + bar.offsetWidth + 8) {
         scale = Math.min(scale, scaleFor(bar.offsetLeft + bar.offsetWidth + 8, 16));
-      }
-      // Le bouton « Zone de sécurité » (en haut à droite) : une bande libre en haut (et en bas) s'il tombe sur le canevas.
-      const button = safeZoneButton.current;
-      if (button) {
-        const right = (node.clientWidth + project.width * scale) / 2;
-        const top = (node.clientHeight - project.height * scale) / 2;
-        const clearance = button.offsetTop + button.offsetHeight + 8;
-        if (right > button.offsetLeft - 8 && top < clearance) scale = Math.min(scale, scaleFor(16, clearance));
       }
       setBox({
         width: Math.max(0, Math.floor(project.width * scale)),
@@ -367,24 +357,23 @@ export function PreviewStage({
         >
           <Diamond className={cn("h-4 w-4", animate && "fill-current")} />
         </Toggle>
+        {/* La zone de sécurité rejoint la colonne : en haut à droite, elle retirait une bande en haut et en bas à l'aperçu. */}
+        {vertical && (
+          <>
+            <span aria-hidden className="my-0.5 h-px w-5 bg-border" />
+            <Toggle
+              size="sm"
+              pressed={safeZone}
+              onPressedChange={toggleSafeZone}
+              aria-label="Zone de sécurité"
+              title="Zone de sécurité : griser ce que cachent les boutons et la légende des plateformes"
+              className="size-7 min-w-7 rounded-md p-0 data-[state=on]:bg-primary/15 data-[state=on]:text-foreground"
+            >
+              <ScanLine className="h-4 w-4" />
+            </Toggle>
+          </>
+        )}
       </div>
-      {vertical && (
-        <Button
-          ref={safeZoneButton}
-          type="button"
-          variant={safeZone ? "secondary" : "ghost"}
-          size="sm"
-          className="absolute right-3 top-3 z-10 gap-1.5"
-          aria-pressed={safeZone}
-          aria-label="Zone de sécurité"
-          title="Griser ce que cachent les boutons et la légende des plateformes"
-          onClick={toggleSafeZone}
-        >
-          <ScanLine className="h-4 w-4" />
-          {/* Scène étroite (panneaux ouverts sur un petit écran) : l'icône seule, le libellé ne serait plus qu'à moitié visible. */}
-          <span className="hidden @sm:inline">Zone de sécurité</span>
-        </Button>
-      )}
       <div className="relative shadow-2xl shadow-black/30" style={{ width: box.width, height: box.height }}>
         <canvas
           ref={canvasRef}
