@@ -51,6 +51,8 @@ export interface ClipProject {
      * ses illustrations sur les bons mots.
      */
     visualNotes?: { line: number; kind: "board" | "show"; text: string }[];
+    /** Montage d'une prise : l'enchaînement de ses tableaux (`planSignature`), pour que le suivant ne le refasse pas. */
+    montage?: string;
   };
   /**
    * Pistes de haut en bas, comme dans la timeline : la première piste
@@ -249,6 +251,13 @@ export interface ThemeHint {
   paint?: "accent" | "plate" | "veil" | "shadow" | "surface" | "highlight" | "success";
   /** Rang du segment, pour la teinte tournante. */
   accent?: number;
+  /**
+   * Élément d'une planche d'illustrations : une marque donne sa police à un
+   * texte, jamais le reste de ses styles, et `boardColor` dit quelle couleur
+   * de la palette de planche il porte (`board-palette.ts`).
+   */
+  board?: boolean;
+  boardColor?: "paper" | "sheet" | "ink" | "onSheet" | "muted" | "accent" | "onAccent" | "shadow";
 }
 
 /**

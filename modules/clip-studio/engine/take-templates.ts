@@ -1,31 +1,39 @@
 /**
- * « Monter ma prise » (dossier 01, V6) : le projet monté.
+ * « Monter ma prise » (dossier 01, V6 ; illustrations, étapes I2 et I3) : le
+ * projet monté.
  *
  * La prise coupée (`take-cut.ts`) devient une suite de plans vidéo, un par
  * passage gardé, avec leur son détaché sur une piste « Voix » (la musique
  * s'efface dessous, et la vidéo et son son restent liés dans l'éditeur). Le
- * plan des temps forts (`take-plan.ts`) dispose la page :
+ * plan des tableaux (`take-plan.ts`) dispose la page, tableau par tableau :
  *
- * - **split** : une planche aux couleurs de la marque en haut (en 16:9, à
- *   gauche), la caméra en bas, cadrée sur le visage ;
- * - **full** : la caméra plein cadre, pour une phrase directe de 5 s ou plus.
+ * - **split** : une planche d'illustrations en haut (en 16:9, à gauche), la
+ *   caméra en bas, cadrée sur le visage ;
+ * - **full** : la caméra plein cadre, pour une phrase directe de 5 s ou plus ;
+ * - **board** : la planche seule, plein écran, pendant que la voix continue.
  *
- * Chaque coupe change le cadrage (un léger zoom une fois sur deux) : le saut
- * de la coupe devient un effet voulu, et rien ne reste plus de 4 s sans
- * changer. Les sous-titres mot à mot suivent le montage, se posent sur la
- * couture entre planche et caméra, mettent en valeur les mots clés, et se
- * taisent quand la planche écrit déjà ce qui est dit. Musique et bruitages
- * sont posés ensuite (`lib/take-edit.ts`). Tout est éditable : ce sont des
- * éléments ordinaires. Fonction pure.
+ * Chaque tableau devient une planche (`take-scenes.ts`, puis `board.ts`) :
+ * ses objets entrent sur leurs mots, se barrent, se croisent, se relient.
+ * D'une mise en page à l'autre, le papier et la caméra glissent au lieu de
+ * sauter. Chaque coupe change le cadrage (un léger zoom une fois sur deux),
+ * et rien ne reste plus de 4 s sans changer. Les sous-titres mot à mot
+ * suivent le montage, mettent en valeur les mots clés, et se taisent quand la
+ * planche écrit déjà ce qui est dit. La marque fournit couleurs, police,
+ * filigrane et carton de fin ; elle n'impose aucune construction. Musique et
+ * bruitages sont posés ensuite (`lib/take-edit.ts`). Tout est éditable : ce
+ * sont des éléments ordinaires. Fonction pure.
  */
 
-import { accentList, applyBrandTheme, SHORT_SAFE_ZONE, themedTextStyle, type BrandTheme } from "./brand";
+import { boardPaletteOf } from "./board-palette";
+import { boardTracks, compileBoard, type CompiledBoard } from "./board";
+import { accentList, applyBrandTheme, SHORT_SAFE_ZONE, type BrandTheme } from "./brand";
 import { CAPTION_STYLE, createProject, uid } from "./edit";
 import { contrastRatio, distinctColors, opaqueHex } from "./legibility";
 import { captionCenterBounds, captionLineCount, measuredPlan } from "./measured-style";
 import { wordGroups } from "./render";
-import { sfxItem } from "./sfx";
-import { MAX_STILL_MS, beatSpans, captionHideSpans, type BeatSpan, type TakeBoard, type TakePlan } from "./take-plan";
+import { sfxItem, sfxSeries } from "./sfx";
+import { MAX_STILL_MS, beatSpans, captionHideSpans, planSignature, type BeatSpan, type TakeLayout, type TakePlan } from "./take-plan";
+import { sceneBoard } from "./take-scenes";
 import type { KeptSegment } from "./take-cut";
 import {
   ASPECTS,
@@ -33,12 +41,8 @@ import {
   type AudioItem,
   type ClipItem,
   type ClipProject,
-  type ImageItem,
   type MediaSource,
-  type ShapeItem,
   type TextItem,
-  type TextRole,
-  type ThemeHint,
   type TimedWord,
   type Track,
   type Transform,
@@ -63,6 +67,8 @@ export interface TakeGeometry {
   /** Centre vertical des sous-titres en « split » (la couture) et en plein cadre. */
   captionSplitY: number;
   captionFullY: number;
+  /** Centre vertical des sous-titres sur la planche seule. */
+  captionBoardY: number;
 }
 
 /**
@@ -79,6 +85,7 @@ export function takeGeometry(aspect: AspectPreset): TakeGeometry {
       content: { left: 0.05, top: 0.1, width: 0.46, height: 0.62 },
       captionSplitY: 0.84,
       captionFullY: 0.84,
+      captionBoardY: 0.84,
     };
   }
   const seam = aspect === "9:16" ? 0.6 : aspect === "4:5" ? 0.56 : 0.5;
@@ -90,6 +97,8 @@ export function takeGeometry(aspect: AspectPreset): TakeGeometry {
     content: { left: 0.07, top, width: 0.86, height: seam - top - 0.08 },
     captionSplitY: seam,
     captionFullY: aspect === "9:16" ? 0.67 : 0.78,
+    // Planche seule : sous ce qui est écrit, au-dessus de la bande du bas des plateformes.
+    captionBoardY: aspect === "9:16" ? 0.71 : 0.8,
   };
 }
 
@@ -145,7 +154,7 @@ export interface TakeProjectInput {
   words: TimedWord[];
   plan: TakePlan;
   /** Logos trouvés, par rang du temps fort dans `plan.beats`. */
-  logos?: Map<number, MediaSource>;
+  logos?: Map<string, MediaSource>;
   theme?: BrandTheme | null;
   /** Phrases dites, pour rédiger les textes de publication. */
   script?: string[];
@@ -159,7 +168,7 @@ interface CameraPiece {
   segment: KeptSegment;
   start: number;
   end: number;
-  layout: "split" | "full";
+  layout: TakeLayout;
   zoomStep: number;
 }
 
@@ -215,163 +224,6 @@ export function alternateZooms(pieces: CameraPiece[]): CameraPiece[] {
   return result;
 }
 
-// ─── Planche ─────────────────────────────────────────────────────
-
-const NO_ANIM = { kind: "none", frames: 6 } as const;
-
-function text(content: string, start: number, duration: number, box: { x: number; y: number; width: number; height: number }, size: number, role: TextRole, hint: Omit<ThemeHint, "role"> = {}, align: "left" | "center" = "center"): TextItem {
-  return {
-    id: uid("x-"),
-    type: "text",
-    start,
-    duration: Math.max(1, duration),
-    text: content,
-    // Style du rôle dans le thème par défaut ; une marque le remplace ensuite par le sien.
-    style: themedTextStyle(null, { role, ...hint }, { size, align }),
-    theme: { role, ...hint },
-    transform: { ...box, rotation: 0, opacity: 1 },
-    animIn: { kind: "pop", frames: 8 },
-    animOut: { ...NO_ANIM },
-    fit: "shrink",
-  };
-}
-
-function shape(start: number, duration: number, box: Box, paint: ThemeHint["paint"], radius = 0): ShapeItem {
-  return {
-    id: uid("s-"),
-    type: "shape",
-    shape: "rect",
-    start,
-    duration: Math.max(1, duration),
-    fill: paint === "surface" ? "#ffffff" : "#1f1b2e",
-    radius,
-    theme: { paint },
-    transform: { x: box.left + box.width / 2, y: box.top + box.height / 2, width: box.width, height: box.height, rotation: 0, opacity: 1 },
-    animIn: { ...NO_ANIM },
-    animOut: { ...NO_ANIM },
-  };
-}
-
-/**
- * Taille d'une ligne de liste : deux lignes au plus dans sa hauteur, et
- * assez petite pour que le texte tienne sur ces deux lignes (une lettre
- * grasse fait environ 0,62 em de large, police de la marque comprise). Jamais
- * plus grande que 5,6 % de la hauteur, ni plus petite que 3,2 %.
- */
-export function listRowSize(content: string, rowHeight: number, width: number, frame: { width: number; height: number }): number {
-  const byHeight = (rowHeight * 0.92) / (2 * 1.3);
-  const byWidth = (width * frame.width * 2) / (Math.max(1, content.length) * 0.62 * frame.height);
-  return Math.max(0.032, Math.min(0.056, byHeight, byWidth));
-}
-
-/** Image du montage où un mot est prononcé, bornée à la plage. */
-const wordFrame = (words: TimedWord[], index: number | undefined, span: BeatSpan, fps: number, fallback: number) => {
-  const word = index !== undefined ? words[index] : undefined;
-  const frame = word ? Math.floor((word.startMs / 1000) * fps) : fallback;
-  return Math.min(span.end - 1, Math.max(span.start, frame));
-};
-
-/**
- * Éléments d'une planche, posés dans la zone d'écriture. Le premier temps
- * fort (l'accroche) n'a aucune entrée animée : il se lit dès la première
- * image. Les éléments d'une liste, la valeur « après » d'un avant / après ou
- * le mot mis en valeur arrivent sur le mot qui les dit.
- */
-export function boardItems(board: TakeBoard, span: BeatSpan, geometry: TakeGeometry, frame: { width: number; height: number }, fps: number, words: TimedWord[], logo: MediaSource | undefined, opening: boolean): ClipItem[] {
-  const area = geometry.content;
-  const cx = area.left + area.width / 2;
-  const cy = area.top + area.height / 2;
-  const duration = span.end - span.start;
-  const vertical = geometry.orientation === "vertical";
-  const big = vertical ? 1 : 0.85;
-  const items: ClipItem[] = [];
-  const at = (frameIndex: number) => ({ start: frameIndex, duration: span.end - frameIndex });
-  const later = (delaySeconds: number) => Math.min(span.end - 1, span.start + Math.round(delaySeconds * fps));
-
-  switch (board.kind) {
-    case "title":
-    case "quote": {
-      const hasEmphasis = Boolean(board.emphasis) && board.kind === "quote";
-      const main = text(board.text, span.start, duration, { x: cx, y: hasEmphasis ? area.top + area.height * 0.32 : cy, width: area.width, height: area.height * (hasEmphasis ? 0.5 : 0.8) }, (board.kind === "title" ? 0.068 : 0.06) * big, "title");
-      items.push(main);
-      if (hasEmphasis) {
-        const wordIndex = words.findIndex((word) => word.text.toLowerCase().includes(board.emphasis!.split(" ")[0].toLowerCase()));
-        const start = opening ? span.start : wordFrame(words, wordIndex >= 0 ? wordIndex : undefined, span, fps, later(0.7));
-        const emphasis = text(board.emphasis!, start, span.end - start, { x: cx, y: area.top + area.height * 0.74, width: area.width, height: area.height * 0.34 }, 0.1 * big, "title", { paint: "highlight" });
-        emphasis.animIn = { kind: "highlight-in", frames: Math.round(0.8 * fps) };
-        items.push(emphasis);
-      }
-      break;
-    }
-    case "counter": {
-      const value = text(board.value, span.start, duration, { x: cx, y: area.top + area.height * 0.42, width: area.width, height: area.height * 0.42 }, 0.15 * big, "title", { paint: "highlight" });
-      value.animIn = { kind: "count-up-pop", frames: Math.round(1.3 * fps) };
-      items.push(value);
-      if (board.label) items.push(text(board.label, span.start, duration, { x: cx, y: area.top + area.height * 0.78, width: area.width, height: area.height * 0.22 }, 0.05 * big, "subtitle"));
-      break;
-    }
-    case "logo": {
-      if (logo) {
-        const side = Math.min(area.height * 0.5, area.width * 0.55);
-        const image: ImageItem = {
-          id: uid("i-"),
-          type: "image",
-          start: span.start,
-          duration,
-          source: logo,
-          fit: "contain",
-          motion: "none",
-          radius: 0.16,
-          label: `Logo – ${board.name}`,
-          transform: { x: cx, y: area.top + area.height * 0.36, width: (side * frame.height) / frame.width, height: side, rotation: 0, opacity: 1 },
-          animIn: { kind: "pop", frames: 9 },
-          animOut: { ...NO_ANIM },
-        };
-        items.push(image);
-        items.push(text(board.name, span.start, duration, { x: cx, y: area.top + area.height * 0.78, width: area.width, height: area.height * 0.2 }, 0.065 * big, "title"));
-        if (board.caption) items.push(text(board.caption, later(0.5), span.end - later(0.5), { x: cx, y: area.top + area.height * 0.94, width: area.width, height: area.height * 0.12 }, 0.038 * big, "subtitle"));
-      } else {
-        // Pas de logo officiel trouvé : le nom, en grand, plutôt qu'un faux.
-        items.push(text(board.name, span.start, duration, { x: cx, y: cy, width: area.width, height: area.height * 0.5 }, 0.09 * big, "title", { paint: "highlight" }));
-        if (board.caption) items.push(text(board.caption, span.start, duration, { x: cx, y: area.top + area.height * 0.8, width: area.width, height: area.height * 0.2 }, 0.045 * big, "subtitle"));
-      }
-      break;
-    }
-    case "list": {
-      const rows = board.items.length;
-      const titleHeight = board.title ? area.height * 0.18 : 0;
-      if (board.title) items.push(text(board.title, span.start, duration, { x: cx, y: area.top + titleHeight / 2, width: area.width, height: titleHeight }, 0.05 * big, "label", { accent: 0 }));
-      const rowHeight = (area.height - titleHeight) / rows;
-      board.items.forEach((entry, index) => {
-        const start = opening && index === 0 ? span.start : wordFrame(words, entry.word, span, fps, later(0.4 + index * 0.9));
-        const row = text(`${index + 1}. ${entry.text}`, start, span.end - start, { x: cx, y: area.top + titleHeight + rowHeight * (index + 0.5), width: area.width, height: rowHeight * 0.9 }, listRowSize(`${index + 1}. ${entry.text}`, rowHeight, area.width, frame), "subtitle", {}, "left");
-        row.animIn = { kind: "slide-left", frames: 8 };
-        items.push(row);
-      });
-      break;
-    }
-    case "compare": {
-      const gap = area.width * 0.06;
-      const cardWidth = (area.width - gap) / 2;
-      const card = (side: 0 | 1): Box => ({ left: area.left + side * (cardWidth + gap), top: area.top + area.height * 0.12, width: cardWidth, height: area.height * 0.76 });
-      const afterStart = opening ? span.start : wordFrame(words, board.after.word, span, fps, later(0.9));
-      for (const side of [0, 1] as const) {
-        const box = card(side);
-        const entry = side === 0 ? board.before : board.after;
-        const start = side === 0 ? span.start : afterStart;
-        const panel = shape(start, span.end - start, box, "surface", 0.08);
-        panel.animIn = side === 0 ? { ...NO_ANIM } : { kind: "pop", frames: 8 };
-        items.push(panel);
-        items.push(text(entry.label, start, span.end - start, { x: box.left + box.width / 2, y: box.top + box.height * 0.22, width: box.width * 0.86, height: box.height * 0.2 }, 0.04 * big, "label", side === 1 ? { accent: 0 } : {}));
-        items.push(text(entry.value, start, span.end - start, { x: box.left + box.width / 2, y: box.top + box.height * 0.62, width: box.width * 0.9, height: box.height * 0.42 }, 0.085 * big, "title"));
-      }
-      break;
-    }
-  }
-  if (opening) for (const item of items) if ("animIn" in item) item.animIn = { ...NO_ANIM };
-  return items;
-}
-
 // ─── Sous-titres ─────────────────────────────────────────────────
 
 /**
@@ -409,7 +261,7 @@ export function takeCaptions(words: TimedWord[], spans: BeatSpan[], hidden: { st
     if (chosen.length === 0) continue;
     const local = chosen.map(({ word }) => ({ text: word.text, startMs: Math.max(0, Math.round(word.startMs - startMs)), endMs: Math.max(1, Math.round(Math.min(word.endMs, endMs) - startMs)) }));
     const layout = layoutAt(spans, start);
-    let y = layout === "full" ? geometry.captionFullY : geometry.captionSplitY;
+    let y = layout === "full" ? geometry.captionFullY : layout === "board" ? geometry.captionBoardY : geometry.captionSplitY;
     // Sur la couture, entre planche et caméra : deux mots à la fois au plus, pour ne déborder ni sur l’une ni sur l’autre.
     const groupSize = layout === "split" && vertical ? Math.min(2, fullGroup) : fullGroup;
     const groups = wordGroups(local, groupSize).map((group) => group.map((entry) => local[entry].text).join(" "));
@@ -472,16 +324,34 @@ export function lanes(items: ClipItem[], name: string): Track[] {
   return tracks;
 }
 
-/** Instants des changements à l'image (planches, éléments qui arrivent), hors caméra et sous-titres. */
-function boardChanges(items: ClipItem[]): number[] {
-  return items.map((item) => item.start);
+/**
+ * Sons de la planche : les tics des compteurs, et un coup sourd quand un
+ * chiffre se pose ou qu'une croix tombe (une seconde au moins entre deux
+ * coups sourds, six au plus sur la vidéo). Une piste par son : leurs écarts
+ * minimaux font qu'aucun ne chevauche le suivant.
+ */
+function boardSounds(boards: CompiledBoard[], fps: number): Track[] {
+  const cues = boards.flatMap((board) => board.cues);
+  const ticks = sfxSeries("tick", cues.filter((cue) => cue.sound === "tick").map((cue) => cue.frame), fps, { label: "Bruitage – compteur", minGapMs: 90 });
+  const thuds = sfxSeries("thud", cues.filter((cue) => cue.sound === "thud").map((cue) => cue.frame), fps, { label: "Bruitage – temps posé", minGapMs: 1000, max: 6 });
+  return [
+    ...(ticks.length ? [{ id: uid("t-"), kind: "audio" as const, name: "Bruitages – compteurs", items: ticks }] : []),
+    ...(thuds.length ? [{ id: uid("t-"), kind: "audio" as const, name: "Bruitages – planche", items: thuds }] : []),
+  ];
 }
 
+/** Région de la caméra d'une mise en page : le cadre entier en plein cadre, la carte du bas sinon (cachée par le papier sur la planche seule). */
+const cameraRegion = (geometry: TakeGeometry, layout: TakeLayout): Box => (layout === "full" ? { left: 0, top: 0, width: 1, height: 1 } : geometry.camera);
+
+/** Durée du glissement de la caméra et du papier d'une mise en page à l'autre. */
+const LAYOUT_GLIDE_SECONDS = 0.4;
+
 /**
- * Projet d'une prise montée. Pistes, de haut en bas : « Sous-titres »,
- * « Planche », « Planche – fond », « Principale » (la caméra), puis « Voix –
- * prise » (le son de la prise, lié aux plans). La marque habille le tout
- * (filigrane, carton de fin, styles et lisibilité), sans mascotte.
+ * Projet d'une prise montée. Pistes, de haut en bas : « Sous-titres », les
+ * pistes de la planche (traits, devant, textes, images, cartes, liaisons,
+ * papier), « Principale » (la caméra), puis « Voix – prise » (le son de la
+ * prise, lié aux plans). La marque habille le tout (filigrane, carton de
+ * fin, police, couleurs et lisibilité), sans mascotte.
  */
 export function buildTakeProject(input: TakeProjectInput): ClipProject {
   const base = createProject(input.name.slice(0, 200) || "Prise montée", input.aspect);
@@ -491,28 +361,40 @@ export function buildTakeProject(input: TakeProjectInput): ClipProject {
   const last = input.segments[input.segments.length - 1];
   const totalFrames = last ? last.start + last.duration : fps;
   const spans = beatSpans(input.plan, input.words, totalFrames, fps);
+  const palette = boardPaletteOf(input.theme ? input.theme.palette : null);
+  // La mascotte n'est plus posée d'office sur la vidéo filmée : elle réagit sur la planche, quand le plan le demande.
+  const mascot = input.theme?.mascot ? { library: input.theme.mascot.library, reactions: input.theme.mascot.reactions } : undefined;
+  const usedPoses: string[] = [];
 
-  // Planches, une par temps fort en « split ».
-  const boardTexts: ClipItem[] = [];
-  const boardGrounds: ClipItem[] = [];
+  // Planches : une par tableau qui en a une ; le papier glisse depuis la mise en page d'avant.
+  const boards: CompiledBoard[] = [];
   spans.forEach((span, index) => {
-    if (span.beat.layout !== "split" || !span.beat.board) return;
-    const ground = shape(span.start, span.end - span.start, geometry.board, "plate");
-    ground.label = "Planche";
-    boardGrounds.push(ground);
-    const beatIndex = input.plan.beats.indexOf(span.beat);
-    boardTexts.push(...boardItems(span.beat.board, span, geometry, frame, fps, input.words, input.logos?.get(beatIndex), index === 0));
+    const spec = sceneBoard(span, {
+      fps,
+      frame,
+      geometry,
+      logos: input.logos,
+      palette,
+      previousLayout: index > 0 ? spans[index - 1].beat.layout : undefined,
+      index: input.plan.beats.indexOf(span.beat),
+      opening: index === 0,
+      mascot,
+      usedPoses,
+    });
+    if (spec) boards.push(compileBoard(spec, { fps, frame, words: input.words, palette }));
   });
+  const changes = boards.flatMap((board) => board.changes);
 
   // Caméra : un plan par passage gardé, recadré à chaque coupe, sans moment figé de plus de 4 s.
-  const pieces = fillCameraCadence(cameraPieces(input.segments, spans), boardChanges([...boardTexts, ...boardGrounds]), totalFrames, fps);
+  const pieces = fillCameraCadence(cameraPieces(input.segments, spans), changes, totalFrames, fps);
   const videos: VideoItem[] = [];
   const voices: AudioItem[] = [];
+  let previous: { layout: TakeLayout; transform: Transform; end: number } | null = null;
   for (const piece of pieces) {
     const take = input.takes[piece.segment.take];
     if (!take) continue;
-    const region: Box = piece.layout === "full" ? { left: 0, top: 0, width: 1, height: 1 } : geometry.camera;
     const zoom = (piece.layout === "full" ? FULL_ZOOMS : CARD_ZOOMS)[piece.zoomStep];
+    const transform = cameraTransform(take.source, take.focus, cameraRegion(geometry, piece.layout), frame, zoom);
     const video: VideoItem = {
       id: uid("v-"),
       type: "video",
@@ -523,11 +405,17 @@ export function buildTakeProject(input: TakeProjectInput): ClipProject {
       trimStart: piece.segment.sourceStart + (piece.start - piece.segment.start),
       volume: 1,
       radius: 0,
-      transform: cameraTransform(take.source, take.focus, region, frame, zoom),
-      animIn: { ...NO_ANIM },
-      animOut: { ...NO_ANIM },
-      label: piece.layout === "full" ? "Caméra – plein cadre" : "Caméra",
+      transform,
+      animIn: { kind: "none", frames: 6 },
+      animOut: { kind: "none", frames: 6 },
+      label: piece.layout === "full" ? "Caméra – plein cadre" : piece.layout === "board" ? "Caméra – sous la planche" : "Caméra",
     };
+    // La caméra passe du plein cadre à la carte du bas (ou l'inverse) sans couper : elle glisse d'un cadre à l'autre.
+    const glide = previous !== null && previous.end === piece.start && previous.layout !== piece.layout && (previous.layout === "full" || piece.layout === "full");
+    if (previous && glide) {
+      video.transform = { ...previous.transform };
+      video.keys = [{ at: 0, frames: Math.round(LAYOUT_GLIDE_SECONDS * fps), x: transform.x, y: transform.y, width: transform.width, height: transform.height, ease: "smooth" }];
+    }
     const voice: AudioItem = {
       id: uid("a-"),
       type: "audio",
@@ -544,6 +432,7 @@ export function buildTakeProject(input: TakeProjectInput): ClipProject {
     video.audioLinkId = voice.id;
     videos.push(video);
     voices.push(voice);
+    previous = { layout: piece.layout, transform, end: piece.end };
   }
 
   const project0: ClipProject = { ...base, tracks: [] };
@@ -552,20 +441,20 @@ export function buildTakeProject(input: TakeProjectInput): ClipProject {
 
   const tracks: Track[] = [
     { id: uid("t-"), kind: "visual", name: "Sous-titres", items: captions },
-    // Une piste ne porte qu'un élément à la fois (l'éditeur le suppose) : les éléments d'une planche se rangent sur plusieurs pistes.
-    ...lanes(boardTexts.filter((item) => item.type !== "shape"), "Planche"),
-    ...lanes(boardTexts.filter((item) => item.type === "shape"), "Planche – cartes"),
-    { id: uid("t-"), kind: "visual", name: "Planche – fond", items: boardGrounds },
+    // Une piste ne porte qu'un élément à la fois (l'éditeur le suppose) : la planche se range par calques.
+    ...boardTracks(boards),
     { id: uid("t-"), kind: "visual", name: "Principale", items: videos },
     { id: uid("t-"), kind: "audio", name: "Voix – prise", items: voices },
+    ...boardSounds(boards, fps),
   ];
   const brief: NonNullable<ClipProject["brief"]> = {
-    prompt: `Prise de parole montée : ${input.plan.hook}`.slice(0, 4000),
+    prompt: `Prise de parole montée : ${input.plan.hook}`.slice(0, 4000),
     title: input.plan.hook.slice(0, 200),
     script: (input.script ?? []).slice(0, 100).map((line) => line.slice(0, 2000)),
+    montage: planSignature(input.plan).slice(0, 400),
   };
   let project: ClipProject = { ...base, tracks, brief, origin: "take" };
-  // La mascotte n'a pas sa place sur une vidéo filmée : la marque habille sans elle.
+  // La marque habille sans poser sa mascotte d'office (elle n'apparaît que sur la planche, ci-dessus).
   if (input.theme) {
     const { mascot: _mascot, ...theme } = input.theme;
     project = applyBrandTheme(project, theme);

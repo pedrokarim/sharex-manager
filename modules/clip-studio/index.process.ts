@@ -286,6 +286,7 @@ function validateProject(project: ClipProject) {
       (brief.script !== undefined && (!Array.isArray(brief.script) || brief.script.length > 100 || brief.script.some((line) => typeof line !== "string" || line.length > 2000))) ||
       (brief.checkedAt !== undefined && (typeof brief.checkedAt !== "number" || !Number.isFinite(brief.checkedAt))) ||
       (brief.sources !== undefined && !validBriefSources(brief.sources)) ||
+      (brief.montage !== undefined && (typeof brief.montage !== "string" || brief.montage.length > 400)) ||
       (brief.visualNotes !== undefined && (!Array.isArray(brief.visualNotes) || brief.visualNotes.length > 200 || brief.visualNotes.some((note) => !note || typeof note.text !== "string" || note.text.length > 200 || !Number.isInteger(note.line) || (note.kind !== "board" && note.kind !== "show"))))
     ) {
       throw new Error("Demande de l'assistant invalide");

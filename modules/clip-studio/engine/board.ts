@@ -21,6 +21,7 @@
  */
 
 import { DEFAULT_TEXT_FONT } from "../lib/font-catalog";
+import { DEFAULT_BOARD_PALETTE, type BoardPalette, type BoardPaletteKey } from "./board-palette";
 import { uid } from "./edit";
 import { lanes, type Box } from "./take-templates";
 import type {
@@ -41,35 +42,20 @@ import type {
 
 // ─── Grille et couleurs ──────────────────────────────────────────
 
+export { DEFAULT_BOARD_PALETTE, type BoardPalette } from "./board-palette";
+
 /** Espacements, en pixels d'un cadre de 1080 de large : toutes les marges et tous les écarts en viennent. */
 export const SPACE = { xs: 12, s: 24, m: 40, l: 64, xl: 96 } as const;
 
-/** Couleurs d'une planche ; une marque les fournit (étape I3), sinon celles-ci. */
-export interface BoardPalette {
-  paper: string;
-  sheet: string;
-  ink: string;
-  muted: string;
-  accent: string;
-  onAccent: string;
-  shadow: string;
-}
-
-export const DEFAULT_BOARD_PALETTE: BoardPalette = {
-  paper: "#f2efe8",
-  sheet: "#ffffff",
-  ink: "#16181d",
-  muted: "#8d8a83",
-  accent: "#2f74f5",
-  onAccent: "#ffffff",
-  shadow: "rgba(22, 24, 29, 0.14)",
-};
-
 /** Couleur nommée de la palette, ou valeur telle quelle. */
-export type BoardColor = keyof BoardPalette | (string & {});
+export type BoardColor = BoardPaletteKey | (string & {});
 
-const paletteColor = (palette: BoardPalette, color: BoardColor | undefined, fallback: keyof BoardPalette) =>
-  color === undefined ? palette[fallback] : color in palette ? palette[color as keyof BoardPalette] : color;
+const paletteColor = (palette: BoardPalette, color: BoardColor | undefined, fallback: BoardPaletteKey) =>
+  color === undefined ? palette[fallback] : color in palette ? palette[color as BoardPaletteKey] : color;
+
+/** Nom de la couleur de palette d'un acteur, pour qu'un changement de marque le recolore ; `undefined` pour une couleur libre. */
+const paletteKey = (palette: BoardPalette, color: BoardColor | undefined, fallback: BoardPaletteKey): BoardPaletteKey | undefined =>
+  color === undefined ? fallback : color in palette ? (color as BoardPaletteKey) : undefined;
 
 // ─── Partition ───────────────────────────────────────────────────
 
@@ -196,6 +182,8 @@ export interface BoardSpec {
    * le papier peut aller jusqu'au bord.
    */
   paperBox?: Box;
+  /** Boîte du papier de la planche d'avant : le papier en part et glisse jusqu'à la sienne (planche seule, plein cadre). */
+  paperFrom?: Box;
   actors: BoardActor[];
   actions?: BoardAction[];
 }
@@ -251,6 +239,8 @@ const LEAVE_SECONDS = 0.26;
 const MOVE_SECONDS = 0.6;
 const DRAW_SECONDS = 0.45;
 const COUNT_SECONDS = 1.1;
+/** Tics d'un compteur qui défile. */
+const COUNT_TICKS = 7;
 /** Montée d'une entrée et levée d'une sortie, en pixels d'un cadre de 1080. */
 const RISE_PX = 44;
 const LIFT_PX = 34;
@@ -284,6 +274,12 @@ export interface CompiledBoard {
   issues: string[];
   /** Instants où la planche change (entrées, mouvements, traits), pour la cadence de la caméra. */
   changes: number[];
+  /**
+   * Sons que les actions appellent, rares et attachés à ce qui bouge : le tic
+   * d'un compteur qui défile, un coup sourd quand son chiffre se pose ou
+   * qu'une croix tombe. Jamais de bruit à l'entrée d'un objet.
+   */
+  cues: { frame: number; sound: "tick" | "thud" }[];
 }
 
 /** Nom des pistes de chaque calque, dans l'éditeur. */
@@ -375,6 +371,7 @@ export function compileBoard(spec: BoardSpec, context: BoardContext): CompiledBo
   }
 
   const extra: Placed[] = [];
+  const cues: CompiledBoard["cues"] = [];
   for (const action of spec.actions ?? []) {
     const frameAt = at(action.at);
     changes.add(frameAt);
@@ -392,7 +389,11 @@ export function compileBoard(spec: BoardSpec, context: BoardContext): CompiledBo
       case "count": {
         const build = builds.get(action.actor);
         if (!build?.text?.count) break;
-        build.text.count = { ...build.text.count, at: frameAt - build.text.start, frames: seconds(action.seconds ?? COUNT_SECONDS) };
+        const frames = seconds(action.seconds ?? COUNT_SECONDS);
+        build.text.count = { ...build.text.count, at: frameAt - build.text.start, frames };
+        // Le tic suit le défilement (rapide puis lent, comme la courbe du compteur), puis le chiffre se pose.
+        for (let tick = 0; tick < COUNT_TICKS; tick++) cues.push({ frame: frameAt + Math.round(frames * (1 - Math.cbrt(1 - tick / COUNT_TICKS))), sound: "tick" });
+        cues.push({ frame: Math.min(spec.end - 1, frameAt + frames), sound: "thud" });
         break;
       }
       case "strike": {
@@ -420,7 +421,9 @@ export function compileBoard(spec: BoardSpec, context: BoardContext): CompiledBo
       case "cross": {
         const build = builds.get(action.actor);
         if (!build) break;
-        extra.push(crossOf(build, action.place ?? "over", frameAt, seconds(action.seconds ?? DRAW_SECONDS), palette, frame, px));
+        const frames = seconds(action.seconds ?? DRAW_SECONDS);
+        extra.push(crossOf(build, action.place ?? "over", frameAt, frames, palette, frame, px));
+        cues.push({ frame: Math.min(spec.end - 1, frameAt + frames), sound: "thud" });
         break;
       }
       case "link":
@@ -465,21 +468,28 @@ export function compileBoard(spec: BoardSpec, context: BoardContext): CompiledBo
       pushKey(part.item, { at: Math.max(0, local), frames, opacity: 0, y: restY(part.item, build.endFrame - frames) - px(LIFT_PX) / frame.height, ease: "in" });
     }
   }
-  // Les traits s'effacent avec ce qu'ils désignent, sur les mêmes dernières images.
+  // Les traits s'effacent juste avant ce qu'ils désignent : ils sont partis quand leurs acteurs commencent
+  // à s'effacer, et rien ne transparaît sous une carte qui s'en va.
   for (const placed of extra) {
-    const frames = Math.min(seconds(LEAVE_SECONDS), Math.max(1, placed.item.duration - 1));
-    pushKey(placed.item, { at: placed.item.duration - frames, frames, opacity: 0, ease: "in" });
+    const frames = Math.min(seconds(LEAVE_SECONDS), Math.max(1, Math.floor((placed.item.duration - 1) / 2)));
+    pushKey(placed.item, { at: Math.max(0, placed.item.duration - frames * 2), frames, opacity: 0, ease: "in" });
   }
 
   const placed: Placed[] = [...extra, ...[...builds.values()].flatMap((build) => build.parts)];
   if (spec.paper) {
-    const ground = shapeItem(spec.start, spec.end - spec.start, spec.paperBox ?? area, palette.paper, 0);
-    ground.theme = { paint: "plate" };
+    const ground = shapeItem(spec.start, spec.end - spec.start, spec.paperBox ?? area, palette.paper, 0, "paper");
     ground.label = "Planche – papier";
+    if (spec.paperFrom) {
+      // Le papier change de taille d'une mise en page à l'autre : il part de la boîte d'avant.
+      const target = { ...ground.transform };
+      const from = spec.paperFrom;
+      ground.transform = { ...target, x: from.left + from.width / 2, y: from.top + from.height / 2, width: from.width, height: from.height };
+      pushKey(ground, { at: 0, frames: seconds(0.45), x: target.x, y: target.y, width: target.width, height: target.height, ease: "smooth" });
+    }
     placed.push({ item: ground, layer: "ground" });
   }
   const layers = LAYER_ORDER.map((layer) => ({ layer, items: placed.filter((entry) => entry.layer === layer).map((entry) => entry.item as ClipItem) }));
-  return { items: layers.flatMap((entry) => entry.items), layers, changes: [...changes].sort((a, b) => a - b), issues: placementIssues(spec, builds, frame, fps) };
+  return { items: layers.flatMap((entry) => entry.items), layers, changes: [...changes].sort((a, b) => a - b), cues: cues.sort((a, b) => a.frame - b.frame), issues: placementIssues(spec, builds, frame, fps) };
 }
 
 // ─── Acteurs ─────────────────────────────────────────────────────
@@ -508,7 +518,7 @@ const BOARD_TEXT: Record<"title" | "text" | "label", Omit<TextStyle, "size" | "a
 
 const styleForRole = (role: TextRole) => (role === "title" ? BOARD_TEXT.title : role === "label" ? BOARD_TEXT.label : BOARD_TEXT.text);
 
-function textItem(content: string, start: number, duration: number, box: { x: number; y: number; width: number; height: number }, size: number, role: TextRole, color: string, align: "left" | "center" | "right" = "center"): TextItem {
+function textItem(content: string, start: number, duration: number, box: { x: number; y: number; width: number; height: number }, size: number, role: TextRole, color: string, align: "left" | "center" | "right" = "center", colorKey?: BoardPaletteKey): TextItem {
   return {
     id: uid("x-"),
     type: "text",
@@ -516,7 +526,8 @@ function textItem(content: string, start: number, duration: number, box: { x: nu
     duration: Math.max(1, duration),
     text: content,
     style: { ...styleForRole(role), size, align, color },
-    theme: { role },
+    // Texte de planche : la marque lui donne sa police, la palette de la planche sa couleur.
+    theme: { role, board: true, ...(colorKey ? { boardColor: colorKey } : {}) },
     transform: { x: box.x, y: box.y, width: box.width, height: box.height, rotation: 0, opacity: 1 },
     animIn: { kind: "none", frames: 1 },
     animOut: { kind: "none", frames: 1 },
@@ -525,9 +536,10 @@ function textItem(content: string, start: number, duration: number, box: { x: nu
   };
 }
 
-function shapeItem(start: number, duration: number, box: Box, fill: string, radius: number): ShapeItem {
+function shapeItem(start: number, duration: number, box: Box, fill: string, radius: number, colorKey?: BoardPaletteKey): ShapeItem {
   return {
     id: uid("s-"),
+    theme: { board: true, ...(colorKey ? { boardColor: colorKey } : {}) },
     type: "shape",
     shape: "rect",
     start,
@@ -556,7 +568,7 @@ function buildActor(actor: BoardActor, start: number, end: number, tools: BuildT
     case "text": {
       const width = (actor.w ?? 1) * area.width;
       const height = (actor.h ?? actor.size * 1.6 / area.height) * area.height;
-      text = textItem(actor.text, start, duration, { x: cx, y: cy, width, height }, actor.size, actor.role ?? "title", paletteColor(palette, actor.color, "ink"), actor.align);
+      text = textItem(actor.text, start, duration, { x: cx, y: cy, width, height }, actor.size, actor.role ?? "title", paletteColor(palette, actor.color, "ink"), actor.align, paletteKey(palette, actor.color, "ink"));
       if (actor.tail) text.tail = { text: actor.tail.text, scale: actor.tail.scale, color: actor.tail.color ? paletteColor(palette, actor.tail.color, "accent") : undefined };
       parts.push({ item: text, layer: "text" });
       box = { x: cx, y: cy, width, height };
@@ -566,7 +578,7 @@ function buildActor(actor: BoardActor, start: number, end: number, tools: BuildT
       // Boîte d'une ligne de titre (interligne 1,12) : celle que dessine le texte, unité comprise.
       const width = area.width;
       const height = actor.size * BOARD_TEXT.title.lineHeight;
-      text = textItem(actor.value, start, duration, { x: cx, y: cy, width, height: height * 1.2 }, actor.size, "title", paletteColor(palette, actor.color, "ink"));
+      text = textItem(actor.value, start, duration, { x: cx, y: cy, width, height: height * 1.2 }, actor.size, "title", paletteColor(palette, actor.color, "ink"), "center", paletteKey(palette, actor.color, "ink"));
       text.count = { from: actor.from ?? 0, at: 0, frames: tools.seconds(COUNT_SECONDS) };
       if (actor.unit) text.tail = { text: actor.unit, scale: 0.42, color: palette.accent };
       parts.push({ item: text, layer: "text" });
@@ -576,9 +588,8 @@ function buildActor(actor: BoardActor, start: number, end: number, tools: BuildT
     case "card": {
       const width = actor.w * area.width;
       const height = actor.h * area.height;
-      const card = shapeItem(start, duration, boxAround(cx, cy, width, height), palette.sheet, 0.16);
+      const card = shapeItem(start, duration, boxAround(cx, cy, width, height), palette.sheet, 0.16, "sheet");
       card.shadow = shadow;
-      card.theme = { paint: "surface" };
       card.label = "Planche – carte";
       parts.push({ item: card, layer: "card" });
       const size = actor.size ?? 0.026;
@@ -587,13 +598,13 @@ function buildActor(actor: BoardActor, start: number, end: number, tools: BuildT
       let textLeft = cx - width / 2 + padX;
       if (actor.index) {
         const indexWidth = size * 1.9 * (frame.height / frame.width);
-        const index = textItem(actor.index, start, duration, { x: textLeft + indexWidth / 2, y: cy, width: indexWidth, height: height * 0.8 }, size, "label", palette.accent, "left");
+        const index = textItem(actor.index, start, duration, { x: textLeft + indexWidth / 2, y: cy, width: indexWidth, height: height * 0.8 }, size, "label", palette.accent, "left", "accent");
         parts.push({ item: index, layer: "text" });
         textLeft += indexWidth + px(SPACE.s) / frame.width;
       }
       const textWidth = cx + width / 2 - padX - textLeft;
       // Une carte à repère se lit comme une ligne de liste (à gauche) ; une carte seule a son texte au centre.
-      text = textItem(actor.text, start, duration, { x: textLeft + textWidth / 2, y: cy, width: textWidth, height: height * 0.8 }, size, "subtitle", palette.ink, actor.align ?? (actor.index ? "left" : "center"));
+      text = textItem(actor.text, start, duration, { x: textLeft + textWidth / 2, y: cy, width: textWidth, height: height * 0.8 }, size, "subtitle", palette.onSheet, actor.align ?? (actor.index ? "left" : "center"), "onSheet");
       parts.push({ item: text, layer: "text" });
       box = { x: cx, y: cy, width, height };
       break;
@@ -605,7 +616,7 @@ function buildActor(actor: BoardActor, start: number, end: number, tools: BuildT
       // Le fond de la pastille a la hauteur d'une ligne (interligne du rôle) ; la largeur suit le texte au rendu.
       const width = area.width * 0.9;
       const height = size * BOARD_TEXT.label.lineHeight;
-      text = textItem(content, start, duration, { x: cx, y: cy, width, height: height * 1.4 }, size, "label", palette.ink);
+      text = textItem(content, start, duration, { x: cx, y: cy, width, height: height * 1.4 }, size, "label", palette.onSheet, "center", "onSheet");
       text.style = { ...text.style, background: { color: palette.sheet, padding: 0.55, radius: 0.5 } };
       if (actor.dot) text.marks = [{ kind: "color", from: 0, to: 1, color: palette.accent }];
       parts.push({ item: text, layer: "text" });
@@ -615,15 +626,14 @@ function buildActor(actor: BoardActor, start: number, end: number, tools: BuildT
     case "note": {
       const width = actor.w * area.width;
       const height = actor.h * area.height;
-      const note = shapeItem(start, duration, boxAround(cx, cy, width, height), palette.accent, 0.06);
+      const note = shapeItem(start, duration, boxAround(cx, cy, width, height), palette.accent, 0.06, "accent");
       note.shadow = shadow;
-      note.theme = { paint: "accent" };
       note.transform.rotation = actor.tilt ?? -4;
       note.label = "Planche – note";
       parts.push({ item: note, layer: "front" });
       const size = actor.size ?? 0.024;
       const pad = px(SPACE.m);
-      text = textItem(actor.text, start, duration, { x: cx, y: cy, width: width - (pad * 2) / frame.width, height: height - (pad * 2) / frame.height }, size, "subtitle", palette.onAccent, "left");
+      text = textItem(actor.text, start, duration, { x: cx, y: cy, width: width - (pad * 2) / frame.width, height: height - (pad * 2) / frame.height }, size, "subtitle", palette.onAccent, "left", "onAccent");
       text.transform.rotation = note.transform.rotation;
       parts.push({ item: text, layer: "front" });
       box = { x: cx, y: cy, width, height };
@@ -635,9 +645,8 @@ function buildActor(actor: BoardActor, start: number, end: number, tools: BuildT
       const height = actor.h * area.height;
       let inner = { width, height };
       if (actor.tile) {
-        const tile = shapeItem(start, duration, boxAround(cx, cy, width, height), palette.sheet, 0.24);
+        const tile = shapeItem(start, duration, boxAround(cx, cy, width, height), palette.sheet, 0.24, "sheet");
         tile.shadow = shadow;
-        tile.theme = { paint: "surface" };
         tile.label = "Planche – carreau";
         parts.push({ item: tile, layer: "card" });
         // Marge du carreau : un cinquième de son petit côté, la même tout autour (en pixels réels).
@@ -767,8 +776,8 @@ function fadeGroup(build: ActorBuild, frameAt: number, frames: number, opacity: 
 
 // ─── Traits ──────────────────────────────────────────────────────
 
-function strokeItem(start: number, duration: number, box: Box, paths: StrokePath[], width: number, color: string, label: string): ShapeItem {
-  const item = shapeItem(start, duration, box, color, 0);
+function strokeItem(start: number, duration: number, box: Box, paths: StrokePath[], width: number, color: string, label: string, colorKey?: BoardPaletteKey): ShapeItem {
+  const item = shapeItem(start, duration, box, color, 0, colorKey);
   item.shape = "stroke";
   item.stroke = { paths, width };
   item.label = label;
@@ -785,7 +794,7 @@ function crossOf(build: ActorBuild, place: "over" | "below", frameAt: number, fr
   const item = strokeItem(frameAt, build.endFrame - frameAt, boxAround(center.x, center.y, size.width, size.height), [
     { points: [[0, 0], [1, 1]], draw: { at: 0, frames: half } },
     { points: [[1, 0], [0, 1]], draw: { at: half, frames: half } },
-  ], px(place === "over" ? 10 : 5) / minSide, palette.ink, "Planche – croix");
+  ], px(place === "over" ? 10 : 5) / minSide, palette.ink, "Planche – croix", "ink");
   return { item, layer: "overlay" };
 }
 
@@ -844,7 +853,7 @@ function lineBetween(
   const minSide = Math.min(frame.width, frame.height);
   const item = strokeItem(start, end - start, { left, top, width, height }, [
     { points: [local(a), local(mid), local(b)], smooth: true, head: arrow ? "end" : undefined, draw: { at: 0, frames } },
-  ], px(arrow ? 6 : 4) / minSide, arrow ? palette.ink : palette.muted, arrow ? "Planche – flèche" : "Planche – liaison");
+  ], px(arrow ? 6 : 4) / minSide, arrow ? palette.ink : palette.muted, arrow ? "Planche – flèche" : "Planche – liaison", arrow ? "ink" : "muted");
   return { item, layer: arrow ? "overlay" : "link" };
 }
 

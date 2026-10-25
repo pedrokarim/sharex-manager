@@ -11,6 +11,7 @@
  */
 
 import { CAPTION_STYLE, TEXT_PRESETS, uid } from "./edit";
+import { boardPaletteOf } from "./board-palette";
 import { backdropOf, legibleKaraoke, legibleStyle, opaqueHex, type Backdrop } from "./legibility";
 import { getPreset } from "./motion/registry";
 import { needsMirror, rankPoses, readEmotion, readGesture, type PoseFraming, type PoseTags } from "./poses";
@@ -239,6 +240,18 @@ function restyle(item: ClipItem, theme: BrandTheme | null): ClipItem {
     };
   }
   if (!item.theme) return item;
+  // Planche d'illustrations : la police de la marque et la couleur de la palette de planche, rien d'autre
+  // (une étiquette de marque poserait par exemple un fond derrière le repère d'une carte).
+  if (item.theme.board) {
+    const palette = boardPaletteOf(theme ? theme.palette : null);
+    const color = item.theme.boardColor ? palette[item.theme.boardColor] : undefined;
+    if (item.type === "text") {
+      const role = theme ? theme.textStyles[item.theme.role ?? "body"] : undefined;
+      return { ...item, style: { ...item.style, ...(role ? { font: role.font, weight: role.weight } : {}), ...(color ? { color } : {}) } };
+    }
+    if (item.type === "shape") return color ? { ...item, fill: color } : item;
+    return item;
+  }
   if (item.type === "text" && item.theme.role) {
     // `fit` vient de la lisibilité d'une marque (`applyLegibility`) : sans marque, le texte reprend sa mise en page d'origine.
     const { fit: _fit, ...rest } = item;

@@ -14,6 +14,7 @@
  * aux tests. Un clip sans marque n'y passe jamais : son rendu reste le sien.
  */
 
+import { keyedFrame } from "./keys";
 import { parseColor } from "./motion/color";
 import type { ClipProject, ShapeItem, TextItem, TextRole, TextStyle, Track, VisualItem } from "./types";
 
@@ -197,8 +198,14 @@ const SOLID_OPACITY = 0.9;
  * rien ne change sous le texte, de la piste la plus proche à la plus basse.
  */
 export function backdropOf(project: ClipProject, trackIndex: number, item: TextItem): Backdrop {
-  const area = clampBox(boxOf(item));
   const end = item.start + item.duration;
+  // Un élément animé par images clés se lit à sa place posée : une fois entré, pas pendant son entrée
+  // (une carte encore transparente n'est pas un fond chargé). Sans image clé, rien ne change.
+  const settle = <T extends VisualItem>(entry: T, at: number): T => {
+    if (!entry.keys?.length) return entry;
+    const frame = Math.min(entry.start + entry.duration - 1, Math.max(at, entry.start + Math.round(project.fps * 0.6)));
+    return { ...entry, transform: keyedFrame(entry, frame).transform };
+  };
   const lower: Track[] = project.tracks.slice(trackIndex + 1).filter((track) => track.kind === "visual" && !track.hidden);
 
   const cuts = new Set<number>([item.start, end]);
@@ -213,9 +220,11 @@ export function backdropOf(project: ClipProject, trackIndex: number, item: TextI
   const colors = new Set<string>();
   for (let index = 0; index < times.length - 1; index++) {
     const at = (times[index] + times[index + 1]) / 2;
+    const area = clampBox(boxOf(settle(item, at)));
     let found: string | null = null;
     for (const track of lower) {
-      const other = track.items.find((candidate) => candidate.start <= at && at < candidate.start + candidate.duration) as VisualItem | undefined;
+      const present = track.items.find((candidate) => candidate.start <= at && at < candidate.start + candidate.duration) as VisualItem | undefined;
+      const other = present ? settle(present, at) : undefined;
       if (!other || other.type === "text" || !intersects(boxOf(other), area)) continue;
       // Un tracé (barre, soulignement, flèche) est un trait, pas un fond : le texte garde le fond d'en dessous.
       if (other.type === "shape" && other.shape === "stroke") continue;

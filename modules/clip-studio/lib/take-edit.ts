@@ -45,7 +45,8 @@ import {
   type Range,
   type SilenceMode,
 } from "../engine/take-cut";
-import { beatPlanPrompt, readBeatPlan, type TakePlan } from "../engine/take-plan";
+import { beatPlanPrompt, readBeatPlan, type TakeLayout, type TakePlan } from "../engine/take-plan";
+import { logoKey } from "../engine/take-scenes";
 import { buildTakeProject, takeBeatSounds, type TakeSource } from "../engine/take-templates";
 import { ASPECTS, type AspectPreset, type ClipAsset, type ClipProject, type MediaSource, type TimedWord, type Track } from "../engine/types";
 import { assetSource, clipDeps, transcriptionDetail, type ClipSource } from "./clip-jobs";
@@ -54,7 +55,7 @@ import { findSegmentIcon } from "./image-search";
 import { assertDiskSpace, holdWorkDir, publicErrorMessage } from "./job-safety";
 import { pickTrack } from "./music";
 import { inspect, runFfmpeg, type MediaStreams } from "./remote-import";
-import { ASSETS_DIR, DATA_DIR, ensureDirs, readAssets, writeAssets, writeProject } from "./store";
+import { ASSETS_DIR, DATA_DIR, ensureDirs, listProjectFiles, readAssets, writeAssets, writeProject } from "./store";
 import { detectFace, type FaceFocus } from "./take-face";
 import { TranscriptionError } from "./transcription-types";
 import { resolveMedia, storedTranscript, storeTranscript } from "./transcription-jobs";
@@ -94,7 +95,7 @@ export interface TakeReport {
   retakeMs: number;
   retakes: { text: string; reason: string }[];
   segments: number;
-  beats: { atMs: number; layout: "split" | "full"; board?: string; text?: string }[];
+  beats: { atMs: number; layout: TakeLayout; board?: string; text?: string }[];
   engines: string[];
   faces: boolean[];
   logos: { name: string; found: boolean }[];
@@ -119,6 +120,18 @@ export interface TakeEditJob {
 
 export const takeDeps = {
   loadTheme: (kitId: string): Promise<BrandTheme | null> => clipDeps.loadTheme(kitId),
+  /**
+   * Enchaînements des derniers montages de prise (de la même marque quand il
+   * y en a une), du plus récent au plus ancien : Codex ne refait ni la même
+   * ouverture ni la même suite.
+   */
+  recentMontages(brandKitId: string | undefined): string[] {
+    return listProjectFiles()
+      .filter((project) => project.origin === "take" && typeof project.brief?.montage === "string" && (!brandKitId || project.brandKitId === brandKitId))
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 3)
+      .map((project) => project.brief!.montage!);
+  },
   /** Codex : le plan des temps forts. */
   ask(prompt: string, signal: AbortSignal): Promise<string> {
     return clipDeps.ask(prompt, signal);
@@ -535,13 +548,19 @@ async function runTakeEdit(job: TakeEditJob, signal: AbortSignal) {
       `${(report.silenceMs / 1000).toFixed(1).replace(".", ",")} s de blancs${request.removeRetakes ? `, ${retakeCount} reprise${retakeCount > 1 ? "s" : ""}` : ""} : ${(report.sourceMs / 1000).toFixed(0)} s → ${(report.editMs / 1000).toFixed(0)} s`
     );
 
-    // 4. Plan des temps forts.
+    // La marque d'abord : le plan sait si elle a une mascotte à faire réagir.
+    const theme = request.brandKitId ? await takeDeps.loadTheme(request.brandKitId) : null;
+    if (signal.aborted) throw abortError();
+
+    // 4. Plan des tableaux.
     step("plan", "running", "Codex lit ce qui est dit…");
     let plan: TakePlan;
     try {
-      const answer = await takeDeps.ask(beatPlanPrompt({ words: editWords, durationMs: report.editMs, language: transcripts[0]?.language }), signal);
+      const recent = takeDeps.recentMontages(request.brandKitId);
+      const mascot = Boolean(theme?.mascot && (theme.mascot.library?.length || theme.mascot.reactions.length));
+      const answer = await takeDeps.ask(beatPlanPrompt({ words: editWords, durationMs: report.editMs, language: transcripts[0]?.language, recent, mascot }), signal);
       plan = readBeatPlan(extractJson(answer), editWords, report.editMs);
-      step("plan", "done", `${plan.beats.length} temps forts, accroche « ${plan.hook.slice(0, 60)} »`);
+      step("plan", "done", `${plan.beats.length} tableau${plan.beats.length > 1 ? "x" : ""}, accroche « ${plan.hook.slice(0, 60)} »`);
     } catch (error) {
       if (signal.aborted) throw abortError();
       console.error("[clip-studio] plan d’une prise :", error instanceof Error ? error.message : error);
@@ -556,18 +575,29 @@ async function runTakeEdit(job: TakeEditJob, signal: AbortSignal) {
       take.focus = await takeDeps.face(path.join(ASSETS_DIR, take.played.file), take.played, signal).catch(() => null);
       report.faces.push(take.focus !== null);
     }
-    const logos = new Map<number, MediaSource>();
+    // Un logo par outil nommé ; un même nom n'est cherché qu'une fois.
+    const logos = new Map<string, MediaSource>();
+    const searched = new Map<string, MediaSource | null>();
     for (const [index, beat] of plan.beats.entries()) {
-      if (beat.board?.kind !== "logo") continue;
-      if (signal.aborted) throw abortError();
-      step("visuals", "running", `Logo officiel de « ${beat.board.name} »…`);
-      const context = editWords.slice(Math.max(0, beat.word - 8), beat.word + 12).map((word) => word.text).join(" ");
-      const found = await takeDeps.logo(beat.board.name, context, signal).catch((error) => {
-        if (signal.aborted) throw error;
-        return null;
-      });
-      if (found) logos.set(index, found);
-      report.logos.push({ name: beat.board.name, found: Boolean(found) });
+      for (const [itemIndex, item] of (beat.items ?? []).entries()) {
+        if (item.kind !== "logo") continue;
+        if (signal.aborted) throw abortError();
+        const name = item.text;
+        const key = name.toLowerCase();
+        if (!searched.has(key)) {
+          step("visuals", "running", `Logo officiel de « ${name} »…`);
+          const around = item.word ?? beat.word;
+          const context = editWords.slice(Math.max(0, around - 8), around + 12).map((word) => word.text).join(" ");
+          const found = await takeDeps.logo(name, context, signal).catch((error) => {
+            if (signal.aborted) throw error;
+            return null;
+          });
+          searched.set(key, found);
+          report.logos.push({ name, found: Boolean(found) });
+        }
+        const found = searched.get(key);
+        if (found) logos.set(logoKey(index, itemIndex), found);
+      }
     }
     const faceCount = report.faces.filter(Boolean).length;
     step(
@@ -583,8 +613,6 @@ async function runTakeEdit(job: TakeEditJob, signal: AbortSignal) {
 
     // 6. Montage.
     step("montage", "running", "Habillage de la marque…");
-    const theme = request.brandKitId ? await takeDeps.loadTheme(request.brandKitId) : null;
-    if (signal.aborted) throw abortError();
     const takes: TakeSource[] = prepared.map((take) => ({ source: assetSource(take.played), focus: take.focus }));
     let project: ClipProject = buildTakeProject({
       name: plan.hook || job.title || "Prise montée",
@@ -615,7 +643,7 @@ async function runTakeEdit(job: TakeEditJob, signal: AbortSignal) {
     report.beats = plan.beats.map((beat) => ({
       atMs: editWords[beat.word]?.startMs ?? 0,
       layout: beat.layout,
-      ...(beat.board ? { board: beat.board.kind, text: boardSummary(beat.board) } : {}),
+      ...(beat.layout !== "full" ? { board: beat.arrangement ?? "single", text: boardSummary(beat) } : {}),
     }));
     job.report = report;
     job.projectId = project.id;
@@ -641,20 +669,8 @@ async function runTakeEdit(job: TakeEditJob, signal: AbortSignal) {
   }
 }
 
-/** Ce que montre une planche, en quelques mots, pour le bilan. */
-function boardSummary(board: NonNullable<TakePlan["beats"][number]["board"]>): string {
-  switch (board.kind) {
-    case "title":
-    case "quote":
-      return board.text;
-    case "counter":
-      return `${board.value}${board.label ? ` ${board.label}` : ""}`;
-    case "logo":
-      return board.name;
-    case "list":
-      return board.items.map((item) => item.text).join(" / ");
-    case "compare":
-      return `${board.before.value} → ${board.after.value}`;
-  }
+/** Ce que montre un tableau, en quelques mots, pour le bilan. */
+function boardSummary(beat: TakePlan["beats"][number]): string {
+  return [beat.heading?.text, ...(beat.items ?? []).map((item) => (item.unit ? `${item.text} ${item.unit}` : item.text))].filter(Boolean).join(" · ").slice(0, 160);
 }
 

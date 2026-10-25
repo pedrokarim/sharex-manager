@@ -55,7 +55,10 @@ import {
   cleanTakeSpeed,
   type Range,
 } from "@/modules/clip-studio/engine/take-cut";
-import { beatPlanPrompt, beatSpans, captionHideSpans, FULL_CAMERA_MIN_MS, numberedTranscript, readBeatPlan, readBoard, screenText } from "@/modules/clip-studio/engine/take-plan";
+import { beatPlanPrompt, beatSpans, captionHideSpans, FULL_CAMERA_MIN_MS, numberedTranscript, planSignature, readBeatPlan, readSceneItem, screenText, SCENE_ARRANGEMENTS } from "@/modules/clip-studio/engine/take-plan";
+import { logoKey, sceneBoard } from "@/modules/clip-studio/engine/take-scenes";
+import { compileBoard } from "@/modules/clip-studio/engine/board";
+import { keyedFrame } from "@/modules/clip-studio/engine/keys";
 import { buildTakeProject, cameraPieces, cameraTransform, emphasisColor, fillCameraCadence, takeBeatSounds, takeGeometry } from "@/modules/clip-studio/engine/take-templates";
 import { faceInFrame, isSkin, medianFocus } from "@/modules/clip-studio/lib/take-face";
 import { cleanTakeRequest, getTakeEditJob, startTakeEdit, stretchedAsset, takeDeps, type TakeEditJob } from "@/modules/clip-studio/lib/take-edit";
@@ -78,7 +81,7 @@ function framesFor(durationMs: number, words: TimedWord[]): Float32Array {
 }
 
 /** Éléments des planches, toutes pistes réunies. */
-const boardOf = (project: { tracks: { name: string; items: any[] }[] }) => project.tracks.filter((track) => /^Planche( d+)?$|^Planche – cartes/.test(track.name)).flatMap((track) => track.items);
+const boardOf = (project: { tracks: { name: string; items: any[] }[] }) => project.tracks.filter((track) => /^Planche/.test(track.name)).flatMap((track) => track.items);
 
 const total = (ranges: Range[]) => ranges.reduce((sum, range) => sum + range.endMs - range.startMs, 0);
 
@@ -243,12 +246,13 @@ describe("plan des temps forts", () => {
     expect(numberedTranscript(editWords).split("\n")[0]).toMatch(/^\[0\.0 s\] #0 J’ai/);
   });
 
-  it("lit les planches avec rigueur", () => {
-    expect(readBoard({ kind: "counter", value: "vingt" }, 10)).toBeUndefined();
-    expect(readBoard({ kind: "counter", value: "20 min", label: "de montage" }, 10)).toEqual({ kind: "counter", value: "20 min", label: "de montage" });
-    expect(readBoard({ kind: "list", items: ["un seul"] }, 10)).toBeUndefined();
-    expect(readBoard({ kind: "quote", text: "Deux fois plus court", emphasis: "trois fois" }, 10)).toEqual({ kind: "quote", text: "Deux fois plus court" });
-    expect(readBoard({ kind: "magic" }, 10)).toBeUndefined();
+  it("lit les objets d'un tableau avec rigueur", () => {
+    expect(readSceneItem({ kind: "counter", text: "vingt" }, 10)).toBeUndefined();
+    expect(readSceneItem({ kind: "counter", text: "20 min", unit: "de montage", word: 3 }, 10)).toEqual({ kind: "counter", text: "20 min", unit: "de montage", word: 3 });
+    // Un mot mis en valeur doit être un mot du texte ; un mot hors de la prise est ignoré.
+    expect(readSceneItem({ kind: "text", text: "Deux fois plus court", pill: "trois fois", word: 99 }, 10)).toEqual({ kind: "text", text: "Deux fois plus court" });
+    expect(readSceneItem({ kind: "card", text: "Couper", strike: 4, cross: 5 }, 10)).toEqual({ kind: "card", text: "Couper", strike: 4, cross: 5 });
+    expect(readSceneItem({ kind: "magic", text: "x" }, 10)).toBeUndefined();
     expect(screenText("Avant — après", 40)).toBe("Avant, après");
     expect(screenText("un texte bien trop long pour une planche de short", 20)).toMatch(/…$/);
   });
@@ -260,11 +264,12 @@ describe("plan des temps forts", () => {
         mood: "happy",
         emphasis: [9, 999, "x"],
         beats: [
-          { word: 7, layout: "split", board: { kind: "counter", value: "20 min" }, payoff: true },
-          { word: 7, layout: "split", board: { kind: "title", text: "doublon" } },
+          { word: 7, layout: "split", arrangement: "single", items: [{ kind: "counter", text: "20 min", word: 8 }], payoff: true },
+          { word: 7, layout: "split", items: [{ kind: "text", text: "doublon" }] },
+          // Ancienne forme : une planche par temps fort, encore lue.
           { word: 13, layout: "split", board: { kind: "logo", name: "Notion" } },
           { word: 14, layout: "full" },
-          { word: 16, layout: "split", board: { kind: "list", items: [{ text: "Couper", word: 21 }, { text: "Nettoyer", word: 22 }, { text: "Sous-titrer", word: 23 }] }, payoff: true },
+          { word: 16, layout: "split", arrangement: "list", items: [{ kind: "card", text: "Couper", word: 20 }, { kind: "card", text: "Nettoyer", word: 21 }, { kind: "card", text: "Sous-titrer", word: 2 }], payoff: true },
           { word: 24, layout: "full" },
           { word: 25, layout: "full" },
           { word: 500, layout: "split", board: { kind: "title", text: "hors bornes" } },
@@ -274,7 +279,10 @@ describe("plan des temps forts", () => {
       editWords,
       DURATION
     );
-    expect(plan.beats[0]).toMatchObject({ word: 0, layout: "split", board: { kind: "title", text: "3 h → 20 min" } });
+    expect(plan.beats[0]).toMatchObject({ word: 0, layout: "split", heading: { text: "3 h → 20 min" } });
+    expect(plan.beats[2]).toMatchObject({ arrangement: "single", items: [{ kind: "logo", text: "Notion" }] });
+    // Un objet n'entre jamais avant le début de son tableau.
+    expect(plan.beats[3].items!.map((item) => item.word)).toEqual([20, 21, 16]);
     expect(plan.emphasis).toEqual([9]);
     expect(plan.beats.map((beat) => beat.word)).toEqual([0, 7, 13, 16, 24]);
     // Le plein cadre du mot 14 durait 0,8 s : écarté. Ceux des mots 24 et 25 n'en font qu'un, de plus de 5 s.
@@ -286,13 +294,13 @@ describe("plan des temps forts", () => {
   it("sans réponse lisible, pose au moins l'accroche", () => {
     const plan = readBeatPlan(null, editWords, DURATION);
     expect(plan.beats).toHaveLength(1);
-    expect(plan.beats[0].board?.kind).toBe("title");
+    expect(plan.beats[0].heading?.text).toBe(plan.hook);
     expect(plan.mood).toBe("inspiring");
   });
 
   it("tait les sous-titres sous une planche qui écrit ce qui est dit", () => {
     const plan = readBeatPlan(
-      { hook: "Monter vite", beats: [{ word: 16, layout: "split", board: { kind: "list", items: [{ text: "couper" }, { text: "nettoyer" }, { text: "sous-titrer" }] } }, { word: 24, layout: "full" }] },
+      { hook: "Monter vite", beats: [{ word: 16, layout: "split", arrangement: "list", items: [{ kind: "card", text: "couper" }, { kind: "card", text: "nettoyer" }, { kind: "card", text: "sous-titrer" }] }, { word: 24, layout: "full" }] },
       editWords,
       DURATION
     );
@@ -306,6 +314,93 @@ describe("plan des temps forts", () => {
   });
 });
 
+describe("tableaux posés sur la grille", () => {
+  const fps = 30;
+  const frame = { width: 1080, height: 1920 };
+  const geometry = takeGeometry("9:16");
+  const logo: MediaSource = { url: "/api/modules/clip-studio/data/assets/logo.png", ref: "module:clip-studio/assets/logo.png", name: "Notion", kind: "image", width: 512, height: 512 };
+  const items: Record<string, object[]> = {
+    single: [{ kind: "counter", text: "400 000", unit: "vues", word: 3 }],
+    row: [{ kind: "logo", text: "Notion", word: 2, cross: 6 }, { kind: "logo", text: "Figma", word: 3, cross: 6 }, { kind: "logo", text: "Canva", word: 4, cross: 6 }],
+    list: [{ kind: "card", text: "Couper les blancs", word: 2 }, { kind: "card", text: "Nettoyer le son", word: 3 }, { kind: "card", text: "Sous-titrer", word: 4, strike: 6 }, { kind: "note", text: "Et pourquoi ?", word: 5 }],
+    hub: [{ kind: "card", text: "Apprendre à réfléchir", word: 1 }, ...["Promesse", "Concret", "Relance", "Tension", "Preuve"].map((text, index) => ({ kind: "chip", text, word: 2 + index }))],
+    versus: [{ kind: "card", text: "Avant : 3 h", word: 2, cross: 5 }, { kind: "card", text: "Après : 20 min", word: 4 }],
+    stack: [{ kind: "counter", text: "16 709", unit: "réels", word: 2 }, { kind: "chip", text: "56 créateurs", word: 4 }],
+  };
+
+  for (const arrangement of SCENE_ARRANGEMENTS) {
+    for (const layout of ["split", "board"] as const) {
+      it(`pose « ${arrangement} » en ${layout} sans chevauchement ni débordement`, () => {
+        const span = { start: 30, end: 300, beat: { word: 1, layout, arrangement, heading: { text: "Un titre de tableau", pill: "titre" }, items: items[arrangement] } };
+        const spec = sceneBoard(span as never, { fps, frame, geometry, logos: new Map([0, 1, 2].map((index) => [logoKey(0, index), logo])), index: 0, opening: false });
+        const compiled = compileBoard(spec!, { fps, frame, words: editWords });
+        expect(compiled.issues).toEqual([]);
+        expect(compiled.items.length).toBeGreaterThan(1);
+      });
+    }
+  }
+
+  it("donne à Codex les enchaînements des derniers montages, pour ne pas les refaire", () => {
+    const prompt = beatPlanPrompt({ words: editWords, durationMs: DURATION, recent: ["split:single, split:list, full"] });
+    expect(prompt).toContain("split:single, split:list, full");
+    expect(planSignature({ beats: [{ word: 0, layout: "split", arrangement: "row" }, { word: 4, layout: "full" }, { word: 9, layout: "board", arrangement: "hub" }] })).toBe("split:row, full, board:hub");
+  });
+});
+
+describe("mascotte sur la planche", () => {
+  const pose = (id: string, emotion: string): { id: string; source: MediaSource; tags: any } => ({
+    id,
+    source: { url: `/api/modules/clip-studio/data/assets/${id}.png`, ref: `module:clip-studio/assets/${id}.png`, name: id, kind: "image", width: 600, height: 800 },
+    tags: { emotion, gesture: "idle", framing: "full", facing: "front" },
+  });
+  const library = [pose("joie-1", "joy"), pose("joie-2", "joy"), pose("surprise", "surprise"), pose("doute", "doubt")];
+
+  it("réagit trois fois au plus, une fois par tableau, et seulement là où elle se pose", () => {
+    const mascot = (word: number, text = "joy") => ({ kind: "mascot", text, word });
+    const plan = readBeatPlan(
+      {
+        hook: "Accroche",
+        beats: [
+          { word: 1, layout: "split", arrangement: "stack", items: [{ kind: "counter", text: "20 min", word: 2 }, mascot(3), mascot(4)] },
+          { word: 7, layout: "split", arrangement: "list", items: [{ kind: "card", text: "Un", word: 8 }, { kind: "card", text: "Deux", word: 9 }, mascot(10)] },
+          { word: 13, layout: "split", arrangement: "row", items: [{ kind: "logo", text: "Notion", word: 13 }, mascot(14, "surprise")] },
+          { word: 16, layout: "split", arrangement: "single", items: [mascot(16, "doubt")] },
+          { word: 20, layout: "split", arrangement: "single", items: [mascot(20, "pride")] },
+          { word: 24, layout: "split", arrangement: "single", items: [mascot(24, "colère inventée")] },
+        ],
+      },
+      editWords,
+      DURATION
+    );
+    const counts = plan.beats.map((beat) => (beat.items ?? []).filter((item) => item.kind === "mascot").length);
+    expect(Math.max(...counts)).toBeLessThanOrEqual(1);
+    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(3);
+    // Pas dans une liste ; une émotion hors de la liste fermée est ignorée.
+    expect(plan.beats.find((beat) => beat.arrangement === "list")!.items!.some((item) => item.kind === "mascot")).toBe(false);
+    // Le tableau qui n'avait qu'une mascotte de trop disparaît, au lieu de laisser un papier vide.
+    expect(plan.beats.every((beat) => beat.layout === "full" || beat.heading || (beat.items?.length ?? 0) > 0)).toBe(true);
+    expect(beatPlanPrompt({ words: editWords, durationMs: DURATION, mascot: true })).toContain('"kind": "mascot"');
+    expect(beatPlanPrompt({ words: editWords, durationMs: DURATION })).not.toContain('"kind": "mascot"');
+  });
+
+  it("choisit la pose de l'émotion, sans montrer deux fois de suite la même", () => {
+    const usedPoses: string[] = [];
+    const context = { fps: 30, frame: { width: 1080, height: 1920 }, geometry: takeGeometry("9:16"), index: 0, opening: false, mascot: { library, reactions: [] }, usedPoses };
+    const picks = [0, 1, 2].map(() => {
+      const spec = sceneBoard({ start: 0, end: 90, beat: { word: 0, layout: "split", arrangement: "single", items: [{ kind: "mascot", text: "joy" }] } }, context);
+      const image = spec!.actors.find((actor) => actor.kind === "image") as { source: MediaSource } | undefined;
+      return image?.source.ref;
+    });
+    expect(picks.every(Boolean)).toBe(true);
+    expect(picks[0]).not.toBe(picks[1]);
+    expect(picks[1]).not.toBe(picks[2]);
+    for (const ref of picks) expect(ref).toMatch(/joie-/);
+    // Sans mascotte dans la marque, rien n'est posé.
+    const none = sceneBoard({ start: 0, end: 90, beat: { word: 0, layout: "split", arrangement: "single", items: [{ kind: "mascot", text: "joy" }] } }, { ...context, mascot: undefined });
+    expect(none!.actors).toEqual([]);
+  });
+});
+
 // ─── Projet monté ────────────────────────────────────────────────
 
 const TAKE: MediaSource = { url: "/api/modules/clip-studio/data/assets/take.mp4", ref: "module:clip-studio/assets/take.mp4", name: "prise.mp4", kind: "video", width: 1920, height: 1080, durationMs: 60_000, hasAudio: true };
@@ -316,9 +411,9 @@ describe("projet d'une prise montée", () => {
       hook: "3 h → 20 min",
       emphasis: [3, 9],
       beats: [
-        { word: 7, layout: "split", board: { kind: "counter", value: "20 min", label: "de montage" }, payoff: true },
-        { word: 13, layout: "split", board: { kind: "logo", name: "Notion" } },
-        { word: 16, layout: "split", board: { kind: "quote", text: "Trois étapes", emphasis: "étapes" }, hideCaptions: true },
+        { word: 7, layout: "split", arrangement: "stack", items: [{ kind: "counter", text: "20 min", word: 8 }, { kind: "chip", text: "de montage", word: 9 }], payoff: true },
+        { word: 13, layout: "split", arrangement: "single", items: [{ kind: "logo", text: "Notion", word: 13 }] },
+        { word: 16, layout: "board", arrangement: "list", heading: { text: "Trois étapes", pill: "étapes" }, items: [{ kind: "card", text: "Couper", word: 20 }, { kind: "card", text: "Nettoyer", word: 21 }, { kind: "card", text: "Sous-titrer", word: 22, strike: 23 }], hideCaptions: true },
         { word: 27, layout: "full" },
       ],
     },
@@ -355,9 +450,11 @@ describe("projet d'une prise montée", () => {
     const card = videos.filter((video) => video.label === "Caméra");
     expect(full.length).toBeGreaterThan(0);
     expect(card.length).toBeGreaterThan(0);
+    // Le plan plein cadre glisse depuis la carte du bas : on lit son cadre une fois le glissement fini.
     for (const video of full) {
-      expect(video.transform.y - video.transform.height / 2).toBeLessThanOrEqual(0.0001);
-      expect(video.transform.y + video.transform.height / 2).toBeGreaterThanOrEqual(0.9999);
+      const settled = keyedFrame(video, video.start + video.duration - 1).transform;
+      expect(settled.y - settled.height / 2).toBeLessThanOrEqual(0.0001);
+      expect(settled.y + settled.height / 2).toBeGreaterThanOrEqual(0.9999);
     }
     const geometry = takeGeometry("9:16");
     for (const video of card) expect(video.transform.y + video.transform.height / 2).toBeGreaterThanOrEqual(1 - 0.0001);
@@ -394,19 +491,42 @@ describe("projet d'une prise montée", () => {
 
   it("pose l'accroche lisible dès la première image, et un nom en grand faute de logo officiel", () => {
     const board = boardOf(project);
-    const opening = board.filter((item) => item.start === 0);
+    const opening = board.filter((item) => item.start === 0 && item.type === "text");
     expect(opening.length).toBeGreaterThan(0);
-    for (const item of opening) expect("animIn" in item && item.animIn.kind).toBe("none");
+    // À la première image, le titre de l'accroche est déjà là, entier.
+    for (const item of opening) expect(keyedFrame(item, 0).transform.opacity).toBe(1);
     expect(board.some((item) => item.type === "text" && item.text === "Notion")).toBe(true);
     expect(board.some((item) => item.type === "image")).toBe(false);
+    // Le compteur entre en comptant, jamais arrêté sur zéro.
     const counter = board.find((item) => item.type === "text" && item.text === "20 min") as TextItem;
-    expect(counter.animIn.kind).toBe("count-up-pop");
+    expect(counter.count).toMatchObject({ from: 0, at: 0 });
+    expect(counter.start).toBe(Math.round((editWords[8].startMs / 1000) * fps));
+  });
+
+  it("glisse le papier vers la planche seule, et la barre tombe sur son mot", () => {
+    const papers = boardOf(project).filter((item) => item.label === "Planche – papier");
+    expect(papers.some((item) => item.keys?.some((key: { height?: number }) => key.height === 1))).toBe(true);
+    const struck = boardOf(project).find((item) => item.type === "text" && item.text === "Sous-titrer") as TextItem;
+    expect(struck.marks?.some((mark) => mark.kind === "strike" && mark.at === Math.round((editWords[23].startMs / 1000) * fps) - struck.start)).toBe(true);
+    expect(project.brief?.montage).toBe(planSignature(plan));
   });
 
   it("place un vrai logo quand il est trouvé", () => {
     const logo: MediaSource = { url: "/api/modules/clip-studio/data/assets/logo.png", ref: "module:clip-studio/assets/logo.png", name: "Notion", kind: "image", width: 512, height: 512 };
-    const withLogo = buildTakeProject({ name: "Test", aspect: "9:16", takes: [{ source: TAKE }], segments, words: editWords, plan, logos: new Map([[plan.beats.findIndex((beat) => beat.board?.kind === "logo"), logo]]), theme: null });
+    const sceneIndex = plan.beats.findIndex((beat) => beat.items?.some((item) => item.kind === "logo"));
+    const withLogo = buildTakeProject({ name: "Test", aspect: "9:16", takes: [{ source: TAKE }], segments, words: editWords, plan, logos: new Map([[logoKey(sceneIndex, 0), logo]]), theme: null });
     expect(boardOf(withLogo).some((item) => item.type === "image" && item.source.ref === logo.ref)).toBe(true);
+  });
+
+  it("fait tiquer le compteur qui défile et pose un coup sourd quand son chiffre arrive, sans bruit d'entrée", () => {
+    const ticks = project.tracks.find((entry) => entry.name === "Bruitages – compteurs");
+    const thuds = project.tracks.find((entry) => entry.name === "Bruitages – planche");
+    expect(ticks?.items.length).toBeGreaterThan(2);
+    expect(ticks!.items.length).toBeLessThanOrEqual(7);
+    expect(thuds?.items.length).toBeGreaterThan(0);
+    // Les tics commencent quand le compteur entre, jamais avant.
+    const counter = boardOf(project).find((item) => item.type === "text" && item.text === "20 min") as TextItem;
+    for (const tick of ticks!.items) expect(tick.start).toBeGreaterThanOrEqual(counter.start);
   });
 
   it("ne met des bruitages que sur l'accroche et les vrais temps forts", () => {
