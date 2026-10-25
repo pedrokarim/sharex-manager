@@ -32,7 +32,7 @@ if (!fontsDir || !outDir) {
   console.error("Usage : bun scripts/board-stills.ts --fonts <dossier> --out <dossier> [--step 0.5]");
   process.exit(1);
 }
-for (const file of readdirSync(fontsDir)) if (/\.(ttf|otf)$/i.test(file)) GlobalFonts.registerFromPath(join(fontsDir, file), file.split("-")[0]);
+for (const file of readdirSync(fontsDir)) if (/\.(ttf|otf)$/i.test(file)) GlobalFonts.registerFromPath(join(fontsDir, file));
 mkdirSync(outDir, { recursive: true });
 
 // Trois « logos » d'essai, dessinés ici : un disque, un losange, un anneau.

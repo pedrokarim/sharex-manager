@@ -270,6 +270,40 @@ function bodyOf(items: SceneItem[], arrangement: string, s: (px: number) => numb
         const height = ratio >= 1 ? side / ratio : side;
         return { height, place: (y) => actors.push({ id, kind: "image", source, x: 0.5, y: ay(y), w: ax(width), h: ay(height), label: `Mascotte – ${item.text}`, enter: enter(item.word, "pop") }) };
       }
+      case "terminal": {
+        const lines = item.lines ?? [];
+        const fontSize = size(0.021);
+        const height = s(64) + s(SPACE.m) * 2 + Math.max(1, lines.length) * fontSize * frame.height * 1.55;
+        return {
+          height,
+          place: (y) =>
+            actors.push({
+              id,
+              kind: "terminal",
+              title: item.text,
+              x: 0.5,
+              y: ay(y),
+              w: 1,
+              size: fontSize,
+              lines: lines.map((line) => ({ text: line.text, kind: line.kind, ...(line.word !== undefined ? { at: { word: line.word } } : {}) })),
+              enter: enter(item.word, "rise"),
+            }),
+        };
+      }
+      case "prompt": {
+        const fontSize = size(0.024);
+        return { height: fontSize * frame.height * 2.9, place: (y) => actors.push({ id, kind: "prompt", text: item.text, placeholder: "Demander à l'assistant", x: 0.5, y: ay(y), w: 1, size: fontSize, ...(item.word !== undefined ? { typeAt: { word: item.word } } : {}), enter: enter(undefined, "rise") }) };
+      }
+      case "phone": {
+        const height = Math.min(areaPx.height * (inStack ? 0.7 : 0.96), s(inStack ? 560 : 760));
+        return { height, place: (y) => actors.push({ id, kind: "phone", title: item.title ?? "Statistiques", label: item.label, value: item.text, unit: item.unit, x: 0.5, y: ay(y), h: ay(height), ...(item.word !== undefined ? { countAt: { word: item.word } } : {}), enter: enter(undefined, "rise") }) };
+      }
+      case "tree": {
+        const lines = item.lines ?? [];
+        const fontSize = size(0.022);
+        const height = s(SPACE.m) * 2 + fontSize * frame.height * (2 + lines.length * 1.9);
+        return { height, place: (y) => actors.push({ id, kind: "tree", title: item.text, x: 0.5, y: ay(y), w: Math.min(1, ax(s(720))), size: fontSize, entries: lines.map((line) => ({ text: line.text, ...(line.word !== undefined ? { at: { word: line.word } } : {}) })), enter: enter(item.word, "rise") }) };
+      }
       case "chip": {
         const fontSize = size(SIZE.chip) * 1.2;
         return { height: fontSize * frame.height * 1.2, place: (y) => (actors.push({ id, kind: "chip", text: item.text, size: fontSize, x: 0.5, y: ay(y), enter: enter(item.word, "pop") }), verbs(id, item)) };

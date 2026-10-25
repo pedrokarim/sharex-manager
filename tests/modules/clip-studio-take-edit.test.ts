@@ -401,6 +401,46 @@ describe("mascotte sur la planche", () => {
   });
 });
 
+describe("interfaces recréées", () => {
+  const fps = 30;
+  const frame = { width: 1080, height: 1920 };
+  const geometry = takeGeometry("9:16");
+  const interfaces: Record<string, object> = {
+    terminal: { kind: "terminal", title: "studio", lines: [{ text: "studio-script audit", kind: "command", word: 3 }, { text: "Lecture…", kind: "output", word: 5 }, { text: "Accroche 7/10", kind: "ok", word: 7 }] },
+    prompt: { kind: "prompt", text: "Écris-moi trois accroches sur le montage", word: 3 },
+    phone: { kind: "phone", title: "Statistiques", label: "Vues", text: "440 765", word: 4 },
+    tree: { kind: "tree", title: "Scripts", lines: [{ text: "trois-videos.md", word: 3 }, { text: "effets.md", word: 5 }] },
+  };
+
+  it("lit les interfaces avec rigueur et ne les pose que seules ou en pile", () => {
+    expect(readSceneItem({ kind: "terminal", lines: [] }, 10)).toBeUndefined();
+    expect(readSceneItem({ kind: "phone", text: "beaucoup" }, 10)).toBeUndefined();
+    expect(readSceneItem({ kind: "terminal", title: "studio", lines: [{ text: "ls", kind: "command", word: 2 }, { text: "x", kind: "inconnu", word: 99 }] }, 10)).toEqual({ kind: "terminal", text: "studio", lines: [{ text: "ls", kind: "command", word: 2 }, { text: "x" }] });
+    const plan = readBeatPlan({ hook: "Accroche", beats: [{ word: 2, layout: "split", arrangement: "row", items: [interfaces.terminal, { kind: "chip", text: "audit", word: 4 }] }] }, editWords, DURATION);
+    expect(plan.beats[1].arrangement).toBe("stack");
+  });
+
+  for (const [kind, item] of Object.entries(interfaces)) {
+    for (const layout of ["split", "board"] as const) {
+      it(`pose « ${kind} » en ${layout} sans chevauchement ni débordement`, () => {
+        const spec = sceneBoard({ start: 30, end: 300, beat: { word: 1, layout, arrangement: "single", items: [item] } } as never, { fps, frame, geometry, index: 0, opening: false });
+        const compiled = compileBoard(spec!, { fps, frame, words: editWords });
+        expect(compiled.issues).toEqual([]);
+        expect(compiled.items.length).toBeGreaterThan(1);
+      });
+    }
+  }
+
+  it("tape la commande sur son mot, au son des touches", () => {
+    const spec = sceneBoard({ start: 0, end: 300, beat: { word: 1, layout: "split", arrangement: "single", items: [interfaces.terminal] } } as never, { fps, frame, geometry, index: 0, opening: false });
+    const compiled = compileBoard(spec!, { fps, frame, words: editWords });
+    const command = compiled.items.find((entry) => entry.type === "text" && entry.text === "> studio-script audit") as TextItem;
+    expect(command.start).toBe(Math.round((editWords[3].startMs / 1000) * fps));
+    expect(command.animIn.kind).toBe("typewriter");
+    expect(compiled.cues).toContainEqual({ frame: command.start, sound: "type", frames: command.animIn.frames });
+  });
+});
+
 // ─── Projet monté ────────────────────────────────────────────────
 
 const TAKE: MediaSource = { url: "/api/modules/clip-studio/data/assets/take.mp4", ref: "module:clip-studio/assets/take.mp4", name: "prise.mp4", kind: "video", width: 1920, height: 1080, durationMs: 60_000, hasAudio: true };

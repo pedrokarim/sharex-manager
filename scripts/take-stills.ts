@@ -39,7 +39,7 @@ if (!fontsDir || !outDir) {
   console.error("Usage : bun scripts/take-stills.ts --fonts <dossier> --out <dossier> [--step 0.5]");
   process.exit(1);
 }
-for (const file of readdirSync(fontsDir)) if (/\.(ttf|otf)$/i.test(file)) GlobalFonts.registerFromPath(join(fontsDir, file), file.split("-")[0]);
+for (const file of readdirSync(fontsDir)) if (/\.(ttf|otf)$/i.test(file)) GlobalFonts.registerFromPath(join(fontsDir, file));
 mkdirSync(outDir, { recursive: true });
 
 // Ce qui est dit : une phrase par tableau, les mots répartis régulièrement.
@@ -50,6 +50,9 @@ const SENTENCES: [number, number, string][] = [
   [13.8, 19.4, "Ce qu'il faut, c'est réfléchir : une promesse, du concret, une relance, une preuve."],
   [19.6, 23.4, "Avant, trois heures de montage. Après, vingt minutes."],
   [23.6, 27.8, "Résultat : seize mille sept cent neuf vues en une semaine."],
+  [28, 33, "Je tape une commande, il lit le script et me rend une note sur dix."],
+  [33.2, 37.6, "Sur Instagram, quatre cent quarante mille vues ce mois-ci."],
+  [37.8, 42.4, "Chaque script finit dans un dossier : trois vidéos, effets, sous-titres."],
 ];
 const words: TimedWord[] = SENTENCES.flatMap(([from, to, sentence]) => {
   const tokens = sentence.split(" ");
@@ -74,6 +77,9 @@ const raw = {
     { word: at("ce", at("zéro")), layout: "board", arrangement: "hub", items: [{ kind: "card", text: "Réfléchir", word: at("réfléchir") }, { kind: "chip", text: "Promesse", word: at("promesse") }, { kind: "chip", text: "Concret", word: at("concret") }, { kind: "chip", text: "Relance", word: at("relance") }, { kind: "chip", text: "Preuve", word: at("preuve") }] },
     { word: at("avant"), layout: "split", arrangement: "versus", items: [{ kind: "card", text: "3 h de montage", word: at("avant"), cross: at("après") }, { kind: "card", text: "20 min", word: at("après") }], payoff: true },
     { word: at("résultat"), layout: "split", arrangement: "stack", items: [{ kind: "counter", text: "16 709", unit: "vues", word: at("seize") }, { kind: "chip", text: "en une semaine", word: at("semaine") }], payoff: true },
+    { word: at("je"), layout: "split", arrangement: "single", items: [{ kind: "terminal", title: "studio", lines: [{ text: "studio-script audit", kind: "command", word: at("commande") }, { text: "Lecture du script…", kind: "output", word: at("lit") }, { text: "Accroche 7/10", kind: "ok", word: at("note") }] }] },
+    { word: at("sur", at("note")), layout: "board", arrangement: "single", items: [{ kind: "phone", title: "Statistiques", label: "Vues", text: "440 765", word: at("quatre", at("note")) }] },
+    { word: at("chaque"), layout: "split", arrangement: "single", items: [{ kind: "tree", title: "Scripts", lines: [{ text: "trois-videos.md", word: at("trois", at("chaque")) }, { text: "effets.md", word: at("effets") }, { text: "sous-titres.md", word: at("sous") }] }] },
   ],
 };
 const plan = readBeatPlan(raw, words, durationMs);

@@ -31,7 +31,7 @@ import { CAPTION_STYLE, createProject, uid } from "./edit";
 import { contrastRatio, distinctColors, opaqueHex } from "./legibility";
 import { captionCenterBounds, captionLineCount, measuredPlan } from "./measured-style";
 import { wordGroups } from "./render";
-import { sfxItem, sfxSeries } from "./sfx";
+import { sfxItem, sfxSeries, typingSfx } from "./sfx";
 import { MAX_STILL_MS, beatSpans, captionHideSpans, planSignature, type BeatSpan, type TakeLayout, type TakePlan } from "./take-plan";
 import { sceneBoard } from "./take-scenes";
 import type { KeptSegment } from "./take-cut";
@@ -334,7 +334,15 @@ function boardSounds(boards: CompiledBoard[], fps: number): Track[] {
   const cues = boards.flatMap((board) => board.cues);
   const ticks = sfxSeries("tick", cues.filter((cue) => cue.sound === "tick").map((cue) => cue.frame), fps, { label: "Bruitage – compteur", minGapMs: 90 });
   const thuds = sfxSeries("thud", cues.filter((cue) => cue.sound === "thud").map((cue) => cue.frame), fps, { label: "Bruitage – temps posé", minGapMs: 1000, max: 6 });
+  // La frappe d'une commande ou d'une demande, sous les lettres qui s'écrivent ; deux frappes ne se chevauchent pas.
+  const typing: AudioItem[] = [];
+  for (const cue of cues.filter((entry) => entry.sound === "type").sort((a, b) => a.frame - b.frame)) {
+    const last = typing[typing.length - 1];
+    const from = Math.max(cue.frame, last ? last.start + last.duration : 0);
+    typing.push(...typingSfx(from, (cue.frames ?? 0) - (from - cue.frame), fps, "Bruitage – frappe"));
+  }
   return [
+    ...(typing.length ? [{ id: uid("t-"), kind: "audio" as const, name: "Bruitages – frappe", items: typing }] : []),
     ...(ticks.length ? [{ id: uid("t-"), kind: "audio" as const, name: "Bruitages – compteurs", items: ticks }] : []),
     ...(thuds.length ? [{ id: uid("t-"), kind: "audio" as const, name: "Bruitages – planche", items: thuds }] : []),
   ];

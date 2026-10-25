@@ -20,7 +20,7 @@
  * Fonction pure.
  */
 
-import { DEFAULT_TEXT_FONT } from "../lib/font-catalog";
+import { CODE_FONT, DEFAULT_TEXT_FONT } from "../lib/font-catalog";
 import { DEFAULT_BOARD_PALETTE, type BoardPalette, type BoardPaletteKey } from "./board-palette";
 import { uid } from "./edit";
 import { lanes, type Box } from "./take-templates";
@@ -154,7 +154,53 @@ export interface CounterActor extends ActorBase {
   color?: BoardColor;
 }
 
-export type BoardActor = TextActor | CardActor | ChipActor | NoteActor | ImageActor | CounterActor;
+/** Terminal recréé : une commande se tape, ses réponses arrivent. */
+export interface TerminalActor extends ActorBase {
+  kind: "terminal";
+  w: number;
+  /** Hauteur, en part de la zone ; absente : celle de ses lignes. */
+  h?: number;
+  title?: string;
+  /** Lignes dans l'ordre : `command` se tape (au son des touches), `output` et `ok` (réussite) apparaissent. */
+  lines: { text: string; at?: BoardAt; kind?: "command" | "output" | "ok" }[];
+  size?: number;
+}
+
+/** Champ de saisie d'un assistant : la demande se tape, à partir de `typeAt`. */
+export interface PromptActor extends ActorBase {
+  kind: "prompt";
+  text: string;
+  w: number;
+  typeAt?: BoardAt;
+  /** Texte gris avant la frappe. */
+  placeholder?: string;
+  size?: number;
+}
+
+/** Écran de statistiques d'un téléphone : titre, chiffre qui défile (à `countAt`), courbe. */
+export interface PhoneActor extends ActorBase {
+  kind: "phone";
+  /** Hauteur, en part de la zone ; la largeur suit les proportions d'un téléphone. */
+  h: number;
+  title: string;
+  value: string;
+  unit?: string;
+  label?: string;
+  from?: number;
+  countAt?: BoardAt;
+  chart?: boolean;
+}
+
+/** Arborescence : un dossier et ses fichiers, qui arrivent un à un. */
+export interface TreeActor extends ActorBase {
+  kind: "tree";
+  w: number;
+  title: string;
+  entries: { text: string; at?: BoardAt }[];
+  size?: number;
+}
+
+export type BoardActor = TextActor | CardActor | ChipActor | NoteActor | ImageActor | CounterActor | TerminalActor | PromptActor | PhoneActor | TreeActor;
 
 export type BoardAction =
   | { verb: "move"; actor: string; at: BoardAt; x?: number; y?: number; scale?: number; seconds?: number }
@@ -241,6 +287,11 @@ const DRAW_SECONDS = 0.45;
 const COUNT_SECONDS = 1.1;
 /** Tics d'un compteur qui défile. */
 const COUNT_TICKS = 7;
+/** Vitesse de frappe d'une commande ou d'une demande, en secondes par caractère. */
+const TYPE_SECONDS_PER_CHAR = 0.045;
+
+/** Couleurs fixes d'un terminal : il reste sombre quelle que soit la marque, comme un vrai. */
+const TERMINAL = { ground: "#17191e", ink: "#f2efe8", muted: "#9a978f", ok: "#5fd38d" } as const;
 /** Montée d'une entrée et levée d'une sortie, en pixels d'un cadre de 1080. */
 const RISE_PX = 44;
 const LIFT_PX = 34;
@@ -263,6 +314,15 @@ interface ActorBuild {
   text?: TextItem;
   enterFrame: number;
   endFrame: number;
+  /** Sons que l'acteur appelle de lui-même (frappe d'une commande, tic d'un compteur). */
+  cues: BoardCue[];
+}
+
+/** Son appelé par la planche ; `frames` : durée d'une frappe. */
+export interface BoardCue {
+  frame: number;
+  sound: "tick" | "thud" | "type";
+  frames?: number;
 }
 
 export interface CompiledBoard {
@@ -279,7 +339,7 @@ export interface CompiledBoard {
    * d'un compteur qui défile, un coup sourd quand son chiffre se pose ou
    * qu'une croix tombe. Jamais de bruit à l'entrée d'un objet.
    */
-  cues: { frame: number; sound: "tick" | "thud" }[];
+  cues: BoardCue[];
 }
 
 /** Nom des pistes de chaque calque, dans l'éditeur. */
@@ -358,6 +418,7 @@ export function compileBoard(spec: BoardSpec, context: BoardContext): CompiledBo
   }
 
   const builds = new Map<string, ActorBuild>();
+  const pendingCues: BoardCue[] = [];
   for (const actor of spec.actors) {
     const forced = forcedEnter.get(actor.id);
     const asked = actor.enter ? at(actor.enter.at) : spec.start;
@@ -365,13 +426,14 @@ export function compileBoard(spec: BoardSpec, context: BoardContext): CompiledBo
     const endFrame = Math.max(enterFrame + 1, leaveAt.get(actor.id) ?? spec.end);
     const build = buildActor(actor, enterFrame, endFrame, { area, frame, palette, toX, toY, px, at, seconds });
     builds.set(actor.id, build);
+    pendingCues.push(...build.cues);
     changes.add(enterFrame);
     const style = forced?.style ?? actor.enter?.style ?? (actor.enter || forced ? "rise" : "none");
     applyEnter(build, style, forced?.frames ?? seconds(actor.enter?.seconds ?? ENTER_SECONDS), frame);
   }
 
   const extra: Placed[] = [];
-  const cues: CompiledBoard["cues"] = [];
+  const cues: BoardCue[] = [...pendingCues];
   for (const action of spec.actions ?? []) {
     const frameAt = at(action.at);
     changes.add(frameAt);
@@ -563,6 +625,7 @@ function buildActor(actor: BoardActor, start: number, end: number, tools: BuildT
   const shadow = { color: palette.shadow, blur: px(28) / Math.min(frame.width, frame.height), offsetY: px(8) / Math.min(frame.width, frame.height) };
   let text: TextItem | undefined;
   let box = { x: cx, y: cy, width: 0, height: 0 };
+  const cues: BoardCue[] = [];
 
   switch (actor.kind) {
     case "text": {
@@ -672,6 +735,184 @@ function buildActor(actor: BoardActor, start: number, end: number, tools: BuildT
       box = { x: cx, y: cy, width, height };
       break;
     }
+    case "terminal": {
+      // Fenêtre de terminal recréée : barre de titre à trois points, puis les lignes, l'une sous l'autre.
+      const size = actor.size ?? 0.021;
+      const linePx = size * frame.height * 1.55;
+      const barPx = px(64);
+      const padPx = px(SPACE.m);
+      const width = actor.w * area.width;
+      const heightPx = actor.h !== undefined ? actor.h * area.height * frame.height : barPx + padPx * 2 + Math.max(1, actor.lines.length) * linePx;
+      const height = heightPx / frame.height;
+      const top = cy - height / 2;
+      const left = cx - width / 2;
+      const window = shapeItem(start, duration, boxAround(cx, cy, width, height), TERMINAL.ground, 0.045);
+      window.shadow = shadow;
+      window.label = "Planche – terminal";
+      parts.push({ item: window, layer: "card" });
+      const dot = px(18);
+      ["#ff5f57", "#febc2e", "#28c840"].forEach((color, index) => {
+        const item = shapeItem(start, duration, boxAround(left + (padPx * 0.9 + index * (dot + px(12)) + dot / 2) / frame.width, top + barPx / 2 / frame.height, dot / frame.width, dot / frame.height), color, 0.5);
+        item.shape = "ellipse";
+        item.label = "Planche – terminal, bouton";
+        parts.push({ item, layer: "text" });
+      });
+      if (actor.title) {
+        const title = textItem(actor.title, start, duration, { x: cx, y: top + barPx / 2 / frame.height, width: width * 0.6, height: barPx / frame.height }, size * 0.78, "label", TERMINAL.muted);
+        title.style = { ...title.style, font: CODE_FONT.family, weight: CODE_FONT.weight };
+        parts.push({ item: title, layer: "text" });
+      }
+      actor.lines.forEach((line, index) => {
+        const lineStart = line.at !== undefined ? Math.max(start, tools.at(line.at)) : start;
+        const kind = line.kind ?? (index === 0 ? "command" : "output");
+        // Une réussite reçoit une coche dessinée (le caractère « ✓ » manque à bien des polices de code) : son texte commence après elle.
+        const content = kind === "command" ? `> ${line.text}` : line.text;
+        const y = top + (barPx + padPx + (index + 0.5) * linePx) / frame.height;
+        const indent = kind === "ok" ? (size * frame.height * 1.25) / frame.width : 0;
+        const textWidth = width - (padPx * 2) / frame.width - indent;
+        const item = textItem(content, lineStart, end - lineStart, { x: left + padPx / frame.width + indent + textWidth / 2, y, width: textWidth, height: linePx / frame.height }, size, "body", kind === "ok" ? TERMINAL.ok : kind === "command" ? TERMINAL.ink : TERMINAL.muted, "left");
+        item.style = { ...item.style, font: CODE_FONT.family, weight: CODE_FONT.weight, letterSpacing: 0 };
+        // Une commande se tape, lettre à lettre, au son des touches ; une réponse arrive d'un coup.
+        if (kind === "command") {
+          item.marks = [{ kind: "color", from: 0, to: 1, color: palette.accent }];
+          if (lineStart > start || index > 0 || line.at !== undefined) {
+            const frames = Math.max(6, Math.round(content.length * TYPE_SECONDS_PER_CHAR * tools.seconds(1)));
+            item.animIn = { kind: "typewriter", frames };
+            cues.push({ frame: lineStart, sound: "type", frames });
+          }
+        } else if (lineStart > start) item.animIn = { kind: "fade", frames: tools.seconds(0.2) };
+        parts.push({ item, layer: "text" });
+        if (kind === "ok") {
+          // Coche de la largeur d'un caractère, centrée sur la hauteur des capitales de la ligne.
+          const em = size * frame.height;
+          const check = strokeItem(lineStart, end - lineStart, boxAround(left + (padPx + em * 0.42) / frame.width, y, (em * 0.62) / frame.width, (em * 0.5) / frame.height), [
+            { points: [[0, 0.55], [0.36, 0.95], [1, 0.05]], draw: { at: 0, frames: tools.seconds(0.25) } },
+          ], (em * 0.11) / Math.min(frame.width, frame.height), TERMINAL.ok, "Planche – coche");
+          parts.push({ item: check, layer: "text" });
+        }
+      });
+      box = { x: cx, y: cy, width, height };
+      break;
+    }
+    case "prompt": {
+      // Champ de saisie d'un assistant : la demande se tape, le bouton d'envoi attend à droite.
+      const size = actor.size ?? 0.024;
+      const heightPx = size * frame.height * 2.9;
+      const width = actor.w * area.width;
+      const height = heightPx / frame.height;
+      const field = shapeItem(start, duration, boxAround(cx, cy, width, height), palette.sheet, 0.5, "sheet");
+      field.shadow = shadow;
+      field.label = "Planche – champ de saisie";
+      parts.push({ item: field, layer: "card" });
+      const button = heightPx * 0.62;
+      const padPx = (heightPx - button) / 2;
+      const buttonX = cx + width / 2 - (padPx + button / 2) / frame.width;
+      const send = shapeItem(start, duration, boxAround(buttonX, cy, button / frame.width, button / frame.height), palette.accent, 0.5, "accent");
+      send.shape = "ellipse";
+      send.label = "Planche – bouton d'envoi";
+      parts.push({ item: send, layer: "text" });
+      const arrow = strokeItem(start, duration, boxAround(buttonX, cy, (button * 0.5) / frame.width, (button * 0.5) / frame.height), [{ points: [[0.5, 0.95], [0.5, 0.08]], head: "end" }], px(5) / Math.min(frame.width, frame.height), palette.onAccent, "Planche – flèche d'envoi", "onAccent");
+      parts.push({ item: arrow, layer: "overlay" });
+      const typeAt = actor.typeAt !== undefined ? Math.max(start, tools.at(actor.typeAt)) : start;
+      const textLeft = cx - width / 2 + (heightPx * 0.42) / frame.width;
+      const textRight = buttonX - (button / 2 + px(SPACE.s)) / frame.width;
+      if (actor.placeholder && typeAt > start) {
+        const hint = textItem(actor.placeholder, start, typeAt - start, { x: (textLeft + textRight) / 2, y: cy, width: textRight - textLeft, height: height * 0.7 }, size, "label", palette.muted, "left", "muted");
+        parts.push({ item: hint, layer: "text" });
+      }
+      text = textItem(actor.text, typeAt, end - typeAt, { x: (textLeft + textRight) / 2, y: cy, width: textRight - textLeft, height: height * 0.7 }, size, "label", palette.onSheet, "left", "onSheet");
+      const frames = Math.max(6, Math.round(actor.text.length * TYPE_SECONDS_PER_CHAR * tools.seconds(1)));
+      text.animIn = { kind: "typewriter", frames };
+      cues.push({ frame: typeAt, sound: "type", frames });
+      parts.push({ item: text, layer: "text" });
+      box = { x: cx, y: cy, width, height };
+      break;
+    }
+    case "phone": {
+      // Écran de statistiques d'un téléphone : un titre, le chiffre qui défile, une courbe qui se trace.
+      const heightPx = actor.h * area.height * frame.height;
+      const widthPx = heightPx * 0.49;
+      const width = widthPx / frame.width;
+      const height = heightPx / frame.height;
+      const body = shapeItem(start, duration, boxAround(cx, cy, width, height), palette.ink, 0.13, "ink");
+      body.shadow = shadow;
+      body.label = "Planche – téléphone";
+      parts.push({ item: body, layer: "card" });
+      const bezel = px(14);
+      const screenW = (widthPx - bezel * 2) / frame.width;
+      const screenH = (heightPx - bezel * 2) / frame.height;
+      const screen = shapeItem(start, duration, boxAround(cx, cy, screenW, screenH), palette.sheet, 0.12, "sheet");
+      screen.label = "Planche – écran";
+      parts.push({ item: screen, layer: "card" });
+      const notch = shapeItem(start, duration, boxAround(cx, cy - height / 2 + (bezel + px(26)) / frame.height, (widthPx * 0.3) / frame.width, px(30) / frame.height), palette.ink, 0.5, "ink");
+      notch.label = "Planche – encoche";
+      parts.push({ item: notch, layer: "image" });
+      const innerPad = px(SPACE.m) / frame.width;
+      const contentLeft = cx - screenW / 2 + innerPad;
+      const contentWidth = screenW - innerPad * 2;
+      const screenTop = cy - screenH / 2;
+      const titleSize = 0.022 * (heightPx / 900);
+      const valueSize = 0.05 * (heightPx / 900);
+      const rows = [
+        { y: 0.17, text: actor.title, size: titleSize, role: "title" as TextRole, color: "onSheet" as BoardPaletteKey },
+        ...(actor.label ? [{ y: 0.27, text: actor.label, size: titleSize * 0.8, role: "label" as TextRole, color: "muted" as BoardPaletteKey }] : []),
+      ];
+      for (const row of rows) {
+        const item = textItem(row.text, start, duration, { x: contentLeft + contentWidth / 2, y: screenTop + screenH * row.y, width: contentWidth, height: row.size * 1.6 }, row.size, row.role, palette[row.color], "left", row.color);
+        parts.push({ item, layer: "text" });
+      }
+      const countAt = actor.countAt !== undefined ? Math.max(start, tools.at(actor.countAt)) : start;
+      text = textItem(actor.value, start, duration, { x: contentLeft + contentWidth / 2, y: screenTop + screenH * 0.42, width: contentWidth, height: valueSize * 1.4 }, valueSize, "title", palette.onSheet, "left", "onSheet");
+      text.count = { from: actor.from ?? 0, at: countAt - start, frames: tools.seconds(COUNT_SECONDS) };
+      if (actor.unit) text.tail = { text: actor.unit, scale: 0.45, color: palette.accent };
+      parts.push({ item: text, layer: "text" });
+      for (let tick = 0; tick < COUNT_TICKS; tick++) cues.push({ frame: countAt + Math.round(tools.seconds(COUNT_SECONDS) * (1 - Math.cbrt(1 - tick / COUNT_TICKS))), sound: "tick" });
+      cues.push({ frame: Math.min(end - 1, countAt + tools.seconds(COUNT_SECONDS)), sound: "thud" });
+      if (actor.chart !== false) {
+        // Courbe des vues : calme, puis la montée de la fin ; elle se trace pendant que le chiffre défile.
+        const chart = strokeItem(start, duration, { left: contentLeft, top: screenTop + screenH * 0.58, width: contentWidth, height: screenH * 0.28 }, [
+          { points: [[0, 0.92], [0.18, 0.86], [0.34, 0.9], [0.5, 0.8], [0.64, 0.84], [0.76, 0.62], [0.86, 0.3], [0.93, 0.12], [1, 0.05]], smooth: true, draw: { at: countAt - start, frames: tools.seconds(COUNT_SECONDS) } },
+        ], px(6) / Math.min(frame.width, frame.height), palette.accent, "Planche – courbe", "accent");
+        parts.push({ item: chart, layer: "text" });
+      }
+      box = { x: cx, y: cy, width, height };
+      break;
+    }
+    case "tree": {
+      // Arborescence : le dossier en titre, ses fichiers l'un sous l'autre, reliés par des traits qui poussent avec eux.
+      const size = actor.size ?? 0.022;
+      const rowPx = size * frame.height * 1.9;
+      const padPx = px(SPACE.m);
+      const titlePx = size * frame.height * 2;
+      const width = actor.w * area.width;
+      const heightPx = padPx * 2 + titlePx + actor.entries.length * rowPx;
+      const height = heightPx / frame.height;
+      const top = cy - height / 2;
+      const left = cx - width / 2;
+      const card = shapeItem(start, duration, boxAround(cx, cy, width, height), palette.sheet, 0.06, "sheet");
+      card.shadow = shadow;
+      card.label = "Planche – arborescence";
+      parts.push({ item: card, layer: "card" });
+      const title = textItem(actor.title, start, duration, { x: cx, y: top + (padPx + titlePx / 2) / frame.height, width: width - (padPx * 2) / frame.width, height: titlePx / frame.height }, size * 1.1, "title", palette.onSheet, "left", "onSheet");
+      parts.push({ item: title, layer: "text" });
+      const trunkX = left + (padPx + px(14)) / frame.width;
+      const indent = (padPx + px(56)) / frame.width;
+      actor.entries.forEach((entry, index) => {
+        const entryStart = entry.at !== undefined ? Math.max(start, tools.at(entry.at)) : start;
+        const y = top + (padPx + titlePx + (index + 0.5) * rowPx) / frame.height;
+        const rowTop = y - rowPx / 2 / frame.height;
+        // Le trait vient du fichier d'au-dessus (ou du titre) et tourne vers ce fichier.
+        const branch = strokeItem(entryStart, end - entryStart, { left: trunkX, top: rowTop - (index === 0 ? px(10) : 0) / frame.height, width: indent - (trunkX - left) - px(10) / frame.width, height: rowPx / 2 / frame.height + (index === 0 ? px(10) : 0) / frame.height }, [
+          { points: [[0, 0], [0, 1], [1, 1]], draw: { at: 0, frames: tools.seconds(0.3) } },
+        ], px(3) / Math.min(frame.width, frame.height), palette.muted, "Planche – branche", "muted");
+        parts.push({ item: branch, layer: "text" });
+        const item = textItem(entry.text, entryStart, end - entryStart, { x: left + indent + (width - indent - padPx / frame.width) / 2, y, width: width - indent - padPx / frame.width, height: rowPx / frame.height }, size, "label", palette.onSheet, "left", "onSheet");
+        if (entryStart > start) item.animIn = { kind: "fade", frames: tools.seconds(0.25) };
+        parts.push({ item, layer: "text" });
+      });
+      box = { x: cx, y: cy, width, height };
+      break;
+    }
   }
   if (text && "marks" in actor && actor.marks?.length) {
     for (const mark of actor.marks) {
@@ -685,7 +926,7 @@ function buildActor(actor: BoardActor, start: number, end: number, tools: BuildT
       });
     }
   }
-  return { actor, parts, box, text, enterFrame: start, endFrame: end };
+  return { actor, parts, box, text, enterFrame: start, endFrame: end, cues };
 }
 
 function addMark(text: TextItem, mark: TextMark) {

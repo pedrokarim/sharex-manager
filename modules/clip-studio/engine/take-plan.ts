@@ -44,7 +44,7 @@ export const TAKE_LAYOUTS: readonly TakeLayout[] = ["split", "full", "board"];
 export type SceneArrangement = "single" | "row" | "list" | "hub" | "versus" | "stack";
 export const SCENE_ARRANGEMENTS: readonly SceneArrangement[] = ["single", "row", "list", "hub", "versus", "stack"];
 
-export type SceneItemKind = "text" | "counter" | "logo" | "card" | "chip" | "note" | "mascot";
+export type SceneItemKind = "text" | "counter" | "logo" | "card" | "chip" | "note" | "mascot" | "terminal" | "prompt" | "phone" | "tree";
 
 /** Un objet d'un tableau. `word` : le mot où il entre (absent : dès le début du tableau). */
 export interface SceneItem {
@@ -65,6 +65,15 @@ export interface SceneItem {
   cross?: number;
   /** Mascotte : son geste (son émotion est dans `text`). */
   gesture?: PoseGesture;
+  /**
+   * Interfaces recréées : le titre de la fenêtre, du dossier ou de l'écran
+   * (terminal, arborescence, téléphone), et leurs lignes (commandes et
+   * réponses d'un terminal, fichiers d'une arborescence), chacune sur son mot.
+   */
+  title?: string;
+  lines?: { text: string; word?: number; kind?: "command" | "output" | "ok" }[];
+  /** Téléphone : ce que compte le chiffre (« Vues », « Comptes touchés »). */
+  label?: string;
 }
 
 /** Titre du tableau, en haut, lisible d'un coup d'œil. */
@@ -167,6 +176,7 @@ export function beatPlanPrompt(input: { words: TimedWord[]; durationMs: number; 
           `- La marque a une mascotte : un objet {"kind": "mascot", "text": émotion parmi ${POSE_EMOTIONS.join(", ")}, "gesture": facultatif, "word": n} la fait réagir sur le mot qui le mérite (une surprise, une victoire, un doute), dans un tableau "single", "stack" ou "row". Une fois par tableau au plus, trois fois par vidéo au plus : elle réagit, elle ne décore pas.`,
         ]
       : []),
+    '- Une interface se recrée plutôt que de se décrire : {"kind": "terminal", "title": string, "lines": [{"text": string, "kind": "command" | "output" | "ok", "word": n}]} quand une commande est tapée ou un outil répond ; {"kind": "prompt", "text": la demande tapée, "word": n} quand on parle à un assistant ; {"kind": "phone", "title": "Statistiques", "label": ce que compte le chiffre, "text": la valeur en chiffres, "unit": string, "word": n} quand un chiffre vient d\'un écran de statistiques ; {"kind": "tree", "title": le dossier, "lines": [{"text": un fichier, "word": n}]} quand on montre ce qu\'un dossier contient. Elles se posent dans un tableau "single" ou "stack".',
     "- hideCaptions : true quand le tableau écrit les mots prononcés pendant qu'il est là ;",
     "- payoff : true pour 1 ou 2 vrais temps forts (le résultat, la révélation), jamais plus.",
     "Règles :",
@@ -213,7 +223,7 @@ const markedWord = (value: unknown, text: string): string | undefined => {
   return mark && text.toLowerCase().includes(mark.toLowerCase()) ? mark : undefined;
 };
 
-const ITEM_KINDS: readonly SceneItemKind[] = ["text", "counter", "logo", "card", "chip", "note", "mascot"];
+const ITEM_KINDS: readonly SceneItemKind[] = ["text", "counter", "logo", "card", "chip", "note", "mascot", "terminal", "prompt", "phone", "tree"];
 
 /** Une vidéo montre la mascotte trois fois au plus : au-delà, elle décore au lieu de réagir. */
 const MAX_MASCOTS = 3;
@@ -235,7 +245,39 @@ export function readSceneItem(raw: unknown, count: number): SceneItem | undefine
     if (gesture) item.gesture = gesture;
     return item;
   }
-  const max = kind === "counter" ? LIMITS.value : kind === "logo" ? LIMITS.name : kind === "chip" ? 24 : LIMITS.text;
+  if (kind === "terminal" || kind === "tree") {
+    // Lignes d'une interface : bornées, nettoyées, chacune sur un mot de la prise ou sans mot (posée d'emblée).
+    const lines = (Array.isArray(entry.lines) ? entry.lines : [])
+      .map((line) => {
+        const value = (line && typeof line === "object" ? line : { text: line }) as Record<string, unknown>;
+        const text = screenText(value.text, kind === "terminal" ? 44 : 32);
+        if (!text) return null;
+        const word = wordIndex(value.word, count);
+        const lineKind = value.kind === "command" || value.kind === "output" || value.kind === "ok" ? (value.kind as "command" | "output" | "ok") : undefined;
+        return { text, ...(word !== undefined ? { word } : {}), ...(kind === "terminal" && lineKind ? { kind: lineKind } : {}) };
+      })
+      .filter((line): line is NonNullable<typeof line> => line !== null)
+      .slice(0, 6);
+    if (lines.length === 0) return undefined;
+    const title = screenText(entry.title ?? entry.text, 32);
+    const item: SceneItem = { kind, text: title || (kind === "tree" ? "Fichiers" : "terminal"), lines };
+    const word = wordIndex(entry.word, count);
+    if (word !== undefined) item.word = word;
+    return item;
+  }
+  if (kind === "phone") {
+    const value = screenText(entry.text ?? entry.value, LIMITS.value);
+    if (!/\d/.test(value)) return undefined;
+    const item: SceneItem = { kind, text: value, title: screenText(entry.title, 24) || "Statistiques" };
+    const unit = screenText(entry.unit, LIMITS.unit);
+    if (unit) item.unit = unit;
+    const label = screenText(entry.label, 28);
+    if (label) item.label = label;
+    const word = wordIndex(entry.word, count);
+    if (word !== undefined) item.word = word;
+    return item;
+  }
+  const max = kind === "counter" ? LIMITS.value : kind === "logo" ? LIMITS.name : kind === "chip" ? 24 : kind === "prompt" ? 70 : LIMITS.text;
   const text = screenText(entry.text ?? entry.value ?? entry.name, max);
   if (!text) return undefined;
   if (kind === "counter" && !/\d/.test(text)) return undefined;
@@ -407,6 +449,12 @@ export function readBeatPlan(raw: unknown, words: TimedWord[], durationMs: numbe
   });
   // Un tableau de planche resté sans rien à montrer disparaît : le précédent continue.
   beats = beats.filter((beat) => beat.layout === "full" || beat.heading || (beat.items?.length ?? 0) > 0);
+  // Une interface recréée prend de la place : seule ou dans une pile, jamais dans une rangée, une liste, un centre ou un avant / après.
+  const INTERFACES = new Set<SceneItemKind>(["terminal", "prompt", "phone", "tree"]);
+  beats = beats.map((beat) => {
+    if (!beat.items?.some((item) => INTERFACES.has(item.kind)) || beat.arrangement === "single" || beat.arrangement === "stack") return beat;
+    return { ...beat, arrangement: beat.items.length === 1 ? "single" : "stack", items: beat.items.slice(0, 3) };
+  });
   // Jamais de papier vide : un tableau sans titre commence au mot de son premier objet (la caméra reste jusque-là).
   beats = beats.map((beat, index) => {
     if (index === 0 || beat.layout === "full" || beat.heading || !beat.items?.length) return beat;

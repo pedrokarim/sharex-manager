@@ -17,6 +17,13 @@ export const FONTS: { family: string; weights: number[]; label: string; text: bo
   { family: "Inter", weights: [600], label: "Inter", text: true },
 ];
 
+/**
+ * Police des textes de code (terminal recréé, commande tapée), embarquée elle
+ * aussi. Hors du catalogue : aucun sélecteur ne la propose pour un texte
+ * courant ni pour un titre.
+ */
+export const CODE_FONT = { family: "JetBrains Mono", weight: 500 } as const;
+
 /** Police de texte par défaut : présente sans réseau, en 500 et 700. */
 export const DEFAULT_TEXT_FONT = "Poppins";
 

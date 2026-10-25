@@ -19,8 +19,9 @@ import "@fontsource/montserrat/800.css";
 import "@fontsource/poppins/500.css";
 import "@fontsource/poppins/700.css";
 import "@fontsource/inter/600.css";
+import "@fontsource/jetbrains-mono/500.css";
 import type { ClipProject } from "../engine/types";
-import { FONTS } from "./font-catalog";
+import { CODE_FONT, FONTS } from "./font-catalog";
 import { callAnyModule } from "./client";
 
 export { FONTS };
@@ -34,13 +35,15 @@ let ready: Promise<void> | null = null;
  */
 export function ensureFonts(): Promise<void> {
   if (!ready) {
-    ready = Promise.all(
-      FONTS.flatMap((font) =>
+    ready = Promise.all([
+      ...FONTS.flatMap((font) =>
         font.weights.map((weight) =>
           document.fonts.load(`${weight} 48px "${font.family}"`).catch(() => [])
         )
-      )
-    ).then(() => undefined);
+      ),
+      // La police de code (terminal recréé) : hors du catalogue, chargée comme les autres.
+      document.fonts.load(`${CODE_FONT.weight} 48px "${CODE_FONT.family}"`).catch(() => []),
+    ]).then(() => undefined);
   }
   return ready;
 }
