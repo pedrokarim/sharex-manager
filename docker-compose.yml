@@ -1,5 +1,10 @@
 services:
   sharex-manager:
+    # Image construite par la CI (`.github/workflows/docker-image.yml`), tirée
+    # par `./deploy.sh`. Le bloc `build` reste là pour le secours :
+    # `./deploy.sh --local` (ou `docker compose up -d --build`) construit sur
+    # place et range le résultat sous ce même nom.
+    image: ghcr.io/pedrokarim/sharex-manager:${SXM_TAG:-main}
     build:
       context: .
       target: runner

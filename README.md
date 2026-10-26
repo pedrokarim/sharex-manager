@@ -140,6 +140,19 @@ bun run setup            # crée .env et config/uploads.json
 docker compose up -d --build
 ```
 
+En production, l’image est construite par GitHub Actions
+(`.github/workflows/docker-image.yml`) et publiée sur
+`ghcr.io/pedrokarim/sharex-manager` ; le serveur ne fait que la tirer :
+
+```bash
+./deploy.sh              # dernière image `main`
+./deploy.sh <sha>        # une version précise (retour arrière)
+./deploy.sh --local      # secours : construction sur le serveur, comme avant
+```
+
+Construire sur le serveur reste possible, mais coûte plusieurs Go de mémoire
+au démon Docker : à garder pour le cas où la CI ne peut pas construire.
+
 Les données (`uploads/`, `data/`, `config/`, données des modules) restent
 sur l’hôte, dans des volumes. Voir [la sécurité du déploiement](docs/security.md)
 et [le redéploiement automatique](docs/deploiement-cron.md).

@@ -1,1 +1,4 @@
 sharex-mobile/patches/*.patch -whitespace
+
+# Scripts lancés sur le serveur Linux : jamais de CRLF.
+*.sh text eol=lf
