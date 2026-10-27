@@ -43,8 +43,8 @@ describe("séquences « Auto » : la consigne du script", () => {
   it("laisse le script choisir le nombre, avec les bornes et la place d'une séquence dans la durée", () => {
     const prompt = scriptPrompt(cleanRequest(AUTO), null, { now: NOW });
     expect(prompt).toContain("Nombre de séquences : choisis-le toi-même, de 3 à 10");
-    // 45 s à 160 mots par minute : 120 mots, 22 mots par séquence, 14 pour le titre et la conclusion.
-    expect(prompt).toContain("45 s de voix font 120 mots, soit 5 séquences environ");
+    // 45 s de clip moins 4 s de pauses : 41 s de voix, 109 mots à 160 par minute, 22 mots par séquence, 14 pour le titre et la conclusion.
+    expect(prompt).toContain("41 s de voix font 109 mots, soit 4 séquences environ");
     expect(prompt).toContain("22 mots environ");
     expect(prompt).toContain("autant de séquences que tu en as choisi");
     expect(prompt).not.toMatch(/Format libre en \d+ séquences/);

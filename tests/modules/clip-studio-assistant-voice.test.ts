@@ -115,7 +115,9 @@ describe("assistant : débit et intonation de la voix", () => {
 
   it("la consigne du script donne la durée visée", () => {
     const prompt = scriptPrompt(cleanRequest({ ...REQUEST, targetSeconds: 45 }));
-    expect(prompt).toContain("doit tenir en 45 secondes au plus, soit 120 mots");
+    // 45 s de clip, dont les pauses : la voix seule vise moins.
+    expect(prompt).toContain("le clip monté dure 45 secondes au plus");
+    expect(prompt).toContain("doit donc tenir en 41 secondes au plus, soit 109 mots");
   });
 });
 

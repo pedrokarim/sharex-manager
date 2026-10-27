@@ -60,7 +60,7 @@ describe("assistant : consigne du raisonnement", () => {
     expect(prompt).toContain("16 000 réels analysés");
     expect(prompt).not.toContain("title la reprend");
     // La voix lit l'accroche : la durée la compte, pas le titre.
-    expect(scriptPrompt({ ...FREE, targetSeconds: 45 })).toContain(`Durée${NBSP}: toute la voix off (l'accroche, chaque segment et la conclusion`);
+    expect(scriptPrompt({ ...FREE, targetSeconds: 45 })).toContain(`Durée${NBSP}: le clip monté dure 45 secondes au plus`);
   });
 
   it("sans fiche du créateur, la marque en tient lieu", () => {

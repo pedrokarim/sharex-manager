@@ -313,6 +313,80 @@ export const AI_SHAPES: readonly string[] = [
   "les exemples génériques inventés (« Imagine un entrepreneur qui… »)",
 ];
 
+// ─── Texte fait pour l'oreille ───────────────────────────────────
+
+/**
+ * Ce qu'une voix de synthèse rend mal, dit au script, à sa vérification et
+ * à son raccourcissement. Vu en production le 26/10/2026 : un script
+ * raccourci deux fois était devenu « Pause douze. Symboles. Pause. Cycle.
+ * Calendrier. » (six mots en sept secondes : chaque point est un silence),
+ * et la consigne « sépare l'image de son interprétation » avait été lue à
+ * voix haute, « Plan : … Lecture : … », dans chaque diapositive.
+ */
+export const SPOKEN_LINES: readonly string[] = [
+  "Écris pour l'oreille : des phrases complètes, avec un verbe, que l'on comprend à la première écoute. Jamais de style télégraphique (une suite de mots ou de groupes nominaux séparés par des points) : la voix marque un silence à chaque point, un texte haché dure plus longtemps qu'une phrase et ne se comprend plus.",
+  "Aucune étiquette lue : jamais « Plan : », « Lecture : », « Fait : », « Théorie : », « Étape 1 : » ni aucun mot suivi de deux-points en tête de phrase. Une consigne de forme de la demande (séparer, comparer, montrer avant de commenter) se suit par la construction des phrases (« On voit… », « On peut y lire… ») et par les notes visuelles, jamais par des mots que la voix lirait comme un plan.",
+];
+
+/** Mots en tête de phrase suivis de deux-points, parenthèse comprise : « Plan : », « Plan (3 min 24) : ». Pas une heure (« 10:30 »). */
+const LABEL = /(?:^|[.!?…]\s+)(\p{L}[\p{L}'’-]*(?:\s\p{L}[\p{L}'’-]*)?)(?:\s*\([^()]{0,30}\))?[\s\u00a0\u202f]*:(?!\d)/gu;
+
+/** Étiquettes lues d'un texte, en minuscules, dans l'ordre. */
+export function spokenLabels(text: string): string[] {
+  return [...text.matchAll(LABEL)].map((match) => match[1].toLowerCase());
+}
+
+/**
+ * Texte haché : au moins deux phrases, et soit deux fragments (deux mots au
+ * plus), soit un fragment et trois mots par phrase au plus en moyenne
+ * (« Chiffre fantôme. Version guettée, virgule comprise. »).
+ * « Pause douze. Symboles. Pause. » l'est ; « Abraxas. Ce nom revient trois
+ * fois dans le trailer. » ne l'est pas.
+ */
+export function isChoppy(text: string): boolean {
+  const sentences = text
+    .split(/[.!?…]+/)
+    .map((sentence) => countWords(sentence))
+    .filter((words) => words > 0);
+  if (sentences.length < 2) return false;
+  const fragments = sentences.filter((words) => words <= 2).length;
+  const average = sentences.reduce((sum, words) => sum + words, 0) / sentences.length;
+  return fragments >= 2 || (fragments >= 1 && average <= 3);
+}
+
+/** Silence qu'une voix de synthèse marque à un point ou à des deux-points, en secondes. */
+export const BREAK_SECONDS = 0.5;
+
+/**
+ * Durée de lecture estimée, silences compris : les mots au débit d'une voix
+ * off, plus un silence par fin de phrase ou deux-points. Un texte haché a
+ * peu de mots mais beaucoup de silences (« Pause douze. Symboles. Pause.
+ * Cycle. Calendrier. » : six mots, dits en près de sept secondes).
+ */
+export function speechSeconds(text: string): number {
+  const breaks = (text.match(/[.!?…:;]+(?=\s|$)/g) ?? []).length;
+  return spokenSeconds(text) + breaks * BREAK_SECONDS;
+}
+
+export type SpokenProblem = "choppy" | "labels";
+
+/**
+ * Textes lus d'un script qui ne passent pas à l'oral, par index : hachés,
+ * ou portant des étiquettes (deux dans le même texte, ou la même dans deux
+ * textes : c'est un plan lu, pas une tournure).
+ */
+export function spokenProblems(texts: readonly string[]): { index: number; problems: SpokenProblem[] }[] {
+  const labels = texts.map(spokenLabels);
+  const seen = new Map<string, number>();
+  for (const list of labels) for (const label of new Set(list)) seen.set(label, (seen.get(label) ?? 0) + 1);
+  return texts.flatMap((text, index) => {
+    const problems: SpokenProblem[] = [];
+    if (isChoppy(text)) problems.push("choppy");
+    if (labels[index].length >= 2 || labels[index].some((label) => (seen.get(label) ?? 0) >= 2)) problems.push("labels");
+    return problems.length ? [{ index, problems }] : [];
+  });
+}
+
 // ─── Consignes ───────────────────────────────────────────────────
 
 /**
@@ -325,6 +399,7 @@ export function scriptRuleLines(options: { french: boolean }): string[] {
     `N'ouvre jamais par ${FORBIDDEN_OPENINGS.join(", ")}.`,
     `Rythme : une idée par phrase, de ${LINE_WORDS.min} à ${LINE_WORDS.max} mots, de longueurs variées ; du concret (un chiffre, un nom, un lieu, un exemple réel), jamais trois phrases abstraites de suite.`,
     `Le texte lu se compte à ${SPEAKING_RATE_WPM} mots par minute : chaque mot doit servir.`,
+    ...SPOKEN_LINES,
     "Fin : aucune formule de clôture creuse (« merci d'avoir regardé », « dites-moi ce que vous en pensez », résumé de ce qui vient d'être dit) ; termine sur une seule demande au spectateur, sur la dernière information utile ou sur une phrase qui reboucle sur la première.",
     "Faits : n'invente aucun chiffre, aucun nom, aucun résultat ni aucune source (« des études montrent »). Le texte est lu par une voix de synthèse : jamais de case à remplir ({{…}}, [crochets]) dans un texte lu ; quand un fait manque, écris la phrase sans lui.",
     `À éviter absolument, ce sont des tics d'IA : ${tells.map((tell) => `« ${tell} »`).join(", ")}${options.french ? "" : " (et leurs équivalents dans la langue du script)"} ; ${AI_SHAPES.join(" ; ")}.`,
@@ -409,7 +484,7 @@ export function scriptReasoningLines(options: { french: boolean; format?: Script
     `2. Accroches : ajoute au JSON une clé "hooks" : trois accroches de formes différentes, [{"text": string, "family": string, "score": number}]. L'accroche est la première phrase dite par la voix : elle annonce la promesse de aim et se dit en ${HOOK_MAX_SECONDS} secondes au plus (${HOOK_MAX_WORDS} mots environ). Les familles ci-dessous sont des formes dont t'inspirer, jamais des gabarits à remplir : comprends le levier de chacune, puis écris ta propre phrase avec le spectateur, le sujet et la preuve de aim, sans crochets ni mots recopiés de la forme. family prend l'identifiant de la famille la plus proche :`,
     ...families,
     `score sur 10 : cinq critères notés de 0 à 2, ${rubric}. Note sans complaisance : la mieux notée ouvre le clip.`,
-    `title : le titre affiché à l'écran pendant que la voix dit l'accroche, ${TITLE_MAX_WORDS} mots au plus. Il complète l'accroche au lieu de la répéter, puisque le spectateur l'entend déjà : il ajoute une information (un chiffre, un nom, l'enjeu) et ne reprend jamais sa phrase mot pour mot.`,
+    `title : le titre affiché à l'écran pendant que la voix dit l'accroche, ${TITLE_MAX_WORDS} mots au plus. Il complète l'accroche au lieu de la répéter, puisque le spectateur l'entend déjà : il ajoute une information (un chiffre, un nom, l'enjeu) et ne reprend jamais sa phrase mot pour mot. Il nomme toujours le sujet : jamais une date, une durée ou un chiffre seuls, qui ne disent pas de quoi parle la vidéo.`,
     "3. Corps : choisis dans aim.type la forme qui sert la promesse, puis suis ses temps dans l'ordre :",
     ...SCRIPT_TYPES.map((type) => `- ${type.id} (${type.name}), quand ${type.when} : ${type.beats.join(" → ")}.`),
     ...(ordered

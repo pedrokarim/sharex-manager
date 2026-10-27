@@ -63,7 +63,7 @@ import { callModule, fetchBrandTheme, getVideoSearchStatus, useBrandKits, type V
 import type { AssistantJob } from "../lib/assistant";
 import { IMAGE_SOURCE_MODES, type ImageSourceMode } from "../lib/image-search-types";
 import { MIN_TARGET_SECONDS, brandVoicePrefill, defaultTargetSeconds, maxTargetSeconds, voiceSourceOf } from "../lib/voice-settings";
-import { CHOSEN_SEGMENTS, suggestedSegments } from "../lib/segment-count";
+import { CHOSEN_SEGMENTS, plannedSegments } from "../lib/segment-count";
 import { createHref, prefillFromIdea, readCreatePrefill, type CreatePrefill } from "../lib/idea-prefill";
 import { ASSISTANT_MODES, modeHref, opensSourceVideos, readFiles, readMode, type CreateMode } from "../lib/create-mode";
 import { useSession } from "@/lib/auth-client";
@@ -295,7 +295,7 @@ export default function CreatePage() {
   const maxTarget = maxTargetSeconds(aspect);
   const targetSeconds = Math.min(maxTarget, Math.max(MIN_TARGET_SECONDS, targetChoice ?? defaultTargetSeconds(template, aspect)));
   const countLabel = COUNT_LABELS[template] ?? COUNT_LABELS.free!;
-  const estimate = suggestedSegments(template, targetSeconds);
+  const estimate = plannedSegments(template, targetSeconds);
 
   // ─── Création ─────────────────────────────────────────────────
   const [busy, setBusy] = useState(false);

@@ -1166,6 +1166,18 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Clip Studio, scripts de l’assistant : un script raccourci pour tenir la
+  durée devenait du charabia (« Pause douze. Symboles. Pause. Cycle.
+  Calendrier. »), et une consigne de forme était lue à voix haute
+  (« Plan : … Lecture : … » dans chaque diapositive). Le script reçoit
+  désormais la durée de la voix seule, pauses et carton de fin retirés : il
+  visait la durée du clip entier, et le calage en retirait six secondes
+  ensuite. Un raccourci doit retirer des idées entières, jamais les verbes ;
+  un raccourci haché est écarté. Une relecture pour l’oral réécrit une fois
+  les textes hachés ou qui lisent des étiquettes, sans répéter l’accroche.
+  Le titre nomme toujours le sujet, jamais une date seule, et la
+  vérification des faits corrige aussi ce que la planche écrit à l’écran.
+
 - Clip Studio, éditeur : l’aperçu avait rétréci depuis l’arrivée des outils
   de tracé (leur barre lui retirait une bande en haut et en bas) ; ils
   forment maintenant une colonne étroite à gauche, qui ne lui prend plus de

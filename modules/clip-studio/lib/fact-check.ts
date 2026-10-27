@@ -155,6 +155,7 @@ export function factCheckPrompt(input: FactCheckInput): string {
     `Un segment corrigé ou remplaçant suit le schéma ${input.segmentSchema}, avec ces limites : ${input.segmentLimits}. Il garde la langue${
       input.language ? ` du script (code BCP 47 « ${input.language} »)` : " (le français, avec sa typographie)"
     } et le ton du script ; quand le nom du sujet change ou était mal écrit, ses requêtes d'image (query, icon) prennent son nom exact.`,
+    "visualNotes d'un segment : ce que le montage écrit (kind \"board\") ou montre (kind \"show\") à l'écran pendant qu'il est lu. Un fait corrigé l'est partout : dans le texte lu ET dans ses visualNotes, que le segment corrigé rend en entier, sinon l'écran contredit la voix ; une note qui ne tient plus est corrigée ou retirée.",
     'Si le titre annonce un nombre ou une affirmation qui ne tient plus (un élément retiré, un fait corrigé), corrige-le : title.verdict vaut "fixed" et title.text, de 60 caractères au plus, le remplace ; sinon title.verdict vaut "ok".',
     input.web
       ? 'sources : pour chaque segment, une à trois pages consultées qui confirment ce qui est écrit (ou la correction), {"url": adresse https complète, "title": titre de la page}.'
