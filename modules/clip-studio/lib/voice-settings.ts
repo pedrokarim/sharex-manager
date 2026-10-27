@@ -144,5 +144,13 @@ export function cleanTargetSeconds(value: unknown, template: string, aspect: str
 /** Accélération la plus forte que le calage peut appliquer, débit choisi compris : ×1,10. */
 export const MAX_SPEED_UP = 1.1;
 
-/** Au-delà de ce dépassement (10 %), le calage raccourcit le script au lieu d'accélérer la voix. */
+/** Au-delà de ce dépassement (10 %), le calage n'accélère plus la voix. */
 export const SPEED_UP_THRESHOLD = 1.1;
+
+/**
+ * Dépassement gardé tel quel (la moitié de la cible) : la durée visée est un
+ * repère, pas un plafond. Au-delà seulement, Codex raccourcit le script, et
+ * jusqu'à cette borne. Avant le 27/10/2026, tout dépassement de plus de 10 %
+ * était raccourci : l'état actuel du sujet disparaissait pour gagner 3 s.
+ */
+export const OVERRUN_TOLERANCE = 1.5;

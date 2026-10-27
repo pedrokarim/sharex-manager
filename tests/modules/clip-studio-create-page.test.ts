@@ -144,7 +144,7 @@ describe("idées depuis une phrase", () => {
           targetSeconds: 45,
           sourceVideo: null,
           prompt: "Explique en quelques séquences le pliage de l’acier, la trempe différentielle et la ligne hamon, avec des faits vérifiables.",
-          checks: { concreteOpening: true, visualFirstSecond: true, singlePromise: true, shortEnough: true },
+          checks: { concreteOpening: true, visualFirstSecond: true, singlePromise: true, currentFacts: true },
         },
       ],
     });
@@ -175,7 +175,7 @@ const IDEA: Idea = {
   targetSeconds: 45,
   aspect: "9:16",
   prompt: "Explique le pliage de l’acier et la trempe différentielle.",
-  checks: { concreteOpening: true, visualFirstSecond: true, singlePromise: true, shortEnough: true },
+  checks: { concreteOpening: true, visualFirstSecond: true, singlePromise: true, currentFacts: true },
   batchId: "batch-abc123",
   createdAt: 1,
   updatedAt: 1,

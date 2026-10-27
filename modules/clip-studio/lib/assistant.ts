@@ -105,6 +105,7 @@ import {
   MAX_SPEED_UP,
   SPEED_LIMITS,
   SPEED_UP_THRESHOLD,
+  OVERRUN_TOLERANCE,
   cleanSpeed,
   cleanTargetSeconds,
   cleanVoiceSettings,
@@ -967,6 +968,7 @@ export function scriptPrompt(
       ? [
           "Sers-toi de la recherche web pour vérifier, avant de l'écrire, chaque fait qui peut avoir changé ou que tu ne connais pas avec certitude : date et statut de sortie, studio, éditeur, chiffres, records, classements, nom exact. N'utilise aucun autre outil, n'exécute aucune commande et n'écris aucun fichier.",
           "Préfère les sources officielles (éditeur, studio, store, site officiel), puis les grands médias ; jamais une rumeur ou une fuite.",
+          "La demande peut dater ou se tromper : vérifie sa prémisse et ses chiffres à la date du jour, sans la croire sur parole. Si elle décrit un état passé, le script dit aussi l'état actuel ; ce qui est temporaire (événement, offre limitée) ou annoncé (changement à venir) est dit aussi. Une accroche donnée par la demande qui est fausse ou trompeuse aujourd'hui est corrigée, jamais reprise telle quelle.",
         ]
       : [
           "N'utilise aucun outil, n'exécute aucune commande et n'écris aucun fichier.",
@@ -1041,7 +1043,7 @@ function durationLine(request: Pick<AssistantRequest, "template" | "count" | "ta
   const seconds = voiceBudgetSeconds(request.template, target, segments, endCardSeconds);
   const words = Math.floor((seconds * SPEAKING_RATE_WPM) / 60);
   const fixed = Math.max(0, target - seconds);
-  return `Durée : le clip monté dure ${target} secondes au plus, dont ${fixed} s environ de pauses entre les segments et de carton de fin. Toute la voix off (l'accroche, chaque segment et la conclusion, lus à la suite) doit donc tenir en ${seconds} secondes au plus, soit ${words} mots au total environ. Pour tenir, choisis moins d'idées, jamais des phrases hachées.`;
+  return `Durée : le clip monté vise ${target} secondes, dont ${fixed} s environ de pauses entre les segments et de carton de fin. Toute la voix off (l'accroche, chaque segment et la conclusion, lus à la suite) vise donc ${seconds} secondes, soit ${words} mots au total environ. C'est un repère, pas un plafond : l'information passe avant la durée. Ne tais jamais l'état actuel du sujet, une condition, une exception ou ce qui est temporaire pour tenir ; ne délaye pas non plus pour remplir. Pour approcher la durée, retire une idée secondaire, jamais des mots : pas de phrases hachées.`;
 }
 
 /** Texte de la fiche transmis tel quel, sauf « < » : il ne peut pas refermer la balise qui l'encadre. */
@@ -2248,10 +2250,12 @@ export async function recordNarration(
     overhead = 0;
   }
   const voiceTarget = Math.max(target / 2, target - overhead);
+  // Repère, pas plafond : jusqu'à une fois et demie la cible, rien n'est coupé.
+  const allowed = voiceTarget * OVERRUN_TOLERANCE;
   const finish = () => {
     tracking.speed = settings.speed;
     tracking.seconds = Math.round((take.seconds + overhead) * 10) / 10;
-    tracking.fits = take.seconds <= voiceTarget;
+    tracking.fits = take.seconds <= allowed;
     if (tracking.attempts > 0 && !tracking.fits) {
       tracking.notes.push(`Durée visée encore dépassée : ${formatSeconds(take.seconds + overhead)} de clip pour ${formatSeconds(target)}`);
     }
@@ -2264,10 +2268,15 @@ export async function recordNarration(
   if (take.recorded === 0) return finish();
 
   while (take.seconds > voiceTarget && tracking.attempts < MAX_FIT_ATTEMPTS) {
-    tracking.attempts++;
     const ratio = take.seconds / voiceTarget;
     const needed = settings.speed * ratio;
-    if (ratio <= SPEED_UP_THRESHOLD && needed <= maxSpeed + 1e-9) {
+    const speedUp = ratio <= SPEED_UP_THRESHOLD && needed <= maxSpeed + 1e-9;
+    if (!speedUp && take.seconds <= allowed) {
+      tracking.notes.push(`Clip de ${formatSeconds(take.seconds + overhead)} pour ${formatSeconds(target)} visées : gardé entier, rien n’est coupé pour tenir la durée`);
+      break;
+    }
+    tracking.attempts++;
+    if (speedUp) {
       // 1. Un peu trop long : la même voix, un peu plus vite.
       const previous = settings;
       settings = { ...settings, speed: roundSpeed(Math.min(maxSpeed, needed * FIT_MARGIN)) };
@@ -2287,11 +2296,11 @@ export async function recordNarration(
       );
       continue;
     }
-    // 2. Bien trop long, ou débit déjà au plus haut : Codex raccourcit le script.
+    // 2. Plus d'une fois et demie la cible : Codex raccourcit le script jusqu'à cette borne.
     onStep("running", `Codex raccourcit le script : ${formatSeconds(take.seconds + overhead)} de clip pour ${formatSeconds(target)} visées…`);
     let shorter: CleanScript;
     try {
-      shorter = await shortenScript(request, current, { targetSeconds: voiceTarget, currentSeconds: take.seconds, language: options.language }, ask, signal);
+      shorter = await shortenScript(request, current, { targetSeconds: allowed, currentSeconds: take.seconds, language: options.language }, ask, signal);
     } catch (error) {
       signal.throwIfAborted();
       tracking.notes.push(`Raccourcissement impossible : ${cut((error as Error)?.message, 160) || "Codex n’a pas répondu"}`);
@@ -2366,7 +2375,8 @@ export function shortenPrompt(
       ? ["Les choix (choices) et la bonne réponse ne changent pas : ils ne sont donnés que pour garder la question et l'explication cohérentes."]
       : []),
     "Garde le sens, les faits, les noms propres et les chiffres exacts ; n'ajoute aucun fait. Chaque texte devient plus court ou reste tel quel, jamais plus long.",
-    "Pour gagner du temps, retire une idée secondaire, un détail ou une précision entière, jamais les verbes ni les mots de liaison : chaque texte reste fait de phrases complètes qu'on comprend à la première écoute.",
+    "Pour gagner du temps, retire une idée secondaire ou un détail entier, jamais les verbes ni les mots de liaison : chaque texte reste fait de phrases complètes qu'on comprend à la première écoute.",
+    "Ne retire jamais l'état actuel du sujet, une condition, une exception, ce qui est temporaire ou annoncé : sans eux, le spectateur repart avec une idée fausse. Un clip plus long vaut mieux.",
     ...SPOKEN_LINES,
     "Si la durée ne peut pas être tenue avec des phrases complètes, rends le texte le plus court qui reste naturel : un clip un peu plus long vaut mieux qu'un texte que personne ne comprend.",
     foreign ? `Garde la langue du script (code BCP 47 « ${foreign} »).` : "Garde le français et la typographie française.",

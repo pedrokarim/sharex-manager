@@ -40,15 +40,19 @@ export interface IdeaChecks {
   visualFirstSecond: boolean;
   /** Une seule promesse, tenue. */
   singlePromise: boolean;
-  /** 45 secondes au plus, sauf classement ou duel. */
-  shortEnough: boolean;
+  /**
+   * Faits vrais à la date du jour : un état passé suivi de l'état actuel,
+   * ce qui est temporaire ou annoncé nommé. Remplace « 45 s au plus » le
+   * 27/10/2026 : la brièveté faisait taire l'état actuel du sujet.
+   */
+  currentFacts: boolean;
 }
 
 export const IDEA_CHECK_LABELS: Record<keyof IdeaChecks, string> = {
   concreteOpening: "Première phrase concrète (chiffre, nom, « gratuit »)",
   visualFirstSecond: "Quelque chose à montrer dès la première seconde",
   singlePromise: "Une seule promesse, tenue",
-  shortEnough: "45 s au plus, sauf classement ou duel",
+  currentFacts: "Faits vrais aujourd’hui, état actuel compris",
 };
 
 export interface Idea {

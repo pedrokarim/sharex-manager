@@ -116,8 +116,9 @@ describe("assistant : débit et intonation de la voix", () => {
   it("la consigne du script donne la durée visée", () => {
     const prompt = scriptPrompt(cleanRequest({ ...REQUEST, targetSeconds: 45 }));
     // 45 s de clip, dont les pauses : la voix seule vise moins.
-    expect(prompt).toContain("le clip monté dure 45 secondes au plus");
-    expect(prompt).toContain("doit donc tenir en 41 secondes au plus, soit 109 mots");
+    expect(prompt).toContain("le clip monté vise 45 secondes");
+    expect(prompt).toContain("C'est un repère, pas un plafond");
+    expect(prompt).toContain("vise donc 41 secondes");
   });
 });
 
@@ -221,7 +222,7 @@ describe("assistant : calage sur la durée visée", () => {
     expect(slideshow.slides[0].voice?.source.ref).toBe("module:clip-studio/assets/voice-7.wav");
   });
 
-  it("n'accélère jamais au-delà de ×1,10 du débit choisi", async () => {
+  it("n'accélère jamais au-delà de ×1,10 du débit choisi, puis garde le clip entier sans le raccourcir", async () => {
     for (const chosen of [1, 1.15]) {
       const { job, script, onStep, signal } = setup({ targetSeconds: 50 });
       // La durée ne suit pas le débit : l'accélération ne suffit jamais.
@@ -235,14 +236,15 @@ describe("assistant : calage sur la durée visée", () => {
       const speeds = synth.mock.calls.map(([input]) => input.speed!);
       expect(Math.max(...speeds)).toBeLessThanOrEqual(chosen * 1.1 + 1e-9);
       expect(Math.max(...speeds)).toBeGreaterThan(chosen);
-      // Débit au plus haut : la seconde tentative demande un script plus court.
-      expect(ask).toHaveBeenCalledTimes(1);
-      expect(job.narration?.attempts).toBe(MAX_FIT_ATTEMPTS);
-      expect(job.narration?.fits).toBe(false);
+      // Débit au plus haut, 54 s pour 50 : sous une fois et demie la cible, rien n'est coupé.
+      expect(ask).not.toHaveBeenCalled();
+      expect(job.narration?.attempts).toBe(1);
+      expect(job.narration?.fits).toBe(true);
+      expect(job.narration?.notes.at(-1)).toContain("gardé entier, rien n’est coupé");
     }
   });
 
-  it("au-delà de 10 %, demande à Codex un script plus court, mêmes éléments et même ordre, puis le relit", async () => {
+  it("au-delà d'une fois et demie la cible, demande à Codex un script plus court, mêmes éléments et même ordre, puis le relit", async () => {
     const raw = { ...RAW, slides: [...RAW.slides.slice(0, 2), { caption: "Le troisième <b>a formé</b> une île entière au milieu de l'océan" }] };
     const { job, script, onStep, signal } = setup({ targetSeconds: 20 }, raw);
     const synth = fakeSynthesize((input) => words(input.text) * 1000);
@@ -260,7 +262,9 @@ describe("assistant : calage sur la durée visée", () => {
     const prompt = ask.mock.calls[0][0];
     expect(prompt).toContain("<script>");
     expect(prompt).toContain("Garde exactement les mêmes éléments, dans le même ordre : 3 diapositives");
-    expect(prompt).toContain("doit tenir en 20 secondes au plus");
+    // Il raccourcit jusqu'à une fois et demie la cible, pas jusqu'à la cible.
+    expect(prompt).toContain("doit tenir en 30 secondes au plus");
+    expect(prompt).toContain("Ne retire jamais l'état actuel du sujet");
     // Le script entre comme une donnée : un « < » ne peut pas refermer la balise.
     expect(prompt).not.toContain("<b>");
     expect(prompt).toContain("\\u003cb>");

@@ -141,6 +141,7 @@ export function factCheckPrompt(input: FactCheckInput): string {
           'Tout ce qui dépend du temps, et tout ce que tu ne peux pas confirmer avec certitude, prend le verdict "doubtful" ; sources reste vide.',
         ]),
     "Contrôle segment par segment chaque affirmation vérifiable : nom exact et orthographe officielle, date de sortie, statut à la date du jour (sorti, à venir, annulé, arrêté), studio et éditeur, plateformes, chiffres, records, classements, citations.",
+    "Une omission peut tromper autant qu'une erreur : un segment qui décrit un état passé (une ancienne valeur, limite, règle, un ancien prix ou statut) sans dire ce qu'il est aujourd'hui, ou qui tait un aspect temporaire (événement, offre limitée) ou un changement annoncé, est complété (verdict \"fixed\") avec l'état actuel vérifié.",
     ...(quiz
       ? [
           "Quiz : pour chaque question, le choix désigné par answer (index dans choices, à partir de 0) doit être juste, et CHACUN des autres choix doit être faux ; l'explication doit être exacte. Sinon corrige answer, les choix ou l'explication (verdict \"fixed\"). Une question sans bonne réponse unique et certaine est corrigée ou retirée.",
@@ -148,7 +149,7 @@ export function factCheckPrompt(input: FactCheckInput): string {
       : []),
     "Verdict de chaque segment :",
     '- "ok" : tout est juste ;',
-    '- "fixed" : une erreur corrigeable (nom mal orthographié, date, studio, chiffre, bonne réponse) ; segment contient le segment ENTIER corrigé ;',
+    '- "fixed" : une erreur corrigeable (nom mal orthographié, date, studio, chiffre, bonne réponse) ou un état actuel qui manque ; segment contient le segment ENTIER corrigé ;',
     '- "replaced" : l\'élément lui-même ne répond pas à la demande (par exemple un jeu déjà sorti dans un classement de jeux à venir) et un autre élément réel, vérifié, absent du script, y répond vraiment ; segment contient le nouvel élément ENTIER ;',
     '- "removed" : faux ou hors sujet, sans remplaçant vérifié. Ne fabrique jamais un élément pour garder le compte : un clip plus court vaut mieux qu\'un élément inventé ;',
     '- "doubtful" : impossible à confirmer (date non annoncée, sources contradictoires) ; note dit le doute en quelques mots.',

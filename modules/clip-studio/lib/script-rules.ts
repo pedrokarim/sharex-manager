@@ -135,7 +135,7 @@ export const SCRIPT_TYPES: readonly ScriptType[] = [
   },
 ];
 
-export type ScriptGateId = "generic" | "interchangeable" | "structureless" | "offConcept";
+export type ScriptGateId = "generic" | "interchangeable" | "structureless" | "offConcept" | "outdated";
 
 /**
  * Contrôles que le modèle passe sur son propre brouillon. Chaque question
@@ -161,6 +161,11 @@ export const SCRIPT_GATES: readonly { id: ScriptGateId; question: string; fix: s
     id: "offConcept",
     question: "le script tourne-t-il autour d'un thème vague au lieu d'un sujet concret et précis, nommé avec un détail précis dès sa première phrase ?",
     fix: "resserre-le sur un sujet précis et ouvre sur ce détail",
+  },
+  {
+    id: "outdated",
+    question: "le script présente-t-il un état passé ou partiel comme actuel, ou tait-il l'état actuel du sujet, ce qui est temporaire ou ce qui est annoncé ?",
+    fix: "ajoute l'état actuel vérifié et ces précisions, même si le clip s'allonge",
   },
 ];
 /** Un verdict de contrôle tient sur une ligne. */
@@ -490,14 +495,14 @@ export function scriptReasoningLines(options: { french: boolean; format?: Script
     ...(ordered
       ? [`${options.format === "quiz" ? "Le quiz" : "Le classement"} fixe déjà l'ordre des segments : le type règle l'angle, les explications et la fin.`]
       : []),
-    "Une seule idée par vidéo : ce qui ne sert pas la promesse sort du script. Vers le milieu, l'attention retombe une fois la promesse entendue : une phrase la relance (un chiffre, un retournement, ce qui reste à découvrir) en rappelant ce que la fin va livrer.",
+    "Une seule idée par vidéo : ce qui ne sert pas la promesse sort du script, mais tout ce qu'il faut pour qu'elle soit juste aujourd'hui reste (état actuel, conditions, exceptions, ce qui est temporaire). Vers le milieu, l'attention retombe une fois la promesse entendue : une phrase la relance (un chiffre, un retournement, ce qui reste à découvrir) en rappelant ce que la fin va livrer.",
     `4. Notes visuelles : ajoute au JSON une clé "visualNotes", à part des phrases dites (la voix ne les lit jamais) : [{"line": number, "kind": "board" | "show", "text": string}]. line : l'index du segment dans ${key}, à partir de 0. kind "board" : de 1 à ${VISUAL_NOTE_LIMITS.boardWords} mots qui valent d'être écrits à l'écran pendant ce segment (un chiffre, un résultat, un nom d'outil, une courte liste) ; kind "show" : ce qu'il faut montrer à l'image, en une phrase de ${VISUAL_NOTE_LIMITS.showChars} caractères au plus. ${VISUAL_NOTE_LIMITS.perLine} notes au plus par segment ; un segment sans rien à montrer n'en a pas.`,
-    "5. Contrôles : relis ton brouillon avec ces quatre questions avant de répondre ; s'il en rate une, réécris ce qui cloche, puis relis-le encore.",
+    "5. Contrôles : relis ton brouillon avec ces cinq questions avant de répondre ; s'il en rate une, réécris ce qui cloche, puis relis-le encore.",
     ...SCRIPT_GATES.map((gate) => `- ${gate.id} : ${gate.question} Si oui, ${gate.fix}.`),
     ...(proven
       ? ["- offConcept, avec les concepts de la niche : le script s'écarte-t-il du concept nommé dans aim.concept, ou n'en nomme-t-il aucun alors que l'un d'eux sert la demande ? Si oui, recentre-le sur ce concept, sans recopier ses exemples."]
       : []),
-    `Facultatif : une clé "gates" : {"generic": string, "interchangeable": string, "structureless": string, "offConcept": string}, le verdict de chaque contrôle sur le script final, en une ligne de ${GATE_MAX_CHARS} caractères au plus.`,
+    `Facultatif : une clé "gates" : {"generic": string, "interchangeable": string, "structureless": string, "offConcept": string, "outdated": string}, le verdict de chaque contrôle sur le script final, en une ligne de ${GATE_MAX_CHARS} caractères au plus.`,
   ];
 }
 

@@ -129,7 +129,7 @@ export function cleanIdea(raw: unknown): Idea | null {
       concreteOpening: checks.concreteOpening === true,
       visualFirstSecond: checks.visualFirstSecond === true,
       singlePromise: checks.singlePromise === true,
-      shortEnough: checks.shortEnough === true,
+      currentFacts: checks.currentFacts === true,
     } satisfies IdeaChecks,
     batchId: typeof entry.batchId === "string" && /^batch-[a-z0-9]{6,40}$/.test(entry.batchId) ? entry.batchId : "batch-legacy",
     ...(typeof entry.jobId === "string" && JOB_ID.test(entry.jobId) ? { jobId: entry.jobId } : {}),

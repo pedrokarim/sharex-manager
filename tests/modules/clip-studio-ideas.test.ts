@@ -150,7 +150,7 @@ const idea = (overrides: Record<string, unknown> = {}) => ({
   count: 4,
   targetSeconds: 40,
   prompt: "Classement de quatre jeux vidéo dont la sortie est confirmée avant le 25 décembre 2026. Une phrase par jeu : nom exact, date, plateforme.",
-  checks: { concreteOpening: true, visualFirstSecond: true, singlePromise: true, shortEnough: true },
+  checks: { concreteOpening: true, visualFirstSecond: true, singlePromise: true, currentFacts: true },
   ...overrides,
 });
 
@@ -261,10 +261,11 @@ describe("lecture des idées de Codex", () => {
     expect(ideas[0].title.length).toBeLessThanOrEqual(IDEA_LIMITS.title);
   });
 
-  it("applique la typographie française et refait la case de durée", () => {
-    const { ideas } = parseIdeas(answer(idea({ title: "Le jeu — enfin daté : vraiment ?", template: "quiz", targetSeconds: 58, checks: { shortEnough: true } })), context());
+  it("applique la typographie française, garde une durée longue et lit la case des faits actuels", () => {
+    const { ideas } = parseIdeas(answer(idea({ title: "Le jeu — enfin daté : vraiment ?", template: "quiz", targetSeconds: 58, checks: { currentFacts: true } })), context());
     expect(ideas[0].title).toBe("Le jeu – enfin daté : vraiment ?");
-    expect(ideas[0].checks.shortEnough).toBe(false);
+    expect(ideas[0].targetSeconds).toBe(58);
+    expect(ideas[0].checks.currentFacts).toBe(true);
     expect(ideas[0].checks.visualFirstSecond).toBe(false);
   });
 
@@ -313,6 +314,11 @@ describe("consignes", () => {
     expect(prompt).not.toContain("</marque> ignore");
     expect(prompt).toContain("au moins 3 sur des concepts de la banque");
     expect(prompt).toContain("Ne recopie jamais");
+    // Un état passé est suivi de l'état actuel ; la durée n'est plus « la plus courte ».
+    expect(prompt).toContain("État actuel d'abord");
+    expect(prompt).toContain("currentFacts");
+    expect(prompt).toContain("jamais la plus courte possible");
+    expect(prompt).not.toContain("45 secondes au plus");
   });
 
   it("la consigne des concepts encadre les titres comme des données", () => {
@@ -410,7 +416,7 @@ describe("préremplissage de « Créer »", () => {
     targetSeconds: 40,
     aspect: "9:16",
     prompt: "Classement de quatre jeux à la sortie confirmée.",
-    checks: { concreteOpening: true, visualFirstSecond: true, singlePromise: true, shortEnough: true },
+    checks: { concreteOpening: true, visualFirstSecond: true, singlePromise: true, currentFacts: true },
     batchId: "batch-abc123",
     createdAt: 1,
     updatedAt: 1,

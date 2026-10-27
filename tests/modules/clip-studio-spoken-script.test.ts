@@ -84,11 +84,21 @@ describe("durée : la voix seule, pas le clip", () => {
 
   it("donne au script la durée de la voix seule, et les règles de l'oral", () => {
     const prompt = scriptPrompt(FREE);
-    expect(prompt).toContain("le clip monté dure 22 secondes au plus");
-    expect(prompt).toContain("doit donc tenir en 18 secondes au plus");
-    expect(prompt).toContain("jamais des phrases hachées");
+    expect(prompt).toContain("le clip monté vise 22 secondes");
+    expect(prompt).toContain("vise donc 18 secondes");
+    expect(prompt).toContain("pas de phrases hachées");
     expect(prompt).toContain("Aucune étiquette lue");
     expect(prompt).toContain("jamais une date, une durée ou un chiffre seuls");
+  });
+});
+
+describe("état actuel : la demande peut dater, le script et la vérification le disent", () => {
+  it("le script vérifie la prémisse de la demande et dit l'état actuel", () => {
+    const prompt = scriptPrompt({ ...FREE, webSearch: true, brief: "Accroche : « Genshin limitait autrefois ta résine à 120. ». La mise à jour 1.1 l'a portée à 160." });
+    expect(prompt).toContain("La demande peut dater ou se tromper");
+    expect(prompt).toContain("le script dit aussi l'état actuel");
+    expect(prompt).toContain("- outdated");
+    expect(prompt).toContain("l'information passe avant la durée");
   });
 });
 
@@ -162,5 +172,11 @@ describe("vérification des faits : l'écran suit la voix", () => {
   it("demande de corriger aussi les notes visuelles d'un segment corrigé", () => {
     const prompt = factCheckPrompt({ brief: "TRANSCENDO", template: "slideshow", title: "Trois indices", segments: [{ caption: "La vidéo dure 3 min 23.", visualNotes: [{ kind: "board", text: "3 min 23" }] }], segmentSchema: "{}", segmentLimits: "", web: true });
     expect(prompt).toContain("dans le texte lu ET dans ses visualNotes");
+  });
+
+  it("traite un état passé sans l'état actuel comme une erreur à compléter", () => {
+    const prompt = factCheckPrompt({ brief: "Genshin", template: "free", title: "Résine", segments: [{ text: "La limite de résine est passée de 120 à 160." }], segmentSchema: "{}", segmentLimits: "", web: true });
+    expect(prompt).toContain("Une omission peut tromper autant qu'une erreur");
+    expect(prompt).toContain("ou un état actuel qui manque");
   });
 });

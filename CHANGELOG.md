@@ -1166,6 +1166,23 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Clip Studio, idées et scripts de l’assistant : une idée racontait un
+  état passé comme une anecdote, sans dire ce qu’il était devenu (la
+  résine de Genshin Impact « limitée à 120, puis 160 », alors qu’elle est
+  à 200 depuis la version 4.7), et rien dans la chaîne ne le voyait. Les
+  idées vérifient désormais l’état actuel de ce qu’elles citent, ce qui est
+  temporaire ou annoncé, et cochent « Faits vrais aujourd’hui » au lieu de
+  « 45 s au plus ». Le script vérifie la prémisse de la demande au lieu de
+  la croire, corrige une accroche trompeuse et passe un contrôle de plus
+  (« outdated ») ; la vérification des faits traite un état actuel
+  manquant comme une erreur à compléter.
+- Clip Studio, durée : la durée visée était un plafond à tous les étages
+  (idée, script, voix), et le calage faisait raccourcir le script dès 10 %
+  de dépassement, quitte à taire l’état actuel du sujet. Elle devient un
+  repère : un clip qui la dépasse de moins de moitié est gardé entier, et
+  un raccourci ne retire jamais l’état actuel, une condition, une exception
+  ni ce qui est temporaire.
+
 - Clip Studio, extraits YouTube : quand YouTube refusait les cookies
   enregistrés, la page « Créer » affichait encore « YouTube » comme
   disponible ; seuls les réglages le disaient. Elle dit maintenant « YouTube

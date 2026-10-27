@@ -100,7 +100,7 @@ const rawIdea = (title: string, extra: Record<string, unknown> = {}) => ({
   count: 3,
   targetSeconds: 40,
   prompt: "Classement de trois jeux gratuits sortis en 2026, une phrase par jeu avec son nom exact et sa plateforme.",
-  checks: { concreteOpening: true, visualFirstSecond: true, singlePromise: true, shortEnough: true },
+  checks: { concreteOpening: true, visualFirstSecond: true, singlePromise: true, currentFacts: true },
   ...extra,
 });
 
@@ -244,7 +244,7 @@ describe("rangement borné", () => {
       targetSeconds: 40,
       aspect: "9:16",
       prompt: "Prompt",
-      checks: { concreteOpening: false, visualFirstSecond: false, singlePromise: false, shortEnough: true },
+      checks: { concreteOpening: false, visualFirstSecond: false, singlePromise: false, currentFacts: true },
       batchId: "batch-abcdef",
       createdAt: index,
       updatedAt: index,
