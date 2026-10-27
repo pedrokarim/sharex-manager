@@ -1166,6 +1166,14 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Fixed
 
+- Clip Studio, extraits YouTube : quand YouTube refusait les cookies
+  enregistrés, la page « Créer » affichait encore « YouTube » comme
+  disponible ; seuls les réglages le disaient. Elle dit maintenant « YouTube
+  refuse les cookies depuis le … », avec le lien pour les renouveler. Le
+  bilan de l'étape « Vidéos » dit une fois où les renouveler, et chaque
+  vidéo écartée porte une raison courte au lieu du message entier coupé en
+  plein mot.
+
 - Clip Studio, scripts de l’assistant : un script raccourci pour tenir la
   durée devenait du charabia (« Pause douze. Symboles. Pause. Cycle.
   Calendrier. »), et une consigne de forme était lue à voix haute

@@ -145,7 +145,7 @@ export default function CreatePage() {
   const [webClips, setWebClips] = useState(true);
   const [clipAudio, setClipAudio] = useState(true);
   const [videoProviders, setVideoProviders] = useState<VideoProviderId[]>(["wikimedia"]);
-  const [clipSources, setClipSources] = useState<{ youtube: "ok" | "no-cookies" | "refused"; twitch: boolean } | null>(null);
+  const [clipSources, setClipSources] = useState<{ youtube: "ok" | "rejected" | "no-cookies" | "refused"; rejectedAt?: number; twitch: boolean } | null>(null);
   // Ancien lien « Monter sur une vidéo » : l'assistant, avec le choix des vidéos ouvert.
   const openSources = opensSourceVideos(params);
   const { data: session } = useSession();
@@ -863,18 +863,29 @@ export default function CreatePage() {
 
 // ─── Sources des extraits ────────────────────────────────────────
 
+/** Jour du refus des cookies YouTube, « 23 oct. ». */
+const REJECTED_DATE = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
+
 /**
  * Ce que la recherche d'extraits peut utiliser : YouTube (sans cookies, un
  * serveur peut être refusé), Twitch (par la recherche web de Codex), les
  * banques libres en repli. Un administrateur a le lien vers les réglages.
  */
-function ClipSourcesLine({ status, providers, isAdmin }: { status: { youtube: "ok" | "no-cookies" | "refused"; twitch: boolean } | null; providers: VideoProviderId[]; isAdmin: boolean }) {
+function ClipSourcesLine({ status, providers, isAdmin }: { status: { youtube: "ok" | "rejected" | "no-cookies" | "refused"; rejectedAt?: number; twitch: boolean } | null; providers: VideoProviderId[]; isAdmin: boolean }) {
   if (!status) return null;
-  const youtubeNote = status.youtube === "refused" ? "YouTube indisponible (cookies non configurés)" : status.youtube === "no-cookies" ? "YouTube sans cookies" : "YouTube";
+  const youtubeNote =
+    status.youtube === "rejected"
+      ? `YouTube refuse les cookies${status.rejectedAt ? ` depuis le ${REJECTED_DATE.format(status.rejectedAt)}` : ""}`
+      : status.youtube === "refused"
+        ? "YouTube indisponible (cookies non configurés)"
+        : status.youtube === "no-cookies"
+          ? "YouTube sans cookies"
+          : "YouTube";
+  const blocked = status.youtube === "refused" || status.youtube === "rejected";
   return (
     <span className="mt-1.5 flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
       <span className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
-        <span className={cn("inline-flex min-w-0 items-center gap-1", status.youtube === "refused" && "text-amber-700 dark:text-amber-400")}>
+        <span className={cn("inline-flex min-w-0 items-center gap-1", blocked && "text-amber-700 dark:text-amber-400")}>
           <BrandLogo brand="youtube" className="size-3.5 shrink-0" />
           <span className="min-w-0 [overflow-wrap:anywhere]">{youtubeNote}</span>
         </span>
@@ -893,7 +904,11 @@ function ClipSourcesLine({ status, providers, isAdmin }: { status: { youtube: "o
       </span>
       {status.youtube !== "ok" && isAdmin ? (
         <Link href="/m/clip-studio/voices#video-sources-title" className="w-fit max-w-full text-primary hover:underline">
-          {status.youtube === "refused" ? "Ajouter les cookies YouTube dans les réglages" : "Cookies YouTube : réglages des sources vidéo"}
+          {status.youtube === "rejected"
+            ? "Renouveler les cookies YouTube dans les réglages"
+            : status.youtube === "refused"
+              ? "Ajouter les cookies YouTube dans les réglages"
+              : "Cookies YouTube : réglages des sources vidéo"}
         </Link>
       ) : null}
     </span>

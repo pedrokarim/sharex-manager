@@ -394,7 +394,7 @@ describe("Trouver et couper un extrait", () => {
     });
     const state: ClipJobState = { audioLeft: 10.5 };
     const result = (await sourceClip(muted, context(deps, state))) as SourcedClip;
-    expect(state.youtubeRefused).toMatch(/cookies non configurés/);
+    expect(state.youtubeRefused).toMatch(/sans cookies.*ajoutez-en dans les réglages/);
     expect(deps.searchWeb).toHaveBeenCalledWith(muted, { youtube: false }, expect.anything());
     expect(result.outcome.video?.site).toBe("twitch");
     expect(calls[0]).toBe("web");

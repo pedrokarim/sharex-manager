@@ -63,7 +63,7 @@ import {
 } from "./remote-import";
 import { ASSETS_DIR, DATA_DIR, ensureDirs, readAssets, writeAssets } from "./store";
 import { transcribeMediaFile, wordKey } from "./transcribe";
-import { copyYoutubeCookies, hasYoutubeCookies, markCookiesRejected } from "./video-sources";
+import { copyYoutubeCookies, hasYoutubeCookies, markCookiesRejected, youtubeCookiesRejectedAt } from "./video-sources";
 
 // ─── Bornes ──────────────────────────────────────────────────────
 
@@ -881,6 +881,10 @@ export function clipAssetToSource(asset: ClipAsset): MediaSource {
   };
 }
 
+/** Bilan d'un refus de YouTube, dit une fois dans l'étape « Vidéos », avec ce qu'il faut faire. */
+const REFUSED_WITH_COOKIES = "YouTube refuse les cookies enregistrés : renouvelez-les dans les réglages de Clip Studio, section « Sources vidéo »";
+const REFUSED_WITHOUT_COOKIES = "YouTube refuse le serveur sans cookies : ajoutez-en dans les réglages de Clip Studio, section « Sources vidéo »";
+
 /** Candidates d'un extrait : YouTube d'abord (sauf site Twitch ou refus), puis Codex sur le web. */
 async function findCandidates(request: ClipRequest, ctx: ClipContext, deps: ClipDeps, notes: string[]): Promise<ClipCandidate[]> {
   const youtube = !ctx.state.youtubeRefused;
@@ -896,7 +900,7 @@ async function findCandidates(request: ClipRequest, ctx: ClipContext, deps: Clip
         const cookies = hasYoutubeCookies();
         if (cookies) markCookiesRejected();
         else youtubeState.refusedAt = Date.now();
-        ctx.state.youtubeRefused = cookies ? "YouTube refuse le serveur malgré les cookies" : "YouTube refuse le serveur (cookies non configurés)";
+        ctx.state.youtubeRefused = cookies ? REFUSED_WITH_COOKIES : REFUSED_WITHOUT_COOKIES;
         notes.push(ctx.state.youtubeRefused);
       } else notes.push(`recherche YouTube impossible (${shortReason(error)})`);
     }
@@ -949,9 +953,11 @@ export async function sourceClip(request: ClipRequest, ctx: ClipContext): Promis
         const cookies = hasYoutubeCookies();
         if (cookies) markCookiesRejected();
         else youtubeState.refusedAt = Date.now();
-        ctx.state.youtubeRefused = cookies ? "YouTube refuse le serveur malgré les cookies" : "YouTube refuse le serveur (cookies non configurés)";
+        ctx.state.youtubeRefused = cookies ? REFUSED_WITH_COOKIES : REFUSED_WITHOUT_COOKIES;
       }
-      notes.push(`« ${cleanText(candidate.title, 60)} » écartée (${shortReason(error)})`);
+      // Un refus de YouTube se dit une fois dans le bilan de l'étape : ici, la raison courte.
+      const reason = isYoutubeRefusal(error) && candidate.site === "youtube" ? (hasYoutubeCookies() ? "cookies YouTube refusés" : "YouTube refuse le serveur") : shortReason(error);
+      notes.push(`« ${cleanText(candidate.title, 60)} » écartée (${reason})`);
     }
   }
   return { outcome: { ...base, note: notes.length ? capitalize(notes.join(" ; ")) : "Aucune vidéo trouvée" } };
@@ -1105,8 +1111,16 @@ function clock(seconds: number): string {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
-/** Sources d'extraits utilisables, pour l'écran de création : jamais un secret. */
-export function clipSourcesStatus(): { youtube: "ok" | "no-cookies" | "refused"; twitch: boolean } {
-  const cookies = hasYoutubeCookies();
-  return { youtube: cookies ? "ok" : youtubeRecentlyRefused() ? "refused" : "no-cookies", twitch: true };
+/**
+ * Sources d'extraits utilisables, pour l'écran de création : jamais un secret.
+ * « rejected » : les cookies enregistrés ont été refusés par YouTube depuis
+ * leur enregistrement (vu le 27/10/2026 : refusés le 23/10, la page disait
+ * encore « YouTube » pendant quatre jours).
+ */
+export function clipSourcesStatus(): { youtube: "ok" | "rejected" | "no-cookies" | "refused"; rejectedAt?: number; twitch: boolean } {
+  if (hasYoutubeCookies()) {
+    const rejectedAt = youtubeCookiesRejectedAt();
+    return rejectedAt ? { youtube: "rejected", rejectedAt, twitch: true } : { youtube: "ok", twitch: true };
+  }
+  return { youtube: youtubeRecentlyRefused() ? "refused" : "no-cookies", twitch: true };
 }

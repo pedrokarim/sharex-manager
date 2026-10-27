@@ -586,7 +586,7 @@ export type { FoundVideo, ImportedVideo, VideoProviderId } from "./video-search"
 export function getVideoSearchStatus(): Promise<{
   pexels: boolean;
   providers: import("./video-search").VideoProviderId[];
-  clips?: { youtube: "ok" | "no-cookies" | "refused"; twitch: boolean };
+  clips?: { youtube: "ok" | "rejected" | "no-cookies" | "refused"; rejectedAt?: number; twitch: boolean };
 }> {
   return callModule("getVideoSearchStatus");
 }

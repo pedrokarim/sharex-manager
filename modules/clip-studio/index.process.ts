@@ -1351,8 +1351,10 @@ export async function getVideoSearchStatus(): Promise<{ pexels: boolean; provide
 
 /** Sources des extraits de vraies vidéos, pour l'écran de création : aucun secret. */
 export interface ClipSourcesStatus {
-  /** « ok » : cookies enregistrés ; « no-cookies » : sans cookies (YouTube peut refuser un serveur) ; « refused » : refusé récemment. */
-  youtube: "ok" | "no-cookies" | "refused";
+  /** « ok » : cookies enregistrés ; « rejected » : cookies refusés par YouTube, à renouveler ; « no-cookies » : sans cookies (YouTube peut refuser un serveur) ; « refused » : refusé récemment sans cookies. */
+  youtube: "ok" | "rejected" | "no-cookies" | "refused";
+  /** Date du refus des cookies (« rejected » seulement). */
+  rejectedAt?: number;
   /** Clips Twitch trouvés par la recherche web de Codex. */
   twitch: boolean;
 }

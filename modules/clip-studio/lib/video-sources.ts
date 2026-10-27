@@ -147,7 +147,12 @@ export function copyYoutubeCookies(dir: string): string | null {
   return target;
 }
 
-/** YouTube a refusé le serveur malgré les cookies : l'écran des réglages le dira. */
+/** Date du dernier refus des cookies enregistrés par YouTube ; absente s'ils n'ont pas été refusés depuis leur enregistrement. */
+export function youtubeCookiesRejectedAt(): number | undefined {
+  return hasYoutubeCookies() ? readSettings().cookiesRejectedAt : undefined;
+}
+
+/** YouTube a refusé le serveur malgré les cookies : l'écran des réglages le dira. */
 export function markCookiesRejected() {
   writeSettings({ ...readSettings(), cookiesRejectedAt: Date.now() });
 }
