@@ -352,7 +352,8 @@ describe("extraits", () => {
 // ─── Travaux ─────────────────────────────────────────────────────
 
 async function settle(id: string, until: ClipJob["status"][] = ["done", "error", "canceled", "review"]): Promise<ClipJob> {
-  for (let attempt = 0; attempt < 200; attempt++) {
+  // Une échéance en temps, pas en tours : sous la charge de la CI, un travail met plus de 2 secondes ; au-delà de 8, le test lui-même expire (vu le 07/11/2026).
+  for (const deadline = Date.now() + 8_000; Date.now() < deadline; ) {
     const job = getClipJob(id);
     if (job && until.includes(job.status)) return job;
     await new Promise((resolve) => setTimeout(resolve, 10));
