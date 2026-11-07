@@ -75,6 +75,8 @@ export const CLIP_LIMITS = {
   /** Durée d'un extrait, en secondes. */
   minSeconds: 1.5,
   maxSeconds: 12,
+  /** Extrait muet : il couvre tout son temps à l'écran (l'accroche comprise pour le premier segment), sans reboucler. */
+  maxMutedSeconds: 20,
   /** Résultats de recherche lus, candidates essayées. */
   searchResults: 6,
   candidatesTried: 2,
@@ -1130,7 +1132,7 @@ async function takeExcerpt(candidate: ClipCandidate, request: ClipRequest, ctx: 
       const tail = Math.min(CLIP_LIMITS.maxTailSeconds, Math.max(1.5, ctx.segmentSeconds));
       const soundSeconds = mode === "sound" ? Math.min(request.seconds, ctx.state.audioLeft) : 0;
       // Un extrait muet est coupé en plans par le rythme : quelques secondes de plus que la voix laissent les plans changer de moment.
-      const seconds = mode === "sound" ? soundSeconds + tail : Math.min(CLIP_LIMITS.maxSeconds, Math.max(request.seconds, ctx.segmentSeconds + 3));
+      const seconds = mode === "sound" ? soundSeconds + tail : Math.min(CLIP_LIMITS.maxMutedSeconds, Math.max(request.seconds, ctx.segmentSeconds + 3));
       const spread = spreadWindows(duration);
       let picked: { start: number; score: number };
       if (spread.length) {

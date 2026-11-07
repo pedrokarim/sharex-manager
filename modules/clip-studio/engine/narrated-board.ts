@@ -134,9 +134,9 @@ export function coverTimeline(items: Illustration[], totalFrames: number, fps: n
  * partagent la vidéo dans l'ordre, sans se chevaucher, et l'écart restant se
  * répartit entre eux. Avant, chacun la prenait en son milieu : 8 secondes
  * d'une diffusion revenaient trois fois en 22 secondes (vu en prod le
- * 07/11/2026). Une source trop courte pour tous ses plans garde son
- * découpage ; une vidéo qui garde son son (une citation) n'est jamais
- * déplacée, ses mots en dépendent.
+ * 07/11/2026). Une source trop courte pour tous ses plans les prend dans
+ * l'ordre, et seul l'excédent revient ; une vidéo qui garde son son (une
+ * citation) n'est jamais déplacée, ses mots en dépendent.
  */
 export function distinctShots(items: Illustration[], fps: number): Illustration[] {
   const groups = new Map<string, VideoItem[]>();
@@ -150,7 +150,19 @@ export function distinctShots(items: Illustration[], fps: number): Illustration[
     const length = sourceFrames(shots[0].source, fps);
     if (!Number.isFinite(length)) continue;
     const needed = shots.reduce((sum, shot) => sum + shot.duration * (shot.speed ?? 1), 0);
-    if (needed > length) continue;
+    if (shots.some((shot) => shot.duration * (shot.speed ?? 1) > length)) continue;
+    if (needed > length) {
+      // Trop courte pour tous ses plans : dans l'ordre, et seul l'excédent revient (le dernier plan recule jusqu'à finir avec la vidéo).
+      let at = 0;
+      for (const shot of [...shots].sort((a, b) => a.start - b.start)) {
+        const span = shot.duration * (shot.speed ?? 1);
+        if (at >= length) at = 0;
+        else if (at + span > length) at = length - span;
+        moved.set(shot.id, at);
+        at += span;
+      }
+      continue;
+    }
     const slack = length - needed;
     const skip = Math.min(introSkip(length, fps), Math.floor(slack / 2));
     const gap = shots.length > 1 ? Math.floor((slack - skip) / (shots.length - 1)) : 0;

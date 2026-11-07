@@ -185,9 +185,10 @@ describe("plans d'une même vidéo", () => {
     expect(items.map((item) => item.trimStart)).toEqual([...items.map((item) => item.trimStart)].sort((a, b) => a - b));
   });
 
-  it("garde le découpage d'une vidéo trop courte et ne déplace jamais une citation", () => {
-    const short = [shot("a", 0, 200, 10), shot("b", 200, 200, 30)];
-    expect(distinctShots(short, FPS)).toEqual(short);
+  it("ne reprend que l'excédent d'une vidéo trop courte et ne déplace jamais une citation", () => {
+    // 400 images à montrer dans 258 : le second plan recule jusqu'à finir avec la vidéo, seules 142 images reviennent.
+    const short = distinctShots([shot("a", 0, 200, 10), shot("b", 200, 200, 30)], FPS) as VideoItem[];
+    expect(short.map((item) => item.trimStart)).toEqual([0, 58]);
     const quote = [shot("q", 0, 60, 90, 12, false)];
     expect(distinctShots(quote, FPS)).toEqual(quote);
   });
