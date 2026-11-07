@@ -76,6 +76,7 @@ import { FOUND_LIMITS, IMAGE_SOURCE_MODES, type ImageSourceMode, type SegmentIma
 import { MOODS, pickTrack } from "./music";
 import { AUTO_SEGMENTS, SEGMENT_WORDS, FRAME_WORDS, cleanCount, plannedSegments, segmentCap, suggestedSegments, voiceBudgetSeconds } from "./segment-count";
 import {
+  ABSENCE_RULE,
   BRAND_RULES_SCOPE,
   SPEAKING_RATE_WPM,
   SPOKEN_LINES,
@@ -2457,6 +2458,7 @@ function spokenProblemCount(request: AssistantRequest, script: CleanScript): num
 const PROBLEM_LABELS: Record<SpokenProblem, string> = {
   choppy: "phrases hachées, en style télégraphique",
   labels: "étiquettes lues à voix haute",
+  absence: "affirmation d'absence (« inconnu », « pas encore annoncé », « reste caché », « viendra plus tard »)",
 };
 
 /**
@@ -2495,6 +2497,7 @@ export function revisePrompt(request: AssistantRequest, script: CleanScript, lan
     `<script>${asData(data)}</script>`,
     `<signales>${asData(flagged)}</signales>`,
     "Réécris seulement les textes signalés, en phrases complètes et naturelles qui disent la même chose ; rends les autres exactement tels quels.",
+    `Un texte signalé pour une affirmation d'absence perd cette affirmation : retire ce qui dit qu'une chose n'est pas connue, pas annoncée ou à venir plus tard, et garde ce qui est annoncé ; n'écris aucune autre absence à la place. ${ABSENCE_RULE}`,
     ...(script.hook ? ["L'accroche (hook) est dite juste avant le premier segment et ne change pas : aucun texte ne la répète."] : []),
     ...SPOKEN_LINES,
     `Garde exactement les mêmes éléments, dans le même ordre (${segments.length} dans "segments"), les faits, les noms propres et les chiffres exacts ; n'ajoute aucun fait. Chaque texte réécrit garde à peu près sa longueur : quelques mots de plus au plus, pour les verbes et les liaisons.`,

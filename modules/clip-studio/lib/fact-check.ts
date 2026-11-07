@@ -142,6 +142,12 @@ export function factCheckPrompt(input: FactCheckInput): string {
         ]),
     "Contrôle segment par segment chaque affirmation vérifiable : nom exact et orthographe officielle, date de sortie, statut à la date du jour (sorti, à venir, annulé, arrêté), studio et éditeur, plateformes, chiffres, records, classements, citations.",
     "Une omission peut tromper autant qu'une erreur : un segment qui décrit un état passé (une ancienne valeur, limite, règle, un ancien prix ou statut) sans dire ce qu'il est aujourd'hui, ou qui tait un aspect temporaire (événement, offre limitée) ou un changement annoncé, est complété (verdict \"fixed\") avec l'état actuel vérifié.",
+    ...(input.web
+      ? [
+          "Une affirmation d'absence (« inconnu », « pas encore annoncé », « aucune date », « non précisé », « viendra plus tard ») ne se confirme JAMAIS par la page qui la dit : elle était peut-être vraie le jour de cette page. Cherche tout ce qui a été publié depuis sur ce sujet, par toutes les communications officielles (articles, notes de version, diffusions, réseaux sociaux de l'éditeur), et par les grands médias qui en rendent compte. Ce qui a été annoncé remplace l'absence (verdict \"fixed\") ; sinon l'affirmation d'absence est retirée du segment et ce qui est connu reste (verdict \"fixed\").",
+          "Une annonce se raconte par son contenu principal : un segment qui parle d'une annonce, d'une mise à jour ou d'une sortie en taisant ce qu'elle apporte de plus important (nouveaux personnages, contenus, date, prix) est complété avec ce contenu vérifié (verdict \"fixed\").",
+        ]
+      : []),
     ...(quiz
       ? [
           "Quiz : pour chaque question, le choix désigné par answer (index dans choices, à partir de 0) doit être juste, et CHACUN des autres choix doit être faux ; l'explication doit être exacte. Sinon corrige answer, les choix ou l'explication (verdict \"fixed\"). Une question sans bonne réponse unique et certaine est corrigée ou retirée.",

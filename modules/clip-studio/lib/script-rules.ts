@@ -373,7 +373,29 @@ export function speechSeconds(text: string): number {
   return spokenSeconds(text) + breaks * BREAK_SECONDS;
 }
 
-export type SpokenProblem = "choppy" | "labels";
+/**
+ * Affirmations d'absence : « inconnu », « pas encore annoncé », « reste
+ * cachée », « viendront plus tard », « TBA ». Une absence n'est vraie que
+ * jusqu'à l'annonce suivante et n'apprend rien au spectateur. Vu en prod le
+ * 07/11/2026 : un clip sur Wuthering Waves 3.8 disait « aucun personnage
+ * jouable n'est précisé », alors que la diffusion du jour présentait Lily.
+ * Lu sur le texte sans accents ni majuscules (`fold`).
+ */
+const ABSENCE =
+  /\b(?:inconnu(?:e|s|es)?|pas encore (?:\w+ )?(?:annonce|precise|connu|devoile|confirme|revele|communique|date|officialise)e?s?|toujours pas (?:de |d'|annonce|precise|connu|devoile|confirme)|non (?:annonce|precise|communique|devoile|confirme|date)e?s?|reste(?:nt)? (?:secret|cache|mysterieu|flou|a decouvrir|a annoncer|a confirmer)\w*|(?:viendra|viendront|arriveront) plus tard|on ne (?:sait|connait) (?:pas|rien)|on ignore (?:encore|toujours)|(?:aucune?|aucun) (?:date|information|info|detail|annonce|personnage)[^.!?]{0,60}?n'(?:est|a|ont|sont) (?:encore |toujours )?(?:ete )?(?:annonce|precise|connu|devoile|confirme|communique|revele)e?s?|unknown|not (?:yet )?(?:been )?(?:announced|revealed|confirmed|disclosed)|yet to be (?:announced|revealed|confirmed)|to be announced|tba|tbd|no (?:release )?date yet)\b/;
+
+const foldText = (text: string) => text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[’]/g, "'");
+
+/** Le texte affirme qu'une chose n'est pas connue ou pas annoncée. */
+export function claimsAbsence(text: string): boolean {
+  return ABSENCE.test(foldText(text));
+}
+
+/** Règle commune aux idées, aux scripts et à leur vérification. */
+export const ABSENCE_RULE =
+  "Jamais une absence présentée comme un fait : pas de « inconnu », « pas encore annoncé », « aucune date », « reste secret », « les détails viendront plus tard ». Une absence n'est vraie que jusqu'à l'annonce suivante et n'apprend rien au spectateur : dis ce qui EST annoncé (qui, quoi, quand, combien). Une vidéo ne se construit jamais sur ce qu'on ne sait pas ; une annonce se raconte par son contenu principal, jamais par ce qu'elle tait.";
+
+export type SpokenProblem = "choppy" | "labels" | "absence";
 
 /**
  * Textes lus d'un script qui ne passent pas à l'oral, par index : hachés,
@@ -388,6 +410,7 @@ export function spokenProblems(texts: readonly string[]): { index: number; probl
     const problems: SpokenProblem[] = [];
     if (isChoppy(text)) problems.push("choppy");
     if (labels[index].length >= 2 || labels[index].some((label) => (seen.get(label) ?? 0) >= 2)) problems.push("labels");
+    if (claimsAbsence(text)) problems.push("absence");
     return problems.length ? [{ index, problems }] : [];
   });
 }
@@ -395,14 +418,14 @@ export function spokenProblems(texts: readonly string[]): { index: number; probl
 // ─── Consignes ───────────────────────────────────────────────────
 
 /**
- * Portée des règles « always » et « never » d'une marque. Elles décrivent son
- * identité graphique ; lues comme des règles sur le sujet, elles faisaient
- * écrire « seulement des schémas rose et bleu, sans logo ni personnage » et
+ * Portée des règles « always » et « never » d'une marque. Elles décrivent son
+ * identité graphique ; lues comme des règles sur le sujet, elles faisaient
+ * écrire « seulement des schémas rose et bleu, sans logo ni personnage » et
  * le script ne demandait plus aucun extrait de vraie vidéo (constaté en prod
  * le 07/11/2026 sur les trois derniers clips de l'assistant).
  */
 export const BRAND_RULES_SCOPE =
-  "Portée des règles « always » et « never » de la marque : elles décrivent son identité graphique (ses encres, ses polices, sa mascotte, ses cartons, ce qu'elle dessine ou génère elle-même), jamais le sujet traité. Le jeu, l'anime, le film, le manga, le produit ou la personne dont parle la vidéo se montre tel qu'il est : bande-annonce, gameplay, visuel officiel, logo officiel, personnages. Une règle qui écarte les logos ou les personnages existants interdit de les générer ou de les imiter, pas de montrer les vrais. Aucune de ces règles ne retire un extrait de vraie vidéo ni un visuel officiel.";
+  "Portée des règles « always » et « never » de la marque : elles décrivent son identité graphique (ses encres, ses polices, sa mascotte, ses cartons, ce qu'elle dessine ou génère elle-même), jamais le sujet traité. Le jeu, l'anime, le film, le manga, le produit ou la personne dont parle la vidéo se montre tel qu'il est : bande-annonce, gameplay, visuel officiel, logo officiel, personnages. Une règle qui écarte les logos ou les personnages existants interdit de les générer ou de les imiter, pas de montrer les vrais. Aucune de ces règles ne retire un extrait de vraie vidéo ni un visuel officiel.";
 
 /**
  * Règles de style communes à tout texte lu (scripts, idées, accroches) :
@@ -417,6 +440,7 @@ export function scriptRuleLines(options: { french: boolean }): string[] {
     ...SPOKEN_LINES,
     "Fin : aucune formule de clôture creuse (« merci d'avoir regardé », « dites-moi ce que vous en pensez », résumé de ce qui vient d'être dit) ; termine sur une seule demande au spectateur, sur la dernière information utile ou sur une phrase qui reboucle sur la première.",
     "Faits : n'invente aucun chiffre, aucun nom, aucun résultat ni aucune source (« des études montrent »). Le texte est lu par une voix de synthèse : jamais de case à remplir ({{…}}, [crochets]) dans un texte lu ; quand un fait manque, écris la phrase sans lui.",
+    ABSENCE_RULE,
     `À éviter absolument, ce sont des tics d'IA : ${tells.map((tell) => `« ${tell} »`).join(", ")}${options.french ? "" : " (et leurs équivalents dans la langue du script)"} ; ${AI_SHAPES.join(" ; ")}.`,
     ...(options.french
       ? ["Jamais de tiret cadratin (—) : une incise prend le tiret demi-cadratin (–) entouré d'espaces, des virgules ou des parenthèses."]

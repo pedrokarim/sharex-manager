@@ -493,11 +493,11 @@ export interface MotionStats {
  * de fin) sont écartés quand la vidéo est assez longue. Rend le début, en
  * secondes.
  *
- * `avoid` : passages déjà montrés dans le même clip, en secondes. Aucune
+ * `avoid` : passages déjà montrés dans le même clip, en secondes. Aucune
  * fenêtre retenue ne les chevauche (avant, trois segments sur la même
  * bande-annonce montraient trois fois les mêmes 12 secondes, vu en prod le
  * 07/11/2026). Introduction et fin redeviennent permises quand il ne reste
- * pas de place ailleurs ; sans aucune place libre, `score` vaut `-Infinity`.
+ * pas de place ailleurs ; sans aucune place libre, `score` vaut `-Infinity`.
  */
 export function pickDynamicWindow(
   stats: MotionStats,
@@ -520,7 +520,7 @@ export function pickDynamicWindow(
     low = 0;
     high = fullHigh;
   }
-  // Tout est déjà pris entre l'introduction et la fin : on s'autorise toute la vidéo.
+  // Tout est déjà pris entre l'introduction et la fin : on s'autorise toute la vidéo.
   if (avoid.length) {
     let free = false;
     for (let start = low; start <= high && !free; start++) free = !overlaps(start);
@@ -1094,7 +1094,7 @@ async function takeExcerpt(candidate: ClipCandidate, request: ClipRequest, ctx: 
       if (mode === "sound") quoteSeconds = Math.min(end - start, soundSeconds);
       if (end - start < CLIP_LIMITS.minSeconds) throw new Error("vidéo trop courte");
     }
-    // Retenu tout de suite, sans attente entre le choix et la réservation : les extraits se cherchent deux à la fois.
+    // Retenu tout de suite, sans attente entre le choix et la réservation : les extraits se cherchent deux à la fois.
     used.push({ start, end });
 
     const keepAudio = mode !== "muted";

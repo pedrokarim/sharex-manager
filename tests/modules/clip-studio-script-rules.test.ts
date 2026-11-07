@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  claimsAbsence,
+  ABSENCE_RULE,
   AI_TELLS_FR,
   HOOK_FAMILIES,
   HOOK_MAX_WORDS,
@@ -15,6 +17,7 @@ import {
   readVisualNote,
   scriptReasoningLines,
   scriptRuleLines,
+  spokenProblems,
   segmentVisualNotes,
   spokenSeconds,
   stripInvisible,
@@ -277,5 +280,29 @@ describe("règles d'écriture : visée, notes et contrôles renvoyés", () => {
   it("retire les cases à remplir qu'une voix lirait telles quelles", () => {
     expect(withoutPlaceholders("J'ai gagné {{chiffre}} abonnés en {{durée}}.")).toBe("J'ai gagné abonnés en.");
     expect(withoutPlaceholders("Rien à retirer, {pas} ici")).toBe("Rien à retirer, {pas} ici");
+  });
+});
+
+describe("affirmations d'absence", () => {
+  it("repère ce qu'a dit le clip Wuthering Waves 3.8 du 07/11/2026", () => {
+    expect(claimsAbsence("La suite reste cachée. Au 7 novembre, aucune date, aucun personnage jouable ni contenu détaillé de la 4.0 n’est précisé.")).toBe(true);
+    expect(claimsAbsence("La 3.8 donne la direction. Les détails viendront plus tard.")).toBe(true);
+    expect(claimsAbsence("Encore inconnus")).toBe(true);
+    expect(claimsAbsence("La date de sortie n'est pas encore annoncée.")).toBe(true);
+    expect(claimsAbsence("Aucune date n'a encore été annoncée pour la version 4.0.")).toBe(true);
+    expect(claimsAbsence("The release date has not been announced yet.")).toBe(true);
+    expect(claimsAbsence("Release date: TBA")).toBe(true);
+  });
+
+  it("laisse passer ce qui dit ce qui est annoncé", () => {
+    expect(claimsAbsence("Lily arrive le 12 novembre avec la version 3.8.")).toBe(false);
+    expect(claimsAbsence("Kuro Games a présenté Lily pendant la diffusion du 6 novembre.")).toBe(false);
+    expect(claimsAbsence("La bannière de Lily ouvre la première phase, avec Sigrika et Qiuyuan.")).toBe(false);
+    expect(claimsAbsence("Le jeu est déjà sorti sur PC et PS5.")).toBe(false);
+  });
+
+  it("fait réécrire le texte lu et entre dans les règles communes", () => {
+    expect(spokenProblems(["Lily arrive le 12 novembre.", "Les détails viendront plus tard."])).toEqual([{ index: 1, problems: ["absence"] }]);
+    expect(scriptRuleLines({ french: true })).toContain(ABSENCE_RULE);
   });
 });
