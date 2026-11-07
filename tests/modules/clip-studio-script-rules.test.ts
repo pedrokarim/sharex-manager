@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   claimsAbsence,
+  REPEAT_RULE,
+  repeatedPhrases,
   ABSENCE_RULE,
   AI_TELLS_FR,
   HOOK_FAMILIES,
@@ -306,5 +308,25 @@ describe("affirmations d'absence", () => {
   it("fait réécrire le texte lu et entre dans les règles communes", () => {
     expect(spokenProblems(["Lily arrive le 12 novembre.", "Les détails viendront plus tard."])).toEqual([{ index: 1, problems: ["absence"] }]);
     expect(scriptRuleLines({ french: true })).toContain(ABSENCE_RULE);
+  });
+});
+
+describe("redites", () => {
+  it("repère ce qui redit l'accroche ou un texte précédent", () => {
+    // Le dernier clip Wuthering Waves de Karim, puis sa relance (07/11/2026).
+    expect(repeatedPhrases(["Wuthering Waves 3.8 amorce déjà la 4.0. Kuro Games le confirme dans son aperçu du 6 novembre."], ["Wuthering Waves 3.8 amorce déjà la 4.0."])).toEqual([["waves 3.8 amorce", "3.8 amorce 4.0"]]);
+    expect(repeatedPhrases(["Kuro Games présente un premier aperçu de la 4.0.", "Le 12 novembre, la 3.8 lancera A Bouquet for Tomorrow, avec Lily.", "Le 6 novembre, Kuro Games n’a montré qu’un premier aperçu de la 4.0."])[2]).toEqual(["premier apercu 4.0"]);
+    // Dans le même texte.
+    expect(repeatedPhrases(["Une course contre Doom. Castle Doom ajoute quoi ? Une course contre Doom."])).toEqual([["course contre doom"]]);
+  });
+
+  it("laisse passer un nom propre répété et des textes qui avancent", () => {
+    expect(repeatedPhrases(["Wuthering Waves Version 3.8 arrive le 12 novembre.", "Dans Wuthering Waves Version 3.8, Lily rejoint la bannière."])).toEqual([[], []]);
+    expect(repeatedPhrases(["Kyoko Kumagai lance cette suite dans Sho-Comi.", "Chiyo et Setsu ont grandi et vivent à l’académie Kagetsu."], ["Chocolate Vampire revient."])).toEqual([[], []]);
+  });
+
+  it("fait réécrire le texte lu et entre dans les règles communes", () => {
+    expect(spokenProblems(["Lily arrive le 12 novembre avec la 3.8.", "Avec la 3.8, Lily arrive le 12 novembre."], ["Wuthering Waves 3.8 change tout."])).toEqual([{ index: 1, problems: ["repeat"] }]);
+    expect(scriptRuleLines({ french: true })).toContain(REPEAT_RULE);
   });
 });

@@ -145,8 +145,8 @@ describe("assistant : accroches et nettoyage du script", () => {
     });
     expect(script.title).toBe("Pompéi, 79 après J.-C.");
     expect(script.hook).toEqual({ text: "Ce volcan a rasé Pompéi en un jour", family: "mid-scene", score: 9 });
-    // La voix dit l'accroche (8 mots), pas le titre : 8 + 2 + 8 = 18 mots à 160 par minute.
-    expect(script.spokenSeconds).toBe(7);
+    // La voix dit l'accroche (8 mots), pas le titre, puis le texte de la séquence sans son heading : 8 + 8 = 16 mots à 160 par minute.
+    expect(script.spokenSeconds).toBe(6);
   });
 
   it("affiche l'accroche quand Codex ne donne pas de titre", () => {
@@ -172,7 +172,8 @@ describe("assistant : accroches et nettoyage du script", () => {
     const scenes = (script as unknown as { scenes: { heading?: string }[] }).scenes;
     expect(scenes[0].heading).toBe("Le magma – brûlant");
     // 2 + 3 + 35 = 40 mots lus, à 160 mots par minute : 15 s.
-    expect(script.spokenSeconds).toBe(15);
+    // Le heading s'affiche sans être lu : seuls les 35 mots du texte et le titre comptent.
+    expect(script.spokenSeconds).toBe(14);
   });
 
   it("demande les accroches à chaque modèle", () => {

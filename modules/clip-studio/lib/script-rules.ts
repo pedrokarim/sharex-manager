@@ -395,15 +395,73 @@ export function claimsAbsence(text: string): boolean {
 export const ABSENCE_RULE =
   "Jamais une absence présentée comme un fait : pas de « inconnu », « pas encore annoncé », « aucune date », « reste secret », « les détails viendront plus tard ». Une absence n'est vraie que jusqu'à l'annonce suivante et n'apprend rien au spectateur : dis ce qui EST annoncé (qui, quoi, quand, combien). Une vidéo ne se construit jamais sur ce qu'on ne sait pas ; une annonce se raconte par son contenu principal, jamais par ce qu'elle tait.";
 
-export type SpokenProblem = "choppy" | "labels" | "absence";
+/**
+ * Mots qui ne portent pas d'information : une redite se reconnaît à ses mots
+ * pleins, pas à ses articles. Sans accents (`foldText`).
+ */
+const FILLER_WORDS = new Set(
+  (
+    "les des une est sont ont avec sans pour par dans sur sous entre vers chez aux du de la le un et ou mais donc car ni que qui quoi dont ce cet cette ces son sa ses leur leurs mon ma mes ton ta tes notre nos votre vos il elle ils elles on se ne pas plus moins tres deja aussi encore toujours tout tous toute toutes bien meme comme quand alors ainsi lui eux nous vous je tu y en a au ai as avait avoir etre etait fait faire peut va vont cela ca ici la-bas puis apres avant selon " +
+    "the and for with from this that these those its their his her are was were has have had will would can could not but also just into onto about over than then them they you your our"
+  ).split(" ")
+);
+
+/** Mots pleins d'un texte, dans l'ordre, avec leur forme d'origine (pour reconnaître un nom propre). */
+function contentWords(text: string): { word: string; name: boolean }[] {
+  return [...text.matchAll(/[\p{L}\p{N}][\p{L}\p{N}'’.-]*/gu)]
+    .map((match) => {
+      const raw = match[0].replace(/[.'’-]+$/, "");
+      const word = foldText(raw).replace(/^(?:l|d|j|n|s|c|qu|m|t)'/, "");
+      return { word, name: /^[\p{Lu}\p{N}]/u.test(raw) };
+    })
+    .filter(({ word }) => word.length >= 3 || /\d/.test(word))
+    .filter(({ word }) => !FILLER_WORDS.has(word));
+}
+
+/**
+ * Redites d'un script lu : pour chaque texte, l'enchaînement de trois mots
+ * pleins déjà dit plus tôt (dans l'accroche, dans un texte précédent ou plus
+ * haut dans le même texte). Un nom propre de trois mots (« Wuthering Waves
+ * 3.8 ») ne compte pas : le répéter est normal. Vu en prod le 07/11/2026 :
+ * « Wuthering Waves 3.8 amorce déjà la 4.0 » dit dans l'accroche puis dans la
+ * première séquence, « un premier aperçu de la 4.0 » dans la première et la
+ * dernière, « Une course contre Doom » deux fois dans la même phrase.
+ * `opening` : ce qui est dit avant le premier texte (accroche, sous-titre).
+ */
+export function repeatedPhrases(texts: readonly string[], opening: readonly string[] = []): string[][] {
+  const said = new Set<string>();
+  const remember = (words: { word: string; name: boolean }[], index: number) => said.add(words.slice(index, index + 3).map((entry) => entry.word).join(" "));
+  for (const text of opening) {
+    const words = contentWords(text);
+    for (let index = 0; index + 3 <= words.length; index++) remember(words, index);
+  }
+  return texts.map((text) => {
+    const words = contentWords(text);
+    const found: string[] = [];
+    for (let index = 0; index + 3 <= words.length; index++) {
+      const three = words.slice(index, index + 3);
+      const key = three.map((entry) => entry.word).join(" ");
+      if (said.has(key) && !three.every((entry) => entry.name) && !found.includes(key)) found.push(key);
+      remember(words, index);
+    }
+    return found;
+  });
+}
+
+/** Règle commune aux idées, aux scripts et à leur vérification. */
+export const REPEAT_RULE =
+  "Chaque phrase dite apprend quelque chose de neuf au spectateur : jamais redire l'accroche, le titre, une séquence précédente ni une phrase du même texte, même reformulée. Le spectateur d'un short entend tout une fois et décroche à la première redite. Plus court plutôt que répété : quand les faits manquent pour la durée visée, la vidéo est plus courte, elle n'est jamais rallongée par une redite.";
+
+export type SpokenProblem = "choppy" | "labels" | "absence" | "repeat";
 
 /**
  * Textes lus d'un script qui ne passent pas à l'oral, par index : hachés,
  * ou portant des étiquettes (deux dans le même texte, ou la même dans deux
  * textes : c'est un plan lu, pas une tournure).
  */
-export function spokenProblems(texts: readonly string[]): { index: number; problems: SpokenProblem[] }[] {
+export function spokenProblems(texts: readonly string[], opening: readonly string[] = []): { index: number; problems: SpokenProblem[] }[] {
   const labels = texts.map(spokenLabels);
+  const repeats = repeatedPhrases(texts, opening);
   const seen = new Map<string, number>();
   for (const list of labels) for (const label of new Set(list)) seen.set(label, (seen.get(label) ?? 0) + 1);
   return texts.flatMap((text, index) => {
@@ -411,6 +469,7 @@ export function spokenProblems(texts: readonly string[]): { index: number; probl
     if (isChoppy(text)) problems.push("choppy");
     if (labels[index].length >= 2 || labels[index].some((label) => (seen.get(label) ?? 0) >= 2)) problems.push("labels");
     if (claimsAbsence(text)) problems.push("absence");
+    if (repeats[index].length) problems.push("repeat");
     return problems.length ? [{ index, problems }] : [];
   });
 }
@@ -438,9 +497,10 @@ export function scriptRuleLines(options: { french: boolean }): string[] {
     `Rythme : une idée par phrase, de ${LINE_WORDS.min} à ${LINE_WORDS.max} mots, de longueurs variées ; du concret (un chiffre, un nom, un lieu, un exemple réel), jamais trois phrases abstraites de suite.`,
     `Le texte lu se compte à ${SPEAKING_RATE_WPM} mots par minute : chaque mot doit servir.`,
     ...SPOKEN_LINES,
-    "Fin : aucune formule de clôture creuse (« merci d'avoir regardé », « dites-moi ce que vous en pensez », résumé de ce qui vient d'être dit) ; termine sur une seule demande au spectateur, sur la dernière information utile ou sur une phrase qui reboucle sur la première.",
+    "Fin : aucune formule de clôture creuse (« merci d'avoir regardé », « dites-moi ce que vous en pensez », résumé de ce qui vient d'être dit) ; termine sur une seule demande au spectateur, sur la dernière information utile ou sur une phrase qui répond à la première sans la redire.",
     "Faits : n'invente aucun chiffre, aucun nom, aucun résultat ni aucune source (« des études montrent »). Le texte est lu par une voix de synthèse : jamais de case à remplir ({{…}}, [crochets]) dans un texte lu ; quand un fait manque, écris la phrase sans lui.",
     ABSENCE_RULE,
+    REPEAT_RULE,
     `À éviter absolument, ce sont des tics d'IA : ${tells.map((tell) => `« ${tell} »`).join(", ")}${options.french ? "" : " (et leurs équivalents dans la langue du script)"} ; ${AI_SHAPES.join(" ; ")}.`,
     ...(options.french
       ? ["Jamais de tiret cadratin (—) : une incise prend le tiret demi-cadratin (–) entouré d'espaces, des virgules ou des parenthèses."]
@@ -529,7 +589,7 @@ export function scriptReasoningLines(options: { french: boolean; format?: Script
     ...(ordered
       ? [`${options.format === "quiz" ? "Le quiz" : "Le classement"} fixe déjà l'ordre des segments : le type règle l'angle, les explications et la fin.`]
       : []),
-    "Une seule idée par vidéo : ce qui ne sert pas la promesse sort du script, mais tout ce qu'il faut pour qu'elle soit juste aujourd'hui reste (état actuel, conditions, exceptions, ce qui est temporaire). Vers le milieu, l'attention retombe une fois la promesse entendue : une phrase la relance (un chiffre, un retournement, ce qui reste à découvrir) en rappelant ce que la fin va livrer.",
+    "Une seule idée par vidéo : ce qui ne sert pas la promesse sort du script, mais tout ce qu'il faut pour qu'elle soit juste aujourd'hui reste (état actuel, conditions, exceptions, ce qui est temporaire). Vers le milieu, l'attention retombe une fois la promesse entendue : une phrase la relance par un fait nouveau (un chiffre, un retournement), jamais en redisant la promesse.",
     `4. Notes visuelles : ajoute au JSON une clé "visualNotes", à part des phrases dites (la voix ne les lit jamais) : [{"line": number, "kind": "board" | "show", "text": string}]. line : l'index du segment dans ${key}, à partir de 0. kind "board" : de 1 à ${VISUAL_NOTE_LIMITS.boardWords} mots qui valent d'être écrits à l'écran pendant ce segment (un chiffre, un résultat, un nom d'outil, une courte liste) ; kind "show" : ce qu'il faut montrer à l'image, en une phrase de ${VISUAL_NOTE_LIMITS.showChars} caractères au plus. ${VISUAL_NOTE_LIMITS.perLine} notes au plus par segment ; un segment sans rien à montrer n'en a pas.`,
     "5. Contrôles : relis ton brouillon avec ces cinq questions avant de répondre ; s'il en rate une, réécris ce qui cloche, puis relis-le encore.",
     ...SCRIPT_GATES.map((gate) => `- ${gate.id} : ${gate.question} Si oui, ${gate.fix}.`),

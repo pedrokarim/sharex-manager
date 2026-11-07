@@ -81,9 +81,18 @@ export const CLIP_LIMITS = {
   /** Une vidéo plus courte n'a rien à montrer ; plus longue, ce n'est plus une vidéo à citer. */
   minVideoSeconds: 8,
   maxVideoSeconds: 3 * 60 * 60,
-  /** Vidéo analysée en entier jusqu'à cette durée, sinon ses premières minutes. */
+  /** Vidéo analysée en entier jusqu'à cette durée, sinon ses premières minutes pour une citation, des morceaux répartis pour un extrait muet. */
   analysisWholeSeconds: 6 * 60,
   analysisWindowSeconds: 10 * 60,
+  /**
+   * Plus longue que la fenêtre, une vidéo est analysée en morceaux répartis
+   * sur toute sa durée pour un extrait muet : ses dix premières minutes
+   * seules, c'était le compte à rebours d'un live (vu en prod le 07/11/2026,
+   * la diffusion de Wuthering Waves 3.8 : tous les extraits venaient de
+   * l'écran d'attente).
+   */
+  analysisParts: 5,
+  analysisPartSeconds: 2 * 60,
   analysisHeight: 480,
   analysisMaxBytes: 300 * 1024 * 1024,
   /** Extrait coupé : 1080p au plus, fichier borné. */
@@ -702,6 +711,15 @@ interface AnalysisEntry {
   words?: TimedWord[];
   transcript?: TranscriptInfo;
   motion?: MotionStats;
+  /** Morceaux analysés d'une longue vidéo (`spreadWindows`), en secondes de la vidéo. */
+  parts?: AnalyzedPart[];
+}
+
+/** Morceau analysé d'une longue vidéo. */
+export interface AnalyzedPart {
+  start: number;
+  end: number;
+  motion: MotionStats;
 }
 
 function readCache(): Record<string, AnalysisEntry> {
@@ -953,6 +971,38 @@ export function analysisWindow(durationSec: number | undefined): { start: number
 }
 
 /**
+ * Morceaux d'une longue vidéo analysés pour un extrait muet : répartis de 10
+ * à 90 % de sa durée, sans l'écran d'attente du début ni le générique de fin.
+ * Rien pour une vidéo que la fenêtre couvre déjà en entier.
+ */
+export function spreadWindows(durationSec: number | undefined): { start: number; end: number }[] {
+  if (!durationSec || durationSec <= CLIP_LIMITS.analysisWindowSeconds) return [];
+  const count = CLIP_LIMITS.analysisParts;
+  const length = CLIP_LIMITS.analysisPartSeconds;
+  const from = 0.1 * durationSec;
+  const to = Math.max(from, 0.9 * durationSec - length);
+  return Array.from({ length: count }, (_, index) => {
+    const start = Math.round(from + ((to - from) * index) / Math.max(1, count - 1));
+    return { start, end: Math.min(durationSec, start + length) };
+  });
+}
+
+/**
+ * Fenêtre la plus vivante parmi les morceaux analysés d'une longue vidéo
+ * (`pickDynamicWindow` sur chacun), en secondes de la vidéo. Les passages
+ * déjà montrés sont écartés ; sans place libre, `score` vaut `-Infinity`.
+ */
+export function pickAcrossParts(parts: AnalyzedPart[], seconds: number, avoid: { start: number; end: number }[] = []): { start: number; score: number } {
+  let best = { start: 0, score: -Infinity };
+  for (const part of parts) {
+    const local = avoid.map((range) => ({ start: range.start - part.start, end: range.end - part.start }));
+    const picked = pickDynamicWindow(part.motion, part.end - part.start, seconds, { introShare: 0, outroShare: 0, avoid: local });
+    if (picked.score > best.score) best = { start: Math.round((part.start + picked.start) * 100) / 100, score: picked.score };
+  }
+  return best;
+}
+
+/**
  * Trouve, analyse et coupe l'extrait d'un segment. Ne rejette que sur
  * annulation : sans extrait, le résultat dit pourquoi (`status: "fallback"`).
  */
@@ -1081,13 +1131,33 @@ async function takeExcerpt(candidate: ClipCandidate, request: ClipRequest, ctx: 
       const soundSeconds = mode === "sound" ? Math.min(request.seconds, ctx.state.audioLeft) : 0;
       // Un extrait muet est coupé en plans par le rythme : quelques secondes de plus que la voix laissent les plans changer de moment.
       const seconds = mode === "sound" ? soundSeconds + tail : Math.min(CLIP_LIMITS.maxSeconds, Math.max(request.seconds, ctx.segmentSeconds + 3));
-      if (!analysis.motion) {
-        const file = await fetchAnalysis();
-        analysis = { ...analysis, at: Date.now(), seconds: analyzed || analysis.seconds, motion: await deps.motion(file, ctx.signal) };
-        deps.writeAnalysis(probe.url, analysis);
+      const spread = spreadWindows(duration);
+      let picked: { start: number; score: number };
+      if (spread.length) {
+        if (!analysis.parts?.length) {
+          const parts: AnalyzedPart[] = [];
+          for (const [index, part] of spread.entries()) {
+            ctx.signal.throwIfAborted();
+            ctx.onProgress?.(`Analyse de « ${cleanText(probe.title, 80)} » (${index + 1} sur ${spread.length})`);
+            assertDiskSpace(DATA_DIR, CLIP_LIMITS.analysisMaxBytes + CLIP_LIMITS.clipMaxBytes);
+            // Coupé à l'image près : les secondes du morceau sont celles de la vidéo.
+            const file = await deps.download(probe.url, probe.site as "youtube" | "twitch", part, path.join(workDir, `analysis-${index}`), { height: CLIP_LIMITS.analysisHeight, maxBytes: Math.ceil(CLIP_LIMITS.analysisMaxBytes / spread.length), exact: true }, ctx.signal);
+            parts.push({ ...part, motion: await deps.motion(file, ctx.signal) });
+            fs.rmSync(file, { force: true });
+          }
+          analysis = { ...analysis, at: Date.now(), parts };
+          deps.writeAnalysis(probe.url, analysis);
+        }
+        picked = pickAcrossParts(analysis.parts!, seconds, used);
+      } else {
+        if (!analysis.motion) {
+          const file = await fetchAnalysis();
+          analysis = { ...analysis, at: Date.now(), seconds: analyzed || analysis.seconds, motion: await deps.motion(file, ctx.signal) };
+          deps.writeAnalysis(probe.url, analysis);
+        }
+        const motion = analysis.motion!;
+        picked = pickDynamicWindow(motion, duration ?? motion.motion.length / motion.fps, seconds, { avoid: used });
       }
-      const motion = analysis.motion!;
-      const picked = pickDynamicWindow(motion, duration ?? motion.motion.length / motion.fps, seconds, { avoid: used });
       if (!Number.isFinite(picked.score)) throw new Error("passages de cette vidéo déjà montrés dans le clip");
       start = picked.start;
       end = Math.min(duration ?? Infinity, start + seconds);
@@ -1153,4 +1223,30 @@ export function clipSourcesStatus(): { youtube: "ok" | "rejected" | "no-cookies"
     return rejectedAt ? { youtube: "rejected", rejectedAt, twitch: true } : { youtube: "ok", twitch: true };
   }
   return { youtube: youtubeRecentlyRefused() ? "refused" : "no-cookies", twitch: true };
+}
+
+/**
+ * Un autre passage, muet, d'une vidéo déjà retenue dans le clip : pour un
+ * segment resté sans illustration, plutôt que de reboucler l'extrait d'avant
+ * (vu en prod le 07/11/2026 : 8 secondes d'une diffusion montrées pendant
+ * 22). Les passages déjà montrés (`ctx.state.used`) sont écartés ; sans place
+ * libre, le résultat dit pourquoi (`status: "fallback"`). Ne rejette que sur
+ * annulation.
+ */
+export async function sourceMoreOf(
+  video: NonNullable<ClipOutcome["video"]>,
+  request: Pick<ClipRequest, "search" | "moment" | "seconds">,
+  ctx: ClipContext
+): Promise<SourcedClip | { outcome: ClipOutcome }> {
+  const deps: ClipDeps = { ...clipDeps, ...ctx.deps };
+  const notes: string[] = [];
+  const clip: ClipRequest = { search: request.search, site: video.site, moment: request.moment, keepAudio: false, seconds: request.seconds };
+  const base: ClipOutcome = { segment: ctx.segment, search: request.search, site: video.site, moment: request.moment, wantedAudio: false, status: "fallback" };
+  try {
+    const found = await takeExcerpt({ url: video.url, site: video.site, title: video.title, ...(video.author ? { channel: video.author } : {}), from: "search" }, clip, ctx, deps, base, notes);
+    return { ...found, outcome: { ...found.outcome, note: capitalize(["autre passage d’une vidéo du clip, faute d’illustration", ...notes].join(" ; ")) } };
+  } catch (error) {
+    if (ctx.signal.aborted) throw error;
+    return { outcome: { ...base, note: capitalize([...notes, shortReason(error)].join(" ; ")) } };
+  }
 }

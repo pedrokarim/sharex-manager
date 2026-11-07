@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildNarratedProject, coverTimeline, illustrationsOf, narrationWords } from "@/modules/clip-studio/engine/narrated-board";
+import { buildNarratedProject, coverTimeline, distinctShots, illustrationsOf, narrationWords } from "@/modules/clip-studio/engine/narrated-board";
 import { beatPlanPrompt, FULL_ILLUSTRATION_MIN_MS, readBeatPlan, screenText } from "@/modules/clip-studio/engine/take-plan";
 import { cameraRegion, takeGeometry } from "@/modules/clip-studio/engine/take-templates";
 import { buildFromTemplate, type FreeData, type VoiceClip } from "@/modules/clip-studio/engine/templates";
 import { projectDuration } from "@/modules/clip-studio/engine/timeline";
-import type { ClipProject, MediaSource, TextItem, TimedWord } from "@/modules/clip-studio/engine/types";
+import type { ClipProject, MediaSource, TextItem, TimedWord, VideoItem } from "@/modules/clip-studio/engine/types";
 import { narratedMontage, recentMontages } from "@/modules/clip-studio/lib/board-montage";
 
 const FPS = 30;
@@ -156,5 +156,39 @@ describe("voix off montée en tableaux", () => {
     expect(screenText("Trouvé ✓", 40)).toBe("Trouvé");
     expect(screenText("Bravo 🎉 !", 40)).toBe("Bravo !");
     expect(screenText("Qu’as-tu oublié ?", 40)).toBe("Qu’as-tu oublié ?");
+  });
+});
+
+describe("plans d'une même vidéo", () => {
+  /** Extrait muet de `seconds` secondes, montré de `start` pendant `duration` images à partir de `trimStart`. */
+  const shot = (id: string, start: number, duration: number, trimStart: number, seconds = 8.6, muted = true): VideoItem =>
+    ({
+      id,
+      type: "video",
+      start,
+      duration,
+      trimStart,
+      muted,
+      volume: 1,
+      fit: "cover",
+      source: { url: "/webclip.mp4", ref: "module:clip-studio/assets/webclip.mp4", name: "webclip.mp4", kind: "video", durationMs: seconds * 1000 },
+    }) as VideoItem;
+  const covered = (items: VideoItem[]) => items.map((item) => [item.trimStart, item.trimStart + item.duration] as const).sort((a, b) => a[0] - b[0]);
+
+  it("ne montre jamais deux fois la même image quand la vidéo suffit", () => {
+    // L'accroche et le premier segment prenaient chacun l'extrait en son milieu (vu en prod le 07/11/2026).
+    const items = distinctShots([shot("a", 0, 60, 47), shot("b", 60, 80, 40), shot("c", 140, 70, 60)], FPS) as VideoItem[];
+    const spans = covered(items);
+    for (let index = 1; index < spans.length; index++) expect(spans[index][0]).toBeGreaterThanOrEqual(spans[index - 1][1]);
+    expect(spans[spans.length - 1][1]).toBeLessThanOrEqual(Math.floor(8.6 * FPS));
+    // Dans l'ordre de la vidéo.
+    expect(items.map((item) => item.trimStart)).toEqual([...items.map((item) => item.trimStart)].sort((a, b) => a - b));
+  });
+
+  it("garde le découpage d'une vidéo trop courte et ne déplace jamais une citation", () => {
+    const short = [shot("a", 0, 200, 10), shot("b", 200, 200, 30)];
+    expect(distinctShots(short, FPS)).toEqual(short);
+    const quote = [shot("q", 0, 60, 90, 12, false)];
+    expect(distinctShots(quote, FPS)).toEqual(quote);
   });
 });

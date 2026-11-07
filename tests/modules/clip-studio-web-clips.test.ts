@@ -43,12 +43,15 @@ import {
   CLIP_LIMITS,
   applyClipBudget,
   locateQuote,
+  pickAcrossParts,
   pickDynamicWindow,
   quoteBudgetSeconds,
   rankCandidates,
   readClipRequest,
   rebaseWords,
   sourceClip,
+  sourceMoreOf,
+  spreadWindows,
   webCandidates,
   type ClipCandidate,
   type ClipDeps,
@@ -60,6 +63,7 @@ import {
 import {
   clipExcerpt,
   clipsSummary,
+  fillFromClipVideos,
   noteClipFallbacks,
   sanitize,
   scriptPrompt,
@@ -415,6 +419,44 @@ describe("Trouver et couper un extrait", () => {
     expect(other.outcome.note).toMatch(/déjà montrés/);
   });
 
+  it("une longue vidéo s'analyse en morceaux répartis, jamais ses seules premières minutes", async () => {
+    // La diffusion de Wuthering Waves 3.8 : dix minutes de compte à rebours au début (vu en prod le 07/11/2026).
+    const live = 50 * 60;
+    expect(spreadWindows(60)).toEqual([]);
+    const parts = spreadWindows(live);
+    expect(parts).toHaveLength(CLIP_LIMITS.analysisParts);
+    expect(parts[0].start).toBe(0.1 * live);
+    expect(parts[parts.length - 1].end).toBeLessThanOrEqual(0.9 * live);
+    const { deps, calls } = fakeDeps({ probe: vi.fn(async (url: string) => ({ url, site: "youtube" as const, title: "Version 3.8 Preview Special Broadcast", author: "Wuthering Waves", duration: live })) });
+    const result = (await sourceClip(muted, context(deps))) as SourcedClip;
+    expect(calls.filter((call) => call.startsWith("cut ")).slice(0, parts.length)).toEqual(parts.map((part) => `cut ${part.start}-${part.end}`));
+    expect(result.outcome.video!.start).toBeGreaterThanOrEqual(parts[0].start);
+  });
+
+  it("choisit le passage le plus vivant parmi les morceaux, hors passages déjà montrés", () => {
+    const calm: MotionStats = { fps: 4, motion: Array.from({ length: 480 }, () => 0.01), flat: Array.from({ length: 480 }, () => false) };
+    const lively: MotionStats = { fps: 4, motion: Array.from({ length: 480 }, (_, index) => (index > 200 && index < 260 ? 0.2 : 0.01)), flat: Array.from({ length: 480 }, () => false) };
+    const parts = [
+      { start: 300, end: 420, motion: calm },
+      { start: 1500, end: 1620, motion: lively },
+    ];
+    const picked = pickAcrossParts(parts, 6, []);
+    expect(picked.start).toBeGreaterThanOrEqual(1500 + 48);
+    expect(picked.start).toBeLessThanOrEqual(1500 + 66);
+    const next = pickAcrossParts(parts, 6, [{ start: picked.start, end: picked.start + 6 }]);
+    expect(next.start >= picked.start + 6 || next.start + 6 <= picked.start).toBe(true);
+  });
+
+  it("coupe un autre passage d'une vidéo déjà retenue, sans recherche", async () => {
+    const { deps, calls } = fakeDeps();
+    const state: ClipJobState = { audioLeft: 0, used: { [trailer.url]: [{ start: 25, end: 34 }] } };
+    const result = (await sourceMoreOf({ site: "youtube", url: trailer.url, title: trailer.title, start: 25, end: 34 }, { search: muted.search, moment: muted.moment, seconds: 1.5 }, context(deps, state))) as SourcedClip;
+    expect(calls).not.toContain("youtube");
+    expect(result.keepAudio).toBe(false);
+    expect(result.outcome.video!.start >= 34 || result.outcome.video!.end <= 25).toBe(true);
+    expect(result.outcome.note).toMatch(/^Autre passage/);
+  });
+
   it("YouTube refuse le serveur sans cookies : Twitch par le web, et YouTube n'est plus demandé", async () => {
     const { deps, calls } = fakeDeps({
       searchYoutube: vi.fn(async () => {
@@ -574,5 +616,37 @@ describe("Placement des extraits", () => {
     const windows = voiceWindows(project);
     const at = quoted.start / project.fps;
     expect(windows.some(([from, to]) => from <= at + 0.01 && to >= at + 1.9)).toBe(true);
+  });
+});
+
+describe("Segments restés sans illustration", () => {
+  const video = { site: "youtube" as const, url: "https://www.youtube.com/watch?v=Ic8dDOPKdlE", title: "Version 3.8 Preview Special Broadcast", start: 1500, end: 1512 };
+  const media = (name: string): MediaSource => ({ url: `/${name}.mp4`, ref: `module:clip-studio/assets/${name}.mp4`, name, kind: "video", durationMs: 9000 });
+  const plan = (text: string) => ({ text, action: "none" }) as unknown as SegmentPlan;
+
+  it("prennent un autre passage de la vidéo du segment d'avant, au lieu de la reboucler", async () => {
+    const job = { clips: [{ segment: 0, search: "Wuthering Waves 3.8 broadcast", site: "youtube" as const, moment: "Lily", wantedAudio: false, status: "found" as const, keepAudio: false, video }] };
+    const first = { media: media("a"), keepAudio: false, outcome: job.clips[0] } as SourcedClip;
+    const clipped: (SourcedClip | undefined)[] = [first, undefined, undefined];
+    const images: (MediaSource | undefined)[] = [first.media, undefined, media("photo")];
+    const seen: { url: string; used: unknown }[] = [];
+    const source = vi.fn(async (from: typeof video, _request: unknown, ctx: { segment: number; state: ClipJobState }) => {
+      seen.push({ url: from.url, used: structuredClone(ctx.state.used) });
+      return { media: media(`more-${ctx.segment}`), keepAudio: false, outcome: { ...job.clips[0], segment: ctx.segment, video: { ...video, start: 1530, end: 1539 } } } as SourcedClip;
+    });
+    const filled = await fillFromClipVideos(job, [plan("Lily arrive."), plan("Avec Sigrika."), plan("Le 12 novembre.")], clipped, images, new AbortController().signal, () => undefined, { source: source as never });
+    expect(filled).toBe(1);
+    // Seul le segment sans rien est rempli ; celui qui a son image la garde.
+    expect(images[1]?.name).toBe("more-1");
+    expect(images[2]?.name).toBe("photo");
+    expect(clipped[1]).toBeDefined();
+    // Le passage déjà montré est écarté.
+    expect(seen).toEqual([{ url: video.url, used: { [video.url]: [{ start: 1500, end: 1512 }] } }]);
+    expect(job.clips.map((outcome) => outcome.segment)).toEqual([0, 1]);
+  });
+
+  it("ne fait rien sans extrait muet trouvé", async () => {
+    const images: (MediaSource | undefined)[] = [undefined, undefined];
+    expect(await fillFromClipVideos({ clips: [] }, [plan("a"), plan("b")], [undefined, undefined], images, new AbortController().signal, () => undefined)).toBe(0);
   });
 });

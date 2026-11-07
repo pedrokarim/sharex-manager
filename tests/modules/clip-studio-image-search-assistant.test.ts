@@ -90,7 +90,8 @@ describe("assistant : plan des illustrations", () => {
       { mode: "generate", query: undefined, prompt: "The mascot waves" },
     ]);
     expect(script.prompts).toEqual(["A hero on a cliff", "Friends playing together", "The mascot waves"]);
-    expect(script.segmentTexts[0]).toBe("Zelda. Un monde ouvert.");
+    // Le heading (« Zelda ») s'affiche ; la voix ne lit que le texte.
+    expect(script.segmentTexts[0]).toBe("Un monde ouvert.");
   });
 
   it("garde l'ancien imagePrompt", () => {

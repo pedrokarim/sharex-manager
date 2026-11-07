@@ -77,6 +77,7 @@ import { MOODS, pickTrack } from "./music";
 import { AUTO_SEGMENTS, SEGMENT_WORDS, FRAME_WORDS, cleanCount, plannedSegments, segmentCap, suggestedSegments, voiceBudgetSeconds } from "./segment-count";
 import {
   ABSENCE_RULE,
+  REPEAT_RULE,
   BRAND_RULES_SCOPE,
   SPEAKING_RATE_WPM,
   SPOKEN_LINES,
@@ -124,6 +125,7 @@ import {
   quoteBudgetSeconds,
   readClipRequest,
   sourceClip,
+  sourceMoreOf,
   type ClipDeps,
   type ClipJobState,
   type ClipOutcome,
@@ -593,7 +595,7 @@ async function run(job: AssistantJob, signal: AbortSignal) {
     // Ce qui ne se trouve pas reste à illustrer : vidéo libre, image trouvée, puis générée.
     const plans = segmentPlans(job.request, script);
     const clipped: (SourcedClip | undefined)[] = job.steps.some((entry) => entry.id === "videos")
-      ? await sourceSegmentClips(job, plans, signal, (state, detail) => step("videos", state, detail))
+      ? await sourceSegmentClips(job, plans, signal, (state, detail) => step("videos", state, detail), {}, openingSeconds(script))
       : plans.map(() => undefined);
 
     // 2. Illustrations : chercher d'abord ce qui existe, générer le reste.
@@ -641,6 +643,12 @@ async function run(job: AssistantJob, signal: AbortSignal) {
           : imagesSummary(job) + (videoError ? `. Vidéos indisponibles : ${videoError}` : "");
 
       step("images", job.images.done > 0 || (job.icons?.found ?? 0) > 0 || job.images.total === 0 ? "done" : "error", summary);
+    }
+    // Un segment resté sans illustration prend un autre passage d'une vidéo du clip, plutôt que de reboucler celle d'avant.
+    if (plans.length && clipped.some(Boolean)) {
+      const filled = await fillFromClipVideos(job, plans, clipped, images, signal, (detail) => step("images", "running", detail));
+      const imagesStep = job.steps.find((entry) => entry.id === "images");
+      if (filled && imagesStep) step("images", imagesStep.state === "error" ? "done" : imagesStep.state, `${imagesStep.detail ?? ""} · ${plural(filled, "segment")} montré${filled > 1 ? "s" : ""} par un autre passage d’une vidéo du clip`);
     }
     // Ce qui a remplacé chaque extrait introuvable, dit dans le suivi des vidéos.
     if (job.clips?.length) {
@@ -1004,8 +1012,8 @@ export function scriptPrompt(
       ...common,
       `Format libre en ${fixed !== undefined ? `${fixed} séquences` : "autant de séquences que tu en as choisi"} : choisis toi-même la forme qui sert le mieux la demande (histoire, explication, conseils, recette, anecdote, comparaison, tutoriel…), sans en faire un quiz ni un classement sauf si la demande le réclame.`,
       `Schéma : {"title": string, "subtitle": string, "scenes": [${segment}], "outro": string}`,
-      "Contraintes : title de 45 caractères au plus ; subtitle facultatif de 70 caractères au plus ; heading facultatif de 32 caractères au plus ; text de 110 caractères au plus, écrit pour être lu à voix haute ; chaque séquence porte au moins un heading ou un text ; outro facultatif de 40 caractères au plus.",
-      "Les séquences s'enchaînent : la première accroche, la dernière conclut.",
+      "Contraintes : title de 45 caractères au plus ; subtitle facultatif de 70 caractères au plus ; heading facultatif de 32 caractères au plus, affiché à l'écran et jamais lu quand la séquence a un text ; text de 110 caractères au plus, écrit pour être lu à voix haute ; chaque séquence porte au moins un heading ou un text ; outro facultatif de 40 caractères au plus.",
+      "Les séquences s'enchaînent : la voix dit d'abord l'accroche, puis la première séquence, qui part de là sans la redire ; la dernière conclut.",
       ...imageGuide(request),
     ].join("\n");
   }
@@ -1342,7 +1350,7 @@ function sanitizeSegments(request: AssistantRequest, raw: RawScript, title: stri
       outro: line(raw.outro, 60) || undefined,
       scenes,
       ...direction,
-      ...segmentArrays(scenes, scenes.map((scene) => [scene.heading, scene.text].filter(Boolean).join(". "))),
+      ...segmentArrays(scenes, scenes.map(spokenScene)),
     };
   }
   if (request.template === "top") {
@@ -2020,7 +2028,7 @@ function narrationLines(template: TemplateId, data: FreeData | QuizData | TopDat
     const free = data as FreeData;
     return [
       [sentence(head), sentence(free.subtitle)].filter(Boolean).join(" "),
-      ...free.scenes.map((scene) => [sentence(scene.heading), sentence(scene.text)].filter(Boolean).join(" ")),
+      ...free.scenes.map((scene) => sentence(spokenScene(scene))),
       sentence(free.outro),
     ];
   }
@@ -2443,7 +2451,9 @@ function applyRewrite(request: AssistantRequest, script: CleanScript, answer: st
 function spokenTexts(request: AssistantRequest, script: CleanScript): string[] {
   const fields = SHORTENABLE_FIELDS[request.template];
   const segments = rawSegments(request, script).map((segment) =>
-    fields
+    request.template === "free"
+      ? spokenScene(segment as { heading?: string; text?: string })
+      : fields
       .map(({ field }) => String(segment[field] ?? "").trim())
       .filter(Boolean)
       .join(" ")
@@ -2452,14 +2462,31 @@ function spokenTexts(request: AssistantRequest, script: CleanScript): string[] {
 }
 
 function spokenProblemCount(request: AssistantRequest, script: CleanScript): number {
-  return spokenProblems(spokenTexts(request, script)).reduce((sum, entry) => sum + entry.problems.length, 0);
+  return spokenProblems(spokenTexts(request, script), spokenOpening(script)).reduce((sum, entry) => sum + entry.problems.length, 0);
 }
 
 const PROBLEM_LABELS: Record<SpokenProblem, string> = {
   choppy: "phrases hachées, en style télégraphique",
   labels: "étiquettes lues à voix haute",
   absence: "affirmation d'absence (« inconnu », « pas encore annoncé », « reste caché », « viendra plus tard »)",
+  repeat: "redite : redit ce que l'accroche, le sous-titre, un texte précédent ou le même texte a déjà dit",
 };
+
+/**
+ * Ce que dit la voix d'une séquence libre : son texte. Le heading est le
+ * titre affiché de la séquence ; lu en plus, il annonçait ce que la phrase
+ * redisait aussitôt (« Une course contre Doom. Castle Doom ajoute quoi ? Une
+ * course contre Doom. », vu en prod le 07/11/2026). Il n'est lu que seul.
+ */
+function spokenScene(scene: { heading?: string; text?: string }): string {
+  return (scene.text ?? "").trim() || (scene.heading ?? "").trim();
+}
+
+/** Ce que la voix dit avant le premier segment : l'accroche, puis le sous-titre. */
+function spokenOpening(script: CleanScript): string[] {
+  const subtitle = "subtitle" in script ? (script.subtitle as string | undefined) : undefined;
+  return [script.hook?.text ?? script.title, subtitle ?? ""].filter(Boolean);
+}
 
 /**
  * Consigne de la relecture pour l'oral : les textes signalés (hachés, ou
@@ -2471,7 +2498,7 @@ export function revisePrompt(request: AssistantRequest, script: CleanScript, lan
   const fields = SHORTENABLE_FIELDS[request.template];
   const texts = spokenTexts(request, script);
   const outroIndex = texts.length - 1;
-  const flagged = spokenProblems(texts).map(({ index, problems }) => ({
+  const flagged = spokenProblems(texts, spokenOpening(script)).map(({ index, problems }) => ({
     element: index === outroIndex ? "outro" : `segments[${index}]`,
     problems: problems.map((problem) => PROBLEM_LABELS[problem]),
   }));
@@ -2499,6 +2526,7 @@ export function revisePrompt(request: AssistantRequest, script: CleanScript, lan
     "Réécris seulement les textes signalés, en phrases complètes et naturelles qui disent la même chose ; rends les autres exactement tels quels.",
     `Un texte signalé pour une affirmation d'absence perd cette affirmation : retire ce qui dit qu'une chose n'est pas connue, pas annoncée ou à venir plus tard, et garde ce qui est annoncé ; n'écris aucune autre absence à la place. ${ABSENCE_RULE}`,
     ...(script.hook ? ["L'accroche (hook) est dite juste avant le premier segment et ne change pas : aucun texte ne la répète."] : []),
+    `Un texte signalé pour une redite perd ce qui a déjà été dit : la phrase redite est retirée, ou remplacée par ce que le texte apporte de neuf ; il peut devenir plus court, et c'est la seule exception à la longueur gardée. ${REPEAT_RULE}`,
     ...SPOKEN_LINES,
     `Garde exactement les mêmes éléments, dans le même ordre (${segments.length} dans "segments"), les faits, les noms propres et les chiffres exacts ; n'ajoute aucun fait. Chaque texte réécrit garde à peu près sa longueur : quelques mots de plus au plus, pour les verbes et les liaisons.`,
     `Textes lus : ${fields.map(({ field }) => field).join(", ")} de chaque élément, ${subtitle ? "subtitle et " : ""}outro. Le titre ne change pas.`,
@@ -2528,7 +2556,7 @@ export async function reviseForSpeech(
 ): Promise<{ script: CleanScript; note?: string }> {
   const before = spokenProblemCount(request, script);
   if (before === 0) return { script };
-  const flagged = spokenProblems(spokenTexts(request, script)).length;
+  const flagged = spokenProblems(spokenTexts(request, script), spokenOpening(script)).length;
   const texts = plural(flagged, "texte");
   try {
     const answer = await ask(revisePrompt(request, script, language), { signal, timeoutMs: REVISE_TIMEOUT_MS });
@@ -2783,7 +2811,8 @@ export async function sourceSegmentClips(
   plans: SegmentPlan[],
   signal: AbortSignal,
   onStep: (state: StepState, detail?: string) => void,
-  deps: SegmentClipDeps = {}
+  deps: SegmentClipDeps = {},
+  leadSeconds = 0
 ): Promise<(SourcedClip | undefined)[]> {
   const results: (SourcedClip | undefined)[] = plans.map(() => undefined);
   const wanted = plans.flatMap((plan, index) => (plan.clip && !plan.covered ? [index] : []));
@@ -2803,7 +2832,9 @@ export async function sourceSegmentClips(
   await eachLimited(wanted, CLIP_LIMITS.downloads, async (index) => {
     signal.throwIfAborted();
     const plan = plans[index];
-    const found = await find(plan.clip!, { segment: index, segmentSeconds: spokenSeconds(plan.text) + 1.5, state, signal, onProgress: progress, deps });
+    // L'extrait du premier segment passe aussi sous l'accroche : il la couvre sans se répéter.
+    const segmentSeconds = spokenSeconds(plan.text) + 1.5 + (index === 0 ? leadSeconds : 0);
+    const found = await find(plan.clip!, { segment: index, segmentSeconds, state, signal, onProgress: progress, deps });
     outcomes.push(found.outcome);
     outcomes.sort((a, b) => a.segment - b.segment);
     if ("media" in found) {
@@ -2831,6 +2862,57 @@ export async function sourceSegmentClips(
   const foundCount = results.filter(Boolean).length;
   onStep(foundCount > 0 ? "done" : "error", clipsSummary(outcomes, state));
   return results;
+}
+
+
+/** Durée parlée avant le premier segment (accroche, ou titre lu, puis sous-titre), en secondes. */
+function openingSeconds(script: CleanScript): number {
+  return spokenOpening(script).reduce((sum, text) => sum + spokenSeconds(text), 0);
+}
+
+/**
+ * Segments restés sans illustration (ni extrait, ni image trouvée ou
+ * générée) : chacun prend un autre passage d'une vidéo déjà retenue dans le
+ * clip, celle du segment le plus proche avant lui (sinon après), sans
+ * reprendre un passage déjà montré. Avant, le montage rebouclait l'extrait
+ * d'avant : 8 secondes d'une diffusion montrées pendant 22 (vu en prod le
+ * 07/11/2026). Remplit `images` et `clipped` ; rend le nombre de segments
+ * remplis. Ne rejette que sur annulation.
+ */
+export async function fillFromClipVideos(
+  job: Pick<AssistantJob, "clips">,
+  plans: SegmentPlan[],
+  clipped: (SourcedClip | undefined)[],
+  images: (MediaSource | undefined)[],
+  signal: AbortSignal,
+  onProgress: (detail: string) => void,
+  deps: { source?: typeof sourceMoreOf; clip?: Partial<ClipDeps> } = {}
+): Promise<number> {
+  const outcomes = job.clips ?? [];
+  const found = outcomes.filter((outcome) => outcome.status === "found" && outcome.video && !outcome.keepAudio);
+  if (found.length === 0) return 0;
+  const used: Record<string, { start: number; end: number }[]> = {};
+  for (const outcome of outcomes) if (outcome.video) (used[outcome.video.url] ??= []).push({ start: outcome.video.start, end: outcome.video.end });
+  const state: ClipJobState = { audioLeft: 0, used };
+  const source = deps.source ?? sourceMoreOf;
+  let filled = 0;
+  for (const [index, plan] of plans.entries()) {
+    if (images[index] || clipped[index]) continue;
+    signal.throwIfAborted();
+    const before = found.filter((outcome) => outcome.segment < index).sort((a, b) => b.segment - a.segment)[0];
+    const near = before ?? found.filter((outcome) => outcome.segment > index).sort((a, b) => a.segment - b.segment)[0];
+    if (!near?.video) continue;
+    const result = await source(near.video, { search: near.search, moment: near.moment, seconds: CLIP_LIMITS.minSeconds }, { segment: index, segmentSeconds: spokenSeconds(plan.text) + 1.5, state, signal, onProgress, deps: deps.clip });
+    if ("media" in result) {
+      outcomes.push(result.outcome);
+      clipped[index] = result;
+      images[index] = result.media;
+      filled++;
+    }
+  }
+  outcomes.sort((a, b) => a.segment - b.segment);
+  job.clips = outcomes;
+  return filled;
 }
 
 const joinNotes = (...notes: (string | undefined)[]) => notes.filter(Boolean).join(" ; ");

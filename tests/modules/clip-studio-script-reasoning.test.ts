@@ -169,8 +169,8 @@ describe("assistant : relectures du script", () => {
     expect(short.hook).toEqual(script.hook);
     expect(short.aim).toEqual(script.aim);
     expect(short.visualNotes).toEqual(script.visualNotes);
-    // « Ton IA recopie des étapes » (5 mots) + 6 + 6 + 5 + 1 = 23 mots, à 160 par minute.
-    expect(short.spokenSeconds).toBe(9);
+    // « Ton IA recopie des étapes » (5 mots) + 4 + 4 + 3 + 1 = 17 mots (les headings s'affichent sans être lus), à 160 par minute.
+    expect(short.spokenSeconds).toBe(6);
   });
 
   it("la voix dit l'accroche à l'ouverture, le titre reste à l'écran", async () => {

@@ -18,7 +18,7 @@
 
 import { boardTracks } from "./board";
 import { uid } from "./edit";
-import { loopSpans, sourceFrames } from "./rhythm";
+import { introSkip, loopSpans, sourceFrames } from "./rhythm";
 import { beatSpans, captionHideSpans, type TakeLayout, type TakePlan } from "./take-plan";
 import {
   boardSounds,
@@ -127,6 +127,42 @@ export function coverTimeline(items: Illustration[], totalFrames: number, fps: n
   return result.sort((a, b) => a.start - b.start);
 }
 
+/**
+ * Jamais deux fois la même image d'une vidéo muette, tant qu'elle en a assez :
+ * les plans d'une même source (l'accroche et le premier segment, les plans
+ * coupés par le rythme, la suite d'un segment resté sans illustration) se
+ * partagent la vidéo dans l'ordre, sans se chevaucher, et l'écart restant se
+ * répartit entre eux. Avant, chacun la prenait en son milieu : 8 secondes
+ * d'une diffusion revenaient trois fois en 22 secondes (vu en prod le
+ * 07/11/2026). Une source trop courte pour tous ses plans garde son
+ * découpage ; une vidéo qui garde son son (une citation) n'est jamais
+ * déplacée, ses mots en dépendent.
+ */
+export function distinctShots(items: Illustration[], fps: number): Illustration[] {
+  const groups = new Map<string, VideoItem[]>();
+  for (const item of items) {
+    if (item.type !== "video" || item.muted === false) continue;
+    const key = item.source.ref ?? item.source.url;
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  const moved = new Map<string, number>();
+  for (const shots of groups.values()) {
+    const length = sourceFrames(shots[0].source, fps);
+    if (!Number.isFinite(length)) continue;
+    const needed = shots.reduce((sum, shot) => sum + shot.duration * (shot.speed ?? 1), 0);
+    if (needed > length) continue;
+    const slack = length - needed;
+    const skip = Math.min(introSkip(length, fps), Math.floor(slack / 2));
+    const gap = shots.length > 1 ? Math.floor((slack - skip) / (shots.length - 1)) : 0;
+    let at = skip;
+    for (const shot of [...shots].sort((a, b) => a.start - b.start)) {
+      moved.set(shot.id, at);
+      at += shot.duration * (shot.speed ?? 1) + gap;
+    }
+  }
+  return items.map((item) => (item.type === "video" && moved.has(item.id) ? { ...item, trimStart: moved.get(item.id)! } : item));
+}
+
 /** Cadre d'une région, en parts du cadre (centre et taille). */
 const regionTransform = (region: Box): Transform => ({
   x: region.left + region.width / 2,
@@ -206,7 +242,7 @@ export function buildNarratedProject(input: NarratedProjectInput): ClipProject {
   const spans = beatSpans(input.plan, input.words, totalFrames, fps);
   const boards = planBoards({ spans, plan: input.plan, words: input.words, fps, frame, geometry, logos: input.logos, theme: input.theme });
 
-  const illustrations = placeIllustrations(coverTimeline(illustrationsOf(base), totalFrames, fps), spans, geometry, fps);
+  const illustrations = placeIllustrations(distinctShots(coverTimeline(illustrationsOf(base), totalFrames, fps), fps), spans, geometry, fps);
   const hidden = captionHideSpans(spans, input.words, fps);
   const captions = takeCaptions(input.words, spans, hidden, geometry, { ...base, tracks: [] }, input.plan.emphasis, input.theme);
   const beats = takeBeatSounds(input.plan, input.words, totalFrames, fps);
