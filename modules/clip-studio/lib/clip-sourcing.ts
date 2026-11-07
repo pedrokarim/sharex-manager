@@ -492,23 +492,47 @@ export interface MotionStats {
  * Les 5 premiers pour cent (logos, introduction) et les 10 derniers (carton
  * de fin) sont écartés quand la vidéo est assez longue. Rend le début, en
  * secondes.
+ *
+ * `avoid` : passages déjà montrés dans le même clip, en secondes. Aucune
+ * fenêtre retenue ne les chevauche (avant, trois segments sur la même
+ * bande-annonce montraient trois fois les mêmes 12 secondes, vu en prod le
+ * 07/11/2026). Introduction et fin redeviennent permises quand il ne reste
+ * pas de place ailleurs ; sans aucune place libre, `score` vaut `-Infinity`.
  */
-export function pickDynamicWindow(stats: MotionStats, durationSec: number, seconds: number, options: { introShare?: number; outroShare?: number } = {}): { start: number; score: number } {
+export function pickDynamicWindow(
+  stats: MotionStats,
+  durationSec: number,
+  seconds: number,
+  options: { introShare?: number; outroShare?: number; avoid?: { start: number; end: number }[] } = {}
+): { start: number; score: number } {
   const { fps } = stats;
   const frames = stats.motion.length;
   const width = Math.max(1, Math.round(seconds * fps));
-  if (frames <= width) return { start: 0, score: 0 };
+  const avoid = options.avoid ?? [];
+  const overlaps = (start: number) => avoid.some((range) => start / fps < range.end && range.start < (start + width) / fps);
+  if (frames <= width) return overlaps(0) ? { start: 0, score: -Infinity } : { start: 0, score: 0 };
   const cuts = new Set(detectCuts(stats.motion, fps));
   const total = Math.min(frames, Math.round(durationSec * fps)) || frames;
+  const fullHigh = Math.max(0, Math.min(frames, total) - width);
   let low = Math.ceil((options.introShare ?? CLIP_LIMITS.introShare) * total);
   let high = Math.floor((1 - (options.outroShare ?? CLIP_LIMITS.outroShare)) * total) - width;
   if (high < low) {
     low = 0;
-    high = Math.max(0, Math.min(frames, total) - width);
+    high = fullHigh;
+  }
+  // Tout est déjà pris entre l'introduction et la fin : on s'autorise toute la vidéo.
+  if (avoid.length) {
+    let free = false;
+    for (let start = low; start <= high && !free; start++) free = !overlaps(start);
+    if (!free) {
+      low = 0;
+      high = fullHigh;
+    }
   }
   const edge = Math.max(1, Math.round(0.5 * fps));
   let best = { start: low, score: -Infinity };
   for (let start = low; start <= high; start++) {
+    if (avoid.length && overlaps(start)) continue;
     let moving = 0;
     let counted = 0;
     let cutCount = 0;
@@ -841,6 +865,8 @@ export interface ClipJobState {
   quotesUnavailable?: string;
   /** Secondes de son d'origine encore permises. */
   audioLeft: number;
+  /** Passages déjà pris par adresse de vidéo, en secondes : un autre segment ne les reprend pas. */
+  used?: Record<string, { start: number; end: number }[]>;
 }
 
 export interface SourcedClip {
@@ -1000,6 +1026,7 @@ async function takeExcerpt(candidate: ClipCandidate, request: ClipRequest, ctx: 
       return analysisFile;
     };
 
+    const used = ((ctx.state.used ??= {})[probe.url] ??= []);
     let start = 0;
     let end = 0;
     let quoteSeconds: number | undefined;
@@ -1060,12 +1087,15 @@ async function takeExcerpt(candidate: ClipCandidate, request: ClipRequest, ctx: 
         deps.writeAnalysis(probe.url, analysis);
       }
       const motion = analysis.motion!;
-      const picked = pickDynamicWindow(motion, duration ?? motion.motion.length / motion.fps, seconds);
+      const picked = pickDynamicWindow(motion, duration ?? motion.motion.length / motion.fps, seconds, { avoid: used });
+      if (!Number.isFinite(picked.score)) throw new Error("passages de cette vidéo déjà montrés dans le clip");
       start = picked.start;
       end = Math.min(duration ?? Infinity, start + seconds);
       if (mode === "sound") quoteSeconds = Math.min(end - start, soundSeconds);
       if (end - start < CLIP_LIMITS.minSeconds) throw new Error("vidéo trop courte");
     }
+    // Retenu tout de suite, sans attente entre le choix et la réservation : les extraits se cherchent deux à la fois.
+    used.push({ start, end });
 
     const keepAudio = mode !== "muted";
     if (keepAudio) ctx.state.audioLeft = Math.max(0, ctx.state.audioLeft - (quoteSeconds ?? 0));

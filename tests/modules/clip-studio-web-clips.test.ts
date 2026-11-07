@@ -320,6 +320,15 @@ describe("Moment vivant, sans IA", () => {
     expect(pickDynamicWindow(stats(), 60, 2).start).toBeGreaterThanOrEqual(3);
     expect(pickDynamicWindow({ fps: 4, motion: [0, 0.1, 0.1], flat: [false, false, false] }, 0.75, 5).start).toBe(0);
   });
+
+  it("ne reprend jamais un passage déjà montré dans le clip", () => {
+    const first = pickDynamicWindow(stats(), 60, 6);
+    const second = pickDynamicWindow(stats(), 60, 6, { avoid: [{ start: first.start, end: first.start + 6 }] });
+    expect(Number.isFinite(second.score)).toBe(true);
+    expect(second.start >= first.start + 6 || second.start + 6 <= first.start).toBe(true);
+    // Plus aucune place libre : le score le dit.
+    expect(pickDynamicWindow(stats(), 60, 6, { avoid: [{ start: 0, end: 60 }] }).score).toBe(-Infinity);
+  });
 });
 
 // ─── Recherche, coupe et replis ──────────────────────────────────
@@ -384,6 +393,26 @@ describe("Trouver et couper un extrait", () => {
     expect(result.outcome.video!.start).toBeGreaterThanOrEqual(24);
     expect(result.media).toMatchObject({ kind: "video", rights: "unverified", origin: { site: "youtube" } });
     expect(deps.download).toHaveBeenLastCalledWith(trailer.url, "youtube", expect.anything(), expect.any(String), { height: 1080, maxBytes: expect.any(Number), exact: true }, expect.anything());
+  });
+
+  it("trois segments sur la même vidéo prennent trois passages différents, puis passent à une autre vidéo", async () => {
+    const { deps } = fakeDeps();
+    const state: ClipJobState = { audioLeft: 10.5 };
+    const windows: { start: number; end: number }[] = [];
+    for (let index = 0; index < 3; index++) {
+      const result = (await sourceClip(muted, context(deps, state))) as SourcedClip;
+      expect(result.outcome.video?.url).toBe(trailer.url);
+      windows.push({ start: result.outcome.video!.start, end: result.outcome.video!.end });
+    }
+    for (let a = 0; a < windows.length; a++)
+      for (let b = a + 1; b < windows.length; b++) expect(windows[a].start < windows[b].end && windows[b].start < windows[a].end).toBe(false);
+    // La bande-annonce entière déjà montrée : le segment suivant se rabat sur une autre vidéo.
+    const gameplay: ClipCandidate = { ...trailer, url: "https://www.youtube.com/watch?v=GameplayXyz", title: "ELDEN RING NIGHTREIGN Official Gameplay Trailer" };
+    const two = fakeDeps({ searchYoutube: vi.fn(async () => [trailer, gameplay]) });
+    const full: ClipJobState = { audioLeft: 10.5, used: { [trailer.url]: [{ start: 0, end: 60 }] } };
+    const other = (await sourceClip(muted, context(two.deps, full))) as SourcedClip;
+    expect(other.outcome.video?.url).toBe(gameplay.url);
+    expect(other.outcome.note).toMatch(/déjà montrés/);
   });
 
   it("YouTube refuse le serveur sans cookies : Twitch par le web, et YouTube n'est plus demandé", async () => {
