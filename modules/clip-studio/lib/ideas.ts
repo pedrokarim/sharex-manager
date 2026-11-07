@@ -42,7 +42,7 @@ import {
   type IdeaSource,
   type IdeaTemplate,
 } from "./idea-types";
-import { HOOK_FAMILIES, HOOK_MAX_WORDS, cleanScriptText, frenchTypography, rankHooks, scriptRuleLines } from "./script-rules";
+import { BRAND_RULES_SCOPE, HOOK_FAMILIES, HOOK_MAX_WORDS, cleanScriptText, frenchTypography, rankHooks, scriptRuleLines } from "./script-rules";
 import { cleanTargetSeconds } from "./voice-settings";
 
 /** Texte transmis tel quel, sauf « < » : il ne peut pas refermer la balise qui l'encadre. */
@@ -258,6 +258,7 @@ export function ideasPrompt(context: IdeaContext, targets: MixTargets): string {
       ? [
           `<marque>${asData(brand)}</marque>`,
           "Les sujets servent cette marque : son ton (tone, scriptTone), ses sujets (tags, hashtags), ses règles always et never.",
+          BRAND_RULES_SCOPE,
         ]
       : []),
     ...topicLines(settings.topic),
@@ -289,7 +290,7 @@ export function ideasPrompt(context: IdeaContext, targets: MixTargets): string {
     "Ne recopie jamais mot pour mot un titre ou une accroche d'une autre chaîne : reprends la forme, écris tes propres phrases.",
     "Filtre avant d'écrire, une case par critère dans checks : concreteOpening (la première phrase nomme l'objet ou la douleur avec un détail concret : un chiffre, un nom connu, « gratuit ») ; visualFirstSecond (quelque chose à montrer dès la première seconde) ; singlePromise (une seule promesse, que la vidéo tient) ; currentFacts (chaque fait est vrai à la date du jour et vérifié ; un état passé est suivi de l'état actuel ; ce qui est temporaire ou annoncé est nommé). Une idée qui rate une case est retravaillée avant d'être proposée.",
     `hook : la première phrase dite, ${HOOK_MAX_WORDS} mots environ, ${IDEA_LIMITS.hook} caractères au plus ; elle nomme le sujet tout de suite, et elle est vraie aujourd'hui : une accroche au passé ne laisse jamais croire que rien n'a changé depuis.`,
-    `prompt : la demande à donner à l'assistant qui écrira le script, ${promptRoom} caractères au plus, sans répéter l'accroche. Écris-le comme un conseil à l'utilisateur : le sujet, l'angle, puis une phrase par élément avec des faits datés et vérifiables et les noms exacts tels qu'ils sont publiés. Il donne l'état actuel du sujet à la date du jour (et ce qu'il a remplacé), ce qui est temporaire ou annoncé, et chaque précision dont le spectateur a besoin pour ne pas repartir avec une idée fausse.`,
+    `prompt : la demande à donner à l'assistant qui écrira le script, ${promptRoom} caractères au plus, sans répéter l'accroche. Écris-le comme un conseil à l'utilisateur : le sujet, l'angle, puis une phrase par élément avec des faits datés et vérifiables et les noms exacts tels qu'ils sont publiés. Il donne l'état actuel du sujet à la date du jour (et ce qu'il a remplacé), ce qui est temporaire ou annoncé, et chaque précision dont le spectateur a besoin pour ne pas repartir avec une idée fausse. Il ne restreint jamais ce qu'on montre du sujet (ni « seulement des schémas », ni « sans logo ni personnage », ni « sans reproduire la couverture ») : l'assistant choisit les visuels et montre les vrais (bande-annonce, gameplay, visuel officiel) ; le prompt peut seulement dire quel moment de ces vidéos ou quel visuel sert le propos.`,
     "Règles d'écriture des accroches et des scripts, à respecter dans hook, title et prompt :",
     ...scriptRuleLines({ french: !foreign }).filter((line) => !line.startsWith("Accroches : ajoute") && !line.startsWith("- ") && !line.startsWith("score sur 10") && !line.startsWith("L'accroche la mieux")),
     "Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour ni bloc de code :",

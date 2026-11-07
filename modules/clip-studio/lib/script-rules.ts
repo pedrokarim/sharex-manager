@@ -395,6 +395,16 @@ export function spokenProblems(texts: readonly string[]): { index: number; probl
 // ─── Consignes ───────────────────────────────────────────────────
 
 /**
+ * Portée des règles « always » et « never » d'une marque. Elles décrivent son
+ * identité graphique ; lues comme des règles sur le sujet, elles faisaient
+ * écrire « seulement des schémas rose et bleu, sans logo ni personnage » et
+ * le script ne demandait plus aucun extrait de vraie vidéo (constaté en prod
+ * le 07/11/2026 sur les trois derniers clips de l'assistant).
+ */
+export const BRAND_RULES_SCOPE =
+  "Portée des règles « always » et « never » de la marque : elles décrivent son identité graphique (ses encres, ses polices, sa mascotte, ses cartons, ce qu'elle dessine ou génère elle-même), jamais le sujet traité. Le jeu, l'anime, le film, le manga, le produit ou la personne dont parle la vidéo se montre tel qu'il est : bande-annonce, gameplay, visuel officiel, logo officiel, personnages. Une règle qui écarte les logos ou les personnages existants interdit de les générer ou de les imiter, pas de montrer les vrais. Aucune de ces règles ne retire un extrait de vraie vidéo ni un visuel officiel.";
+
+/**
  * Règles de style communes à tout texte lu (scripts, idées, accroches) :
  * ouvertures interdites, rythme, fin, faits, tics d'IA, typographie.
  */

@@ -12,6 +12,7 @@ import {
   type AssistantRequest,
   type BrandKitRecord,
 } from "@/modules/clip-studio/lib/assistant";
+import { BRAND_RULES_SCOPE } from "@/modules/clip-studio/lib/script-rules";
 
 const THEME: BrandTheme = {
   kitId: "kit-test01",
@@ -60,6 +61,12 @@ describe("assistant : script dans la marque", () => {
     expect(prompt).toMatch(/DONNÉES/);
     // La mascotte : un booléen par segment.
     expect(prompt).toContain('"mascot"');
+  });
+
+  it("borne les règles de la marque à son identité graphique, pas au sujet", () => {
+    const prompt = scriptPrompt({ ...REQUEST, imageSource: "find", webClips: true }, toAssistantBrand(KIT, THEME));
+    expect(prompt).toContain(BRAND_RULES_SCOPE);
+    expect(prompt).toContain('kind "clip"');
   });
 
   it("ne laisse pas la fiche refermer la balise de données", () => {

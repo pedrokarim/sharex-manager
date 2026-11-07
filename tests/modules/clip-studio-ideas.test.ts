@@ -18,6 +18,7 @@ import {
   type IdeaContext,
   type MeasuredShort,
 } from "@/modules/clip-studio/lib/ideas";
+import { BRAND_RULES_SCOPE } from "@/modules/clip-studio/lib/script-rules";
 import { channelStat, conceptStatus, measureChannel, median, recentHits, signalOf, type MeasuredVideo } from "@/modules/clip-studio/lib/idea-scoring";
 import { createHref, ideaBrief, prefillFromIdea, readCreatePrefill } from "@/modules/clip-studio/lib/idea-prefill";
 import { cleanChannelHandle, DEFAULT_IDEA_SETTINGS, IDEA_LIMITS, type Concept, type Idea } from "@/modules/clip-studio/lib/idea-types";
@@ -319,6 +320,9 @@ describe("consignes", () => {
     expect(prompt).toContain("currentFacts");
     expect(prompt).toContain("jamais la plus courte possible");
     expect(prompt).not.toContain("45 secondes au plus");
+    // Les règles de la marque ne restreignent pas ce qu'on montre du sujet.
+    expect(prompt).toContain(BRAND_RULES_SCOPE);
+    expect(prompt).toContain("Il ne restreint jamais ce qu'on montre du sujet");
   });
 
   it("la consigne des concepts encadre les titres comme des données", () => {
