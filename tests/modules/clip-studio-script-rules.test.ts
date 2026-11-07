@@ -292,6 +292,8 @@ describe("affirmations d'absence", () => {
     expect(claimsAbsence("Aucune date n'a encore été annoncée pour la version 4.0.")).toBe(true);
     expect(claimsAbsence("The release date has not been announced yet.")).toBe(true);
     expect(claimsAbsence("Release date: TBA")).toBe(true);
+    expect(claimsAbsence("Le 6 novembre, Kuro Games n’a montré qu’un premier aperçu de la 4.0 et promet plus de détails.")).toBe(true);
+    expect(claimsAbsence("D'autres détails suivront.")).toBe(true);
   });
 
   it("laisse passer ce qui dit ce qui est annoncé", () => {
