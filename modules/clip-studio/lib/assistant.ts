@@ -595,7 +595,7 @@ async function run(job: AssistantJob, signal: AbortSignal) {
     // Ce qui ne se trouve pas reste à illustrer : vidéo libre, image trouvée, puis générée.
     const plans = segmentPlans(job.request, script);
     const clipped: (SourcedClip | undefined)[] = job.steps.some((entry) => entry.id === "videos")
-      ? await sourceSegmentClips(job, plans, signal, (state, detail) => step("videos", state, detail), {}, openingSeconds(script))
+      ? await sourceSegmentClips(job, plans, signal, (state, detail) => step("videos", state, detail), {}, openingSeconds(script), closingSeconds(script))
       : plans.map(() => undefined);
 
     // 2. Illustrations : chercher d'abord ce qui existe, générer le reste.
@@ -646,9 +646,14 @@ async function run(job: AssistantJob, signal: AbortSignal) {
     }
     // Un segment resté sans illustration prend un autre passage d'une vidéo du clip, plutôt que de reboucler celle d'avant.
     if (plans.length && clipped.some(Boolean)) {
-      const filled = await fillFromClipVideos(job, plans, clipped, images, signal, (detail) => step("images", "running", detail));
-      const imagesStep = job.steps.find((entry) => entry.id === "images");
-      if (filled && imagesStep) step("images", imagesStep.state === "error" ? "done" : imagesStep.state, `${imagesStep.detail ?? ""} · ${plural(filled, "segment")} montré${filled > 1 ? "s" : ""} par un autre passage d’une vidéo du clip`);
+      // Le bilan des illustrations, tel qu'il était avant les coupes : la progression le remplace le temps de couper.
+      const before = job.steps.find((entry) => entry.id === "images");
+      const done = before ? { state: before.state, detail: before.detail } : null;
+      const filled = await fillFromClipVideos(job, plans, clipped, images, signal, (detail) => step("images", "running", detail), {}, closingSeconds(script));
+      if (done) {
+        const extra = filled ? ` · ${plural(filled, "segment")} montré${filled > 1 ? "s" : ""} par un autre passage d’une vidéo du clip` : "";
+        step("images", filled && done.state === "error" ? "done" : done.state, `${done.detail ?? ""}${extra}`);
+      }
     }
     // Ce qui a remplacé chaque extrait introuvable, dit dans le suivi des vidéos.
     if (job.clips?.length) {
@@ -2812,7 +2817,8 @@ export async function sourceSegmentClips(
   signal: AbortSignal,
   onStep: (state: StepState, detail?: string) => void,
   deps: SegmentClipDeps = {},
-  leadSeconds = 0
+  leadSeconds = 0,
+  trailSeconds = 0
 ): Promise<(SourcedClip | undefined)[]> {
   const results: (SourcedClip | undefined)[] = plans.map(() => undefined);
   const wanted = plans.flatMap((plan, index) => (plan.clip && !plan.covered ? [index] : []));
@@ -2832,8 +2838,8 @@ export async function sourceSegmentClips(
   await eachLimited(wanted, CLIP_LIMITS.downloads, async (index) => {
     signal.throwIfAborted();
     const plan = plans[index];
-    // L'extrait du premier segment passe aussi sous l'accroche : il la couvre sans se répéter.
-    const segmentSeconds = spokenSeconds(plan.text) + 1.5 + (index === 0 ? leadSeconds : 0);
+    // L'extrait du premier segment passe aussi sous l'accroche, celui du dernier sous la fin : il les couvre sans se répéter.
+    const segmentSeconds = spokenSeconds(plan.text) + 1.5 + (index === 0 ? leadSeconds : 0) + (index === plans.length - 1 ? trailSeconds : 0);
     const found = await find(plan.clip!, { segment: index, segmentSeconds, state, signal, onProgress: progress, deps });
     outcomes.push(found.outcome);
     outcomes.sort((a, b) => a.segment - b.segment);
@@ -2870,6 +2876,11 @@ function openingSeconds(script: CleanScript): number {
   return spokenOpening(script).reduce((sum, text) => sum + spokenSeconds(text), 0);
 }
 
+/** Durée parlée après le dernier segment (la fin du script), en secondes : son extrait la couvre aussi. */
+function closingSeconds(script: CleanScript): number {
+  return script.outro ? spokenSeconds(script.outro) + 1 : 0;
+}
+
 /**
  * Segments restés sans illustration (ni extrait, ni image trouvée ou
  * générée) : chacun prend un autre passage d'une vidéo déjà retenue dans le
@@ -2886,7 +2897,8 @@ export async function fillFromClipVideos(
   images: (MediaSource | undefined)[],
   signal: AbortSignal,
   onProgress: (detail: string) => void,
-  deps: { source?: typeof sourceMoreOf; clip?: Partial<ClipDeps> } = {}
+  deps: { source?: typeof sourceMoreOf; clip?: Partial<ClipDeps> } = {},
+  trailSeconds = 0
 ): Promise<number> {
   const outcomes = job.clips ?? [];
   const found = outcomes.filter((outcome) => outcome.status === "found" && outcome.video && !outcome.keepAudio);
@@ -2902,7 +2914,7 @@ export async function fillFromClipVideos(
     const before = found.filter((outcome) => outcome.segment < index).sort((a, b) => b.segment - a.segment)[0];
     const near = before ?? found.filter((outcome) => outcome.segment > index).sort((a, b) => a.segment - b.segment)[0];
     if (!near?.video) continue;
-    const result = await source(near.video, { search: near.search, moment: near.moment, seconds: CLIP_LIMITS.minSeconds }, { segment: index, segmentSeconds: spokenSeconds(plan.text) + 1.5, state, signal, onProgress, deps: deps.clip });
+    const result = await source(near.video, { search: near.search, moment: near.moment, seconds: CLIP_LIMITS.minSeconds }, { segment: index, segmentSeconds: spokenSeconds(plan.text) + 1.5 + (index === plans.length - 1 ? trailSeconds : 0), state, signal, onProgress, deps: deps.clip });
     if ("media" in result) {
       outcomes.push(result.outcome);
       clipped[index] = result;
