@@ -13,6 +13,7 @@ import {
   FolderPlus,
   Share,
   Info,
+  Tag,
 } from "lucide-react";
 import {
   ContextMenuContent,
@@ -44,6 +45,8 @@ interface FileContextMenuContentProps {
   onShare?: () => void;
   albums?: Array<{ id: number; name: string; isPublic?: boolean; inCatalog?: boolean }>;
   onAddToSpecificAlbum?: (albumId: number) => void;
+  /** « Tags… » : ouvre la pose des tags du fichier. Absent, l'entrée n'apparaît pas. */
+  onEditTags?: () => void;
 }
 
 /**
@@ -69,6 +72,7 @@ export function FileContextMenuContent({
   onShare,
   albums = [],
   onAddToSpecificAlbum,
+  onEditTags,
 }: FileContextMenuContentProps) {
   const { t } = useTranslation();
 
@@ -189,6 +193,13 @@ export function FileContextMenuContent({
           <FolderPlus className="h-4 w-4 mr-2" />
           {t("multiselect.add_to_album")}
           <ContextMenuShortcut>Ctrl+Shift+A</ContextMenuShortcut>
+        </ContextMenuItem>
+      )}
+
+      {onEditTags && (
+        <ContextMenuItem onClick={onEditTags}>
+          <Tag className="h-4 w-4 mr-2" />
+          Tags…
         </ContextMenuItem>
       )}
 

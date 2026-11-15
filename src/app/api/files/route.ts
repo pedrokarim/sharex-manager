@@ -6,7 +6,8 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getAbsoluteUploadPath } from "@/lib/config";
 import { setFileSecure, removeFileFromSecure } from "@/lib/secure-files";
-import { galleryQueryFrom, listGalleryFiles } from "@/lib/gallery-listing";
+import { galleryQueryFrom, listGalleryFiles, resolveGalleryCollection } from "@/lib/gallery-listing";
+import { organizationDb } from "@/lib/organization/organization-db";
 import { summarizeMonths } from "@/lib/timeline";
 import type { NextRequest } from "next/server";
 import { logger } from "@/lib/utils/logger";
@@ -41,7 +42,16 @@ export async function GET(request: Request) {
     // Force la revalidation du dossier public/uploads
     revalidatePath("/uploads");
 
-    const query = galleryQueryFrom(searchParams);
+    // `collection=<id>` : les règles de la collection du compte connecté ; une
+    // collection inconnue ou à un autre compte ne se distingue pas (404).
+    const resolved = resolveGalleryCollection(galleryQueryFrom(searchParams), session.user.id, {
+      sort: searchParams.has("sort"),
+      order: searchParams.has("order"),
+    });
+    if (!resolved) {
+      return NextResponse.json({ error: "Collection introuvable" }, { status: 404 });
+    }
+    const query = resolved.query;
     const validFiles = await listGalleryFiles(query);
 
     // Frise des mois : le nombre de fichiers par mois, sans les fichiers
@@ -176,6 +186,7 @@ export const DELETE = withAuth(async (req: NextRequest, _context, session) => {
       // Retirer le fichier de la liste des fichiers sécurisés s'il y est
       await removeFileFromSecure(filename);
       await deleteDeletionToken(filename);
+      organizationDb.forgetFile(filename);
 
       await logger.logFileAction("file.delete", "Suppression d'un fichier", {
         userId: session.user.id,

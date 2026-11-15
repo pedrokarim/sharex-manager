@@ -14,6 +14,8 @@ import {
   FolderInput,
   MoreHorizontal,
   Keyboard,
+  Tag,
+  TagsIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +44,10 @@ interface SelectionToolbarProps {
   onRemoveFromAlbum?: () => void;
   onMoveToAlbum?: () => void;
   onShowHelp: () => void;
+  /** « Ajouter des tags » sur la sélection ; absent, le bouton n'apparaît pas. */
+  onAddTags?: () => void;
+  /** « Retirer des tags », dans le menu de la barre. */
+  onRemoveTags?: () => void;
   className?: string;
 }
 
@@ -58,6 +64,8 @@ export function SelectionToolbar({
   onRemoveFromAlbum,
   onMoveToAlbum,
   onShowHelp,
+  onAddTags,
+  onRemoveTags,
   className,
 }: SelectionToolbarProps) {
   const { t } = useTranslation();
@@ -114,6 +122,20 @@ export function SelectionToolbar({
           <FolderPlus className="h-4 w-4 mr-1" />
           <span className="hidden sm:inline">{t("multiselect.add_to_album")}</span>
         </Button>
+
+        {onAddTags && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onAddTags}
+            className="h-8 px-2"
+            title="Ajouter des tags"
+            aria-label="Ajouter des tags"
+          >
+            <Tag className="h-4 w-4 lg:mr-1" />
+            <span className="hidden lg:inline">Ajouter des tags</span>
+          </Button>
+        )}
 
         <Button
           variant="ghost"
@@ -187,6 +209,13 @@ export function SelectionToolbar({
             <DropdownMenuItem onClick={onDownloadSelected}>
               <Download className="h-4 w-4 mr-2" />
               {t("multiselect.actions.download_selected")}
+            </DropdownMenuItem>
+          )}
+
+          {onRemoveTags && (
+            <DropdownMenuItem onClick={onRemoveTags}>
+              <TagsIcon className="h-4 w-4 mr-2" />
+              Retirer des tags
             </DropdownMenuItem>
           )}
 

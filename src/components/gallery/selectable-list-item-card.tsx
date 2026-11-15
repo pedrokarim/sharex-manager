@@ -59,6 +59,7 @@ interface SelectableListItemCardProps {
   onStartSelectionMode?: (fileName: string) => void;
   detailed?: boolean;
   isNew?: boolean;
+  onEditTags?: (fileName: string) => void;
 }
 
 export function SelectableListItemCard({
@@ -88,6 +89,7 @@ export function SelectableListItemCard({
   onStartSelectionMode,
   detailed,
   isNew,
+  onEditTags,
 }: SelectableListItemCardProps) {
   const locale = useDateLocale();
   const showSelectionControl =
@@ -310,6 +312,7 @@ export function SelectableListItemCard({
           onAddSingleFileToAlbum={onAddSingleFileToAlbum}
           onAddToSpecificAlbum={onAddToSpecificAlbum}
           albums={albums}
+          onEditTags={onEditTags ? () => onEditTags(file.name) : undefined}
         />
       )}
     </ContextMenu>

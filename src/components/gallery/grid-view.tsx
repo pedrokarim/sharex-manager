@@ -38,6 +38,8 @@ interface GridViewProps {
   onStartSelectionMode?: (fileName: string) => void;
   fileAlbumsCache?: Record<string, any[]>;
   newFileIds: string[];
+  /** « Tags… » dans le menu d'un fichier. */
+  onEditTags?: (fileName: string) => void;
 }
 
 export function GridView({
@@ -67,6 +69,7 @@ export function GridView({
   onStartSelectionMode,
   fileAlbumsCache = {},
   newFileIds,
+  onEditTags,
 }: GridViewProps) {
   const [defaultThumbnailSize, setDefaultThumbnailSize] =
     useAtom(thumbnailSizeAtom);
@@ -114,6 +117,7 @@ export function GridView({
           fileAlbums={fileAlbumsCache[file.name] || []}
           isNew={newFileIds.includes(file.name)}
           size={thumbnailSize}
+          onEditTags={onEditTags}
         />
       ))}
     </div>

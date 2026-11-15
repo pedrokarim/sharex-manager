@@ -33,6 +33,8 @@ interface ListViewProps {
   onStartSelectionMode?: (fileName: string) => void;
   detailed?: boolean;
   newFileIds: string[];
+  /** « Tags… » dans le menu d'un fichier. */
+  onEditTags?: (fileName: string) => void;
 }
 
 export function ListView({
@@ -62,6 +64,7 @@ export function ListView({
   onStartSelectionMode,
   detailed,
   newFileIds,
+  onEditTags,
 }: ListViewProps) {
   return (
     <div className="space-y-1 sm:space-y-2">
@@ -96,6 +99,7 @@ export function ListView({
           onStartSelectionMode={onStartSelectionMode}
           detailed={detailed}
           isNew={newFileIds.includes(file.name)}
+          onEditTags={onEditTags}
         />
       ))}
     </div>

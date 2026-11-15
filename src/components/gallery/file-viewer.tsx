@@ -34,6 +34,7 @@ import { Separator } from "../ui/separator";
 import { VisuallyHidden } from "../ui/visually-hidden";
 import { useTranslation } from "@/lib/i18n";
 import { FileAlbumsSection } from "@/components/gallery/file-albums-section";
+import { FileTags } from "@/components/tags/file-tags";
 import { toast } from "sonner";
 import { readApiError } from "@/lib/utils/chunk";
 import { ModuleActions } from "./module-actions";
@@ -59,6 +60,8 @@ interface FileViewerProps {
   hasNext: boolean;
   isLoading?: boolean;
   loadingName?: string | null;
+  /** À incrémenter quand les tags ont changé hors de la visionneuse : sa section « Tags » se relit. */
+  tagsVersion?: number;
 }
 
 interface FileViewerBodyProps extends FileViewerProps {
@@ -94,6 +97,7 @@ function FileViewerBody({
   hasNext,
   isLoading = false,
   loadingName = null,
+  tagsVersion = 0,
   showDetails,
   setShowDetails,
 }: FileViewerBodyProps) {
@@ -469,6 +473,10 @@ function FileViewerBody({
 
                     <Separator />
 
+                    <FileTags fileName={file.name} version={tagsVersion} />
+
+                    <Separator />
+
                     <FileAlbumsSection
                       fileName={file.name}
                       onAddToAlbum={() => setIsAddToAlbumDialogOpen(true)}
@@ -605,6 +613,7 @@ export function FileViewer({
   hasNext,
   isLoading = false,
   loadingName = null,
+  tagsVersion = 0,
 }: FileViewerProps) {
   const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
@@ -687,6 +696,7 @@ export function FileViewer({
       hasNext={hasNext}
       isLoading={isLoading}
       loadingName={loadingName}
+      tagsVersion={tagsVersion}
       showDetails={showDetails}
       setShowDetails={setShowDetails}
     />

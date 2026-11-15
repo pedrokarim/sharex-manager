@@ -46,6 +46,7 @@ interface SelectableFileCardProps {
   onToggleSecuritySelected?: () => void;
   onStartSelectionMode?: (fileName: string) => void;
   fileAlbums?: any[];
+  onEditTags?: (fileName: string) => void;
 }
 
 export function SelectableFileCard({
@@ -76,6 +77,7 @@ export function SelectableFileCard({
   onToggleSecuritySelected,
   onStartSelectionMode,
   fileAlbums = [],
+  onEditTags,
 }: SelectableFileCardProps) {
   const showSelectionControl =
     isSelectionMode || showSelectionCheckbox || isSelected;
@@ -216,6 +218,7 @@ export function SelectableFileCard({
           onAddSingleFileToAlbum={onAddSingleFileToAlbum}
           albums={albums}
           onAddToSpecificAlbum={onAddToSpecificAlbum}
+          onEditTags={onEditTags ? () => onEditTags(file.name) : undefined}
         />
       )}
     </ContextMenu>

@@ -18,6 +18,7 @@ import { existsSync } from "fs";
 import { isVideoFile } from "@/lib/media-kind";
 import { forgetVideo } from "@/lib/media/video";
 import { serveMediaFile } from "@/lib/modules/media-response";
+import { organizationDb } from "@/lib/organization/organization-db";
 
 /** Nom de fichier seul : le paramètre est décodé, « %2F.. » y devient un chemin. */
 function safeName(value: string): string | null {
@@ -79,6 +80,7 @@ export async function DELETE(
     await forgetVideo(name);
     await removeFileFromSecure(name);
     await deleteDeletionToken(name);
+    organizationDb.forgetFile(name);
 
     logDb.createLog({
       level: "info",

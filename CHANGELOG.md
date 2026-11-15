@@ -7,6 +7,15 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Tags et collections (docs/organisation.md) : un tag s’ajoute à un fichier
+  depuis son menu, une sélection ou la visionneuse, se gère sur
+  /organization/tags (renommer, décrire, fusionner, supprimer) et filtre la
+  galerie (/gallery?tag=…). Une collection garde des règles (tags avec, au
+  moins un, sans, types, favoris, sécurisés, période, texte) et se recalcule
+  à chaque ouverture ; l’éditeur montre le nombre de fichiers et un aperçu
+  pendant la saisie. Les tags d’un fichier supprimé disparaissent avec lui.
+- Page 404 dans le style des pages publiques, avec un lien vers la galerie
+  pour un compte connecté.
 - Thème global, icônes : les icônes de la barre latérale et des en-têtes
   d’administration se dessinent dans un jeu choisi sur la page du thème, parmi
   onze (Fluent Color par défaut, Lucide, Phosphor, Solar, Hugeicons, Fluent,

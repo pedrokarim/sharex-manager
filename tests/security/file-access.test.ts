@@ -18,6 +18,8 @@ const state = vi.hoisted(() => ({
   data: new Map<string, string>(),
   logs: [] as Array<{ action: string; message: string; metadata?: Record<string, unknown> }>,
   secure: new Set<string>(),
+  /** Fichiers dont les tags ont été oubliés. */
+  forgottenTags: [] as string[],
 }));
 
 const uploads = fs.mkdtempSync(path.join(os.tmpdir(), "sxm-file-access-"));
@@ -40,6 +42,10 @@ vi.mock("@/lib/utils/logger", () => ({
   },
 }));
 vi.mock("@/lib/media/video", () => ({ forgetVideo: async () => {} }));
+// La base des tags passe par `bun:sqlite`, absent de Node.
+vi.mock("@/lib/organization/organization-db", () => ({
+  organizationDb: { forgetFile: (name: string) => void state.forgottenTags.push(name), tagsByFile: () => new Map() },
+}));
 vi.mock("@/lib/secure-files", () => ({
   isFileSecure: async (name: string) => state.secure.has(name),
   setFileSecure: async (name: string, secure: boolean) => void (secure ? state.secure.add(name) : state.secure.delete(name)),
@@ -175,6 +181,8 @@ describe("DELETE /api/files?id=", () => {
     expect((await remove("alice-sharex.png")).status).toBe(200);
     expect(fs.existsSync(path.join(uploads, "alice-web.png"))).toBe(false);
     expect(state.logs.filter((log) => log.action === "file.delete")).toHaveLength(2);
+    // Un fichier supprimé oublie ses tags.
+    expect(state.forgottenTags).toEqual(expect.arrayContaining(["alice-web.png", "alice-sharex.png"]));
   });
 
   it("laisse un admin supprimer n'importe quel fichier", async () => {
@@ -197,6 +205,7 @@ describe("DELETE /api/files/[filename] (session)", () => {
     expect(fs.existsSync(path.join(uploads, "alice-web.png"))).toBe(true);
     state.session = alice;
     expect((await remove("alice-web.png")).status).toBe(204);
+    expect(state.forgottenTags).toContain("alice-web.png");
     state.session = null;
     expect((await remove("bob.png")).status).toBe(401);
   });

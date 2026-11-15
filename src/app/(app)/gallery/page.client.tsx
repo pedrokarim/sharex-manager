@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useSession } from "@/lib/auth-client";
-import { redirect, useSearchParams } from "next/navigation";
+import { redirect, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ThemedIcon } from "@/components/icon-theme";
 import type { IconConcept } from "@/lib/icon-themes/registry";
 import { toast } from "sonner";
@@ -22,7 +22,12 @@ import {
   languageAtom,
 } from "@/lib/atoms/preferences";
 import { Button } from "@/components/ui/button";
-import { CalendarSearch, Check, ChevronDown, CircleAlert, ImageOff, Minus, RefreshCcw, RotateCw, Upload } from "lucide-react";
+import { CalendarSearch, Check, ChevronDown, CircleAlert, ImageOff, Minus, RefreshCcw, RotateCw, Upload, X } from "lucide-react";
+import Link from "next/link";
+import { FileTagsDialog } from "@/components/tags/file-tags";
+import { BatchTagsDialog, type BatchTagsMode } from "@/components/tags/batch-tags-dialog";
+import { useTagList } from "@/components/tags/tags-api";
+import { appendScope, appendSort } from "./gallery-request";
 import { useSimpleSelection } from "@/hooks/use-simple-selection";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { SelectionToolbar } from "@/components/gallery/selection-toolbar";
@@ -65,7 +70,7 @@ interface FileInfo {
 }
 
 interface MonthGroup {
-  /** « 2026-09 ». */
+  /** « 2026-09 ». */
   key: string;
   files: FileInfo[];
   /** Rang du premier fichier du groupe dans la galerie entière. */
@@ -88,6 +93,10 @@ interface GalleryClientProps {
   initialSearch?: string;
   secureOnly?: boolean;
   starredOnly?: boolean;
+  /** Slugs de tags : seuls les fichiers qui les portent tous (`/gallery?tag=`). */
+  tags?: string[];
+  /** Galerie d'une collection : ses règles filtrent la liste (`/api/files?collection=`). */
+  collectionId?: number;
 }
 
 export function GalleryClient({
@@ -97,7 +106,19 @@ export function GalleryClient({
   initialSearch = "",
   secureOnly = false,
   starredOnly = false,
+  tags,
+  collectionId,
 }: GalleryClientProps) {
+  // Une clé stable : le tableau reçu change d'identité à chaque rendu du serveur.
+  const tagsKey = (tags ?? []).join("\u0000");
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- recalculé quand la clé change
+  const tagFilter = useMemo(() => tags ?? [], [tagsKey]);
+  const isScoped = tagFilter.length > 0 || collectionId !== undefined;
+  /** Le tri a été choisi à la main dans la barre d'outils (voir `appendSort`). */
+  const [sortChosen, setSortChosen] = useState(false);
+  const markSortChosen = useCallback(() => setSortChosen(true), []);
+  const router = useRouter();
+  const pathname = usePathname();
   const { data: session, isPending: isSessionPending } = useSession();
   const { t } = useTranslation();
   const urlSearchParams = useSearchParams();
@@ -136,12 +157,24 @@ export function GalleryClient({
    * sous les derniers chargés), avec de quoi réessayer.
    */
   const [loadFailed, setLoadFailed] = useState(false);
-  /** Résultat de la copie des URL de la sélection, lu au-dessus de sa barre. */
+  /**
+   * Résultat d'une action de la barre de sélection (copie des URL, tags en
+   * lot), lu juste au-dessus de la barre.
+   */
   const copyFeedback = useFeedback();
+  /** Fichier dont la fenêtre « Tags… » est ouverte. */
+  const [tagsFileName, setTagsFileName] = useState<string | null>(null);
+  /** « Ajouter des tags » ou « Retirer des tags » sur la sélection ; `null` : fermé. */
+  const [batchTagsMode, setBatchTagsMode] = useState<BatchTagsMode | null>(null);
+  const [batchTagsFiles, setBatchTagsFiles] = useState<string[]>([]);
+  /** Relit la section « Tags » de la visionneuse après une action en lot. */
+  const [tagsVersion, setTagsVersion] = useState(0);
+  // Les noms des tags du filtre, pour la barre d'outils (« Tag : Valorant »).
+  const filterTags = useTagList({ enabled: tagFilter.length > 0 });
   /**
    * La liste se recharge depuis le début (filtre, tri, ou première page que le
    * serveur n'a pas fournie). Tant que c'est le cas, une liste vide ne veut
-   * pas dire « aucune image » : on montre un squelette.
+   * pas dire « aucune image » : on montre un squelette.
    */
   const [isReloading, setIsReloading] = useState(initialFiles === null);
   const [newFileIds, setNewFileIds] = useState<string[]>([]);
@@ -268,10 +301,10 @@ export function GalleryClient({
         if (search) searchParams.set("q", search);
         if (secureOnly) searchParams.set("secure", "true");
         if (starredOnly) searchParams.set("starred", "true");
-        searchParams.set("sort", sortBy);
-        searchParams.set("order", sortOrder);
+        appendSort(searchParams, { sortBy, sortOrder }, { collectionId, sortChosen });
         if (startDate) searchParams.set("start", startDate);
         if (endDate) searchParams.set("end", endDate);
+        appendScope(searchParams, tagFilter, collectionId);
 
         const res = await fetch(`/api/files?${searchParams.toString()}`, {
           cache: "no-store",
@@ -291,7 +324,7 @@ export function GalleryClient({
         };
       }
     },
-    [search, secureOnly, starredOnly, sortBy, sortOrder, startDate, endDate],
+    [search, secureOnly, starredOnly, sortBy, sortOrder, startDate, endDate, tagFilter, collectionId, sortChosen],
   );
 
   const {
@@ -348,10 +381,10 @@ export function GalleryClient({
     if (search) params.set("q", search);
     if (secureOnly) params.set("secure", "true");
     if (starredOnly) params.set("starred", "true");
-    params.set("sort", sortBy);
-    params.set("order", sortOrder);
+    appendSort(params, { sortBy, sortOrder }, { collectionId, sortChosen });
     if (startDate) params.set("start", startDate);
     if (endDate) params.set("end", endDate);
+    appendScope(params, tagFilter, collectionId);
 
     let cancelled = false;
     fetch(`/api/files?${params.toString()}`, { cache: "no-store" })
@@ -364,7 +397,7 @@ export function GalleryClient({
     return () => {
       cancelled = true;
     };
-  }, [search, secureOnly, starredOnly, sortBy, sortOrder, startDate, endDate, timelineVersion]);
+  }, [search, secureOnly, starredOnly, sortBy, sortOrder, startDate, endDate, tagFilter, collectionId, sortChosen, timelineVersion]);
 
   /** Saut à une date : la galerie repart de la page qui contient ce rang. */
   const loadAt = useCallback(
@@ -392,6 +425,9 @@ export function GalleryClient({
 
   const endDateRef = useRef(endDate);
   endDateRef.current = endDate;
+
+  const isScopedRef = useRef(isScoped);
+  isScopedRef.current = isScoped;
 
   // SSE pour les nouveaux fichiers en temps réel
   useEffect(() => {
@@ -438,8 +474,10 @@ export function GalleryClient({
 
           if (data.type === "new_file" && data.file) {
             // Prepend the new file without resetting scroll position
+            // Un nouvel envoi ne porte aucun tag : il n'a pas sa place dans une
+            // galerie filtrée par tag ou par collection.
             const hasActiveFilters =
-              searchRef.current || startDateRef.current || endDateRef.current;
+              searchRef.current || startDateRef.current || endDateRef.current || isScopedRef.current;
 
             setTimelineVersion((version) => version + 1);
 
@@ -518,7 +556,7 @@ export function GalleryClient({
       })
       .finally(() => setIsReloading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchFiles accessed via ref
-  }, [search, sortBy, sortOrder, startDate, endDate, applyReset]);
+  }, [search, sortBy, sortOrder, startDate, endDate, tagFilter, collectionId, sortChosen, applyReset]);
 
   // Le serveur n'a rien pu envoyer : la première page se charge ici.
   useEffect(() => {
@@ -798,7 +836,7 @@ export function GalleryClient({
 
   // Copie lancée depuis un menu contextuel, la visionneuse ou un raccourci :
   // le menu se referme et les boutons appartiennent à leurs composants, sans
-  // place pour un « Copié ». Le toast reste donc ici.
+  // place pour un « Copié ». Le toast reste donc ici.
   const copyToClipboard = async (url: string) => {
     try {
       if (
@@ -1091,6 +1129,29 @@ export function GalleryClient({
     setIsAddToAlbumDialogOpen(true);
   }, [getSelectedFiles]);
 
+  const openBatchTags = useCallback(
+    (mode: BatchTagsMode) => {
+      const selectedFiles = getSelectedFiles();
+      if (selectedFiles.length === 0) return;
+      copyFeedback.clear();
+      setBatchTagsFiles(selectedFiles);
+      setBatchTagsMode(mode);
+    },
+    [getSelectedFiles, copyFeedback],
+  );
+
+  const handleBatchTagsDone = useCallback(
+    (message: string) => {
+      setBatchTagsMode(null);
+      // La fenêtre se ferme et la sélection reste : le bilan se lit au-dessus de sa barre.
+      copyFeedback.success(message);
+      setTagsVersion((version) => version + 1);
+      // Une galerie filtrée par tag ou par collection peut gagner ou perdre des fichiers.
+      if (isScopedRef.current) void handleRefresh();
+    },
+    [copyFeedback, handleRefresh],
+  );
+
   const handleAddSingleFileToAlbum = useCallback((fileName: string) => {
     // Passer directement ce fichier au dialog
     setFilesToAddToAlbum([fileName]);
@@ -1196,13 +1257,32 @@ export function GalleryClient({
       ? t("gallery.starred_files")
       : t("gallery.title");
   // La même icône que l'entrée de la barre latérale qui mène ici.
-  const galleryConcept: IconConcept = secureOnly
-    ? "secure"
-    : starredOnly
-      ? "starred"
-      : urlSearchParams.get("sort") === "recent"
-        ? "recent"
-        : "gallery";
+  const galleryConcept: IconConcept = tagFilter.length > 0
+    ? "tags"
+    : collectionId !== undefined
+      ? "collections"
+      : secureOnly
+        ? "secure"
+        : starredOnly
+          ? "starred"
+          : urlSearchParams.get("sort") === "recent"
+            ? "recent"
+            : "gallery";
+
+  // « Tag : Valorant » ; le slug tant que les noms ne sont pas arrivés.
+  const filterTagNames = tagFilter.map(
+    (slug) => filterTags.tags.find((tag) => tag.slug === slug)?.name ?? slug,
+  );
+  const filterLabel =
+    tagFilter.length === 0
+      ? null
+      : `${tagFilter.length > 1 ? "Tags" : "Tag"} : ${filterTagNames.join(", ")}`;
+  const removeTagFilter = () => {
+    const params = new URLSearchParams(urlSearchParams.toString());
+    params.delete("tag");
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname);
+  };
 
   return (
     <>
@@ -1210,9 +1290,26 @@ export function GalleryClient({
         <UploadZone onFinishUpload={handleFinishUpload} pickerRef={uploadZoneRef}>
         <section className="mb-4 flex flex-wrap items-center justify-between gap-2 pt-2 sm:pr-10">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="flex size-9 shrink-0 items-center justify-center" title={galleryTitle}>
+            <span className="flex size-9 shrink-0 items-center justify-center" title={filterLabel ?? galleryTitle}>
               <ThemedIcon concept={galleryConcept} className="size-5" />
             </span>
+            {filterLabel && (
+              <span className="flex min-w-0 items-center gap-0.5" data-slot="gallery-tag-filter">
+                <span className="min-w-0 truncate px-1 text-sm font-medium text-foreground" title={filterLabel}>
+                  {filterLabel}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0 rounded-lg"
+                  onClick={removeTagFilter}
+                  aria-label="Retirer le filtre"
+                  title="Retirer le filtre"
+                >
+                  <X className="size-4" />
+                </Button>
+              </span>
+            )}
             {(secureOnly || starredOnly) && (
               <span className="px-1 text-sm font-medium text-foreground">
                 {galleryTitle}
@@ -1253,7 +1350,7 @@ export function GalleryClient({
             >
               <RefreshCcw className="h-4 w-4" />
             </Button>
-            <GalleryDisplayMenu />
+            <GalleryDisplayMenu onSortChosen={markSortChosen} />
             <Button
               onClick={() => setIsAddOpen(true)}
               size="sm"
@@ -1266,7 +1363,7 @@ export function GalleryClient({
         </section>
 
         {/* À la une : seulement sur la galerie entière, pas sur une recherche ni un filtre. */}
-        {galleryDisplay.highlights && !secureOnly && !starredOnly && !search && !startDate && !endDate && (
+        {galleryDisplay.highlights && !secureOnly && !starredOnly && !isScoped && !search && !startDate && !endDate && (
           <GalleryHighlights />
         )}
 
@@ -1275,6 +1372,37 @@ export function GalleryClient({
         ) : files.length === 0 && loadFailed ? (
           // Un échec ne doit pas se faire passer pour une galerie vide.
           <LoadErrorNotice message={t("gallery.errors.loading_files")} onRetry={handleRefresh} retrying={isRefreshing} />
+        ) : files.length === 0 && tagFilter.length > 0 ? (
+          <div className="flex flex-col items-center justify-center gap-4 px-4 py-12 text-center sm:py-24">
+            <ThemedIcon concept="tags" className="size-8 text-muted-foreground sm:size-12" />
+            <div className="min-w-0 space-y-2">
+              <h3 className="break-words text-base font-semibold sm:text-lg">
+                {tagFilter.length > 1
+                  ? "Aucun fichier ne porte tous ces tags"
+                  : `Aucun fichier ne porte le tag « ${filterTagNames[0]} »`}
+              </h3>
+              <p className="max-w-md text-xs text-muted-foreground sm:text-sm">
+                {search || startDate || endDate
+                  ? "La recherche ou la période en cours peut aussi écarter des fichiers."
+                  : "Posez-le depuis le menu d’un fichier (« Tags… ») ou sur une sélection."}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={removeTagFilter}>
+                Voir toute la galerie
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/organization/tags">Gérer les tags</Link>
+              </Button>
+            </div>
+          </div>
+        ) : files.length === 0 && collectionId !== undefined ? (
+          <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center sm:py-24">
+            <h3 className="text-base font-semibold sm:text-lg">Aucun fichier ne répond à ces règles</h3>
+            <p className="max-w-md text-xs text-muted-foreground sm:text-sm">
+              Un fichier qui les remplit plus tard entrera de lui-même dans la collection.
+            </p>
+          </div>
         ) : files.length === 0 ? (
           <div className="flex flex-col items-center justify-center space-y-4 py-12 sm:py-24 text-center px-4">
             <ImageOff className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground" />
@@ -1444,6 +1572,7 @@ export function GalleryClient({
                       onStartSelectionMode={handleStartSelectionMode}
                       fileAlbumsCache={fileAlbumsCache}
                       newFileIds={newFileIds}
+                      onEditTags={setTagsFileName}
                     />
                   ) : (
                     <ListView
@@ -1477,6 +1606,7 @@ export function GalleryClient({
                       onStartSelectionMode={handleStartSelectionMode}
                       detailed={viewMode === "details"}
                       newFileIds={newFileIds}
+                      onEditTags={setTagsFileName}
                     />
                   )}
                   </DaySections>
@@ -1539,6 +1669,7 @@ export function GalleryClient({
         hasNext={viewerFileIndex >= 0 && viewerFileIndex < uniqueFiles.length - 1}
         isLoading={isViewerLoading}
         loadingName={viewerFileName}
+        tagsVersion={tagsVersion}
       />
 
       {/* Barre d'outils de sélection */}
@@ -1553,9 +1684,19 @@ export function GalleryClient({
           onToggleSecuritySelected={handleToggleSecuritySelected}
           onAddToAlbum={handleAddToAlbum}
           onShowHelp={handleShowHelp}
+          onAddTags={() => openBatchTags("add")}
+          onRemoveTags={() => openBatchTags("remove")}
         />
       )}
       {isSelectionMode && hasSelection && <SelectionCopyStatus state={copyFeedback.state} />}
+
+      <FileTagsDialog fileName={tagsFileName} onOpenChange={(open) => !open && setTagsFileName(null)} />
+      <BatchTagsDialog
+        mode={batchTagsMode}
+        files={batchTagsFiles}
+        onOpenChange={(open) => !open && setBatchTagsMode(null)}
+        onDone={handleBatchTagsDone}
+      />
 
       {/* Dialog d'ajout à un album */}
       <AddToAlbumDialog

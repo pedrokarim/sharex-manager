@@ -66,7 +66,12 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
  * bouton : ce sont des réglages qu'on pose une fois, pas des actions. Le
  * bouton signale d'un point qu'un filtre de période est actif.
  */
-export function GalleryDisplayMenu() {
+export function GalleryDisplayMenu({
+  onSortChosen,
+}: {
+  /** Le tri vient d'être choisi ici, à la main (la galerie d'une collection garde sinon le sien). */
+  onSortChosen?: () => void;
+} = {}) {
   const { t } = useTranslation();
   const [defaultView, setDefaultView] = useAtom(galleryViewModeAtom);
   const [view, setView] = useQueryState<ViewMode>("view", {
@@ -126,7 +131,10 @@ export function GalleryDisplayMenu() {
         <Row label={t("gallery.display.sort")}>
           <Segment<SortBy>
             value={sortBy}
-            onChange={setSortBy}
+            onChange={(next) => {
+              onSortChosen?.();
+              setSortBy(next);
+            }}
             options={[
               { value: "date", label: t("gallery.sort.date") },
               { value: "name", label: t("gallery.sort.name") },
@@ -137,7 +145,10 @@ export function GalleryDisplayMenu() {
             variant="ghost"
             size="sm"
             className="h-8 justify-start gap-2 px-2 text-xs"
-            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+            onClick={() => {
+              onSortChosen?.();
+              setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+            }}
           >
             {sortOrder === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
             {orderLabel}
