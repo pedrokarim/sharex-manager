@@ -93,3 +93,15 @@ describe("themeDb, jeu d'icônes", () => {
     expect(result).toEqual({ before: "fluent-color", after: "phosphor-duotone", last: "lucide", refused: true });
   });
 });
+
+describe("THEMED_ICONS dans les composants serveur", () => {
+  it("n'est lu que par des modules clients : une page serveur passe le nom du concept", async () => {
+    const { globSync } = await import("node:fs");
+    const files = globSync("src/**/*.tsx", { cwd: process.cwd() });
+    const offenders = files.filter((file) => {
+      const text = readFileSync(join(process.cwd(), file), "utf8");
+      return text.includes("THEMED_ICONS.") && !/^\s*["']use client["']/.test(text);
+    });
+    expect(offenders).toEqual([]);
+  });
+});

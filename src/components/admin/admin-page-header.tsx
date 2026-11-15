@@ -1,8 +1,13 @@
 import type { ReactNode } from "react";
-import type { IconComponent } from "@/components/icon-theme";
+import { ThemedIcon, type IconComponent } from "@/components/icon-theme";
+import type { IconConcept } from "@/lib/icon-themes/registry";
 
 interface AdminPageHeaderProps {
-  icon: IconComponent;
+  /**
+   * Une icône, ou le nom d’un concept du jeu d’icônes. Une page serveur passe
+   * le nom : elle ne peut pas lire `THEMED_ICONS`, objet d’un module client.
+   */
+  icon: IconComponent | IconConcept;
   title: ReactNode;
   description?: ReactNode;
   /** Boutons de la page, calés à droite. */
@@ -19,7 +24,7 @@ export function AdminPageHeader({ icon: Icon, title, description, actions }: Adm
     <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
       <div className="flex min-w-0 items-start gap-3">
         <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Icon className="h-5 w-5" />
+          {typeof Icon === "string" ? <ThemedIcon concept={Icon} className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
         </span>
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
