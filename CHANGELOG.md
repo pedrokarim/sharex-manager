@@ -14,8 +14,12 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
   moins un, sans, types, favoris, sécurisés, période, texte) et se recalcule
   à chaque ouverture ; l’éditeur montre le nombre de fichiers et un aperçu
   pendant la saisie. Les tags d’un fichier supprimé disparaissent avec lui.
-- Page 404 dans le style des pages publiques, avec un lien vers la galerie
-  pour un compte connecté.
+- Pages d’erreur en français à la place des écrans anglais de Next.js : la
+  404 et l’erreur d’une page publique dans le style des pages publiques,
+  l’erreur d’une page de l’espace connecté dans la page même (la barre
+  latérale reste), et une page autonome si la mise en page racine échoue.
+  Chacune propose de réessayer et donne le code de l’erreur à citer au
+  support, jamais son message.
 - Thème global, icônes : les icônes de la barre latérale et des en-têtes
   d’administration se dessinent dans un jeu choisi sur la page du thème, parmi
   onze (Fluent Color par défaut, Lucide, Phosphor, Solar, Hugeicons, Fluent,
