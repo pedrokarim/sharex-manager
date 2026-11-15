@@ -189,7 +189,12 @@
     "license": "CC BY 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
     "pageUrl": "https://www.jamendo.com/track/1670662",
-    "audioUrl": "https://prod-1.storage.jamendo.com/?trackid=1670662&format=mp32"
+    "audioUrl": "https://prod-1.storage.jamendo.com/?trackid=1670662&format=mp32",
+    "rights": {
+      "state": "claimed",
+      "reason": "Revendiqué par HAAWK au nom de Soundrider (titre « Memories ») sur le Short TdSclzwxnYo, bloqué dans le monde entier ; contestation envoyée le 15/11/2026.",
+      "since": "2026-11-15"
+    }
   },
   {
     "id": "5aa97836-c4d6-4921-9343-a1320c11f57c",

@@ -19,6 +19,9 @@ import path from "path";
 import { ensureResource, resourcePath, resourceState, type ResourceSpec, type ResourceState } from "./resources";
 import { DATA_DIR, ensureDirs } from "./store";
 import { recordAiUsage, usageError } from "@/lib/ai-usage";
+import { isAutoPickable, type TrackRightsNote } from "./rights-types";
+
+export { isAutoPickable };
 
 const MODULE_DIR = path.join(process.cwd(), "modules", "clip-studio");
 const LIBRARY_FILE = path.join(MODULE_DIR, "music", "library.json");
@@ -42,6 +45,7 @@ export interface MusicTrack {
   audioUrl: string;
   /** Ajouté depuis l'éditeur, donc retirable. */
   added?: boolean;
+  rights?: TrackRightsNote;
 }
 
 export interface MusicEntry extends MusicTrack {
@@ -290,7 +294,7 @@ function writeAdded(tracks: MusicTrack[]) {
 
 /** Un morceau prêt de l'humeur demandée, pour l'assistant. */
 export function pickTrack(mood: string | undefined, minDurationMs = 0): MusicEntry | undefined {
-  const ready = listMusic().filter((track) => track.state.status === "ready");
+  const ready = listMusic().filter((track) => track.state.status === "ready" && isAutoPickable(track));
   const matching = ready.filter((track) => track.mood === mood);
   const pool = matching.length ? matching : ready;
   const longEnough = pool.filter((track) => track.durationMs >= minDurationMs);
