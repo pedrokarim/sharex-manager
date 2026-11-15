@@ -5,6 +5,7 @@ import { ArrowUpRight, Globe, Mail } from "lucide-react";
 import { FRONT_NARROW } from "@/components/front/container";
 import { DISPLAY } from "@/components/front/fonts";
 import { PhotoHeader } from "@/components/front/photo-header";
+import { THEMED_ICONS } from "@/components/icon-theme";
 import { Reveal } from "@/components/front/reveal";
 import { ACCENT, KICKER, PILL_SOFT, PILL_SOLID } from "@/components/front/styles";
 import { appConfig } from "@/lib/constant";
@@ -18,6 +19,7 @@ export function AboutPageClient() {
     <>
       <PhotoHeader
         photo="pines"
+        icon={THEMED_ICONS.about}
         kicker={`Version ${appConfig.version}`}
         title={appConfig.name}
         description={appConfig.description}

@@ -8,7 +8,7 @@ import { uploadConfigSchema, type UploadConfig } from "@/schemas/upload-config";
 import { Form } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Upload } from "lucide-react";
+
 import { LoadingState } from "@/components/loading";
 import { useUploadConfig } from "@/hooks/use-upload-config";
 import { ActionStatus, FormStatus, useFeedback, type FeedbackState } from "@/components/feedback";
@@ -17,6 +17,8 @@ import { ThumbnailsTab } from "../_components/thumbnails-tab";
 import { StorageTab } from "../_components/storage-tab";
 import { useTranslation } from "@/lib/i18n";
 
+import { THEMED_ICONS } from "@/components/icon-theme";
+import { PageTitleIcon } from "@/components/page-title-icon";
 const CONFIG_TABS = ["general", "thumbnails", "storage"] as const;
 
 export function ConfigPageClient() {
@@ -60,9 +62,7 @@ export function ConfigPageClient() {
       <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
         <div className="flex flex-col gap-2">
           <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight sm:text-3xl">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm sm:h-11 sm:w-11">
-              <Upload className="h-5 w-5" />
-            </span>
+            <PageTitleIcon icon={THEMED_ICONS.uploadConfig} />
             {t("uploads.config.title")}
           </h1>
           <p className="text-muted-foreground text-sm sm:text-base">

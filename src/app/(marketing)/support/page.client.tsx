@@ -5,6 +5,7 @@ import { ArrowUpRight } from "lucide-react";
 import { FRONT_CONTAINER, FRONT_NARROW } from "@/components/front/container";
 import { DISPLAY } from "@/components/front/fonts";
 import { PhotoHeader } from "@/components/front/photo-header";
+import { THEMED_ICONS } from "@/components/icon-theme";
 import { Reveal } from "@/components/front/reveal";
 import { ACCENT, KICKER, PILL_SOFT, PILL_SOLID } from "@/components/front/styles";
 import { Discord, Github } from "@/components/ui/icons";
@@ -38,7 +39,7 @@ export function SupportPageClient() {
 
   return (
     <>
-      <PhotoHeader photo="lake" kicker="Support" title={t("support.title")} description={t("support.description")} />
+      <PhotoHeader photo="lake" icon={THEMED_ICONS.support} kicker="Support" title={t("support.title")} description={t("support.description")} />
 
       <ul className={cn(FRONT_CONTAINER, "grid gap-5 pt-6 md:grid-cols-2")}>
         {CHANNELS.map((channel, index) => (

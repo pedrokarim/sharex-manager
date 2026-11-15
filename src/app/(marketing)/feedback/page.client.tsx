@@ -7,6 +7,7 @@ import { ArrowUpRight, Send } from "lucide-react";
 import { FRONT_CONTAINER } from "@/components/front/container";
 import { DISPLAY } from "@/components/front/fonts";
 import { PhotoHeader } from "@/components/front/photo-header";
+import { THEMED_ICONS } from "@/components/icon-theme";
 import { Reveal } from "@/components/front/reveal";
 import { ACCENT, FIELD, FIELD_AREA, KICKER, PILL_SOLID } from "@/components/front/styles";
 import { Discord, Github } from "@/components/ui/icons";
@@ -37,7 +38,7 @@ export function FeedbackPageClient() {
 
   return (
     <>
-      <PhotoHeader photo="glade" kicker="Feedback" title={t("feedback.title")} description={t("feedback.description")} />
+      <PhotoHeader photo="glade" icon={THEMED_ICONS.feedback} kicker="Avis" title={t("feedback.title")} description={t("feedback.description")} />
 
       <div className={cn(FRONT_CONTAINER, "grid gap-14 pt-6 pb-24 sm:pb-32 lg:grid-cols-12")}>
         <Reveal className="lg:col-span-7">

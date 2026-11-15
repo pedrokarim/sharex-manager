@@ -31,10 +31,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Info, KeyRound, Plus, RotateCw, Trash2 } from "lucide-react";
+import { Info, Plus, RotateCw, Trash2 } from "lucide-react";
 
 
 
+import { THEMED_ICONS } from "@/components/icon-theme";
+import { PageTitleIcon } from "@/components/page-title-icon";
 export default function ApiKeysPage() {
   const { t } = useTranslation();
   const { data: session, isPending: isSessionPending } = useSession();
@@ -139,9 +141,7 @@ export default function ApiKeysPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-2">
             <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm sm:h-11 sm:w-11">
-                <KeyRound className="h-5 w-5" />
-              </span>
+              <PageTitleIcon icon={THEMED_ICONS.apiKeys} />
               {t("settings.sections.api_keys.title")}
             </h1>
             <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">

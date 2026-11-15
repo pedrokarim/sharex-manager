@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useSession } from "@/lib/auth-client";
-import { redirect } from "next/navigation";
+import { redirect, useSearchParams } from "next/navigation";
+import { ThemedIcon } from "@/components/icon-theme";
+import type { IconConcept } from "@/lib/icon-themes/registry";
 import { toast } from "sonner";
 import { useAtom } from "jotai";
 import {
@@ -98,6 +100,7 @@ export function GalleryClient({
 }: GalleryClientProps) {
   const { data: session, isPending: isSessionPending } = useSession();
   const { t } = useTranslation();
+  const urlSearchParams = useSearchParams();
   const [defaultViewMode, setDefaultViewMode] = useAtom(galleryViewModeAtom);
   const [showFileInfo] = useAtom(showFileInfoAtom);
   const [showFileSize] = useAtom(showFileSizeAtom);
@@ -1192,6 +1195,14 @@ export function GalleryClient({
     : starredOnly
       ? t("gallery.starred_files")
       : t("gallery.title");
+  // La même icône que l'entrée de la barre latérale qui mène ici.
+  const galleryConcept: IconConcept = secureOnly
+    ? "secure"
+    : starredOnly
+      ? "starred"
+      : urlSearchParams.get("sort") === "recent"
+        ? "recent"
+        : "gallery";
 
   return (
     <>
@@ -1199,6 +1210,9 @@ export function GalleryClient({
         <UploadZone onFinishUpload={handleFinishUpload} pickerRef={uploadZoneRef}>
         <section className="mb-4 flex flex-wrap items-center justify-between gap-2 pt-2 sm:pr-10">
           <div className="flex min-w-0 items-center gap-2">
+            <span className="flex size-9 shrink-0 items-center justify-center" title={galleryTitle}>
+              <ThemedIcon concept={galleryConcept} className="size-5" />
+            </span>
             {(secureOnly || starredOnly) && (
               <span className="px-1 text-sm font-medium text-foreground">
                 {galleryTitle}

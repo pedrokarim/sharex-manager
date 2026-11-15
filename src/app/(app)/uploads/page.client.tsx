@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
+import { THEMED_ICONS } from "@/components/icon-theme";
+import { PageTitleIcon } from "@/components/page-title-icon";
 export function UploadsPageClient() {
   const { t } = useTranslation();
 
@@ -70,7 +72,8 @@ export function UploadsPageClient() {
       <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex flex-col gap-4 py-4">
           <div className="flex flex-col gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            <h1 className="flex min-w-0 items-center gap-3 text-2xl sm:text-3xl font-bold tracking-tight">
+              <PageTitleIcon icon={THEMED_ICONS.uploads} />
               {t("uploads.title")}
             </h1>
             <p className="text-muted-foreground text-sm sm:text-base">

@@ -6,6 +6,7 @@ import { ArrowRight, ScanSearch } from "lucide-react";
 import { FRONT_CONTAINER, FRONT_NARROW, FRONT_WIDE } from "@/components/front/container";
 import { DISPLAY } from "@/components/front/fonts";
 import { PhotoHeader } from "@/components/front/photo-header";
+import { THEMED_ICONS } from "@/components/icon-theme";
 import { Reveal } from "@/components/front/reveal";
 import { ACCENT, KICKER } from "@/components/front/styles";
 import { ServiceCard } from "@/components/tools/service-card";
@@ -57,6 +58,7 @@ export function ToolsPageClient() {
     <>
       <PhotoHeader
         photo="path"
+        icon={THEMED_ICONS.tools}
         kicker={t("tools.hub.kicker")}
         title={t("tools.hub.title")}
         description={t("tools.hub.subtitle")}

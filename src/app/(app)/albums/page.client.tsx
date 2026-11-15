@@ -14,6 +14,8 @@ import { AlbumCard } from "@/components/albums/album-card";
 import { CardsPageSkeleton } from "@/components/skeletons/page-skeletons";
 import type { Album } from "@/types/albums";
 
+import { THEMED_ICONS } from "@/components/icon-theme";
+import { PageTitleIcon } from "@/components/page-title-icon";
 export function AlbumsClient() {
   const { data: session } = useSession();
   const { t } = useTranslation();
@@ -141,7 +143,10 @@ export function AlbumsClient() {
       {/* En-tête */}
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">{t("albums.title")}</h1>
+          <h1 className="flex min-w-0 items-center gap-3 text-xl sm:text-2xl font-bold">
+            <PageTitleIcon icon={THEMED_ICONS.albums} />
+            {t("albums.title")}
+          </h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Organisez vos fichiers en albums pour un accès facile
           </p>

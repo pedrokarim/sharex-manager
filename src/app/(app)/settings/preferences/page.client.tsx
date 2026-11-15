@@ -22,7 +22,6 @@ import {
   type SortOrder,
 } from "@/lib/atoms/preferences";
 import {
-  Settings2,
   RotateCcw,
   Grid2X2,
   List,
@@ -63,6 +62,8 @@ import { ActionStatus, useFeedback } from "@/components/feedback";
 import { GALLERY_DISPLAY_DEFAULTS, useGalleryDisplay } from "@/hooks/use-gallery-display";
 import { cn } from "@/lib/utils";
 
+import { THEMED_ICONS } from "@/components/icon-theme";
+import { PageTitleIcon } from "@/components/page-title-icon";
 const settingsPanelClassName =
   "rounded-2xl border border-border/70 bg-card px-4 py-4 shadow-sm sm:px-5 sm:py-5";
 const settingsBlockClassName =
@@ -150,9 +151,7 @@ export function PreferencesPageClient() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm sm:h-11 sm:w-11">
-                <Settings2 className="h-5 w-5" />
-              </span>
+              <PageTitleIcon icon={THEMED_ICONS.preferences} />
               {t("settings.preferences")}
             </h1>
             <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">

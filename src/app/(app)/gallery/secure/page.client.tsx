@@ -11,6 +11,8 @@ import { useInView } from "react-intersection-observer";
 import { useEffect } from "react";
 import { useDebounce } from "@/hooks/use-debounce";
 
+import { THEMED_ICONS } from "@/components/icon-theme";
+import { PageTitleIcon } from "@/components/page-title-icon";
 interface SecureFile {
   name: string;
   url: string;
@@ -71,7 +73,8 @@ export function SecureGalleryClient() {
     <div className="container mx-auto py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-4 sm:gap-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h1 className="text-xl sm:text-2xl font-bold">
+          <h1 className="flex min-w-0 items-center gap-3 text-xl sm:text-2xl font-bold">
+            <PageTitleIcon icon={THEMED_ICONS.secure} />
             Fichiers Sécurisés ({totalFiles})
           </h1>
           <div className="flex items-center gap-4">

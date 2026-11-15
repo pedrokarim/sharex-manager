@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { FOREST, FRONT_CONTAINER, FRONT_WIDE } from "@/components/front/container";
 import { DISPLAY } from "@/components/front/fonts";
 import { Reveal } from "@/components/front/reveal";
+import type { IconComponent } from "@/components/icon-theme";
 import { cn } from "@/lib/utils";
 
 /** Photos de nature disponibles dans `public/images/home/`. */
@@ -14,6 +15,8 @@ interface PhotoHeaderProps {
   photo?: FrontPhoto;
   /** Fond propre à la page, à la place de la photo : la mosaïque du catalogue. */
   backdrop?: ReactNode;
+  /** Icône de la page, la même que son entrée dans la barre latérale (`THEMED_ICONS`). */
+  icon?: IconComponent;
   kicker?: ReactNode;
   title: ReactNode;
   /** Fin du titre, en italique et en vert clair. */
@@ -37,6 +40,7 @@ interface PhotoHeaderProps {
 export function PhotoHeader({
   photo = "mist",
   backdrop,
+  icon: Icon,
   kicker,
   title,
   titleAccent,
@@ -75,6 +79,7 @@ export function PhotoHeader({
         )}
       >
         <Reveal immediate>
+          {Icon ? <Icon className={cn("mb-5 size-12 drop-shadow-sm", centered && "mx-auto")} /> : null}
           {kicker ? <p className="text-xs font-semibold tracking-[0.18em] text-[#bfe6c9] uppercase">{kicker}</p> : null}
           <h1
             className={cn(

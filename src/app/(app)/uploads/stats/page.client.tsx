@@ -21,6 +21,8 @@ import { StatsAnalyticsTab } from "./_components/stats-analytics-tab";
 import { StatsGrowthTab } from "./_components/stats-growth-tab";
 import { StatsNetworkTab } from "./_components/stats-network-tab";
 
+import { THEMED_ICONS } from "@/components/icon-theme";
+import { PageTitleIcon } from "@/components/page-title-icon";
 /** `showNetwork` : l'onglet Réseau montre les adresses IP des envois, réservé aux admins. */
 export function StatsPageClient({ showNetwork = false }: { showNetwork?: boolean }) {
   const { t } = useTranslation();
@@ -181,7 +183,8 @@ export function StatsPageClient({ showNetwork = false }: { showNetwork?: boolean
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
+          <h1 className="flex min-w-0 items-center gap-3 text-xl sm:text-2xl font-bold tracking-tight">
+            <PageTitleIcon icon={THEMED_ICONS.stats} />
             {t("uploads.stats.title")}
           </h1>
           <p className="text-muted-foreground text-sm">

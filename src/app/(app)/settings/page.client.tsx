@@ -6,13 +6,14 @@ import {
   History,
   KeyRound,
   Settings2,
-  SlidersHorizontal,
   Upload,
 } from "lucide-react";
 
 import { NavCard, type NavCardAccent } from "@/components/nav-card";
 import { useTranslation } from "@/lib/i18n";
 
+import { THEMED_ICONS } from "@/components/icon-theme";
+import { PageTitleIcon } from "@/components/page-title-icon";
 interface SettingsItem {
   href: string;
   icon: typeof Upload;
@@ -103,9 +104,7 @@ export function SettingsPageClient() {
       <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm sm:p-6">
         <div className="space-y-2">
           <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm sm:h-11 sm:w-11">
-              <SlidersHorizontal className="h-5 w-5" />
-            </span>
+            <PageTitleIcon icon={THEMED_ICONS.settings} />
             {t("settings.title")}
           </h1>
           <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
