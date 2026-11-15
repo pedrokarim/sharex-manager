@@ -10,6 +10,7 @@ import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { normalizeLegacyFontTokens } from "@/lib/theme/normalize-font-tokens";
+import { DEFAULT_ICON_SET, isIconSetId, type IconSetId } from "@/lib/icon-themes/registry";
 
 const GLOBAL_THEME_ROW_ID = 1;
 
@@ -46,6 +47,17 @@ class ThemeDatabase {
         mode TEXT NOT NULL,
         light_styles TEXT NOT NULL,
         dark_styles TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        updated_by_user_id TEXT
+      )
+    `);
+
+    // Jeu d'icônes de l'interface, à part du thème des couleurs : son schéma
+    // reste celui que valide `globalThemeConfigSchema`.
+    db.run(`
+      CREATE TABLE IF NOT EXISTS global_icon_config (
+        id INTEGER PRIMARY KEY CHECK (id = ${GLOBAL_THEME_ROW_ID}),
+        icon_set TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         updated_by_user_id TEXT
       )
@@ -138,9 +150,35 @@ class ThemeDatabase {
     return ThemeDatabase.getGlobalThemeConfig();
   }
 
+  /** Jeu d'icônes publié ; Fluent Color tant que rien n'a été choisi, ou si le jeu enregistré n'existe plus. */
+  public static getIconSet(): IconSetId {
+    const db = ThemeDatabase.getConnection();
+    const row = db
+      .prepare("SELECT icon_set FROM global_icon_config WHERE id = ?")
+      .get(GLOBAL_THEME_ROW_ID) as { icon_set?: string } | null;
+    return isIconSetId(row?.icon_set) ? row.icon_set : DEFAULT_ICON_SET;
+  }
+
+  public static setIconSet(iconSet: IconSetId, updatedByUserId?: string | null): IconSetId {
+    if (!isIconSetId(iconSet)) throw new Error(`Jeu d'icônes inconnu : ${iconSet}`);
+    const db = ThemeDatabase.getConnection();
+    db.prepare(
+      `
+      INSERT INTO global_icon_config (id, icon_set, updated_at, updated_by_user_id)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        icon_set = excluded.icon_set,
+        updated_at = excluded.updated_at,
+        updated_by_user_id = excluded.updated_by_user_id
+    `,
+    ).run(GLOBAL_THEME_ROW_ID, iconSet, new Date().toISOString(), updatedByUserId ?? null);
+    return ThemeDatabase.getIconSet();
+  }
+
   public static resetThemeDb() {
     const db = ThemeDatabase.getConnection();
     db.prepare("DELETE FROM global_theme_config").run();
+    db.prepare("DELETE FROM global_icon_config").run();
     ThemeDatabase.initTables(db);
   }
 }

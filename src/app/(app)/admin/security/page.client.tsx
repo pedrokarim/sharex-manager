@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { useQueryState } from "nuqs";
 import { MotionConfig } from "framer-motion";
-import { RefreshCw, Shield } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { ActionStatus, useFeedback } from "@/components/feedback";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { ResourceProvider } from "./_components/resource";
 import { RulesTab } from "./_components/rules-tab";
 import { SessionsTab } from "./_components/sessions-tab";
 import { SignInTab } from "./_components/sign-in-tab";
+import { THEMED_ICONS } from "@/components/icon-theme";
 
 export const SECURITY_TABS: { id: SecurityTabId; label: string }[] = [
   { id: "overview", label: "État" },
@@ -72,7 +73,7 @@ function SecurityScreen({ ascenciaIssuer }: { ascenciaIssuer: string | null }) {
     <MotionConfig reducedMotion="user">
       <div className="w-full min-w-0 space-y-6">
         <AdminPageHeader
-          icon={Shield}
+          icon={THEMED_ICONS.security}
           title="Sécurité"
           description="L’état de l’instance, les sessions ouvertes, les clés API, les connexions et les règles qui les encadrent."
           actions={

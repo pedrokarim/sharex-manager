@@ -1,5 +1,4 @@
 "use client";
-
 import {
   Database,
   Link2,
@@ -11,9 +10,11 @@ import {
   Users,
 } from "lucide-react";
 
+
 import { NavCard, type NavCardAccent } from "@/components/nav-card";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { useTranslation } from "@/lib/i18n";
+import { THEMED_ICONS } from "@/components/icon-theme";
 
 export function AdminPageClient() {
   const { t } = useTranslation();
@@ -61,7 +62,7 @@ export function AdminPageClient() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader icon={Shield} title={t("admin.title")} description={t("admin.description")} />
+      <AdminPageHeader icon={THEMED_ICONS.overview} title={t("admin.title")} description={t("admin.description")} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {adminSections.map((section) => (

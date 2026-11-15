@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { THEMED_ICONS } from "@/components/icon-theme";
 import {
   Table,
   TableBody,
@@ -51,11 +52,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  CalendarIcon,
   Info,
   RefreshCw,
-  ScrollText,
-  Search,
   Trash2,
 } from "lucide-react";
 
@@ -205,7 +203,7 @@ export default function LogsPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        icon={ScrollText}
+        icon={THEMED_ICONS.logs}
         title={t("admin.sections.logs.title")}
         description={t("admin.sections.logs.description")}
       />

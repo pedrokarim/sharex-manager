@@ -3,10 +3,11 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { isAdmin } from "@/lib/api-guard";
 import { Metadata } from "next";
-import { Puzzle } from "lucide-react";
+
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ModuleList } from "@/components/modules/module-list";
+import { THEMED_ICONS } from "@/components/icon-theme";
 
 export const metadata: Metadata = {
   title: "Gestion des modules",
@@ -19,7 +20,7 @@ export default async function ModulesPage() {
   return (
     <div className="flex min-h-full shrink-0 flex-col gap-6">
       <AdminPageHeader
-        icon={Puzzle}
+        icon={THEMED_ICONS.modulesSettings}
         title="Gestion des modules"
         description="Installez, activez, désactivez et supprimez des modules pour étendre les fonctionnalités de votre application."
       />

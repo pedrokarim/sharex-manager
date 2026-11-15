@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import type { IconComponent } from "@/components/icon-theme";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -26,13 +27,13 @@ import { isLinkActive, linkSectionId } from "./nav-state";
 interface SubItem {
   title: string;
   url: string;
-  icon?: LucideIcon;
+  icon?: IconComponent;
 }
 
 export interface NavMenuItem {
   title: string;
   url: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   /** Logo affiché à la place de l'icône : celui d'un module. */
   image?: string;
   items?: SubItem[];

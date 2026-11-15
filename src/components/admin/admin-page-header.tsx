@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/components/icon-theme";
 
 interface AdminPageHeaderProps {
-  icon: LucideIcon;
+  icon: IconComponent;
   title: ReactNode;
   description?: ReactNode;
   /** Boutons de la page, calés à droite. */

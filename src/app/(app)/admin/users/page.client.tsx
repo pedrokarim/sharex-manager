@@ -43,7 +43,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useTranslation } from "@/lib/i18n";
-import { RefreshCw, Search, Shield, UserPlus, Users } from "lucide-react";
+import { RefreshCw, Shield, UserPlus } from "lucide-react";
+import { THEMED_ICONS } from "@/components/icon-theme";
+
 
 interface User {
   id: string;
@@ -127,7 +129,7 @@ export default function UsersPageClient({
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        icon={Users}
+        icon={THEMED_ICONS.users}
         title={t("admin.users.title")}
         // Les trois chiffres tiennent dans la phrase : pas besoin de tuiles.
         description={`${stats.total} ${stats.total > 1 ? "comptes" : "compte"}, dont ${stats.admins} ${stats.admins > 1 ? "administrateurs" : "administrateur"}. Gérez les rôles et les accès.`}

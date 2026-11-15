@@ -1,6 +1,6 @@
 import Link from "next/link";
 import * as React from "react";
-import { type LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/components/icon-theme";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -18,7 +18,7 @@ export function NavSecondary({
   items: {
     title: string;
     url: string;
-    icon: LucideIcon;
+    icon: IconComponent;
   }[];
   /** Adresse du lien qui correspond à la page courante. */
   activeHref: string | null;

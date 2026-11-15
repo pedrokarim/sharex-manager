@@ -1,48 +1,14 @@
 "use client";
 
 import * as React from "react";
-import {
-  Home,
-  Image as ImageIcon,
-  Upload,
-  Settings2,
-  FileImage,
-  History,
-  Settings,
-  FolderOpen,
-  Users,
-  Shield,
-  HelpCircle,
-  Send,
-  UserCog,
-  Info,
-  Sliders,
-  Key,
-  Share2,
-  Wrench,
-  AudioWaveform,
-  Palette,
-  MoreHorizontal,
-  Clock,
-  Star,
-  Lock,
-  BarChart3,
-  Tag,
-  Grid3X3,
-  LayoutDashboard,
-  ScrollText,
-  Server,
-  Package,
-  Link2,
-  PlugZap,
-  type LucideIcon,
-} from "lucide-react";
+
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import type { ModuleNavEntry } from "@/lib/modules/nav-items";
 import { resolveIcon } from "@/lib/utils/resolve-icon";
+import { THEMED_ICONS } from "@/components/icon-theme";
 
 import { NavMain, type NavMenuItem } from "./nav-main";
 import { NavSecondary } from "./nav-secondary";
@@ -101,34 +67,34 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
       {
         title: t("sidebar.main.gallery"),
         url: "/gallery",
-        icon: ImageIcon,
+        icon: THEMED_ICONS.gallery,
         items: [
           {
             title: t("sidebar.main.recent"),
             url: "/gallery?sort=recent",
-            icon: Clock,
+            icon: THEMED_ICONS.recent,
           },
           {
             title: t("sidebar.main.starred"),
             url: "/gallery/starred",
-            icon: Star,
+            icon: THEMED_ICONS.starred,
           },
           {
             title: t("sidebar.main.secure"),
             url: "/gallery/secure",
-            icon: Lock,
+            icon: THEMED_ICONS.secure,
           },
         ],
       },
       {
         title: t("sidebar.main.uploads"),
         url: "/uploads",
-        icon: Upload,
+        icon: THEMED_ICONS.uploads,
         items: [
           {
             title: t("sidebar.main.history"),
             url: "/uploads/history",
-            icon: History,
+            icon: THEMED_ICONS.history,
           },
           // Réservée aux admins (la page renvoie les autres vers l'accueil).
           ...(isAdmin
@@ -136,58 +102,58 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
                 {
                   title: t("sidebar.main.configuration"),
                   url: "/uploads/config",
-                  icon: Settings,
+                  icon: THEMED_ICONS.uploadConfig,
                 },
               ]
             : []),
           {
             title: t("sidebar.main.stats"),
             url: "/uploads/stats",
-            icon: BarChart3,
+            icon: THEMED_ICONS.stats,
           },
         ],
       },
       {
         title: t("sidebar.main.organization"),
         url: "/albums",
-        icon: FolderOpen,
+        icon: THEMED_ICONS.organization,
         items: [
           {
             title: t("albums.title"),
             url: "/albums",
-            icon: FolderOpen,
+            icon: THEMED_ICONS.albums,
           },
           {
             title: t("sidebar.main.tags"),
             url: "/organization/tags",
-            icon: Tag,
+            icon: THEMED_ICONS.tags,
           },
           {
             title: t("sidebar.main.collections"),
             url: "/organization/collections",
-            icon: Grid3X3,
+            icon: THEMED_ICONS.collections,
           },
         ],
       },
       {
         title: t("sidebar.main.settings"),
         url: "/settings",
-        icon: Settings2,
+        icon: THEMED_ICONS.settings,
         items: [
           {
             title: t("sidebar.secondary.preferences"),
             url: "/settings/preferences",
-            icon: Sliders,
+            icon: THEMED_ICONS.preferences,
           },
           {
             title: t("account.api_keys"),
             url: "/settings/api-keys",
-            icon: Key,
+            icon: THEMED_ICONS.apiKeys,
           },
           {
             title: t("sidebar.settings.integrations"),
             url: "/settings/integrations",
-            icon: Share2,
+            icon: THEMED_ICONS.integrations,
           },
           // La gestion des modules est réservée aux admins, comme sa page.
           ...(isAdmin
@@ -195,7 +161,7 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
                 {
                   title: "Modules",
                   url: "/modules",
-                  icon: FileImage,
+                  icon: THEMED_ICONS.modulesSettings,
                 },
               ]
             : []),
@@ -208,47 +174,47 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
       {
         title: t("sidebar.admin.overview"),
         url: "/admin",
-        icon: LayoutDashboard,
+        icon: THEMED_ICONS.overview,
       },
       {
         title: t("sidebar.admin.users"),
         url: "/admin/users",
-        icon: Users,
+        icon: THEMED_ICONS.users,
       },
       {
         title: t("sidebar.admin.logs"),
         url: "/admin/logs",
-        icon: ScrollText,
+        icon: THEMED_ICONS.logs,
       },
       {
         title: t("sidebar.admin.global_theme"),
         url: "/admin/theme",
-        icon: Palette,
+        icon: THEMED_ICONS.theme,
       },
       {
         title: t("sidebar.admin.system_config"),
         url: "/admin/system",
-        icon: Server,
+        icon: THEMED_ICONS.system,
       },
       {
         title: t("sidebar.admin.modules"),
         url: "/admin/modules",
-        icon: Package,
+        icon: THEMED_ICONS.modules,
       },
       {
         title: "Comptes connectés",
         url: "/admin/connections",
-        icon: Link2,
+        icon: THEMED_ICONS.connections,
       },
       {
         title: "Services externes",
         url: "/admin/services",
-        icon: PlugZap,
+        icon: THEMED_ICONS.services,
       },
       {
         title: t("sidebar.admin.security"),
         url: "/admin/security",
-        icon: Shield,
+        icon: THEMED_ICONS.security,
       },
     ],
     navOther: [
@@ -257,29 +223,29 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
         // elle-même présente Just Tools et MCInfo.
         title: "Outils",
         url: "/tools",
-        icon: MoreHorizontal,
+        icon: THEMED_ICONS.tools,
       },
     ],
     navSecondary: [
       {
         title: t("sidebar.secondary.preferences"),
         url: "/settings/preferences",
-        icon: Sliders,
+        icon: THEMED_ICONS.preferences,
       },
       {
         title: t("sidebar.secondary.support"),
         url: "/support",
-        icon: HelpCircle,
+        icon: THEMED_ICONS.support,
       },
       {
         title: t("sidebar.secondary.feedback"),
         url: "/feedback",
-        icon: Send,
+        icon: THEMED_ICONS.feedback,
       },
       {
         title: t("sidebar.secondary.about_app"),
         url: "/about-app",
-        icon: Info,
+        icon: THEMED_ICONS.about,
       },
     ],
   };

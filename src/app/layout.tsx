@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./global.css";
 import { Providers } from "@/components/providers";
+import { IconThemeProvider } from "@/components/icon-theme";
+import { getActiveIconSet } from "@/lib/icon-themes/server";
 import { Toaster } from "@/components/ui/sonner";
 import { auth } from "@/lib/auth";
 import { createThemeBootstrapScript } from "@/lib/theme/create-theme-bootstrap-script";
@@ -66,6 +68,9 @@ export default async function RootLayout({
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
   const initialTheme = await getResolvedThemePayload();
+  // Le jeu d'icônes publié part avec la page : la barre est peinte d'emblée
+  // avec les bonnes icônes, sans repli remplacé après l'hydratation.
+  const iconSet = await getActiveIconSet();
 
   const themeBootstrapScript = createThemeBootstrapScript({ initialTheme });
 
@@ -114,13 +119,15 @@ export default async function RootLayout({
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:z-[9999] focus:bg-background focus:px-4 focus:py-2 focus:text-foreground"
         >
-          Skip to main content
+          Aller au contenu
         </a>
         <Providers initialTheme={initialTheme} session={session}>
-          <div className="relative min-h-screen">
-            <main id="main-content">{children}</main>
-            <Toaster />
-          </div>
+          <IconThemeProvider initial={iconSet}>
+            <div className="relative min-h-screen">
+              <main id="main-content">{children}</main>
+              <Toaster />
+            </div>
+          </IconThemeProvider>
         </Providers>
       </body>
     </html>

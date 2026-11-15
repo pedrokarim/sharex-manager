@@ -2,10 +2,11 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { isAdmin } from "@/lib/api-guard";
-import { Package } from "lucide-react";
+
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ModuleList } from "@/components/modules/module-list";
+import { THEMED_ICONS } from "@/components/icon-theme";
 
 export const metadata = {
   title: "Administration des modules",
@@ -18,7 +19,7 @@ export default async function ModulesPage() {
   return (
     <div className="flex min-h-full shrink-0 flex-col gap-6">
       <AdminPageHeader
-        icon={Package}
+        icon={THEMED_ICONS.modules}
         title="Gestion des modules"
         description="Installez, activez, désactivez et supprimez des modules pour étendre les fonctionnalités de votre application."
       />

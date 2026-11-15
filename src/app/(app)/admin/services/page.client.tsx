@@ -12,7 +12,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { MotionConfig } from "framer-motion";
-import { PlugZap, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import type { AiLimit, AiProviderId, AiUsageEvent, AiUsageOverview } from "@/lib/ai-usage/types";
 import { ActionStatus, useFeedback } from "@/components/feedback";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -26,6 +26,7 @@ import { LimitsPanel } from "./_components/limits-panel";
 import { ProviderSheet } from "./_components/provider-sheet";
 import { ProvidersTable } from "./_components/providers-table";
 import { RecentCalls } from "./_components/recent-calls";
+import { THEMED_ICONS } from "@/components/icon-theme";
 
 type RemoteLimits = Partial<Record<AiProviderId, AiLimit[]>>;
 
@@ -68,7 +69,7 @@ export function ServicesPageClient({ initial }: { initial: AiUsageOverview }) {
     <MotionConfig reducedMotion="user">
       <div className="w-full min-w-0 space-y-6">
         <AdminPageHeader
-          icon={PlugZap}
+          icon={THEMED_ICONS.services}
           title="Services externes"
           description="Consommation, quotas et derniers appels des services utilisés par l’application."
           actions={

@@ -7,6 +7,13 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Thème global, icônes : les icônes de la barre latérale et des en-têtes
+  d’administration se dessinent dans un jeu choisi sur la page du thème, parmi
+  onze (Fluent Color par défaut, Lucide, Phosphor, Solar, Hugeicons, Fluent,
+  Remix, MingCute, Material Symbols). Le choix s’applique aussitôt à toute la
+  page, d’un seul coup, et « Publier » le donne à tout le monde ; le
+  serveur envoie le jeu publié avec la page, sans repli remplacé après coup.
+  Les icônes des boutons et des menus restent en Lucide.
 - Clip Studio, droits des musiques et blocages (dossier 01 quater) : chaque
   morceau de la banque garde une preuve de sa licence (fiche Openverse,
   empreinte du fichier, archive Wayback Machine) et se contrôle chaque

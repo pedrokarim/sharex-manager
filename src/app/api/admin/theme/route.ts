@@ -4,10 +4,13 @@ import { themeDb } from "@/lib/theme/theme-db";
 import { globalThemeModeSchema } from "@/types/theme-runtime";
 import { themeStylesSchema } from "@/types/theme";
 import * as z from "zod";
+import { isIconSetId } from "@/lib/icon-themes/registry";
 
 const updateGlobalThemeSchema = z.object({
   mode: globalThemeModeSchema,
   styles: themeStylesSchema,
+  /** Jeu d’icônes de l’interface, enregistré à part du thème des couleurs. */
+  iconSet: z.string().refine(isIconSetId, "Jeu d’icônes inconnu").optional(),
 });
 
 export const GET = withAuth(async (_request: Request, _context: unknown, session) => {
@@ -15,6 +18,7 @@ export const GET = withAuth(async (_request: Request, _context: unknown, session
 
   return Response.json({
     globalTheme,
+    iconSet: themeDb.getIconSet(),
     payload: resolveThemePayload(globalTheme),
   });
 }, { role: "admin" });
@@ -33,13 +37,18 @@ export const PUT = withAuth(async (request: Request, _context: unknown, session)
     );
   }
 
+  const { iconSet: requestedIconSet, ...themeInput } = parsed.data;
   const globalTheme = themeDb.updateGlobalThemeConfig({
-    ...parsed.data,
+    ...themeInput,
     updatedByUserId: session.user.id,
   });
+  const iconSet = requestedIconSet
+    ? themeDb.setIconSet(requestedIconSet, session.user.id)
+    : themeDb.getIconSet();
 
   return Response.json({
     globalTheme,
+    iconSet,
     payload: resolveThemePayload(globalTheme),
   });
 }, { role: "admin" });

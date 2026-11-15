@@ -15,6 +15,9 @@ import { THEME_COLOR_KEYS } from "@/lib/theme/constants";
 import { cn } from "@/lib/utils";
 import type { ThemeStyles } from "@/types/theme";
 import type { GlobalThemeConfig, GlobalThemeMode, ThemeRuntimeUpdateResponse } from "@/types/theme-runtime";
+import { THEMED_ICONS, useIconTheme } from "@/components/icon-theme";
+import { IconSetPicker } from "@/components/theme/icon-set-picker";
+import type { IconSetData, IconSetId } from "@/lib/icon-themes/registry";
 
 const MODES: { value: GlobalThemeMode; label: string; hint: string }[] = [
   { value: "light", label: "Clair", hint: "Toujours clair" },
@@ -42,13 +45,24 @@ const sameColors = (a: ThemeStyles, b: ThemeStyles) =>
   (["light", "dark"] as const).every((mode) => THEME_COLOR_KEYS.every((key) => a[mode][key] === b[mode][key]));
 
 /**
- * Thème global : le mode du site et ses couleurs, rien de plus. Les polices,
- * les rayons, les ombres et les espacements du thème publié sont renvoyés tels
- * quels à l'enregistrement.
+ * Thème global : le mode du site, ses couleurs et le jeu d'icônes de
+ * l'interface. Les polices, les rayons, les ombres et les espacements du
+ * thème publié sont renvoyés tels quels à l'enregistrement.
  */
-export default function ThemeAdminPageClient({ initialGlobalTheme }: { initialGlobalTheme: GlobalThemeConfig }) {
+export default function ThemeAdminPageClient({
+  initialGlobalTheme,
+  initialIconSet,
+  iconSets,
+}: {
+  initialGlobalTheme: GlobalThemeConfig;
+  initialIconSet: IconSetId;
+  iconSets: IconSetData[];
+}) {
   const router = useRouter();
   const { replaceResolvedTheme } = useTheme();
+  const iconTheme = useIconTheme();
+  const [publishedIconSet, setPublishedIconSet] = useState(initialIconSet);
+  const [iconSet, setIconSet] = useState<IconSetId>(initialIconSet);
   const [published, setPublished] = useState(initialGlobalTheme);
   const [mode, setMode] = useState<GlobalThemeMode>(initialGlobalTheme.mode);
   const [styles, setStyles] = useState<ThemeStyles>(initialGlobalTheme.styles);
@@ -58,7 +72,7 @@ export default function ThemeAdminPageClient({ initialGlobalTheme }: { initialGl
   // Le résultat de la publication se lit à côté du bouton Publier.
   const publishFeedback = useFeedback();
 
-  const dirty = mode !== published.mode || !sameColors(styles, published.styles);
+  const dirty = mode !== published.mode || !sameColors(styles, published.styles) || iconSet !== publishedIconSet;
   const isDefault = useMemo(() => sameColors(styles, defaultThemeState.styles as ThemeStyles), [styles]);
 
   const setColor = (key: (typeof THEME_COLOR_KEYS)[number], value: string) =>
@@ -110,15 +124,21 @@ export default function ThemeAdminPageClient({ initialGlobalTheme }: { initialGl
       const response = await fetch("/api/admin/theme", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, styles }),
+        body: JSON.stringify({ mode, styles, iconSet }),
       });
-      const data = (await response.json()) as ThemeRuntimeUpdateResponse & { error?: string };
+      const data = (await response.json()) as ThemeRuntimeUpdateResponse & { iconSet?: IconSetId; error?: string };
       if (!response.ok) throw new Error(data.error || "Impossible de publier le thème");
 
       setPublished(data.globalTheme);
       setMode(data.globalTheme.mode);
       setStyles(data.globalTheme.styles);
       replaceResolvedTheme(data.payload, { animate: false });
+      // Le jeu montré en aperçu devient le jeu publié, sans repasser par un autre.
+      const savedIconSet = data.iconSet ?? iconSet;
+      const savedIcons = iconSets.find((set) => set.id === savedIconSet);
+      if (savedIcons) iconTheme?.publish(savedIcons);
+      setPublishedIconSet(savedIconSet);
+      setIconSet(savedIconSet);
       router.refresh();
       publishFeedback.success("Thème publié");
     } catch (error) {
@@ -131,9 +151,9 @@ export default function ThemeAdminPageClient({ initialGlobalTheme }: { initialGl
   return (
     <div className="flex min-h-full shrink-0 flex-col gap-8">
       <AdminPageHeader
-        icon={Palette}
+        icon={THEMED_ICONS.theme}
         title="Thème global"
-        description="Le mode et les couleurs du site, pour tous les visiteurs."
+        description="Le mode, les couleurs et les icônes du site, pour tous les visiteurs."
         actions={
           <>
             {/* Posé avant les boutons : ils ne bougent pas quand le message
@@ -172,6 +192,17 @@ export default function ThemeAdminPageClient({ initialGlobalTheme }: { initialGl
               {option.label}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold tracking-tight">Icônes</h2>
+        <p className="text-sm text-muted-foreground">
+          Celles de la barre latérale et des en-têtes d’écran. Le choix s’applique tout de suite sur cette page ; « Publier » le
+          donne à tout le monde. Les icônes des boutons et des menus ne changent pas.
+        </p>
+        <div className="mt-4">
+          <IconSetPicker sets={iconSets} value={iconSet} onChange={setIconSet} />
         </div>
       </section>
 

@@ -38,6 +38,7 @@ import { AccountAvatar, RelativeTime, ServiceLogo, StatusDot, accountHealth, cap
 import type { ConnectionsOverview, ConnectorView } from "@/components/connections/types";
 import { verifyAccountAction } from "./actions";
 import { DisconnectDialog, RenameDialog } from "./shared";
+import { THEMED_ICONS } from "@/components/icon-theme";
 
 type StateFilter = "all" | "attention" | "ok";
 type SortKey = "name" | "checked";
@@ -167,7 +168,7 @@ export function ConnectionsPageClient({ initial }: { initial: ConnectionsOvervie
     <MotionConfig reducedMotion="user">
       <div className="w-full min-w-0 space-y-6">
         <AdminPageHeader
-          icon={Link2}
+          icon={THEMED_ICONS.connections}
           title="Comptes connectés"
           description="Les comptes où ShareX Manager publie. Clip Studio, Image de marque et les modules à venir s’en servent tous."
           actions={

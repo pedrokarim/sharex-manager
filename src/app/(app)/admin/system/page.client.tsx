@@ -1,11 +1,10 @@
 "use client";
-
 import {
-  Settings,
   Upload,
   Database,
   Package,
 } from "lucide-react";
+
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import {
@@ -19,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/lib/i18n";
 import { useState } from "react";
 import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
+import { THEMED_ICONS } from "@/components/icon-theme";
 
 interface ModuleDependencyResult {
   name: string;
@@ -78,7 +78,7 @@ export default function SystemPageClient() {
 
   return (
     <div className="w-full space-y-6">
-      <AdminPageHeader icon={Settings} title={t("admin.system.title")} description={t("admin.system.description")} />
+      <AdminPageHeader icon={THEMED_ICONS.system} title={t("admin.system.title")} description={t("admin.system.description")} />
 
       <div className="grid gap-6 xl:grid-cols-2">
         {/* Gestion des modules */}

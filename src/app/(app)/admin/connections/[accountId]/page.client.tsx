@@ -5,7 +5,7 @@ import { useQueryState } from "nuqs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MotionConfig } from "framer-motion";
-import { ArrowLeft, CircleAlert, ExternalLink, Link2, MoreHorizontal, PencilLine, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
+import { ArrowLeft, CircleAlert, ExternalLink, MoreHorizontal, PencilLine, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
 import { ActionStatus, useFeedback } from "@/components/feedback";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { PostsTab } from "./posts-tab";
 import { QueueTab, isActiveJob, isOpenJob } from "./queue-tab";
 import { QuotaTab } from "./quota-tab";
 import { ChannelTab } from "./channel-tab";
+import { THEMED_ICONS } from "@/components/icon-theme";
 
 export function AccountPageClient({ initial }: { initial: AccountPageData }) {
   const router = useRouter();
@@ -113,7 +114,7 @@ export function AccountPageClient({ initial }: { initial: AccountPageData }) {
         </Button>
 
         <AdminPageHeader
-          icon={Link2}
+          icon={THEMED_ICONS.connections}
           title={<span className="block [overflow-wrap:anywhere]">{account.displayName}</span>}
           description={
             <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
