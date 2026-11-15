@@ -90,6 +90,7 @@ import {
   getEditorChat as readEditorChat,
   recordEditorChatOutcome as storeEditorChatOutcome,
   sendEditorChat as askEditorChat,
+  startIssueChat,
   type EditorChat,
 } from "./lib/editor-chat";
 import { isTranscriptionEngine, saveTranscriptionEngine, transcriptionEngine, type TranscriptionSettings } from "./lib/transcription-settings";
@@ -207,6 +208,8 @@ import {
   type ParsedStudioClaim,
 } from "./lib/publication-issues";
 import type { PublicationIssue, PublicationIssueClaim, PublicationIssueKind, PublicationIssueResolutionState } from "./lib/rights-types";
+import { briefForAssistant, buildIssueBrief, createIssueFix as makeIssueFix, issueOpening, noteIssueFixExport, type IssueBrief, type IssueFixResult } from "./lib/issue-fixes";
+import { listIssueFixes, type IssueFixSolution } from "./lib/publication-issues";
 
 export type { ProjectSummary } from "./lib/library";
 
@@ -582,6 +585,12 @@ export async function registerExport(input: RegisterExportInput): Promise<ClipEx
     // Un modèle illisible ne doit pas faire perdre le rendu : les textes restent à écrire.
   }
   writeExports([entry, ...readExports()]);
+  // Rendu depuis une copie faite pour régler un blocage : le blocage passe réglé, avec le lien vers ce nouvel export.
+  try {
+    noteIssueFixExport(entry.projectId, entry.id);
+  } catch (error) {
+    console.error("[clip-studio] lien du blocage non rangé :", error instanceof Error ? error.message : error);
+  }
   return entry;
 }
 
@@ -1369,6 +1378,43 @@ export async function resolveExportIssue(id: string, resolution: { state: Public
     ...(typeof resolution?.note === "string" ? { note: resolution.note } : {}),
     ...(typeof resolution?.newExportId === "string" ? { newExportId: resolution.newExportId } : {}),
   });
+}
+
+/**
+ * Dossier d'un blocage (§ 6.1) : éléments du projet sur la plage, droits et
+ * preuve, historique, morceaux de remplacement, texte de contestation et
+ * solutions avec leur coût.
+ */
+export async function getIssueBrief(issueId: string): Promise<IssueBrief> {
+  return buildIssueBrief(String(issueId ?? ""));
+}
+
+/**
+ * Crée la copie du projet qui porte une solution (musique remplacée, passage
+ * à retirer, visuel à remplacer, assistant) et rend l'écran à ouvrir.
+ * L'original ne bouge jamais ; rien n'est rendu ni publié ici.
+ */
+export async function createIssueFix(input: { issueId: string; solution: IssueFixSolution; trackId?: string }): Promise<IssueFixResult> {
+  return makeIssueFix({
+    issueId: String(input?.issueId ?? ""),
+    solution: input?.solution,
+    ...(typeof input?.trackId === "string" ? { trackId: input.trackId } : {}),
+  });
+}
+
+/**
+ * Ouvre l'assistant de l'éditeur sur un blocage : seulement dans une copie
+ * faite pour ce blocage. Le dossier est rangé avec la conversation et le
+ * premier message, écrit sans Codex, cite le média, la plage et le demandeur.
+ */
+export async function openIssueAssistant(input: { projectId: string; issueId: string }): Promise<EditorChat> {
+  const projectId = String(input?.projectId ?? "");
+  const issueId = String(input?.issueId ?? "");
+  assertId(projectId, "Identifiant de projet");
+  if (!listIssueFixes({ issueId, projectId }).length) throw new Error("Ce projet n’est pas une copie faite pour ce blocage.");
+  const brief = buildIssueBrief(issueId);
+  const opening = issueOpening(brief);
+  return startIssueChat(projectId, { issueId, brief: briefForAssistant(brief), text: opening.text, solutions: opening.solutions });
 }
 
 // ─── Banque de musique ───────────────────────────────────────────

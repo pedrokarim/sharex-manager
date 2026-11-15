@@ -169,11 +169,12 @@ Soundrider/Dope `at-risk`.
 | Instagram | Graph API, objet IG Media | `copyright_check_information` (état, correspondances trouvées), si le champ répond pour un média déjà publié (question 2) |
 | Threads | – | Aucun champ connu : publication en lecture seule, contrôlée par sa présence |
 
-À mesurer avant d’écrire le code : ce que `videos.list` renvoie pour
-`TdSclzwxnYo`. Si un Short bloqué par Content ID ne montre ni
-`regionRestriction` ni `rejectionReason`, le seul signal automatique reste
-la disparition des vues et l’absence de lecture publique, et la saisie à la
-main (§ 5.3) devient le chemin principal.
+Mesuré le 15/11/2026 sur `TdSclzwxnYo`, un jour après le blocage :
+`videos.list` rend `uploadStatus` `processed`, `privacyStatus` `public` et
+aucun `rejectionReason`, mais `contentDetails.regionRestriction.blocked` liste les 249 codes pays
+de l’ISO 3166. Un blocage mondial se lit donc à la longueur de cette liste
+(240 pays ou plus, `isWorldwideScope`), et la lecture automatique l’a
+relevé seule au premier passage.
 
 Le détail (titre revendiqué, demandeur, plage) n’existe que dans Studio et
 dans l’e-mail que YouTube envoie au propriétaire de la chaîne.

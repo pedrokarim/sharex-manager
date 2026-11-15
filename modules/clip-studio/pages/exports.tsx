@@ -136,6 +136,7 @@ import { JobTimeline, MOVING, formatDuration, jobsPending, serviceTargets, type 
 import { ScreenHeader } from "../components/screen-header";
 import { AspectChip, ChannelLogos, ExportPoster, FiltersBar, Pager, SortButton, formatClock, formatCount, formatRelative, formatShortDate, type ConnectorBadge } from "../components/library-ui";
 import { PublicationIssueDialog, issueSummary, type IssueTarget } from "../components/publication-issue-dialog";
+import { IssueFixDialog } from "../components/issue-fix-dialog";
 import { issueStateText, type PublicationIssue } from "../lib/rights-types";
 
 export default function ExportsPage() {
@@ -1436,6 +1437,8 @@ function PublicationsPanel({ entryId, jobsKey, onChanged }: { entryId: string; j
   const [rowTarget, setRowTarget] = useState<string | null>(null);
   const headerFeedback = useFeedback();
   const [issueDialog, setIssueDialog] = useState<{ target: IssueTarget; row: PublicationRow; mode: "view" | "report" } | null>(null);
+  /** Blocage ouvert dans « Régler ce blocage ». */
+  const [fixIssueId, setFixIssueId] = useState<string | null>(null);
 
   const load = useCallback(
     async (refresh = false) => {
@@ -1603,10 +1606,16 @@ function PublicationsPanel({ entryId, jobsKey, onChanged }: { entryId: string; j
                       </Button>
                     ) : null}
                     {issue ? (
-                      <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" onClick={() => openIssue(row, "view")}>
-                        <FileWarning className="size-3.5" />
-                        Détail du blocage
-                      </Button>
+                      <>
+                        <Button size="sm" className="h-7 gap-1.5 px-2.5 text-xs" onClick={() => setFixIssueId(issue.id)}>
+                          <Wand2 className="size-3.5" />
+                          Régler ce blocage
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" onClick={() => openIssue(row, "view")}>
+                          <FileWarning className="size-3.5" />
+                          Détail du blocage
+                        </Button>
+                      </>
                     ) : row.state === "published" && row.externalId ? (
                       <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs text-muted-foreground" onClick={() => openIssue(row, issuesOf(row).length > 0 ? "view" : "report")}>
                         <FileWarning className="size-3.5" />
@@ -1636,6 +1645,7 @@ function PublicationsPanel({ entryId, jobsKey, onChanged }: { entryId: string; j
         onClose={() => setIssueDialog(null)}
         onChanged={() => void load()}
       />
+      <IssueFixDialog issueId={fixIssueId} onClose={() => setFixIssueId(null)} onChanged={() => void load()} />
       {details?.statsFetchedAt ? <PanelFooter>Statistiques lues {formatRelative(details.statsFetchedAt)}, gardées dix minutes avant d’être relues chez le service.</PanelFooter> : null}
     </Panel>
   );

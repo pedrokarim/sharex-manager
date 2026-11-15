@@ -258,6 +258,25 @@ describe("lecture de santé YouTube", () => {
     expect(label("gone01")).toBe("Retirée");
   });
 
+  it("lit 249 pays bloqués comme un blocage mondial (mesuré sur TdSclzwxnYo)", () => {
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const codes = Array.from({ length: 249 }, (_, index) => `${letters[Math.floor(index / 26)]}${letters[index % 26]}`);
+    const draft = issues.healthToIssue({ externalId: VIDEO_ID, found: true, uploadStatus: "processed", regionRestriction: { blocked: codes }, checkedAt: NOW });
+    expect(draft?.kind).toBe("blocked");
+    expect(draft?.scope?.worldwide).toBe(true);
+    // La liste reste, pour le détail.
+    expect(draft?.scope?.countries).toHaveLength(249);
+    expect(issueStateText(draft!)).toBe("Bloquée dans le monde entier");
+    // Quelques pays seulement : un blocage partiel.
+    expect(issues.healthToIssue({ externalId: VIDEO_ID, found: true, regionRestriction: { blocked: codes.slice(0, 12) }, checkedAt: NOW })?.scope?.worldwide).toBe(false);
+
+    // Relu par l'API après une saisie à la main « monde entier » : pas de doublon.
+    seedProject();
+    issues.recordPublicationIssue({ ...target, kind: "blocked", scope: { worldwide: true }, source: "manual" });
+    expect(issues.recordHealthReading(target, { externalId: VIDEO_ID, found: true, regionRestriction: { blocked: codes }, checkedAt: NOW })).toBeNull();
+    expect(issues.listPublicationIssues()).toHaveLength(1);
+  });
+
   it("distingue un refus pour une autre raison", () => {
     expect(issues.healthToIssue({ externalId: "x", found: true, uploadStatus: "rejected", rejectionReason: "trademark", checkedAt: NOW })).toEqual({ kind: "rejected" });
     expect(issues.healthToIssue({ externalId: "x", found: true, regionRestriction: { allowed: ["FR"] }, checkedAt: NOW })).toEqual({ kind: "blocked", scope: { worldwide: false } });

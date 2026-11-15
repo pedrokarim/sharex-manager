@@ -31,6 +31,10 @@ export interface EditorChatMessage {
   error?: "failed" | "canceled" | "interrupted";
   /** Réponse : durée de l'appel à Codex. */
   durationMs?: number;
+  /** Réponse : les solutions proposées, numérotées à partir de 1 (premier message ouvert depuis un blocage). */
+  solutions?: string[];
+  /** Message écrit sans Codex à l'ouverture depuis un blocage : son identifiant. */
+  issueId?: string;
 }
 
 /** Demande en cours de traitement. */
@@ -48,6 +52,11 @@ export interface EditorChat {
   messages: EditorChatMessage[];
   pending?: EditorChatPending;
   updatedAt: number;
+  /**
+   * Projet ouvert pour régler un blocage de publication (dossier 01 quater,
+   * § 6.1) : le dossier du blocage, relu par Codex à chaque demande.
+   */
+  issue?: { id: string; brief: unknown };
 }
 
 /** Bornes de la conversation rangée. */

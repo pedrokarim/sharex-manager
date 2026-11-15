@@ -26,6 +26,8 @@ import { DATA_DIR, readExports, readProject } from "./store";
 import { askCodex, extractJson, findCodex } from "./codex";
 import { setTrackRightsNote } from "./music-rights";
 import {
+  WORLDWIDE_COUNTRY_COUNT,
+  isWorldwideScope,
   issueStateText,
   type PublicationIssue,
   type PublicationIssueClaim,
@@ -81,6 +83,24 @@ interface IssuesFile {
   issues: PublicationIssue[];
   /** Par travail de publication (`PublishJob.id`). */
   watch: Record<string, HealthWatch>;
+  /** Copies de projet faites pour régler un blocage (dossier 01 quater, § 6.2). */
+  fixes: IssueFix[];
+}
+
+/** Solutions qui passent par une copie du projet. */
+export type IssueFixSolution = "replace-music" | "trim" | "replace-visual" | "assistant";
+
+/** Une copie du projet faite pour régler un blocage ; l'original ne bouge jamais. */
+export interface IssueFix {
+  issueId: string;
+  solution: IssueFixSolution;
+  projectId: string;
+  projectName: string;
+  createdAt: string;
+  /** Morceau choisi pour remplacer la musique en cause. */
+  replacementTrackId?: string;
+  /** Premier export rendu depuis la copie. */
+  exportId?: string;
 }
 
 const issuesFile = () => path.join(DATA_DIR, "publication-issues.json");
@@ -91,9 +111,10 @@ function readFile(): IssuesFile {
     return {
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
       watch: parsed.watch && typeof parsed.watch === "object" ? parsed.watch : {},
+      fixes: Array.isArray(parsed.fixes) ? parsed.fixes : [],
     };
   } catch {
-    return { issues: [], watch: {} };
+    return { issues: [], watch: {}, fixes: [] };
   }
 }
 
@@ -134,8 +155,9 @@ function cleanCountries(value: unknown): string[] | undefined {
 function cleanScope(value: unknown): PublicationIssue["scope"] | undefined {
   if (!value || typeof value !== "object") return undefined;
   const raw = value as { worldwide?: unknown; countries?: unknown };
-  const worldwide = raw.worldwide === true;
-  const countries = worldwide ? undefined : cleanCountries(raw.countries);
+  // Les pays restent avec un blocage mondial : YouTube le donne comme la liste de presque tous les pays.
+  const countries = cleanCountries(raw.countries);
+  const worldwide = raw.worldwide === true || (countries?.length ?? 0) >= WORLDWIDE_COUNTRY_COUNT;
   return { worldwide, ...(countries ? { countries } : {}) };
 }
 
@@ -165,7 +187,7 @@ const isService = isPublicationService;
 
 /** Ce qui distingue deux états d'une même publication : un état relu ne recrée pas d'entrée. */
 function issueSignature(issue: Pick<PublicationIssue, "kind" | "scope">): string {
-  const scope = issue.scope ? (issue.scope.worldwide ? "world" : (issue.scope.countries ?? []).join(",")) : "";
+  const scope = issue.scope ? (isWorldwideScope(issue.scope) ? "world" : (issue.scope.countries ?? []).join(",")) : "";
   return `${issue.kind}|${scope}`;
 }
 
@@ -322,6 +344,66 @@ export function issueLookup(): (row: { jobId: string; connector: string; externa
     return rest;
   };
   return (row) => best(byJob.get(row.jobId)) ?? (row.externalId ? best(byExternal.get(`${row.connector}:${row.externalId}`)) : undefined);
+}
+
+// ─── Copies faites pour régler un blocage ────────────────────────
+
+/** Un blocage par son identifiant, ou rien. */
+export function getPublicationIssue(id: string): PublicationIssue | undefined {
+  return typeof id === "string" ? readFile().issues.find((issue) => issue.id === id) : undefined;
+}
+
+/** Range le lien entre un blocage et la copie du projet faite pour le régler. */
+export function recordIssueFix(fix: Omit<IssueFix, "createdAt" | "exportId">): IssueFix {
+  const entry: IssueFix = { ...fix, createdAt: isoNow() };
+  mutate((data) => {
+    if (!data.issues.some((issue) => issue.id === fix.issueId)) throw new Error("Blocage introuvable.");
+    data.fixes.push(entry);
+  });
+  return entry;
+}
+
+/** Copies faites pour un blocage (ou toutes), de la plus récente à la plus ancienne. */
+export function listIssueFixes(filter: { issueId?: string; projectId?: string } = {}): IssueFix[] {
+  return readFile()
+    .fixes.filter((fix) => (!filter.issueId || fix.issueId === filter.issueId) && (!filter.projectId || fix.projectId === filter.projectId))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/**
+ * Un export vient d'être enregistré : s'il est rendu depuis une copie faite
+ * pour un blocage, le blocage passe « musique remplacée », « passage coupé »
+ * ou « visuel remplacé », avec le lien vers ce nouvel export. `settle` dit,
+ * pour une copie de l'assistant, ce que la copie a changé (ou `null` : rien
+ * de décisif). Une revendication déjà levée ne bouge pas.
+ */
+export function noteFixExport(
+  projectId: string,
+  exportId: string,
+  settle: (fix: IssueFix, issue: PublicationIssue) => "replaced" | "trimmed" | null = (fix) => (fix.solution === "trim" ? "trimmed" : fix.solution === "assistant" ? null : "replaced")
+): PublicationIssue[] {
+  const data = readFile();
+  const fixes = data.fixes.filter((fix) => fix.projectId === projectId && !fix.exportId);
+  if (fixes.length === 0) return [];
+  const decisions = fixes.flatMap((fix) => {
+    const issue = data.issues.find((entry) => entry.id === fix.issueId);
+    if (!issue || issue.resolution?.state === "released") return [];
+    const state = settle(fix, issue);
+    return state ? [{ fix, state }] : [];
+  });
+  return mutate((current) => {
+    const changed: PublicationIssue[] = [];
+    for (const { fix, state } of decisions) {
+      // Une copie sans changement décisif attend un export suivant.
+      const stored = current.fixes.find((entry) => entry.projectId === fix.projectId && entry.issueId === fix.issueId && entry.createdAt === fix.createdAt);
+      if (stored) stored.exportId = exportId;
+      const issue = current.issues.find((entry) => entry.id === fix.issueId);
+      if (!issue) continue;
+      issue.resolution = { state, at: isoNow(), newExportId: exportId, note: `Export rendu depuis la copie «${NBSP}${fix.projectName}${NBSP}».` };
+      changed.push(issue);
+    }
+    return changed;
+  });
 }
 
 // ─── Morceau en cause ────────────────────────────────────────────
@@ -602,7 +684,8 @@ export function healthToIssue(health: PublicationHealth): Pick<PublicationIssue,
   }
   if (Array.isArray(restriction?.blocked) && restriction.blocked.length > 0) {
     const countries = cleanCountries(restriction.blocked);
-    return { kind: "blocked", scope: { worldwide: false, ...(countries ? { countries } : {}) } };
+    // Mesuré sur TdSclzwxnYo : un blocage mondial arrive comme `blocked` avec 249 codes pays.
+    return { kind: "blocked", scope: { worldwide: (countries?.length ?? 0) >= WORLDWIDE_COUNTRY_COUNT, ...(countries ? { countries } : {}) } };
   }
   return null;
 }

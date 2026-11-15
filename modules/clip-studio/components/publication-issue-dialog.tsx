@@ -23,7 +23,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { callModule } from "../lib/client";
 import type { ParsedStudioClaim } from "../lib/publication-issues";
-import { issueStateText, type PublicationIssue, type PublicationIssueClaim, type PublicationIssueKind } from "../lib/rights-types";
+import { isWorldwideScope, issueStateText, type PublicationIssue, type PublicationIssueClaim, type PublicationIssueKind } from "../lib/rights-types";
 import { formatClock, formatRelative } from "./library-ui";
 
 const NBSP = " ";
@@ -69,7 +69,7 @@ const MEDIA_LABELS: Record<PublicationIssueClaim["media"], string> = { audio: "A
 
 function effectOf(kind: PublicationIssueKind, scope?: PublicationIssue["scope"]): Effect {
   if (kind === "muted" || kind === "removed" || kind === "rejected") return kind;
-  if (scope?.worldwide) return "worldwide";
+  if (isWorldwideScope(scope)) return "worldwide";
   if (scope) return "countries";
   return "claimed";
 }
@@ -443,7 +443,11 @@ function IssueHistory({
               <Row term="Plage" value={formatIssueRange(issue.claim)} />
               <Row term="Média" value={issue.claim ? MEDIA_LABELS[issue.claim.media] : null} />
               <Row term="Effet" value={issue.kind === "copyright-claim" || issue.kind === "blocked" ? issueStateText({ kind: issue.kind, scope: issue.scope }) : null} />
-              <Row term="Pays" value={allowed ? `Lue seulement dans ${allowed.join(", ")}` : issue.scope?.countries?.length ? issue.scope.countries.join(", ") : null} />
+              {/* Un blocage mondial ne liste pas ses pays (YouTube en donne 249). */}
+              {allowed ? <Row term="Pays" value={`Lue seulement dans ${countryList(allowed).text}`} title={countryList(allowed).title} /> : null}
+              {!allowed && issue.scope?.countries?.length && !isWorldwideScope(issue.scope) ? (
+                <Row term="Pays" value={`Bloquée dans ${countryList(issue.scope.countries).text}`} title={countryList(issue.scope.countries).title} />
+              ) : null}
               <Row term="Morceau" value={issue.trackId ? "Retrouvé dans le projet, marqué revendiqué dans la banque" : null} />
               <Row term="Relevé" value={`${formatRelative(Date.parse(issue.detectedAt))}, ${issue.source === "api" ? "par l’API du service" : "à la main"}`} />
               <Row term="Règlement" value={issue.resolution ? `${RESOLUTION_LABELS[issue.resolution.state]} ${formatRelative(Date.parse(issue.resolution.at))}${issue.resolution.note ? ` · ${issue.resolution.note}` : ""}` : null} />
@@ -472,12 +476,22 @@ function IssueHistory({
   );
 }
 
-function Row({ term, value }: { term: string; value: string | null }) {
+/** Au-delà de vingt codes : les premiers, puis « et N autres », la liste complète en infobulle. */
+const SHOWN_COUNTRIES = 20;
+
+function countryList(codes: string[]): { text: string; title?: string } {
+  if (codes.length <= SHOWN_COUNTRIES) return { text: codes.join(", ") };
+  return { text: `${codes.slice(0, SHOWN_COUNTRIES).join(", ")} et ${codes.length - SHOWN_COUNTRIES} autres`, title: codes.join(", ") };
+}
+
+function Row({ term, value, title }: { term: string; value: string | null; title?: string }) {
   if (!value) return null;
   return (
     <>
       <dt className="min-w-0 text-muted-foreground">{term}</dt>
-      <dd className="min-w-0 [overflow-wrap:anywhere]">{value}</dd>
+      <dd className="min-w-0 [overflow-wrap:anywhere]" title={title}>
+        {value}
+      </dd>
     </>
   );
 }

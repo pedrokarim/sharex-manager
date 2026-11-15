@@ -110,17 +110,36 @@ export default function EditorPage() {
   const id = params.get("id");
   // Élément à montrer à l'ouverture (`&item=`), depuis les vérifications des écrans Exporter et Publier.
   const focusItemId = params.get("item");
+  // Ouvert depuis « Régler ce blocage » (`&issue=`) : l'assistant reçoit le dossier du blocage avant l'ouverture.
+  const issueId = params.get("issue");
   const [project, setProject] = useState<ClipProject | null | undefined>(undefined);
+  const [issueNote, setIssueNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
       setProject(null);
       return;
     }
-    callModule<ClipProject | null>("getProject", id)
-      .then(setProject)
-      .catch(() => setProject(null));
-  }, [id]);
+    let alive = true;
+    void (async () => {
+      if (issueId) {
+        try {
+          await callModule("openIssueAssistant", { projectId: id, issueId });
+        } catch (error) {
+          if (alive) setIssueNote(errorMessage(error, "Le dossier du blocage n’a pas pu être ouvert."));
+        }
+      }
+      try {
+        const next = await callModule<ClipProject | null>("getProject", id);
+        if (alive) setProject(next);
+      } catch {
+        if (alive) setProject(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [id, issueId]);
 
   if (project === undefined) {
     return (
@@ -139,7 +158,7 @@ export default function EditorPage() {
   }
   return (
     <MotionConfig reducedMotion="user">
-      <Editor key={project.id} initial={project} focusItemId={focusItemId} />
+      <Editor key={project.id} initial={project} focusItemId={focusItemId} openAssistant={Boolean(issueId)} issueNote={issueNote} />
     </MotionConfig>
   );
 }
@@ -150,7 +169,7 @@ type Panel = "media" | "text" | "illustrate" | "voice" | "music" | "assistant";
 const PANEL_WIDTH = 300;
 const ASSISTANT_PANEL_WIDTH = 360;
 
-function Editor({ initial, focusItemId }: { initial: ClipProject; focusItemId?: string | null }) {
+function Editor({ initial, focusItemId, openAssistant = false, issueNote = null }: { initial: ClipProject; focusItemId?: string | null; openAssistant?: boolean; issueNote?: string | null }) {
   const { project, commit, undo, redo, canUndo, canRedo, saveState } = useProjectHistory(initial);
   const projectRef = useRef(project);
   projectRef.current = project;
@@ -160,11 +179,13 @@ function Editor({ initial, focusItemId }: { initial: ClipProject; focusItemId?: 
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(() => (focusItemId && findItem(initial, focusItemId) ? focusItemId : null));
-  const [panel, setPanel] = useState<Panel | null>("media");
+  const [panel, setPanel] = useState<Panel | null>(openAssistant ? "assistant" : "media");
   // Téléphone : les panneaux et l'inspecteur passent par-dessus l'aperçu au lieu de le pousser hors de l'écran.
   const narrow = useIsMobile();
   useEffect(() => {
-    if (window.matchMedia("(max-width: 767px)").matches) setPanel(null);
+    // Ouvert depuis un blocage, l'assistant reste ouvert, même sur un téléphone.
+    if (window.matchMedia("(max-width: 767px)").matches && !openAssistant) setPanel(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const router = useRouter();
   const [exporting, setExporting] = useState(false);
@@ -645,7 +666,14 @@ function Editor({ initial, focusItemId }: { initial: ClipProject; focusItemId?: 
                     />
                   </MusicReplaceFrame>
                 )}
-                {panel === "assistant" && <AssistantPanel state={assistant} project={project} frame={frame} selectedId={selectedId} onFocus={focusChange} />}
+                {panel === "assistant" && (
+                  <div className="flex h-full min-h-0 min-w-0 flex-col">
+                    {issueNote ? <p className="shrink-0 px-3 pt-3 text-xs text-pretty text-destructive [overflow-wrap:anywhere]">{issueNote}</p> : null}
+                    <div className="min-h-0 min-w-0 flex-1">
+                      <AssistantPanel state={assistant} project={project} frame={frame} selectedId={selectedId} onFocus={focusChange} />
+                    </div>
+                  </div>
+                )}
                 {panel === "voice" && (
                   <VoicePanel
                     selectedText={selected?.type === "text" && !selected.karaoke ? selected.text : undefined}

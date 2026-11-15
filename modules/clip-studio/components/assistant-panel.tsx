@@ -580,6 +580,20 @@ function AssistantMessage({ message, project, latest, revertState, onRevert, onA
     <div className="mr-2 flex min-w-0 flex-col gap-3">
       <p className="text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.text}</p>
 
+      {message.solutions?.length ? (
+        <section className="flex min-w-0 flex-col gap-1">
+          <h3 className="text-[11px] font-medium text-muted-foreground">Solutions</h3>
+          <ol className="flex min-w-0 flex-col gap-1.5">
+            {message.solutions.map((solution, index) => (
+              <li key={index} className="flex min-w-0 items-baseline gap-2 text-xs leading-5">
+                <span className="w-4 shrink-0 text-right font-medium tabular-nums">{index + 1}.</span>
+                <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">{solution}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
       {understood.length > 0 && (
         <section className="flex min-w-0 flex-col gap-1">
           <h3 className="text-[11px] font-medium text-muted-foreground">Ce que j’ai compris</h3>

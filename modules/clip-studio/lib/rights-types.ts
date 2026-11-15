@@ -130,12 +130,24 @@ export const PUBLICATION_ISSUE_LABELS: Record<PublicationIssueKind, string> = {
   rejected: "Refusée",
 };
 
+/**
+ * YouTube dit un blocage mondial en listant tous les pays dans
+ * `regionRestriction.blocked` (249 codes ISO 3166 relevés le 15/11/2026 sur
+ * le Short TdSclzwxnYo), jamais par un drapeau : au-delà de 240 pays, c'est
+ * le monde entier.
+ */
+export const WORLDWIDE_COUNTRY_COUNT = 240;
+
+export function isWorldwideScope(scope: PublicationIssue["scope"]): boolean {
+  return Boolean(scope?.worldwide) || (scope?.countries?.length ?? 0) >= WORLDWIDE_COUNTRY_COUNT;
+}
+
 /** Libellé de la ligne d'une publication bloquée (« Bloquée dans le monde entier »). */
 export function issueStateText(issue: Pick<PublicationIssue, "kind" | "scope" | "resolution">): string {
   if (issue.resolution?.state === "disputed") return "Contestée";
   if (issue.resolution?.state === "released") return "Revendication levée";
   if (issue.kind === "blocked" || (issue.kind === "copyright-claim" && issue.scope)) {
-    if (issue.scope?.worldwide) return "Bloquée dans le monde entier";
+    if (isWorldwideScope(issue.scope)) return "Bloquée dans le monde entier";
     const count = issue.scope?.countries?.length ?? 0;
     if (count > 0) return `Bloquée dans ${count} pays`;
   }

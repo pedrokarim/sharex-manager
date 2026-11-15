@@ -188,6 +188,7 @@ export function sendEditorChat(raw: unknown, image?: unknown): EditorChat {
   };
   const jobId = `ejob-${Date.now().toString(36)}${randomBytes(3).toString("hex")}`;
   const history = historyOf(chat.messages);
+  const issue = chat.issue?.brief;
   const next = updateChat(projectId, (current) => ({
     ...current,
     messages: [...current.messages, message],
@@ -195,7 +196,7 @@ export function sendEditorChat(raw: unknown, image?: unknown): EditorChat {
   }));
   const controller = new AbortController();
   running.set(projectId, { jobId, controller });
-  void runTurn({ project, request: { ...request, selectedId: selected?.id ?? null }, history, image: Buffer.isBuffer(image) ? image : null, jobId, signal: controller.signal }).finally(() => {
+  void runTurn({ project, request: { ...request, selectedId: selected?.id ?? null }, history, image: Buffer.isBuffer(image) ? image : null, jobId, signal: controller.signal, ...(issue ? { issue } : {}) }).finally(() => {
     if (running.get(projectId)?.jobId === jobId) running.delete(projectId);
   });
   return next;
@@ -217,6 +218,34 @@ export function clearEditorChat(projectId: unknown): EditorChat {
   running.delete(projectId as string);
   fs.rmSync(chatFile(projectId as string), { force: true });
   return emptyChat(projectId as string);
+}
+
+// ─── Ouverture depuis un blocage ─────────────────────────────────
+
+/**
+ * Ouvre la conversation d'un projet sur un blocage de publication : le
+ * dossier du blocage est rangé avec la conversation (Codex le relit à chaque
+ * demande), et le premier message, écrit sans Codex, cite le média, la plage
+ * et le demandeur, puis numérote les solutions. Rouvrir sur le même blocage
+ * ne répète pas le message ; une demande en cours n'est pas dérangée.
+ */
+export function startIssueChat(projectId: unknown, opening: { issueId: string; brief: unknown; text: string; solutions: string[] }): EditorChat {
+  assertId(projectId, "Identifiant de projet");
+  if (typeof opening?.issueId !== "string" || !/^iss-[a-z0-9]{4,40}$/.test(opening.issueId)) throw new Error("Blocage invalide.");
+  const text = String(opening.text ?? "").slice(0, 2000);
+  const solutions = (Array.isArray(opening.solutions) ? opening.solutions : []).map((line) => String(line).slice(0, 600)).slice(0, 8);
+  const current = getEditorChat(projectId);
+  if (current.pending) return current;
+  return updateChat(projectId as string, (chat) => {
+    const said = chat.messages.some((message) => message.issueId === opening.issueId);
+    const issue = { id: opening.issueId, brief: opening.brief };
+    if (said) return { ...chat, issue };
+    return {
+      ...chat,
+      issue,
+      messages: [...chat.messages, { id: newMessageId(), role: "assistant", text, at: editorChatDeps.now(), issueId: opening.issueId, ...(solutions.length ? { solutions } : {}) }],
+    };
+  });
 }
 
 // ─── Résultat dans l'éditeur ─────────────────────────────────────
@@ -273,9 +302,11 @@ export function historyOf(messages: EditorChatMessage[]): BriefTurn[] {
     .map((message): BriefTurn => {
       if (message.role === "user") return { role: "user", text: message.text };
       const outcome = message.outcome;
+      // Les solutions numérotées font partie de ce que l'utilisateur a lu : « la 2 » s'y rapporte.
+      const solutions = message.solutions?.length ? `\n${message.solutions.map((line, index) => `${index + 1}. ${line}`).join("\n")}` : "";
       return {
         role: "assistant",
-        text: message.text,
+        text: `${message.text}${solutions}`,
         ...(outcome?.applied.length ? { applied: outcome.applied.map((change) => change.summary) } : {}),
         ...(outcome?.skipped.length ? { skipped: outcome.skipped.map((change) => `${change.summary} : ${change.reason ?? "écarté"}`) } : {}),
         ...(outcome?.reverted ? { reverted: true } : {}),
@@ -291,6 +322,8 @@ interface Turn {
   image: Buffer | null;
   jobId: string;
   signal: AbortSignal;
+  /** Dossier du blocage, quand le projet a été ouvert pour en régler un. */
+  issue?: unknown;
 }
 
 /** La réponse (ou l'échec) entre dans la conversation, sauf si elle a été vidée ou le projet supprimé entre-temps. */
@@ -332,6 +365,7 @@ async function runTurn(turn: Turn) {
       history: turn.history,
       request: request.text,
       image: images.length > 0,
+      ...(turn.issue ? { issue: turn.issue } : {}),
     });
     const answer = await editorChatDeps.ask(prompt, {
       signal,
