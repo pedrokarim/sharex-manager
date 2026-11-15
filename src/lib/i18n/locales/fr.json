@@ -144,6 +144,11 @@
         "badge": "Domaines",
         "description": "Gérez les domaines pour vos fichiers"
       },
+      "integrations": {
+        "title": "Intégrations",
+        "badge": "Outils",
+        "description": "Branchez ShareX, Flameshot ou l’application mobile sur ce serveur."
+      },
       "cleanup": {
         "title": "Nettoyage",
         "badge": "Nettoyage",

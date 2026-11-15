@@ -69,6 +69,14 @@ export function SettingsPageClient() {
           descriptionKey: "settings.sections.api_keys.description",
           badgeKey: "settings.sections.api_keys.badge",
         },
+        {
+          href: "/settings/integrations",
+          icon: THEMED_ICONS.integrations,
+          accent: "cyan",
+          titleKey: "settings.sections.integrations.title",
+          descriptionKey: "settings.sections.integrations.description",
+          badgeKey: "settings.sections.integrations.badge",
+        },
       ],
     },
     {

@@ -13,11 +13,11 @@ Sous Windows, on utilise **[ShareX](https://getsharex.com)**, le client officiel
 ## 1. Récupérer la configuration `.sxcu` depuis ShareX Manager
 
 1. Connecte-toi à ShareX Manager.
-2. Va dans **Paramètres → Clés API**.
-3. **Crée une clé API** en cochant les permissions voulues (images, fichiers, texte).
-4. Ouvre le **détail de la clé** → onglet **« Configuration ShareX »**.
-5. Clique sur **Copier**.
-6. Colle le contenu dans un fichier `sharex-manager.sxcu`.
+2. Va dans **Paramètres → Intégrations**, panneau **ShareX** (Windows).
+3. Onglet **« Créer une clé »** : garde ou change le nom et les permissions, puis crée la clé.
+4. Clique sur **« Télécharger le fichier .sxcu »** (le fichier s’appelle `sharex-windows.sxcu` pour le nom proposé). La clé ne s’affiche qu’une fois : télécharge le fichier avant de fermer.
+
+Tu as déjà une clé ? Onglet **« J’ai déjà une clé »** : colle-la, le fichier est fabriqué dans le navigateur sans que la clé parte au serveur.
 
 ---
 

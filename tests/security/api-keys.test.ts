@@ -214,6 +214,29 @@ describe("création", () => {
     expect(fs.existsSync(keysFile)).toBe(false);
   });
 
+  it("retient l'outil d'une clé créée depuis la page Intégrations", async () => {
+    const response = await createKey({ name: "Flameshot – Linux", permissions: { uploadImages: true }, tool: "flameshot" });
+    expect(response.status).toBe(200);
+    const created = await response.json();
+    expect(created.tool).toBe("flameshot");
+    expect(JSON.parse(readKeysFile())[0].tool).toBe("flameshot");
+
+    const { GET } = await import("@/app/api/api-keys/route");
+    const list = await (await GET(new Request(`${ORIGIN}/api/api-keys`), {})).json();
+    expect(list[0].tool).toBe("flameshot");
+
+    // Sans outil, la clé n'en porte aucun.
+    const plain = await (await createKey({ name: "Autre", permissions: { uploadImages: true } })).json();
+    expect(plain).not.toHaveProperty("tool");
+  });
+
+  it("refuse un outil inconnu", async () => {
+    const response = await createKey({ name: "x", permissions: { uploadImages: true }, tool: "dropbox" });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Outil inconnu.");
+    expect(fs.existsSync(keysFile)).toBe(false);
+  });
+
   it("applique la durée par défaut et la durée maximale de l'écran Sécurité", async () => {
     settings.updateSecuritySettings({ apiKeys: { defaultExpiryDays: 30, maxExpiryDays: 60 } });
     const expiresIn = async (body: Record<string, unknown>) => {

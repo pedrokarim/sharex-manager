@@ -7,6 +7,14 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Page Intégrations (/settings/integrations, carte sur la page Paramètres) :
+  un panneau par outil d’envoi (ShareX sous Windows, Flameshot et fu sous
+  Linux, ShareX Mobile). On y crée une clé nommée d’après l’outil, puis on
+  télécharge aussitôt le fichier .sxcu ou on scanne le QR code, une seule
+  fois. Une clé déjà en main se colle dans le panneau : le fichier ou le QR
+  code se fabrique dans le navigateur, sans envoyer la clé. Chaque clé créée
+  ici retient son outil, et chaque panneau dit combien de clés le servent et
+  quand a eu lieu le dernier envoi.
 - Tags et collections (docs/organisation.md) : un tag s’ajoute à un fichier
   depuis son menu, une sélection ou la visionneuse, se gère sur
   /organization/tags (renommer, décrire, fusionner, supprimer) et filtre la

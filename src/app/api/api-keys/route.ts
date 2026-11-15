@@ -1,7 +1,7 @@
 import { isAdmin, withAuth } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import type { ApiKeyPermissions, CreatedApiKey } from "@/types/api-key";
+import { API_KEY_TOOLS, type ApiKeyPermissions, type CreatedApiKey } from "@/types/api-key";
 import { logDb } from "@/lib/utils/db";
 import { raiseAlert } from "@/lib/security/alerts";
 import { apiKeyExpiry } from "@/lib/security/settings";
@@ -37,6 +37,8 @@ const createSchema = z.object({
   expiresInDays: z.number().int().min(1).max(3650).nullable().optional(),
   /** Ancienne forme : une date d'expiration. */
   expiresAt: z.string().nullable().optional(),
+  /** Outil servi par la clé (page Intégrations) ; une valeur inconnue est refusée. */
+  tool: z.enum(API_KEY_TOOLS, { message: "Outil inconnu." }).optional(),
 });
 
 /** Durée demandée en jours : `undefined` (rien demandé : durée par défaut), `null` (sans expiration) ou un nombre. */
@@ -97,6 +99,7 @@ export const POST = withAuth(async (request: NextRequest, _context: unknown, ses
       // Durée par défaut et durée maximale de l'écran Sécurité.
       expiresAt: apiKeyExpiry(days, now),
       createdBy: session.user.id || "system",
+      tool: parsed.data.tool,
     });
     void raiseAlert("newApiKey", { userId: session.user.id, userEmail: session.user.email, keyId: record.id, keyName: record.name });
 
@@ -111,6 +114,7 @@ export const POST = withAuth(async (request: NextRequest, _context: unknown, ses
         keyName: record.name,
         permissions: record.permissions,
         expiresAt: record.expiresAt,
+        tool: record.tool,
       },
     });
 

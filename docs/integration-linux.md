@@ -43,11 +43,11 @@ fu show
 ## 2. Récupérer la configuration `.sxcu` depuis ShareX Manager
 
 1. Connecte-toi à ShareX Manager.
-2. Va dans **Paramètres → Clés API**.
-3. **Crée une clé API** en cochant les permissions voulues (images, fichiers, texte).
-4. Ouvre le **détail de la clé** → onglet **« Configuration ShareX »**.
-5. Clique sur **Copier**.
-6. Colle le contenu dans un fichier, par exemple `~/sharex-manager.sxcu`.
+2. Va dans **Paramètres → Intégrations**, panneau **Flameshot et fu** (Linux).
+3. Onglet **« Créer une clé »** : garde ou change le nom et les permissions, puis crée la clé.
+4. Clique sur **« Télécharger le fichier .sxcu »**. La clé ne s’affiche qu’une fois : télécharge le fichier avant de fermer. La page donne aussi les commandes `fu add` et `fu default` avec le nom exact du fichier.
+
+Tu as déjà une clé ? Onglet **« J’ai déjà une clé »** : colle-la, le fichier est fabriqué dans le navigateur sans que la clé parte au serveur. Les exemples ci-dessous supposent le fichier rangé en `~/sharex-manager.sxcu`.
 
 La configuration ressemble à ceci :
 

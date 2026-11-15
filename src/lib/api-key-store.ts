@@ -20,7 +20,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "fs/promises";
 import path from "path";
-import type { ApiKey, ApiKeyPermissions, ApiKeyView } from "@/types/api-key";
+import type { ApiKey, ApiKeyPermissions, ApiKeyTool, ApiKeyView } from "@/types/api-key";
 
 export const API_KEYS_FILE = path.join(/* turbopackIgnore: true */ process.cwd(), "data", "api-keys.json");
 
@@ -219,6 +219,8 @@ export interface NewApiKeyInput {
   permissions: ApiKeyPermissions;
   expiresAt: Date | null;
   createdBy: string;
+  /** Outil servi par la clé, quand elle vient de la page Intégrations. */
+  tool?: ApiKeyTool;
 }
 
 /** Crée une clé ; la clé complète n'est renvoyée qu'ici. */
@@ -233,6 +235,7 @@ export async function createApiKey(input: NewApiKeyInput): Promise<{ record: Api
     expiresAt: input.expiresAt ? input.expiresAt.toISOString() : null,
     createdBy: input.createdBy,
     permissions: input.permissions,
+    ...(input.tool ? { tool: input.tool } : {}),
   };
   await mutateApiKeys((keys) => {
     keys.push(record);

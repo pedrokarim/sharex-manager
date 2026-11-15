@@ -17,6 +17,7 @@ import { Check, Copy, KeyRound, QrCode, TriangleAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import QRCode from "qrcode";
+import { buildMobileConfig, buildSxcu, DEFAULT_SXCU_NAME, serverBaseUrl } from "@/lib/integrations/client-config";
 
 interface ApiKeyDetailsDialogProps {
   apiKey: ApiKeyView | null;
@@ -57,7 +58,9 @@ export function ApiKeyDetailsDialog({
   useEffect(() => {
     setQrCodeDataUrl("");
     if (apiKey && open && secret) {
-      const qrData = generateQRCodeData(secret);
+      const qrData = JSON.stringify(
+        buildMobileConfig({ baseUrl: serverBaseUrl(), key: secret, permissions: apiKey.permissions }),
+      );
       QRCode.toDataURL(qrData, {
         width: 256,
         margin: 2,
@@ -73,42 +76,8 @@ export function ApiKeyDetailsDialog({
 
   if (!apiKey) return null;
 
-  const generateSxcuConfig = (key: string) => {
-    const destinations = [];
-    if (apiKey.permissions.uploadImages) destinations.push("ImageUploader");
-    if (apiKey.permissions.uploadText) destinations.push("TextUploader");
-    if (apiKey.permissions.uploadFiles) destinations.push("FileUploader");
-
-    return {
-      Version: "14.0.0",
-      Name: "ShareX Upload",
-      DestinationType: destinations.join(", "),
-      RequestMethod: "POST",
-      RequestURL: `${
-        process.env.NEXT_PUBLIC_API_URL || window.location.origin
-      }/api/upload`,
-      Headers: {
-        "x-api-key": key,
-      },
-      Body: "MultipartFormData",
-      FileFormName: "file",
-      URL: "{json:url}",
-      ThumbnailURL: "{json:thumbnail_url}",
-      DeletionURL: "{json:deletion_url}",
-      ErrorMessage: "{json:error}",
-    };
-  };
-
-  const generateQRCodeData = (key: string) => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
-    return JSON.stringify({
-      type: "sharex-mobile-config",
-      version: "1.0.0",
-      serverUrl: baseUrl,
-      apiKey: key,
-      permissions: apiKey.permissions,
-    });
-  };
+  const generateSxcuConfig = (key: string) =>
+    buildSxcu({ baseUrl: serverBaseUrl(), key, permissions: apiKey.permissions, name: DEFAULT_SXCU_NAME });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

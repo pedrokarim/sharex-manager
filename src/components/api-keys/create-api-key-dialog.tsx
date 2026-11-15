@@ -36,7 +36,8 @@ import { FormStatus, errorMessage, useFeedback } from "@/components/feedback";
 import { readApiError } from "@/lib/utils/chunk";
 import type { ApiKeyPolicy, CreatedApiKey } from "@/types/api-key";
 
-const NEVER = "never";
+/** Valeur du choix « Sans expiration ». */
+export const NEVER = "never";
 
 /** Durées proposées, en jours, avant filtrage par la durée maximale de l'écran Sécurité. */
 const EXPIRY_CHOICES = [7, 30, 90, 180, 365, 730];
@@ -77,14 +78,14 @@ interface CreateApiKeyDialogProps {
   onCreated: (created: CreatedApiKey) => void;
 }
 
-function durationLabel(days: number): string {
+export function durationLabel(days: number): string {
   if (days % 365 === 0) return days === 365 ? "1 an" : `${days / 365} ans`;
   if (days % 30 === 0 && days >= 30) return `${days / 30} mois`;
   return days === 1 ? "1 jour" : `${days} jours`;
 }
 
 /** Durées permises par les réglages : jamais au-delà du maximum, « sans expiration » seulement sans maximum. */
-function expiryOptions(policy: ApiKeyPolicy | null) {
+export function expiryOptions(policy: ApiKeyPolicy | null) {
   const max = policy?.maxExpiryDays ?? null;
   const days = new Set(EXPIRY_CHOICES.filter((value) => max === null || value <= max));
   if (max !== null) days.add(max);
@@ -94,7 +95,7 @@ function expiryOptions(policy: ApiKeyPolicy | null) {
   return options;
 }
 
-function defaultExpiry(policy: ApiKeyPolicy | null): string {
+export function defaultExpiry(policy: ApiKeyPolicy | null): string {
   if (!policy) return "90";
   if (policy.defaultExpiryDays !== null) return String(policy.defaultExpiryDays);
   return policy.maxExpiryDays === null ? NEVER : String(policy.maxExpiryDays);

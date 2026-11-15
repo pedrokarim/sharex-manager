@@ -52,6 +52,7 @@ export function BreadcrumbNav({ modules = [] }: { modules?: BreadcrumbModule[] }
       stats: t("sidebar.main.stats"),
       settings: t("navigation.settings"),
       "api-keys": t("account.api_keys"),
+      integrations: t("sidebar.settings.integrations"),
       create: t("common.create"),
       admin: t("sidebar.admin.administration"),
       users: t("sidebar.admin.users"),

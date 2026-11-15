@@ -2,6 +2,13 @@
 export const API_KEY_PERMISSIONS = ["uploadImages", "uploadText", "uploadFiles", "extractColors"] as const;
 export type ApiKeyPermission = (typeof API_KEY_PERMISSIONS)[number];
 
+/**
+ * Outils qu'une clé peut servir, retenus quand elle est créée depuis la page
+ * Intégrations. Toute autre valeur est refusée à la création.
+ */
+export const API_KEY_TOOLS = ["sharex", "flameshot", "mobile"] as const;
+export type ApiKeyTool = (typeof API_KEY_TOOLS)[number];
+
 export interface ApiKeyPermissions {
   uploadImages: boolean;
   uploadText: boolean;
@@ -25,6 +32,8 @@ export interface ApiKey {
   createdBy: string;
   permissions: ApiKeyPermissions;
   lastUsed?: string;
+  /** Outil pour lequel la clé a été créée (page Intégrations) ; absent pour une clé créée ailleurs. */
+  tool?: ApiKeyTool;
 }
 
 /** Ce que voit l'interface : jamais l'empreinte. */

@@ -143,6 +143,11 @@
         "badge": "Domains",
         "description": "Manage domains for your files"
       },
+      "integrations": {
+        "title": "Integrations",
+        "badge": "Tools",
+        "description": "Connect ShareX, Flameshot or the mobile app to this server."
+      },
       "cleanup": {
         "title": "Cleanup",
         "badge": "Cleanup",
