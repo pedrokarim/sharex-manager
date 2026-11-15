@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 
 import { frontDisplay } from "@/components/front/fonts";
@@ -6,6 +7,11 @@ import { SiteNav } from "@/components/front/site-nav";
 import { Footer } from "@/components/layout/footer";
 import { auth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+
+export const metadata: Metadata = {
+  title: "Page introuvable",
+  robots: { index: false },
+};
 
 /**
  * Page 404 de tout le site : une adresse inconnue, ou un `notFound()` levé

@@ -61,6 +61,9 @@ export function BreadcrumbNav({ modules = [] }: { modules?: BreadcrumbModule[] }
       theme: pathname.startsWith("/admin") ? t("sidebar.admin.global_theme") : t("sidebar.secondary.theme"),
       modules: t("sidebar.admin.modules"),
       albums: t("albums.title"),
+      organization: t("sidebar.main.organization"),
+      tags: t("sidebar.main.tags"),
+      collections: t("sidebar.main.collections"),
       preferences: t("sidebar.secondary.preferences"),
       account: t("account.my_account"),
       // Libellé en dur, comme l'entrée de la barre latérale.

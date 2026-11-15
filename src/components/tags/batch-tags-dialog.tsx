@@ -91,8 +91,12 @@ export function BatchTagsDialog({
           <DialogTitle>{lastMode === "add" ? "Ajouter des tags" : "Retirer des tags"}</DialogTitle>
           <DialogDescription>
             {lastMode === "add"
-              ? `Les tags choisis s’ajoutent aux ${filesLabel(files.length)} sélectionnés. Un nom inconnu crée le tag.`
-              : `Les tags choisis sont retirés des ${filesLabel(files.length)} sélectionnés qui les portent.`}
+              ? files.length === 1
+                ? "Les tags choisis s’ajoutent au fichier sélectionné. Un nom inconnu crée le tag."
+                : `Les tags choisis s’ajoutent aux ${filesLabel(files.length)} sélectionnés. Un nom inconnu crée le tag.`
+              : files.length === 1
+                ? "Les tags choisis sont retirés du fichier sélectionné."
+                : `Les tags choisis sont retirés des ${filesLabel(files.length)} sélectionnés qui les portent.`}
           </DialogDescription>
         </DialogHeader>
         <form
