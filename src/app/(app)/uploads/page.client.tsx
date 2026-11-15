@@ -9,9 +9,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import {
-  History,
-  BarChart,
-  Settings,
   ArrowRight,
   Clock,
   TrendingUp,
@@ -28,7 +25,7 @@ export function UploadsPageClient() {
     {
       title: t("uploads.features.history.title"),
       description: t("uploads.features.history.description"),
-      icon: History,
+      icon: THEMED_ICONS.history,
       href: "/uploads/history",
       color: "text-blue-500",
       gradient: "from-blue-500/20 to-blue-600/20",
@@ -40,7 +37,7 @@ export function UploadsPageClient() {
     {
       title: t("uploads.features.stats.title"),
       description: t("uploads.features.stats.description"),
-      icon: BarChart,
+      icon: THEMED_ICONS.stats,
       href: "/uploads/stats",
       color: "text-green-500",
       gradient: "from-green-500/20 to-green-600/20",
@@ -52,7 +49,7 @@ export function UploadsPageClient() {
     {
       title: t("uploads.features.config.title"),
       description: t("uploads.features.config.description"),
-      icon: Settings,
+      icon: THEMED_ICONS.uploadConfig,
       href: "/uploads/config",
       color: "text-purple-500",
       gradient: "from-purple-500/20 to-purple-600/20",

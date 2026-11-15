@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, type LucideIcon } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import type { IconComponent } from "@/components/icon-theme";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -70,7 +71,7 @@ export interface NavCardProps {
   href: string;
   title: string;
   description: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   /** Micro-libellé de catégorie affiché en haut à droite. */
   badge?: string;
   /** Pastille d'état accolée au titre (ex. « Bientôt »). */

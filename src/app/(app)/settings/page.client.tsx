@@ -1,22 +1,17 @@
 "use client";
 
 import {
-  BarChart3,
   Globe2,
-  History,
-  KeyRound,
-  Settings2,
-  Upload,
 } from "lucide-react";
 
 import { NavCard, type NavCardAccent } from "@/components/nav-card";
 import { useTranslation } from "@/lib/i18n";
 
-import { THEMED_ICONS } from "@/components/icon-theme";
+import { THEMED_ICONS, type IconComponent } from "@/components/icon-theme";
 import { PageTitleIcon } from "@/components/page-title-icon";
 interface SettingsItem {
   href: string;
-  icon: typeof Upload;
+  icon: IconComponent;
   accent: NavCardAccent;
   /** Clés de traduction, données explicitement : les libellés de ces liens
       vivent sous des espaces de noms différents (`settings`, `uploads`). */
@@ -39,7 +34,7 @@ export function SettingsPageClient() {
       items: [
         {
           href: "/settings/preferences",
-          icon: Settings2,
+          icon: THEMED_ICONS.preferences,
           accent: "slate",
           titleKey: "settings.preferences",
           descriptionKey: "settings.preferences_description",
@@ -52,7 +47,7 @@ export function SettingsPageClient() {
       items: [
         {
           href: "/uploads/config",
-          icon: Upload,
+          icon: THEMED_ICONS.uploadConfig,
           accent: "blue",
           titleKey: "settings.sections.upload_config.title",
           descriptionKey: "settings.sections.upload_config.description",
@@ -68,7 +63,7 @@ export function SettingsPageClient() {
         },
         {
           href: "/settings/api-keys",
-          icon: KeyRound,
+          icon: THEMED_ICONS.apiKeys,
           accent: "amber",
           titleKey: "settings.sections.api_keys.title",
           descriptionKey: "settings.sections.api_keys.description",
@@ -81,7 +76,7 @@ export function SettingsPageClient() {
       items: [
         {
           href: "/uploads/history",
-          icon: History,
+          icon: THEMED_ICONS.history,
           accent: "violet",
           titleKey: "uploads.history.title",
           descriptionKey: "uploads.history.description",
@@ -89,7 +84,7 @@ export function SettingsPageClient() {
         },
         {
           href: "/uploads/stats",
-          icon: BarChart3,
+          icon: THEMED_ICONS.stats,
           accent: "rose",
           titleKey: "uploads.stats.title",
           descriptionKey: "uploads.stats.description",
