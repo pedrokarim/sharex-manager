@@ -85,8 +85,10 @@ import {
   type PreRenderCheck,
 } from "../lib/export-screens";
 import { ensureProjectFonts } from "../lib/fonts";
+import { groupRightsWarnings, projectRightsWarnings } from "../lib/rights-warnings";
 import { projectToSrt, projectWords } from "../lib/subtitles";
 import { ClipPlayer, type ClipPlayerHandle } from "../components/clip-player";
+import { useMusicRights } from "../components/music-rights";
 import type { PublishTargets } from "../components/publish-shared";
 import { ScreenHeader } from "../components/screen-header";
 
@@ -274,6 +276,9 @@ function ExportScreen({ project }: { project: ClipProject }) {
 
   const credits = useMemo(() => projectCreditList(project, language), [project, language]);
   const unverified = useMemo(() => unverifiedSources(project), [project]);
+  // Morceaux de la banque revendiqués, retirés ou à risque : une ligne chacun.
+  const musicTracks = useMusicRights();
+  const musicRights = useMemo(() => groupRightsWarnings(projectRightsWarnings(project, musicTracks ?? [])), [project, musicTracks]);
 
   const linkedTargets: LimitTarget[] = useMemo(() => {
     const ids = kit?.publishing?.accountIds ?? [];
@@ -297,6 +302,7 @@ function ExportScreen({ project }: { project: ClipProject }) {
     missingFonts,
     missingMedia,
     unverifiedImages: unverified,
+    musicRights,
     frame: { width: project.width, height: project.height, durationMs },
     targets: linkedTargets,
     brandName: kit?.name,
@@ -694,8 +700,11 @@ function CheckRow({ check, editorHref }: { check: PreRenderCheck; editorHref: st
             {check.inEditor ? (
               <>
                 {" "}
-                <Link href={editorHref} className="inline-flex items-center gap-0.5 font-medium text-foreground underline underline-offset-2">
-                  Ouvrir l’éditeur
+                <Link
+                  href={check.editorItemId ? `${editorHref}&item=${encodeURIComponent(check.editorItemId)}` : editorHref}
+                  className="inline-flex items-center gap-0.5 font-medium text-foreground underline underline-offset-2"
+                >
+                  {check.editorItemId ? "Voir dans l’éditeur" : "Ouvrir l’éditeur"}
                   <ArrowRight className="size-3" />
                 </Link>
               </>

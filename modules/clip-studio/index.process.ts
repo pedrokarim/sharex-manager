@@ -56,6 +56,9 @@ import {
   type MusicCandidate,
   type MusicEntry,
 } from "./lib/music";
+import { publishRightsProblem } from "./lib/rights-warnings";
+import { checkTrackRights, getTrackRightsRecord, isTrackRightsState, setTrackRightsNote, startMusicRightsChecks } from "./lib/music-rights";
+import { TRACK_RIGHTS_LABELS, type TrackRightsRecord, type TrackRightsState } from "./lib/rights-types";
 import {
   cancelAssistantJob,
   getAssistantJob as readAssistantJob,
@@ -194,6 +197,16 @@ import {
   type IdeasBoard,
 } from "./lib/idea-service";
 import { youtubePublicReader } from "./lib/niche-public-default";
+import {
+  isPublicationService,
+  listPublicationIssues,
+  parseStudioClaim,
+  recordPublicationIssue,
+  resolvePublicationIssue,
+  startPublicationHealthChecks,
+  type ParsedStudioClaim,
+} from "./lib/publication-issues";
+import type { PublicationIssue, PublicationIssueClaim, PublicationIssueKind, PublicationIssueResolutionState } from "./lib/rights-types";
 
 export type { ProjectSummary } from "./lib/library";
 
@@ -774,6 +787,8 @@ const videoFields = (connector: ConnectorInfo | undefined): PublishField[] =>
 export async function publishExport(input: {
   exportId: string;
   targets: PublishTarget[];
+  /** Morceaux revendiqués ou retirés que l'on publie quand même, confirmés sur l'écran Publier. */
+  confirmedTracks?: string[];
 }): Promise<{ jobs: PublishJobSummary[]; failed: { accountId: string; error: string }[] }> {
   const exportId = String(input?.exportId ?? "");
   const file = await resolveExportFile(exportId);
@@ -782,6 +797,9 @@ export async function publishExport(input: {
   if (targets.length === 0) throw new Error("Choisissez au moins un compte.");
 
   const project = readProject(entry.projectId);
+  // Le garde-fou de l'écran Publier ne suffit pas : un appel direct passe aussi par ici.
+  const rightsProblem = publishRightsProblem(project, listMusic(), input?.confirmedTracks);
+  if (rightsProblem) throw new Error(rightsProblem);
   const brand = await loadExportBrand(entry.brandKitId ?? project?.brandKitId);
   // Un export d'avant les textes de publication reprend ceux de la marque.
   const post = entry.post ?? postForExport(entry, project, brand);
@@ -1288,6 +1306,71 @@ export async function respeakVoice(input: { ref?: string; text?: string; voice: 
   });
 }
 
+// ─── Blocages des publications ───────────────────────────────────
+//
+// Dossier 01 quater, § 5. Absentes de `functions` dans module.json :
+// réservées aux administrateurs, comme toute la publication.
+
+/** Blocages des publications d'un export, levés compris, du plus récent au plus ancien. */
+export async function listExportIssues(exportId: string): Promise<PublicationIssue[]> {
+  const entry = findExport(String(exportId ?? ""));
+  return listPublicationIssues({ exportId: entry.id });
+}
+
+/** Texte collé depuis Studio, borné : une page « Revendications » tient largement dedans. */
+const CLAIM_TEXT_MAX = 20_000;
+
+/**
+ * Blocage saisi à la main sur une publication de l'export (texte de Studio
+ * relu, ou champs remplis à la main). La publication est désignée par son
+ * travail : service et identifiant chez le service viennent de la file, jamais
+ * du navigateur.
+ */
+export async function reportPublicationIssue(input: {
+  exportId: string;
+  jobId: string;
+  kind: PublicationIssueKind;
+  scope?: { worldwide: boolean; countries?: string[] };
+  claim?: PublicationIssueClaim;
+  /** Texte collé depuis Studio, gardé avec le blocage. */
+  text?: string;
+}): Promise<PublicationIssue> {
+  const entry = findExport(String(input?.exportId ?? ""));
+  const jobId = String(input?.jobId ?? "");
+  const job = listJobs({ sourceModule: "clip-studio", sourceId: entry.id }).find((candidate) => candidate.id === jobId);
+  if (!job) throw new Error("Publication introuvable pour cet export.");
+  if (!job.result?.externalId) throw new Error("Cette publication n’est pas en ligne.");
+  if (!isPublicationService(job.connector)) throw new Error("Les blocages de ce service ne sont pas suivis.");
+  const text = typeof input?.text === "string" ? input.text.slice(0, CLAIM_TEXT_MAX) : undefined;
+  return recordPublicationIssue({
+    exportId: entry.id,
+    jobId: job.id,
+    service: job.connector,
+    externalId: job.result.externalId,
+    kind: input?.kind,
+    scope: input?.scope,
+    claim: input?.claim,
+    source: "manual",
+    ...(text?.trim() ? { raw: text } : {}),
+  });
+}
+
+/** Lit le texte collé depuis Studio et rend les champs du blocage, à relire avant d'enregistrer. */
+export async function parsePublicationClaim(text: string): Promise<ParsedStudioClaim> {
+  if (typeof text !== "string" || !text.trim()) throw new Error("Collez d’abord le texte de la revendication.");
+  if (text.length > CLAIM_TEXT_MAX) throw new Error("Texte trop long : collez seulement le détail de la revendication.");
+  return parseStudioClaim(text);
+}
+
+/** Règle un blocage : contesté, revendication levée, musique remplacée… */
+export async function resolveExportIssue(id: string, resolution: { state: PublicationIssueResolutionState; note?: string; newExportId?: string }): Promise<PublicationIssue> {
+  return resolvePublicationIssue(String(id ?? ""), {
+    state: resolution?.state,
+    ...(typeof resolution?.note === "string" ? { note: resolution.note } : {}),
+    ...(typeof resolution?.newExportId === "string" ? { newExportId: resolution.newExportId } : {}),
+  });
+}
+
 // ─── Banque de musique ───────────────────────────────────────────
 
 /** Morceaux de la banque, avec l'état de leur téléchargement. */
@@ -1313,6 +1396,40 @@ export async function addMusicToLibrary(input: { id: string; mood?: string }): P
 export async function removeMusicFromLibrary(id: string): Promise<{ success: boolean }> {
   removeMusic(String(id));
   return { success: true };
+}
+
+function libraryTrackId(trackId: unknown): string {
+  const id = String(trackId ?? "");
+  if (!listMusic().some((track) => track.id === id)) throw new Error("Morceau introuvable dans la banque.");
+  return id;
+}
+
+/**
+ * Droits d'un morceau : preuve de licence, contrôles et historique. Absente
+ * de `functions` : réservée aux admins.
+ */
+export async function getMusicRights(trackId: string): Promise<TrackRightsRecord> {
+  const id = libraryTrackId(trackId);
+  return getTrackRightsRecord(id) ?? { trackId: id, checks: [], history: [] };
+}
+
+/**
+ * Pose ou lève à la main l'état des droits d'un morceau (« Licence achetée »,
+ * « Contestation gagnée »), avec une note gardée dans l'historique. Absente
+ * de `functions` : réservée aux admins.
+ */
+export async function setMusicRightsState(trackId: string, state: TrackRightsState, note: string): Promise<TrackRightsRecord> {
+  const id = libraryTrackId(trackId);
+  if (!isTrackRightsState(state)) throw new Error("État des droits inconnu.");
+  const text = String(note ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
+  if (!text) throw new Error("Expliquez ce changement d’état dans la note.");
+  setTrackRightsNote(id, { state, reason: text }, `${TRACK_RIGHTS_LABELS[state]} à la main : ${text}`);
+  return getTrackRightsRecord(id)!;
+}
+
+/** Contrôle tout de suite la fiche Openverse (et Jamendo) d'un morceau. Absente de `functions` : réservée aux admins. */
+export async function checkMusicRightsNow(trackId: string): Promise<TrackRightsRecord> {
+  return checkTrackRights(libraryTrackId(trackId));
 }
 
 // ─── Images trouvées (onglet « Trouver ») ────────────────────────
@@ -1451,8 +1568,12 @@ export function initModule() {
   prefetchTts();
   // Banque de musique : les morceaux manquants arrivent un par un.
   prefetchMusic();
+  // Droits des morceaux : premier contrôle peu après le démarrage, puis un réveil par jour.
+  startMusicRightsChecks();
   // Dossiers de travail laissés par un arrêt brutal (plus de six heures) : au démarrage, puis toutes les heures.
   startWorkDirSweeper();
+  // Santé des publications YouTube : 1 h, 6 h, 24 h, 72 h et 7 jours après la mise en ligne.
+  startPublicationHealthChecks();
   // Candidates du web plus vieilles que vingt-quatre heures, jamais importées.
   try {
     cleanFoundImages();

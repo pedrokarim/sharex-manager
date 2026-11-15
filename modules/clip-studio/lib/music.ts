@@ -20,6 +20,7 @@ import { ensureResource, resourcePath, resourceState, type ResourceSpec, type Re
 import { DATA_DIR, ensureDirs } from "./store";
 import { recordAiUsage, usageError } from "@/lib/ai-usage";
 import { isAutoPickable, type TrackRightsNote } from "./rights-types";
+import { captureTrackEvidence, effectiveRights, lastSuccessfulCheck, readTrackRightsRecords } from "./music-rights";
 
 export { isAutoPickable };
 
@@ -28,6 +29,8 @@ const LIBRARY_FILE = path.join(MODULE_DIR, "music", "library.json");
 const ADDED_FILE = path.join(DATA_DIR, "music-added.json");
 const OPENVERSE = "https://api.openverse.org/v1/audio/";
 const USER_AGENT = "ShareX-Manager/clip-studio (https://github.com/pedrokarim/sharex-manager)";
+/** En-tête `user-agent` des appels à Openverse, repris par les contrôles des droits. */
+export const MUSIC_USER_AGENT = USER_AGENT;
 
 export const MOODS = ["energetic", "happy", "chill", "epic", "suspense", "inspiring", "funky", "ambient"] as const;
 export type Mood = (typeof MOODS)[number];
@@ -53,6 +56,8 @@ export interface MusicEntry extends MusicTrack {
   /** Adresse de lecture locale, quand le fichier est téléchargé. */
   url?: string;
   credit: string;
+  /** Dernier contrôle des droits arrivé au bout (ISO), s'il y en a eu un. */
+  rightsCheckedAt?: string;
 }
 
 // ─── Banque ──────────────────────────────────────────────────────
@@ -82,16 +87,25 @@ function spec(track: MusicTrack): ResourceSpec {
   return { id: `music:${track.id}`, label: track.title, url: track.audioUrl, target: `music/${track.id}.mp3`, maxBytes: MAX_TRACK_BYTES };
 }
 
+/** Chemin du fichier audio téléchargé d'un morceau (qu'il existe ou non). */
+export function trackFilePath(track: MusicTrack): string {
+  return resourcePath(spec(track));
+}
+
 /** Mention à reprendre dans la description d'une vidéo publiée. */
 export function musicCredit(track: Pick<MusicTrack, "title" | "artist" | "license" | "pageUrl">): string {
   return `« ${track.title} » par ${track.artist}, ${track.license}${track.pageUrl ? ` (${track.pageUrl})` : ""}`;
 }
 
 export function listMusic(): MusicEntry[] {
+  const records = readTrackRightsRecords();
   return readLibrary().map((track) => {
     const state = resourceState(spec(track));
     return {
       ...track,
+      // État effectif : blocage ou décision à la main, sinon note de library.json, sinon contrôles.
+      rights: effectiveRights(track, records),
+      rightsCheckedAt: lastSuccessfulCheck(records[track.id]),
       state,
       url: state.status === "ready" ? `/api/modules/clip-studio/data/resources/music/${track.id}.mp3` : undefined,
       credit: musicCredit(track),
@@ -99,12 +113,18 @@ export function listMusic(): MusicEntry[] {
   });
 }
 
-/** Au démarrage : les morceaux manquants, un par un pour ménager la source. */
+/**
+ * Au démarrage : les morceaux manquants, un par un pour ménager la source,
+ * puis la preuve de licence de ceux qui n'en ont pas encore (une fois le
+ * fichier là, pour son empreinte ; la file des droits espace les appels).
+ */
 export function prefetchMusic() {
   if (process.env.NEXT_PHASE === "phase-production-build") return;
   void (async () => {
+    const records = readTrackRightsRecords();
     for (const track of readLibrary()) {
       await ensureResource(spec(track)).catch(() => undefined);
+      if (!records[track.id]?.evidence?.audioSha256) await captureTrackEvidence(track).catch(() => undefined);
     }
   })();
 }
@@ -271,7 +291,13 @@ export async function addMusic(input: { id: string; mood?: string }): Promise<Mu
   }
   writeAdded([...added, track]);
 
-  void ensureResource(spec(track)).catch(() => undefined);
+  // La preuve suit le téléchargement, pour porter l'empreinte du fichier
+  // reçu ; un téléchargement manqué ne la retarde pas (l'empreinte viendra
+  // au démarrage suivant).
+  void ensureResource(spec(track))
+    .catch(() => undefined)
+    .then(() => captureTrackEvidence(track, item))
+    .catch(() => undefined);
   return listMusic().find((entry) => entry.id === id)!;
 }
 
@@ -292,7 +318,7 @@ function writeAdded(tracks: MusicTrack[]) {
   fs.renameSync(temporary, ADDED_FILE);
 }
 
-/** Un morceau prêt de l'humeur demandée, pour l'assistant. */
+/** Un morceau prêt de l'humeur demandée, pour l'assistant (état des droits effectif, venu de `listMusic`). */
 export function pickTrack(mood: string | undefined, minDurationMs = 0): MusicEntry | undefined {
   const ready = listMusic().filter((track) => track.state.status === "ready" && isAutoPickable(track));
   const matching = ready.filter((track) => track.mood === mood);

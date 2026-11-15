@@ -14,7 +14,7 @@
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
-import { getConnector, listAccounts, listJobs, listPosts, peekPosts, type PublishJobSummary } from "@/lib/connections";
+import { getConnector, listAccounts, listJobs, listPosts, peekPosts, type PublicationHealth, type PublishJobSummary } from "@/lib/connections";
 import type { ClipExport, ClipProject } from "../engine/types";
 import { changeAspect } from "../engine/edit";
 import {
@@ -54,6 +54,8 @@ import {
   writeThumbs,
 } from "./store";
 import type { AspectPreset } from "../engine/types";
+import { issueLookup, listPublicationIssues, recordHealthFromPosts } from "./publication-issues";
+import type { PublicationIssue } from "./rights-types";
 import { ASPECTS } from "../engine/types";
 
 const MODULE = "clip-studio";
@@ -373,7 +375,8 @@ export function publicationsByExport(jobs: PublishJobSummary[] = listJobs({ sour
     grouped.set(job.source.id, list);
   }
   const out = new Map<string, ExportPublications>();
-  for (const [id, list] of grouped) out.set(id, exportPublications(list));
+  const issueFor = issueLookup();
+  for (const [id, list] of grouped) out.set(id, withIssues(exportPublications(list), issueFor));
   return out;
 }
 
@@ -425,12 +428,13 @@ function connectorBadges(ids: Iterable<string>): { id: string; label: string; lo
 }
 
 /** Statistiques gardées par le cœur pour ces comptes : `read` demande la liste au service si elle n'est plus fraîche. */
-async function statsFor(accountIds: Iterable<string>, read: boolean): Promise<{ stats: Map<string, Map<string, PostStats>>; fetchedAt: number | null; errors: string[] }> {
+async function statsFor(accountIds: Iterable<string>, read: boolean): Promise<StatsRead> {
   const stats = new Map<string, Map<string, PostStats>>();
+  const health = new Map<string, Map<string, PublicationHealth>>();
   const errors: string[] = [];
   let fetchedAt: number | null = null;
   for (const accountId of new Set(accountIds)) {
-    let entry: { posts: { id: string; views?: number; likes?: number; comments?: number }[]; fetchedAt: number } | null = null;
+    let entry: { posts: { id: string; views?: number; likes?: number; comments?: number; health?: PublicationHealth }[]; fetchedAt: number } | null = null;
     try {
       entry = read ? await listPosts(accountId) : peekPosts(accountId);
     } catch (error) {
@@ -444,8 +448,29 @@ async function statsFor(accountIds: Iterable<string>, read: boolean): Promise<{ 
       map.set(post.id, { views: post.views, likes: post.likes, comments: post.comments });
     }
     stats.set(accountId, map);
+    health.set(accountId, healthOf(entry.posts));
   }
-  return { stats, fetchedAt, errors };
+  return { stats, health, fetchedAt, errors };
+}
+
+/** Blocage en cours de chaque ligne (dossier 01 quater, § 5.4). */
+function withIssues(state: ExportPublications, issueFor: ReturnType<typeof issueLookup>): ExportPublications {
+  return {
+    ...state,
+    rows: state.rows.map((row) => {
+      const issue = row.state === "published" ? issueFor(row) : undefined;
+      return issue ? { ...row, issue } : row;
+    }),
+  };
+}
+
+type StatsRead = { stats: Map<string, Map<string, PostStats>>; health: Map<string, Map<string, PublicationHealth>>; fetchedAt: number | null; errors: string[] };
+
+/** Santé des publications rendue avec la liste (YouTube : même demande que les statistiques). */
+function healthOf(posts: { id: string; health?: PublicationHealth }[]): Map<string, PublicationHealth> {
+  const map = new Map<string, PublicationHealth>();
+  for (const post of posts) if (post.health) map.set(post.id, post.health);
+  return map;
 }
 
 /** Comptes qui portent au moins une publication réussie d'un export de Clip Studio et savent lister leurs publications. */
@@ -524,6 +549,8 @@ export async function publicationsOverview(input: { exportIds?: unknown; readSta
 
 export interface ExportPublicationDetails {
   rows: (PublicationRow & { stats?: PostStats })[];
+  /** Tous les blocages de l'export, levés compris, du plus récent au plus ancien. */
+  issues: PublicationIssue[];
   accounts: PublicationAccount[];
   connectors: { id: string; label: string; logo: string }[];
   statsFetchedAt: number | null;
@@ -536,9 +563,20 @@ export async function exportPublicationDetails(id: string, refresh = false): Pro
   // Les comptes dont le dernier envoi a été annulé restent visibles sur la fiche : l'envoi a eu lieu.
   const rows = publicationRows(jobs);
   const readable = readableAccounts(rows);
-  const { stats, fetchedAt, errors } = refresh ? await refreshStats(readable) : await statsFor(readable, true);
+  const { stats, health, fetchedAt, errors } = refresh ? await refreshStats(readable) : await statsFor(readable, true);
+  // La santé lue avec les statistiques devient un blocage, sans unité de quota de plus.
+  try {
+    recordHealthFromPosts(id, rows, health);
+  } catch (error) {
+    console.error("[clip-studio] santé des publications non rangée :", error instanceof Error ? error.message : error);
+  }
+  const issueFor = issueLookup();
   return {
-    rows: withStats(rows, stats),
+    rows: withStats(rows, stats).map((row) => {
+      const issue = row.state === "published" ? issueFor(row) : undefined;
+      return issue ? { ...row, issue } : row;
+    }),
+    issues: listPublicationIssues({ exportId: id }),
     accounts: publicationAccounts(rows.map((row) => row.accountId)),
     connectors: connectorBadges(rows.map((row) => row.connector)),
     statsFetchedAt: fetchedAt,
@@ -547,8 +585,9 @@ export async function exportPublicationDetails(id: string, refresh = false): Pro
 }
 
 /** Relit les publications chez le service, même fraîches (« Actualiser »). */
-async function refreshStats(accountIds: string[]) {
+async function refreshStats(accountIds: string[]): Promise<StatsRead> {
   const stats = new Map<string, Map<string, PostStats>>();
+  const health = new Map<string, Map<string, PublicationHealth>>();
   const errors: string[] = [];
   let fetchedAt: number | null = null;
   for (const accountId of accountIds) {
@@ -558,9 +597,10 @@ async function refreshStats(accountIds: string[]) {
       const map = new Map<string, PostStats>();
       for (const post of entry.posts) map.set(post.id, { views: post.views, likes: post.likes, comments: post.comments });
       stats.set(accountId, map);
+      health.set(accountId, healthOf(entry.posts));
     } catch (error) {
       errors.push(error instanceof Error ? error.message : "Lecture impossible");
     }
   }
-  return { stats, fetchedAt, errors };
+  return { stats, health, fetchedAt, errors };
 }

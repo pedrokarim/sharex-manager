@@ -37,6 +37,8 @@ import { CounterFields, KeysField, MarksField, ShadowField, StrokeFields } from 
 import { Choice, ColorField, FieldLabel, Row, Section, Slider } from "./inspector-parts";
 import { SceneField } from "./scene-picker";
 import { VideoCaptionsField, type TranscribedHandler } from "./video-captions-field";
+import { RightsInspectorSection } from "./music-rights";
+import type { ProjectRightsWarning } from "../lib/rights-warnings";
 
 interface InspectorProps {
   project: ClipProject;
@@ -71,9 +73,13 @@ interface InspectorProps {
   onSeek?: (frame: number) => void;
   /** Palette de planche de la marque du projet, pour les marques, ombres et unités. */
   palette?: BoardPalette;
+  /** Morceau de la banque en cause pour ce son : son état, sa raison. */
+  rightsWarning?: ProjectRightsWarning;
+  /** Ouvre le panneau Musique pour remplacer le morceau de ce son. */
+  onReplaceMusic?: (itemId: string) => void;
 }
 
-export function Inspector({ project, item, onPatch, onClose, onCaption, brandFonts = [], onChangeTrackVoice, onSetTrackDuck, onDetachAudio, onReattachAudio, onTranscribed, frame = item.start, animate = false, onPlace, onSeek, palette = DEFAULT_BOARD_PALETTE }: InspectorProps) {
+export function Inspector({ project, item, onPatch, onClose, onCaption, brandFonts = [], onChangeTrackVoice, onSetTrackDuck, onDetachAudio, onReattachAudio, onTranscribed, frame = item.start, animate = false, onPlace, onSeek, palette = DEFAULT_BOARD_PALETTE, rightsWarning, onReplaceMusic }: InspectorProps) {
   const fps = project.fps;
   const size = { width: project.width, height: project.height };
   const track = project.tracks.find((entry) => entry.items.some((other) => other.id === item.id));
@@ -97,6 +103,10 @@ export function Inspector({ project, item, onPatch, onClose, onCaption, brandFon
         </Button>
       </div>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
+        {/* Un morceau revendiqué ou à risque se dit avant tout réglage. */}
+        {item.type === "audio" && rightsWarning && (
+          <RightsInspectorSection warning={rightsWarning} onReplace={onReplaceMusic ? () => onReplaceMusic(item.id) : undefined} />
+        )}
         {item.type === "text" && <TextFields item={item} onPatch={onPatch} brandFonts={brandFonts} />}
         {item.type === "text" && <CounterFields item={item} fps={fps} palette={palette} onPatch={onPatch} />}
         {item.type === "text" && !item.karaoke && <MarksField item={item} fps={fps} frame={frame} palette={palette} onPatch={onPatch} />}

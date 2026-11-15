@@ -147,6 +147,7 @@ export function describeConnector(connector: Connector): ConnectorInfo {
     ...(connector.fetchAccounts ? { multipleAccounts: true } : {}),
     ...(connector.publicMedia ? { publicMedia: true } : {}),
     ...(connector.publishForm ? { livePublishForm: true } : {}),
+    ...(connector.health ? { publicationHealth: true } : {}),
     ...(followUps ? { followUps } : {}),
     onDemandCapabilities: onDemandCapabilities(connector),
     capabilityScopes: Object.fromEntries(connector.capabilities.map((entry) => [entry.capability, scopesForCapability(connector, entry.capability)])),

@@ -7,6 +7,16 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Added
 
+- Clip Studio, droits des musiques et blocages (dossier 01 quater) : chaque
+  morceau de la banque garde une preuve de sa licence (fiche Openverse,
+  empreinte du fichier, archive Wayback Machine) et se contrôle chaque
+  semaine ; un morceau revendiqué, à risque ou retiré l’affiche dans la
+  banque, sort des choix de l’assistant et se signale dans l’éditeur,
+  l’écran Exporter et l’écran Publier, qui demande une confirmation pour un
+  morceau revendiqué. Les publications YouTube sont relues (1 h, 6 h, 24 h,
+  72 h et 7 jours après la mise en ligne) : une vidéo bloquée l’affiche sur
+  la fiche de l’export et dans le filtre « Bloqués », et un blocage se
+  saisit à la main en collant le texte de YouTube Studio.
 - Clip Studio, vidéos de l’assistant en tableaux (dossier 01 illustrations) :
   les modèles « libre » et « diaporama », racontés par une voix off, se
   montent désormais comme « Monter ma prise ». Codex lit les mots de la voix

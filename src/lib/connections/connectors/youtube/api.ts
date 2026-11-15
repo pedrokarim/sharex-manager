@@ -5,7 +5,7 @@
  * message d'erreur.
  */
 
-import type { AccessToken, ConnectorContext, PostPatch, PostPrivacy, PostSummary, WatermarkTiming } from "../../types";
+import type { AccessToken, ConnectorContext, PostPatch, PostPrivacy, PostSummary, PublicationHealth, WatermarkTiming } from "../../types";
 import { QuotaExceededError, ServiceError } from "../../errors";
 import { youtubeCost, youtubeQuota } from "./quota";
 import { sanitizeDescription, sanitizeTags, sanitizeTitle } from "./metadata";
@@ -174,6 +174,8 @@ interface VideoStatus {
   privacyStatus?: PostPrivacy;
   publishAt?: string;
   uploadStatus?: string;
+  /** Présent quand `uploadStatus` vaut `rejected` (`claim`, `copyright`, `trademark`, `length`…). */
+  rejectionReason?: string;
   selfDeclaredMadeForKids?: boolean;
   containsSyntheticMedia?: boolean;
   embeddable?: boolean;
@@ -188,6 +190,8 @@ export interface VideoResource {
   status?: VideoStatus;
   statistics?: { viewCount?: string; likeCount?: string; commentCount?: string };
   processingDetails?: { processingStatus?: string; processingFailureReason?: string };
+  /** `regionRestriction` : pays où la vidéo se lit (`allowed`) ou ne se lit pas (`blocked`). */
+  contentDetails?: { duration?: string; regionRestriction?: { allowed?: string[]; blocked?: string[] }; [key: string]: unknown };
 }
 
 export const videoUrl = (id: string) => `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
@@ -209,7 +213,56 @@ function toPost(video: VideoResource): PostSummary {
     views: count(video.statistics?.viewCount),
     likes: count(video.statistics?.likeCount),
     comments: count(video.statistics?.commentCount),
+    ...(video.status && video.contentDetails ? { health: videoHealth(video, Date.now()) } : {}),
   };
+}
+
+/** Codes de pays d'une restriction, tels que YouTube les rend (deux lettres), sans doublon. */
+function countryCodes(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return [...new Set(value.filter((code): code is string => typeof code === "string" && /^[A-Z]{2}$/.test(code)))].sort();
+}
+
+/** Santé d'une vidéo lue avec `status` et `contentDetails`. */
+export function videoHealth(video: VideoResource, checkedAt: number): PublicationHealth {
+  const restriction = video.contentDetails?.regionRestriction;
+  const allowed = countryCodes(restriction?.allowed);
+  const blocked = countryCodes(restriction?.blocked);
+  return {
+    externalId: video.id,
+    found: true,
+    ...(video.status?.uploadStatus ? { uploadStatus: video.status.uploadStatus } : {}),
+    ...(video.status?.rejectionReason ? { rejectionReason: video.status.rejectionReason } : {}),
+    ...(video.status?.privacyStatus ? { privacyStatus: video.status.privacyStatus } : {}),
+    ...(allowed || blocked ? { regionRestriction: { ...(allowed ? { allowed } : {}), ...(blocked ? { blocked } : {}) } } : {}),
+    checkedAt,
+  };
+}
+
+/** Vidéos lues en un appel de `videos.list` (1 unité quel que soit le nombre de parties). */
+export const HEALTH_BATCH = 50;
+
+/**
+ * Lecture de santé de vidéos de la chaîne : `videos.list` avec
+ * `part=status,contentDetails`, une unité de quota par lot de 50. Une vidéo
+ * absente de la réponse est rendue `found: false` (supprimée ou retirée).
+ */
+export async function readPublicationHealth(context: ConnectorContext, externalIds: string[]): Promise<PublicationHealth[]> {
+  const ids = [...new Set(externalIds.filter((id) => typeof id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(id)))];
+  const out: PublicationHealth[] = [];
+  for (let index = 0; index < ids.length; index += HEALTH_BATCH) {
+    const batch = ids.slice(index, index + HEALTH_BATCH);
+    const body = await youtubeRequest<{ items?: VideoResource[] }>(context, "videos.list", "videos", {
+      query: { part: "status,contentDetails", id: batch.join(","), maxResults: HEALTH_BATCH },
+    });
+    const checkedAt = Date.now();
+    const found = new Map((body.items ?? []).filter((video) => typeof video?.id === "string").map((video) => [video.id, video]));
+    for (const id of batch) {
+      const video = found.get(id);
+      out.push(video ? videoHealth(video, checkedAt) : { externalId: id, found: false, checkedAt });
+    }
+  }
+  return out;
 }
 
 export async function getVideo(context: ConnectorContext, id: string, part: string): Promise<VideoResource> {
@@ -243,7 +296,8 @@ export async function listUploads(context: ConnectorContext, limit = 50): Promis
   for (let index = 0; index < Math.min(ids.length, limit); index += 50) {
     const batch = ids.slice(index, Math.min(index + 50, limit));
     const body = await youtubeRequest<{ items?: VideoResource[] }>(context, "videos.list", "videos", {
-      query: { part: "snippet,status,statistics", id: batch.join(","), maxResults: 50 },
+      // `contentDetails` donne la santé de chaque vidéo dans la même lecture, sans unité de plus.
+      query: { part: "snippet,status,statistics,contentDetails", id: batch.join(","), maxResults: 50 },
     });
     posts.push(...(body.items ?? []).map(toPost));
   }

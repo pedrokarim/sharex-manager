@@ -11,6 +11,7 @@ import { checkMediaLimits, describeMediaLimits } from "@/lib/connections/limits"
 import type { MediaLimits, ShortFormNote } from "@/lib/connections/types";
 import type { ClipItem, ClipProject } from "../engine/types";
 import { POST_TEXT_FIELDS, emptyPostTexts, type ExportPost, type PostTextField, type PostTexts } from "./post-types";
+import { rightsFix, rightsTitle, rightsUsage, type MusicRightsGroup } from "./rights-warnings";
 
 // ─── Plage à exporter ────────────────────────────────────────────
 
@@ -111,6 +112,8 @@ export interface PreRenderCheck {
   fix?: string;
   /** La correction se fait dans l'éditeur. */
   inEditor?: boolean;
+  /** Élément à sélectionner en ouvrant l'éditeur (`&item=`). */
+  editorItemId?: string;
   /** Logo du service concerné (entrée de `BrandLogo`). */
   logo?: string;
 }
@@ -135,6 +138,8 @@ export interface PreRenderInput {
   missingFonts: string[] | null;
   missingMedia: MissingMedia[] | null;
   unverifiedImages: string[];
+  /** Morceaux de la banque en cause (`groupRightsWarnings`), une ligne chacun. */
+  musicRights?: MusicRightsGroup[];
   frame: { width: number; height: number; durationMs: number };
   targets: LimitTarget[];
   /** Nom de la marque, pour dire d'où viennent les comptes. */
@@ -153,7 +158,7 @@ function formatSeconds(seconds: number): string {
 
 /**
  * Ce qu'il faut savoir avant de lancer le rendu, ligne par ligne : polices,
- * médias, droits des images, puis durée et format comparés aux limites de
+ * médias, droits des images et des musiques, puis durée et format comparés aux limites de
  * chaque compte lié à la marque. Les lignes bloquantes viennent d'abord.
  */
 export function preRenderChecks(input: PreRenderInput): PreRenderCheck[] {
@@ -202,6 +207,20 @@ export function preRenderChecks(input: PreRenderInput): PreRenderCheck[] {
       detail: list(input.unverifiedImages),
       fix: "Trouvées sur le web : vérifiez leur licence avant de publier, ou remplacez-les dans l’éditeur.",
       inEditor: true,
+    });
+  }
+
+  for (const group of input.musicRights ?? []) {
+    const usage = rightsUsage(group);
+    checks.push({
+      id: `music-${group.music.id}`,
+      // Le rendu peut partir : c'est la publication qui demandera une confirmation.
+      tone: group.state === "at-risk" ? "info" : "warning",
+      title: rightsTitle(group),
+      detail: [group.music.artist, group.reason].filter(Boolean).join(" · ") + (usage ? ` ${usage}` : ""),
+      fix: rightsFix(group),
+      inEditor: true,
+      editorItemId: group.items[0]?.item.id,
     });
   }
 

@@ -389,8 +389,11 @@ export function listExportPublications(id: string): Promise<PublishJobSummary[]>
   return callModule<PublishJobSummary[]>("listExportPublications", id);
 }
 
-/** Mise en file (administrateurs) : textes calculés par le serveur, surchargés par `options`. */
-export function publishExport(input: { exportId: string; targets: PublishTarget[] }): Promise<{ jobs: PublishJobSummary[]; failed: { accountId: string; error: string }[] }> {
+/**
+ * Mise en file (administrateurs) : textes calculés par le serveur, surchargés par `options`.
+ * `confirmedTracks` : morceaux revendiqués ou retirés que l'on publie quand même (case cochée sur l'écran Publier).
+ */
+export function publishExport(input: { exportId: string; targets: PublishTarget[]; confirmedTracks?: string[] }): Promise<{ jobs: PublishJobSummary[]; failed: { accountId: string; error: string }[] }> {
   return callModule("publishExport", input);
 }
 

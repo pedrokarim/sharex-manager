@@ -8,6 +8,7 @@
  */
 
 import type { AspectPreset } from "../engine/types";
+import type { PublicationIssue } from "./rights-types";
 
 // ─── Commun ──────────────────────────────────────────────────────
 
@@ -420,6 +421,13 @@ export interface PublicationRow {
   attempts: number;
   /** Le dernier envoi peut repartir (« Reprendre »). */
   retryable: boolean;
+  /** Blocage en cours de la publication (revendication, blocage par pays…), sans la réponse brute. */
+  issue?: PublicationIssue;
+}
+
+/** Un blocage compte tant que la revendication n'est pas levée (une contestation laisse la vidéo bloquée). */
+export function isIssueActive(issue: Pick<PublicationIssue, "resolution">): boolean {
+  return issue.resolution?.state !== "released";
 }
 
 function jobState(job: JobLike): ChannelState {
@@ -471,6 +479,14 @@ export function publicationRows(jobs: JobLike[]): PublicationRow[] {
 /** État d'ensemble d'un export : « none » quand rien n'a été envoyé (ou tout annulé). */
 export type ExportStatus = "published" | "scheduled" | "pending" | "failed" | "none";
 
+/**
+ * Filtre d'état de la liste : un état de publication, ou « Bloqués » (au
+ * moins une publication bloquée, revendiquée, rendue muette ou retirée).
+ */
+export type ExportStatusFilter = ExportStatus | "blocked";
+
+export const BLOCKED_FILTER_LABEL = "Bloqués";
+
 export const EXPORT_STATUS_LABELS: Record<ExportStatus, string> = {
   published: "Publié",
   scheduled: "Programmé",
@@ -492,8 +508,9 @@ export function exportPublications(jobs: JobLike[]): ExportPublications {
 }
 
 /** L'export correspond-il au filtre d'état ? Un export publié ici et en échec là répond aux deux. */
-export function matchesStatus(publications: ExportPublications, status: ExportStatus | ""): boolean {
+export function matchesStatus(publications: ExportPublications, status: ExportStatusFilter | ""): boolean {
   if (!status) return true;
+  if (status === "blocked") return publications.rows.some((row) => row.issue !== undefined && isIssueActive(row.issue));
   if (status === "none") return publications.rows.length === 0;
   return publications.rows.some((row) => row.state === status);
 }
@@ -520,6 +537,7 @@ export const EXPORT_SORT_LABELS: Record<ExportSort, string> = { date: "Date du r
 const EXPORT_SORT_DIR: Record<ExportSort, SortDirection> = { date: "desc", name: "asc", duration: "desc", size: "desc" };
 
 export const EXPORT_STATUSES: readonly ExportStatus[] = ["published", "scheduled", "pending", "failed", "none"];
+const STATUS_FILTERS: readonly string[] = [...EXPORT_STATUSES, "blocked"];
 
 export interface ExportQuery {
   page: number;
@@ -531,7 +549,7 @@ export interface ExportQuery {
   project: string;
   /** Service où l'export a été publié (identifiant du connecteur). */
   channel: string;
-  status: ExportStatus | "";
+  status: ExportStatusFilter | "";
   period: Period | "";
 }
 
@@ -554,7 +572,7 @@ export function parseExportQuery(params: URLSearchParams): ExportQuery {
     brand: brand === "none" || KIT_ID.test(brand) ? brand : "",
     project: PROJECT_ID.test(project) ? project : "",
     channel: /^[a-z][a-z0-9-]{1,40}$/.test(channel) ? channel : "",
-    status: (EXPORT_STATUSES as readonly string[]).includes(status ?? "") ? (status as ExportStatus) : "",
+    status: STATUS_FILTERS.includes(status ?? "") ? (status as ExportStatusFilter) : "",
     period: isPeriod(params.get("period")) ? (params.get("period") as Period) : "",
   };
 }

@@ -61,6 +61,7 @@ import { callAnyModule, callModule, defaultPostTexts, exportUrl, getExport, publ
 import { unverifiedSources, usesGeneratedImages } from "../lib/credits";
 import { emptyPost, publishTimes, samePost, scheduleProblems, staggerSchedule, textsOf, type ScheduleMode } from "../lib/export-screens";
 import { fieldValuesFor, firstCommentFor } from "../lib/post-texts";
+import { groupRightsWarnings, projectRightsWarnings, unconfirmedBlockers } from "../lib/rights-warnings";
 import type { ExportDetails, ExportPost, PublishTarget } from "../lib/post-types";
 import { exportHref } from "../components/export-card";
 import { PostPreview, previewLayout } from "../components/post-preview";
@@ -80,6 +81,7 @@ import {
   type PublishTargets,
   type Values,
 } from "../components/publish-shared";
+import { PublishRightsLines, useMusicRights } from "../components/music-rights";
 import { ScreenHeader } from "../components/screen-header";
 
 const SAVE_DELAY_MS = 1200;
@@ -227,6 +229,17 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
   const connectorOf = useCallback((account: AccountSummary) => targets.connectors.find((item) => item.id === account.connector) ?? null, [targets.connectors]);
   const synthetic = useMemo(() => usesGeneratedImages(project), [project]);
   const rightsNames = useMemo(() => unverifiedSources(project), [project]);
+  // Morceaux de la banque en cause : revendiqué ou retiré, l'envoi attend une confirmation explicite.
+  const musicTracks = useMusicRights();
+  const musicGroups = useMemo(() => groupRightsWarnings(projectRightsWarnings(project, musicTracks ?? [])), [project, musicTracks]);
+  const [musicConfirmed, setMusicConfirmed] = useState<Set<string>>(() => new Set());
+  const confirmMusic = (trackId: string, on: boolean) =>
+    setMusicConfirmed((current) => {
+      const next = new Set(current);
+      if (on) next.add(trackId);
+      else next.delete(trackId);
+      return next;
+    });
 
   // ─── Comptes cochés et réglages ────────────────────────────────
   const [checked, setChecked] = useState<Set<string>>(() => {
@@ -492,8 +505,18 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
     ),
   ];
   const rightsBlocking = rightsNames.length > 0 && !rightsConfirmed;
-  const blockerCount = reviews.reduce((sum, review) => sum + review.blockers.length, 0) + (rightsBlocking ? 1 : 0);
-  const firstBlocker = reviews.flatMap((review) => review.blockers.map((blocker) => `${review.account.displayName} – ${blocker}`))[0] ?? (rightsBlocking ? "Vérifiez les droits des images." : undefined);
+  const musicPending = Boolean(project) && musicTracks === null;
+  const musicBlocking = unconfirmedBlockers(musicGroups, musicConfirmed);
+  const blockerCount = reviews.reduce((sum, review) => sum + review.blockers.length, 0) + (rightsBlocking ? 1 : 0) + musicBlocking.length + (musicPending ? 1 : 0);
+  const firstBlocker =
+    reviews.flatMap((review) => review.blockers.map((blocker) => `${review.account.displayName} – ${blocker}`))[0] ??
+    (musicPending
+      ? "Lecture des droits des musiques…"
+      : musicBlocking.length > 0
+        ? `Confirmez la publication avec « ${musicBlocking[0].music.title} », ou remplacez la musique.`
+        : rightsBlocking
+          ? "Vérifiez les droits des images."
+          : undefined);
   const totalCost = reviews.reduce<{ amount: number; currency: string } | null>((sum, review) => {
     if (!review.cost) return sum;
     if (sum && sum.currency !== review.cost.currency) return sum;
@@ -539,7 +562,7 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
           ...(review.connector.followUps?.comment && !review.canComment ? { followUps: { comment: false as const } } : {}),
         };
       });
-      const result = await publishExport({ exportId: entry.id, targets: list });
+      const result = await publishExport({ exportId: entry.id, targets: list, confirmedTracks: [...musicConfirmed] });
       if (result.failed.length > 0) {
         const lines = result.failed.map((failure) => {
           const account = accounts.find((item) => item.id === failure.accountId);
@@ -731,6 +754,13 @@ function PublishScreen({ details, targets: initialTargets, kit, project, post: i
       <Separator />
 
       <section className="grid min-w-0 gap-3" aria-label="Envoi">
+        <PublishRightsLines
+          groups={musicGroups}
+          confirmed={musicConfirmed}
+          onConfirm={confirmMusic}
+          editorHref={project ? `/m/clip-studio/edit?id=${encodeURIComponent(project.id)}` : undefined}
+          disabled={submitting}
+        />
         {rightsNames.length > 0 && reviews.length > 0 ? (
           <label className="flex min-w-0 cursor-pointer items-start gap-2 text-sm">
             <Checkbox checked={rightsConfirmed} onCheckedChange={(value) => setRightsConfirmed(value === true)} className="mt-0.5" />

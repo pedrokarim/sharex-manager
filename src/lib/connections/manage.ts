@@ -19,6 +19,7 @@ import type {
   PlaylistSummary,
   PostPatch,
   PostSummary,
+  PublicationHealth,
   ProfileChoice,
   ProfileSection,
   ProfileSnapshot,
@@ -100,6 +101,23 @@ export async function removePost(accountId: string, postId: string): Promise<voi
   });
   const cached = postsCache.get(accountId);
   if (cached) cached.posts = cached.posts.filter((post) => post.id !== postId);
+}
+
+// ─── Santé des publications ───────────────────────────────────────
+
+/**
+ * État de publications déjà faites par ce compte (refus, suppression,
+ * blocage par pays), lu chez le service : un appel par lot, compté dans le
+ * quota. Exige `posts.list`. Les publications que le service ne rend plus
+ * reviennent `found: false`. Le connecteur doit déclarer `health`.
+ */
+export async function readPublicationHealth(accountId: string, externalIds: string[]): Promise<PublicationHealth[]> {
+  const ids = [...new Set((Array.isArray(externalIds) ? externalIds : []).filter((id) => typeof id === "string" && /^[A-Za-z0-9_.:-]{1,128}$/.test(id)))];
+  if (ids.length === 0) return [];
+  return withAccount(accountId, "posts.list", (connector, context) => {
+    if (!connector.health) throw new Error(`${connector.label} ne dit pas l’état d’une publication.`);
+    return connector.health.read(context, ids.slice(0, connector.health.maxBatch * 4));
+  });
 }
 
 // ─── Lecture publique d'une chaîne ────────────────────────────────

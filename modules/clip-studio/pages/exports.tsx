@@ -34,6 +34,7 @@ import {
   ExternalLink,
   Eye,
   FileVideo,
+  FileWarning,
   History,
   ImageUp,
   LayoutGrid,
@@ -108,6 +109,7 @@ import type { ExportDetails, ExportPost, PostTextField } from "../lib/post-types
 import {
   ASPECT_LABELS,
   ASPECT_PRESETS,
+  BLOCKED_FILTER_LABEL,
   EXPORT_SORTS,
   EXPORT_SORT_LABELS,
   EXPORT_STATUSES,
@@ -117,6 +119,7 @@ import {
   exportQueryString,
   exportTitle,
   hasExportFilters,
+  isIssueActive,
   parseExportQuery,
   updateExportQuery,
   type ChannelState,
@@ -132,6 +135,8 @@ import { PostTextsEditor } from "../components/post-texts-editor";
 import { JobTimeline, MOVING, formatDuration, jobsPending, serviceTargets, type PublishTargets } from "../components/publish-shared";
 import { ScreenHeader } from "../components/screen-header";
 import { AspectChip, ChannelLogos, ExportPoster, FiltersBar, Pager, SortButton, formatClock, formatCount, formatRelative, formatShortDate, type ConnectorBadge } from "../components/library-ui";
+import { PublicationIssueDialog, issueSummary, type IssueTarget } from "../components/publication-issue-dialog";
+import { issueStateText, type PublicationIssue } from "../lib/rights-types";
 
 export default function ExportsPage() {
   const params = useSearchParams();
@@ -357,7 +362,7 @@ function ExportsList() {
                 label="État"
                 value={query.status}
                 onChange={(value) => patch({ status: value as ExportQuery["status"] })}
-                options={EXPORT_STATUSES.map((status) => ({ value: status, label: EXPORT_STATUS_LABELS[status] }))}
+                options={[...EXPORT_STATUSES.map((status) => ({ value: status, label: EXPORT_STATUS_LABELS[status] })), { value: "blocked", label: BLOCKED_FILTER_LABEL }]}
                 allLabel="Tous les états"
               />
               {(facets?.channels.length ?? 0) > 0 || query.channel ? (
@@ -647,10 +652,16 @@ function PublicationCell({ publications, context }: { publications?: ExportPubli
   if (!publications) return <Skeleton className="h-4 w-16" />;
   if (publications.rows.length === 0) return <span className="text-xs text-muted-foreground">{EXPORT_STATUS_LABELS.none}</span>;
   const failedCount = publications.rows.filter((row) => row.state === "failed").length;
+  const blocked = publications.rows.flatMap((row) => (row.issue && isIssueActive(row.issue) ? [row.issue] : []));
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
       <ChannelLogos rows={publications.rows} connectors={context.connectors} accounts={context.accounts} />
       {failedCount > 0 ? <span className="text-[11px] text-destructive">{failedCount > 1 ? `${failedCount} échecs` : "1 échec"}</span> : null}
+      {blocked.length > 0 ? (
+        <span className="min-w-0 truncate text-[11px] text-destructive" title={blocked.map((issue) => issueStateText(issue)).join(" ; ")}>
+          {blocked.length > 1 ? `${blocked.length} bloquées` : issueStateText(blocked[0])}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -1424,6 +1435,7 @@ function PublicationsPanel({ entryId, jobsKey, onChanged }: { entryId: string; j
   const rowFeedback = useFeedback();
   const [rowTarget, setRowTarget] = useState<string | null>(null);
   const headerFeedback = useFeedback();
+  const [issueDialog, setIssueDialog] = useState<{ target: IssueTarget; row: PublicationRow; mode: "view" | "report" } | null>(null);
 
   const load = useCallback(
     async (refresh = false) => {
@@ -1470,6 +1482,15 @@ function PublicationsPanel({ entryId, jobsKey, onChanged }: { entryId: string; j
   const accountOf = (id: string) => details?.accounts.find((account) => account.id === id);
   const connectorOf = (id: string) => details?.connectors.find((connector) => connector.id === id);
   const hasStats = rows.some((row) => row.state === "published" && row.externalId);
+  /** Blocages d'une publication : par son travail, sinon par son identifiant chez le service. */
+  const issuesOf = (row: PublicationRow): PublicationIssue[] =>
+    (details?.issues ?? []).filter((issue) => issue.jobId === row.jobId || (row.externalId !== undefined && issue.service === row.connector && issue.externalId === row.externalId));
+  const openIssue = (row: PublicationRow, mode: "view" | "report") =>
+    setIssueDialog({
+      row,
+      mode,
+      target: { exportId: entryId, jobId: row.jobId, accountName: accountOf(row.accountId)?.displayName ?? "Compte retiré", serviceLabel: connectorOf(row.connector)?.label ?? row.connector },
+    });
 
   return (
     <Panel aria-labelledby="export-publications">
@@ -1522,7 +1543,8 @@ function PublicationsPanel({ entryId, jobsKey, onChanged }: { entryId: string; j
             {rows.map((row) => {
               const account = accountOf(row.accountId);
               const connector = connectorOf(row.connector);
-              const tone = ROW_STATE[row.state];
+              const issue = row.state === "published" && row.issue && isIssueActive(row.issue) ? row.issue : undefined;
+              const tone = issue ? ROW_STATE.failed : ROW_STATE[row.state];
               const Icon = tone.icon;
               return (
                 <motion.div key={row.accountId} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid min-w-0 gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -1540,10 +1562,15 @@ function PublicationsPanel({ entryId, jobsKey, onChanged }: { entryId: string; j
                       <span className={cn("flex min-w-0 items-center gap-1.5 text-xs", tone.className)}>
                         <Icon className="size-3.5 shrink-0" aria-hidden />
                         <span className="min-w-0 [overflow-wrap:anywhere]">
-                          {rowStateText(row)}
+                          {issue ? `${issueStateText(issue)}, relevé ${formatRelative(Date.parse(issue.detectedAt))}` : rowStateText(row)}
                           {row.attempts > 1 ? <span className="text-muted-foreground"> · {row.attempts} envois</span> : null}
                         </span>
                       </span>
+                      {issue ? (
+                        <span className="min-w-0 truncate text-xs text-muted-foreground" title={issueSummary(issue)}>
+                          {issueSummary(issue)}
+                        </span>
+                      ) : null}
                       {row.error && row.state !== "published" ? <span className="text-xs text-pretty text-destructive [overflow-wrap:anywhere]">{row.error}</span> : null}
                       {row.stats ? (
                         <span className="flex min-w-0 flex-wrap items-center gap-x-3 text-xs text-muted-foreground tabular-nums">
@@ -1575,6 +1602,17 @@ function PublicationsPanel({ entryId, jobsKey, onChanged }: { entryId: string; j
                         </a>
                       </Button>
                     ) : null}
+                    {issue ? (
+                      <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" onClick={() => openIssue(row, "view")}>
+                        <FileWarning className="size-3.5" />
+                        Détail du blocage
+                      </Button>
+                    ) : row.state === "published" && row.externalId ? (
+                      <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs text-muted-foreground" onClick={() => openIssue(row, issuesOf(row).length > 0 ? "view" : "report")}>
+                        <FileWarning className="size-3.5" />
+                        Signaler un blocage
+                      </Button>
+                    ) : null}
                     {row.retryable ? (
                       <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" loading={busy === row.jobId} onClick={() => void retry(row)}>
                         <RotateCcw className="size-3.5" />
@@ -1591,6 +1629,13 @@ function PublicationsPanel({ entryId, jobsKey, onChanged }: { entryId: string; j
           </AnimatePresence>
         </PanelRows>
       )}
+      <PublicationIssueDialog
+        target={issueDialog?.target ?? null}
+        issues={issueDialog ? issuesOf(issueDialog.row) : []}
+        initialMode={issueDialog?.mode ?? "report"}
+        onClose={() => setIssueDialog(null)}
+        onChanged={() => void load()}
+      />
       {details?.statsFetchedAt ? <PanelFooter>Statistiques lues {formatRelative(details.statsFetchedAt)}, gardées dix minutes avant d’être relues chez le service.</PanelFooter> : null}
     </Panel>
   );

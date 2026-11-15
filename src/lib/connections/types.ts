@@ -579,6 +579,31 @@ export interface PostSummary {
   views?: number;
   likes?: number;
   comments?: number;
+  /**
+   * Santé de la publication, quand le service la donne dans la même lecture
+   * (YouTube : `status` et `contentDetails` de `videos.list`, sans unité de plus).
+   */
+  health?: PublicationHealth;
+}
+
+/**
+ * Ce qu'un service dit de l'état d'une publication déjà faite : refus,
+ * suppression, blocage par pays. Les valeurs sont celles du service, sans
+ * interprétation ; le module qui publie en tire un blocage ou rien.
+ */
+export interface PublicationHealth {
+  externalId: string;
+  /** Faux : le service ne rend plus la publication (supprimée ou retirée). */
+  found: boolean;
+  /** État de l'envoi (YouTube `status.uploadStatus` : `uploaded`, `processed`, `failed`, `rejected`, `deleted`). */
+  uploadStatus?: string;
+  /** Motif d'un refus (YouTube `status.rejectionReason` : `claim`, `copyright`, `trademark`, `length`…). */
+  rejectionReason?: string;
+  privacyStatus?: PostPrivacy;
+  /** Pays où la publication se lit (`allowed`) ou ne se lit pas (`blocked`), codes ISO 3166-1 alpha-2. */
+  regionRestriction?: { allowed?: string[]; blocked?: string[] };
+  /** Lecture faite à cet instant (ms). */
+  checkedAt: number;
 }
 
 // ─── Lecture publique d'une chaîne (étude d'une niche) ───────────
@@ -1443,6 +1468,16 @@ export interface Connector {
     channelVideos(context: ConnectorContext, query: ChannelQuery, options?: ChannelReadOptions): Promise<ChannelVideos>;
     costPerChannel(options?: ChannelReadOptions): { min: number; max: number };
   };
+  /**
+   * Lecture de santé de publications déjà faites (`PublicationHealth`), par
+   * lots : une publication absente de la réponse est rendue `found: false`.
+   * Exige `posts.list` ; chaque appel est compté dans le quota du service.
+   */
+  health?: {
+    /** Identifiants lus en un seul appel, au plus. */
+    maxBatch: number;
+    read(context: ConnectorContext, externalIds: string[]): Promise<PublicationHealth[]>;
+  };
   /** Actions de gestion, présentes selon les capacités. */
   posts?: {
     list(context: ConnectorContext): Promise<PostSummary[]>;
@@ -1521,6 +1556,8 @@ export interface ConnectorInfo {
   publicMedia?: boolean;
   /** Les réglages d'un compte se lisent chez le service à l'affichage (`Connector.publishForm`, action `publishFormAction`). */
   livePublishForm?: boolean;
+  /** Le service sait dire l'état d'une publication faite (`readPublicationHealth`). */
+  publicationHealth?: boolean;
   /**
    * Suites de publication que le service accepte, avec leurs limites et la
    * capacité exigée ; seules celles que le connecteur sait exécuter figurent.

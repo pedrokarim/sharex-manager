@@ -102,10 +102,14 @@ import { AssistantPanel, capturePreview, useEditorChat } from "../components/ass
 import { applyEditorOps, type EditorApplyResult, type EditorChange, type EditorOpEntry } from "../engine/editor-ops";
 import { applyVoiceReplacements } from "../engine/revoice";
 import { useProjectHistory, type SaveState } from "../components/use-project-history";
+import { useMusicRights } from "../components/music-rights";
+import { projectRightsWarnings, replaceMusic } from "../lib/rights-warnings";
 
 export default function EditorPage() {
   const params = useSearchParams();
   const id = params.get("id");
+  // Élément à montrer à l'ouverture (`&item=`), depuis les vérifications des écrans Exporter et Publier.
+  const focusItemId = params.get("item");
   const [project, setProject] = useState<ClipProject | null | undefined>(undefined);
 
   useEffect(() => {
@@ -135,7 +139,7 @@ export default function EditorPage() {
   }
   return (
     <MotionConfig reducedMotion="user">
-      <Editor key={project.id} initial={project} />
+      <Editor key={project.id} initial={project} focusItemId={focusItemId} />
     </MotionConfig>
   );
 }
@@ -146,7 +150,7 @@ type Panel = "media" | "text" | "illustrate" | "voice" | "music" | "assistant";
 const PANEL_WIDTH = 300;
 const ASSISTANT_PANEL_WIDTH = 360;
 
-function Editor({ initial }: { initial: ClipProject }) {
+function Editor({ initial, focusItemId }: { initial: ClipProject; focusItemId?: string | null }) {
   const { project, commit, undo, redo, canUndo, canRedo, saveState } = useProjectHistory(initial);
   const projectRef = useRef(project);
   projectRef.current = project;
@@ -155,7 +159,7 @@ function Editor({ initial }: { initial: ClipProject }) {
   const playerRef = useRef<PreviewPlayer | null>(null);
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => (focusItemId && findItem(initial, focusItemId) ? focusItemId : null));
   const [panel, setPanel] = useState<Panel | null>("media");
   // Téléphone : les panneaux et l'inspecteur passent par-dessus l'aperçu au lieu de le pousser hors de l'écran.
   const narrow = useIsMobile();
@@ -237,6 +241,25 @@ function Editor({ initial }: { initial: ClipProject }) {
 
   const seek = useCallback((next: number) => playerRef.current?.seek(next), []);
   const togglePlay = useCallback(() => playerRef.current?.toggle(), []);
+
+  // Ouvert sur un élément : la tête de lecture se pose à son début.
+  useEffect(() => {
+    const found = focusItemId ? findItem(projectRef.current, focusItemId) : null;
+    if (found) seek(found.item.start);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- une fois, à l'ouverture
+  }, []);
+
+  // ─── Droits des musiques ───────────────────────────────────────
+  const musicTracks = useMusicRights();
+  const rightsWarnings = useMemo(
+    () => new Map(projectRightsWarnings(project, musicTracks ?? []).map((warning) => [warning.item.id, warning])),
+    [project, musicTracks]
+  );
+  /** Son dont on remplace le morceau : le panneau Musique choisit alors le remplaçant. */
+  const [replacingId, setReplacingId] = useState<string | null>(null);
+  useEffect(() => {
+    if (panel !== "music") setReplacingId(null);
+  }, [panel]);
 
   // ─── Modifications ─────────────────────────────────────────────
   const addSource = useCallback(
@@ -603,7 +626,25 @@ function Editor({ initial }: { initial: ClipProject }) {
                     onAddActor={(kind: ActorKind) => addIllustration(createActor(kind, illustrateContext()))}
                   />
                 )}
-                {panel === "music" && <MusicPanel onAdd={addMusic} />}
+                {panel === "music" && (
+                  <MusicReplaceFrame
+                    replacing={replacingId ? findItem(project, replacingId)?.item ?? null : null}
+                    onCancel={() => setReplacingId(null)}
+                  >
+                    <MusicPanel
+                      onAdd={(source) => {
+                        const target = replacingId ? findItem(projectRef.current, replacingId)?.item : null;
+                        if (target?.type !== "audio") return addMusic(source);
+                        // Calculé ici, comme une duplication : l'identifiant du remplaçant doit être connu pour le sélectionner.
+                        const result = replaceMusic(projectRef.current, target.id, source);
+                        commit(() => result.project);
+                        setReplacingId(null);
+                        // Le remplaçant reprend la sélection : l'inspecteur dit s'il est libre.
+                        if (result.itemId) setSelectedId(result.itemId);
+                      }}
+                    />
+                  </MusicReplaceFrame>
+                )}
                 {panel === "assistant" && <AssistantPanel state={assistant} project={project} frame={frame} selectedId={selectedId} onFocus={focusChange} />}
                 {panel === "voice" && (
                   <VoicePanel
@@ -676,6 +717,11 @@ function Editor({ initial }: { initial: ClipProject }) {
                     onPlace={(next, key) => placeItem(selected.id, next, `inspect-${selected.id}-${key}`)}
                     onSeek={seek}
                     palette={boardStyle.palette}
+                    rightsWarning={rightsWarnings.get(selected.id)}
+                    onReplaceMusic={(itemId) => {
+                      setReplacingId(itemId);
+                      setPanel("music");
+                    }}
                     onChangeTrackVoice={setVoiceTrackId}
                     onSetTrackDuck={(trackId, duck, key) => commit((current) => setTrackDuck(current, trackId, duck), `track-${trackId}-${key}`)}
                     onDetachAudio={(videoId) => commit((current) => detachVideoAudio(current, videoId).project)}
@@ -733,6 +779,7 @@ function Editor({ initial }: { initial: ClipProject }) {
           onChangeTrackVoice={setVoiceTrackId}
           onDetachAudio={(videoId) => commit((current) => detachVideoAudio(current, videoId).project)}
           onReattachAudio={reattachAudio}
+          rightsWarnings={rightsWarnings}
         />
       </div>
       <TrackVoiceDialog
@@ -797,6 +844,31 @@ function IconButton({
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
+  );
+}
+
+/**
+ * Panneau Musique ouvert depuis l'inspecteur pour remplacer un morceau : une
+ * ligne au-dessus dit lequel, le morceau choisi prend sa place au lieu de
+ * s'ajouter.
+ */
+function MusicReplaceFrame({ replacing, onCancel, children }: { replacing: ClipItem | null; onCancel: () => void; children: React.ReactNode }) {
+  const name = replacing?.type === "audio" ? replacing.label || replacing.source.name : null;
+  // Même arbre avec ou sans la ligne : le panneau garde son onglet et sa liste.
+  return (
+    <div className="flex h-full min-w-0 flex-col">
+      {name ? (
+        <div className="flex min-w-0 shrink-0 items-center gap-2 border-b px-3 py-2 text-xs">
+          <p className="min-w-0 flex-1 truncate" title={`Choisissez le morceau qui remplacera « ${name} »`}>
+            Remplace «&nbsp;{name}&nbsp;»
+          </p>
+          <Button variant="ghost" size="sm" className="h-7 shrink-0 px-2 text-xs" onClick={onCancel}>
+            Annuler
+          </Button>
+        </div>
+      ) : null}
+      <div className="min-h-0 flex-1">{children}</div>
+    </div>
   );
 }
 

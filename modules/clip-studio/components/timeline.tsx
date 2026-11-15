@@ -19,6 +19,7 @@ import {
   Plus,
   Scissors,
   Shapes,
+  ShieldAlert,
   Trash2,
   Type,
   Unlink2,
@@ -60,6 +61,8 @@ import { ShotFxMarker } from "./scene-fx";
 import type { ClipItem, ClipProject, ShotEffect, Track, VisualItem } from "../engine/types";
 import { isVoiceItem } from "../engine/revoice";
 import { keyFrames, keysByArrival, keySummary, moveKeyTo, removeKey } from "../engine/key-edit";
+import { rightsTooltip, type ProjectRightsWarning } from "../lib/rights-warnings";
+import { rightsToneClass } from "./music-rights";
 
 export const MEDIA_DRAG_TYPE = "application/x-clip-media";
 
@@ -104,6 +107,8 @@ interface TimelineProps {
   onDetachAudio?: (videoId: string) => void;
   /** Rattache un son détaché à sa vidéo (depuis l'un ou l'autre). */
   onReattachAudio?: (itemId: string) => void;
+  /** Musiques de la banque en cause, par identifiant d'élément : un repère sur leur bloc. */
+  rightsWarnings?: ReadonlyMap<string, ProjectRightsWarning>;
 }
 
 type Drag =
@@ -941,6 +946,7 @@ function TimelineItem({
   const partner = item.type === "video" || item.type === "audio" ? linkedItem(props.project, item) : null;
   const linkedAudio = item.type === "audio" && partner !== null;
   const videoSound = item.type === "video" && item.source.hasAudio !== false && !item.audioLinkId;
+  const rightsWarning = item.type === "audio" ? props.rightsWarnings?.get(item.id) : undefined;
   // Images clés : un losange à l'instant où chacune arrive, un trait fin pour son mouvement.
   const keys = item.type !== "audio" && width >= 24 ? keysByArrival(item) : [];
   /** Image clé visée par le dernier clic droit, pour la retirer depuis le menu. */
@@ -1024,6 +1030,12 @@ function TimelineItem({
             {itemLabel(item)}
           </span>
           {(item.type === "video" || linkedAudio) && <SoundBadges item={item} linked={partner !== null} />}
+          {rightsWarning && (
+            // Morceau revendiqué, retiré ou à risque : l'inspecteur en dit plus et propose de le remplacer.
+            <span role="img" aria-label={rightsTooltip(rightsWarning)} title={rightsTooltip(rightsWarning)} className={cn("relative flex shrink-0", !linkedAudio && "ml-auto")}>
+              <ShieldAlert aria-hidden className={cn("h-3.5 w-3.5", rightsToneClass(rightsWarning.state))} />
+            </span>
+          )}
           {showAnimHandles && inWidth > 0 && (
             <span
               data-anim-edge="in"

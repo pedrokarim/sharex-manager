@@ -6,7 +6,7 @@
  */
 
 import type { Connector } from "../../types";
-import { deleteVideo, fetchChannelProfile, listUploads, setChannelBanner, setChannelWatermark, updateVideo, videoProcessing } from "./api";
+import { HEALTH_BATCH, deleteVideo, fetchChannelProfile, listUploads, readPublicationHealth, setChannelBanner, setChannelWatermark, updateVideo, videoProcessing } from "./api";
 import { YOUTUBE_PUBLISH_FIELDS, normalizeYoutubeOptions, type YoutubeOptions } from "./metadata";
 import { youtubeQuota } from "./quota";
 import { uploadVideo } from "./upload";
@@ -142,6 +142,8 @@ export const youtubeConnector: Connector = {
     channelVideos: fetchChannelVideos,
     costPerChannel: youtubeChannelCost,
   },
+  // Santé d'une vidéo publiée (refus, blocage par pays) : `videos.list`, 1 unité par lot de 50.
+  health: { maxBatch: HEALTH_BATCH, read: readPublicationHealth },
   posts: {
     list: (context) => listUploads(context),
     update: updateVideo,
