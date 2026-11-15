@@ -1002,6 +1002,15 @@ politique complète se trouve dans [`docs/versioning.md`](docs/versioning.md).
 
 ### Changed
 
+- Barre latérale : le lien de la page courante est marqué, avec le module
+  d’une sous-page `/m/<module>/…`, et sa section s’ouvre d’elle-même ; les
+  autres sections restent comme on les a laissées. Les modules passent juste
+  sous « Mon espace » (titre qui remplace « Galerie », déjà le nom du premier
+  lien), avant l’administration, repliée tant qu’on n’est pas sur une de ses
+  pages. Chaque flèche dit ce qu’elle ouvre (« Afficher les pages de Clip
+  Studio ») et offre 32 px à toucher sur téléphone. En français, « Uploads »,
+  « Logs » et « Feedback » deviennent « Envois », « Journaux » et « Avis ».
+  Le groupe Albums, Tags et Collections s’appelle « Organisation ».
 - Docker : l’image d’exécution installe `libstdc++6` et `libgomp1`, dont
   dépend whisper.cpp (transcription locale de Clip Studio).
 - Clip Studio, sous-titres mot à mot : des mots peuvent être mis en valeur

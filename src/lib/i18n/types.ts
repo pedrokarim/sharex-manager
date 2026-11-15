@@ -2,12 +2,15 @@ import { Language } from "../atoms/preferences";
 
 export type TranslationKey = string;
 
+/** Une valeur peut aussi être une liste (puces, étapes d'un guide…). */
+export type TranslationValue = string | NestedTranslations | TranslationValue[];
+
 export type NestedTranslations = {
-  [key: string]: string | NestedTranslations;
+  [key: string]: TranslationValue;
 };
 
 export type Translations = {
-  [key: string]: string | NestedTranslations;
+  [key: string]: TranslationValue;
 };
 
 export type LocaleData = {

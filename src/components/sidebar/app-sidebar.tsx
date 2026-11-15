@@ -1,6 +1,6 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 import {
   Home,
   Image as ImageIcon,
@@ -39,14 +39,23 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import type { ModuleNavEntry } from "@/lib/modules/nav-items";
 import { resolveIcon } from "@/lib/utils/resolve-icon";
 
-import { NavMain } from "./nav-main";
+import { NavMain, type NavMenuItem } from "./nav-main";
 import { NavSecondary } from "./nav-secondary";
 import { NavUser, type NavUserData } from "./nav-user";
 import { ThemeToggle } from "../theme-toggle";
+import {
+  activeSectionIds,
+  collectHrefs,
+  findActiveHref,
+  linkSectionId,
+  openSections,
+  type NavSection,
+} from "./nav-state";
 import {
   Sidebar,
   SidebarContent,
@@ -69,6 +78,9 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user: NavUserData;
 }
 
+/** Section du groupe Administration, replié tant qu'on n'est pas sur une page d'admin. */
+const ADMIN_SECTION_ID = "group:admin";
+
 export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSidebarProps) {
   const { t } = useTranslation();
 
@@ -90,7 +102,6 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
         title: t("sidebar.main.gallery"),
         url: "/gallery",
         icon: ImageIcon,
-        isActive: true,
         items: [
           {
             title: t("sidebar.main.recent"),
@@ -191,8 +202,8 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
         ],
       },
     ],
-    // À plat : la section s'appelle déjà « Administration », chaque page y a
-    // son entrée. Aucune de ces pages n'a de sous-page, donc pas de sous-menu.
+    // À plat sous le titre « Administration », qui replie le groupe entier.
+    // Aucune de ces pages n'a de sous-page, donc pas de sous-menu.
     navAdmin: [
       {
         title: t("sidebar.admin.overview"),
@@ -273,6 +284,45 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
     ],
   };
 
+  // Modules d'abord, puis la passerelle vers les outils annexes.
+  const navModules: NavMenuItem[] = [...moduleMenuItems, ...data.navOther];
+  const navAdmin: NavMenuItem[] = isAdmin ? data.navAdmin : [];
+
+  // Sections repliables : chaque lien à sous-liens, et le groupe Administration.
+  const sections: NavSection[] = [
+    ...[...data.navMain, ...navModules]
+      .filter((item) => item.items?.length)
+      .map((item) => ({ id: linkSectionId(item.url), links: [item] })),
+    ...(isAdmin ? [{ id: ADMIN_SECTION_ID, links: navAdmin }] : []),
+  ];
+
+  const pathname = usePathname();
+  const search = useSearchParams()?.toString() ?? "";
+  const activeHref = findActiveHref(
+    collectHrefs([...data.navMain, ...navModules, ...navAdmin, ...data.navSecondary]),
+    pathname,
+    search,
+  );
+  const sectionsToOpen = activeSectionIds(sections, activeHref);
+
+  // Fermées par défaut, sauf celle de la page courante. À chaque arrivée sur
+  // une page, sa section s'ouvre ; les autres restent comme on les a laissées.
+  const [openState, setOpenState] = React.useState<Record<string, boolean>>(() =>
+    openSections({}, sectionsToOpen),
+  );
+  const location = `${pathname}?${search}`;
+  const [seenLocation, setSeenLocation] = React.useState(location);
+  if (seenLocation !== location) {
+    setSeenLocation(location);
+    setOpenState((current) => openSections(current, sectionsToOpen));
+  }
+
+  const navSections = {
+    open: openState,
+    onOpenChange: (id: string, open: boolean) =>
+      setOpenState((current) => (current[id] === open ? current : { ...current, [id]: open })),
+  };
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -310,18 +360,30 @@ export function AppSidebar({ isAdmin, moduleNavItems, user, ...props }: AppSideb
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain title={t("sidebar.main.gallery")} items={data.navMain} />
+        {/* Ordre : l'espace personnel, les modules (visibles sans défiler,
+            même sur téléphone), puis l'administration, repliée. */}
+        <NavMain
+          title={t("sidebar.main.workspace")}
+          items={data.navMain}
+          activeHref={activeHref}
+          sections={navSections}
+        />
+        <NavMain
+          title={t("sidebar.main.modules_and_tools")}
+          items={navModules}
+          activeHref={activeHref}
+          sections={navSections}
+        />
         {isAdmin && (
           <NavMain
             title={t("sidebar.admin.administration")}
-            items={data.navAdmin}
+            items={navAdmin}
+            activeHref={activeHref}
+            sections={navSections}
+            groupSectionId={ADMIN_SECTION_ID}
           />
         )}
-        <NavMain
-          title="Autre"
-          items={[...data.navOther, ...moduleMenuItems]}
-        />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavSecondary items={data.navSecondary} activeHref={activeHref} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />

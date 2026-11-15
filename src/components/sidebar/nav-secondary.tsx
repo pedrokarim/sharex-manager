@@ -8,10 +8,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "../ui/sidebar";
-import { useTranslation } from "@/lib/i18n";
 import { LinkPendingIcon } from "@/components/loading";
+
 export function NavSecondary({
   items,
+  activeHref,
   ...props
 }: {
   items: {
@@ -19,17 +20,18 @@ export function NavSecondary({
     url: string;
     icon: LucideIcon;
   }[];
+  /** Adresse du lien qui correspond à la page courante. */
+  activeHref: string | null;
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
-  const { t } = useTranslation();
 
   return (
     <SidebarGroup {...props}>
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild size="sm">
-                <Link href={item.url}>
+            <SidebarMenuItem key={item.url}>
+              <SidebarMenuButton asChild size="sm" isActive={item.url === activeHref}>
+                <Link href={item.url} aria-current={item.url === activeHref ? "page" : undefined}>
                   <LinkPendingIcon>
                     <item.icon />
                   </LinkPendingIcon>
