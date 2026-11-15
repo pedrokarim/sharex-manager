@@ -645,8 +645,8 @@
     "toggle_sidebar": "Afficher ou masquer la barre latérale",
     "mobile_title": "Navigation",
     "mobile_description": "Pages de ShareX Manager",
-    "show_pages": "Afficher les pages de {name}",
-    "hide_pages": "Masquer les pages de {name}",
+    "show_pages": "Déplier « {name} »",
+    "hide_pages": "Replier « {name} »",
     "main": {
       "workspace": "Mon espace",
       "modules_and_tools": "Modules et outils",

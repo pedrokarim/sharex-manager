@@ -85,9 +85,9 @@ describe("barre latérale", () => {
     expect(link("Clip Studio")).toHaveAttribute("data-active", "true");
     expect(link("Galerie")).toHaveAttribute("data-active", "false");
 
-    const clipToggle = screen.getByRole("button", { name: "Masquer les pages de Clip Studio" });
+    const clipToggle = screen.getByRole("button", { name: "Replier « Clip Studio »" });
     expect(clipToggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: "Afficher les pages de Galerie" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Déplier « Galerie »" })).toHaveAttribute(
       "aria-expanded",
       "false",
     );
@@ -111,7 +111,7 @@ describe("barre latérale", () => {
     const view = renderSidebar();
 
     // Galerie ouverte d'elle-même ; on la referme, puis on va en admin.
-    await user.click(screen.getByRole("button", { name: "Masquer les pages de Galerie" }));
+    await user.click(screen.getByRole("button", { name: "Replier « Galerie »" }));
     nav.pathname = "/admin/logs";
     await act(async () => {
       view.rerender(
@@ -123,7 +123,7 @@ describe("barre latérale", () => {
 
     expect(screen.getByRole("button", { name: "Administration" })).toHaveAttribute("aria-expanded", "true");
     expect(link("Journaux")).toHaveAttribute("data-active", "true");
-    expect(screen.getByRole("button", { name: "Afficher les pages de Galerie" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Déplier « Galerie »" })).toHaveAttribute(
       "aria-expanded",
       "false",
     );
